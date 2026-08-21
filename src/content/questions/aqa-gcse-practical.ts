@@ -1,0 +1,732 @@
+// Authored AQA GCSE practical and applied-question bank.
+import { defineQuestions } from "./authoring";
+
+const BIOLOGY = "aqa-gcse-biology";
+const CHEMISTRY = "aqa-gcse-chemistry";
+const MATHS = "aqa-gcse-maths";
+const PHYSICS = "aqa-gcse-physics";
+
+const metadata = {
+  source: "authored" as const,
+  verification: "checked" as const,
+  reviewer: "authored/AQA-2024-v1-review",
+  lastChecked: "2026-08-18",
+  specVersion: "2024-1.0",
+};
+
+export const aqaGcsePracticalQuestions = defineQuestions([
+  {
+    ...metadata,
+    slug: "aqa-gcse-biology-practical-microscopy",
+    subjectId: BIOLOGY,
+    topics: ["cell-structure"],
+    kind: "structured",
+    stem: "A student uses an eyepiece graticule to measure onion epidermal cells with a light microscope.",
+    difficulty: 3,
+    calculator: false,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe how the student calibrates the eyepiece graticule before measuring the cells.",
+        marks: 3,
+        scheme: [
+          "Places a stage micrometer on the microscope stage",
+          "Aligns the eyepiece and stage scales at the same magnification",
+          "Calculates the value of one graticule division and repeats for each magnification used",
+        ],
+        specPointIds: ["aqa-gcse-biology.cell-structure.sp-03"],
+        learningClaims: [
+          "use a stage micrometer to calibrate an eyepiece graticule",
+          "align microscope scales at the same magnification",
+          "calculate the value of one graticule division",
+        ],
+        answer: "Place a stage micrometer on the stage and view it with the eyepiece graticule. Align the two scales at the same magnification, then use the known stage distance to calculate the value of one graticule division. Recalibrate if the magnification changes.",
+      },
+      {
+        prompt: "An image of a cell is 0.24 mm wide and the actual cell is 60 μm wide. Calculate the magnification.",
+        marks: 2,
+        scheme: [
+          "Converts 0.24 mm to 240 μm",
+          "Magnification = 240 ÷ 60 = 4×",
+        ],
+        specPointIds: ["aqa-gcse-biology.cell-structure.sp-03"],
+        learningClaims: [
+          "convert image and actual sizes to the same unit",
+          "calculate magnification from image size and actual size",
+        ],
+        answer: "0.24 mm = 240 μm. Magnification = image size ÷ actual size = 240 ÷ 60 = 4×.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-biology-practical-osmosis",
+    subjectId: BIOLOGY,
+    topics: ["membranes-transport"],
+    kind: "structured",
+    stem: "Students investigate osmosis using equal lengths of Visking tubing filled with sucrose solutions of different concentrations.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Identify the independent variable, dependent variable and one control variable.",
+        marks: 3,
+        scheme: [
+          "Independent variable is sucrose concentration or water potential",
+          "Dependent variable is change in mass or percentage change in mass",
+          "A control variable is tubing length, solution volume, temperature or time",
+        ],
+        specPointIds: ["aqa-gcse-biology.membranes-transport.sp-05"],
+        learningClaims: [
+          "identify the independent variable in an osmosis investigation",
+          "identify the dependent variable in an osmosis investigation",
+          "select a relevant control variable",
+        ],
+        answer: "The independent variable is the sucrose concentration or water potential. The dependent variable is the change, preferably percentage change, in mass. A control variable could be the length of tubing, volume of solution, temperature or time.",
+      },
+      {
+        prompt: "Give three improvements that would make the results more reliable and valid.",
+        marks: 3,
+        scheme: [
+          "Blots the outside of every tube in the same way before weighing",
+          "Repeats each concentration and calculates a mean, ignoring justified anomalies",
+          "Uses equal tubing dimensions and equal solution volumes at a constant temperature and time",
+        ],
+        specPointIds: ["aqa-gcse-biology.membranes-transport.sp-05"],
+        learningClaims: [
+          "remove surface liquid consistently before measuring mass",
+          "use repeats and a mean to improve reliability",
+          "control tubing dimensions, volume, temperature and time",
+        ],
+        answer: "Blot each tube consistently before weighing, repeat every concentration and calculate a mean, and keep the tubing dimensions, solution volumes, temperature and immersion time constant.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-biology-practical-enzyme-rate",
+    subjectId: BIOLOGY,
+    topics: ["enzymes"],
+    kind: "structured",
+    stem: "A student investigates how temperature affects the rate at which catalase breaks down hydrogen peroxide. Oxygen is collected in a gas syringe.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe a valid method for investigating the effect of temperature.",
+        marks: 4,
+        scheme: [
+          "Uses water baths at measured temperatures and allows enzyme and substrate to equilibrate",
+          "Uses the same volumes and concentrations of catalase and hydrogen peroxide each time",
+          "Starts the reaction and records oxygen volume after a fixed time, or calculates an initial rate",
+          "Controls pH, mixes consistently, repeats each temperature and calculates a mean",
+        ],
+        specPointIds: ["aqa-gcse-biology.enzymes.sp-05"],
+        learningClaims: [
+          "equilibrate enzyme and substrate at controlled temperatures",
+          "control volumes and concentrations in an enzyme investigation",
+          "measure oxygen production over a fixed interval",
+          "control pH and use repeats to obtain a mean rate",
+        ],
+        answer: "Place equal volumes and concentrations of catalase and hydrogen peroxide in separate water baths at measured temperatures and allow them to equilibrate. Mix them, immediately collect the oxygen in a gas syringe and record the volume after a fixed time, or calculate an initial rate. Keep pH and mixing constant, repeat each temperature and calculate a mean.",
+      },
+      {
+        prompt: "Explain why the initial rate is usually used rather than the volume of oxygen after a long time.",
+        marks: 2,
+        scheme: [
+          "Substrate concentration falls as the reaction proceeds",
+          "The rate therefore changes, so an early interval gives a fairer comparison of initial enzyme activity",
+        ],
+        specPointIds: ["aqa-gcse-biology.enzymes.sp-05"],
+        learningClaims: [
+          "recognise that substrate concentration falls during a reaction",
+          "use initial rate for a fair comparison between enzyme conditions",
+        ],
+        answer: "The substrate concentration falls during the reaction, so the rate is not constant. Measuring the initial rate compares enzyme activity before substrate depletion has substantially changed the conditions.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-biology-practical-photosynthesis",
+    subjectId: BIOLOGY,
+    topics: ["photosynthesis"],
+    kind: "structured",
+    stem: "A student places pondweed at different distances from a lamp and counts oxygen bubbles released in one minute.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "State the independent variable, dependent variable and two important control variables.",
+        marks: 4,
+        scheme: [
+          "Independent variable is lamp distance or light intensity",
+          "Dependent variable is oxygen bubbles per minute or oxygen volume per minute",
+          "Controls temperature and carbon dioxide concentration",
+          "Also controls pondweed species or length, lamp type and counting time",
+        ],
+        specPointIds: ["aqa-gcse-biology.photosynthesis.sp-05"],
+        learningClaims: [
+          "identify lamp distance or light intensity as the independent variable",
+          "measure oxygen production as the dependent variable",
+          "control temperature and carbon dioxide concentration",
+          "control plant material, lamp type and measurement time",
+        ],
+        answer: "The independent variable is lamp distance or the resulting light intensity. The dependent variable is oxygen bubbles or oxygen volume per minute. Temperature and carbon dioxide concentration must be controlled; plant length/species, lamp type and counting time should also be kept constant.",
+      },
+      {
+        prompt: "The oxygen counts at one distance are 42, 39 and 45 bubbles per minute. Calculate the mean and state why repeats are useful.",
+        marks: 3,
+        scheme: [
+          "Adds the three results to give 126",
+          "Mean = 126 ÷ 3 = 42 bubbles per minute",
+          "Repeats reveal anomalies and improve reliability when a mean is calculated",
+        ],
+        specPointIds: ["aqa-gcse-biology.photosynthesis.sp-05"],
+        learningClaims: [
+          "calculate a mean rate from repeat measurements",
+          "divide the total by the number of valid repeats",
+          "explain how repeats improve reliability and identify anomalies",
+        ],
+        answer: "Mean = (42 + 39 + 45) ÷ 3 = 126 ÷ 3 = 42 bubbles per minute. Repeats allow anomalies to be identified and a mean to be calculated, improving reliability.",
+      },
+    ],
+  },
+
+  {
+    ...metadata,
+    slug: "aqa-gcse-chemistry-practical-titration",
+    subjectId: CHEMISTRY,
+    topics: ["acids-bases"],
+    kind: "structured",
+    stem: "A student determines the concentration of an alkali by titrating it with an acid of known concentration.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe the method for obtaining a reliable titre.",
+        marks: 4,
+        scheme: [
+          "Rinses and fills the burette with the acid, recording the initial reading",
+          "Uses a pipette and safety filler to transfer a measured alkali volume to a conical flask",
+          "Adds a suitable indicator and swirls while adding acid, slowing to dropwise addition near the endpoint",
+          "Repeats until concordant titres are obtained and calculates their mean",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.acids-bases.sp-05"],
+        learningClaims: [
+          "prepare a burette and record an initial reading",
+          "transfer a measured solution safely with a pipette and filler",
+          "add titrant carefully to identify an endpoint",
+          "obtain concordant titres and calculate a reliable mean",
+        ],
+        answer: "Rinse and fill the burette with the acid and record its initial reading. Use a pipette and safety filler to transfer a fixed alkali volume to a conical flask, add a suitable indicator and swirl while adding acid. Add it dropwise near the endpoint. Repeat until concordant titres are obtained and average those titres.",
+      },
+      {
+        prompt: "Explain why the first titration is often treated as a rough titre rather than included in the mean.",
+        marks: 2,
+        scheme: [
+          "It locates the approximate endpoint",
+          "The endpoint may be overshot while the student learns the colour change, so it may not be accurate or concordant",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.acids-bases.sp-05"],
+        learningClaims: [
+          "use a rough titration to locate the endpoint",
+          "exclude an overshot or non-concordant titre from the reliable mean",
+        ],
+        answer: "The rough titration shows approximately where the endpoint occurs. It may be overshot while the endpoint colour is being judged, so it is not necessarily accurate or concordant and is normally excluded from the mean.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-chemistry-practical-rate",
+    subjectId: CHEMISTRY,
+    topics: ["kinetics"],
+    kind: "structured",
+    stem: "Students investigate how hydrochloric acid concentration affects the rate of reaction with magnesium. Hydrogen is collected in a gas syringe.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Give four features of a valid method for comparing the rates.",
+        marks: 4,
+        scheme: [
+          "Uses measured acid volumes and different concentrations",
+          "Uses identical magnesium pieces or equal surface area and mass",
+          "Starts timing when the magnesium is added and measures hydrogen volume at fixed times",
+          "Controls temperature, apparatus and total solution volume, then repeats each concentration",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.kinetics.sp-01"],
+        learningClaims: [
+          "vary acid concentration using measured volumes",
+          "keep magnesium mass and surface area constant",
+          "measure gas volume against time consistently",
+          "control temperature, apparatus and volume and repeat measurements",
+        ],
+        answer: "Use measured acid volumes at different concentrations and identical magnesium pieces, or pieces with the same mass and surface area. Add the magnesium, start the timer and record hydrogen volume at fixed time intervals. Keep temperature, apparatus and total volume constant, and repeat each concentration.",
+      },
+      {
+        prompt: "State two ways of obtaining a rate from the gas-volume results.",
+        marks: 2,
+        scheme: [
+          "Calculate volume of hydrogen produced per unit time over the same early interval",
+          "Plot volume against time and determine the gradient of the initial tangent",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.kinetics.sp-01"],
+        learningClaims: [
+          "calculate an initial gas-production rate over a fixed interval",
+          "use the gradient of a volume-time graph as the initial rate",
+        ],
+        answer: "Use the volume produced per unit time over the same early interval, or plot volume against time and calculate the gradient of the initial tangent.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-chemistry-practical-calorimetry",
+    subjectId: CHEMISTRY,
+    topics: ["energetics"],
+    kind: "calculation",
+    stem: "In a simple calorimetry experiment, 50.0 g of solution warms by 6.2 °C. The specific heat capacity is 4.18 J g⁻¹ °C⁻¹.",
+    difficulty: 3,
+    calculator: true,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Calculate the energy transferred to the solution.",
+        marks: 3,
+        scheme: [
+          "Uses q = mcΔT",
+          "Substitutes 50.0 × 4.18 × 6.2",
+          "q = 1 296 J or 1.30 kJ",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.energetics.sp-05"],
+        learningClaims: [
+          "select q = mcΔT for a calorimetry calculation",
+          "substitute mass, specific heat capacity and temperature change",
+          "report the energy transferred with a suitable unit",
+        ],
+        answer: "q = mcΔT = 50.0 × 4.18 × 6.2 = 1 295.8 J, which rounds to 1.30 kJ.",
+      },
+      {
+        prompt: "Give three changes that would reduce heat loss and improve the experiment.",
+        marks: 3,
+        scheme: [
+          "Use a lid and insulation around the container",
+          "Use a measured thermometer and stir so the solution has a uniform temperature",
+          "Use repeats and a mean, and minimise the time between mixing and reading the maximum temperature",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.energetics.sp-05"],
+        learningClaims: [
+          "reduce heat exchange with a lid and insulation",
+          "measure a uniform solution temperature accurately",
+          "use repeats and minimise heat loss before the maximum reading",
+        ],
+        answer: "Use a lid and insulate the container, stir the solution while measuring its temperature, and repeat the experiment. Take the maximum temperature promptly after mixing so less heat is lost to the surroundings.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-chemistry-practical-chromatography",
+    subjectId: CHEMISTRY,
+    topics: ["spectroscopy"],
+    kind: "structured",
+    stem: "A student separates the dyes in an ink using paper chromatography. The solvent front travels 8.0 cm and one dye travels 3.2 cm.",
+    difficulty: 2,
+    calculator: false,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe two important features of the chromatography setup.",
+        marks: 3,
+        scheme: [
+          "Draws the sample spots on a pencil baseline",
+          "Keeps the solvent below the baseline so the samples do not dissolve directly into it",
+          "Covers the container to allow the chamber to become saturated and uses a small concentrated spot",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.spectroscopy.sp-05"],
+        learningClaims: [
+          "use a pencil baseline for chromatography",
+          "keep the solvent below the sample line",
+          "use a covered chamber and concentrated sample spot",
+        ],
+        answer: "Draw a pencil baseline and place a small concentrated sample spot on it. Put the paper in solvent with the solvent below the baseline, then cover the container so the chamber becomes saturated.",
+      },
+      {
+        prompt: "Calculate the Rf value of the dye.",
+        marks: 2,
+        scheme: [
+          "Uses Rf = distance travelled by dye ÷ distance travelled by solvent",
+          "Rf = 3.2 ÷ 8.0 = 0.40",
+        ],
+        specPointIds: ["aqa-gcse-chemistry.spectroscopy.sp-05"],
+        learningClaims: [
+          "use the Rf definition for chromatography",
+          "calculate an Rf value between zero and one",
+        ],
+        answer: "Rf = distance travelled by dye ÷ distance travelled by solvent = 3.2 ÷ 8.0 = 0.40.",
+      },
+    ],
+  },
+
+  {
+    ...metadata,
+    slug: "aqa-gcse-maths-practical-sampling",
+    subjectId: MATHS,
+    topics: ["statistical-sampling"],
+    kind: "structured",
+    stem: "A school wants to estimate the average time students spend travelling to school. It has 900 students: 360 in Year 10 and 540 in Year 11. A sample of 90 students is needed.",
+    difficulty: 2,
+    calculator: false,
+    aos: ["AO1", "AO3"],
+    parts: [
+      {
+        prompt: "Describe a proportional stratified sampling method for selecting the 90 students.",
+        marks: 4,
+        scheme: [
+          "Select 36 students from Year 10 and 54 from Year 11",
+          "Use a sampling frame containing every student in each year group",
+          "Select students randomly within each year group",
+          "Use the same travel-time question and recording method for every selected student",
+        ],
+        specPointIds: ["aqa-gcse-maths.statistical-sampling.sp-01"],
+        learningClaims: [
+          "allocate a proportional sample between strata",
+          "construct or use a sampling frame",
+          "select observations randomly within each stratum",
+          "collect comparable data from each selected person",
+        ],
+        answer: "Take 360/900 × 90 = 36 students from Year 10 and 540/900 × 90 = 54 from Year 11. Use a complete sampling frame for each year and select the students randomly within their year group. Ask every selected student the same travel-time question and record answers in the same units.",
+      },
+      {
+        prompt: "Explain one source of bias if students volunteer to take part instead.",
+        marks: 2,
+        scheme: [
+          "Students who volunteer may have travel times or opinions that differ from non-volunteers",
+          "The sample may not represent the population, so the estimate can be biased",
+        ],
+        specPointIds: ["aqa-gcse-maths.statistical-sampling.sp-01"],
+        learningClaims: [
+          "identify self-selection as a possible source of bias",
+          "explain how a biased sample affects representativeness",
+        ],
+        answer: "Volunteers may have unusually long or short journeys, or a particular reason for responding. Their results may therefore not represent all students and the estimated average can be biased.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-maths-practical-binomial-quality",
+    subjectId: MATHS,
+    topics: ["distributions"],
+    kind: "calculation",
+    stem: "A quality inspector knows that 10% of components from a production line are faulty. The inspector checks 20 components independently.",
+    difficulty: 3,
+    calculator: true,
+    aos: ["AO2"],
+    parts: [
+      {
+        prompt: "Let X be the number of faulty components. State the distribution of X and calculate P(X = 2).",
+        marks: 3,
+        scheme: [
+          "X ~ B(20, 0.10)",
+          "Uses P(X = 2) = ²⁰C₂(0.10)²(0.90)¹⁸",
+          "P(X = 2) ≈ 0.285",
+        ],
+        specPointIds: ["aqa-gcse-maths.distributions.sp-01"],
+        learningClaims: [
+          "identify a binomial variable and its parameters",
+          "substitute into the binomial probability formula",
+          "evaluate a binomial probability for a quality-control sample",
+        ],
+        answer: "X ~ B(20, 0.10). P(X = 2) = ²⁰C₂(0.10)²(0.90)¹⁸ ≈ 0.285.",
+      },
+      {
+        prompt: "State one condition required for the binomial model to be appropriate.",
+        marks: 1,
+        scheme: ["The trials are independent and have the same probability of a faulty component"],
+        specPointIds: ["aqa-gcse-maths.distributions.sp-01"],
+        learningClaims: ["state independence and constant probability conditions for a binomial model"],
+        answer: "Each component must be an independent trial with the same probability, 0.10, of being faulty.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-maths-practical-light-gates",
+    subjectId: MATHS,
+    topics: ["kinematics"],
+    kind: "calculation",
+    stem: "A trolley travels 0.80 m between two light gates. The measured travel times are 0.40 s, 0.32 s and 0.27 s for three runs.",
+    difficulty: 2,
+    calculator: false,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Calculate the speed for the 0.32 s run and the mean time for the three runs.",
+        marks: 3,
+        scheme: [
+          "Speed = distance ÷ time = 0.80 ÷ 0.32",
+          "Speed = 2.5 m s⁻¹",
+          "Mean time = (0.40 + 0.32 + 0.27) ÷ 3 = 0.33 s",
+        ],
+        specPointIds: ["aqa-gcse-maths.kinematics.sp-02"],
+        learningClaims: [
+          "calculate speed from measured distance and time",
+          "report speed with appropriate units",
+          "calculate a mean from repeated travel times",
+        ],
+        answer: "Speed = 0.80 ÷ 0.32 = 2.5 m s⁻¹. Mean time = (0.40 + 0.32 + 0.27) ÷ 3 = 0.99 ÷ 3 = 0.33 s.",
+      },
+      {
+        prompt: "Explain why the student should repeat the measurement rather than rely on one run.",
+        marks: 2,
+        scheme: [
+          "Repeats reveal random variation or an anomalous result",
+          "A mean gives a more reliable estimate than a single measurement",
+        ],
+        specPointIds: ["aqa-gcse-maths.kinematics.sp-02"],
+        learningClaims: [
+          "use repeats to reveal random variation or anomalies",
+          "use a mean to obtain a more reliable estimate",
+        ],
+        answer: "Repeated runs reveal random variation and possible anomalies. A mean of valid runs is more reliable than relying on one timing.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-maths-practical-balancing-ruler",
+    subjectId: MATHS,
+    topics: ["forces"],
+    kind: "calculation",
+    stem: "A student balances a metre rule on a pivot. A 2.0 N weight acts 0.25 m to the left of the pivot.",
+    difficulty: 2,
+    calculator: false,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "A second weight is placed 0.50 m to the right of the pivot. Calculate its weight when the rule is balanced.",
+        marks: 3,
+        scheme: [
+          "Uses clockwise moment = anticlockwise moment",
+          "2.0 × 0.25 = W × 0.50",
+          "W = 1.0 N",
+        ],
+        specPointIds: ["aqa-gcse-maths.forces.sp-03"],
+        learningClaims: [
+          "equate clockwise and anticlockwise moments in equilibrium",
+          "substitute force and perpendicular distance in a moments equation",
+          "calculate an unknown force from a balancing experiment",
+        ],
+        answer: "For balance, 2.0 × 0.25 = W × 0.50. Therefore W = 0.50 ÷ 0.50 = 1.0 N.",
+      },
+      {
+        prompt: "State one practical precaution that improves the reliability of the balance measurement.",
+        marks: 2,
+        scheme: [
+          "Measure perpendicular distances from the pivot and keep the rule horizontal",
+          "Repeat the balance position or use a knife edge and average readings",
+        ],
+        specPointIds: ["aqa-gcse-maths.forces.sp-03"],
+        learningClaims: [
+          "measure perpendicular distance from a pivot in a moments experiment",
+          "repeat or stabilise a balance measurement to improve reliability",
+        ],
+        answer: "Measure each perpendicular distance from the pivot and keep the rule horizontal. Repeat the balance position, or use a sharp knife edge, and average consistent readings.",
+      },
+    ],
+  },
+
+  {
+    ...metadata,
+    slug: "aqa-gcse-physics-practical-resistance",
+    subjectId: PHYSICS,
+    topics: ["electric-circuits"],
+    kind: "structured",
+    stem: "A student investigates how the resistance of a wire changes as its length increases.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe the circuit and measurement method.",
+        marks: 4,
+        scheme: [
+          "Connects the ammeter in series with the wire and power supply",
+          "Connects the voltmeter in parallel across the test length",
+          "Changes the wire length while keeping the material, cross-sectional area and temperature controlled",
+          "Records V and I for each length and calculates R = V/I, using a low current or switch-off intervals to limit heating",
+        ],
+        specPointIds: ["aqa-gcse-physics.electric-circuits.sp-06"],
+        learningClaims: [
+          "connect an ammeter in series",
+          "connect a voltmeter in parallel across a component",
+          "control wire material, area and temperature while changing length",
+          "calculate resistance from voltage and current while limiting heating",
+        ],
+        answer: "Connect the ammeter in series and the voltmeter in parallel across the measured length of wire. Change only the length, keeping the material, cross-sectional area and temperature controlled. Record voltage and current, calculate R = V/I for each length, and use a low current or switch off between readings to reduce heating.",
+      },
+      {
+        prompt: "For one reading, V = 1.2 V and I = 0.30 A. Calculate the resistance.",
+        marks: 2,
+        scheme: [
+          "Uses R = V/I",
+          "R = 1.2 ÷ 0.30 = 4.0 Ω",
+        ],
+        specPointIds: ["aqa-gcse-physics.electric-circuits.sp-02"],
+        learningClaims: [
+          "use R = V/I for an electrical measurement",
+          "calculate resistance with the correct unit",
+        ],
+        answer: "R = V/I = 1.2 ÷ 0.30 = 4.0 Ω.",
+      },
+      {
+        prompt: "State one improvement for reducing measurement error.",
+        marks: 2,
+        scheme: [
+          "Use a digital voltmeter and ammeter with suitable ranges or repeat readings",
+          "Check the wire temperature and switch off between readings to reduce systematic heating error",
+        ],
+        specPointIds: ["aqa-gcse-physics.electric-circuits.sp-08"],
+        learningClaims: [
+          "choose suitable electrical meters or repeat readings to reduce random error",
+          "reduce heating as a source of systematic error in resistance measurements",
+        ],
+        answer: "Use meters with suitable ranges and repeat each reading, and switch off between measurements so heating does not change the wire resistance.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-physics-practical-specific-heat",
+    subjectId: PHYSICS,
+    topics: ["thermal"],
+    kind: "calculation",
+    stem: "In a specific heat capacity experiment, a 0.50 kg metal block is heated electrically. It receives 9 000 J and its temperature rises by 30 °C.",
+    difficulty: 3,
+    calculator: false,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Calculate the specific heat capacity of the metal, assuming no energy is lost.",
+        marks: 3,
+        scheme: [
+          "Uses Q = mcΔT",
+          "Rearranges to c = Q/(mΔT)",
+          "c = 9 000 ÷ (0.50 × 30) = 600 J kg⁻¹ °C⁻¹",
+        ],
+        specPointIds: ["aqa-gcse-physics.thermal.sp-02"],
+        learningClaims: [
+          "select Q = mcΔT for a specific-heat experiment",
+          "rearrange the equation to calculate specific heat capacity",
+          "report specific heat capacity with a suitable unit",
+        ],
+        answer: "Q = mcΔT, so c = Q/(mΔT) = 9 000/(0.50 × 30) = 600 J kg⁻¹ °C⁻¹.",
+      },
+      {
+        prompt: "Give two changes that would make the measured value more accurate.",
+        marks: 2,
+        scheme: [
+          "Insulate the block and heater to reduce energy transferred to the surroundings",
+          "Measure electrical energy and temperature accurately, allow the block to reach a uniform temperature, and repeat",
+        ],
+        specPointIds: ["aqa-gcse-physics.thermal.sp-02"],
+        learningClaims: [
+          "reduce heat loss from a specific-heat experiment",
+          "measure energy and uniform temperature change accurately and repeat",
+        ],
+        answer: "Insulate the block and heater to reduce heat loss. Measure the electrical energy and temperature accurately, allow the block to reach a uniform temperature and repeat the experiment.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-physics-practical-hookes-law",
+    subjectId: PHYSICS,
+    topics: ["materials"],
+    kind: "structured",
+    stem: "A student investigates the extension of a spring by adding loads and measuring its length.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe three features of a reliable method.",
+        marks: 3,
+        scheme: [
+          "Measures the unloaded length and adds known loads one at a time",
+          "Reads the ruler at eye level after the spring stops moving, using a pointer or fiducial mark",
+          "Repeats readings, removes loads to check return to the original length, and avoids exceeding the elastic limit",
+        ],
+        specPointIds: ["aqa-gcse-physics.materials.sp-05"],
+        learningClaims: [
+          "measure unloaded length and extension for known loads",
+          "avoid parallax when reading a spring length",
+          "repeat measurements and stay within the elastic limit",
+        ],
+        answer: "Measure the unloaded length, then add known loads one at a time and measure the length after the spring stops moving. Read at eye level using a pointer or fiducial mark to avoid parallax. Repeat readings, remove the loads to check the spring returns and do not exceed the elastic limit.",
+      },
+      {
+        prompt: "Explain how a force-extension graph shows the limit of proportionality.",
+        marks: 3,
+        scheme: [
+          "The straight-line section through the origin shows extension proportional to force",
+          "The limit of proportionality is where the graph first starts to curve",
+          "Beyond it, increasing force no longer produces a proportional increase in extension",
+        ],
+        specPointIds: ["aqa-gcse-physics.materials.sp-05"],
+        learningClaims: [
+          "identify proportional behaviour from a straight force-extension graph",
+          "locate the limit of proportionality where the graph curves",
+          "explain why extension is no longer proportional beyond that point",
+        ],
+        answer: "The straight section through the origin shows that extension is proportional to force. The limit of proportionality is where the graph first curves; after this point, equal increases in force no longer produce equal increases in extension.",
+      },
+    ],
+  },
+  {
+    ...metadata,
+    slug: "aqa-gcse-physics-practical-ripple-tank",
+    subjectId: PHYSICS,
+    topics: ["waves"],
+    kind: "calculation",
+    stem: "A student uses a ripple tank to measure the wavelength of water waves. The frequency is 12 Hz and the measured wavelength is 2.5 cm.",
+    difficulty: 2,
+    calculator: false,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Describe how the student could obtain a more reliable wavelength measurement from the tank.",
+        marks: 4,
+        scheme: [
+          "Measures across several wavefront spacings rather than one wavelength",
+          "Divides the total distance by the number of wavelengths",
+          "Uses a still image or stroboscope and reads perpendicular to the wavefronts",
+          "Repeats at the same frequency and calculates a mean while keeping water depth constant",
+        ],
+        specPointIds: ["aqa-gcse-physics.waves.sp-01"],
+        learningClaims: [
+          "measure several wavelengths to reduce percentage uncertainty",
+          "divide total wavefront distance by the number of wavelengths",
+          "use a clear image and a perpendicular measurement direction",
+          "repeat measurements at controlled frequency and water depth",
+        ],
+        answer: "Measure the distance across several wavefront spacings and divide by the number of wavelengths. Use a still image or stroboscope, measure perpendicular to the wavefronts, repeat at the same frequency and calculate a mean. Keep the water depth constant.",
+      },
+      {
+        prompt: "Calculate the wave speed.",
+        marks: 2,
+        scheme: [
+          "Converts 2.5 cm to 0.025 m and uses v = fλ",
+          "v = 12 × 0.025 = 0.30 m s⁻¹",
+        ],
+        specPointIds: ["aqa-gcse-physics.waves.sp-01"],
+        learningClaims: [
+          "convert wavelength to metres and use v = fλ",
+          "calculate wave speed with a suitable unit",
+        ],
+        answer: "λ = 2.5 cm = 0.025 m. v = fλ = 12 × 0.025 = 0.30 m s⁻¹.",
+      },
+    ],
+  },
+]);

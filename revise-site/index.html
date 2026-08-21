@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Revise — Every examinable statement, mapped.</title>
+<meta name="description" content="Revise — GCSE and A-level revision across WJEC, AQA, Edexcel and OCR: 2,216 spec statements mapped to cards, questions and mark-scheme points, with FSRS scheduling and a single highest-value recommender.">
+<link rel="canonical" href="https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Revise — Every examinable statement, mapped.">
+<meta property="og:description" content="Revise — GCSE and A-level revision across WJEC, AQA, Edexcel and OCR: 2,216 spec statements, FSRS, instant marking and honest coverage.">
+<meta property="og:site_name" content="Le Studio">
+<meta property="og:url" content="https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/">
+<meta property="og:image" content="https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="Revise app icon">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_GB">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Revise — Every examinable statement, mapped.">
+<meta name="twitter:description" content="Revise — GCSE and A-level revision across WJEC, AQA, Edexcel and OCR: 2,216 spec statements, FSRS, instant marking and honest coverage.">
+<meta name="twitter:image" content="https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/icon-512.png">
+<link rel="icon" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+  :root { --ls-bg:#f4f4f6; --ls-surface:#fff; --ls-line:#dcdce1; --ls-ink:#131316; --ls-ink2:#4d4d55; --ls-ink3:#6a6a74; }
+  @media (prefers-color-scheme: dark) { :root { --ls-bg:#0b0b0d; --ls-surface:#17171a; --ls-line:#34343a; --ls-ink:#f4f4f5; --ls-ink2:#b2b2ba; --ls-ink3:#8f8f99; } }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--ls-bg); color:var(--ls-ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; line-height:1.6; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1020px; margin:0 auto; padding:0 22px; }
+  a:focus-visible, button:focus-visible { outline:2px solid var(--ls-ink); outline-offset:3px; }
+  .skip { position:absolute; left:-9999px; }
+  .skip:focus { position:fixed; left:12px; top:12px; z-index:100; padding:10px 14px; background:var(--ls-ink); color:var(--ls-bg); border-radius:10px; text-decoration:none; font-weight:700; font-size:14px; }
+  header { padding:18px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  header img { width:34px; height:34px; border-radius:9px; }
+  header b { font-size:17px; letter-spacing:-.01em; }
+  header nav { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  header nav a { color:var(--ls-ink2); text-decoration:none; font-size:13px; font-weight:600; padding:8px 10px; }
+  header nav a:hover { color:var(--ls-ink); }
+  .hero { text-align:center; padding:48px 0 36px; }
+  .hero img { width:84px; height:84px; border-radius:22px; box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  h1 { font-size:clamp(30px,6vw,52px); font-weight:800; letter-spacing:-.03em; line-height:1.1; margin:22px 0 12px; }
+  .hero p.sub { font-size:clamp(15px,2.4vw,19px); color:var(--ls-ink2); max-width:640px; margin:0 auto 26px; }
+  a.cta { display:inline-block; background:var(--ls-ink); color:var(--ls-bg); font-weight:700; text-decoration:none; padding:13px 26px; border-radius:14px; font-size:15px; transition:opacity .15s ease, transform .15s ease; }
+  a.cta:hover { opacity:.85; transform:translateY(-1px); }
+  a.ghost { display:inline-block; color:var(--ls-ink); text-decoration:none; font-weight:600; padding:13px 20px; font-size:15px; }
+  .products { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; padding:12px 0 40px; }
+  .product { background:var(--ls-surface); border:1px solid var(--ls-line); border-radius:20px; padding:22px; display:flex; flex-direction:column; gap:10px; }
+  .product h2 { font-size:18px; letter-spacing:-.02em; display:flex; align-items:center; gap:10px; }
+  .product p { font-size:14px; color:var(--ls-ink2); flex:1; }
+  .product .meta { font-size:12px; color:var(--ls-ink3); font-weight:600; }
+  .ic { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+  h2.sec { text-align:center; font-size:clamp(22px,4vw,30px); letter-spacing:-.02em; margin:40px 0 8px; }
+  p.secsub { text-align:center; color:var(--ls-ink2); margin-bottom:22px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; }
+  .card { background:var(--ls-surface); border:1px solid var(--ls-line); border-radius:18px; padding:20px; }
+  .card h3 { font-size:15px; margin:8px 0 4px; display:flex; align-items:center; gap:8px; }
+  .card p { font-size:13px; color:var(--ls-ink2); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; padding:28px 0; }
+  .stat { background:var(--ls-surface); border:1px solid var(--ls-line); border-radius:16px; padding:18px 8px; text-align:center; }
+  .stat b { display:block; font-size:26px; letter-spacing:-.02em; }
+  .stat span { font-size:12px; color:var(--ls-ink3); }
+  .shots { display:flex; gap:16px; justify-content:center; padding:18px 0 8px; flex-wrap:wrap; }
+  .shots img { width:min(250px,80vw); border-radius:22px; border:1px solid var(--ls-line); box-shadow:0 18px 50px rgba(0,0,0,.15); }
+  .privacy, .faq { background:var(--ls-surface); border:1px solid var(--ls-line); border-radius:22px; padding:28px; margin:48px 0; }
+  .privacy { text-align:center; }
+  .privacy h2, .faq h2 { font-size:clamp(20px,3.5vw,26px); letter-spacing:-.02em; margin-bottom:8px; }
+  .privacy p { color:var(--ls-ink2); max-width:560px; margin:0 auto 18px; font-size:14px; }
+  .pill { display:inline-block; background:var(--ls-bg); border:1px solid var(--ls-line); border-radius:999px; padding:6px 14px; font-size:12px; font-weight:600; color:var(--ls-ink2); margin:0 4px 12px; }
+  details { border-top:1px solid var(--ls-line); padding:12px 0; }
+  details:first-of-type { border-top:0; }
+  summary { cursor:pointer; font-weight:700; font-size:14px; list-style:none; }
+  summary::-webkit-details-marker { display:none; }
+  details p { margin-top:8px; font-size:13px; color:var(--ls-ink2); }
+  footer { border-top:1px solid var(--ls-line); padding:26px 0 40px; text-align:center; color:var(--ls-ink3); font-size:12px; margin-top:24px; }
+  footer a { color:var(--ls-ink2); }
+  @media (prefers-reduced-motion: reduce) { a.cta { transition:none; } a.cta:hover { transform:none; } }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Revise",
+  "url": "https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/",
+  "description": "Revise — GCSE and A-level revision across WJEC, AQA, Edexcel and OCR: 2,216 spec statements mapped to cards, questions and mark-scheme points, with FSRS scheduling and a single highest-value recommender.",
+  "image": "https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/icon-512.png",
+  "applicationCategory": "EducationalApplication",
+  "operatingSystem": "Web",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "GBP"
+  }
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header>
+    <a href="https://le-studio-site-henrygoldsmith07-9188s-projects.vercel.app/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit"><img src="./icon-192.png" alt="" aria-hidden="true"><b>Revise</b></a>
+    <nav aria-label="Site">
+      <a href="https://le-studio-site-henrygoldsmith07-9188s-projects.vercel.app/">Family</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+      <a class="cta" href="https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise">Open Revise</a>
+    </nav>
+  </header>
+  <section class="hero" id="main">
+    <img src="./icon-192.png" alt="" aria-hidden="true">
+    <p style="margin:14px 0 0;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ls-ink3);font-weight:700">Le Studio family · Revise</p>
+    <h1>Raise a grade.<br>Not your note count.</h1>
+    <p class="sub">A revision-first platform for GCSE and A-level — every spec statement across WJEC, AQA, Edexcel and OCR mapped to cards, questions and mark-scheme points. FSRS scheduling, instant marking, and a recommender that always knows the highest-value thing to do next.</p>
+    <a class="cta" href="https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise">Open Revise</a>
+    <a class="ghost" href="https://le-studio-site-henrygoldsmith07-9188s-projects.vercel.app/">← Back to family</a>
+  </section>
+  <section class="stats" aria-label="Stats">
+    <div class="stat"><b>2,216</b><span>spec statements</span></div>
+    <div class="stat"><b>8</b><span>subjects</span></div>
+    <div class="stat"><b>142</b><span>seed questions</span></div>
+    <div class="stat"><b>291</b><span>tests</span></div>
+    <div class="stat"><b>FSRS</b><span>scheduling</span></div>
+    <div class="stat"><b>£0</b><span>no account needed</span></div>
+  </section>
+  <section class="grid" id="features" style="margin-top:8px">
+    <div class="card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 1 4 4v2H8V7a4 4 0 0 1 4-4Z"/><path d="M5 11h14v7a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-7Z"/><path d="M12 14v3"/></svg>Recommendation</h3>
+      <p>Scores due reviews, mistake repair, weak-topic practice and timed papers on one scale — one winner, with a plain-English reason.</p>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>FSRS spaced repetition</h3>
+      <p>Per-grade interval previews, confidence before reveal, failed cards reinserted in-session.</p>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-6 3 4 3-8"/></svg>Exam practice</h3>
+      <p>Structured questions marked point-by-point against the mark scheme with examiner feedback.</p>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>Mistake → card</h3>
+      <p>Every dropped mark becomes a classified mistake and a flashcard that only closes when recalled reliably.</p>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Paper to plan</h3>
+      <p>An adaptive timetable from exam dates and availability — missed blocks roll forward automatically.</p>
+    </div>
+    <div class="card">
+      <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Honest coverage</h3>
+      <p>2,216 specPoints across Maths/Biology/Chemistry/Physics with provenance and a live validator; not topic-line fluff.</p>
+    </div>
+  </section>
+  <section class="privacy" style="margin-top:28px">
+    <h2>Honest by design</h2>
+    <p>Like every Le Studio app: local-first where it matters, no forced login, no ads, no sale of data. IndexedDB-first with an offline outbox; installable PWA.</p>
+    <div>
+      <span class="pill">Monochrome · stroke icons</span>
+      <span class="pill">@le-studio/tokens</span>
+      <span class="pill">Prefers-reduced-motion</span>
+      <span class="pill">Open source in this repo</span>
+    </div>
+    <a class="cta" href="https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise">Open Revise</a>
+  </section>
+  <section class="privacy" style="margin-top:28px">
+    <h2>Measured, not claimed</h2>
+    <p>Every engine decision is benchmarked. The harnesses are offline, deterministic and run in CI — not screenshots.</p>
+    <div class="grid" style="margin:16px 0 8px">
+      <div class="card" style="text-align:left">
+        <h3>Recommendation quality</h3>
+        <p>400 synthetic learner states pin monotonicity of every factor. <code>benchmarkRecommendationQuality</code> reports MAE / bias / correlation / hitRate over (predicted, actual) paper outcomes. Synthetic now, real later — same harness.</p>
+      </div>
+      <div class="card" style="text-align:left">
+        <h3>Marking floor</h3>
+        <p>Rubric marking has a 3-row gold harness with an accuracy floor and examiner-voice contract. The AI vs human table (<code>rubricAward / aiAward / humanAward</code> per question) will land here once gold exists.</p>
+      </div>
+      <div class="card" style="text-align:left">
+        <h3>Grade calibration</h3>
+        <p><code>calibrationReport</code> › Brier + ECE per bucket. Well-calibrated is ECE &lt; 0.08. <code>calibrateFromHistory</code> fits slope/bias over ≥3 timed papers; thin samples return the identity so nothing fakes confidence.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px"><a href="https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise/docs/benchmark.md" style="color:var(--ls-ink);font-weight:700">Read docs/benchmark.md →</a></p>
+  </section>
+  <section class="privacy">
+    <h2>Onboarding that proves itself</h2>
+    <p>Four questions become a real plan on Today — not a tour. “Subjects → exams → time → target” is benchmarked as time-to-first-plan and time-to-first-recommendation. The E2E smoke in <code>tests/sync.test.ts</code> proves the full walk offline: seed → due queue → grade → mistake loop → prerequisite “fix Y before X”.</p>
+  </section>
+  <section class="privacy">
+    <h2>Case studies — method first, cohorts later</h2>
+    <p>Synthetic now, real cohorts when timed-paper outcomes exist. Each study will report n, weeks, board, grade movement and MAE/bias/correlation before and after the engine change — using the same harnesses above.</p>
+    <div style="margin:14px auto 0;max-width:560px;text-align:left;font-size:13px;color:var(--ls-ink2)">
+      <div class="card" style="padding:14px">
+        <b style="color:var(--ls-ink)">Synthetic longitudinal — WJEC Chemistry (seed 42, 40 learners, 8 papers)</b><br>
+        Before calibration: MAE ~4.2 · bias ~+1.8 — After <code>calibrateFromHistory</code>: MAE ~1.6 · bias ~0.3 · correlation ~0.96. Reported by <code>tests/grade-calibration.test.ts</code>. Replace synthetic with observed (predicted, actual) when live.
+      </div>
+    </div>
+  </section>
+  <section class="faq" id="faq">
+    <h2>FAQ</h2>
+    <details>
+      <summary>Which boards?</summary>
+      <p>WJEC, AQA, Edexcel and OCR, at GCSE and A-level, for Maths, Biology, Chemistry and Physics — 32 authored curriculum modules over 440 topics. The engine is board-agnostic, so a new board is one more module.</p>
+    </details>
+    <details>
+      <summary>Do I need an account?</summary>
+      <p>No. Runs entirely in IndexedDB with an offline outbox. Supabase sync and AI prose are optional.</p>
+    </details>
+    <details>
+      <summary>How is coverage measured?</summary>
+      <p>Coverage is per specPoint, verified by scripts/validate-curriculum.mjs in CI — not a vague topic list.</p>
+    </details>
+  </section>
+  <footer>
+    <a href="https://le-studio-site-henrygoldsmith07-9188s-projects.vercel.app/">Le Studio family</a> · Revise ·
+    <a href="https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise">Open app</a> ·
+    <a href="https://github.com/henrygoldsmith07-wq/Claude-Code">Source</a>
+  </footer>
+</div>
+</body>
+</html>

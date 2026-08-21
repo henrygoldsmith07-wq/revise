@@ -1,0 +1,21 @@
+{
+  "name": "Revise — exam revision that knows what to do next",
+  "short_name": "Revise",
+  "description": "Evidence-based revision: spaced repetition, exam-style practice, AI marking and an adaptive plan that rebuilds itself.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f4f6",
+  "theme_color": "#131316",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Review due cards", "url": "/review" },
+    { "name": "Practise questions", "url": "/practice" },
+    { "name": "Today's plan", "url": "/planner" }
+  ]
+}
