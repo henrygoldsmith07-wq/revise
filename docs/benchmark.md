@@ -63,12 +63,18 @@ Revise owns its claims with numbers. This doc records the harnesses, the invaria
 ## Adversarial marking fence (synthetic, deterministic)
 
 Hostile answer categories — fluent nonsense, irrelevant-but-fluent, keyword
-stuffing, contradictions, partial reasoning, alternative notation, spelling
-noise — are generated purely from the authored seed bank and run through the
-shipped rubric marker (`src/domain/marking-adversarial.ts`). Fences: recitation
-never reaches full marks (anti-regurgitation cap), retractions never score full,
-typos cost at most one mark (single-edit token matching), equivalent fractions/
-decimals are credited via maths-equivalence. Pinned by
+stuffing, correct-keywords-wrong-reasoning, contradictions, mixed claims,
+partial reasoning, alternative methods, maths equivalence, scientific
+notation, significant figures, valid-method-wrong-answer, unit mistakes,
+unusual phrasing, grammar errors, student shorthand, bullet points,
+rambling, ambiguous handwriting/transcription, spelling noise and
+diagram-dependent answers — are generated purely from the authored seed bank
+and run through the shipped rubric marker (`src/domain/marking-adversarial.ts`).
+Fences: recitation never reaches full marks (anti-regurgitation cap),
+retractions never score full, typos cost at most one mark (single-edit token
+matching), equivalent fractions/decimals/×10^n forms are credited via
+maths-equivalence and numeric parsing, formatting-only rewrites (bullets,
+grammar, reordered working) mark identically. Pinned by
 `tests/marking-adversarial.test.ts` and rendered live on /benchmarks.
 
 Scheduler calibration also reports a leakage-free holdout view:

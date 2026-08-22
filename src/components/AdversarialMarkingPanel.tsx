@@ -16,15 +16,31 @@ const CATEGORY_HINTS: Record<string, string> = {
   "fluent-nonsense": "prose with zero scheme content",
   "irrelevant-but-fluent": "a fluent answer to a different question",
   "keyword-stuffing": "recited scheme wording",
+  "keywords-wrong-reasoning": "scheme terms, bogus causality",
   contradictory: "correct content, then retracted",
+  "mixed-claims": "one reversed claim in a correct answer",
   "partially-correct": "half the scheme points",
+  "alternative-method": "same working, different order",
   "alternative-notation": "equivalent fraction/decimal forms",
+  "scientific-notation": "3.55 × 10^1 for 35.5",
+  "significant-figures": "values over-rounded to 1 s.f.",
+  "valid-method-wrong-answer": "right route, slipped final value",
+  "unit-mistakes": "J for kJ, cm³ for m³…",
+  "unusual-phrasing": "rhetorical synonym swaps",
+  "grammar-errors": "dropped articles, content intact",
+  "student-shorthand": "note-form abbreviations",
+  "bullet-points": "same content as a list",
+  rambling: "repetition and filler padding",
+  "ambiguous-transcription": "OCR-style garbled words",
   "spelling-noise": "the model answer with typos",
+  "diagram-reference": "'as shown on the diagram' only",
 };
 
 export function AdversarialMarkingPanel() {
+  // Reduced per-category sample so the live table computes quickly in the
+  // browser; CI pins the full-budget run over the whole seed bank.
   const report = useMemo(
-    () => runAdversarialMarkingBenchmark({ questions: seedQuestions }),
+    () => runAdversarialMarkingBenchmark({ questions: seedQuestions, maxCasesPerCategory: 10 }),
     [],
   );
 
@@ -70,7 +86,8 @@ export function AdversarialMarkingPanel() {
           </table>
         </div>
         <p className="text-[11px] text-ink3 mt-3">
-          {report.totalCases} cases · {report.ok ? "all fences hold" : `${report.failedCases} fence failures`} ·{" "}
+          {report.totalCases} cases (live sample of {Math.min(seedQuestions.length, 10)} questions per
+          category; CI runs the full budget) · {report.ok ? "all fences hold" : `${report.failedCases} fence failures`} ·{" "}
           synthetic fixtures generated deterministically from authored seeds ({seedQuestions.length} questions) — not
           human evidence. Source: <code className="font-mono">src/domain/marking-adversarial.ts</code>, pinned by{" "}
           <code className="font-mono">tests/marking-adversarial.test.ts</code>.

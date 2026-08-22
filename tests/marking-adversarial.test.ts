@@ -17,22 +17,38 @@ describe("marking adversarial benchmark", () => {
       "fluent-nonsense",
       "irrelevant-but-fluent",
       "keyword-stuffing",
+      "keywords-wrong-reasoning",
       "contradictory",
+      "mixed-claims",
       "partially-correct",
+      "alternative-method",
       "alternative-notation",
+      "scientific-notation",
+      "significant-figures",
+      "valid-method-wrong-answer",
+      "unit-mistakes",
+      "unusual-phrasing",
+      "grammar-errors",
+      "student-shorthand",
+      "bullet-points",
+      "rambling",
+      "ambiguous-transcription",
       "spelling-noise",
+      "diagram-reference",
     ]);
     for (const category of report.categories) {
-      if (category.id === "alternative-notation") continue; // depends on numeric model answers existing
+      if (["alternative-notation", "scientific-notation", "significant-figures", "valid-method-wrong-answer"].includes(category.id)) {
+        continue; // depend on numeric model answers existing in the sampled bank
+      }
       expect(category.cases).toBeGreaterThan(0);
     }
-    expect(report.totalCases).toBeGreaterThan(50);
+    expect(report.totalCases).toBeGreaterThan(150);
   });
 
   it("is deterministic — identical reports across two runs", () => {
     const again = runAdversarialMarkingBenchmark({ questions: seedQuestions });
     expect(again).toEqual(report);
-  });
+  }, 180_000);
 
   it("never awards full marks for fluent nonsense or off-topic fluency", () => {
     for (const id of ["fluent-nonsense", "irrelevant-but-fluent"] as const) {

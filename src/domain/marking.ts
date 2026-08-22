@@ -89,8 +89,11 @@ function parseScalar(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Extract every number-like token from free text, including fractions and simple exponents. */
-function extractNumbers(text: string): Array<{ raw: string; value: number | null; denom?: number }> {
+/** Extract every number-like token from free text, including fractions, simple exponents and scientific notation. */
+function extractNumbers(input: string): Array<{ raw: string; value: number | null; denom?: number }> {
+  // Normalise unicode super/subscripts so "×10⁻³" reads as "x10-3".
+  const SUPERS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9" };
+  const text = input.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻₀-₉]/g, (ch) => SUPERS[ch] ?? ch);
   const out: Array<{ raw: string; value: number | null; denom?: number }> = [];
   // Fractions first so 1/2 is not read as two scalars.
   for (const m of text.matchAll(/(-?\d+(?:,\d{3})*(?:\.\d+)?)\s*\/\s*(-?\d+(?:,\d{3})*(?:\.\d+)?)/g)) {
@@ -99,11 +102,25 @@ function extractNumbers(text: string): Array<{ raw: string; value: number | null
     const val = num != null && den != null && den !== 0 ? num / den : null;
     out.push({ raw: m[0], value: val });
   }
-  // Remaining scalars (skip those already consumed inside a fraction)
+  // Scientific notation written as "3.55 × 10^1" / "x 10^-3". Only the "×10^exp"
+  // part is consumed: the mantissa stays visible to the plain-scalar path below,
+  // so a scheme expecting "1.32 x 10^-3" still loosely matches "1.32" elsewhere.
+  const consumed: Array<readonly [number, number]> = [];
+  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([x×])\s*10\s*\^?\s*\{?([+-]?\d+)\}?/gi)) {
+    const mantissa = parseScalar(m[1]);
+    const exponent = parseScalar(m[3]);
+    if (mantissa == null || exponent == null) continue;
+    // Consume from the × sign onwards so the mantissa still reaches the plain path.
+    const relSeparator = m[0].search(/[x×]/i);
+    consumed.push([m.index! + relSeparator, m[0].length - relSeparator]);
+    out.push({ raw: m[0], value: mantissa * 10 ** exponent });
+  }
+  // Remaining scalars (skip those already consumed by a fraction or ×10^ tail)
   const fractionSpans = [...text.matchAll(/-?\d+(?:,\d{3})*(?:\.\d+)?\s*\/\s*-?\d+(?:,\d{3})*(?:\.\d+)?/g)].map((m)=> [m.index!, m[0].length] as const);
-  const isInsideFraction = (i: number) => fractionSpans.some(([s,l])=> i >= s && i < s + l);
+  const spans = [...fractionSpans, ...consumed];
+  const isConsumed = (i: number) => spans.some(([s,l])=> i >= s && i < s + l);
   for (const m of text.matchAll(/-?\d+(?:,\d{3})*(?:\.\d+)?(?:e[+-]?\d+)?/gi)) {
-    if (isInsideFraction(m.index!)) continue;
+    if (isConsumed(m.index!)) continue;
     out.push({ raw: m[0], value: parseScalar(m[0]) });
   }
   // Powers written as 2^3 or 2²/³ — normalise to numeric exponent where possible
