@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { isNumericPoint, numericEquivalent, perPointThreshold, pointCoverage } from "./marking";
+import { findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
 import type { Question, QuestionPart } from "./types";
 
@@ -46,7 +47,8 @@ export type WorkedSolutionIssueKind =
   | "missing-model-answer"
   | "missing-mark-scheme"
   | "mark-scheme-gap"
-  | "numeric-mismatch";
+  | "numeric-mismatch"
+  | "unbalanced-equation";
 
 export type WorkedSolutionIssueSeverity = "warning" | "error";
 
@@ -161,6 +163,18 @@ export function validateWorkedSolution(part: QuestionPart): WorkedSolutionValida
     const numericExpected = isNumericPoint(point);
     const numericMatches = !numericExpected || numericEquivalent(point, modelAnswer);
     const score = modelAnswer ? bestWorkedSolutionScore(point, modelAnswer, modelSteps) : 0;
+
+    // Chemistry sanity: an embedded equation whose elements do not balance is
+    // a content-quality warning, not a hard error — the parser only verifies
+    // simple bracket-free equations.
+    for (const bad of findUnbalancedEquations(`${point} ${modelAnswer}`)) {
+      issues.push({
+        kind: "unbalanced-equation",
+        severity: "warning",
+        pointIndex,
+        detail: `Equation does not balance: ${bad}`,
+      });
+    }
 
     if (numericExpected && !numericMatches) {
       issues.push({

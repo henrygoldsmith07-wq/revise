@@ -95,3 +95,37 @@ describe("marking adversarial benchmark", () => {
     expect(report.ok || report.failedCases > 0).toBe(true);
   });
 });
+
+describe("fence sensitivity — mutated markers are caught", () => {
+  // Mutation-style check: deliberately broken markers must trip fences, or
+  // the harness would be decoration that can never fail.
+  const sample = seedQuestions.slice(0, 24);
+
+  it("a marker that awards everything fails loudly", () => {
+    const generous = runAdversarialMarkingBenchmark({
+      questions: sample,
+      marker: (q) => ({ awarded: q.totalMarks, max: q.totalMarks }),
+    });
+    expect(generous.failedCases).toBeGreaterThan(0);
+    expect(generous.ok).toBe(false);
+  });
+
+  it("a marker that awards nothing fails loudly", () => {
+    const stingy = runAdversarialMarkingBenchmark({
+      questions: sample,
+      marker: () => ({ awarded: 0, max: 1 }),
+    });
+    expect(stingy.categories.some((c) => c.id === "partially-correct" && c.failed > 0)).toBe(true);
+  });
+});
+
+describe("performance budget", () => {
+  it("marks adversarial cases at interactive speed", () => {
+    const start = performance.now();
+    const sampled = runAdversarialMarkingBenchmark({ questions: seedQuestions, maxCasesPerCategory: 12 });
+    const elapsedMs = performance.now() - start;
+    expect(sampled.totalCases).toBeGreaterThan(100);
+    // Generous CI headroom: local runs land well under half of this.
+    expect(elapsedMs / sampled.totalCases).toBeLessThan(60);
+  }, 30_000);
+});

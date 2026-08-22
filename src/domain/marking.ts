@@ -40,16 +40,17 @@ export function tokenise(text: string): Set<string> {
   );
 }
 
-/** Bounded edit-distance test (optimal string alignment): true when a and b differ by at most one insertion, deletion, substitution or adjacent transposition. */
-function withinOneEdit(a: string, b: string): boolean {
+/** Bounded edit-distance test (optimal string alignment): true when a and b differ by at most `maxEdits` insertions, deletions, substitutions or adjacent transpositions. */
+function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
   if (a === b) return true;
-  if (Math.abs(a.length - b.length) > 1) return false;
+  if (Math.abs(a.length - b.length) > maxEdits) return false;
   const small = a.length <= b.length ? a : b;
   const large = a.length <= b.length ? b : a;
   let prev2: number[] | null = null;
   let prev = Array.from({ length: small.length + 1 }, (_, i) => i);
   for (let i = 1; i <= large.length; i++) {
     const cur = [i];
+    let rowMin = i;
     for (let j = 1; j <= small.length; j++) {
       const substitution = prev[j - 1] + (large[i - 1] === small[j - 1] ? 0 : 1);
       let best = Math.min(prev[j] + 1, cur[j - 1] + 1, substitution);
@@ -58,18 +59,22 @@ function withinOneEdit(a: string, b: string): boolean {
         best = Math.min(best, (prev2 ? prev2[j - 2] : Number.POSITIVE_INFINITY) + 1);
       }
       cur[j] = best;
+      if (best < rowMin) rowMin = best;
     }
-    if (Math.min(...cur) > 1) return false;
+    if (rowMin > maxEdits) return false;
     prev2 = prev;
     prev = cur;
   }
-  return prev[small.length] <= 1;
+  return prev[small.length] <= maxEdits;
 }
 
 /**
  * 0–1 overlap of a mark-scheme point's content words with the answer.
- * Tokens of five-plus characters also match under a single edit (transposed
- * or mistyped letters), so handwriting noise is not punished as absence.
+ * Tokens match under bounded edit distance: one edit from five characters,
+ * two edits from eight — enough to absorb handwriting noise without
+ * confusing genuinely different words. The two-edit path also requires a
+ * shared three-character prefix so sibling scheme points that happen to
+ * sound alike are not credited by each other.
  */
 export function pointCoverage(point: string, answer: string): number {
   const wanted = [...tokenise(point)];
@@ -78,7 +83,10 @@ export function pointCoverage(point: string, answer: string): number {
   const exact = new Set(given);
   const hits = wanted.filter((w) => {
     if (exact.has(w)) return true;
-    return w.length >= 5 && given.some((g) => g.length >= 5 && withinOneEdit(g, w));
+    if (w.length >= 8 && given.some((g) => g.length >= 8 && g.slice(0, 3) === w.slice(0, 3) && withinEditDistance(g, w, 2))) {
+      return true;
+    }
+    return w.length >= 5 && given.some((g) => g.length >= 5 && withinEditDistance(g, w, 1));
   }).length;
   return hits / wanted.length;
 }
@@ -138,6 +146,80 @@ function numbersClose(a: number, b: number, relEps = 0.01, absEps = 0.005): bool
   return Math.abs(a - b) <= Math.max(absEps, relEps * scale);
 }
 
+// --- unit-aware comparison ----------------------------------------------------
+// A numeric mark point carrying a physical unit only credits an answer whose
+// number sits in the same dimension (SI prefixes convert; J does not become m).
+
+const UNIT_BASE: Record<string, { family: string; factor: number }> = {
+  j: { family: "energy", factor: 1 }, kj: { family: "energy", factor: 1e3 }, mj: { family: "energy", factor: 1e6 },
+  n: { family: "force", factor: 1 }, kn: { family: "force", factor: 1e3 },
+  pa: { family: "pressure", factor: 1 }, kpa: { family: "pressure", factor: 1e3 }, mpa: { family: "pressure", factor: 1e6 },
+  v: { family: "potential", factor: 1 }, mv: { family: "potential", factor: 1e-3 }, kv: { family: "potential", factor: 1e3 },
+  a: { family: "current", factor: 1 }, ma: { family: "current", factor: 1e-3 },
+  w: { family: "power", factor: 1 }, kw: { family: "power", factor: 1e3 },
+  hz: { family: "frequency", factor: 1 },
+  nm: { family: "length", factor: 1e-9 }, um: { family: "length", factor: 1e-6 }, mm: { family: "length", factor: 1e-3 },
+  cm: { family: "length", factor: 0.01 }, m: { family: "length", factor: 1 }, km: { family: "length", factor: 1e3 },
+  mg: { family: "mass", factor: 1e-6 }, g: { family: "mass", factor: 1e-3 }, kg: { family: "mass", factor: 1 },
+  ns: { family: "time", factor: 1e-9 }, ms: { family: "time", factor: 1e-3 }, s: { family: "time", factor: 1 },
+  min: { family: "time", factor: 60 }, hr: { family: "time", factor: 3600 }, h: { family: "time", factor: 3600 },
+  mmol: { family: "amount", factor: 1e-3 }, mol: { family: "amount", factor: 1 },
+  ml: { family: "volume", factor: 1e-6 }, l: { family: "volume", factor: 1e-3 },
+  cm3: { family: "volume", factor: 1e-6 }, dm3: { family: "volume", factor: 1e-3 }, m3: { family: "volume", factor: 1 },
+  "mol/dm3": { family: "concentration", factor: 1 }, "mol/l": { family: "concentration", factor: 1 }, moldm3: { family: "concentration", factor: 1 },
+};
+
+/** Normalised unit attached to a number, or null when none follows it. */
+function unitAfter(text: string, endOfNumber: number): string | null {
+  const rest = text.slice(endOfNumber, endOfNumber + 12);
+  const match = rest.match(/^[ \u00a0]*((?:mol\s*\/\s*(?:dm3|l)|dm3|cm3|m3|[GMkcmnµu]?(?:J|N|Pa|V|A|W|Hz|mol|g|m|s|L|K))[\^]?\{?-?\d\}?|%)/i);
+  if (!match) return null;
+  return match[1].replace(/\s+/g, "").replace(/[\u00b2\u00b3]/g, (d) => (d === "\u00b2" ? "2" : "3")).toLowerCase();
+}
+
+interface UnitHit { value: number; unit: string | null }
+
+function quantities(text: string): UnitHit[] {
+  const out: UnitHit[] = [];
+  for (const m of text.matchAll(/-?\d+(?:,\d{3})*(?:\.\d+)?(?:e[+-]?\d+)?/gi)) {
+    const value = parseScalar(m[0]);
+    if (value == null) continue;
+    out.push({ value, unit: unitAfter(text, m.index! + m[0].length) });
+  }
+  return out;
+}
+
+/**
+ * Pair-level verdict: values close, and when BOTH sides carry units they must
+ * share a dimension — SI prefixes convert ("3500 J" ≡ "3.5 kJ"), cross-family
+ * units block the credit entirely.
+ */
+function quantityPairMatches(wanted: number | null, wantedUnit: string | null, given: number | null, givenUnit: string | null): boolean {
+  if (wanted == null || given == null) return false;
+  if (!numbersClose(wanted, given)) return false;
+  if (wantedUnit && givenUnit) {
+    const bw = UNIT_BASE[wantedUnit];
+    const bg = UNIT_BASE[givenUnit];
+    if (bw && bg) {
+      if (bw.family !== bg.family) return false;
+      if (bw.factor !== bg.factor) return numbersClose(wanted * bw.factor, given * bg.factor);
+    } else if (wantedUnit !== givenUnit) {
+      // Unrecognised-but-different labels are not evidence of equivalence.
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Equality to two significant figures, guarded so distant values cannot round onto each other. */
+function sameToTwoSigFigs(a: number, b: number): boolean {
+  if (a === b) return true;
+  if (a === 0 || b === 0) return false;
+  if (Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b)) > 0.06) return false;
+  return Number(a.toPrecision(2)) === Number(b.toPrecision(2));
+}
+
+
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 function numericMatch(point: string, answer: string): boolean {
   const wanted = extractNumbers(point.replace(/[−–—]/g, "-"));
@@ -148,13 +230,54 @@ function numericMatch(point: string, answer: string): boolean {
   const unicodeFrac: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1/3, "⅔": 2/3 };
   for (const ch of Object.keys(unicodeFrac)) if (answer.includes(ch)) given.push({ raw: ch, value: unicodeFrac[ch] });
   for (const ch of Object.keys(unicodeFrac)) if (point.includes(ch)) wanted.push({ raw: ch, value: unicodeFrac[ch] });
+  // Unit-aware quantities: a value with a unit on one side pairs against the
+  // other side's same-dimension value (prefix-converted) or its bare value.
+  const wantedQuantities = quantities(point);
+  const givenQuantities = quantities(answer);
   for (const w of wanted) {
     if (w.value == null) continue;
     for (const g of given) {
       if (g.value == null) continue;
-      if (numbersClose(w.value, g.value)) return true;
+      if (numbersClose(w.value, g.value)) {
+        // Values are close; the unit gate can still veto cross-family pairs.
+        const qw = wantedQuantities.find((q) => q.value === w.value);
+        const qg = givenQuantities.find((q) => q.value === g.value);
+        if (!qw?.unit || !qg?.unit || quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+      }
       // Exact raw string match as a fallback (covers trailing zeros, etc.)
       if (w.raw === g.raw) return true;
+    }
+  }
+  // Prefix-conversion rescue: "3500 J" vs "3.5 kJ" is close only after conversion.
+  for (const qw of wantedQuantities) {
+    if (!qw.unit) continue;
+    for (const qg of givenQuantities) {
+      if (!qg.unit || qg.value === qw.value) continue;
+      if (quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+    }
+  }
+  // Examiner tolerance: an explicit "(accept X)" or two-significant-figure
+  // equality credits rounded answers without opening the door to distant values.
+  const accept = point.match(/\(accept\s+(-?\d+(?:[.,]\d+)?)\s*\)/i);
+  if (accept) {
+    const alt = Number(accept[1].replace(",", "."));
+    for (const g of given) {
+      const gv = g.value;
+      if (gv == null) continue;
+      if (numbersClose(gv, alt, 0.05, 0.05)) return true;
+    }
+    for (const g of givenQuantities) {
+      if (g.unit == null) continue;
+      if (numbersClose(g.value, alt, 0.05, 0.05)) return true;
+    }
+  }
+  for (const w of wanted) {
+    const wv = w.value;
+    if (wv == null) continue;
+    for (const g of given) {
+      const gv = g.value;
+      if (gv == null) continue;
+      if (sameToTwoSigFigs(wv, gv)) return true;
     }
   }
   return false;
@@ -253,6 +376,31 @@ function explanationFor(
   return "The marking result did not report a decision for this point, and no matching evidence was found.";
 }
 
+/**
+ * Confidence that a rubric mark is correct, derived from the evidence mix:
+ * strong credits are certain, partial-strength credits less so, and a missed
+ * point that still shows partial evidence is the classic ambiguous case.
+ * Null when no evidence exists (MCQs) — those are certain by construction.
+ */
+export function rubricConfidence(marked: MarkedPart[]): number | null {
+  let sum = 0;
+  let n = 0;
+  for (const part of marked) {
+    for (const ev of part.evidence ?? []) {
+      n++;
+      sum +=
+        ev.status === "credited"
+          ? ev.evidenceStrength === "strong"
+            ? 1
+            : 0.6
+          : ev.evidenceStrength === "partial"
+            ? 0.45
+            : 0.95;
+    }
+  }
+  return n ? Math.round((sum / n) * 100) / 100 : null;
+}
+
 /** Build a deterministic explanation for every point reported by a marker. */
 export function evidenceForMarkedPart(
   part: QuestionPart,
@@ -301,12 +449,48 @@ export function withMarkEvidence<T extends { marked: MarkedPart[] }>(
   } as T;
 }
 
+/**
+ * Wrong-reasoning detection: the answer asserts the opposite direction to the
+ * scheme point (scheme says "increases", answer says "decreases") without ever
+ * stating the scheme's own word. Conservative — both-words answers are
+ * contrast structures, not reversals, and are left to coverage.
+ */
+const ANTONYM_STEMS: Array<[string, string]> = [
+  ["increas", "decreas"], ["higher", "lower"], ["more", "less"], ["faster", "slower"],
+  ["greater", "smaller"], ["gain", "lose"], ["absorb", "release"], ["endothermic", "exothermic"],
+  ["longer", "shorter"], ["stronger", "weaker"],
+];
+
+function polarityConflict(point: string, answer: string): boolean {
+  const p = point.toLowerCase();
+  const a = answer.toLowerCase();
+  return ANTONYM_STEMS.some(
+    ([x, y]) =>
+      (p.includes(x) && a.includes(y) && !a.includes(x)) ||
+      (p.includes(y) && a.includes(x) && !a.includes(y)),
+  );
+}
+
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
   const trimmed = (answer ?? "").trim();
   const credited: string[] = [];
   const missed: string[] = [];
+  const givenTokens = new Set(
+    [...tokenise(trimmed)].map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean),
+  );
 
-  for (const point of part.markScheme) {
+  // Scaffolding guard: sibling scheme points often share most vocabulary
+  // ("chlorine is reduced to chloride…" vs "chlorine is oxidised to
+  // chlorate(I)…"). When a point has distinctive tokens — unique to it across
+  // the whole scheme — and the answer contains NONE of them, coverage came
+  // from shared scaffolding alone and cannot credit the point.
+  const pointTokenSets = part.markScheme.map((p) =>
+    new Set([...tokenise(p)].map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean)),
+  );
+  const documentFrequency = new Map<string, number>();
+  for (const set of pointTokenSets) for (const t of set) documentFrequency.set(t, (documentFrequency.get(t) ?? 0) + 1);
+
+  for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
     const cov = pointCoverage(point, trimmed);
     const num = numericMatch(point, trimmed);
@@ -317,7 +501,7 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     const sym = symbolicMatch(trimmed, point);
     const numeric = isNumericPoint(point);
     const strict = Boolean(calibration?.strictNumericPoints && numeric);
-    const ok =
+    let ok =
       sym === "equivalent"
         ? true
         : sym === "not-equivalent"
@@ -327,6 +511,14 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
             : numeric
               ? (num || cov >= thresh)
               : (cov >= thresh || num);
+    if (ok && !num && sym === "unknown") {
+      const discriminative = [...(pointTokenSets[pointIndex] ?? [])].filter(
+        (t) => (documentFrequency.get(t) ?? 0) === 1,
+      );
+      if (discriminative.length >= 1 && !discriminative.some((t) => givenTokens.has(t))) ok = false;
+    }
+    // Reversed reasoning vetoes the point even when its keywords otherwise land.
+    if (ok && sym !== "equivalent" && polarityConflict(point, trimmed)) ok = false;
     (ok ? credited : missed).push(point);
   }
 
@@ -339,29 +531,51 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // keywords it happens to contain.
   if (trimmed.split(/\s+/).length < 3 && part.marks > 1) awarded = Math.min(awarded, 1);
 
-  // Anti-regurgitation: when nearly every content word in the answer is the
-  // scheme's own vocabulary, the response recites rather than engages — an
-  // examiner would cap it below full marks. Genuine answers paraphrase, so
-  // they keep novel wording and are untouched by this guard. Filler words and
-  // stray punctuation do not count as engagement, on either side.
+  // Anti-regurgitation: when almost every content word in the answer comes
+  // from the scheme's own vocabulary, the response recites rather than
+  // engages — an examiner caps it below full marks. Genuine answers
+  // paraphrase, so they keep novel wording. Filler words and stray
+  // punctuation do not count as engagement, on either side. The coverage
+  // ratio also catches numeric-dominant schemes whose verbatim restatement
+  // carries almost no independent wording.
   const stripEdges = (t: string) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
   const contentTokens = [...tokenise(trimmed)].map(stripEdges).filter((t) => t && !STOP_WORDS.has(t));
   if (contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
     const schemeVocabulary = new Set(
       part.markScheme.flatMap((p) => [...tokenise(p)]).map(stripEdges).filter((t) => t && !STOP_WORDS.has(t)),
     );
-    const novelShare = contentTokens.filter((t) => !schemeVocabulary.has(t)).length / contentTokens.length;
-    if (novelShare < 0.1) awarded = part.marks - 1;
+    // Vocabulary membership is fuzzy so a transposed word still counts as
+    // recited — noise must not let a restatement escape the cap.
+    const inSchemeVocabulary = (t: string): boolean => {
+      if (schemeVocabulary.has(t)) return true;
+      if (!t.length) return false;
+      for (const s of schemeVocabulary) {
+        if (Math.abs(s.length - t.length) > 1) continue;
+        if (withinEditDistance(s, t, 1)) return true;
+      }
+      return false;
+    };
+    const coveredShare = contentTokens.filter(inSchemeVocabulary).length / contentTokens.length;
+    if (coveredShare >= 0.92) awarded = part.marks - 1;
   }
 
-  // Explicit self-retraction: an answer that ends by declaring itself wrong
-  // or reversed cannot be worth full marks, whichever way the keywords fall.
-  const finalFragment = trimmed.split(/\.\s+/).pop() ?? "";
-  if (
-    awarded >= part.marks &&
-    part.marks > 1 &&
-    /\b(opposite|reversed|not true|incorrect)\b/i.test(finalFragment)
-  ) {
+  // Explicit self-retraction: an answer whose closing lines declare ITSELF
+  // wrong, reversed or contradicted cannot be worth full marks. A bare
+  // "contradicts …" is how proofs work, so the cue must be self-referential.
+  // Cue words are matched with single-edit tolerance so handwriting noise
+  // cannot silently un-retract an answer ("reversed"→"reversde").
+  const tailFragments = trimmed.split(/\.\s+/).slice(-2);
+  const retractTail = tailFragments.join(". ");
+  const wordsOfTail = retractTail.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 4);
+  const CUE_WORDS = ["opposite", "reversed", "reverse", "incorrect", "wrong", "instead"];
+  const SELF_WORDS = ["answer", "statement", "claim", "assumption", "conclusion", "itself", "initial"];
+  const tailHasCue = CUE_WORDS.some((cue) =>
+    wordsOfTail.some((w) => w === cue || (cue.length >= 5 && withinEditDistance(w, cue, 1)) || (w.startsWith(cue.slice(0, 5)) && Math.abs(w.length - cue.length) <= 2)),
+  );
+  const tailHasSelfRef = SELF_WORDS.some((cue) =>
+    wordsOfTail.some((w) => w === cue || (w.startsWith(cue.slice(0, 4)) && Math.abs(w.length - cue.length) <= 3)),
+  );
+  if (awarded >= part.marks && part.marks > 1 && tailHasCue && tailHasSelfRef) {
     awarded = part.marks - 1;
   }
 

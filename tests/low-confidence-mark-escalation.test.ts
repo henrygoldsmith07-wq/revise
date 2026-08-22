@@ -34,10 +34,13 @@ describe("low-confidence mark escalation", () => {
     });
   });
 
-  it("does not escalate threshold-level or deterministic rubric marks", () => {
+  it("does not escalate threshold-level or evidence-free rubric marks", () => {
     expect(assessLowConfidenceMark({ markedBy: "ai", confidence: LOW_CONFIDENCE_MARK_THRESHOLD }).escalate).toBe(false);
-    expect(assessLowConfidenceMark({ markedBy: "rubric", confidence: 0.1 }).escalate).toBe(false);
+    // No confidence at all (MCQs, full-strength evidence) stays not-required…
     expect(createMarkEscalationRecord(assessLowConfidenceMark({ markedBy: "rubric" }), "2026-08-18T12:00:00.000Z")).toBeUndefined();
+    // …but a rubric mark WITH measured low confidence goes to review like AI.
+    const low = assessLowConfidenceMark({ markedBy: "rubric", confidence: 0.1 });
+    expect(low.escalate).toBe(true);
   });
 
   it("escalates missing AI confidence as urgent and reports queue coverage", () => {

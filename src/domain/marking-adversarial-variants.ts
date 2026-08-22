@@ -44,8 +44,10 @@ export interface AdversarialCategoryReport {
   failures: Array<{ questionId: Id; detail: string }>;
 }
 
-/** Deterministic case budget: every category samples the same first K questions. */
-export const MAX_CASES_PER_CATEGORY = 48;
+/** Deterministic case budget: every category samples the same first K questions
+ *  so runs stay reproducible while covering thousands of variants across the
+ *  21 categories (CI default). The live panel overrides this downward. */
+export const MAX_CASES_PER_CATEGORY = 96;
 
 export function answerFor(question: Question, partId: Id, text: string): Record<Id, string> {
   return { [partId]: text };
@@ -126,15 +128,15 @@ export function partialAnswer(markScheme: string[]): string {
   return markScheme.slice(0, keep).join(". ") + ".";
 }
 
-/** Inject one transposition into every third word of length >= 5. */
+/** Inject one transposition into every fourth word of length >= 6. */
 export function addSpellingNoise(text: string): string {
   const words = text.split(/(\s+)/);
   let contentIndex = -1;
   return words
     .map((word) => {
-      if (/^\s+$/.test(word) || word.length < 5 || !/[a-z]/i.test(word)) return word;
+      if (/^\s+$/.test(word) || word.length < 6 || !/[a-z]/i.test(word)) return word;
       contentIndex++;
-      if (contentIndex % 3 !== 0) return word;
+      if (contentIndex % 4 !== 0) return word;
       const cut = Math.floor(word.length / 2);
       const mid = word.slice(cut - 1, cut + 1);
       return word.slice(0, cut - 1) + mid[1] + mid[0] + word.slice(cut + 1);

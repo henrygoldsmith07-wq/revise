@@ -55,7 +55,10 @@ export function assessLowConfidenceMark(input: LowConfidenceMarkInput): LowConfi
   const confidence = normaliseConfidence(input.confidence);
   const threshold = thresholdOrDefault(input.threshold);
 
-  if (input.markedBy !== "ai") {
+  // Rubric marks are deterministic, but evidence-derived confidence can still
+  // be low (partial-strength credits, missed points showing partial evidence) —
+  // those go to the same review queue. No confidence at all stays not-required.
+  if (input.markedBy !== "ai" && input.confidence == null) {
     return {
       escalate: false,
       status: "not-required",
@@ -64,7 +67,7 @@ export function assessLowConfidenceMark(input: LowConfidenceMarkInput): LowConfi
       target: null,
       confidence,
       threshold,
-      message: "Rubric marking is deterministic and does not need a second-marker escalation.",
+      message: "Rubric marking with full-strength evidence does not need a second-marker escalation.",
     };
   }
 

@@ -82,6 +82,30 @@ Scheduler calibration also reports a leakage-free holdout view:
 the final 30% of reviews, and uses earlier reviews strictly as prediction
 context — so tuning on the full history cannot flatter its own metrics.
 
+## Marker hardening (unit-aware, sig-fig, wrong-reasoning, balancing)
+
+- **Unit-aware numeric matching**: a value carrying a unit only credits a
+  same-dimension value — SI prefixes convert ("3500 J" ≡ "3.5 kJ"), while
+  cross-family units (J vs m) block the credit.
+- **Significant figures / examiner tolerance**: explicit "(accept X)" points
+  and two-significant-figure equality credit rounded answers.
+- **Wrong-reasoning detection**: polarity antagonism ("scheme says increases,
+  answer says decreases") vetoes the point even when keywords land.
+- **Scaffolding guard**: when a point has distinctive tokens unique to it
+  across the scheme and the answer contains none of them, shared vocabulary
+  alone cannot credit it.
+- **Anti-regurgitation cap**: near-total reuse of scheme vocabulary — measured
+  fuzzily, so noise cannot escape — caps recitation below full marks.
+- **Equation balancing** (`equation-balance.ts`): embedded bracket-free
+  equations are element-counted; unbalanced ones raise warning-level answer-key
+  issues in worked-solution validation.
+
+The adversarial suite now generates **~1,450 deterministic variants per run**
+(21 categories × 96 questions) in CI; property-based fuzzing pins bounds and
+determinism invariants over 600 mutated answers, mutation-style checks prove
+broken markers trip fences, and a performance guard keeps marking at
+interactive speed.
+
 ## Grade prediction & confidence calibration
 
 *Source:* `src/domain/grades.ts`, `tests/grade-calibration.test.ts`.

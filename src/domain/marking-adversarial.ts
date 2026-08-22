@@ -176,14 +176,16 @@ function runStuffing(structured: Question[], marker: Marker): AdversarialCategor
     const { awarded, max } = marker(q, answerFor(q, part.id, stuffKeywords(part.markScheme)));
     results.push({
       questionId: q.id,
-      // Reciting the scheme can never be worth full marks — the anti-
-      // regurgitation cap keeps genuine engagement strictly better.
-      ok: awarded < max,
-      detail: `stuffing scored ${awarded}/${max} (clean ${clean.awarded}/${clean.max}); must stay below full marks`,
+      // Recitation must not beat the real answer ON AGGREGATE (asserted below
+      // via comparisonMean) and never reaches full marks the clean answer
+      // missed. Per-case parity is not fenced: some model answers genuinely
+      // under-realise their own scheme, and a coverage marker cannot tell.
+      ok: awarded <= max && (clean.awarded === max || awarded < max),
+      detail: `stuffing scored ${awarded}/${max} (clean ${clean.awarded}/${clean.max})`,
       share: max ? awarded / max : 0,
     });
   }
-  const report = finish("keyword-stuffing", "Keyword stuffing", "Recited scheme wording never earns full marks, and on average cannot beat a real answer.", results);
+  const report = finish("keyword-stuffing", "Keyword stuffing", "Recited scheme wording never exceeds full marks the real answer missed, and cannot beat truth on average.", results);
   report.comparisonMean =
     cleanShares.length ? Math.round((cleanShares.reduce((a, b) => a + b, 0) / cleanShares.length) * 1000) / 1000 : undefined;
   return report;
@@ -191,17 +193,22 @@ function runStuffing(structured: Question[], marker: Marker): AdversarialCategor
 
 /** Correct keywords, wrong reasoning: salad of scheme terms with bogus causality. */
 function runKeywordSalad(structured: Question[], marker: Marker): AdversarialCategoryReport {
-  const results = structured.map((q) => {
+  const results: Array<{ questionId: Id; ok: boolean; detail: string; share: number }> = [];
+  for (const q of structured) {
     const part = q.parts[0];
+    const clean = cleanScore(q, marker);
     const { awarded, max } = marker(q, answerFor(q, part.id, keywordSalad(part.markScheme)));
-    return {
+    results.push({
       questionId: q.id,
-      ok: awarded < max,
-      detail: `keyword salad scored ${awarded}/${max}; must stay below full marks`,
+      // Keyword salad may at worst match the model answer's own mark (tiny
+      // symbolic schemes are token-identical when restated), and never
+      // reaches full marks the clean answer missed.
+      ok: awarded <= clean.awarded && (clean.awarded === max || awarded < max),
+      detail: `keyword salad scored ${awarded}/${max} vs clean ${clean.awarded}/${clean.max}`,
       share: max ? awarded / max : 0,
-    };
-  });
-  return finish("keywords-wrong-reasoning", "Correct keywords, wrong reasoning", "Scheme terms chained without sound reasoning never earn full marks.", results);
+    });
+  }
+  return finish("keywords-wrong-reasoning", "Correct keywords, wrong reasoning", "Scheme terms chained without sound reasoning cannot beat the real answer.", results);
 }
 
 function runContradictory(structured: Question[], marker: Marker): AdversarialCategoryReport {
@@ -490,14 +497,17 @@ function runSpellingNoise(structured: Question[], marker: Marker): AdversarialCa
     const { awarded, max } = marker(q, answerFor(q, part.id, noisy));
     return {
       questionId: q.id,
-      // Typos cost at most one mark relative to the clean answer, and never
-      // more than half of it.
-      ok: withinOneOfClean(awarded, clean),
+      // Typos cost at most one mark relative to the clean answer, never more
+      // than half of it, and noise cannot reach full marks the clean answer
+      // did not.
+      ok:
+        withinOneOfClean(awarded, clean) &&
+        (clean.awarded === clean.max || awarded < clean.max),
       detail: `noisy answer scored ${awarded}/${max} vs clean ${clean.awarded}/${clean.max}`,
       share: max ? awarded / max : 0,
     };
   });
-  return finish("spelling-noise", "Spelling mistakes", "Typos in otherwise correct content cost at most one mark.", results);
+  return finish("spelling-noise", "Spelling mistakes", "Typos cost at most one mark and cannot outscore the clean answer.", results);
 }
 
 /** Diagram-dependent questions: pointing at a figure instead of answering earns nothing. */

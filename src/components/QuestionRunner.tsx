@@ -10,7 +10,7 @@ import {
   scheduleDelayedFarTransfer,
   type DelayedFarTransferRetest,
 } from "@/domain/delayed-far-transfer";
-import { markMcq } from "@/domain/marking";
+import { markMcq, rubricConfidence } from "@/domain/marking";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
 import type { RetestEvaluation } from "@/domain/mistakes";
 import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
@@ -126,9 +126,12 @@ export function QuestionRunner({
     const markedBy: Attempt["markedBy"] = source === "ai" ? "ai" : "rubric";
     const attemptId = crypto.randomUUID();
     const createdAt = new Date().toISOString();
+    // Rubric marks carry evidence-derived confidence too, so genuinely
+    // ambiguous offline marking reaches the same review queue as AI marks.
+    const rubricConf = source === "ai" ? null : rubricConfidence(marked);
     const escalationDecision = assessLowConfidenceMark({
       markedBy,
-      confidence: source === "ai" ? markConfidence : undefined,
+      confidence: source === "ai" ? markConfidence : rubricConf,
     });
     const markEscalation = createMarkEscalationRecord(escalationDecision, createdAt);
     const attempt: Attempt = {
@@ -143,7 +146,7 @@ export function QuestionRunner({
       max: marked.reduce((a, m) => a + m.max, 0),
       feedback,
       markedBy,
-      markConfidence: source === "ai" ? markConfidence ?? undefined : undefined,
+      markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
       markEscalation,
       elapsedMs,
       mode,
