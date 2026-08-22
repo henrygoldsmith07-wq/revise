@@ -33,6 +33,8 @@ describe("offline feedback contracts", () => {
     const sync = read("src/data/sync.ts");
 
     expect(sync).toContain("Promise<{ pulled: number; failed: number }>");
-    expect(sync).toContain("if (failed === 0) await writeReviseMeta(\"lastPullAt\", startedAt);");
+    // The cursor only advances on a fully successful pass, and it advances to
+    // the newest server-authored timestamp observed — never the local clock.
+    expect(sync).toContain('if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseMeta("lastPullAt", maxObservedUpdatedAt);');
   });
 });

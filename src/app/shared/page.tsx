@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { allTopics, topicsFor } from "@/domain/curriculum";
 import { materialiseDeck } from "@/domain/deck-io";
@@ -14,18 +14,23 @@ import { Button, EmptyState, Field, Panel, Pill, SectionHeading } from "@/compon
 // which the browser never sends to a server — so opening someone's link
 // reveals nothing to anyone, and works with the app installed and offline.
 
+// The fragment is only readable on the client. useSyncExternalStore lets the
+// server snapshot be "nothing" while the client reads the live location hash —
+// no effect, no hydration mismatch, no flash of the wrong empty state.
+const NO_SUBSCRIBE = () => () => {};
+const readFragment = () => window.location.hash;
+const noFragment = () => "";
+
 export default function SharedDeckPage() {
   const router = useRouter();
   const store = useStore();
   const subjects = useSubjects();
 
-  // Read the fragment once, lazily, during the first render. An effect would
-  // set state a frame later and flash the "nothing to import" state first.
-  const [deck] = useState<DeckExport | null>(() => {
-    if (typeof window === "undefined") return null;
-    const fragment = window.location.hash.replace(/^#/, "");
-    return fragment ? decodeDeckFromLink(fragment) : null;
-  });
+  const rawFragment = useSyncExternalStore(NO_SUBSCRIBE, readFragment, noFragment);
+  const deck = useMemo<DeckExport | null>(() => {
+    const bare = rawFragment.replace(/^#/, "");
+    return bare ? decodeDeckFromLink(bare) : null;
+  }, [rawFragment]);
   const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
   const [topicId, setTopicId] = useState(topicsFor(subjects[0]?.id ?? "")[0]?.id ?? "");
   const [saved, setSaved] = useState<number | null>(null);

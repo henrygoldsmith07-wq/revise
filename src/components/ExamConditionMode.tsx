@@ -367,11 +367,13 @@ function ExamQuestion({
       <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>
 
       {isMcq ? (
-        <ul className="mt-4 space-y-1.5">
+        <ul className="mt-4 space-y-1.5" role="radiogroup" aria-label="Choose one answer">
           {question.options?.map((option, optionIndex) => (
             <li key={optionIndex}>
               <button
                 type="button"
+                role="radio"
+                aria-checked={choice === optionIndex}
                 disabled={disabled}
                 onClick={() => onChoice(optionIndex)}
                 className={cx(
@@ -380,6 +382,7 @@ function ExamQuestion({
                 )}
               >
                 <span className="text-xs font-semibold text-ink3 mt-0.5">{String.fromCharCode(65 + optionIndex)}</span>
+                {choice === optionIndex ? <span className="sr-only">Selected.</span> : null}
                 <RichText className="text-sm flex-1">{option}</RichText>
               </button>
             </li>

@@ -161,6 +161,8 @@ export function useStore(): StoreValue {
   return value;
 }
 
+let syncInFlight = false;
+
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
@@ -240,7 +242,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   }, []);
 
   const syncNow = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || syncInFlight) return;
+    syncInFlight = true;
     setSyncStatus((s) => ({ ...s, syncing: true }));
     try {
       const result = await sync(userId);
@@ -259,7 +262,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         lastSyncError: error,
       }));
       if (result.pulled > 0) setSnapshot(await repo.loadSnapshot(userId));
-    } catch {
+    } catch (caught) {
+      // Keep a diagnostic trail instead of swallowing the failure: without it,
+      // a permanently broken sync looks identical to a slow one.
+      console.warn("[sync] failed", caught);
       const pending = await outboxSize();
       setSyncStatus((s) => ({
         ...s,
@@ -267,14 +273,17 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         pending,
         lastSyncError: "Sync is unavailable right now. Your data is still saved on this device.",
       }));
+    } finally {
+      syncInFlight = false;
     }
   }, [userId]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !snapshot || !syncStatus.online) return;
-    // Deferred rather than called inline: syncNow sets state, and doing that
-    // synchronously inside an effect cascades an extra render on every mount.
-    const first = setTimeout(() => void syncNow(), 0);
+    // Debounced rather than per-write: snapshot changes on every graded card,
+    // and a full drain+pull cycle per keystroke would hammer the network while
+    // a session runs. The interval covers quiet periods.
+    const first = setTimeout(() => void syncNow(), 5_000);
     const timer = setInterval(() => void syncNow(), 120_000);
     return () => {
       clearTimeout(first);

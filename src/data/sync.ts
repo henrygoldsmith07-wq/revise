@@ -58,6 +58,9 @@ export interface SyncResult {
   skipped?: "unconfigured" | "offline" | "signed-out";
 }
 
+/** After this many failed attempts an outbox item stops blocking the queue. */
+const MAX_OUTBOX_ATTEMPTS = 10;
+
 /** Push the outbox, then pull anything newer from the server. */
 export async function sync(userId: Id): Promise<SyncResult> {
   if (!isSupabaseConfigured) return { pushed: 0, pulled: 0, failed: 0, skipped: "unconfigured" };
@@ -82,9 +85,12 @@ async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number
   let failed = 0;
 
   // Batch by entity so a 200-card session is one request, not 200.
+  // Items past the attempt cap are skipped (kept, never silently dropped)
+  // so one poison payload cannot block every newer change forever.
   const upserts = new Map<SyncEntity, OutboxItem[]>();
   const deletes = new Map<SyncEntity, OutboxItem[]>();
   for (const item of items) {
+    if (item.attempts >= MAX_OUTBOX_ATTEMPTS) continue;
     const bucket = item.op === "delete" ? deletes : upserts;
     const list = bucket.get(item.entity) ?? [];
     list.push(item);
@@ -109,10 +115,19 @@ async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number
   }
 
   for (const [entity, list] of deletes) {
-    const ids = list.map((i) => rowId(i.payload));
+    const ids = [...new Set(list.map((i) => rowId(i.payload)))].filter(Boolean);
+    if (!ids.length) {
+      for (const item of list) await db.delete("outbox", item.id);
+      continue;
+    }
     const { error } = await supabase!.from(TABLES[entity]).delete().in("id", ids);
     if (error) {
       failed += list.length;
+      // Mirror the upsert path: record the failure so it is diagnosable and
+      // the attempt counter can eventually retire the item.
+      for (const item of list) {
+        await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
+      }
       continue;
     }
     pushed += ids.length;
@@ -126,9 +141,12 @@ async function pull(userId: Id): Promise<{ pulled: number; failed: number }> {
   const supabase = getSupabase();
   const db = await getDb();
   const since = (await readReviseMeta<string>("lastPullAt")) ?? "1970-01-01T00:00:00.000Z";
-  const startedAt = new Date().toISOString();
   let pulled = 0;
   let failed = 0;
+  // Advance the cursor to the newest server-authored timestamp actually
+  // observed — comparing against this device's wall clock would permanently
+  // skip rows from any device whose clock runs behind ours.
+  let maxObservedUpdatedAt = since;
 
   for (const [entity, table] of Object.entries(TABLES) as [SyncEntity, string][]) {
     const { data, error } = await supabase!
@@ -149,13 +167,15 @@ async function pull(userId: Id): Promise<{ pulled: number; failed: number }> {
       const existing = await tx.store.get(keyFor(entity, local));
       if (!existing || isNewer(local, existing)) await tx.store.put(local as never);
       pulled++;
+      const rowUpdatedAt = String(row.updated_at ?? "");
+      if (rowUpdatedAt > maxObservedUpdatedAt) maxObservedUpdatedAt = rowUpdatedAt;
     }
     await tx.done;
   }
 
   // Keep the old cursor when a table failed so reconnecting retries that
   // table instead of silently skipping rows that were never pulled.
-  if (failed === 0) await writeReviseMeta("lastPullAt", startedAt);
+  if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseMeta("lastPullAt", maxObservedUpdatedAt);
   return { pulled, failed };
 }
 
@@ -211,11 +231,16 @@ function fromRow(entity: SyncEntity, row: Record<string, unknown>): Record<strin
 }
 
 function isNewer(incoming: Record<string, unknown>, existing: unknown): boolean {
-  const a = String((incoming.updatedAt as string) ?? (incoming.createdAt as string) ?? "");
-  const b = String(
-    ((existing as Record<string, unknown>)?.updatedAt as string) ??
-      ((existing as Record<string, unknown>)?.createdAt as string) ??
-      "",
-  );
-  return a >= b;
+  // Compare as instants: mixed ISO precisions ("…Z" vs "…000Z") order
+  // differently as strings but are identical moments.
+  const timeOf = (row: Record<string, unknown> | undefined): number | null => {
+    if (!row) return null;
+    const raw = (row.updatedAt as string) ?? (row.createdAt as string) ?? "";
+    const ms = Date.parse(raw);
+    return Number.isFinite(ms) ? ms : null;
+  };
+  const a = timeOf(incoming);
+  const b = timeOf(existing as Record<string, unknown>);
+  if (a != null && b != null) return a >= b;
+  return String((incoming.updatedAt as string) ?? "") >= String(((existing as Record<string, unknown>)?.updatedAt as string) ?? "");
 }

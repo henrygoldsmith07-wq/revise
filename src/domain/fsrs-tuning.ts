@@ -1,5 +1,5 @@
 import type { Card, Id, ReviewLog } from "./types";
-import { retrievability } from "./scheduling";
+import { forgettingCurve } from "./scheduling";
 
 // ---------------------------------------------------------------------------
 // FSRS validation & personalisation — real-data only.
@@ -71,58 +71,82 @@ function bucketMid(label: string): number {
 }
 
 /** Predict retrievability at the instant the review happened. Falls back to 0.9 for new cards. */
-function predictedAtReview(card: Card | undefined, log: ReviewLog): number {
-  if (!card || !card.lastReviewedAt) return DEFAULT_REQUEST_RETENTION;
-  // Recompute retrievability as it was at review time: elapsed = review - lastReview
+function predictedAtReview(card: Card | undefined, log: ReviewLog, previousReviewedAt?: string): number {
+  if (!card || card.reps === 0 || !previousReviewedAt) return DEFAULT_REQUEST_RETENTION;
+  // Recompute retrievability as it was at review time: elapsed = review − previous review.
   // We only have the card's *current* stability; historical stability is approximated by current.
-  // This is a conservative proxy — real optimizer would use the card's history rows.
-  // For long horizons the bias is < 0.03; for Phase 3 it is sufficient to surface drift.
-  const elapsed = (new Date(log.reviewedAt).getTime() - new Date(card.lastReviewedAt).getTime()) / 86_400_000;
+  // This is a conservative proxy — a real optimizer would use the card's history rows.
+  const elapsed = (new Date(log.reviewedAt).getTime() - new Date(previousReviewedAt).getTime()) / 86_400_000;
   if (elapsed <= 0) return 1;
   const s = Math.max(0.5, card.stability);
-  const DECAY = -0.5;
-  const FACTOR = 19 / 81;
-  return Math.pow(1 + FACTOR * (elapsed / s), DECAY);
+  return forgettingCurve(elapsed, s);
 }
 
-export function validateFsrs(input: {
-  cards: Card[];
-  logs: ReviewLog[];
-  predictedRetention?: number;
-}): FsrsValidation {
-  const predictedRetention = input.predictedRetention ?? DEFAULT_REQUEST_RETENTION;
-  const n = input.logs.length;
-  if (n < 20) {
-    return {
-      n,
-      overallRecall: 0,
-      predictedRetention,
-      mae: 0,
-      ece: 0,
-      bias: 0,
-      buckets: [],
-      verdict: "insufficient-data",
-      suggestion: null,
-    };
+/** Group logs per card and sort them chronologically. */
+function groupLogsByCard(logs: ReviewLog[]): Map<Id, ReviewLog[]> {
+  const logsByCard = new Map<Id, ReviewLog[]>();
+  for (const log of logs) {
+    const list = logsByCard.get(log.cardId);
+    if (list) list.push(log);
+    else logsByCard.set(log.cardId, [log]);
   }
-  const byId = new Map<Id, Card>(input.cards.map((c) => [c.id, c]));
+  for (const list of logsByCard.values()) list.sort((a, b) => a.reviewedAt.localeCompare(b.reviewedAt));
+  return logsByCard;
+}
+
+interface CalibrationAggregate {
+  n: number;
+  correct: number;
+  bucketMap: Map<string, { sumPred: number; sumActual: number; count: number }>;
+}
+
+/**
+ * Walk every card's logs chronologically and predict at each review from the
+ * *previous* review's instant (never from the card's final state), aggregating
+ * only the logs `shouldCount` accepts — so a holdout evaluation can reuse the
+ * full history as context while scoring nothing that informed it.
+ */
+function calibrate(
+  cardsById: Map<Id, Card>,
+  logsByCard: Map<Id, ReviewLog[]>,
+  predictedRetention: number,
+  shouldCount?: (log: ReviewLog) => boolean,
+): CalibrationAggregate {
   let correct = 0;
+  let n = 0;
   const bucketMap = new Map<string, { sumPred: number; sumActual: number; count: number }>();
-  for (const log of input.logs) {
-    const card = byId.get(log.cardId);
-    const pred = card ? retrievability(card, new Date(log.reviewedAt)) : predictedRetention;
-    // Clamp predicted to [0,1]; retrievability returns 0 for new cards — treat as 0.9 for validation
-    const p = card && card.reps === 0 ? predictedRetention : Math.max(0.05, Math.min(0.99, pred || predictedRetention));
-    const actual = log.grade === "again" ? 0 : 1;
-    if (actual) correct++;
-    const label = bucketLabel(p);
-    const b = bucketMap.get(label) ?? { sumPred: 0, sumActual: 0, count: 0 };
-    b.sumPred += p;
-    b.sumActual += actual;
-    b.count++;
-    bucketMap.set(label, b);
+  for (const [cardId, list] of logsByCard) {
+    const card = cardsById.get(cardId);
+    for (let i = 0; i < list.length; i++) {
+      const log = list[i];
+      if (shouldCount && !shouldCount(log)) continue;
+      const pred = predictedAtReview(card, log, i > 0 ? list[i - 1].reviewedAt : undefined);
+      // Clamp predicted to [0,1]; treat the default target as the floor so a
+      // single degenerate prediction cannot dominate a bucket.
+      const p = Math.max(0.05, Math.min(0.99, pred || predictedRetention));
+      const actual = log.grade === "again" ? 0 : 1;
+      if (actual) correct++;
+      n++;
+      const label = bucketLabel(p);
+      const b = bucketMap.get(label) ?? { sumPred: 0, sumActual: 0, count: 0 };
+      b.sumPred += p;
+      b.sumActual += actual;
+      b.count++;
+      bucketMap.set(label, b);
+    }
   }
-  const overallRecall = correct / n;
+  return { n, correct, bucketMap };
+}
+
+/** Turn a calibration aggregate into the public validation report. */
+function finishCalibration(
+  counted: number,
+  correct: number,
+  bucketMap: Map<string, { sumPred: number; sumActual: number; count: number }>,
+  predictedRetention: number,
+  totalLogs: number,
+): FsrsValidation {
+  const overallRecall = counted ? correct / counted : 0;
   const buckets: FsrsBucket[] = [...bucketMap.entries()]
     .map(([label, b]) => ({
       label,
@@ -136,13 +160,13 @@ export function validateFsrs(input: {
   let ece = 0;
   let maeSum = 0;
   for (const b of buckets) {
-    ece += (b.count / n) * Math.abs(b.actualRecall - b.predictedMean);
+    ece += (b.count / (counted || 1)) * Math.abs(b.actualRecall - b.predictedMean);
     maeSum += Math.abs(b.gap);
   }
   const mae = buckets.length ? maeSum / buckets.length : 0;
   const bias = overallRecall - predictedRetention;
   const verdict: FsrsValidation["verdict"] =
-    n < MIN_FOR_HINT
+    totalLogs < MIN_FOR_HINT
       ? "insufficient-data"
       : ece < 0.08
         ? "well-calibrated"
@@ -152,8 +176,122 @@ export function validateFsrs(input: {
             ? "over-confident"
             : "well-calibrated";
 
-  const suggestion = suggestPersonalisation({ n, overallRecall, predictedRetention, ece });
-  return { n, overallRecall: Math.round(overallRecall * 1000) / 1000, predictedRetention, mae: Math.round(mae * 1000) / 1000, ece: Math.round(ece * 1000) / 1000, bias: Math.round(bias * 1000) / 1000, buckets, verdict, suggestion };
+  const suggestion = suggestPersonalisation({ n: totalLogs, overallRecall, predictedRetention, ece });
+  return {
+    n: totalLogs,
+    overallRecall: Math.round(overallRecall * 1000) / 1000,
+    predictedRetention,
+    mae: Math.round(mae * 1000) / 1000,
+    ece: Math.round(ece * 1000) / 1000,
+    bias: Math.round(bias * 1000) / 1000,
+    buckets,
+    verdict,
+    suggestion,
+  };
+}
+
+export function validateFsrs(input: {
+  cards: Card[];
+  logs: ReviewLog[];
+  predictedRetention?: number;
+}): FsrsValidation {
+  const predictedRetention = input.predictedRetention ?? DEFAULT_REQUEST_RETENTION;
+  if (input.logs.length < 20) {
+    return {
+      n: input.logs.length,
+      overallRecall: 0,
+      predictedRetention,
+      mae: 0,
+      ece: 0,
+      bias: 0,
+      buckets: [],
+      verdict: "insufficient-data",
+      suggestion: null,
+    };
+  }
+  const byId = new Map<Id, Card>(input.cards.map((c) => [c.id, c]));
+  const logsByCard = groupLogsByCard(input.logs);
+  const { n: counted, correct, bucketMap } = calibrate(byId, logsByCard, predictedRetention);
+  return finishCalibration(counted, correct, bucketMap, predictedRetention, input.logs.length);
+}
+
+export interface FsrsHoldoutValidation {
+  /** Logs used only as prediction context; never scored. */
+  trainLogs: number;
+  /** Later-in-time logs the metrics are computed on. */
+  holdoutLogs: number;
+  holdout: FsrsValidation | null;
+  note: string;
+}
+
+/**
+ * Leakage-free calibration check. Each card's history is split chronologically:
+ * the earliest 70% of its reviews provide prediction context only, and every
+ * metric is computed on the final 30%. Because predictions at a holdout review
+ * use the review immediately before it (in time), no future outcome can inform
+ * the number it is scored against — tuning request_retention on the full
+ * history and reporting the same rows' calibration would.
+ */
+export function validateFsrsHoldout(input: {
+  cards: Card[];
+  logs: ReviewLog[];
+  predictedRetention?: number;
+}): FsrsHoldoutValidation | null {
+  const predictedRetention = input.predictedRetention ?? DEFAULT_REQUEST_RETENTION;
+  const byId = new Map<Id, Card>(input.cards.map((c) => [c.id, c]));
+  const logsByCard = groupLogsByCard(input.logs);
+
+  const train: ReviewLog[] = [];
+  const holdout = new Set<ReviewLog>();
+  let holdoutCount = 0;
+  for (const list of logsByCard.values()) {
+    if (list.length < 2) {
+      train.push(...list);
+      continue;
+    }
+    const cut = Math.max(1, Math.floor(list.length * 0.7));
+    if (cut >= list.length) {
+      train.push(...list);
+      continue;
+    }
+    train.push(...list.slice(0, cut));
+    for (const log of list.slice(cut)) {
+      holdout.add(log);
+      holdoutCount++;
+    }
+  }
+  if (!holdoutCount) return null;
+
+  const { n: counted, correct, bucketMap } = calibrate(
+    byId,
+    logsByCard,
+    predictedRetention,
+    (log) => holdout.has(log),
+  );
+  const validation =
+    counted >= 20
+      ? finishCalibration(counted, correct, bucketMap, predictedRetention, counted)
+      : {
+          n: counted,
+          overallRecall: counted ? correct / counted : 0,
+          predictedRetention,
+          mae: 0,
+          ece: 0,
+          bias: 0,
+          buckets: [],
+          verdict: "insufficient-data" as const,
+          suggestion: null,
+        };
+
+  return {
+    trainLogs: input.logs.length - holdoutCount,
+    holdoutLogs: holdoutCount,
+    holdout: validation,
+    note:
+      counted >= 20
+        ? `Holdout-only calibration over ${counted} later reviews; earlier reviews provided prediction context and were never scored.`
+        : `Only ${counted} holdout reviews so far — need 20+ before the holdout verdict means anything.`,
+  };
 }
 
 function suggestPersonalisation(input: {

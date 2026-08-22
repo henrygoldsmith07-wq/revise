@@ -151,16 +151,26 @@ export function previewIntervals(card: Card, now: Date = new Date()): Record<Rec
 }
 
 /**
+ * FSRS forgetting curve: R = (1 + FACTOR * t/S)^DECAY with the v5 constants.
+ * Shared by retrievability, interval previews and FSRS validation so every
+ * surface computes identical predictions.
+ */
+export function forgettingCurve(elapsedDays: number, stabilityDays: number): number {
+  if (elapsedDays <= 0) return 1;
+  const s = Math.max(0.1, stabilityDays);
+  const DECAY = -0.5;
+  const FACTOR = 19 / 81;
+  return Math.pow(1 + FACTOR * (elapsedDays / s), DECAY);
+}
+
+/**
  * Predicted probability the card is still recallable today. FSRS's forgetting
  * curve: R = (1 + FACTOR * t/S)^DECAY with the v5 constants.
  */
 export function retrievability(card: Card, now: Date = new Date()): number {
   if (!card.lastReviewedAt || card.stability <= 0) return 0;
   const elapsedDays = (now.getTime() - new Date(card.lastReviewedAt).getTime()) / 86_400_000;
-  if (elapsedDays <= 0) return 1;
-  const DECAY = -0.5;
-  const FACTOR = 19 / 81;
-  return Math.pow(1 + FACTOR * (elapsedDays / card.stability), DECAY);
+  return forgettingCurve(elapsedDays, card.stability);
 }
 
 export function isDue(card: Card, on: IsoDate = todayIso()): boolean {

@@ -100,11 +100,17 @@ export function placeLabel(round: DiagramRound, hotspotId: Id, label: string): {
   const correct = normalise(hotspot.label) === normalise(label);
   if (!correct) return { round: { ...round, wrong: round.wrong + 1 }, correct: false };
 
+  // Remove a single occurrence: two hotspots may legitimately share a label,
+  // and removing both would leave the second one impossible to complete.
+  const bank = [...round.bank];
+  const at = bank.indexOf(hotspot.label);
+  if (at >= 0) bank.splice(at, 1);
+
   return {
     round: {
       ...round,
       placed: { ...round.placed, [hotspotId]: hotspot.label },
-      bank: round.bank.filter((l) => l !== label),
+      bank,
     },
     correct: true,
   };

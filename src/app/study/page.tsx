@@ -94,7 +94,11 @@ function Study() {
     resumeRequested && store.revisionCheckpoint?.activity === "study" ? store.revisionCheckpoint : null;
   const [resumeQueueIds] = useState<string[] | null>(() => savedCheckpoint?.queueIds ?? null);
 
-  const [mode, setMode] = useState<StudyMode | null>((params.get("mode") as StudyMode) || null);
+  // An unknown ?mode= used to blank the whole page; only accept known modes.
+  const requestedMode = params.get("mode");
+  const [mode, setMode] = useState<StudyMode | null>(
+    MODES.some((m) => m.mode === requestedMode) ? (requestedMode as StudyMode) : null,
+  );
   const [subjectId, setSubjectId] = useState(params.get("subject") ?? "");
   const [topicId, setTopicId] = useState(params.get("topic") ?? "");
   const [query, setQuery] = useState(params.get("q") ?? "");

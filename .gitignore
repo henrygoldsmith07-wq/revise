@@ -6,3 +6,4 @@ out
 next-env.d.ts
 coverage
 public/pdf.worker.min.mjs
+public/docs/

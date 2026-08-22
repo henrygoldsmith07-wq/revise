@@ -24,7 +24,7 @@ export const MIN_ATTEMPTS_FOR_MARKS_PER_HOUR = 6;
 /** True retention measured from review logs over a trailing window. */
 export interface RetentionWindow {
   checkpoint: RetentionCheckpoint;
-  /** Trailing window in days ending today (1: yesterday only, 7: last 7 days, 30: last 30 days). */
+  /** Trailing window in days, ending yesterday (today's reviews measure the same-session memory trace, not retention: 1 → yesterday only, 7 → the 7 days before today, 30 → the 30 days before today). */
   windowDays: number;
   reviews: number;
   recalled: number;
@@ -91,7 +91,9 @@ export function retentionReport(input: {
     const since = isoDateDaysAgo(today, windowDays);
     const inWindow = logs.filter((l) => {
       const d = l.reviewedAt.slice(0, 10);
-      return d > since && d <= today;
+      // Exclude today: reviews minutes apart grade short-term memory and
+      // inflate the checkpoint. Checkpoint N means "the N days before today".
+      return d >= since && d < today;
     });
     const recalled = inWindow.filter((l) => l.grade !== "again").length;
     const retention = inWindow.length ? recalled / inWindow.length : null;

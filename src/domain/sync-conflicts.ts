@@ -30,11 +30,51 @@ export interface Conflict<T extends { id?: Id; userId?: Id; updatedAt: IsoInstan
   explanation: string;
 }
 
+/** Parse an ISO instant; returns NaN for anything unparseable. */
+function instantMs(value: string): number {
+  return Date.parse(String(value));
+}
+
+/**
+ * True when `a` is at or after `b`. Instants are compared as times, not
+ * strings — "…T00:00:00Z" and "…T00:00:00.000Z" are the same moment but
+ * order differently lexicographically.
+ */
 export function isNewerByTimestamp(
   a: { updatedAt: IsoInstant; [k: string]: unknown },
   b: { updatedAt: IsoInstant; [k: string]: unknown },
 ): boolean {
+  const ta = instantMs(a.updatedAt);
+  const tb = instantMs(b.updatedAt);
+  if (Number.isFinite(ta) && Number.isFinite(tb)) return ta >= tb;
   return String(a.updatedAt) >= String(b.updatedAt);
+}
+
+/** Strictly-after variant used for "changed since baseline" checks. */
+function isAfterTimestamp(
+  a: { updatedAt: IsoInstant; [k: string]: unknown },
+  b: { updatedAt: IsoInstant; [k: string]: unknown },
+): boolean {
+  const ta = instantMs(a.updatedAt);
+  const tb = instantMs(b.updatedAt);
+  if (Number.isFinite(ta) && Number.isFinite(tb)) return ta > tb;
+  return String(a.updatedAt) > String(b.updatedAt);
+}
+
+/**
+ * Key-order-independent JSON: logically identical rows must compare equal
+ * regardless of property insertion order.
+ */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v) => {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const obj = v as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(obj).sort()) out[k] = obj[k];
+      return out;
+    }
+    return v;
+  });
 }
 
 /**
@@ -47,12 +87,13 @@ export function detectConflict<T extends { id?: Id; userId?: Id; updatedAt: IsoI
   local: T,
   remote: T,
 ): Conflict<T> | null {
-  if (local.updatedAt === remote.updatedAt && JSON.stringify(local) === JSON.stringify(remote)) {
+  if (local.updatedAt === remote.updatedAt && canonicalJson(local) === canonicalJson(remote)) {
     return null; // identical
   }
+  const hasBaseline = baseline != null;
   const baseTime = baseline?.updatedAt ?? "";
-  const localChanged = baseTime === "" || String(local.updatedAt) > baseTime;
-  const remoteChanged = baseTime === "" || String(remote.updatedAt) > baseTime;
+  const localChanged = !hasBaseline || isAfterTimestamp(local, { updatedAt: baseTime as IsoInstant });
+  const remoteChanged = !hasBaseline || isAfterTimestamp(remote, { updatedAt: baseTime as IsoInstant });
   if (!localChanged && !remoteChanged) return null;
   if (localChanged !== remoteChanged) return null; // only one side changed → fast-forward
 
@@ -152,7 +193,15 @@ export function collapseOutboxById<T extends { id: Id }>(items: Array<{ id: Id; 
   const byId = new Map<Id, { payload: T; queuedAt: IsoInstant }>();
   for (const item of items) {
     const cur = byId.get(item.id);
-    if (!cur || String(item.queuedAt) >= String(cur.queuedAt)) byId.set(item.id, { payload: item.payload, queuedAt: item.queuedAt });
+    if (!cur) {
+      byId.set(item.id, item);
+      continue;
+    }
+    // Later queuedAt wins; compare as instants so mixed precisions order correctly.
+    const ta = Date.parse(String(item.queuedAt));
+    const tb = Date.parse(String(cur.queuedAt));
+    const newer = Number.isFinite(ta) && Number.isFinite(tb) ? ta >= tb : String(item.queuedAt) >= String(cur.queuedAt);
+    if (newer) byId.set(item.id, { payload: item.payload, queuedAt: item.queuedAt });
   }
   return new Map([...byId.entries()].map(([k, v]) => [k, v.payload]));
 }

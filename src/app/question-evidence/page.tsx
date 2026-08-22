@@ -13,7 +13,7 @@ import {
 import { todayIso } from "@/domain/scheduling";
 import { useStore, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
-import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading, StatTile } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar, SectionHeading, StatTile } from "@/components/ui";
 
 const FILTERS: Array<{ value: QuestionEvidenceFilter; label: string }> = [
   { value: "all", label: "All questions" },
@@ -247,11 +247,9 @@ function QuestionEvidenceRecordCard({ record }: { record: QuestionEvidenceRecord
             difficulty {question.difficulty}/5
           </p>
         </div>
-        <Link href={`/practice?question=${encodeURIComponent(question.id)}`}>
-          <Button size="sm" variant="primary">
-            Practise
-          </Button>
-        </Link>
+        <ButtonLink href={`/practice?question=${encodeURIComponent(question.id)}`} size="sm" variant="primary">
+          Practise
+        </ButtonLink>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-xs">

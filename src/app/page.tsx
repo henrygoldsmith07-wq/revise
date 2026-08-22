@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { planForDate } from "@/domain/planner";
 import { todayIso } from "@/domain/scheduling";
 import { useStore } from "@/state/store";
@@ -17,6 +17,9 @@ export default function TodayPage() {
   const store = useStore();
   const today = todayIso();
   const { recommendations, dueCards, mistakes, streak, plannedSessions, settings } = store;
+  // The greeting reads the wall clock, so it can only be computed on the
+  // client — computing it during SSR would hydrate a different string.
+  const greetingLabel = useGreeting();
 
   const [primary] = recommendations;
   const todaysPlan = useMemo(() => planForDate(plannedSessions, today), [plannedSessions, today]);
@@ -28,7 +31,8 @@ export default function TodayPage() {
       <header>
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Today</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">
-          {greeting()}, {settings.displayName}
+          {greetingLabel ? `${greetingLabel}, ` : ""}
+          {settings.displayName}
         </h1>
         <p className="text-sm text-ink3 mt-1">
           {primary
@@ -115,8 +119,21 @@ function StatusLink({
   );
 }
 
-function greeting(): string {
-  const hour = new Date().getHours();
+const NO_SUBSCRIBE = () => () => {};
+let cachedHour: number | null = null;
+function clientHour(): number {
+  if (cachedHour == null) cachedHour = new Date().getHours();
+  return cachedHour;
+}
+function serverHour(): number {
+  return -1;
+}
+
+/** Time-of-day greeting. Reads the wall clock on the client only — the server
+ * snapshot is -1, so both renders agree and hydration stays clean. */
+function useGreeting(): string {
+  const hour = useSyncExternalStore(NO_SUBSCRIBE, clientHour, serverHour);
+  if (hour < 0) return "";
   if (hour < 12) return "Morning";
   if (hour < 18) return "Afternoon";
   return "Evening";

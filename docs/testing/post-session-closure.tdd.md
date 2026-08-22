@@ -42,7 +42,7 @@ surfaces, including the delayed planned-session completion rule.
 
 ## Verification
 
-Run from `apps/revise`:
+Run from the repo root:
 
 ```text
 npm.cmd run type-check

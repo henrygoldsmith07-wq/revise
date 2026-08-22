@@ -62,6 +62,12 @@ export interface LongitudinalStudyReport {
   meanDelayedAccuracy: number | null;
   meanGain: number | null;
   medianGain: number | null;
+  /** Mean gain per hour of recorded revision time; null when minutes unrecorded. */
+  improvementPerHour: number | null;
+  /** Share of all participants who withdrew before the delayed assessment. */
+  dropoutRate: number | null;
+  /** Share of participants past baseline who reached "completed". */
+  completionRate: number | null;
   unseenShare: number | null;
   insufficientData: boolean;
   insufficientReason: string | null;
@@ -117,6 +123,95 @@ export function recordDelayed(study: LongitudinalStudy, assessment: LearnerAsses
   };
 }
 
+export function withdrawStudy(study: LongitudinalStudy, now = new Date()): LongitudinalStudy {
+  const at = now.toISOString();
+  return { ...study, phase: "withdrawn", interventionEnd: study.interventionEnd ?? at, updatedAt: at };
+}
+
+/**
+ * Trial instrumentation for "were recommendations followed?". One event per
+ * recommended slot: `performed` is the activity actually done (null when the
+ * student studied something else / nothing). Pure — studies import their logs.
+ */
+export interface RecommendationFollowEvent {
+  /** Activity id the engine recommended, e.g. "review-due" or "practice-topic". */
+  recommended: string;
+  /** What the student actually did next; null when nothing was recorded. */
+  performed: string | null;
+}
+
+export interface RecommendationFollowRate {
+  measured: number;
+  followed: number;
+  rate: number | null;
+}
+
+export function recommendationFollowRate(events: RecommendationFollowEvent[]): RecommendationFollowRate {
+  const measurable = events.filter((e) => e.recommended);
+  if (!measurable.length) return { measured: 0, followed: 0, rate: null };
+  const followed = measurable.filter((e) => e.performed != null && e.performed === e.recommended).length;
+  return { measured: measurable.length, followed, rate: round(followed / measurable.length, 3) };
+}
+
+function summarise(studies: LongitudinalStudy[], outcomes: LongitudinalOutcome[]): LongitudinalStudyReport {
+  const complete = outcomes.filter((o) => o.baselineAccuracy != null && o.delayedAccuracy != null);
+  const n = complete.length;
+
+  if (n < 5) {
+    return {
+      participants: studies.length,
+      withBaselineAndDelayed: n,
+      meanBaselineAccuracy: null,
+      meanDelayedAccuracy: null,
+      meanGain: null,
+      medianGain: null,
+      improvementPerHour: null,
+      dropoutRate: null,
+      completionRate: null,
+      unseenShare: null,
+      insufficientData: true,
+      insufficientReason: `Only ${n} participants with both baseline and delayed unseen assessment — need 5+ to report learning gain (currently ${studies.length} participants total). Do not claim improvement until real data exists.`,
+      outcomes,
+    };
+  }
+
+  const gains = complete.map((o) => o.gain!);
+  const baselines = complete.map((o) => o.baselineAccuracy!);
+  const delayeds = complete.map((o) => o.delayedAccuracy!);
+  const unseenShare = round(complete.filter((o) => o.isUnseen).length / n, 3);
+
+  // Gain per hour uses only participants that recorded revision time, so an
+  // unrecorded denominator can never inflate the figure.
+  const timed = complete.filter((o) => o.revisionMinutes != null && o.revisionMinutes > 0);
+  let improvementPerHour: number | null = null;
+  if (timed.length >= 5) {
+    const totalHours = timed.reduce((a, o) => a + (o.revisionMinutes! / 60), 0);
+    const totalGain = timed.reduce((a, o) => a + (o.gain ?? 0), 0);
+    improvementPerHour = totalHours > 0 ? round(totalGain / totalHours, 4) : null;
+  }
+
+  const participants = studies.length;
+  const withdrawn = studies.filter((s) => s.phase === "withdrawn").length;
+  const pastBaseline = studies.filter((s) => s.phase !== "baseline").length;
+  const completedCount = studies.filter((s) => s.phase === "completed").length;
+
+  return {
+    participants,
+    withBaselineAndDelayed: n,
+    meanBaselineAccuracy: round(baselines.reduce((a, b) => a + b, 0) / baselines.length, 3),
+    meanDelayedAccuracy: round(delayeds.reduce((a, b) => a + b, 0) / delayeds.length, 3),
+    meanGain: round(gains.reduce((a, b) => a + b, 0) / gains.length, 3),
+    medianGain: round(median(gains), 3),
+    improvementPerHour,
+    dropoutRate: participants ? round(withdrawn / participants, 3) : null,
+    completionRate: pastBaseline ? round(completedCount / pastBaseline, 3) : null,
+    unseenShare,
+    insufficientData: false,
+    insufficientReason: null,
+    outcomes,
+  };
+}
+
 export function buildLongitudinalReport(studies: LongitudinalStudy[]): LongitudinalStudyReport {
   const outcomes: LongitudinalOutcome[] = studies.map((s) => {
     const baselineAccuracy = s.baseline ? s.baseline.awarded / Math.max(1, s.baseline.max) : null;
@@ -134,39 +229,5 @@ export function buildLongitudinalReport(studies: LongitudinalStudy[]): Longitudi
     };
   });
 
-  const complete = outcomes.filter((o) => o.baselineAccuracy != null && o.delayedAccuracy != null);
-  const n = complete.length;
-
-  if (n < 5) {
-    return {
-      participants: studies.length,
-      withBaselineAndDelayed: n,
-      meanBaselineAccuracy: null,
-      meanDelayedAccuracy: null,
-      meanGain: null,
-      medianGain: null,
-      unseenShare: null,
-      insufficientData: true,
-      insufficientReason: `Only ${n} participants with both baseline and delayed unseen assessment — need 5+ to report learning gain (currently ${studies.length} participants total). Do not claim improvement until real data exists.`,
-      outcomes,
-    };
-  }
-
-  const gains = complete.map((o) => o.gain!);
-  const baselines = complete.map((o) => o.baselineAccuracy!);
-  const delayeds = complete.map((o) => o.delayedAccuracy!);
-  const unseenShare = round(complete.filter((o) => o.isUnseen).length / n, 3);
-
-  return {
-    participants: studies.length,
-    withBaselineAndDelayed: n,
-    meanBaselineAccuracy: round(baselines.reduce((a, b) => a + b, 0) / baselines.length, 3),
-    meanDelayedAccuracy: round(delayeds.reduce((a, b) => a + b, 0) / delayeds.length, 3),
-    meanGain: round(gains.reduce((a, b) => a + b, 0) / gains.length, 3),
-    medianGain: round(median(gains), 3),
-    unseenShare,
-    insufficientData: false,
-    insufficientReason: null,
-    outcomes,
-  };
+  return summarise(studies, outcomes);
 }

@@ -13,3 +13,13 @@ const to = join(root, "public/pdf.worker.min.mjs");
 mkdirSync(dirname(to), { recursive: true });
 copyFileSync(from, to);
 console.log("copied pdf.worker.min.mjs → public/");
+
+// The case-study and settings pages link /docs/*.md; serve the canonical
+// copies from public/ so the links resolve in dev and production.
+for (const doc of ["benchmark.md", "revision-engine.md"]) {
+  const src = join(root, "docs", doc);
+  const dest = join(root, "public", "docs", doc);
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(src, dest);
+  console.log(`copied docs/${doc} → public/docs/`);
+}

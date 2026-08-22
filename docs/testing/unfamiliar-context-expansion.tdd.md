@@ -40,7 +40,7 @@ npm.cmd test -- --run tests/unfamiliar-context-expansion.test.ts
 
 ## Verification
 
-Run from `apps/revise`:
+Run from the repo root:
 
 ```text
 npm.cmd run type-check                         pass

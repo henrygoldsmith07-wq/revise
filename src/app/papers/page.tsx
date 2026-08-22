@@ -156,15 +156,20 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
 
   async function photograph(files: FileList, into: (value: string) => void) {
     setBusy("ocr");
-    const pages: string[] = [];
-    for (const file of Array.from(files).slice(0, 12)) {
-      const base64 = await toBase64(file);
-      const result = await aiOcr(base64, file.type || "image/jpeg", "printed");
-      if (result.data.text) pages.push(result.data.text);
-      else setStatus(result.note ?? "Could not read that page.");
+    try {
+      const pages: string[] = [];
+      for (const file of Array.from(files).slice(0, 12)) {
+        const base64 = await toBase64(file);
+        const result = await aiOcr(base64, file.type || "image/jpeg", "printed");
+        if (result.data.text) pages.push(result.data.text);
+        else setStatus(result.note ?? "Could not read that page.");
+      }
+      if (pages.length) into(pages.join("\n\n"));
+    } catch {
+      setStatus("Could not read those photos — try again or paste the text.");
+    } finally {
+      setBusy(null);
     }
-    if (pages.length) into(pages.join("\n\n"));
-    setBusy(null);
   }
 
   async function extract() {
@@ -172,8 +177,9 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
     setBusy("extract");
     setStatus(null);
 
-    const combined = markScheme.trim() ? `${text}\n\n--- MARK SCHEME ---\n${markScheme}` : text;
-    const result = await aiExtractQuestions(subjectId, combined);
+    try {
+      const combined = markScheme.trim() ? `${text}\n\n--- MARK SCHEME ---\n${markScheme}` : text;
+      const result = await aiExtractQuestions(subjectId, combined);
 
     if (!result.data.questions.length) {
       setStatus(
@@ -231,7 +237,11 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
       setMarkScheme("");
       setTitle("");
     }
-    setBusy(null);
+    } catch {
+      setStatus("Extraction failed — the paper is still saved as text, so try again.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (

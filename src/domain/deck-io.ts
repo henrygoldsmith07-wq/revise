@@ -361,7 +361,8 @@ export function materialiseDeck(deck: DeckExport, options: MaterialiseOptions): 
   return { cards, duplicates, retargeted };
 }
 
-function normaliseKind(value: unknown): DeckExportCard["kind"] {
+/** Coerce an untrusted kind string onto the allowed card kinds. */
+export function normaliseKind(value: unknown): DeckExportCard["kind"] {
   const kind = String(value ?? "basic").toLowerCase();
   const allowed = ["basic", "cloze", "image", "equation", "mistake", "audio"];
   return (allowed.includes(kind) ? kind : "basic") as DeckExportCard["kind"];

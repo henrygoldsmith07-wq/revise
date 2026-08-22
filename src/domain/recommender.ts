@@ -200,9 +200,11 @@ function avgRetentionForTopic(cards: Card[], topicId: string, now: Date): number
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
-function paperLabelFor(exams: ExamDate[], subjectId: Id): string | null {
-  const row = exams.filter((e) => e.subjectId === subjectId).sort((a, b) => a.date.localeCompare(b.date))[0];
-  return row?.label ?? null;
+function paperLabelFor(exams: ExamDate[], subjectId: Id, today: string): string | null {
+  const mine = exams.filter((e) => e.subjectId === subjectId).sort((a, b) => a.date.localeCompare(b.date));
+  // Prefer the next future paper so the label and the day countdown always
+  // refer to the same exam; fall back to the earliest past paper otherwise.
+  return (mine.find((e) => e.date >= today) ?? mine[0])?.label ?? null;
 }
 
 function buildExplanation(
@@ -212,31 +214,21 @@ function buildExplanation(
   daysTo: number | null,
   label: string | null,
   factors: RecommendationFactors,
-  topicId?: Id,
 ): RecommendationExplanation {
   const lastEvidencePercent = masteryRow ? Math.round(masteryRow.accuracy * 100) : null;
-  // lastEvidence is null when no attempts exist → show as null rather than 0 so the UI can say "no evidence yet"
+  // lastEvidence is null when no attempts exist — show as null rather than 0 so the UI can say "no evidence yet"
   const evidencePercent = masteryRow && masteryRow.attempts > 0 ? lastEvidencePercent : null;
-  const daysSince = masteryRow?.lastStudiedAt ? daysBetween(masteryRow.lastStudiedAt.slice(0, 10), todayFromFactors(factors)) : null;
-  // We don't have today threaded here; compute from lastStudiedAt delta inside caller instead.
-  // Workaround: daysSince is computed by caller and passed through factors context; keep field for UI.
-  void topicId;
   return {
     recoverableMarks: Math.round(recoverableMarks * 10) / 10,
     marksPerHour,
     lastEvidencePercent: evidencePercent,
-    daysSinceRetrieval: daysSince,
+    daysSinceRetrieval: null,
     daysToExam: daysTo,
     paperLabel: label,
     factors,
   };
 }
-
-function todayFromFactors(_f: RecommendationFactors): string {
-  // This is a tiny indirection so buildExplanation can stay pure. The actual
-  // daysSince is computed upstream where `today` is in scope.
-  return "";
-}
+void buildExplanation;
 
 export function recommend(input: RecommendInput): Recommendation[] {
   const now = input.now ?? new Date();
@@ -301,7 +293,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const daysTo = daysToExam(input.exams, subjectId, today);
     const prox = proximityFor(daysTo, examGain, minutes);
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox;
-    const label = paperLabelFor(input.exams, subjectId);
+    const label = paperLabelFor(input.exams, subjectId, today);
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(examGain * 10) / 10,
       marksPerHour: Math.round((examGain / Math.max(5, minutes)) * 60 * 10) / 10,
@@ -355,7 +347,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const daysTo = daysToExam(input.exams, subjectId, today);
     const prox = proximityFor(daysTo, examGain, minutes);
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox;
-    const label = paperLabelFor(input.exams, subjectId);
+    const label = paperLabelFor(input.exams, subjectId, today);
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(recoverable * 10) / 10,
       marksPerHour: Math.round((recoverable / Math.max(5, minutes)) * 60 * 10) / 10,
@@ -397,7 +389,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const prox = proximityFor(daysTo, examGain, minutes);
     const adaptive = adaptiveDifficultyFactor(topic, weakRow, input.adaptiveDifficultyOffset?.get(weakRow.topicId));
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive;
-    const label = paperLabelFor(input.exams, weakRow.subjectId);
+    const label = paperLabelFor(input.exams, weakRow.subjectId, today);
     const mphRounded = mph != null ? Math.round(mph * 10) / 10 : null;
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(recoverable * 10) / 10,
@@ -441,7 +433,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const prox = proximityFor(daysTo, examGain, minutes);
     const adaptive = adaptiveDifficultyFactor(topic, undefined, input.adaptiveDifficultyOffset?.get(fresh.topicId));
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive;
-    const label = paperLabelFor(input.exams, fresh.subjectId);
+    const label = paperLabelFor(input.exams, fresh.subjectId, today);
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(examGain * 10) / 10,
       marksPerHour: Math.round((examGain / Math.max(5, minutes)) * 60 * 10) / 10,
@@ -483,7 +475,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const factors: RecommendationFactors = { examGain: Math.round(examGain * 10) / 10, urgency: u, weakness: weak, forgetting, uncertainty: unc };
     const prox = proximityFor(days, examGain, minutes);
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox;
-    const label = paperLabelFor(input.exams, subjectId);
+    const label = paperLabelFor(input.exams, subjectId, today);
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(examGain * 10) / 10,
       marksPerHour: Math.round((examGain / Math.max(5, minutes)) * 60 * 10) / 10,
@@ -524,7 +516,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
       const examGain = 2.5;
       const factors: RecommendationFactors = { examGain, urgency: u, weakness: 1, forgetting: 1, uncertainty: 1 };
       const daysTo = daysToExam(input.exams, session.subjectId, today);
-      const label = paperLabelFor(input.exams, session.subjectId);
+      const label = paperLabelFor(input.exams, session.subjectId, today);
       out.push({
         activity: session.activity,
         subjectId: session.subjectId,

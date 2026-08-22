@@ -62,6 +62,7 @@ export interface MarkingValidationReport {
   byMarkTotal: MarkingValidationByGroup[];
   byQuestionType: MarkingValidationByGroup[];
   byDifficulty: MarkingValidationByGroup[];
+  byAbility: MarkingValidationByGroup[];
   pointAgreement: MarkingPointAgreement | null;
   internalVsExternalWarning: string | null;
 }
@@ -183,6 +184,9 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
   const byMarkTotal = groupStats(adjudicated, aiMark, (r) => String(r.maximumMarks));
   const byQuestionType = groupStats(adjudicated, aiMark, (r) => r.questionTypeTags);
   const byDifficulty = groupStats(adjudicated, aiMark, (r) => String(r.difficulty));
+  // Prior-attainment band of the student whose answer was marked, when the
+  // corpus row records it. Unrecorded rows are grouped so coverage stays honest.
+  const byAbility = groupStats(adjudicated, aiMark, (r) => r.abilityLevel ?? "unrecorded");
 
   // Point-level agreement requires structured per-point AI output — not available from scalar aiMark
   const pointAgreement: MarkingPointAgreement | null = null;
@@ -205,6 +209,7 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
     byMarkTotal,
     byQuestionType,
     byDifficulty,
+    byAbility,
     pointAgreement,
     internalVsExternalWarning,
   };

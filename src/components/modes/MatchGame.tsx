@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { buildMatchBoard, isMatch, matchScore, MATCH_PAIRS } from "@/domain/study-modes";
 import type { MatchTile } from "@/domain/study-modes";
 import type { Card } from "@/domain/types";
@@ -9,11 +9,25 @@ import { Button, EmptyState, Panel, Pill, cx } from "../ui";
 import { TimerIcon, ICON_SIZE } from "../icons";
 
 // The match game. The only mode where speed is the point: it drills the
-// front↔back association until recognition is instant, which is what makes
+// front→back association until recognition is instant, which is what makes
 // the slower recall modes feel less like wading.
 
+const NO_SUBSCRIBE = () => () => {};
+let clientSeedCache: number | null = null;
+function clientSeed(): number {
+  if (clientSeedCache == null) clientSeedCache = Math.floor(Math.random() * 100000) + 1;
+  return clientSeedCache;
+}
+const DETERMINISTIC_SEED = () => 1;
+
 export function MatchGame({ cards, onExit }: { cards: Card[]; onExit: () => void }) {
-  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 100000));
+  // A random seed computed during render would build a different board on the
+  // server and the client; the server snapshot stays deterministic and React
+  // swaps to the per-load random seed right after hydration.
+  const seedBase = useSyncExternalStore(NO_SUBSCRIBE, clientSeed, DETERMINISTIC_SEED);
+  // Restart deals a fresh board immediately, so it overrides the per-load seed.
+  const [seedOverride, setSeedOverride] = useState<number | null>(null);
+  const seed = seedOverride ?? seedBase;
   const [selected, setSelected] = useState<MatchTile | null>(null);
   const [matched, setMatched] = useState<Set<string>>(new Set());
   const [wrongPair, setWrongPair] = useState<string[]>([]);
@@ -61,7 +75,7 @@ export function MatchGame({ cards, onExit }: { cards: Card[]; onExit: () => void
   }
 
   function restart() {
-    setSeed(Math.floor(Math.random() * 100000));
+    setSeedOverride(Math.floor(Math.random() * 100000) + 1);
     setSelected(null);
     setMatched(new Set());
     setWrongPair([]);

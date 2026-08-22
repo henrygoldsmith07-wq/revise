@@ -100,19 +100,23 @@ export function AnswerInput({
   };
 
   const onPhoto = async (file: File) => {
-    setStatus("Reading your handwriting…");
-    const base64 = await toBase64(file);
-    const result = await aiOcr(base64, file.type || "image/jpeg", "handwriting");
-    if (!result.data.text) {
-      setStatus(result.note ?? "Could not transcribe that image — type your answer instead.");
-      return;
+    try {
+      setStatus("Reading your handwriting…");
+      const base64 = await toBase64(file);
+      const result = await aiOcr(base64, file.type || "image/jpeg", "handwriting");
+      if (!result.data.text) {
+        setStatus(result.note ?? "Could not transcribe that image — type your answer instead.");
+        return;
+      }
+      onChange(value ? `${value}\n${result.data.text}` : result.data.text);
+      setStatus(
+        result.data.confidence < 0.6
+          ? "Transcribed, but the handwriting was hard to read — check it before submitting."
+          : "Transcribed. Check it reads as you wrote it.",
+      );
+    } catch {
+      setStatus("Could not read that photo — type your answer instead.");
     }
-    onChange(value ? `${value}\n${result.data.text}` : result.data.text);
-    setStatus(
-      result.data.confidence < 0.6
-        ? "Transcribed, but the handwriting was hard to read — check it before submitting."
-        : "Transcribed. Check it reads as you wrote it.",
-    );
   };
 
   return (

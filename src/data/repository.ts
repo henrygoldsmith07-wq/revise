@@ -242,13 +242,17 @@ export async function replacePlan(userId: Id, sessions: PlannedSession[]): Promi
   const db = await getDb();
   const existing = (await db.getAll("plannedSessions")) as PlannedSession[];
   const keep = new Set(sessions.map((s) => s.id));
+  const removed = existing.filter((s) => s.userId === userId && !keep.has(s.id));
   const tx = db.transaction("plannedSessions", "readwrite");
-  await Promise.all(
-    existing.filter((s) => s.userId === userId && !keep.has(s.id)).map((s) => tx.store.delete(s.id)),
-  );
+  await Promise.all(removed.map((s) => tx.store.delete(s.id)));
   await Promise.all(sessions.map((s) => tx.store.put(s)));
   await tx.done;
   for (const s of sessions) await enqueue("plannedSessions", "upsert", s);
+  // Dropped sessions must also be deleted on the server, or every other
+  // device keeps them and a future pull resurrects them locally.
+  for (const s of removed) {
+    await enqueue("plannedSessions", "delete", { id: s.id } as Partial<PlannedSession>);
+  }
 }
 
 export async function saveExamDate(exam: ExamDate): Promise<void> {

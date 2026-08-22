@@ -241,10 +241,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 py-5 sm:py-7 app-enter">{children}</div>
       </main>
 
-      {/* Mobile bottom bar — duplicate Main landmark for thumb reach; same aria-label as desktop rail */}
+      {/* Mobile bottom bar — duplicate navigation for thumb reach; a distinct
+          label keeps the two landmarks unambiguous for screen readers */}
       <nav
         className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line elev-nav pb-safe"
-        aria-label="Main"
+        aria-label="Primary sections (mobile)"
       >
         <div className="grid grid-cols-5">
           {NAV.filter((item) => item.primary).map((item) => (

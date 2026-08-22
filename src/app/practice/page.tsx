@@ -129,6 +129,25 @@ function Practice() {
     [order, questionsById],
   );
 
+  // A ?question= push that arrives while the page is already mounted (e.g.
+  // ⌘K search) must retarget the held queue, not silently do nothing. The
+  // adjustment happens during render (record-the-previous-value pattern) so
+  // no setState-in-effect cascade is created.
+  const [lastRequestedQuestion, setLastRequestedQuestion] = useState<string | null>(requestedQuestionParam);
+  if (requestedQuestionParam !== lastRequestedQuestion) {
+    setLastRequestedQuestion(requestedQuestionParam);
+    if (
+      requestedQuestionParam &&
+      !closed &&
+      !retestMistake &&
+      order[0] !== requestedQuestionParam &&
+      questionsById.has(requestedQuestionParam)
+    ) {
+      setOrder([requestedQuestionParam]);
+      setIndex(0);
+    }
+  }
+
   const current: Question | undefined = retestMistake ? retestQuestion : queue[index];
 
   const checkpointHref = useMemo(() => {
@@ -323,9 +342,7 @@ function Practice() {
                 A new-context question checks whether your original success on {getTopic(farTransferRetest.topicIds[0] ?? "")?.title ?? "this topic"} transfers after a delay.
               </p>
             </div>
-            <Link href="/practice">
-              <Button size="sm">Leave retest</Button>
-            </Link>
+            <ButtonLink href="/practice" size="sm">Leave retest</ButtonLink>
           </div>
         </Panel>
       ) : null}

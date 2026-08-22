@@ -85,6 +85,17 @@ export function QuestionRunner({
 
   async function submit() {
     setMarking(true);
+    try {
+      const finished = await runSubmit();
+      onFinished?.(finished);
+    } finally {
+      // Whatever marking or persistence does, the runner must never stay
+      // stuck on "Marking…" with the submit button disabled.
+      setMarking(false);
+    }
+  }
+
+  async function runSubmit(): Promise<Attempt> {
     const elapsedMs = startedAt.current ? Date.now() - startedAt.current : 0;
 
     // MCQs are marked locally and instantly — sending a letter to a model for
@@ -168,8 +179,7 @@ export function QuestionRunner({
       escalation: escalationDecision.escalate ? escalationDecision : undefined,
       farTransfer: persistedAttempt.farTransfer,
     });
-    setMarking(false);
-    onFinished?.(persistedAttempt);
+    return persistedAttempt;
   }
 
   return (
@@ -198,7 +208,7 @@ export function QuestionRunner({
         <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>
 
         {isMcq ? (
-          <ul className="mt-4 space-y-1.5">
+          <ul className="mt-4 space-y-1.5" role="radiogroup" aria-label="Choose one answer">
             {question.options?.map((option, index) => {
               const correct = result && index === question.correctIndex;
               const wrongPick = result && index === choice && index !== question.correctIndex;
@@ -206,6 +216,8 @@ export function QuestionRunner({
                 <li key={index}>
                   <button
                     type="button"
+                    role="radio"
+                    aria-checked={choice === index}
                     disabled={Boolean(result)}
                     onClick={() => {
                       setChoice(index);
@@ -220,6 +232,11 @@ export function QuestionRunner({
                   >
                     <span className="text-xs font-semibold text-ink3 mt-0.5">
                       {String.fromCharCode(65 + index)}
+                      {correct ? " ✓" : wrongPick ? " ✗" : ""}
+                    </span>
+                    <span className="sr-only">
+                      {correct ? "Correct answer. " : wrongPick ? "Your incorrect pick. " : ""}
+                      {choice === index ? "Selected." : ""}
                     </span>
                     <RichText className="text-sm flex-1">{option}</RichText>
                   </button>

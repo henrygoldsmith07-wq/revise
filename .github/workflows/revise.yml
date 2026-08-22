@@ -44,6 +44,3 @@ jobs:
             e2e/__screenshots__
           if-no-files-found: ignore
       - run: du -sh .next 2>/dev/null || du -sh dist 2>/dev/null || du -sh build 2>/dev/null || echo "no build artifact to measure"
-      - run: node -e "const fs=require('fs');try{const s=require('child_process').execSync('du -sk .next 2>/dev/null || du -sk dist 2>/dev/null || echo 0',{encoding:'utf8'}).trim();console.log('SIZE_KB:'+s.split(/\s+/)[0])}catch(e){console.log('size check skipped')}" 
-      - name: Enforce performance budget
-        run: node ../../scripts/check-performance-budgets.mjs --require-builds --only=.

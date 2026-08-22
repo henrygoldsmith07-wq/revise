@@ -408,10 +408,11 @@ export function assessPlanRealism(input: PlanInput, plan: PlannedSession[]): Pla
   const peakDayMinutes = Math.max(0, ...byDate.values());
 
   const issues: PlanRealismIssue[] = [];
+  const loadLabel = Number.isFinite(utilisation) ? `${Math.round(utilisation * 100)}%` : "over 100%";
   if (!Number.isFinite(utilisation) || utilisation > 1.05) {
     issues.push({
       severity: "blocking",
-      message: `Plan needs ${totalPlanned} min but only ${totalAvailable} min are available in the next ${horizon} days (${Math.round(utilisation * 100)}% load).`,
+      message: `Plan needs ${totalPlanned} min but only ${totalAvailable} min are available in the next ${horizon} days (${loadLabel} load).`,
       remedy: "Add availability, extend the horizon, or shorten sessions.",
     });
   } else if (utilisation > 0.88) {

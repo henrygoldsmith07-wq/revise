@@ -41,6 +41,14 @@ function Library() {
 
   const topic = topicId ? getTopic(topicId) : null;
 
+  // One pass over the deck instead of a filter per topic row per render.
+  // Computed before the detail-view early return to keep hook order stable.
+  const cardCountByTopic = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of store.cards) counts.set(card.topicId, (counts.get(card.topicId) ?? 0) + 1);
+    return counts;
+  }, [store.cards]);
+
   if (topic) {
     return <TopicDetail topic={topic} onBack={() => setTopicId("")} highlightMisconceptionId={misconceptionParam ?? ""} />;
   }
@@ -75,7 +83,7 @@ function Library() {
             <ul className="card divide-y divide-line cv-list">
               {topics.map((row) => {
                 const mastery = masteryById.get(row.id);
-                const cards = store.cards.filter((c) => c.topicId === row.id).length;
+                const cards = cardCountByTopic.get(row.id) ?? 0;
                 return (
                   <li key={row.id}>
                     <button
@@ -361,7 +369,7 @@ function TopicDetail({
                   size="sm"
                   variant="ghost"
                   onClick={() => void store.removeCard(card.id)}
-                  aria-label="Delete card"
+                  aria-label={`Delete card: ${card.front.slice(0, 60)}`}
                 >
                   <DeleteIcon size={ICON_SIZE.sm} aria-hidden />
                 </Button>

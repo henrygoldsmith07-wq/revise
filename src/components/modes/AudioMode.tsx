@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { speak, speechAvailable, stopSpeaking } from "@/lib/speech";
 import type { Card } from "@/domain/types";
 import { RichText } from "../RichText";
@@ -14,12 +14,19 @@ import { AudioIcon, AudioOffIcon, ForwardIcon, ICON_SIZE } from "../icons";
 /** Seconds of silence after the question before the answer is read. */
 const THINK_SECONDS = 5;
 
+const NO_SUBSCRIBE = () => () => {};
+const speechUnsupportedOnServer = () => false;
+
 export function AudioMode({ cards, onExit }: { cards: Card[]; onExit: () => void }) {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<"idle" | "question" | "thinking" | "answer">("idle");
   const [playing, setPlaying] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // speechAvailable() differs between server and client, so it is read through
+  // useSyncExternalStore: both renders agree during hydration, then React
+  // re-renders with the real capability.
+  const canSpeak = useSyncExternalStore(NO_SUBSCRIBE, speechAvailable, speechUnsupportedOnServer);
 
   const card = cards[index];
 
@@ -87,7 +94,7 @@ export function AudioMode({ cards, onExit }: { cards: Card[]; onExit: () => void
     return <EmptyState title="Nothing to listen to" body="No cards match this selection." action={<Button onClick={onExit}>Back</Button>} />;
   }
 
-  if (!speechAvailable()) {
+  if (!canSpeak) {
     return (
       <EmptyState
         title="This browser cannot speak"

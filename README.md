@@ -8,7 +8,7 @@ Open the app → get a recommended task → complete it → get marked instantly
 progress updates → next task.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE** —
-**440 topics, 374 seed questions**, every topic with `specPoints` and provenance —
+**440 topics, 718 seed questions**, every topic with `specPoints` and provenance —
 as real, authored revision content. The architecture is board-agnostic: adding
 a new board or qualification means adding one curriculum module and changing
 nothing else.
@@ -18,7 +18,7 @@ nothing else.
 ```bash
 npm install
 npm run dev          # http://localhost:3000
-npm test             # 466 tests (36 files) — see docs/benchmark.md and /benchmarks for outcome benchmarks
+npm test             # 728 tests (97 files) — see docs/benchmark.md and /benchmarks for outcome benchmarks
 npm run build        # production build
 ```
 
@@ -235,7 +235,7 @@ provenance record (`source` / `verification` / `reviewer` / `lastChecked` /
 retrieval cards, how many have an exam question (*which* parts test *which*
 statements), which are verified, and — per `SPEC_MANIFEST` — which unit/paper
 (duration, marks, weighting) each belongs to. The statement model now covers all **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE): 440 topics,
-374 seed questions**, every topic with `specPoints` and every seed question part
+718 seed questions**, every topic with `specPoints` and every seed question part
 mapped with `specPointIds + learningClaims` aligned 1:1 with mark-scheme points.
 Topic lists and grade boundaries remain approximate and labelled as such; always
 check the current board specification for exact assessment objectives and

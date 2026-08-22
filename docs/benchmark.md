@@ -60,6 +60,22 @@ Revise owns its claims with numbers. This doc records the harnesses, the invaria
 - The built-in rows are explicitly synthetic demonstrations. They are a UI and
   metric fixture, not teacher evidence; imported rows carry `provenance: imported`.
 
+## Adversarial marking fence (synthetic, deterministic)
+
+Hostile answer categories — fluent nonsense, irrelevant-but-fluent, keyword
+stuffing, contradictions, partial reasoning, alternative notation, spelling
+noise — are generated purely from the authored seed bank and run through the
+shipped rubric marker (`src/domain/marking-adversarial.ts`). Fences: recitation
+never reaches full marks (anti-regurgitation cap), retractions never score full,
+typos cost at most one mark (single-edit token matching), equivalent fractions/
+decimals are credited via maths-equivalence. Pinned by
+`tests/marking-adversarial.test.ts` and rendered live on /benchmarks.
+
+Scheduler calibration also reports a leakage-free holdout view:
+`validateFsrsHoldout()` splits each card's history chronologically, scores only
+the final 30% of reviews, and uses earlier reviews strictly as prediction
+context — so tuning on the full history cannot flatter its own metrics.
+
 ## Grade prediction & confidence calibration
 
 *Source:* `src/domain/grades.ts`, `tests/grade-calibration.test.ts`.

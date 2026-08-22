@@ -24,7 +24,14 @@ export function examClockState(remaining: number, warningSeconds = EXAM_WARNING_
 }
 
 export function questionHasAnswer(question: Question, answers: Record<string, string>): boolean {
-  if (question.kind === "mcq") return Boolean(answers[question.id]?.trim());
+  if (question.kind === "mcq") {
+    // MCQ answers are keyed under the first part id by the marker and the
+    // question runner; accept the question id too so both shapes count.
+    const partKey = question.parts[0]?.id;
+    const raw = answers[question.id] ?? "";
+    const viaPart = partKey ? answers[partKey] ?? "" : "";
+    return Boolean((raw || viaPart).trim());
+  }
   return question.parts.some((part) => Boolean(answers[part.id]?.trim()));
 }
 

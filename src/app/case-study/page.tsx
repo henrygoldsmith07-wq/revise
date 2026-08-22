@@ -102,16 +102,16 @@ export default function CaseStudyPage() {
           <ul className="text-sm text-ink2 space-y-1.5 list-disc list-inside">
             <li><strong>Recommendation quality</strong> — <code className="font-mono text-xs">syntheticOutcomePairs</code> + <code className="font-mono text-xs">benchmarkRecommendationQuality</code> → MAE / bias / correlation / hitRate(±5). Live on <Link className="underline" href="/benchmarks">/benchmarks</Link>.</li>
             <li><strong>Calibration</strong> — <code className="font-mono text-xs">calibrationReport</code> → Brier / ECE / bias; well-calibrated is ECE &lt; 0.08. Same harness, real pairs when ≥3 timed papers exist.</li>
-            <li><strong>Curriculum</strong> — <code className="font-mono text-xs">scripts/validate-curriculum.mjs</code> + <code className="font-mono text-xs">src/domain/coverage.ts</code> — 440 topics / 302 questions; every topic has specPoints; every specPointIds is paired with learningClaims.</li>
+            <li><strong>Curriculum</strong> — <code className="font-mono text-xs">scripts/validate-curriculum.mjs</code> + <code className="font-mono text-xs">src/domain/coverage.ts</code> — 440 topics / 718 questions; every topic has specPoints; every specPointIds is paired with learningClaims.</li>
             <li><strong>Offline & sync</strong> — <code className="font-mono text-xs">tests/sync.test.ts</code> (node smoke) + <code className="font-mono text-xs">e2e/offline.spec.ts</code> (Playwright) + <code className="font-mono text-xs">src/data/sync.ts</code> (IndexedDB truth, outbox, LWW).</li>
             <li><strong>Perf & security & WCAG</strong> — curriculum ≤100k / domain ≤120k, validation &lt;1.5s, build &lt;80MB; <code className="font-mono text-xs">/_next/static</code> immutable + <code className="font-mono text-xs">/api</code> no-store; RLS on every user table; skip-link + Main/Primary/banner landmarks + combobox/listbox/option + live regions; pinned in <code className="font-mono text-xs">tests/a11y.test.ts</code> + <code className="font-mono text-xs">tests/perf.test.ts</code>.</li>
           </ul>
           <p className="text-xs text-ink2 mt-3">How to reproduce locally:</p>
-          <pre className="mt-2 text-[11px] bg-surface2 p-3 rounded-[8px] overflow-auto nice-scroll">npm --prefix apps/revise run type-check
-node apps/revise/scripts/validate-curriculum.mjs
-npm --prefix apps/revise test -- --run
-npx --prefix apps/revise playwright test --reporter=list   # with browsers
-npm --prefix apps/revise run build</pre>
+          <pre className="mt-2 text-[11px] bg-surface2 p-3 rounded-[8px] overflow-auto nice-scroll">npm run type-check
+node scripts/validate-curriculum.mjs
+npm test -- --run
+npx playwright test --reporter=list   # with browsers
+npm run build</pre>
         </Panel>
       </section>
 

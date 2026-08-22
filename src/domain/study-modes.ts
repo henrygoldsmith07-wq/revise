@@ -285,7 +285,20 @@ export interface MatchTile {
 export const MATCH_PAIRS = 6;
 
 export function buildMatchBoard(cards: Card[], pairs = MATCH_PAIRS, seed = 1): MatchTile[] {
-  const usable = cards.filter((c) => c.front.trim() && c.back.trim()).slice(0, Math.max(2, pairs));
+  // Duplicate fronts or backs make pairs ambiguous (two tiles match the same
+  // text), so identical texts are skipped rather than dealt twice.
+  const seenFront = new Set<string>();
+  const seenBack = new Set<string>();
+  const usable: Card[] = [];
+  for (const card of cards) {
+    const front = card.front.trim();
+    const back = card.back.trim();
+    if (!front || !back || seenFront.has(front) || seenBack.has(back)) continue;
+    seenFront.add(front);
+    seenBack.add(back);
+    usable.push(card);
+    if (usable.length >= Math.max(2, pairs)) break;
+  }
   const tiles = usable.flatMap((card) => [
     { id: `${card.id}:front`, cardId: card.id, side: "front" as const, text: card.front },
     { id: `${card.id}:back`, cardId: card.id, side: "back" as const, text: card.back },

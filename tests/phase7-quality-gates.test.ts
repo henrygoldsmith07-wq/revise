@@ -36,7 +36,7 @@ describe("Phase 7 — E2E harness", () => {
     expect(md).toContain("__screenshots__");
   });
   it("CI workflow runs Playwright conditionally and uploads artefacts", () => {
-    const yml = readFileSync(join(root, "../../.github/workflows/revise.yml"), "utf8");
+    const yml = readFileSync(join(root, ".github/workflows/revise.yml"), "utf8");
     expect(yml).toContain("Playwright E2E");
     expect(yml).toContain("@playwright/test");
     expect(yml).toContain("upload-artifact");

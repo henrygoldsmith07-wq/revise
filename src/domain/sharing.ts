@@ -1,4 +1,4 @@
-import { exportDeck } from "./deck-io";
+import { exportDeck, normaliseKind } from "./deck-io";
 import type { Card, DeckExport } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ export function decodeDeckFromLink(encoded: string): DeckExport | null {
         .map((card) => ({
           front: String(card.f).slice(0, 4000),
           back: String(card.b).slice(0, 4000),
-          kind: (card.k as DeckExport["cards"][number]["kind"]) ?? "basic",
+          kind: normaliseKind(card.k),
           tags: Array.isArray(card.t) ? card.t.map(String).slice(0, 10) : [],
         })),
     };

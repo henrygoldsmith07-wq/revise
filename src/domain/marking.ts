@@ -40,12 +40,46 @@ export function tokenise(text: string): Set<string> {
   );
 }
 
-/** 0–1 overlap of a mark-scheme point's content words with the answer. */
+/** Bounded edit-distance test (optimal string alignment): true when a and b differ by at most one insertion, deletion, substitution or adjacent transposition. */
+function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  const small = a.length <= b.length ? a : b;
+  const large = a.length <= b.length ? b : a;
+  let prev2: number[] | null = null;
+  let prev = Array.from({ length: small.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= large.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= small.length; j++) {
+      const substitution = prev[j - 1] + (large[i - 1] === small[j - 1] ? 0 : 1);
+      let best = Math.min(prev[j] + 1, cur[j - 1] + 1, substitution);
+      // Adjacent transposition counts as a single edit.
+      if (i > 1 && j > 1 && large[i - 1] === small[j - 2] && large[i - 2] === small[j - 1]) {
+        best = Math.min(best, (prev2 ? prev2[j - 2] : Number.POSITIVE_INFINITY) + 1);
+      }
+      cur[j] = best;
+    }
+    if (Math.min(...cur) > 1) return false;
+    prev2 = prev;
+    prev = cur;
+  }
+  return prev[small.length] <= 1;
+}
+
+/**
+ * 0–1 overlap of a mark-scheme point's content words with the answer.
+ * Tokens of five-plus characters also match under a single edit (transposed
+ * or mistyped letters), so handwriting noise is not punished as absence.
+ */
 export function pointCoverage(point: string, answer: string): number {
   const wanted = [...tokenise(point)];
   if (!wanted.length) return 0;
-  const given = tokenise(answer);
-  const hits = wanted.filter((w) => given.has(w)).length;
+  const given = [...tokenise(answer)];
+  const exact = new Set(given);
+  const hits = wanted.filter((w) => {
+    if (exact.has(w)) return true;
+    return w.length >= 5 && given.some((g) => g.length >= 5 && withinOneEdit(g, w));
+  }).length;
   return hits / wanted.length;
 }
 
@@ -288,6 +322,32 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // keywords it happens to contain.
   if (trimmed.split(/\s+/).length < 3 && part.marks > 1) awarded = Math.min(awarded, 1);
 
+  // Anti-regurgitation: when nearly every content word in the answer is the
+  // scheme's own vocabulary, the response recites rather than engages — an
+  // examiner would cap it below full marks. Genuine answers paraphrase, so
+  // they keep novel wording and are untouched by this guard. Filler words and
+  // stray punctuation do not count as engagement, on either side.
+  const stripEdges = (t: string) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+  const contentTokens = [...tokenise(trimmed)].map(stripEdges).filter((t) => t && !STOP_WORDS.has(t));
+  if (contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
+    const schemeVocabulary = new Set(
+      part.markScheme.flatMap((p) => [...tokenise(p)]).map(stripEdges).filter((t) => t && !STOP_WORDS.has(t)),
+    );
+    const novelShare = contentTokens.filter((t) => !schemeVocabulary.has(t)).length / contentTokens.length;
+    if (novelShare < 0.1) awarded = part.marks - 1;
+  }
+
+  // Explicit self-retraction: an answer that ends by declaring itself wrong
+  // or reversed cannot be worth full marks, whichever way the keywords fall.
+  const finalFragment = trimmed.split(/\.\s+/).pop() ?? "";
+  if (
+    awarded >= part.marks &&
+    part.marks > 1 &&
+    /\b(opposite|reversed|not true|incorrect)\b/i.test(finalFragment)
+  ) {
+    awarded = part.marks - 1;
+  }
+
   const marked: MarkedPart = {
     partId: part.id,
     awarded,
@@ -343,9 +403,12 @@ export interface RubricResult {
 }
 
 export function markQuestion(question: Question, answers: Record<string, string>, calibration?: PartialCreditCalibration): RubricResult {
+  const mcqRaw = answers[question.parts[0]?.id ?? question.id];
+  // "" (unanswered) must not coerce to 0 — that would grade "option A selected".
+  const mcqIndex = mcqRaw != null && /^\d+$/.test(mcqRaw.trim()) ? Number(mcqRaw.trim()) : -1;
   const marked =
     question.kind === "mcq"
-      ? [markMcq(question, Number(answers[question.parts[0]?.id ?? question.id] ?? -1))]
+      ? [markMcq(question, mcqIndex)]
       : question.parts.map((part) => markPart(part, answers[part.id] ?? "", calibration));
 
   const awarded = marked.reduce((a, m) => a + m.awarded, 0);

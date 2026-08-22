@@ -60,7 +60,7 @@ export interface Unit {
 
 export type AoCode = "AO1" | "AO2" | "AO3";
 export type VerificationStatus = "unverified" | "checked" | "verified";
-export type ContentSource = "authored" | "licensed" | "generated" | "past-paper" | "import";
+export type ContentSource = "authored" | "licensed" | "generated" | "past-paper" | "import" | "adapted" | "unreviewed";
 
 /** Cite a licensed source when provenance is "licensed". Paraphrased claims stay compliant without verbatim text. */
 export interface LicensedSource {
