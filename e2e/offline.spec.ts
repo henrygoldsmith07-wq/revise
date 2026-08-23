@@ -101,7 +101,30 @@ test.describe("offline walk", () => {
     await page.reload();
     await todayOrOnboarding(page);
     await context.setOffline(true);
-    await page.reload();
+    await page.reload().catch((e) => console.log("DIAG reload threw:", String(e).slice(0, 200)));
+    // TEMPORARY DIAGNOSTIC (removed before merge): CI fails here while local
+    // passes, so capture what the worker actually served.
+    console.log("DIAG url=", page.url());
+    console.log("DIAG title=", await page.title().catch(() => "<none>"));
+    console.log(
+      "DIAG state=",
+      JSON.stringify(
+        await page
+          .evaluate(async () => ({
+            controller: Boolean(navigator.serviceWorker?.controller),
+            cacheNames: await caches.keys(),
+            cachedRoot: await caches.match("/").then((r) => (r ? r.status : null)),
+            cachedCount: await caches
+              .open("revise-v3")
+              .then((c) => c.keys())
+              .then((k) => k.length)
+              .catch(() => -1),
+            hasMain: Boolean(document.querySelector("main#main")),
+            bodyStart: document.body ? document.body.innerHTML.slice(0, 300) : "<no body>",
+          }))
+          .catch((e) => ({ evalFailed: String(e).slice(0, 200) })),
+      ),
+    );
     // A fresh profile re-opens onboarding after reload; the banner lives in the
     // app shell, so settle past onboarding before asserting either state.
     if ((await todayOrOnboarding(page)) === "onboarding") {
