@@ -126,6 +126,34 @@ function anthropicProvider(): AiProvider | null {
  * remaining entries before surfacing an error — callers fall back offline as
  * usual, never to an unlisted model.
  */
+/**
+ * Capability map (slug -> input modalities) fetched once per process so
+ * image-bearing requests (OCR/handwriting) only rotate onto vision models,
+ * while text requests take the intelligence-ranked order unchanged.
+ */
+let modalityCache: Map<string, string[]> | null | undefined;
+
+async function inputModalities(baseUrl: string, key?: string): Promise<Map<string, string[]> | null> {
+  if (modalityCache !== undefined) return modalityCache;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, {
+      headers: key ? { authorization: `Bearer ${key}` } : {},
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`models ${res.status}`);
+    const json = (await res.json()) as { data?: Array<{ id: string; architecture?: { input_modalities?: string[] } }> };
+    modalityCache = new Map(
+      (json.data ?? []).map((m) => [m.id, m.architecture?.input_modalities ?? ["text"]]),
+    );
+  } catch {
+    modalityCache = null;
+  }
+  return modalityCache;
+}
+
 function openAiCompatibleProvider(): AiProvider | null {
   const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
   const key = process.env.OPENAI_COMPATIBLE_API_KEY;
@@ -147,8 +175,18 @@ function openAiCompatibleProvider(): AiProvider | null {
     name: "openai-compatible",
     model: primary,
     async complete(request) {
+      // Image-bearing requests (OCR/handwriting) only rotate onto models that
+      // accept images; text requests keep the intelligence-ranked order.
+      let effectiveChain = chain;
+      if (request.images?.length) {
+        const modalities = await inputModalities(baseUrl, key);
+        if (modalities) {
+          const visionChain = chain.filter((slug) => modalities.get(slug)?.includes("image"));
+          if (visionChain.length) effectiveChain = visionChain;
+        }
+      }
       let lastError: unknown = null;
-      for (const model of chain) {
+      for (const model of effectiveChain) {
         try {
           const headers: Record<string, string> = {};
           if (key) headers.authorization = `Bearer ${key}`;
