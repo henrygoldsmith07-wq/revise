@@ -9,6 +9,7 @@ import { HUMAN_MARKING_CORPUS, passesHumanMarkingFloor, scoreHumanMarkingCorpus 
 import { scoreMarkerDisagreement } from "@/domain/marker-disagreement";
 import { Panel, SectionHeading, Pill, ProgressBar } from "@/components/ui";
 import { AdversarialMarkingPanel } from "@/components/AdversarialMarkingPanel";
+import { ExaminerBenchmarkPanel } from "@/components/ExaminerBenchmarkPanel";
 
 // Public benchmark page — the honest ledger.
 // Every number is computed live in the browser from the same deterministic
@@ -265,6 +266,8 @@ export default function BenchmarksPage() {
       </section>
 
             <AdversarialMarkingPanel />
+
+      <ExaminerBenchmarkPanel />
 
 <section className="space-y-3">
         <SectionHeading title="Provenance" hint="How this page stays honest" />

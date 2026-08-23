@@ -1,5 +1,31 @@
 # Benchmarks
 
+## Examiner benchmark (the real gate)
+
+Synthetic marker tests are exhausted; the credibility gate is now genuine
+double-marked answers. Protocol: four blind independent markers per
+answer - Examiner A, Examiner B, the Revise rubric and Revise AI - with
+post-hoc adjudication kept separately from raw marks.
+
+Phases: Phase 1 targets 250 genuine anonymised student answers; Phase 2
+1,000+. Quotas guarantee coverage across Biology/Chemistry/Physics/Maths,
+GCSE/A-level, 1-2/3-4/6+ mark tariffs, calculation/practical/
+evaluate-explain types and weak/borderline/near-perfect quality bands.
+
+Reported per comparison (examiner-vs-examiner as the human ceiling;
+rubric-vs-examiner and AI-vs-examiner against each examiner and the
+consensus): exact agreement, plus-or-minus-one agreement, MAE, signed
+over-/under-marking bias, Cohen's kappa and linearly/quadratically
+weighted kappa, breakdowns by subject, tariff, question kind, ability
+and quality band, and confidence calibration of the AI/rubric markers.
+
+Headline criterion: Revise's disagreement with an examiner should be
+COMPARABLE TO examiner-vs-examiner disagreement - a disagreement ratio
+(MAE ratio vs the human ceiling) at or below 1.00. Humans do not agree
+with each other 100%; that is the bar, not perfection. Status renders on
+/benchmarks; schema in src/domain/examiner-benchmark.ts, pinned by
+tests/examiner-benchmark.test.ts with hand-computed kappa values.
+
 ## Prospective recommendation experiment
 
 The thesis - open, recommended task, complete, mark, update, next - is now
