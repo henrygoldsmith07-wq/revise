@@ -1,4 +1,17 @@
-# Benchmarks — recommendation quality, marking and grades
+# Benchmarks
+
+## Prospective recommendation experiment
+
+The thesis - open, recommended task, complete, mark, update, next - is now
+instrumented for a real prospective trial (`src/domain/recommendation-experiment.ts`).
+Participants are deterministically assigned across four arms: production recommender,
+self-directed control, weakest-topic-first baseline and most-overdue-first baseline.
+Shown / started / completed / rejected events accumulate locally; attempts and reviews
+supply hours, marks, transfer and calibration. analyseExperiment() emits all ten
+preregistered metrics per arm plus the headline marks-per-hour effect versus control,
+and refuses any efficacy claim until every arm has real participants and delayed
+unseen assessments. Enrol in Settings; live contribution renders on Progress.
+ — recommendation quality, marking and grades
 
 Revise owns its claims with numbers. This doc records the harnesses, the invariants and the honest limits.
 

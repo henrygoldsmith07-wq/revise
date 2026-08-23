@@ -1,5 +1,12 @@
 "use client";
 
+const ARM_LABELS: Record<string, string> = {
+  revise: "Revise recommendations",
+  "baseline-mastery": "Weakest-topic-first baseline",
+  "baseline-overdue": "Most-overdue-first baseline",
+  control: "Self-directed revision (control)",
+} as const;
+
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/ai/client";
 import { allSubjects, subjectLabel } from "@/domain/curriculum";
@@ -272,6 +279,27 @@ function Account() {
   if (!isSupabaseConfigured) {
     return (
       <section>
+        <SectionHeading title="Effectiveness study" hint="Opt-in. Proves whether recommendations beat self-selected revision." />
+        <Panel>
+          {store.experimentArm ? (
+            <div className="space-y-2">
+              <p className="text-sm text-ink2">
+                You are in the <strong className="text-ink">{ARM_LABELS[store.experimentArm.arm] ?? store.experimentArm.arm}</strong> arm.
+                {" " }Everything stays on this device; only anonymous counts ever leave it (and nothing leaves unless Pulse sync is on).
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => void store.leaveExperiment()}>Leave study</Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-ink2">
+                Join a four-arm study comparing Revise&apos;s recommendations against self-chosen revision,
+                weakest-topic-first and most-overdue-first baselines. Unseen assessments afterwards decide the winner.
+              </p>
+              <Button variant="primary" size="sm" onClick={() => void store.joinExperiment()}>Join the study</Button>
+            </div>
+          )}
+        </Panel>
+
         <SectionHeading title="Account" />
         <Panel>
           <Pill>Local profile</Pill>

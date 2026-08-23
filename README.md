@@ -44,6 +44,7 @@ source immediately.
 
 | Area | Behaviour |
 |------|-----------|
+| **Effectiveness study** | Opt-in four-arm prospective experiment ? Revise vs self-directed control, weakest-topic-first and most-overdue-first baselines ? measuring marks per hour, delayed retention, unseen transfer, calibration and adherence with an honest no-claims gate. |
 | **Recommendation** | Scores every candidate activity on one scale — due reviews, mistake repair, weak-topic practice, first-pass learning, timed papers — and shows the winner with a plain-English reason. |
 | **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, and failed cards reinserted within the same session. |
 | **Exam practice** | Structured questions marked point-by-point against the mark scheme, with examiner-style feedback, model answers, safe draft-preserving navigation and five- or ten-minute question sprints. |

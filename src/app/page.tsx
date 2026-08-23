@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { planForDate } from "@/domain/planner";
 import { todayIso } from "@/domain/scheduling";
 import { useStore } from "@/state/store";
@@ -22,6 +22,13 @@ export default function TodayPage() {
   const greetingLabel = useGreeting();
 
   const [primary] = recommendations;
+  const experimentArm = store.experimentArm;
+  const recordExperimentEvent = store.recordExperimentEvent;
+  useEffect(() => {
+    if (!experimentArm || !primary) return;
+    const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
+    void recordExperimentEvent("shown", { taskId, activity: primary.activity, topicId: primary.topicId ?? null });
+  }, [experimentArm, primary, recordExperimentEvent, today]);
   const todaysPlan = useMemo(() => planForDate(plannedSessions, today), [plannedSessions, today]);
   const completedPlan = todaysPlan.filter((session) => session.status === "done").length;
   const openMistakes = mistakes.filter((m) => !m.resolved).length;

@@ -17,6 +17,7 @@ import { dueCountByDay, todayIso } from "@/domain/scheduling";
 import type { DiagnoseResponse } from "@/ai/types";
 import { useStore, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
+import { ExperimentPanel } from "@/components/ExperimentPanel";
 import { ApplicationMasteryCard, CalculationMasteryCard, CalibrationCard, DifficultyAndSubtopics, ExpectedMarksCard, MarksLostByCause, MasteryUncertaintyCard, NextGradeView, PaperSimulationCard, QuestionDiscriminationCard, RecallMasteryCard, RecurringMisconceptions, TechniqueVsKnowledgeCard } from "@/components/AssessmentPanels";
 import { ResponseTimeCalibrationPanel } from "@/components/ResponseTimeCalibration";
 import { RetentionMasteryPanel } from "@/components/RetentionMasteryPanel";
@@ -209,7 +210,9 @@ export default function ProgressPage() {
         <StatTile label="Level" value={level.level} sub={`${level.into}/${level.needed} XP to next`} />
       </div>
 
-      <section aria-labelledby="progress-story-heading">
+      <ExperimentPanel />
+
+<section aria-labelledby="progress-story-heading">
         <Panel className="border-l-4 border-l-accent">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">

@@ -73,6 +73,8 @@ import * as repo from "@/data/repository";
 import { LOCAL_USER_ID } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
+import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
+import { assignArm as assignExperimentArm, type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
 import {
   createRevisionCheckpoint,
@@ -151,6 +153,10 @@ interface StoreValue extends Snapshot {
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
   clearRevisionCheckpoint(): Promise<void>;
   syncNow(): Promise<void>;
+  experimentArm: ExperimentAssignment | null;
+  joinExperiment(): Promise<void>;
+  leaveExperiment(): Promise<void>;
+  recordExperimentEvent(type: ExperimentEventType, task: { taskId: string; activity: string; topicId?: Id | null }, at?: string): Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -166,6 +172,7 @@ let syncInFlight = false;
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
+  const [experimentArm, setExperimentArm] = useState<ExperimentAssignment | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -183,11 +190,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     if (bootstrapped.current) return;
     bootstrapped.current = true;
     void (async () => {
-      const [loaded, checkpoint] = await Promise.all([
+      const [loaded, checkpoint, assignment] = await Promise.all([
         repo.loadSnapshot(userId),
         repo.loadRevisionCheckpoint(userId),
+        readReviseMeta<ExperimentAssignment>("experimentAssignment"),
       ]);
       setRevisionCheckpoint(checkpoint ?? null);
+      setExperimentArm(assignment ?? null);
       setSnapshot(loaded);
       lastFingerprint.current = computeFingerprint({
         exams: loaded.examDates,
@@ -637,6 +646,29 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [userId, snapshot, bumpGamification, patch],
   );
 
+  const joinExperiment = useCallback(async () => {
+    const assignment = assignExperimentArm(userId);
+    await writeReviseMeta("experimentAssignment", assignment);
+    setExperimentArm(assignment);
+  }, [userId]);
+
+  const leaveExperiment = useCallback(async () => {
+    await writeReviseMeta("experimentAssignment", { anonId: userId, arm: "control", assignedAt: new Date().toISOString(), optedOut: true });
+    setExperimentArm(null);
+  }, [userId]);
+
+  const recordExperimentEvent = useCallback(async (type: ExperimentEventType, task: { taskId: string; activity: string; topicId?: Id | null }, at?: string) => {
+    const arm = experimentArm;
+    if (!arm) return;
+    const events = (await readReviseMeta<ExperimentEvent[]>("experimentEvents")) ?? [];
+    const atIso = at ?? new Date().toISOString();
+    const day = atIso.slice(0, 10);
+    const duplicate = events.some((e) => e.type === type && e.taskId === task.taskId && e.at.slice(0, 10) === day);
+    if (duplicate) return;
+    const next = [...events.slice(-2000), { anonId: arm.anonId, taskId: task.taskId, activity: task.activity, topicId: task.topicId ?? null, type, at: atIso }];
+    await writeReviseMeta("experimentEvents", next);
+  }, [experimentArm]);
+
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
       const isRetest = Boolean(attempt.retestMistakeId);
@@ -652,6 +684,14 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         : undefined;
 
       await repo.saveAttempt(attempt);
+      // Prospective experiment telemetry: derive started/completed events
+      // from the recorded attempt so no extra student action is required.
+      if (experimentArm) {
+        const expTopicId = question.topicIds[0] ?? attempt.topicIds[0] ?? null;
+        const expTaskId = `${attempt.mode}:${expTopicId ?? question.subjectId}`;
+        void recordExperimentEvent("started", { taskId: expTaskId, activity: attempt.mode, topicId: expTopicId }, new Date(new Date(attempt.createdAt).getTime() - Math.max(0, attempt.elapsedMs || 0)).toISOString());
+        void recordExperimentEvent("completed", { taskId: expTaskId, activity: attempt.mode, topicId: expTopicId }, attempt.createdAt);
+      }
       if (updatedMistake) await repo.saveMistake(updatedMistake);
 
       // A failed retest updates the original mistake in place. It must not
@@ -680,7 +720,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       });
       return updatedMistake ? [updatedMistake] : drafts.map((d) => d.mistake);
     },
-    [bumpGamification, patch, snapshot],
+    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent],
   );
 
   const addCards = useCallback<StoreValue["addCards"]>(
@@ -831,6 +871,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [userId],
   );
 
+
   const clearRevisionCheckpoint = useCallback<StoreValue["clearRevisionCheckpoint"]>(async () => {
     await repo.clearRevisionCheckpoint(userId);
     setRevisionCheckpoint(null);
@@ -886,6 +927,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
       syncNow,
+      experimentArm,
+      joinExperiment,
+      leaveExperiment,
+      recordExperimentEvent,
     };
   }, [
     snapshot,
@@ -934,6 +979,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     syncNow,
+    experimentArm,
+    joinExperiment,
+    leaveExperiment,
+    recordExperimentEvent,
   ]);
 
   if (!value) return <BootScreen />;
