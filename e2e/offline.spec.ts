@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { todayOrOnboarding } from "./helpers";
+import { serviceWorkerReady, todayOrOnboarding } from "./helpers";
 
 /**
  * Offline walk — the core user journey without a network or AI key.
@@ -89,7 +89,9 @@ test.describe("offline walk", () => {
 
   test("offline banner appears when offline", async ({ page, context }) => {
     await page.goto("/");
-    await page.waitForTimeout(500);
+    // The reload below must be served by the service worker, so wait for it to
+    // actually control the page before cutting the network.
+    await serviceWorkerReady(page);
     await context.setOffline(true);
     await page.reload();
     // A fresh profile re-opens onboarding after reload; the banner lives in the

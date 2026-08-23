@@ -34,3 +34,23 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 25_000): Promise
   }).toPass({ timeout: timeoutMs });
   return outcome ?? "today";
 }
+
+/**
+ * Waits until the PWA worker is installed, activated and *controlling* the
+ * page, so a reload can be served from the precache with no network.
+ *
+ * Why this exists: the offline spec used to sleep 500ms before cutting the
+ * network, which is nowhere near enough for register → precache (the ~22-route
+ * app shell) → activate → clients.claim(). The reload then went to the network
+ * with no controller and failed outright with ERR_INTERNET_DISCONNECTED.
+ *
+ * `navigator.serviceWorker.controller` is set by the clients.claim() call in
+ * sw.js's activate handler, which runs only after install's precache has
+ * settled — so it is exactly the "ready to serve offline" signal, and waiting
+ * on it is deterministic rather than a timing guess.
+ */
+export async function serviceWorkerReady(page: Page, timeoutMs = 30_000): Promise<void> {
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), undefined, {
+    timeout: timeoutMs,
+  });
+}
