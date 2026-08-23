@@ -42,6 +42,12 @@ export interface AiProvider {
 
 const TIMEOUT_MS = 45_000;
 
+/** How many allowlisted models a single request may rotate through on failure. */
+function maxRotations(): number {
+  const parsed = Number(process.env.OPENAI_COMPATIBLE_MAX_ROTATIONS);
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.min(32, Math.floor(parsed)) : 8;
+}
+
 async function postJson(url: string, headers: Record<string, string>, body: unknown): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -114,44 +120,73 @@ function anthropicProvider(): AiProvider | null {
  * Any OpenAI-compatible endpoint: OpenRouter's free tier, Groq, Together, or a
  * local llama.cpp server. This is the route to a genuinely free model without
  * the app taking a hard dependency on one vendor's uptime or pricing.
+ *
+ * OPENAI_COMPATIBLE_MODELS (comma-separated) acts as a strict allowlist: the
+ * configured primary must appear on it, and request failures rotate down the
+ * remaining entries before surfacing an error — callers fall back offline as
+ * usual, never to an unlisted model.
  */
 function openAiCompatibleProvider(): AiProvider | null {
   const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
   const key = process.env.OPENAI_COMPATIBLE_API_KEY;
-  const model = process.env.OPENAI_COMPATIBLE_MODEL;
-  if (!baseUrl || !model) return null;
+  const primary = process.env.OPENAI_COMPATIBLE_MODEL;
+  if (!baseUrl || !primary) return null;
+  const allowed = (process.env.OPENAI_COMPATIBLE_MODELS ?? "")
+    .split(",")
+    .map((slug) => slug.trim())
+    .filter(Boolean);
+  if (allowed.length && !allowed.includes(primary)) {
+    console.warn(
+      `[ai] OPENAI_COMPATIBLE_MODEL "${primary}" is not in OPENAI_COMPATIBLE_MODELS — provider disabled.`,
+    );
+    return null;
+  }
+  const chain = [primary, ...allowed.filter((slug) => slug !== primary).slice(0, maxRotations())];
+  const isOpenRouter = /openrouter\.ai/i.test(baseUrl);
   return {
     name: "openai-compatible",
-    model,
+    model: primary,
     async complete(request) {
-      const res = await postJson(
-        `${baseUrl.replace(/\/$/, "")}/chat/completions`,
-        key ? { authorization: `Bearer ${key}` } : {},
-        {
-          model,
-          max_tokens: request.maxTokens ?? 1200,
-          temperature: request.temperature ?? 0.3,
-          ...(request.jsonHint ? { response_format: { type: "json_object" } } : {}),
-          messages: [
-            {
-              role: "system",
-              content: request.jsonHint
-                ? `${request.system}\n\nReply with JSON only, matching: ${request.jsonHint}`
-                : request.system,
-            },
-            ...withImages(request, (text, images) => [
-              { type: "text", text },
-              ...images.map((image) => ({
-                type: "image_url",
-                image_url: { url: `data:${image.mediaType};base64,${image.base64}` },
-              })),
-            ]),
-          ],
-        },
-      );
-      if (!res.ok) throw new Error(`openai-compatible ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      return (json.choices?.[0]?.message?.content ?? "").trim();
+      let lastError: unknown = null;
+      for (const model of chain) {
+        try {
+          const headers: Record<string, string> = {};
+          if (key) headers.authorization = `Bearer ${key}`;
+          if (isOpenRouter) {
+            headers["http-referer"] = "https://revise.local";
+            headers["x-title"] = "Revise";
+          }
+          const res = await postJson(`${baseUrl.replace(/\/$/, "")}/chat/completions`, headers, {
+            model,
+            max_tokens: request.maxTokens ?? 1200,
+            temperature: request.temperature ?? 0.3,
+            ...(request.jsonHint ? { response_format: { type: "json_object" } } : {}),
+            messages: [
+              {
+                role: "system",
+                content: request.jsonHint
+                  ? `${request.system}\n\nReply with JSON only, matching: ${request.jsonHint}`
+                  : request.system,
+              },
+              ...withImages(request, (text, images) => [
+                { type: "text", text },
+                ...images.map((image) => ({
+                  type: "image_url",
+                  image_url: { url: `data:${image.mediaType};base64,${image.base64}` },
+                })),
+              ]),
+            ],
+          });
+          if (!res.ok) throw new Error(`openai-compatible ${res.status}: ${(await res.text()).slice(0, 200)}`);
+          const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+          const content = (json.choices?.[0]?.message?.content ?? "").trim();
+          if (!content) throw new Error("openai-compatible returned an empty completion");
+          return content;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error("openai-compatible failed");
     },
   };
 }
