@@ -18,6 +18,13 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 25_000): Promise
   const today = page.locator("main#main");
   let outcome: ShellState | null = null;
   await expect(async () => {
+    // A store that cannot be read is a dead end, not something to keep polling
+    // for. Surface the reason immediately instead of burning the full timeout
+    // and reporting only "main#main not found".
+    const bootError = await page
+      .evaluate(() => document.querySelector("[data-boot-error]")?.getAttribute("data-boot-error") ?? null)
+      .catch(() => null);
+    if (bootError) throw new Error(`app failed to boot: ${bootError}`);
     if (await onboarding.isVisible().catch(() => false)) {
       outcome = "onboarding";
       return;

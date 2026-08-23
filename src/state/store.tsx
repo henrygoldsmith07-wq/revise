@@ -184,12 +184,15 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   });
   const bootstrapped = useRef(false);
   const [replanSummary, setReplanSummary] = useState<string | null>(null);
+  // Boot must never fail silently: see the try/catch below.
+  const [bootError, setBootError] = useState<string | null>(null);
   const lastFingerprint = useRef<ReplanFingerprint | null>(null);
 
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
     void (async () => {
+      try {
       const [loaded, checkpoint, assignment] = await Promise.all([
         repo.loadSnapshot(userId),
         repo.loadRevisionCheckpoint(userId),
@@ -214,6 +217,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         const healed = rescheduleMissed(loaded.plannedSessions, today, 6);
         await repo.savePlan(healed);
         setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
+      }
+      } catch (error) {
+        // Without this the rejection went unhandled, `snapshot` stayed null,
+        // and the app sat on "Loading your revision data…" forever with
+        // nothing on screen saying why. An offline-first app that cannot read
+        // its own store has to say so rather than spin.
+        setBootError(error instanceof Error ? error.message : String(error));
       }
     })();
   }, [userId]);
@@ -985,8 +995,36 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     recordExperimentEvent,
   ]);
 
+  if (bootError) return <BootFailure message={bootError} />;
   if (!value) return <BootScreen />;
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+/**
+ * Shown when the store could not be read at all. Deliberately not a spinner:
+ * a boot that cannot finish is a dead end, so it names the failure and offers
+ * the one action that can help.
+ */
+function BootFailure({ message }: { message: string }) {
+  return (
+    <div className="min-h-dvh grid place-items-center bg-bg p-6">
+      <div
+        className="flex max-w-md flex-col items-center gap-3 text-center"
+        role="alert"
+        data-boot-error={message}
+      >
+        <p className="text-sm font-semibold text-ink">Your revision data could not be loaded.</p>
+        <p className="text-xs text-ink3">{message}</p>
+        <button
+          type="button"
+          className="rounded-[8px] border border-line px-3 py-1.5 text-xs text-ink2"
+          onClick={() => window.location.reload()}
+        >
+          Try again
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function BootScreen() {
