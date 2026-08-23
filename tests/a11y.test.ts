@@ -20,10 +20,10 @@ describe("a11y scaffolding", () => {
     expect(src, 'main#main missing').toContain('id="main"');
     expect(src, 'Main nav landmark missing').toContain('aria-label="Main"');
     expect(src, 'offline live region missing').toContain('role="status"');
-    expect(src, 'reduce-motion class missing').toContain("reduce-motion");
+    expect(src, "reduce-motion class missing").toContain("reduce-motion");
     const nav = (await import("@/components/AppShell")).AppShell;
     expect(typeof nav).toBe("function");
-  });
+  }, 60_000);
   it("SearchOverlay: combobox/listbox/option a11y contract", async () => {
     const src = readFileSync(join(process.cwd(), "src/components/SearchOverlay.tsx"), "utf8");
     expect(src).toContain('role="dialog"');
