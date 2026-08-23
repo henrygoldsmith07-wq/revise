@@ -76,19 +76,25 @@ function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
  * shared three-character prefix so sibling scheme points that happen to
  * sound alike are not credited by each other.
  */
-export function pointCoverage(point: string, answer: string): number {
+export function pointCoverage(point: string, answer: string, earlyExitAt?: number): number {
   const wanted = [...tokenise(point)];
   if (!wanted.length) return 0;
   const given = [...tokenise(answer)];
   const exact = new Set(given);
-  const hits = wanted.filter((w) => {
+  let exactHits = 0;
+  for (const w of wanted) if (exact.has(w)) exactHits++;
+  // Fast path: when exact keyword coverage already clears the caller threshold,
+  // skip the fuzzy scan entirely — the hot loop in marking and benchmarks.
+  if (earlyExitAt != null && exactHits / wanted.length >= earlyExitAt) return exactHits / wanted.length;
+  const missing = earlyExitAt != null ? wanted.filter((w) => !exact.has(w)) : wanted;
+  const hits = missing.filter((w) => {
     if (exact.has(w)) return true;
     if (w.length >= 8 && given.some((g) => g.length >= 8 && g.slice(0, 3) === w.slice(0, 3) && withinEditDistance(g, w, 2))) {
       return true;
     }
     return w.length >= 5 && given.some((g) => g.length >= 5 && withinEditDistance(g, w, 1));
   }).length;
-  return hits / wanted.length;
+  return (earlyExitAt != null ? exactHits + hits : hits) / wanted.length;
 }
 
 /** Normalise a numeric string: strip thousands separators and keep a single canonical decimal form. */
@@ -98,7 +104,20 @@ function parseScalar(raw: string): number | null {
 }
 
 /** Extract every number-like token from free text, including fractions, simple exponents and scientific notation. */
-function extractNumbers(input: string): Array<{ raw: string; value: number | null; denom?: number }> {
+/** Bounded memo: scheme/answer strings repeat heavily across marking calls
+ *  (same part, many adversarial variants) and the scan is regex-heavy. */
+type NumberHitX = { raw: string; value: number | null; denom?: number };
+const NUMBER_CACHE = new Map<string, NumberHitX[]>();
+function extractNumbersCached(text: string): NumberHitX[] {
+  const hit = NUMBER_CACHE.get(text);
+  if (hit) return hit;
+  const result = extractNumbersUncached(text);
+  if (NUMBER_CACHE.size > 512) NUMBER_CACHE.clear();
+  NUMBER_CACHE.set(text, result);
+  return result;
+}
+
+function extractNumbersUncached(input: string): Array<{ raw: string; value: number | null; denom?: number }> {
   // Normalise unicode super/subscripts so "×10⁻³" reads as "x10-3".
   const SUPERS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9" };
   const text = input.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻₀-₉]/g, (ch) => SUPERS[ch] ?? ch);
@@ -222,38 +241,43 @@ function sameToTwoSigFigs(a: number, b: number): boolean {
 
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 function numericMatch(point: string, answer: string): boolean {
-  const wanted = extractNumbers(point.replace(/[−–—]/g, "-"));
+  const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
   if (!wanted.length) return false;
-  const given = extractNumbers(answer.replace(/[−–—]/g, "-"));
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-"));
   if (!given.length) return false;
   // Also accept unicode fractions like ½ ¼ ¾
   const unicodeFrac: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1/3, "⅔": 2/3 };
   for (const ch of Object.keys(unicodeFrac)) if (answer.includes(ch)) given.push({ raw: ch, value: unicodeFrac[ch] });
   for (const ch of Object.keys(unicodeFrac)) if (point.includes(ch)) wanted.push({ raw: ch, value: unicodeFrac[ch] });
-  // Unit-aware quantities: a value with a unit on one side pairs against the
-  // other side's same-dimension value (prefix-converted) or its bare value.
-  const wantedQuantities = quantities(point);
-  const givenQuantities = quantities(answer);
+  // Unit-aware quantities are computed lazily: most scheme points carry no
+  // units, and scanning the answer for "number+unit" pairs is pure waste then.
+  let wantedQuantities: ReturnType<typeof quantities> | null = null;
+  const wantQuantities = () => (wantedQuantities ??= quantities(point));
   for (const w of wanted) {
     if (w.value == null) continue;
     for (const g of given) {
       if (g.value == null) continue;
       if (numbersClose(w.value, g.value)) {
         // Values are close; the unit gate can still veto cross-family pairs.
-        const qw = wantedQuantities.find((q) => q.value === w.value);
-        const qg = givenQuantities.find((q) => q.value === g.value);
-        if (!qw?.unit || !qg?.unit || quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+        const qw = wantQuantities().find((q) => q.value === w.value);
+        if (!qw?.unit) return true;
+        const qg = quantities(answer).find((q) => q.value === g.value);
+        if (!qg?.unit || quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
       }
       // Exact raw string match as a fallback (covers trailing zeros, etc.)
       if (w.raw === g.raw) return true;
     }
   }
   // Prefix-conversion rescue: "3500 J" vs "3.5 kJ" is close only after conversion.
-  for (const qw of wantedQuantities) {
-    if (!qw.unit) continue;
-    for (const qg of givenQuantities) {
-      if (!qg.unit || qg.value === qw.value) continue;
-      if (quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+  wantedQuantities = wantQuantities();
+  if (wantedQuantities.some((q) => q.unit != null)) {
+    const givenQuantities = quantities(answer);
+    for (const qw of wantedQuantities) {
+      if (!qw.unit) continue;
+      for (const qg of givenQuantities) {
+        if (!qg.unit || qg.value === qw.value) continue;
+        if (quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+      }
     }
   }
   // Examiner tolerance: an explicit "(accept X)" or two-significant-figure
@@ -266,7 +290,7 @@ function numericMatch(point: string, answer: string): boolean {
       if (gv == null) continue;
       if (numbersClose(gv, alt, 0.05, 0.05)) return true;
     }
-    for (const g of givenQuantities) {
+    for (const g of quantities(answer)) {
       if (g.unit == null) continue;
       if (numbersClose(g.value, alt, 0.05, 0.05)) return true;
     }
@@ -492,7 +516,7 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
 
   for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
-    const cov = pointCoverage(point, trimmed);
+    const cov = pointCoverage(point, trimmed, thresh);
     const num = numericMatch(point, trimmed);
     // Symbolic layer: when both the point and the answer contain a parseable
     // algebra expression, accept equivalent forms (`(x+2)(x-3)` for `x^2 - x - 6`)

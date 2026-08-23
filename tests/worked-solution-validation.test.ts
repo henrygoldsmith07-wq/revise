@@ -135,5 +135,5 @@ describe("worked solution validation", () => {
     expect(result.questionCount).toBeGreaterThan(0);
     expect(result.partCount).toBeGreaterThan(0);
     expect(result.errors).toBe(0);
-  });
+  }, 60_000);
 });

@@ -27,6 +27,7 @@ import { authenticSourceQuestions } from "./questions/authentic-source";
 import { ocrAuthoredQuestions } from "./questions/ocr-authored";
 import { extendedResponseQuestions } from "./questions/extended-responses";
 import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
+import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -35,6 +36,7 @@ export { CONTENT_SCHEMAS, contentCardSchema, contentQuestionPartSchema, contentQ
 /** The authored question bank. Uploaded and AI-generated questions live in
  *  IndexedDB alongside these and are treated identically everywhere else. */
 export const seedQuestions: Question[] = [
+  ...flagshipPhysicsDepthQuestions,
   ...evidenceExpansionQuestions,
   ...authenticExpansionQuestions,
   ...gcseExpansionQuestions,

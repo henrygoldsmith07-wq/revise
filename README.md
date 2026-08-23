@@ -66,6 +66,22 @@ source immediately.
 | **Input** | Typing, voice dictation, or a photo of handwritten working (OCR). LaTeX throughout. |
 | **Offline** | IndexedDB-first with a durable outbox. Installable PWA. Everything works on a train. |
 
+## Depth first: flagship subject combinations
+
+Breadth is paused. Four WJEC A-level flagships - Mathematics, Biology,
+Chemistry, Physics - are being built to per-statement depth: for every
+specification point, retrieval cards plus simple, application,
+unfamiliar-context, misconception and harder/synoptic questions, each with
+a worked solution and verified provenance. The headline the depth ledger
+(on /benchmarks) makes computable is not "440 topics" but:
+
+> N% of WJEC A-level Physics specification statements have at least four
+> independently reviewed exam questions covering recall, application and
+> transfer.
+
+Everything outside the flagships remains reference-tier: usable, searchable,
+and honestly labelled, but not where authoring effort goes.
+
 ## Architecture
 
 ```

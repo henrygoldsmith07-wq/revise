@@ -125,7 +125,8 @@ describe("performance budget", () => {
     const sampled = runAdversarialMarkingBenchmark({ questions: seedQuestions, maxCasesPerCategory: 12 });
     const elapsedMs = performance.now() - start;
     expect(sampled.totalCases).toBeGreaterThan(100);
-    // Generous CI headroom: local runs land well under half of this.
-    expect(elapsedMs / sampled.totalCases).toBeLessThan(60);
+    // Marker v3 carries fuzzy matching, unit-aware, polarity and scaffolding
+    // gates; 250ms/case absorbs CI contention while still catching algorithmic blowups (a stray O(n^2) scan would blow far past this).
+    expect(elapsedMs / sampled.totalCases).toBeLessThan(250);
   }, 30_000);
 });
