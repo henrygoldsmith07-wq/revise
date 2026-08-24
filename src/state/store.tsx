@@ -74,6 +74,7 @@ import { LOCAL_USER_ID } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
+import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
 import { assignArm as assignExperimentArm, type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
 import {
@@ -157,6 +158,8 @@ interface StoreValue extends Snapshot {
   joinExperiment(): Promise<void>;
   leaveExperiment(): Promise<void>;
   recordExperimentEvent(type: ExperimentEventType, task: { taskId: string; activity: string; topicId?: Id | null }, at?: string): Promise<void>;
+  recordFunnel(type: FunnelEventType, detail?: string): Promise<void>;
+  funnelEvents: FunnelEvent[];
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -173,6 +176,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
   const [experimentArm, setExperimentArm] = useState<ExperimentAssignment | null>(null);
+  const [funnelEvents, setFunnelEvents] = useState<FunnelEvent[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -186,17 +190,38 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [replanSummary, setReplanSummary] = useState<string | null>(null);
   const lastFingerprint = useRef<ReplanFingerprint | null>(null);
 
+  const recordFunnel = useCallback(async (type: FunnelEventType, detail?: string) => {
+    const now = Date.now();
+    const windows: Record<FunnelEventType, number> = { app_opened: 3_600_000, recommendation_displayed: 6 * 3_600_000, recommendation_accepted: 0, feedback_read: 0 };
+    const existing = ((await readReviseMeta<Array<{ anonId: string; type: FunnelEventType; at: string; detail?: string }>>("funnelEvents")) ?? []);
+    let last: number | null = null;
+    for (let i = existing.length - 1; i >= 0; i--) {
+      const e = existing[i];
+      if (e.type !== type || (detail != null && e.detail !== detail)) continue;
+      last = new Date(e.at).getTime();
+      break;
+    }
+    if (type !== "recommendation_accepted" && type !== "feedback_read" && last != null && now - last < windows[type]) return;
+    const log = existing;
+    const nextFunnel = [...log.slice(-2000), { anonId: userId, type, at: new Date(now).toISOString(), detail }];
+    await writeReviseMeta("funnelEvents", nextFunnel);
+    setFunnelEvents(nextFunnel);
+  }, [userId]);
+
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
+    void recordFunnel("app_opened");
     void (async () => {
-      const [loaded, checkpoint, assignment] = await Promise.all([
+      const [loaded, checkpoint, assignment, funnel] = await Promise.all([
         repo.loadSnapshot(userId),
         repo.loadRevisionCheckpoint(userId),
         readReviseMeta<ExperimentAssignment>("experimentAssignment"),
+        readReviseMeta<FunnelEvent[]>("funnelEvents"),
       ]);
       setRevisionCheckpoint(checkpoint ?? null);
       setExperimentArm(assignment ?? null);
+      setFunnelEvents(funnel ?? []);
       setSnapshot(loaded);
       lastFingerprint.current = computeFingerprint({
         exams: loaded.examDates,
@@ -669,6 +694,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     await writeReviseMeta("experimentEvents", next);
   }, [experimentArm]);
 
+
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
       const isRetest = Boolean(attempt.retestMistakeId);
@@ -931,6 +957,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       joinExperiment,
       leaveExperiment,
       recordExperimentEvent,
+      recordFunnel,
+      funnelEvents,
     };
   }, [
     snapshot,

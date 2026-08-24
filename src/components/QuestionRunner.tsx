@@ -83,6 +83,8 @@ export function QuestionRunner({
 
   const awarded = useMemo(() => result?.marked.reduce((a, m) => a + m.awarded, 0) ?? 0, [result]);
 
+  const funnelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (funnelTimer.current) clearTimeout(funnelTimer.current); }, []);
   async function submit() {
     setMarking(true);
     try {
@@ -125,6 +127,11 @@ export function QuestionRunner({
     const submittedAnswers = isMcq ? { [question.parts[0]?.id ?? question.id]: String(choice) } : answers;
     const markedBy: Attempt["markedBy"] = source === "ai" ? "ai" : "rubric";
     const attemptId = crypto.randomUUID();
+    // Feedback-read telemetry: fires once the result view has been on screen
+    // for a moment; unmount before that means it was never read.
+    funnelTimer.current = setTimeout(() => {
+      void store.recordFunnel("feedback_read", attemptId);
+    }, 2500);
     const createdAt = new Date().toISOString();
     // Rubric marks carry evidence-derived confidence too, so genuinely
     // ambiguous offline marking reaches the same review queue as AI marks.
@@ -148,6 +155,7 @@ export function QuestionRunner({
       markedBy,
       markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
       markEscalation,
+
       elapsedMs,
       mode,
       ...(paperId ? { paperId } : {}),

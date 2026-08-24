@@ -25,8 +25,9 @@ export default function TodayPage() {
   const experimentArm = store.experimentArm;
   const recordExperimentEvent = store.recordExperimentEvent;
   useEffect(() => {
-    if (!experimentArm || !primary) return;
-    const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
+    if (!primary) return;
+    void store.recordFunnel("recommendation_displayed", `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`);
+    if (!experimentArm) return;    const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
     void recordExperimentEvent("shown", { taskId, activity: primary.activity, topicId: primary.topicId ?? null });
   }, [experimentArm, primary, recordExperimentEvent, today]);
   const todaysPlan = useMemo(() => planForDate(plannedSessions, today), [plannedSessions, today]);

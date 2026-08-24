@@ -11,6 +11,7 @@ import { Panel, SectionHeading, Pill, ProgressBar } from "@/components/ui";
 import { AdversarialMarkingPanel } from "@/components/AdversarialMarkingPanel";
 import { ExaminerBenchmarkPanel } from "@/components/ExaminerBenchmarkPanel";
 import { FlagshipDepthPanel } from "@/components/FlagshipDepthPanel";
+import { FunnelPanel } from "@/components/FunnelPanel";
 
 // Public benchmark page — the honest ledger.
 // Every number is computed live in the browser from the same deterministic
@@ -267,6 +268,8 @@ export default function BenchmarksPage() {
       </section>
 
             <AdversarialMarkingPanel />
+
+      <FunnelPanel />
 
       <FlagshipDepthPanel />
 
