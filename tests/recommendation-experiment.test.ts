@@ -110,8 +110,8 @@ describe("analyseExperiment", () => {
     const control = analysis.arms.find((a) => a.arm === "control")!;
     expect(revise.hoursPractised).toBeCloseTo(1, 1);
     expect(revise.marksEarned).toBe(4);
-    expect(revise.marksPerHour).toBe(4);
-    expect(control.marksPerHour).toBe(1);
+    expect(revise.practiceMarksPerHour).toBe(4);
+    expect(control.practiceMarksPerHour).toBe(1);
     expect(analysis.marksPerHourEffect).toBeNull(); // efficacy gate requires all four arms populated
   });
 
@@ -169,6 +169,6 @@ describe("analyseExperiment", () => {
       minParticipantsPerArm: 1,
     });
     const revise = analysis.arms.find((a) => a.arm === "revise")!;
-    expect(revise.transferShare).toBeCloseTo(1); // both post-assignment questions unseen before
+    expect(revise.unseenExposureShare).toBeCloseTo(1); // both post-assignment questions unseen before
   });
 });

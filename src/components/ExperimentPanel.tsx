@@ -7,7 +7,7 @@ import { Panel, SectionHeading } from "./ui";
 
 // Live view of the prospective recommendation experiment for the enrolled
 // profile. Every number is computed from locally recorded attempts, reviews
-// and shown/rejected events — the same pure analysis CI pins. Until all four
+// and shown/rejected events â€” the same pure analysis CI pins. Until all four
 // arms have real participants the panel refuses to headline an effect.
 
 const ARM_LABELS: Record<string, string> = {
@@ -20,10 +20,10 @@ const ARM_LABELS: Record<string, string> = {
 const METRIC_LABELS: Array<[string, keyof import("@/domain/recommendation-experiment").ArmOutcome]> = [
   ["Practice hours", "hoursPractised"],
   ["Marks earned", "marksEarned"],
-  ["Marks per hour", "marksPerHour"],
+  ["Marks per hour", "practiceMarksPerHour"],
   ["Marks per activity", "marksPerActivity"],
   ["Delayed retention (7d+)", "delayedRetention"],
-  ["Unseen-question share", "transferShare"],
+  ["Unseen-question share", "unseenExposureShare"],
   ["Mastery calibration error", "masteryCalibrationError"],
   ["Recommendation completion", "completionRate"],
   ["Recommendation rejection", "rejectionRate"],
@@ -33,7 +33,7 @@ const METRIC_LABELS: Array<[string, keyof import("@/domain/recommendation-experi
 ];
 
 function formatValue(key: string, value: unknown): string {
-  if (value == null) return "—";
+  if (value == null) return "â€”";
   if (typeof value !== "number") return String(value);
   if (/rate|share|retention|error|dropout/i.test(key)) return `${Math.round(value * 100)}%`;
   if (/begin/i.test(key)) return value < 90 ? `${Math.round(value)}s` : `${Math.round(value / 60)} min`;
@@ -83,7 +83,7 @@ export function ExperimentPanel() {
             <div key={String(key)} className="rounded-[8px] border border-line px-2.5 py-2">
               <p className="text-[11px] text-ink3">{label}</p>
               <p className="text-sm font-semibold tabular-nums text-ink mt-0.5">
-                {mine ? formatValue(String(key), mine[key]) : "—"}
+                {mine ? formatValue(String(key), mine[key]) : "â€”"}
               </p>
             </div>
           ))}

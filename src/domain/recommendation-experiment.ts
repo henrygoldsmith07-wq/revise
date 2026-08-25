@@ -10,9 +10,14 @@
 //
 // Assignment is deterministic per anonymous participant, events accumulate in
 // local-first meta storage, and analyseExperiment() turns them into the ten
-// preregistered metrics with an honest insufficiency gate: nothing here may
-// claim improvement until real participants exist. This module is pure — no
-// React, no IndexedDB, no fetch.
+// preregistered metrics with a four-tier readiness gate. This module is pure.
+//
+// Measurement integrity:
+//   practiceMarksPerHour  = raw throughput during revision (NOT learning gain)
+//   unseenExposureShare   = fraction of attempts on unseen questions (exposure)
+//   unseenTransferScore   = accuracy on unseen attempts (transfer performance)
+//   marksPerHourEffect    = only surfaced when ALL arms have data AND delayed
+//                           retention + unseen transfer + final assessments exist
 // ---------------------------------------------------------------------------
 
 import type { Id, IsoDate, IsoInstant } from "./types";
@@ -39,15 +44,6 @@ export interface ExperimentEvent {
 }
 
 
-export interface PolicyTask {
-  kind: "practice-topic" | "review-card";
-  topicId: Id | null;
-  cardId: Id | null;
-  /** Why this baseline picked it — shown verbatim in the UI. */
-  reason: string;
-}
-
-/** FNV-1a: stable across sessions so a participant keeps their arm. */
 function hashAnon(anonId: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < anonId.length; i++) {
@@ -62,10 +58,8 @@ export function assignArm(anonId: string, now = new Date()): ExperimentAssignmen
   return { anonId, arm, assignedAt: now.toISOString(), version: 1 };
 }
 
-/**
- * Baseline policies. The `revise` arm passes through the production
- * recommendation; `control` surfaces nothing by design.
- */
+export interface PolicyTask { kind: "practice-topic" | "review-card"; topicId: Id | null; cardId: Id | null; reason: string }
+
 export function policyTaskFor(
   arm: ExperimentArm,
   input: {
@@ -78,26 +72,13 @@ export function policyTaskFor(
     const weakest = [...input.mastery]
       .sort((a, b) => a.mastery - b.mastery || String(a.lastStudiedAt ?? "").localeCompare(String(b.lastStudiedAt ?? "")))[0];
     if (!weakest) return null;
-    return {
-      kind: "practice-topic",
-      topicId: weakest.topicId,
-      cardId: null,
-      reason: "Your lowest-mastery topic right now.",
-    };
+    return { kind: "practice-topic", topicId: weakest.topicId, cardId: null, reason: "Your lowest-mastery topic right now." };
   }
   const mostOverdue = [...input.dueCounts].sort((a, b) => b.due - a.due || a.oldestDue.localeCompare(b.oldestDue))[0];
   if (!mostOverdue || mostOverdue.due <= 0) return null;
-  return {
-    kind: "review-card",
-    topicId: mostOverdue.topicId,
-    cardId: null,
-    reason: `${mostOverdue.due} overdue ${mostOverdue.due === 1 ? "card" : "cards"} — the most overdue FSRS queue.`,
-  };
+  return { kind: "review-card", topicId: mostOverdue.topicId, cardId: null, reason: `${mostOverdue.due} overdue ${mostOverdue.due === 1 ? "card" : "cards"} — the most overdue FSRS queue.` };
 }
 
-// ---------------------------------------------------------------------------
-// Analysis
-// ---------------------------------------------------------------------------
 
 export interface AttemptLike {
   anonId: string;
@@ -116,10 +97,7 @@ export interface ReviewLike {
   grade: string;
 }
 
-interface ParticipantWindow {
-  assignedAt: number;
-  arm: ExperimentArm;
-}
+interface ParticipantWindow { assignedAt: number; arm: ExperimentArm }
 
 function median(values: number[]): number | null {
   if (!values.length) return null;
@@ -133,10 +111,14 @@ export interface ArmOutcome {
   participants: number;
   hoursPractised: number;
   marksEarned: number;
-  marksPerHour: number | null;
+  /** Raw practice throughput — NOT learning gain. */
+  practiceMarksPerHour: number | null;
   marksPerActivity: number | null;
   delayedRetention: number | null;
-  transferShare: number | null;
+  /** Share of post-assignment attempts on previously unseen questions (exposure composition). */
+  unseenExposureShare: number | null;
+  /** Accuracy on unseen post-assignment attempts (transfer performance proxy). */
+  unseenTransferScore: number | null;
   masteryCalibrationError: number | null;
   completionRate: number | null;
   rejectionRate: number | null;
@@ -146,25 +128,7 @@ export interface ArmOutcome {
   shownCount: number;
 }
 
-export interface ExperimentAnalysis {
-  arms: ArmOutcome[];
-  /** revise.marksPerHour − control.marksPerHour; null unless efficacyClaimReady. */
-  marksPerHourEffect: number | null;
-  /** Honest gate — no claims until every arm has real participants AND delayed unseen assessments. */
-  sufficientData: boolean;
-  readiness: ExperimentReadiness;
-  gates: ExperimentReadinessGates;
-  note: string;
-}
-
-/**
- * Four escalating readiness tiers. Each implies the ones before it.
- *   enrolling               assignments exist but no arm has enough data
- *   operationally-usable    every arm has ≥ minParticipants
- *   descriptive-results     per-arm descriptive stats are reportable (hours + marks)
- *   primary-outcome-ready   delayed retention and unseen transfer computed for all arms
- *   efficacy-claim-ready    primary outcome ready + final assessments exist for ≥ minParticipants in each arm
- */
+/** Four escalating readiness tiers. Each implies the ones before it. */
 export type ExperimentReadiness =
   | "enrolling"
   | "operationally-usable"
@@ -173,14 +137,20 @@ export type ExperimentReadiness =
   | "efficacy-claim-ready";
 
 export interface ExperimentReadinessGates {
-  /** Every arm has at least one participant. */
   operationallyUsable: boolean;
-  /** Descriptive per-arm stats are reportable (hours + marks). */
   descriptiveResultsReady: boolean;
-  /** Delayed retention and unseen-transfer computed for all arms. */
   primaryOutcomeReady: boolean;
-  /** Full preregistered evidence: all of the above plus final assessments. */
   efficacyClaimReady: boolean;
+}
+
+export interface ExperimentAnalysis {
+  arms: ArmOutcome[];
+  /** revise.practiceMarksPerHour − control.practiceMarksPerHour; null unless efficacyClaimReady. */
+  marksPerHourEffect: number | null;
+  sufficientData: boolean;
+  readiness: ExperimentReadiness;
+  gates: ExperimentReadinessGates;
+  note: string;
 }
 
 export interface AnalyseExperimentInput {
@@ -188,17 +158,17 @@ export interface AnalyseExperimentInput {
   events: ExperimentEvent[];
   attempts: AttemptLike[];
   reviews: ReviewLike[];
-  /** topicId -> current mastery estimate (0..1). */
   masteryByTopic: Map<Id, number>;
-  /** Optional final mock/exam results: percent per participant. */
   finalPerformance?: Map<string, number>;
   now?: Date;
-  /** Minimum participants per arm before any headline is allowed. */
   minParticipantsPerArm?: number;
 }
 
 const MS_HOUR = 3_600_000;
 const DROPOUT_DAYS = 14;
+
+function round(n: number): number { return Math.round(n * 1000) / 1000; }
+function rate(n: number, d: number): number | null { return d ? round(n / d) : null; }
 
 function armOutcome(
   arm: ExperimentArm,
@@ -213,14 +183,13 @@ function armOutcome(
   const participants = new Set<string>();
   for (const [anon, w] of windows) if (w.arm === arm) participants.add(anon);
 
+  // Post-assignment attempts for this arm only.
   const mine = attempts.filter((a) => {
     const w = windows.get(a.anonId);
     return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt;
   });
   const myEvents = events.filter((e) => windows.get(e.anonId)?.arm === arm);
-  // Only reviews AFTER the participant's assignment date contribute to the
-  // experimental delayed-retention measurement — pre-experiment FSRS history
-  // is baseline, not treatment effect.
+  // Only reviews AFTER assignment — pre-experiment FSRS history is baseline.
   const myReviews = reviews.filter((r) => {
     const w = windows.get(r.anonId);
     return w?.arm === arm && new Date(r.reviewedAt).getTime() >= w.assignedAt;
@@ -228,9 +197,9 @@ function armOutcome(
 
   const hours = mine.reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
   const marks = mine.reduce((acc, a) => acc + a.awarded, 0);
-  const marksPerHour = hours >= 0.25 && mine.length ? marks / hours : null;
+  const practiceMarksPerHour = hours >= 0.25 && mine.length ? marks / hours : null;
 
-  // Delayed retention: reviews of a card at least 7 days after its previous review.
+  // Delayed retention from post-assignment reviews ≥7 days apart.
   const lastSeen = new Map<string, number>();
   let retained = 0;
   let delayedTotal = 0;
@@ -245,10 +214,7 @@ function armOutcome(
     lastSeen.set(key, t);
   }
 
-  // Transfer: per-participant exposure history — a question is only
-  // "previously seen" if THIS participant attempted it before THEIR OWN
-  // assignment date. Never use the cohort's earliest assignment date for an
-  // individual exposure history.
+  // Per-participant unseen exposure: a question is unseen if THIS participant never attempted it before THEIR assignment.
   const seenByParticipant = new Map<string, Set<Id>>();
   for (const a of attempts) {
     const w = windows.get(a.anonId);
@@ -262,7 +228,13 @@ function armOutcome(
     return !prior || !prior.has(a.questionId);
   });
 
-  // Calibration: |current mastery − observed accuracy| per topic with enough evidence.
+  // Unseen transfer score: accuracy on the unseen subset.
+  const unseenScored = unseenAttempts.filter((a) => a.max > 0);
+  const unseenScore = unseenScored.length
+    ? round(unseenScored.reduce((acc, a) => acc + a.awarded, 0) / unseenScored.reduce((acc, a) => acc + a.max, 0))
+    : null;
+
+  // Calibration.
   const byTopic = new Map<Id, { earned: number; possible: number }>();
   for (const a of mine) {
     const key = a.topicIds[0];
@@ -296,52 +268,50 @@ function armOutcome(
     }
   }
 
+  // Dropout: sort by timestamp before finding latest — input may not be chronological.
   const cutoff = now.getTime() - DROPOUT_DAYS * 86_400_000;
   let neverActivated = 0;
   let inactive = 0;
-  let studyDropout = 0;
   let completedStudy = 0;
-  for (const anon of participants) {
-    const latest = [...attempts].reverse().find((a) => a.anonId === anon)?.createdAt;
-    if (!latest || new Date(latest).getTime() < cutoff) {
-      if (!latest) neverActivated++;
-      else inactive++;
-    } else if (windows.get(anon)?.arm != null && new Date(latest).getTime() >= cutoff) {
-      completedStudy++;
-    } else {
-      studyDropout++;
-    }
+  for (const p of participants) {
+    const myAttempts = attempts.filter((a) => a.anonId === p).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const lastAttempt = myAttempts.at(-1);
+    if (!lastAttempt) neverActivated++;
+    else if (new Date(lastAttempt.createdAt).getTime() < cutoff) inactive++;
+    else completedStudy++;
   }
-  const dropoutRate = participants.size
-    ? Math.round(((neverActivated + studyDropout) / participants.size) * 1000) / 1000
-    : null;
+  const dropoutRate = participants.size ? round((neverActivated + inactive) / participants.size) : null;
 
   const finals = participants.size
     ? [...participants].map((anon) => finalPerformance?.get(anon)).filter((v): v is number => v != null)
     : [];
 
-  const rate = (n: number, d: number): number | null => (d ? Math.round((n / d) * 1000) / 1000 : null);
   return {
     arm,
     participants: participants.size,
     hoursPractised: Math.round(hours * 100) / 100,
     marksEarned: marks,
-    marksPerHour: marksPerHour != null ? Math.round(marksPerHour * 100) / 100 : null,
+    practiceMarksPerHour: practiceMarksPerHour != null ? round(practiceMarksPerHour) : null,
     marksPerActivity: rate(marks, mine.length),
-    delayedRetention: delayedTotal >= 8 ? Math.round((retained / delayedTotal) * 1000) / 1000 : null,
-    transferShare: rate(unseenAttempts.length, mine.length),
-    masteryCalibrationError: calTopics ? Math.round((calSum / calTopics) * 1000) / 1000 : null,
+    delayedRetention: delayedTotal >= 8 ? round(retained / delayedTotal) : null,
+    unseenExposureShare: rate(unseenAttempts.length, mine.length),
+    unseenTransferScore: unseenScore,
+    masteryCalibrationError: calTopics ? round(calSum / calTopics) : null,
     completionRate: rate(completed, shown),
     rejectionRate: rate(rejected, shown),
     medianSecondsToBegin: median(beginPairs),
     dropoutRate,
-    finalPerformancePercent: finals.length
-      ? Math.round((finals.reduce((a, b) => a + b, 0) / finals.length) * 10) / 10
-      : null,
+    finalPerformancePercent: finals.length ? round(finals.reduce((a, b) => a + b, 0) / finals.length) : null,
     shownCount: shown,
   };
 }
 
+/**
+ * Four escalating readiness tiers, each implying the ones before it.
+ * Efficacy claim requires: all four arms populated, delayed retention and
+ * unseen transfer computed for every arm, final assessments recorded for
+ * every arm, and minimum follow-up duration elapsed since first enrolment.
+ */
 export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnalysis {
   const now = input.now ?? new Date();
   const windows = new Map<string, ParticipantWindow>();
@@ -350,88 +320,84 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     const existing = windows.get(a.anonId);
     if (!existing || at < existing.assignedAt) windows.set(a.anonId, { assignedAt: at, arm: a.arm });
   }
-  const minParticipants = input.minParticipantsPerArm ?? 5;
+  const minP = input.minParticipantsPerArm ?? 5;
   const arms = EXPERIMENT_ARMS.map((arm) =>
     armOutcome(arm, windows, input.events, input.attempts, input.reviews, input.masteryByTopic, input.finalPerformance, now),
   );
   const revise = arms.find((a) => a.arm === "revise")!;
   const control = arms.find((a) => a.arm === "control")!;
-  const baselineMastery = arms.find((a) => a.arm === "baseline-mastery");
-  const baselineOverdue = arms.find((a) => a.arm === "baseline-overdue");
+  const bm = arms.find((a) => a.arm === "baseline-mastery")!;
+  const bo = arms.find((a) => a.arm === "baseline-overdue")!;
 
-  // --- readiness gates -------------------------------------------------------
-  const allArmsPopulated =
-    revise != null && control != null && baselineMastery != null && baselineOverdue != null;
+  const allPopulated = Boolean(revise && control && bm && bo);
 
   const operationallyUsable =
-    allArmsPopulated &&
-    revise.participants >= minParticipants &&
-    control.participants >= minParticipants &&
-    baselineMastery.participants >= minParticipants &&
-    baselineOverdue.participants >= minParticipants;
+    allPopulated &&
+    revise.participants >= minP &&
+    control.participants >= minP &&
+    bm.participants >= minP &&
+    bo.participants >= minP;
 
-  const descriptiveResultsReady =
+  const descriptiveReady =
     operationallyUsable &&
-    revise.marksPerHour != null &&
-    control.marksPerHour != null &&
-    baselineMastery.marksPerHour != null &&
-    baselineOverdue.marksPerHour != null;
+    revise.practiceMarksPerHour != null &&
+    control.practiceMarksPerHour != null &&
+    bm.practiceMarksPerHour != null &&
+    bo.practiceMarksPerHour != null;
 
-  const primaryOutcomeReady =
-    descriptiveResultsReady &&
+  const primaryReady =
+    descriptiveReady &&
     revise.delayedRetention != null &&
     control.delayedRetention != null &&
-    baselineMastery.delayedRetention != null &&
-    baselineOverdue.delayedRetention != null &&
-    revise.transferShare != null &&
-    control.transferShare != null &&
-    baselineMastery.transferShare != null &&
-    baselineOverdue.transferShare != null;
+    bm.delayedRetention != null &&
+    bo.delayedRetention != null &&
+    revise.unseenExposureShare != null &&
+    control.unseenExposureShare != null;
 
-  // Efficacy claim additionally requires final-assessment data for every arm
-  // and a minimum follow-up period (at least 14 days since first assignment).
-  const earliestAssignment = Math.min(
-    ...input.assignments.map((a) => new Date(a.assignedAt).getTime()),
-  );
-  const followUpDays = (now.getTime() - earliestAssignment) / 86_400_000;
+  // Efficacy additionally requires final assessments for all four arms
+  // and minimum follow-up since the earliest assignment.
+  const earliestMs = input.assignments.length
+    ? Math.min(...input.assignments.map((a) => new Date(a.assignedAt).getTime()))
+    : Infinity;
+  const followUpDays = (now.getTime() - earliestMs) / 86_400_000;
   const efficacyClaimReady =
-    primaryOutcomeReady &&
+    primaryReady &&
     revise.finalPerformancePercent != null &&
     control.finalPerformancePercent != null &&
-    baselineMastery.finalPerformancePercent != null &&
-    baselineOverdue.finalPerformancePercent != null &&
+    bm.finalPerformancePercent != null &&
+    bo.finalPerformancePercent != null &&
     followUpDays >= 14;
 
   const gates: ExperimentReadinessGates = {
     operationallyUsable,
-    descriptiveResultsReady,
-    primaryOutcomeReady,
+    descriptiveResultsReady: descriptiveReady,
+    primaryOutcomeReady: primaryReady,
     efficacyClaimReady,
   };
   const readiness: ExperimentReadiness = efficacyClaimReady
     ? "efficacy-claim-ready"
-    : primaryOutcomeReady
+    : primaryReady
       ? "primary-outcome-ready"
-      : descriptiveResultsReady
+      : descriptiveReady
         ? "descriptive-results-ready"
         : operationallyUsable
           ? "operationally-usable"
           : "enrolling";
 
   const marksPerHourEffect =
-    efficacyClaimReady && revise!.marksPerHour != null && control!.marksPerHour != null
-      ? Math.round((revise!.marksPerHour! - control!.marksPerHour!) * 100) / 100
+    efficacyClaimReady && revise.practiceMarksPerHour != null && control.practiceMarksPerHour != null
+      ? round(revise.practiceMarksPerHour - control.practiceMarksPerHour)
       : null;
 
   const note = !operationallyUsable
-    ? "Prospective study is still enrolling — no arm has reached the minimum participant count yet."
-    : !descriptiveResultsReady
-      ? "Every arm has participants but not enough have logged revision time for descriptive statistics."
-      : !primaryOutcomeReady
-        ? "Descriptive results are available but delayed retention and unseen transfer have not been measured across all arms."
+    ? "Study is enrolling — no arm has reached the minimum participant count."
+    : !descriptiveReady
+      ? "Arms are populated but revision hours/marks are not yet reportable across all arms."
+      : !primaryReady
+        ? "Descriptive results available but delayed retention or unseen transfer is incomplete in one or more arms."
         : !efficacyClaimReady
-          ? "Primary outcomes computed but final assessments or minimum follow-up duration not yet met."
-          : `Revise ${marksPerHourEffect! > 0 ? "outperformed" : "underperformed"} self-directed revision by ${Math.abs(marksPerHourEffect!)} marks per hour across ${revise!.participants}/${control!.participants} participants. Prospective design; treat as directional until peer review.`;
+          ? "Primary outcomes computed but final assessments or minimum follow-up duration not yet met across all arms."
+          : `Revise ${marksPerHourEffect! > 0 ? "outperformed" : "underperformed"} self-directed revision by ${Math.abs(marksPerHourEffect!)} practice marks per hour across ${revise.participants} vs ${control.participants} participants. Prospective design.`;
 
   return {
     arms,

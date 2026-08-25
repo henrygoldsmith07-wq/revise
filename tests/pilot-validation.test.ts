@@ -182,7 +182,7 @@ describe("pilot validation", () => {
     });
     for (const arm of analysis.arms) {
       expect(arm.participants).toBeGreaterThan(0);
-      expect(arm.marksPerHour).not.toBeNull();
+      expect(arm.practiceMarksPerHour).not.toBeNull();
     }
   });
 
@@ -198,7 +198,7 @@ describe("pilot validation", () => {
     });
     const revise = analysis.arms.find((a) => a.arm === "revise")!;
     const control = analysis.arms.find((a) => a.arm === "control")!;
-    expect(revise.marksPerHour!).toBeGreaterThan(control.marksPerHour!);
+    expect(revise.practiceMarksPerHour!).toBeGreaterThan(control.practiceMarksPerHour!);
   });
 
   it("delayed retention differentiates arms with planted retention bonus", () => {
@@ -229,7 +229,7 @@ describe("pilot validation", () => {
       minParticipantsPerArm: 3,
     });
     for (const arm of analysis.arms) {
-      expect(arm.transferShare).not.toBeNull();
+      expect(arm.unseenExposureShare).not.toBeNull();
     }
   });
 
