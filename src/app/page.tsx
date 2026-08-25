@@ -2,130 +2,184 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { planForDate } from "@/domain/planner";
 import { todayIso } from "@/domain/scheduling";
+import { getSubject, getTopic } from "@/domain/curriculum";
+import type { Recommendation } from "@/domain/types";
 import { useStore } from "@/state/store";
-import { RecommendationCard } from "@/components/RecommendationCard";
+import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
-import { ButtonLink, EmptyState } from "@/components/ui";
 
-// The whole product in one screen: what to do next, why, and how long it takes.
-// Everything below the primary card is context for overriding that choice —
-// never a competing call to action.
+// Next Best Action IS the product. The entire home screen answers one
+// question: "what should I do right now?" — and makes starting effortless.
+// Everything else is context, never a competing call to action.
 
 export default function TodayPage() {
   const store = useStore();
   const today = todayIso();
-  const { recommendations, dueCards, mistakes, streak, plannedSessions, settings } = store;
-  // The greeting reads the wall clock, so it can only be computed on the
-  // client — computing it during SSR would hydrate a different string.
+  const { recommendations, dueCards, mistakes, streak, settings } = store;
   const greetingLabel = useGreeting();
 
-  const [primary] = recommendations;
+  const [primary, ...rest] = recommendations;
   const experimentArm = store.experimentArm;
   const recordExperimentEvent = store.recordExperimentEvent;
+
   useEffect(() => {
     if (!primary) return;
     void store.recordFunnel("recommendation_displayed", `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`);
-    if (!experimentArm) return;    const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
+    if (!experimentArm) return;
+    const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
     void recordExperimentEvent("shown", { taskId, activity: primary.activity, topicId: primary.topicId ?? null });
   }, [experimentArm, primary, recordExperimentEvent, today]);
-  const todaysPlan = useMemo(() => planForDate(plannedSessions, today), [plannedSessions, today]);
-  const completedPlan = todaysPlan.filter((session) => session.status === "done").length;
-  const openMistakes = mistakes.filter((m) => !m.resolved).length;
+
+  if (!primary) return <EmptyToday name={settings.displayName} />;
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <header>
-        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Today</p>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">
-          {greetingLabel ? `${greetingLabel}, ` : ""}
-          {settings.displayName}
-        </h1>
-        <p className="text-sm text-ink3 mt-1">
-          {primary
-            ? "One useful next step."
-            : "Nothing is queued yet. Set an exam date to get started."}
-        </p>
-      </header>
+    <div className="max-w-2xl mx-auto space-y-5">
+      {/* --- Hero: the one thing to do right now ------------------------- */}
+      <NextBestAction recommendation={primary} displayName={settings.displayName} greeting={greetingLabel} />
 
-      <ResumeRevisionCard />
-
-      {primary ? (
-        <RecommendationCard recommendation={primary} variant="primary" compact />
-      ) : (
-        <EmptyState
-          title="No revision queued"
-          body="Set an exam date and available study time. Revise will choose your next best task."
-          action={
-            <ButtonLink href="/settings" variant="primary">
-              Set up exams
-            </ButtonLink>
-          }
-        />
+      {/* --- Queue: what comes after -------------------------------------- */}
+      {rest.length > 0 && (
+        <div className="space-y-1 px-1">
+          {rest.slice(0, 3).map((rec, i) => (
+            <Link
+              key={`${rec.activity}-${rec.topicId ?? rec.subjectId}`}
+              href={rec.topicId ? `/practice?topic=${rec.topicId}` : `/review`}
+              className="flex items-center gap-2 text-xs text-ink3 hover:text-ink transition-colors group"
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink3/70">
+                {i === 0 ? "After this:" : i === 1 ? "Then:" : ""}
+              </span>
+              <span className="group-hover:underline">
+                {getSubject(rec.subjectId)?.name ?? rec.subjectId}
+                {rec.topicId ? ` — ${getTopic(rec.topicId)?.title ?? ""}` : ""}
+              </span>
+              <span className="tabular-nums">{rec.minutes} min</span>
+            </Link>
+          ))}
+        </div>
       )}
 
-      <div className="card grid grid-cols-2 sm:grid-cols-4" aria-label="Today status">
-        <StatusLink href="/review" label="Due" value={dueCards.length} note={dueCards.length ? "cards" : "clear"} />
-        <StatusLink href="/review?mode=mistakes" label="Mistakes" value={openMistakes} note={openMistakes ? "to fix" : "clear"} />
-        <StatusLink
-          href="/planner"
-          label="Plan"
-          value={todaysPlan.length ? `${completedPlan}/${todaysPlan.length}` : "—"}
-          note={todaysPlan.length ? "done" : "not set"}
-        />
-        <StatusLink
-          href="/progress"
-          label="Streak"
-          value={streak.current}
-          note={streak.current === 1 ? "day" : "days"}
-        />
+      {/* --- Resume interrupted session ---------------------------------- */}
+      <ResumeRevisionCard />
+
+      {/* --- Minimal status strip ----------------------------------------- */}
+      <div className="flex gap-4 text-[11px] text-ink3 border-t border-line pt-3 px-1" aria-label="Quick stats">
+        <span>
+          <strong className="text-ink tabular-nums">{dueCards.length}</strong> due
+        </span>
+        <span>
+          <strong className="text-ink tabular-nums">{mistakes.filter((m) => !m.resolved).length}</strong> mistakes open
+        </span>
+        <span>
+          <strong className="text-ink tabular-nums">{streak.current}</strong>-day streak
+        </span>
       </div>
-
-      <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-line pt-5">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">Need less time?</h2>
-          <p className="text-xs text-ink3 mt-0.5">A short, marked sprint still counts.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/practice?quick=5" className="btn btn-secondary text-xs" aria-label="I have 5 minutes">
-            5 min
-          </Link>
-          <Link href="/practice?quick=10" className="btn btn-secondary text-xs" aria-label="I have 10 minutes">
-            10 min
-          </Link>
-        </div>
-      </section>
-
-      <nav aria-label="Today follow-up" className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink3">
-        <Link href="/planner" className="hover:text-ink hover:underline">Open full plan →</Link>
-        <Link href="/progress" className="hover:text-ink hover:underline">View progress →</Link>
-      </nav>
     </div>
   );
 }
 
-function StatusLink({
-  href,
-  label,
-  value,
-  note,
+// ---------------------------------------------------------------------------
+// Next Best Action hero
+// ---------------------------------------------------------------------------
+
+function NextBestAction({
+  recommendation,
+  displayName,
+  greeting,
 }: {
-  href: string;
-  label: string;
-  value: string | number;
-  note: string;
+  recommendation: Recommendation;
+  displayName: string;
+  greeting: string;
 }) {
-  return (
-    <Link href={href} className="p-3 sm:p-3.5 hover:bg-surface2 transition-colors first:border-l-0 border-line [&:nth-child(n+2)]:border-l [&:nth-child(n+3)]:border-t sm:[&:nth-child(n+3)]:border-t-0">
-      <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{label}</p>
-      <div className="flex items-baseline gap-1.5 mt-1">
-        <span className="text-xl font-semibold tabular-nums text-ink">{value}</span>
-        <span className="text-[11px] text-ink3">{note}</span>
-      </div>
-    </Link>
+  const subject = getSubject(recommendation.subjectId);
+  const topic = recommendation.topicId ? getTopic(recommendation.topicId) : null;
+  const exp = recommendation.explanation;
+
+  const href = recommendation.topicId
+    ? `/practice?topic=${recommendation.topicId}`
+    : `/review`;
+
+  // Why-this bullets derived from structured explanation factors.
+  const reasons: string[] = [];
+  if (exp?.lastEvidencePercent != null && exp.lastEvidencePercent < 50)
+    reasons.push(`scored ${exp.lastEvidencePercent}% last time`);
+  if (exp?.daysSinceRetrieval != null && exp.daysSinceRetrieval >= 7)
+    reasons.push(`last studied ${exp.daysSinceRetrieval} days ago`);
+  else if (!exp?.daysSinceRetrieval) reasons.push("not yet covered");
+  if (exp?.daysToExam != null && exp.daysToExam <= 30)
+    reasons.push(`exam in ${exp.daysToExam} days`);
+  if (exp?.recoverableMarks != null && exp.recoverableMarks > 0)
+    reasons.push(`~${Math.round(exp.recoverableMarks)} marks recoverable`);
+  if (exp?.marksPerHour != null)
+    reasons.push(`${Math.round(exp.marksPerHour)} marks/hour on this topic`);
+
+  const activityLabel: Record<string, string> = {
+    learn: "Learn",
+    flashcards: "Flashcards",
+    recall: "Active recall",
+    practice: "Practice",
+    paper: "Timed paper",
+    mistakes: "Fix a mistake",
+  };
+
+return (
+    <section aria-label="Your next best task">
+      {greeting ? (
+        <p className="text-[11px] text-ink3 mb-0.5">{greeting}, {displayName}</p>
+      ) : null}
+
+      <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink mt-1">
+        Your next{" "}
+        <span className="tabular-nums text-accent">{recommendation.minutes} minutes</span>
+      </p>
+
+      <p className="text-lg text-ink mt-2 font-medium">
+        {subject?.name ?? recommendation.subjectId}
+        {topic ? ` — ${topic.title}` : ""}
+      </p>
+
+      <p className="text-sm text-ink3 mt-0.5">
+        {activityLabel[recommendation.activity] ?? recommendation.activity} · {reasons.slice(0, 3).join(" · ")}
+      </p>
+
+      <ButtonLink href={href} variant="primary" size="md" className="mt-4 w-full sm:w-auto min-h-[3rem] text-base">
+        Start →
+      </ButtonLink>
+
+      {recommendation.reason ? (
+        <details className="mt-2">
+          <summary className="text-xs text-ink3 cursor-pointer select-none">Why this?</summary>
+          <ul className="text-xs text-ink3 mt-1 space-y-0.5 list-disc list-inside pl-2">
+            {reasons.map((r, i) => (
+              <li key={i}>{r.charAt(0).toUpperCase() + r.slice(1)}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+
+function EmptyToday({ name }: { name: string }) {
+  return (
+    <div className="max-w-2xl mx-auto space-y-4 py-12">
+      <p className="text-2xl font-semibold tracking-tight text-ink">Ready when you are{name ? `, ${name}` : ""}.</p>
+      <p className="text-sm text-ink3">Set an exam date and available study time to get your first recommendation.</p>
+      <ButtonLink href="/settings" variant="primary" size="md" className="mt-2">
+        Set up exams
+      </ButtonLink>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Greeting hook (client-only wall clock, SSR-safe)
+// ---------------------------------------------------------------------------
 
 const NO_SUBSCRIBE = () => () => {};
 let cachedHour: number | null = null;
@@ -137,8 +191,6 @@ function serverHour(): number {
   return -1;
 }
 
-/** Time-of-day greeting. Reads the wall clock on the client only — the server
- * snapshot is -1, so both renders agree and hydration stays clean. */
 function useGreeting(): string {
   const hour = useSyncExternalStore(NO_SUBSCRIBE, clientHour, serverHour);
   if (hour < 0) return "";
