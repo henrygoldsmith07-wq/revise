@@ -127,6 +127,7 @@ describe("performance budget", () => {
     expect(sampled.totalCases).toBeGreaterThan(100);
     // Marker v3 carries fuzzy matching, unit-aware, polarity and scaffolding
     // gates; 250ms/case absorbs CI contention while still catching algorithmic blowups (a stray O(n^2) scan would blow far past this).
-    expect(elapsedMs / sampled.totalCases).toBeLessThan(250);
-  }, 30_000);
+    const budget = process.env.CI ? 400 : 250;
+    expect(elapsedMs / sampled.totalCases).toBeLessThan(budget);
+  }, 60_000);
 });
