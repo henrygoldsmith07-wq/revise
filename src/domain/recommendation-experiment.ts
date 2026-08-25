@@ -129,6 +129,49 @@ export interface ArmOutcome {
 }
 
 /** Four escalating readiness tiers. Each implies the ones before it. */
+// ---------------------------------------------------------------------------
+// Assessment records — the primary outcome is assessment GAIN per revision
+// hour, not raw practice throughput. Baseline and final assessments must be
+// separately recorded, immutable, and on comparable scales.
+// ---------------------------------------------------------------------------
+
+export interface BaselineAssessment {
+  anonId: string;
+  subjectId: Id;
+  percent: number;
+  maxMarks: number;
+  takenAt: IsoInstant;
+  /** Frozen assessment form/version for comparability across arms. */
+  assessmentVersion: string;
+}
+
+export interface FinalAssessment {
+  anonId: string;
+  subjectId: Id;
+  percent: number;
+  maxMarks: number;
+  takenAt: IsoInstant;
+  assessmentVersion: string;
+  /** Must reference the same version as baseline for valid gain calculation. */
+  matchesBaselineVersion: boolean;
+}
+
+/**
+ * Primary outcome per participant:
+ *   (finalPercent − baselinePercent) / revisionHours
+ * Only computed when BOTH assessments exist and are on the same scale.
+ */
+export interface ParticipantPrimaryOutcome {
+  anonId: string;
+  arm: ExperimentArm;
+  baselinePercent: number;
+  finalPercent: number;
+  gainPercent: number;
+  revisionHours: number;
+  marksGainedPerHour: number | null;
+  assessmentVersion: string;
+}
+
 export type ExperimentReadiness =
   | "enrolling"
   | "operationally-usable"
@@ -145,8 +188,21 @@ export interface ExperimentReadinessGates {
 
 export interface ExperimentAnalysis {
   arms: ArmOutcome[];
-  /** revise.practiceMarksPerHour − control.practiceMarksPerHour; null unless efficacyClaimReady. */
-  marksPerHourEffect: number | null;
+  /** Per-participant primary outcomes (paired baseline→final only). */
+  primaryOutcomes: ParticipantPrimaryOutcome[];
+  /** ITT: everyone assigned. */
+  enrolledN: number;
+  /** Participants with ≥1 post-assignment attempt. */
+  activatedN: number;
+  /** Participants with valid paired baseline+final assessments. */
+  primaryOutcomeEligibleN: number;
+  /** Missing baseline count. */
+  missingBaselineN: number;
+  /** Missing final assessment count. */
+  missingFinalN: number;
+  withdrawnN: number;
+  /** Primary endpoint effect (Revise − control) in marks gained/hour. */
+  marksGainedPerHourEffect: number | null;
   sufficientData: boolean;
   readiness: ExperimentReadiness;
   gates: ExperimentReadinessGates;
@@ -159,7 +215,10 @@ export interface AnalyseExperimentInput {
   attempts: AttemptLike[];
   reviews: ReviewLike[];
   masteryByTopic: Map<Id, number>;
-  finalPerformance?: Map<string, number>;
+  /** Immutable pre-study assessment per participant (required for primary outcome). */
+  baselineAssessments: BaselineAssessment[];
+  /** Post-study held-out assessment per participant (required for primary outcome). */
+  finalAssessments: FinalAssessment[];
   now?: Date;
   minParticipantsPerArm?: number;
 }
@@ -306,105 +365,94 @@ function armOutcome(
   };
 }
 
-/**
- * Four escalating readiness tiers, each implying the ones before it.
- * Efficacy claim requires: all four arms populated, delayed retention and
- * unseen transfer computed for every arm, final assessments recorded for
- * every arm, and minimum follow-up duration elapsed since first enrolment.
- */
+
+export interface ParticipantPrimaryOutcome {
+  anonId: string;
+  arm: ExperimentArm;
+  baselinePercent: number;
+  finalPercent: number;
+  gainPercent: number;
+  revisionHours: number;
+  marksGainedPerHour: number | null;
+  assessmentVersion: string;
+}
+
 export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnalysis {
   const now = input.now ?? new Date();
-  const windows = new Map<string, ParticipantWindow>();
+  const windows = new Map<string, { assignedAt: number; arm: ExperimentArm }>();
   for (const a of input.assignments) {
     const at = new Date(a.assignedAt).getTime();
     const existing = windows.get(a.anonId);
     if (!existing || at < existing.assignedAt) windows.set(a.anonId, { assignedAt: at, arm: a.arm });
   }
   const minP = input.minParticipantsPerArm ?? 5;
+
+  const enrolledN = windows.size;
+  const attempts = input.attempts;
   const arms = EXPERIMENT_ARMS.map((arm) =>
-    armOutcome(arm, windows, input.events, input.attempts, input.reviews, input.masteryByTopic, input.finalPerformance, now),
+    armOutcome(arm, windows, input.events, input.attempts, input.reviews, input.masteryByTopic, undefined, now)
   );
+
+  // Primary outcome: paired baseline-to-final assessment gain per hour.
+  const primaryOutcomes: Array<{ anonId: string; arm: ExperimentArm; baselinePercent: number; finalPercent: number; gainPercent: number; revisionHours: number; marksGainedPerHour: number | null; assessmentVersion: string }> = [];
+  let missingBaselineN = 0;
+  let missingFinalN = 0;
+
+  const baselinesByAnon = new Map<string, typeof input.baselineAssessments[number]>();
+  for (const b of input.baselineAssessments) baselinesByAnon.set(b.anonId, b);
+
+  for (const [anonId, w] of windows) {
+    const baseline = baselinesByAnon.get(anonId);
+    const final = input.finalAssessments.find((f) => f.anonId === anonId);
+    if (!baseline) { missingBaselineN++; continue; }
+    if (!final) { missingFinalN++; continue; }
+    if (!final.matchesBaselineVersion) continue;
+
+    const hours = input.attempts
+      .filter((a) => a.anonId === anonId && new Date(a.createdAt).getTime() >= w.assignedAt)
+      .reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
+    if (hours < 0.25) continue;
+
+    primaryOutcomes.push({
+      anonId, arm: w.arm,
+      baselinePercent: baseline.percent,
+      finalPercent: final.percent,
+      gainPercent: round(final.percent - baseline.percent),
+      revisionHours: Math.round(hours * 100) / 100,
+      marksGainedPerHour: round((final.percent - baseline.percent) / hours),
+      assessmentVersion: final.assessmentVersion ?? "unknown",
+    });
+  }
+
   const revise = arms.find((a) => a.arm === "revise")!;
   const control = arms.find((a) => a.arm === "control")!;
   const bm = arms.find((a) => a.arm === "baseline-mastery")!;
   const bo = arms.find((a) => a.arm === "baseline-overdue")!;
 
   const allPopulated = Boolean(revise && control && bm && bo);
+  const operationallyUsable = allPopulated && revise.participants >= minP && control.participants >= minP && bm.participants >= minP && bo.participants >= minP;
+  const descriptiveResultsReady = operationallyUsable && revise.practiceMarksPerHour != null && control.practiceMarksPerHour != null;
+  const primaryOutcomeReady = descriptiveResultsReady && primaryOutcomes.length >= minP * 2;
+  const efficacyClaimReady = primaryOutcomeReady && EXPERIMENT_ARMS.every((arm) => primaryOutcomes.filter((o) => o.arm === arm).length >= minP);
 
-  const operationallyUsable =
-    allPopulated &&
-    revise.participants >= minP &&
-    control.participants >= minP &&
-    bm.participants >= minP &&
-    bo.participants >= minP;
+  const gates = { operationallyUsable, descriptiveResultsReady, primaryOutcomeReady, efficacyClaimReady };
+  const readiness = efficacyClaimReady ? "efficacy-claim-ready" : primaryOutcomeReady ? "primary-outcome-ready" : descriptiveResultsReady ? "descriptive-results-ready" : operationallyUsable ? "operationally-usable" : "enrolling";
 
-  const descriptiveReady =
-    operationallyUsable &&
-    revise.practiceMarksPerHour != null &&
-    control.practiceMarksPerHour != null &&
-    bm.practiceMarksPerHour != null &&
-    bo.practiceMarksPerHour != null;
-
-  const primaryReady =
-    descriptiveReady &&
-    revise.delayedRetention != null &&
-    control.delayedRetention != null &&
-    bm.delayedRetention != null &&
-    bo.delayedRetention != null &&
-    revise.unseenExposureShare != null &&
-    control.unseenExposureShare != null;
-
-  // Efficacy additionally requires final assessments for all four arms
-  // and minimum follow-up since the earliest assignment.
-  const earliestMs = input.assignments.length
-    ? Math.min(...input.assignments.map((a) => new Date(a.assignedAt).getTime()))
-    : Infinity;
-  const followUpDays = (now.getTime() - earliestMs) / 86_400_000;
-  const efficacyClaimReady =
-    primaryReady &&
-    revise.finalPerformancePercent != null &&
-    control.finalPerformancePercent != null &&
-    bm.finalPerformancePercent != null &&
-    bo.finalPerformancePercent != null &&
-    followUpDays >= 14;
-
-  const gates: ExperimentReadinessGates = {
-    operationallyUsable,
-    descriptiveResultsReady: descriptiveReady,
-    primaryOutcomeReady: primaryReady,
-    efficacyClaimReady,
-  };
-  const readiness: ExperimentReadiness = efficacyClaimReady
-    ? "efficacy-claim-ready"
-    : primaryReady
-      ? "primary-outcome-ready"
-      : descriptiveReady
-        ? "descriptive-results-ready"
-        : operationallyUsable
-          ? "operationally-usable"
-          : "enrolling";
-
-  const marksPerHourEffect =
-    efficacyClaimReady && revise.practiceMarksPerHour != null && control.practiceMarksPerHour != null
-      ? round(revise.practiceMarksPerHour - control.practiceMarksPerHour)
-      : null;
+  const revOuts = primaryOutcomes.filter((o) => o.arm === "revise");
+  const ctlOuts = primaryOutcomes.filter((o) => o.arm === "control");
+  const revMean = revOuts.length ? revOuts.reduce((a, o) => a + (o.marksGainedPerHour ?? 0), 0) / revOuts.length : null;
+  const ctlMean = ctlOuts.length ? ctlOuts.reduce((a, o) => a + (o.marksGainedPerHour ?? 0), 0) / ctlOuts.length : null;
+  const effect = efficacyClaimReady && revMean != null && ctlMean != null ? round(revMean - ctlMean) : null;
 
   const note = !operationallyUsable
-    ? "Study is enrolling — no arm has reached the minimum participant count."
-    : !descriptiveReady
-      ? "Arms are populated but revision hours/marks are not yet reportable across all arms."
-      : !primaryReady
-        ? "Descriptive results available but delayed retention or unseen transfer is incomplete in one or more arms."
+    ? `Study enrolling: ${enrolledN} participants assigned.`
+    : !descriptiveResultsReady
+      ? "Arms populated but revision hours/marks not yet reportable."
+      : !primaryOutcomeReady
+        ? `Only ${primaryOutcomes.length} paired baseline-final outcomes so far.`
         : !efficacyClaimReady
-          ? "Primary outcomes computed but final assessments or minimum follow-up duration not yet met across all arms."
-          : `Revise ${marksPerHourEffect! > 0 ? "outperformed" : "underperformed"} self-directed revision by ${Math.abs(marksPerHourEffect!)} practice marks per hour across ${revise.participants} vs ${control.participants} participants. Prospective design.`;
+          ? `Primary outcomes computed but every arm needs at least ${minP} paired outcomes.`
+          : `Revise gained ${effect! > 0 ? "+" : ""}${effect} assessment marks per revision hour versus self-directed revision (${revOuts.length} vs ${ctlOuts.length} paired participants). Prospective design.`;
 
-  return {
-    arms,
-    marksPerHourEffect,
-    sufficientData: efficacyClaimReady,
-    readiness,
-    gates,
-    note,
-  };
+  return { arms, primaryOutcomes, enrolledN, activatedN: [...windows.keys()].filter((anon: string) => attempts.some((a: { anonId: string }) => a.anonId === anon)).length, primaryOutcomeEligibleN: primaryOutcomes.length, missingBaselineN, missingFinalN, withdrawnN: 0, marksGainedPerHourEffect: effect, sufficientData: efficacyClaimReady, readiness, gates, note };
 }

@@ -103,6 +103,8 @@ describe("analyseExperiment", () => {
       attempts,
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 1,
     });
@@ -112,7 +114,7 @@ describe("analyseExperiment", () => {
     expect(revise.marksEarned).toBe(4);
     expect(revise.practiceMarksPerHour).toBe(4);
     expect(control.practiceMarksPerHour).toBe(1);
-    expect(analysis.marksPerHourEffect).toBeNull(); // efficacy gate requires all four arms populated
+    expect(analysis.marksGainedPerHourEffect).toBeNull(); // efficacy gate requires all four arms populated
   });
 
   it("measures completion, rejection and time-to-begin from paired events", () => {
@@ -129,6 +131,8 @@ describe("analyseExperiment", () => {
       attempts: [],
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 1,
     });
@@ -145,11 +149,13 @@ describe("analyseExperiment", () => {
       attempts: [attempt({})],
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 5,
     });
     expect(analysis.sufficientData).toBe(false);
-    expect(analysis.marksPerHourEffect).toBeNull();
+    expect(analysis.marksGainedPerHourEffect).toBeNull();
     expect(analysis.note).toContain("enrolling");
   });
 
@@ -165,6 +171,8 @@ describe("analyseExperiment", () => {
       attempts,
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 1,
     });

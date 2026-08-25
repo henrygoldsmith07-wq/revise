@@ -177,6 +177,8 @@ describe("pilot validation", () => {
       attempts: pilot.attempts,
       reviews: pilot.reviews,
       masteryByTopic: new Map([["topic-0", 0.5], ["topic-1", 0.5], ["topic-2", 0.5], ["topic-3", 0.5]]),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(day(DAYS)),
       minParticipantsPerArm: 3,
     });
@@ -193,6 +195,8 @@ describe("pilot validation", () => {
       attempts: pilot.attempts,
       reviews: pilot.reviews,
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(day(DAYS)),
       minParticipantsPerArm: 3,
     });
@@ -208,6 +212,8 @@ describe("pilot validation", () => {
       attempts: pilot.attempts,
       reviews: pilot.reviews,
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(day(DAYS)),
       minParticipantsPerArm: 3,
     });
@@ -225,6 +231,8 @@ describe("pilot validation", () => {
       attempts: pilot.attempts,
       reviews: pilot.reviews,
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(day(DAYS)),
       minParticipantsPerArm: 3,
     });
@@ -240,6 +248,8 @@ describe("pilot validation", () => {
       attempts: pilot.attempts,
       reviews: pilot.reviews,
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(day(DAYS)),
       minParticipantsPerArm: 3,
     });
@@ -281,6 +291,8 @@ describe("computeEfficacyEvidence", () => {
       attempts: pilot.attempts,
       reviews: pilot.reviews,
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(day(DAYS)),
       minParticipantsPerArm: 3,
     });

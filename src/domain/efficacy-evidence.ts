@@ -43,7 +43,7 @@ const ARM_LABELS: Record<string, string> = {
 
 export function computeEfficacyEvidence(analysis: ExperimentAnalysis): EfficacyEvidence {
   return {
-    effect: analysis.marksPerHourEffect,
+    effect: analysis.marksGainedPerHourEffect,
     arms: analysis.arms.map((arm) => ({
       arm: arm.arm,
       label: ARM_LABELS[arm.arm] ?? arm.arm,

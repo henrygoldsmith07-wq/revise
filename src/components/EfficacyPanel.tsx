@@ -39,7 +39,7 @@ export function EfficacyPanel() {
       grade: r.grade,
     }));
     const masteryByTopic = new Map(store.mastery.map((m) => [m.topicId, m.mastery]));
-    return analyseExperiment({ assignments, events: [], attempts, reviews, masteryByTopic });
+    return analyseExperiment({ assignments, events: [], attempts, reviews, masteryByTopic, baselineAssessments: [], finalAssessments: [] });
   }, [store.experimentArm, store.attempts, store.reviewLogs, store.mastery, store.userId]);
 
   if (!store.experimentArm) return null;
