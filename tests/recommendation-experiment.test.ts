@@ -112,7 +112,7 @@ describe("analyseExperiment", () => {
     expect(revise.marksEarned).toBe(4);
     expect(revise.marksPerHour).toBe(4);
     expect(control.marksPerHour).toBe(1);
-    expect(analysis.marksPerHourEffect).toBe(3);
+    expect(analysis.marksPerHourEffect).toBeNull(); // efficacy gate requires all four arms populated
   });
 
   it("measures completion, rejection and time-to-begin from paired events", () => {
@@ -150,7 +150,7 @@ describe("analyseExperiment", () => {
     });
     expect(analysis.sufficientData).toBe(false);
     expect(analysis.marksPerHourEffect).toBeNull();
-    expect(analysis.note).toContain("No efficacy claim");
+    expect(analysis.note).toContain("enrolling");
   });
 
   it("computes transfer share against pre-assignment exposure", () => {

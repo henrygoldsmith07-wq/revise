@@ -148,11 +148,39 @@ export interface ArmOutcome {
 
 export interface ExperimentAnalysis {
   arms: ArmOutcome[];
-  /** revise.marksPerHour − control.marksPerHour, only when both arms are usable. */
+  /** revise.marksPerHour − control.marksPerHour; null unless efficacyClaimReady. */
   marksPerHourEffect: number | null;
-  /** Honest gate — mirrors learner-outcomes: no claims until real data exists. */
+  /** Honest gate — no claims until every arm has real participants AND delayed unseen assessments. */
   sufficientData: boolean;
+  readiness: ExperimentReadiness;
+  gates: ExperimentReadinessGates;
   note: string;
+}
+
+/**
+ * Four escalating readiness tiers. Each implies the ones before it.
+ *   enrolling               assignments exist but no arm has enough data
+ *   operationally-usable    every arm has ≥ minParticipants
+ *   descriptive-results     per-arm descriptive stats are reportable (hours + marks)
+ *   primary-outcome-ready   delayed retention and unseen transfer computed for all arms
+ *   efficacy-claim-ready    primary outcome ready + final assessments exist for ≥ minParticipants in each arm
+ */
+export type ExperimentReadiness =
+  | "enrolling"
+  | "operationally-usable"
+  | "descriptive-results-ready"
+  | "primary-outcome-ready"
+  | "efficacy-claim-ready";
+
+export interface ExperimentReadinessGates {
+  /** Every arm has at least one participant. */
+  operationallyUsable: boolean;
+  /** Descriptive per-arm stats are reportable (hours + marks). */
+  descriptiveResultsReady: boolean;
+  /** Delayed retention and unseen-transfer computed for all arms. */
+  primaryOutcomeReady: boolean;
+  /** Full preregistered evidence: all of the above plus final assessments. */
+  efficacyClaimReady: boolean;
 }
 
 export interface AnalyseExperimentInput {
@@ -295,21 +323,91 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   const arms = EXPERIMENT_ARMS.map((arm) =>
     armOutcome(arm, windows, input.events, input.attempts, input.reviews, input.masteryByTopic, input.finalPerformance, now),
   );
-  const revise = arms.find((a) => a.arm === "revise");
-  const control = arms.find((a) => a.arm === "control");
-  const sufficient =
-    Boolean(revise && control && revise.participants >= minParticipants && control.participants >= minParticipants &&
-      revise.marksPerHour != null && control.marksPerHour != null);
+  const revise = arms.find((a) => a.arm === "revise")!;
+  const control = arms.find((a) => a.arm === "control")!;
+  const baselineMastery = arms.find((a) => a.arm === "baseline-mastery");
+  const baselineOverdue = arms.find((a) => a.arm === "baseline-overdue");
+
+  // --- readiness gates -------------------------------------------------------
+  const allArmsPopulated =
+    revise != null && control != null && baselineMastery != null && baselineOverdue != null;
+
+  const operationallyUsable =
+    allArmsPopulated &&
+    revise.participants >= minParticipants &&
+    control.participants >= minParticipants &&
+    baselineMastery.participants >= minParticipants &&
+    baselineOverdue.participants >= minParticipants;
+
+  const descriptiveResultsReady =
+    operationallyUsable &&
+    revise.marksPerHour != null &&
+    control.marksPerHour != null &&
+    baselineMastery.marksPerHour != null &&
+    baselineOverdue.marksPerHour != null;
+
+  const primaryOutcomeReady =
+    descriptiveResultsReady &&
+    revise.delayedRetention != null &&
+    control.delayedRetention != null &&
+    baselineMastery.delayedRetention != null &&
+    baselineOverdue.delayedRetention != null &&
+    revise.transferShare != null &&
+    control.transferShare != null &&
+    baselineMastery.transferShare != null &&
+    baselineOverdue.transferShare != null;
+
+  // Efficacy claim additionally requires final-assessment data for every arm
+  // and a minimum follow-up period (at least 14 days since first assignment).
+  const earliestAssignment = Math.min(
+    ...input.assignments.map((a) => new Date(a.assignedAt).getTime()),
+  );
+  const followUpDays = (now.getTime() - earliestAssignment) / 86_400_000;
+  const efficacyClaimReady =
+    primaryOutcomeReady &&
+    revise.finalPerformancePercent != null &&
+    control.finalPerformancePercent != null &&
+    baselineMastery.finalPerformancePercent != null &&
+    baselineOverdue.finalPerformancePercent != null &&
+    followUpDays >= 14;
+
+  const gates: ExperimentReadinessGates = {
+    operationallyUsable,
+    descriptiveResultsReady,
+    primaryOutcomeReady,
+    efficacyClaimReady,
+  };
+  const readiness: ExperimentReadiness = efficacyClaimReady
+    ? "efficacy-claim-ready"
+    : primaryOutcomeReady
+      ? "primary-outcome-ready"
+      : descriptiveResultsReady
+        ? "descriptive-results-ready"
+        : operationallyUsable
+          ? "operationally-usable"
+          : "enrolling";
+
   const marksPerHourEffect =
-    sufficient && revise && control && revise.marksPerHour != null && control.marksPerHour != null
-      ? Math.round((revise.marksPerHour - control.marksPerHour) * 100) / 100
+    efficacyClaimReady && revise!.marksPerHour != null && control!.marksPerHour != null
+      ? Math.round((revise!.marksPerHour! - control!.marksPerHour!) * 100) / 100
       : null;
+
+  const note = !operationallyUsable
+    ? "Prospective study is still enrolling — no arm has reached the minimum participant count yet."
+    : !descriptiveResultsReady
+      ? "Every arm has participants but not enough have logged revision time for descriptive statistics."
+      : !primaryOutcomeReady
+        ? "Descriptive results are available but delayed retention and unseen transfer have not been measured across all arms."
+        : !efficacyClaimReady
+          ? "Primary outcomes computed but final assessments or minimum follow-up duration not yet met."
+          : `Revise ${marksPerHourEffect! > 0 ? "outperformed" : "underperformed"} self-directed revision by ${Math.abs(marksPerHourEffect!)} marks per hour across ${revise!.participants}/${control!.participants} participants. Prospective design; treat as directional until peer review.`;
+
   return {
     arms,
     marksPerHourEffect,
-    sufficientData: sufficient,
-    note: sufficient
-      ? `Revise produced ${marksPerHourEffect! > 0 ? "+" : ""}${marksPerHourEffect} practice marks per hour versus self-selected revision across ${revise!.participants}/${control!.participants} participants. Prospective, not randomised-blind; treat as directional until peer review.`
-      : "Prospective study is enrolling. No efficacy claim may be made until every arm has real participants and delayed unseen assessments.",
+    sufficientData: efficacyClaimReady,
+    readiness,
+    gates,
+    note,
   };
 }
