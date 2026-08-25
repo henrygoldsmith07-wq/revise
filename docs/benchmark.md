@@ -1,5 +1,23 @@
 # Benchmarks
 
+## Recommender tournament
+
+Ten selection policies - Random, Weakest topic, Highest exam weighting,
+Most overdue, Lowest predicted marks, Mistake-first, FSRS-only, the Revise
+heuristic, a LinUCB contextual bandit and a logistic learned ranker - are
+replayed over learner trajectories in src/domain/recommender-tournament.ts.
+
+Leakage rule: at decision i the policy context folds events[0..i) only;
+the realised event at i is the outcome. A maxEvents probe slices the
+window so tests can flip future outcomes and prove earlier decisions are
+untouched (static policies) while online learners legitimately adapt.
+
+Reported: completion rate and immediate score per decision; 7-day delayed
+retention; unseen final-assessment marks per invested hour as the ranking
+metric. The deterministic Revise heuristic stays in production unless a
+challenger beats it on real learner replays. Demo table on /benchmarks is
+synthetic and labelled as such.
+
 ## Examiner benchmark (the real gate)
 
 Synthetic marker tests are exhausted; the credibility gate is now genuine
