@@ -1,5 +1,22 @@
 # Benchmarks
 
+## Editorial review pipeline
+
+The trust chain between Revise and a content generator: Draft,
+Structural validation, Subject review, Mark-scheme review, Exam-style
+review, Verified, Published, then periodic re-review on a fixed clock.
+
+Rules enforced by src/domain/editorial-pipeline.ts: stages cannot be
+skipped; the author can never pass their own human review; a failed
+review returns content to Draft with full history; retiring requires a
+stated reason and records who decided; published items return for
+re-review when their interval elapses; an unresolved MAJOR user issue
+quarantines published content back into subject review.
+
+editorialConfidence() distils lineage into one number (source prior,
++passed gates, -open issues, -stale re-review) with named reasons. UI
+badges visibly separate Verified from Generated / unreviewed.
+
 ## Past-paper import benchmark
 
 Import becomes trustworthy when it is measured and confidence-aware.
