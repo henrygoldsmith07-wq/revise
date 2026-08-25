@@ -76,7 +76,8 @@ import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
 import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
-import { assignArm as assignExperimentArm, type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
+import { assignArm as assignExperimentArm, policyTaskFor,
+  type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType, type ExperimentArm } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
 import {
   createRevisionCheckpoint,
@@ -585,6 +586,38 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     });
   }, [snapshot, mastery, topics, subjectIds, marksPerHour]);
 
+  // Experiment arm enforcement: baseline arms see their assigned policy,
+  // not the production recommender. Control sees no recommendation.
+  const experimentRecs = useMemo(() => {
+    const arm = experimentArm?.arm;
+    if (!arm || !snapshot) return recommendations;
+    if (arm === "control") return [];
+    if (arm !== "baseline-mastery" && arm !== "baseline-overdue") return recommendations;
+    // Build mastery/due inputs for the policy
+    const masteryRows = mastery.map((m) => ({
+      topicId: m.topicId,
+      mastery: m.mastery ?? 0,
+      lastStudiedAt: null as string | null,
+    }));
+    const today = todayIso();
+    const dueByTopic = new Map<Id, number>();
+    for (const card of snapshot.cards) {
+      if (card.due <= today) dueByTopic.set(card.topicId, (dueByTopic.get(card.topicId) ?? 0) + 1);
+    }
+    const dueCounts = [...dueByTopic.entries()].map(([topicId, due]) => ({
+      topicId, due, oldestDue: today as string,
+    }));
+    const pick = policyTaskFor(arm, { mastery: masteryRows, dueCounts });
+    if (!pick || !pick.topicId) return recommendations;
+    // Substitute the top recommendation with the baseline policy pick
+    const base = recommendations.find((r) => r.topicId === pick.topicId);
+    if (base) return [base, ...recommendations.slice(1)];
+    // No matching rec ? construct one from the policy pick
+    const fallback = recommendations[0];
+    if (!fallback) return [];
+    return [{ ...fallback, topicId: pick.topicId, reason: pick.reason }];
+  }, [experimentArm, recommendations, mastery, snapshot]);
+
   const predictions = useMemo(() => {
     if (!snapshot) return [];
     return subjectIds
@@ -966,7 +999,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       masteryUncertainty,
       applicationMastery,
       recallMastery,
-      recommendations,
+      recommendations: experimentRecs,
       predictions,
       dueCards,
       assessment,

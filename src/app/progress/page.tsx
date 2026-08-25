@@ -19,6 +19,7 @@ import type { DiagnoseResponse } from "@/ai/types";
 import { useStore, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
 import { ExperimentPanel } from "@/components/ExperimentPanel";
+import { EfficacyPanel } from "@/components/EfficacyPanel";
 import { ApplicationMasteryCard, CalculationMasteryCard, CalibrationCard, DifficultyAndSubtopics, ExpectedMarksCard, MarksLostByCause, MasteryUncertaintyCard, NextGradeView, PaperSimulationCard, QuestionDiscriminationCard, RecallMasteryCard, RecurringMisconceptions, TechniqueVsKnowledgeCard } from "@/components/AssessmentPanels";
 import { ResponseTimeCalibrationPanel } from "@/components/ResponseTimeCalibration";
 import { RetentionMasteryPanel } from "@/components/RetentionMasteryPanel";
@@ -217,6 +218,7 @@ export default function ProgressPage() {
       </div>
 
       <ExperimentPanel />
+      <EfficacyPanel />
 
 <section aria-labelledby="progress-story-heading">
         <Panel className="border-l-4 border-l-accent">
