@@ -9,6 +9,8 @@ export const REVISE_META_KEYS = {
   experimentAssignment: "revise.experimentAssignment.v1",
   experimentEvents: "revise.experimentEvents.v1",
   funnelEvents: "revise.funnelEvents.v1",
+  gradePredictions: "revise.gradePredictions.v1",
+  gradeActuals: "revise.gradeActuals.v1",
 } as const;
 
 // New keys have no legacy spelling; lookups fall back gracefully.

@@ -75,6 +75,7 @@ import type { Snapshot } from "@/data/repository";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
+import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
 import { assignArm as assignExperimentArm, type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
 import {
@@ -160,6 +161,9 @@ interface StoreValue extends Snapshot {
   recordExperimentEvent(type: ExperimentEventType, task: { taskId: string; activity: string; topicId?: Id | null }, at?: string): Promise<void>;
   recordFunnel(type: FunnelEventType, detail?: string): Promise<void>;
   funnelEvents: FunnelEvent[];
+  gradePredictionLog: GradePredictionRecord[];
+  gradeActuals: ActualResultRecord[];
+  recordGradeActual(subjectId: Id, percent: number, kind: "mock" | "paper" | "final"): Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -177,6 +181,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
   const [experimentArm, setExperimentArm] = useState<ExperimentAssignment | null>(null);
   const [funnelEvents, setFunnelEvents] = useState<FunnelEvent[]>([]);
+  const [gradePredictionLog, setGradePredictionLog] = useState<GradePredictionRecord[]>([]);
+  const [gradeActuals, setGradeActuals] = useState<ActualResultRecord[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -213,15 +219,19 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     bootstrapped.current = true;
     void recordFunnel("app_opened");
     void (async () => {
-      const [loaded, checkpoint, assignment, funnel] = await Promise.all([
+      const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs] = await Promise.all([
         repo.loadSnapshot(userId),
         repo.loadRevisionCheckpoint(userId),
         readReviseMeta<ExperimentAssignment>("experimentAssignment"),
         readReviseMeta<FunnelEvent[]>("funnelEvents"),
+        readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
+        readReviseMeta<ActualResultRecord[]>("gradeActuals"),
       ]);
       setRevisionCheckpoint(checkpoint ?? null);
       setExperimentArm(assignment ?? null);
       setFunnelEvents(funnel ?? []);
+      setGradePredictionLog(gradePreds ?? []);
+      setGradeActuals(gradeActs ?? []);
       setSnapshot(loaded);
       lastFingerprint.current = computeFingerprint({
         exams: loaded.examDates,
@@ -582,6 +592,40 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
       .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates));
   }, [snapshot, mastery, subjectIds]);
+  // Close the grade loop: snapshot predictions weekly so later mocks can be
+  // paired against what Revise believed at the time - not retro-fitted.
+  useEffect(() => {
+    if (!snapshot || !predictions.length) return;
+    void (async () => {
+      const existing = (await readReviseMeta<GradePredictionRecord[]>("gradePredictions")) ?? [];
+      const week = Math.floor(Date.now() / (7 * 86_400_000));
+      let appended = false;
+      for (const p of predictions) {
+        const weekKey = `${p.subjectId}:${week}`;
+        if (existing.some((r) => r.id === `gp-${weekKey}`)) continue;
+        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId && a.max > 0).length;
+        const record: GradePredictionRecord = {
+          id: `gp-${weekKey}`,
+          anonId: userId,
+          subjectId: p.subjectId,
+          predictedPercent: p.percent,
+          lowerPercent: Math.max(0, p.percent - (100 - p.confidence * 100) / 2),
+          upperPercent: Math.min(100, p.percent + (100 - p.confidence * 100) / 2),
+          gradeLabel: p.grade,
+          confidence: p.confidence,
+          evidenceShare: Math.min(1, marked / 40),
+          createdAt: new Date().toISOString(),
+          examDate: snapshot.examDates.find((e) => e.subjectId === p.subjectId)?.date ?? null,
+        };
+        existing.push(record);
+        appended = true;
+      }
+      if (appended) {
+        await writeReviseMeta("gradePredictions", existing.slice(-500));
+        setGradePredictionLog(existing.slice(-500));
+      }
+    })();
+  }, [predictions, snapshot, userId]);
 
   const previewPaper = useCallback(
     (subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null => {
@@ -693,6 +737,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     const next = [...events.slice(-2000), { anonId: arm.anonId, taskId: task.taskId, activity: task.activity, topicId: task.topicId ?? null, type, at: atIso }];
     await writeReviseMeta("experimentEvents", next);
   }, [experimentArm]);
+
+  const recordGradeActual = useCallback(async (subjectId: Id, percent: number, kind: "mock" | "paper" | "final") => {
+    const record: ActualResultRecord = { id: crypto.randomUUID(), anonId: userId, subjectId, percent, kind, takenAt: new Date().toISOString() };
+    const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
+    await writeReviseMeta("gradeActuals", [...log.slice(-500), record]);
+    setGradeActuals([...log.slice(-500), record]);
+  }, [userId]);
 
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
@@ -959,6 +1010,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       recordExperimentEvent,
       recordFunnel,
       funnelEvents,
+      gradePredictionLog,
+      gradeActuals,
+      recordGradeActual,
     };
   }, [
     snapshot,
@@ -1011,6 +1065,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     joinExperiment,
     leaveExperiment,
     recordExperimentEvent,
+    gradePredictionLog,
+    gradeActuals,
+    recordGradeActual,
   ]);
 
   if (!value) return <BootScreen />;

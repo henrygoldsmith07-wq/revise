@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { aiDiagnose } from "@/ai/client";
 import { gradeCalibrationNarrative } from "@/domain/analytics";
+import { analyseGradeLoop, gradeConfidenceNarrative } from "@/domain/grade-loop";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { delayedFarTransferReport, delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import type { GradePrediction } from "@/domain/grades";
@@ -108,6 +109,11 @@ function PredictedGradeCard({
       </details>
     </Panel>
   );
+}
+
+function evidenceShareFor(subjectId: string, store: { gradeActuals: unknown[]; attempts: Array<{ subjectId: string; max: number }> }): number {
+  const marked = store.attempts.filter((a) => a.subjectId === subjectId && a.max > 0).length;
+  return Math.min(1, marked / 40);
 }
 
 export default function ProgressPage() {
@@ -428,13 +434,18 @@ export default function ProgressPage() {
         />
         <ul className="grid sm:grid-cols-2 gap-3">
           {store.predictions.map((prediction) => (
-            <PredictedGradeCard
-              key={prediction.subjectId}
-              prediction={prediction}
-              subjectName={getSubject(prediction.subjectId)?.name ?? prediction.subjectId}
-              markedAnswers={store.attempts.filter((attempt) => attempt.subjectId === prediction.subjectId).length}
-              topicTitle={(topicId) => getTopic(topicId)?.title ?? topicId}
-            />
+            <div key={`wrap-${prediction.subjectId}`}>{" "}
+              <p className="text-xs text-ink2 mb-1">
+                {gradeConfidenceNarrative({ gradeLabel: prediction.grade, confidence: prediction.confidence, evidenceShare: evidenceShareFor(prediction.subjectId, store) })}
+              </p>
+              <PredictedGradeCard
+                key={prediction.subjectId}
+                prediction={prediction}
+                subjectName={getSubject(prediction.subjectId)?.name ?? prediction.subjectId}
+                markedAnswers={store.attempts.filter((attempt) => attempt.subjectId === prediction.subjectId).length}
+                topicTitle={(topicId) => getTopic(topicId)?.title ?? topicId}
+              />
+            </div>
           ))}
         </ul>
       </section>
