@@ -73,9 +73,11 @@ export function buildSessionStructure(input: {
       { minutes: warm, kind: "warmup", label: "Quick retrieval warm-up" },
       { minutes: transfer, kind: "transfer", label: "Transfer / exam-level question" },
     );
-    // Optional delayed-retrieval closer if there's room.
+    // Optional delayed-retrieval closer if there's room (subtract from transfer).
     if (totalMinutes >= 12) {
       const close = clamp(Math.round(totalMinutes * 0.15), 1, 3);
+      const lastTransfer = segments[segments.length - 1];
+      lastTransfer.minutes = Math.max(3, lastTransfer.minutes - close);
       segments.push({ minutes: close, kind: "delayed-retrieval", label: "Delayed retrieval check" });
     }
     return { topicId, totalMinutes, segments, shape: "retrieval" };
