@@ -102,7 +102,7 @@ function buildTimeline(input: {
     const created = new Date(a.createdAt).getTime();
     const taskId = `${a.mode}:${a.topicIds[0] ?? a.questionId}`;
     if (a.elapsedMs > 0) nodes.push({ t: created - Math.min(a.elapsedMs, 45 * 60_000), kind: "started", taskId });
-    nodes.push({ t: created, kind: "submitted", taskId, attemptId: a.anonId ? undefined : undefined, topicId: a.topicIds[0] ?? null, hasRetest: Boolean(a.retestMistakeId), repairSuccess: Boolean(a.retestMistakeId) && a.max > 0 && a.awarded === a.max });
+    nodes.push({ t: created, kind: "submitted", taskId, attemptId: undefined, topicId: a.topicIds[0] ?? null, hasRetest: Boolean(a.retestMistakeId), repairSuccess: Boolean(a.retestMistakeId) && a.max > 0 && a.awarded === a.max });
     nodes.push({ t: created, kind: "completed", taskId, attemptId: undefined });
     if (a.retestMistakeId && a.max > 0 && a.awarded === a.max) {
       nodes.push({ t: created, kind: "repair", attemptId: String(a.retestMistakeId) });
@@ -210,9 +210,21 @@ export function analyseFunnel(input: {
   ).length;
 
   // Continuation: a start within 45 minutes after feedback was read.
-  const continued = started.filter((sNode) =>
-    feedbacks.some((f) => sNode.t > f.t && sNode.t - f.t <= 45 * 60_000),
-  ).length;
+  // Next-task continuation uses one-to-one pairing: each feedback-read event
+  // matches AT MOST ONE subsequent start, so multiple rapid tasks after one
+  // feedback cannot inflate the numerator.
+  const usedFeedback = new Set<number>();
+  const continued = started.filter((sNode) => {
+    for (let fi = 0; fi < feedbacks.length; fi++) {
+      if (usedFeedback.has(fi)) continue;
+      const f = feedbacks[fi];
+      if (sNode.t > f.t && sNode.t - f.t <= 45 * 60_000) {
+        usedFeedback.add(fi);
+        return true;
+      }
+    }
+    return false;
+  }).length;
 
   // Open -> studying per session that has both an open and a start.
   const openToStudySeconds: number[] = [];

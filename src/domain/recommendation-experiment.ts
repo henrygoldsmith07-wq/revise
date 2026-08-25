@@ -218,7 +218,13 @@ function armOutcome(
     return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt;
   });
   const myEvents = events.filter((e) => windows.get(e.anonId)?.arm === arm);
-  const myReviews = reviews.filter((r) => windows.get(r.anonId)?.arm === arm);
+  // Only reviews AFTER the participant's assignment date contribute to the
+  // experimental delayed-retention measurement — pre-experiment FSRS history
+  // is baseline, not treatment effect.
+  const myReviews = reviews.filter((r) => {
+    const w = windows.get(r.anonId);
+    return w?.arm === arm && new Date(r.reviewedAt).getTime() >= w.assignedAt;
+  });
 
   const hours = mine.reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
   const marks = mine.reduce((acc, a) => acc + a.awarded, 0);
@@ -239,10 +245,22 @@ function armOutcome(
     lastSeen.set(key, t);
   }
 
-  // Transfer: post-assignment attempts on questions never attempted before any assignment.
-  const assignedAtMin = Math.min(...[...windows.values()].map((w) => w.assignedAt), Number.POSITIVE_INFINITY);
-  const seenBefore = new Set(attempts.filter((a) => new Date(a.createdAt).getTime() < assignedAtMin).map((a) => `${a.anonId}:${a.questionId}`));
-  const unseenAttempts = mine.filter((a) => !seenBefore.has(`${a.anonId}:${a.questionId}`));
+  // Transfer: per-participant exposure history — a question is only
+  // "previously seen" if THIS participant attempted it before THEIR OWN
+  // assignment date. Never use the cohort's earliest assignment date for an
+  // individual exposure history.
+  const seenByParticipant = new Map<string, Set<Id>>();
+  for (const a of attempts) {
+    const w = windows.get(a.anonId);
+    if (!w || new Date(a.createdAt).getTime() >= w.assignedAt) continue;
+    const set = seenByParticipant.get(a.anonId) ?? new Set<Id>();
+    set.add(a.questionId);
+    seenByParticipant.set(a.anonId, set);
+  }
+  const unseenAttempts = mine.filter((a) => {
+    const prior = seenByParticipant.get(a.anonId);
+    return !prior || !prior.has(a.questionId);
+  });
 
   // Calibration: |current mastery − observed accuracy| per topic with enough evidence.
   const byTopic = new Map<Id, { earned: number; possible: number }>();
@@ -279,11 +297,24 @@ function armOutcome(
   }
 
   const cutoff = now.getTime() - DROPOUT_DAYS * 86_400_000;
-  let dropped = 0;
+  let neverActivated = 0;
+  let inactive = 0;
+  let studyDropout = 0;
+  let completedStudy = 0;
   for (const anon of participants) {
     const latest = [...attempts].reverse().find((a) => a.anonId === anon)?.createdAt;
-    if (!latest || new Date(latest).getTime() < cutoff) dropped++;
+    if (!latest || new Date(latest).getTime() < cutoff) {
+      if (!latest) neverActivated++;
+      else inactive++;
+    } else if (windows.get(anon)?.arm != null && new Date(latest).getTime() >= cutoff) {
+      completedStudy++;
+    } else {
+      studyDropout++;
+    }
   }
+  const dropoutRate = participants.size
+    ? Math.round(((neverActivated + studyDropout) / participants.size) * 1000) / 1000
+    : null;
 
   const finals = participants.size
     ? [...participants].map((anon) => finalPerformance?.get(anon)).filter((v): v is number => v != null)
@@ -303,7 +334,7 @@ function armOutcome(
     completionRate: rate(completed, shown),
     rejectionRate: rate(rejected, shown),
     medianSecondsToBegin: median(beginPairs),
-    dropoutRate: participants.size ? rate(dropped, participants.size) : null,
+    dropoutRate,
     finalPerformancePercent: finals.length
       ? Math.round((finals.reduce((a, b) => a + b, 0) / finals.length) * 10) / 10
       : null,

@@ -72,7 +72,7 @@ describe("pairPredictionsWithActuals", () => {
 
   it("computes days before exam from the paired prediction's exam date", () => {
     const pairs = pairPredictionsWithActuals([prediction({})], [actual({})]);
-    expect(pairs[0].daysBeforeExam).toBe(61); // Mar 1 → May 15 minus Mar 15 offset ≈ 61 days
+    expect(pairs[0].daysBeforeExam).toBe(75); // Mar 1 → May 15: measured from prediction, not actual
   });
 });
 

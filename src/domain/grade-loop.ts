@@ -76,7 +76,7 @@ export interface GradeLoopReport {
   bias: number | null; // mean(actual − predicted); positive = Revise under-predicts
   intervalCoverage: number | null; // share of actuals landing inside their CI
   calibration: CalibrationRow[];
-  byDistance: { within30Days: GroupAccuracy; days31to90: GroupAccuracy; beyond90Days: GroupAccuracy };
+  byDistance: { within30Days: GroupAccuracy; days31to90: GroupAccuracy; beyond90Days: GroupAccuracy; unknown: GroupAccuracy };
   bySubject: GroupAccuracy[];
   byEvidence: { under25: GroupAccuracy; quarterTo60: GroupAccuracy; over60: GroupAccuracy };
   insufficientData: boolean;
@@ -104,9 +104,12 @@ export function pairPredictionsWithActuals(
     const latest = candidates.reduce((best, p) =>
       new Date(p.createdAt).getTime() > new Date(best.createdAt).getTime() ? p : best,
     );
+    // Days-before-exam is measured from the PREDICTION date, not the actual
+    // date — "how accurate are predictions made 90 days out?" refers to when
+    // the prediction was made, not when the exam was sat.
     const daysBeforeExam =
       latest.examDate != null
-        ? Math.round((new Date(latest.examDate).getTime() - takenAt) / 86_400_000)
+        ? Math.round((new Date(latest.examDate).getTime() - new Date(latest.createdAt).getTime()) / 86_400_000)
         : null;
     out.push({
       actualId: actual.id,
@@ -161,12 +164,7 @@ export function analyseGradeLoop(input: {
     };
   });
 
-  const distanceBucket = (p: PredictionOutcome): string => {
-    if (p.daysBeforeExam == null || p.daysBeforeExam > 90) return "beyond90Days";
-    if (p.daysBeforeExam <= 30) return "within30Days";
-    return "days31to90";
-  };
-
+  
   const makeGroups = (keyFn: (p: PredictionOutcome) => string): Record<string, GroupAccuracy> => {
     const groups: Record<string, PredictionOutcome[]> = {};
     for (const p of outcomes) {
@@ -176,11 +174,17 @@ export function analyseGradeLoop(input: {
     return Object.fromEntries(Object.entries(groups).map(([k, list]) => [k, groupAccuracy(list, k)]));
   };
 
-  const byDistanceRaw = makeGroups(distanceBucket);
+  const byDistanceRaw = makeGroups((p) => {
+    if (p.daysBeforeExam == null) return "unknown";
+    if (p.daysBeforeExam > 90) return "beyond90Days";
+    if (p.daysBeforeExam <= 30) return "within30Days";
+    return "days31to90";
+  });
   const byDistance = {
     within30Days: byDistanceRaw.within30Days ?? groupAccuracy([], "within30Days"),
     days31to90: byDistanceRaw.days31to90 ?? groupAccuracy([], "days31to90"),
     beyond90Days: byDistanceRaw.beyond90Days ?? groupAccuracy([], "beyond90Days"),
+    unknown: byDistanceRaw.unknown ?? groupAccuracy([], "unknown"),
   };
 
   const subjects = new Map<string, number>();
