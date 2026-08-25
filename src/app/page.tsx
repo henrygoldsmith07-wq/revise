@@ -8,6 +8,7 @@ import type { Recommendation } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
+import { buildSessionStructure } from "@/domain/session-structure";
 
 // Next Best Action IS the product. The entire home screen answers one
 // question: "what should I do right now?" — and makes starting effortless.
@@ -123,6 +124,14 @@ function NextBestAction({
     mistakes: "Fix a mistake",
   };
 
+  // Build a structured session from mastery level.
+  const mastery = exp?.lastEvidencePercent != null ? exp.lastEvidencePercent / 100 : null;
+  const session = buildSessionStructure({
+    topicId: recommendation.topicId ?? recommendation.subjectId,
+    mastery,
+    totalMinutes: recommendation.minutes,
+  });
+
 return (
     <section aria-label="Your next best task">
       {greeting ? (
@@ -142,6 +151,20 @@ return (
       <p className="text-sm text-ink3 mt-0.5">
         {activityLabel[recommendation.activity] ?? recommendation.activity} · {reasons.slice(0, 3).join(" · ")}
       </p>
+
+            <div className="mt-3 space-y-1">
+        {session.segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs text-ink2">
+            <span className="tabular-nums text-ink3 w-8 text-right">{seg.minutes}m</span>
+            <span className={"inline-block w-1.5 h-1.5 rounded-full " + (
+              seg.kind === "warmup" || seg.kind === "easy-retrieval" ? "bg-accent" :
+              seg.kind === "mistake-repair" ? "bg-danger" :
+              seg.kind === "transfer" ? "bg-success" :
+              "bg-ink3/50")} aria-hidden />
+            <span>{seg.label}</span>
+          </div>
+        ))}
+      </div>
 
       <ButtonLink href={href} variant="primary" size="md" className="mt-4 w-full sm:w-auto min-h-[3rem] text-base">
         Start →
