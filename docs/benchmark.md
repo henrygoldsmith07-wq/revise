@@ -1,5 +1,24 @@
 # Benchmarks
 
+## Past-paper import benchmark
+
+Import becomes trustworthy when it is measured and confidence-aware.
+Gold protocol: 100 papers (Phase 1) then 400+ with mark schemes, hand-
+annotated across nine dimensions - question boundaries, subparts, mark
+values, figures, tables, scheme alignment, spec points, topics and
+command words - blind, adjudicated.
+
+Metrics per importer: segmentation F1, subpart detection F1, mark-
+extraction accuracy, scheme-pairing accuracy, topic mapping top-1/top-3,
+spec-point precision/recall and diagram association. Schema in
+src/domain/paper-import-benchmark.ts, pinned by tests.
+
+Every imported question carries importConfidence() from documented
+signals (marks parsed, scheme paired, topic margin, spec coverage...).
+Below the 70% review threshold the question routes to a human review
+queue instead of silently joining the bank: "Question 4b - 94%
+confident" ships; "Question 7c - 48%" waits for a person.
+
 ## Recommender tournament
 
 Ten selection policies - Random, Weakest topic, Highest exam weighting,
