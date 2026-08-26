@@ -203,6 +203,15 @@ export interface ExperimentAnalysis {
   withdrawnN: number;
   /** Primary endpoint effect (Revise − control) in marks gained/hour. */
   marksGainedPerHourEffect: number | null;
+  /** Bootstrap CI for the primary comparison vs strongest simple baseline. */
+  primaryComparison: {
+    strongestBaselineId: string;
+    effect: number;
+    ci95Lower: number;
+    ci95Upper: number;
+    reviseN: number;
+    baselineN: number;
+  } | null;
   sufficientData: boolean;
   readiness: ExperimentReadiness;
   gates: ExperimentReadinessGates;
@@ -377,6 +386,35 @@ export interface ParticipantPrimaryOutcome {
   assessmentVersion: string;
 }
 
+/**
+ * Participant-level bootstrap CI for the difference in mean gain/hour.
+ * Resamples PARTICIPANTS with replacement — never individual attempts.
+ */
+export function bootstrapDifferenceCI(
+  armA: number[],
+  armB: number[],
+  opts?: { iterations?: number; seed?: number },
+): { estimate: number; ci95Lower: number; ci95Upper: number; iterations: number } {
+  const iterations = opts?.iterations ?? 2000;
+  if (!armA.length || !armB.length) return { estimate: 0, ci95Lower: 0, ci95Upper: 0, iterations: 0 };
+  const observed = armA.reduce((a, v) => a + v, 0) / armA.length - armB.reduce((a, v) => a + v, 0) / armB.length;
+  const rng = (() => { let s = opts?.seed ?? 42; return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
+  const diffs: number[] = [];
+  for (let iter = 0; iter < iterations; iter++) {
+    const sa: number[] = []; const sb: number[] = [];
+    for (let i = 0; i < armA.length; i++) sa.push(armA[Math.floor(rng() * armA.length)]);
+    for (let i = 0; i < armB.length; i++) sb.push(armB[Math.floor(rng() * armB.length)]);
+    diffs.push(sa.reduce((a, v) => a + v, 0) / sa.length - sb.reduce((a, v) => a + v, 0) / sb.length);
+  }
+  diffs.sort((x, y) => x - y);
+  return {
+    estimate: round(observed),
+    ci95Lower: round(diffs[Math.floor(0.025 * iterations)]),
+    ci95Upper: round(diffs[Math.floor(0.975 * iterations)]),
+    iterations,
+  };
+}
+
 export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnalysis {
   const now = input.now ?? new Date();
   const windows = new Map<string, { assignedAt: number; arm: ExperimentArm }>();
@@ -435,14 +473,51 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   const primaryOutcomeReady = descriptiveResultsReady && primaryOutcomes.length >= minP * 2;
   const efficacyClaimReady = primaryOutcomeReady && EXPERIMENT_ARMS.every((arm) => primaryOutcomes.filter((o) => o.arm === arm).length >= minP);
 
-  const gates = { operationallyUsable, descriptiveResultsReady, primaryOutcomeReady, efficacyClaimReady };
+  // Additional evidence gates: transfer and retention must be computed for all arms.
+  const transferReady = operationallyUsable &&
+    revise.unseenTransferScore != null && control.unseenTransferScore != null &&
+    bm.unseenTransferScore != null && bo.unseenTransferScore != null;
+  const retentionReady = operationallyUsable &&
+    revise.delayedRetention != null && control.delayedRetention != null &&
+    bm.delayedRetention != null && bo.delayedRetention != null;
+  // Efficacy claim requires all three evidence types.
+  const fullEfficacyReady = efficacyClaimReady && transferReady && retentionReady;
+
+  const gates = { operationallyUsable, descriptiveResultsReady, primaryOutcomeReady: primaryOutcomeReady, efficacyClaimReady: fullEfficacyReady };
   const readiness = efficacyClaimReady ? "efficacy-claim-ready" : primaryOutcomeReady ? "primary-outcome-ready" : descriptiveResultsReady ? "descriptive-results-ready" : operationallyUsable ? "operationally-usable" : "enrolling";
 
   const revOuts = primaryOutcomes.filter((o) => o.arm === "revise");
   const ctlOuts = primaryOutcomes.filter((o) => o.arm === "control");
   const revMean = revOuts.length ? revOuts.reduce((a, o) => a + (o.marksGainedPerHour ?? 0), 0) / revOuts.length : null;
   const ctlMean = ctlOuts.length ? ctlOuts.reduce((a, o) => a + (o.marksGainedPerHour ?? 0), 0) / ctlOuts.length : null;
-  const effect = efficacyClaimReady && revMean != null && ctlMean != null ? round(revMean - ctlMean) : null;
+  // Primary endpoint: assessment marks gained per revision hour.
+  const effect = fullEfficacyReady && revMean != null && ctlMean != null ? round(revMean - ctlMean) : null;
+
+  // Strongest simple baseline comparison with bootstrap CI.
+  let primaryComparison: ExperimentAnalysis["primaryComparison"] = null;
+  if (fullEfficacyReady) {
+    const revGains = primaryOutcomes.filter((o) => o.arm === "revise").map((o) => o.marksGainedPerHour ?? 0);
+    let strongestId = "baseline-mastery";
+    let strongestGain = -Infinity;
+    for (const bid of ["baseline-mastery", "baseline-overdue"] as const) {
+      const outs = primaryOutcomes.filter((o) => o.arm === bid);
+      if (!outs.length) continue;
+      const mean = outs.reduce((acc, o) => acc + (o.marksGainedPerHour ?? 0), 0) / outs.length;
+      if (mean > strongestGain) { strongestGain = mean; strongestId = bid; }
+    }
+    const baseGains = primaryOutcomes.filter((o) => o.arm === strongestId).map((o) => o.marksGainedPerHour ?? 0);
+    if (revGains.length >= minP && baseGains.length >= minP) {
+      const ci = bootstrapDifferenceCI(revGains, baseGains, { iterations: 2000, seed: 42 });
+      primaryComparison = {
+        strongestBaselineId: strongestId,
+        effect: ci.estimate,
+        ci95Lower: ci.ci95Lower,
+        ci95Upper: ci.ci95Upper,
+        reviseN: revGains.length,
+        baselineN: baseGains.length,
+      };
+    }
+  }
 
   const note = !operationallyUsable
     ? `Study enrolling: ${enrolledN} participants assigned.`
@@ -454,5 +529,7 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
           ? `Primary outcomes computed but every arm needs at least ${minP} paired outcomes.`
           : `Revise gained ${effect! > 0 ? "+" : ""}${effect} assessment marks per revision hour versus self-directed revision (${revOuts.length} vs ${ctlOuts.length} paired participants). Prospective design.`;
 
-  return { arms, primaryOutcomes, enrolledN, activatedN: [...windows.keys()].filter((anon: string) => attempts.some((a: { anonId: string }) => a.anonId === anon)).length, primaryOutcomeEligibleN: primaryOutcomes.length, missingBaselineN, missingFinalN, withdrawnN: 0, marksGainedPerHourEffect: effect, sufficientData: efficacyClaimReady, readiness, gates, note };
+  return { arms, primaryOutcomes, enrolledN, activatedN: [...windows.keys()].filter((anon: string) => attempts.some((a: { anonId: string }) => a.anonId === anon)).length, primaryOutcomeEligibleN: primaryOutcomes.length, missingBaselineN, missingFinalN, withdrawnN: 0,     marksGainedPerHourEffect: effect,
+    primaryComparison,
+    sufficientData: fullEfficacyReady, readiness, gates, note };
 }
