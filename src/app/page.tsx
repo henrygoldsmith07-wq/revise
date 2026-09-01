@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { todayIso } from "@/domain/scheduling";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import type { Recommendation } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
+import { LessonsIcon, ICON_SIZE } from "@/components/icons";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
 import { buildSessionStructure } from "@/domain/session-structure";
 
@@ -23,6 +24,7 @@ export default function TodayPage() {
   const [primary, ...rest] = recommendations;
   const experimentArm = store.experimentArm;
   const recordExperimentEvent = store.recordExperimentEvent;
+  const lessonsStarted = useLessonsStarted();
 
   useEffect(() => {
     if (!primary) return;
@@ -32,10 +34,18 @@ export default function TodayPage() {
     void recordExperimentEvent("shown", { taskId, activity: primary.activity, topicId: primary.topicId ?? null });
   }, [experimentArm, primary, recordExperimentEvent, today]);
 
-  if (!primary) return <EmptyToday name={settings.displayName} />;
+  if (!primary) return (
+    <div className="max-w-2xl mx-auto space-y-5">
+      <StartHereCallout started={lessonsStarted} />
+      <EmptyToday name={settings.displayName} />
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
+      {/* --- First-run: learn the topic before drilling it -------------- */}
+      <StartHereCallout started={lessonsStarted} />
+
       {/* --- Hero: the one thing to do right now ------------------------- */}
       <NextBestAction recommendation={primary} displayName={settings.displayName} greeting={greetingLabel} />
 
@@ -197,6 +207,56 @@ function EmptyToday({ name }: { name: string }) {
         Set up exams
       </ButtonLink>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// First-run lesson callout
+// ---------------------------------------------------------------------------
+
+// Lesson completion is tracked in localStorage by LessonMode; the Today page
+// only needs to know whether *any* lesson has been finished. Same shape as
+// useGreeting below: a stable getSnapshot read during render, SSR defaulting
+// to "started" so the callout never flashes for a returning user.
+const LESSONS_COMPLETED_KEY = "revise.lessons.completed";
+
+const NO_LESSONS_SUBSCRIBE = () => () => {};
+
+function clientLessonsStarted(): boolean {
+  try {
+    const raw = localStorage.getItem(LESSONS_COMPLETED_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    return Object.keys(map).length > 0;
+  } catch {
+    /* private browsing: fall back to hiding the callout */
+    return true;
+  }
+}
+
+function useLessonsStarted(): boolean {
+  return useSyncExternalStore(NO_LESSONS_SUBSCRIBE, clientLessonsStarted, () => true);
+}
+
+function StartHereCallout({ started }: { started: boolean }) {
+  if (started) return null;
+  return (
+    <section
+      aria-label="Start here"
+      className="flex items-center gap-3 px-4 py-3 rounded-[10px] border border-accent/40 bg-accentsoft/30"
+    >
+      <div className="shrink-0 w-8 h-8 rounded-full bg-accentsoft text-accent flex items-center justify-center">
+        <LessonsIcon size={ICON_SIZE.md} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">New here? Start with a lesson.</p>
+        <p className="text-xs text-ink3 mt-0.5">
+          Learn a topic from zero before the flashcards — lessons take about five minutes.
+        </p>
+      </div>
+      <ButtonLink href="/lesson" variant="primary" size="sm" className="shrink-0">
+        Start here
+      </ButtonLink>
+    </section>
   );
 }
 
