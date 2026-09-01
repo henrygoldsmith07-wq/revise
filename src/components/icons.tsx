@@ -28,6 +28,7 @@ import {
   Clock,
   FileText,
   Flame,
+  GraduationCap,
   LayoutGrid,
   Layers,
   Library,
@@ -83,6 +84,7 @@ export const SettingsIcon = Settings;
 export const TeacherIcon = UsersRound;
 /** Study modes other than plain review. */
 export const ModesIcon = Shapes;
+export const LessonsIcon = GraduationCap;
 /** One-click generation from notes. */
 export const GenerateIcon = Sparkle;
 export const BenchmarkIcon = BarChart3;

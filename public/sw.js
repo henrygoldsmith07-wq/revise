@@ -15,6 +15,7 @@ const APP_SHELL = [
   "/cards",
   "/case-study",
   "/generate",
+  "/lesson",
   "/library",
   "/papers",
   "/planner",
