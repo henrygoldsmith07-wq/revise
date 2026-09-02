@@ -385,8 +385,9 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   // ---- Lesson list -------------------------------------------------------
   const doneCount = lessons.filter((l) => completed[l.lesson.id]).length;
   // Mirror the summary's "Next up" on the list: one glanceable resume card
-  // instead of making the student scan for the first un-done lesson.
-  const firstIncomplete = lessons.findIndex((l) => !completed[l.lesson.id]);
+  // instead of making the student scan for the first un-done lesson. A topic
+  // counts as started once either its steps or its video are done.
+  const firstIncomplete = lessons.findIndex((l) => !completed[l.lesson.id] && !completed[`video:${l.topic.id}`]);
   const resumeIdx = firstIncomplete === -1 ? 0 : firstIncomplete;
   const resumeLabel =
     doneCount === 0

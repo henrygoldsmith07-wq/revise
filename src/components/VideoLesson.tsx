@@ -19,6 +19,9 @@ import { Button, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 // seek, auto-advance and end-of-video can never disagree.
 
 const TICK_MS = 250;
+
+/** Current wall-clock time, injectable for tests. */
+const nowMs = () => Date.now();
 const NARRATE_KEY = "revise.lessons.autoNarrate";
 
 function clock(totalSeconds: number): string {
@@ -95,11 +98,37 @@ export function VideoLesson({
   const scene = scenes[sceneIdx];
   const ended = envelope !== null && position >= totalSeconds;
 
+  // The clock advances by wall-clock deltas, not fixed ticks: browsers
+  // throttle timers in background tabs, and fixed-tick addition would make
+  // the video lag behind its own displayed timestamp after every switch.
+  const lastTickAt = useRef<number | null>(null);
   useEffect(() => {
-    if (!playing || !scene || ended) return;
-    const timer = setInterval(() => setPosition((p) => p + TICK_MS / 1000), TICK_MS);
-    return () => clearInterval(timer);
-  }, [playing, scene, ended]);
+    if (!playing || ended) {
+      lastTickAt.current = null;
+      return;
+    }
+    lastTickAt.current = nowMs();
+    const timer = setInterval(() => {
+      const at = nowMs();
+      const delta = (at - (lastTickAt.current ?? at)) / 1000;
+      lastTickAt.current = at;
+      setPosition((p) => p + delta);
+    }, TICK_MS);
+    return () => {
+      clearInterval(timer);
+      lastTickAt.current = null;
+    };
+  }, [playing, ended]);
+
+  // Going to the background pauses playback (and with it the narration) —
+  // a hidden tab should not keep "playing" to nobody.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) setPlaying(false);
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, []);
 
   // Mark watched exactly once per play-through.
   useEffect(() => {
