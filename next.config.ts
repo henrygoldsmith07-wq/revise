@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   // a path prefix. Unset means "serve at the root", which is exactly how this
   // app deploys on its own today, so leaving the variable alone changes nothing.
   basePath: process.env.APP_BASE_PATH || "",
+  // The Hoplite preview tunnel serves the dev server from a *.preview.usehoplite.com
+  // hostname, which Next 16 otherwise treats as cross-origin and blocks from dev
+  // resources (chunks fail to load and the app never hydrates in the preview).
+  allowedDevOrigins: ["localhost", "127.0.0.1", "*.preview.usehoplite.com"],
   // The service worker and manifest are served straight from /public; no
   // build-time PWA plugin is needed and none is wanted — a hand-written
   // worker is easier to reason about than a generated one.

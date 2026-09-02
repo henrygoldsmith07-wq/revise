@@ -101,5 +101,9 @@ async function dispatch(task: AiTask, payload: unknown) {
       const p = payload as { subjectId: string; text: string };
       return tasks.extractQuestions(p.subjectId, p.text);
     }
+    case "video-lesson": {
+      const p = payload as { topicId: string };
+      return tasks.videoLesson(p.topicId);
+    }
   }
 }

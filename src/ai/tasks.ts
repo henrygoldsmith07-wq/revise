@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { misconceptionsForTopic } from "@/content";
 import { getTopic, subjectLabel } from "@/domain/curriculum";
 import type { Question, Topic } from "@/domain/types";
 import {
@@ -10,6 +11,7 @@ import {
   markFallback,
   socraticFallback,
   summariseFallback,
+  videoLessonFallback,
 } from "./fallback";
 import { extractJson, getProvider } from "./provider";
 import type { AiEnvelope, AiTask } from "./types";
@@ -56,10 +58,16 @@ async function run<T>(
   const provider = getProvider();
   if (!provider) return { data: fallback(), source: "fallback", provider: null };
 
-  try {
+  const complete = async (extraFeedback?: string): Promise<T> => {
     const text = await provider.complete({
       system,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "user", content: prompt },
+        // One corrective pass: reasoning models often break a strict schema on
+        // the first try, and telling them which constraint failed fixes most
+        // of those without a second full prompt.
+        ...(extraFeedback ? [{ role: "user" as const, content: extraFeedback }] : []),
+      ],
       jsonHint,
       maxTokens,
     });
@@ -67,7 +75,23 @@ async function run<T>(
     if (raw == null) throw new Error("no JSON in model reply");
     const parsed = schema.safeParse(raw);
     if (!parsed.success) throw new Error(`schema: ${parsed.error.issues[0]?.message ?? "invalid"}`);
-    return { data: parsed.data, source: "ai", provider: provider.name };
+    return parsed.data;
+  };
+
+  try {
+    let data: T;
+    try {
+      data = await complete();
+    } catch (firstError) {
+      // Retry once with the validation failure quoted back; anything that
+      // fails twice was never going to parse, so fall through to offline.
+      const message = firstError instanceof Error ? firstError.message : "AI request failed";
+      if (!message.startsWith("schema:")) throw firstError;
+      data = await complete(
+        `Your previous reply did not match the required JSON contract: ${message}. Reply again with corrected JSON only — same shape, no prose around it.`,
+      );
+    }
+    return { data, source: "ai", provider: provider.name };
   } catch (error) {
     // A model failure must never become a user-facing failure.
     return {
@@ -109,6 +133,7 @@ export const payloadSchemas = {
     topicId: z.string().optional(),
     count: z.number().int().min(1).max(25).default(10),
   }),
+  "video-lesson": z.object({ topicId: z.string() }),
   ocr: z.object({
     // ~8 MB of base64 is roughly a 6 MB photo, which is plenty for a page of
     // handwriting and small enough to keep the request from timing out.
@@ -263,6 +288,69 @@ export async function summarise(topicId: string) {
     [topicContext(topic), "", "Write a one-page revision summary a student could read the night before the exam."].join("\n"),
     `{ "summary": string (markdown), "bullets": string[] }`,
     () => summariseFallback(topicId),
+  );
+}
+
+/**
+ * Video-style lesson: a storyboard a video editor could animate — timed
+ * scenes with narration, on-screen text and a visual — grounded in the topic's
+ * authored spec data and misconception library so the video can never drift
+ * from the specification.
+ */
+export async function videoLesson(topicId: string) {
+  const topic = getTopic(topicId);
+  const misconceptions = misconceptionsForTopic(topicId);
+  const misconceptionLines = misconceptions
+    .slice(0, 3)
+    .map((m) => `- Wrong idea: "${m.statement}" — correct it with: "${m.correction}"`)
+    .join("\n");
+  const specLines = (topic?.specPoints ?? [])
+    .slice(0, 4)
+    .map((sp) => `- ${sp.ref} (${sp.aos.join(", ")}): ${sp.text}`)
+    .join("\n");
+
+  const grounding = [
+    topicContext(topic),
+    misconceptions.length ? `\nMisconceptions students actually hold here:\n${misconceptionLines}` : "",
+    specLines ? `\nSpecification statements this topic is examined under:\n${specLines}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return run(
+    RESPONSE_SCHEMAS["video-lesson"],
+    `You are a video lesson director for a UK revision platform.
+You storyboard short revision videos that a video editor can animate directly.
+You are accurate and concrete: every scene teaches exactly one idea from the
+specification content you are given, and you never invent content that is not
+there. Write like an experienced examiner's report delivered by a good teacher:
+specific, warm, zero filler. Never pad scenes with restatements of other
+scenes. Use LaTeX between $ delimiters for any mathematics.`,
+    [
+      grounding,
+      "",
+      "Storyboard this topic as a revision video of roughly three to four minutes.",
+      "Use 7-10 scenes in this shape:",
+      "1. A hook (kind \"intro\"): why this topic earns marks, tied to the specification statements.",
+      "2. One scene per key point (kind \"teach\"): teach the point, then show the exam wording it earns.",
+      "3. Where misconceptions are listed, one scene per misconception (kind \"misconception\"): state the wrong idea in the student's voice, then correct it. Never merge two misconceptions into one scene.",
+      "4. One scene on the classic mistakes (kind \"trap\").",
+      specLines
+        ? '5. One scene on how the exam asks about it (kind "exam"): name the spec reference and command words.'
+        : "",
+      'Finally a recap scene (kind "recap") that compresses the video to three lines and sends the viewer to drill the deck.',
+      "",
+      `In each scene: "narration" is the spoken voiceover (2-4 short sentences), "onScreenText" is`,
+      "the few words the viewer reads on screen, \"visual\" is what the animation shows, and",
+      '"seconds" is the scene length (8-45).',
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    `{ "title": string, "scenes": [{ "title": string, "narration": string, "onScreenText": string, "visual": string, "seconds": number, "kind": "intro" | "teach" | "misconception" | "trap" | "exam" | "recap" }] }`,
+    () => videoLessonFallback(topicId),
+    // Reasoning models spend most of the budget thinking before the JSON —
+    // 3000 truncated every reply mid-scene (finish_reason "length").
+    9000,
   );
 }
 

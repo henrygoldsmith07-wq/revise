@@ -12,7 +12,10 @@ export default defineConfig({
   // boot ("Loading your revision data…") and turn timing into flakes.
   workers: 2,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  timeout: 45_000,
+  // 120s: a fresh profile seeds ~4.6k records into IndexedDB before the shell
+  // renders (tens of seconds on CI's two cores with parallel workers), and the
+  // offline walk then runs its whole journey inside the same test budget.
+  timeout: 120_000,
   expect: { timeout: 10_000 },
   use: {
     baseURL: BASE_URL,

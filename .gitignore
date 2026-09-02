@@ -8,3 +8,4 @@ coverage
 public/pdf.worker.min.mjs
 public/docs/
 test-results
+.hoplite/archive/
