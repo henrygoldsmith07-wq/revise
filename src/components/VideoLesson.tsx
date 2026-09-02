@@ -99,12 +99,6 @@ export function VideoLesson({
     // needs the network here.
     if (readCache(topic.id)) return;
     let cancelled = false;
-    const cached = readCache(topic.id);
-    if (cached) {
-      // A saved storyboard answers instantly; "Regenerate" replaces it.
-      setEnvelope(cached);
-      return;
-    }
     aiVideoLesson(topic.id).then((result) => {
       if (cancelled) return;
       if (result.source === "ai") writeCache(topic.id, result);
