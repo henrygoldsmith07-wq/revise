@@ -229,16 +229,26 @@ export function videoLessonFallback(topicId: string): VideoLessonResponse {
     },
   ];
 
-  for (const point of topic.keyPoints.slice(0, 6)) {
+  // Deterministic rotation keeps back-to-back teach scenes from ending on the
+  // same instruction every time.
+  const NUDGES = [
+    "Say it back in your own words before the next scene.",
+    "Pause the video and rehearse the exact wording — the mark scheme rewards it.",
+    "Cover the screen and try to restate that point from memory.",
+    "Hear it once more, then say the key phrase aloud.",
+    "That sentence is the one to write in the exam — lock it in now.",
+  ];
+
+  topic.keyPoints.slice(0, 6).forEach((point, index) => {
     scenes.push({
       title: clamp(firstClause(point), 120),
-      narration: clamp(`${point} Say it back in your own words before the next scene.`, 2000),
+      narration: clamp(`${point} ${NUDGES[(index + topic.order) % NUDGES.length]}`, 2000),
       onScreenText: clamp(firstClause(point), 300),
       visual: "The point builds on screen step by step, ending on the exact wording an examiner rewards.",
       seconds: duration(point) + 4,
       kind: "teach",
     });
-  }
+  });
 
   // The authored misconception library: name the wrong idea, then correct it.
   for (const misconception of misconceptionsForTopic(topic.id).slice(0, 2)) {

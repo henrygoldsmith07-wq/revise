@@ -58,10 +58,16 @@ async function run<T>(
   const provider = getProvider();
   if (!provider) return { data: fallback(), source: "fallback", provider: null };
 
-  try {
+  const complete = async (extraFeedback?: string): Promise<T> => {
     const text = await provider.complete({
       system,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "user", content: prompt },
+        // One corrective pass: reasoning models often break a strict schema on
+        // the first try, and telling them which constraint failed fixes most
+        // of those without a second full prompt.
+        ...(extraFeedback ? [{ role: "user" as const, content: extraFeedback }] : []),
+      ],
       jsonHint,
       maxTokens,
     });
@@ -69,7 +75,23 @@ async function run<T>(
     if (raw == null) throw new Error("no JSON in model reply");
     const parsed = schema.safeParse(raw);
     if (!parsed.success) throw new Error(`schema: ${parsed.error.issues[0]?.message ?? "invalid"}`);
-    return { data: parsed.data, source: "ai", provider: provider.name };
+    return parsed.data;
+  };
+
+  try {
+    let data: T;
+    try {
+      data = await complete();
+    } catch (firstError) {
+      // Retry once with the validation failure quoted back; anything that
+      // fails twice was never going to parse, so fall through to offline.
+      const message = firstError instanceof Error ? firstError.message : "AI request failed";
+      if (!message.startsWith("schema:")) throw firstError;
+      data = await complete(
+        `Your previous reply did not match the required JSON contract: ${message}. Reply again with corrected JSON only — same shape, no prose around it.`,
+      );
+    }
+    return { data, source: "ai", provider: provider.name };
   } catch (error) {
     // A model failure must never become a user-facing failure.
     return {

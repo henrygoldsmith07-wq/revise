@@ -88,6 +88,13 @@ describe("video lesson fallback", () => {
     for (const error of topic!.commonErrors.slice(0, 2)) {
       expect(narration).toContain(error);
     }
+    // Teach scenes rotate their closing nudge instead of repeating one line.
+    const nudges = lesson.scenes
+      .filter((s) => s.kind === "teach")
+      .map((s) => s.narration.split(". ").slice(-2)[0]);
+    for (let i = 1; i < nudges.length; i++) {
+      expect(nudges[i], `${topic!.id} teach scene ${i}`).not.toBe(nudges[i - 1]);
+    }
   });
 
   it("keeps every scene within a watchable length", () => {

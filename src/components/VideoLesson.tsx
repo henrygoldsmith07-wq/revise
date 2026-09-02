@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { aiVideoLesson } from "@/ai/client";
 import type { AiEnvelope, VideoLessonResponse, VideoLessonScene } from "@/ai/types";
+import { speechAvailable, speak, stopSpeaking, toSpokenText } from "@/lib/speech";
 import type { Topic } from "@/domain/types";
 import { BackIcon, ForwardIcon, PauseIcon, PlayIcon, VideoIcon, ICON_SIZE } from "./icons";
 import { SpeakButton } from "./SpeakButton";
@@ -18,6 +19,7 @@ import { Button, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 // seek, auto-advance and end-of-video can never disagree.
 
 const TICK_MS = 250;
+const NARRATE_KEY = "revise.lessons.autoNarrate";
 
 function clock(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -33,11 +35,32 @@ const KIND_LABELS: Record<NonNullable<VideoLessonScene["kind"]>, string> = {
   recap: "Recap",
 };
 
-export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => void }) {
+export function VideoLesson({
+  topic,
+  onExit,
+  onEnded,
+  nextTopic,
+  onSelectTopic,
+}: {
+  topic: Topic;
+  onExit: () => void;
+  /** Fired once when playback reaches the end — marks the video watched. */
+  onEnded?: (topicId: string) => void;
+  /** The next unwatched topic, for one-click chaining after the recap. */
+  nextTopic?: Topic | null;
+  onSelectTopic?: (topic: Topic) => void;
+}) {
   const [envelope, setEnvelope] = useState<AiEnvelope<VideoLessonResponse> | null>(null);
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [showScript, setShowScript] = useState(false);
+  const [autoNarrate, setAutoNarrate] = useState<boolean>(
+    () => typeof window !== "undefined" && window.localStorage.getItem(NARRATE_KEY) === "1",
+  );
+  // Fired-once guard: `ended` stays true across re-renders, and the callback
+  // must run once per play-through, not once per render.
+  const endedReported = useRef(false);
+  const speechOk = speechAvailable();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +100,27 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
     const timer = setInterval(() => setPosition((p) => p + TICK_MS / 1000), TICK_MS);
     return () => clearInterval(timer);
   }, [playing, scene, ended]);
+
+  // Mark watched exactly once per play-through.
+  useEffect(() => {
+    if (ended && !endedReported.current) {
+      endedReported.current = true;
+      onEnded?.(topic.id);
+    }
+    if (!ended) endedReported.current = false;
+  }, [ended, onEnded, topic.id]);
+
+  // Auto-narration: speak the current scene's voiceover while playing, and
+  // fall silent on pause, seek or scene change (this effect re-speaks).
+  useEffect(() => {
+    if (!autoNarrate || !playing || ended || !scene) {
+      stopSpeaking();
+      return;
+    }
+    speak(toSpokenText(scene.narration));
+    return () => stopSpeaking();
+  }, [autoNarrate, playing, ended, scene, sceneIdx]);
+  useEffect(() => () => stopSpeaking(), []);
 
   const togglePlay = useCallback(() => {
     if (!envelope) return;
@@ -200,11 +244,16 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
             {scene.onScreenText}
           </p>
           {ended ? (
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
               <Button size="sm" variant="secondary" onClick={() => setPosition(0)}>
                 <PlayIcon size={ICON_SIZE.sm} /> Watch again
               </Button>
-              <Button size="sm" variant="primary" onClick={onExit}>
+              {nextTopic && onSelectTopic ? (
+                <Button size="sm" variant="primary" onClick={() => onSelectTopic(nextTopic)}>
+                  Next: {nextTopic.title}
+                </Button>
+              ) : null}
+              <Button size="sm" variant="ghost" onClick={onExit}>
                 Back to lessons
               </Button>
             </div>
@@ -235,6 +284,23 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
             </div>
             <div className="flex items-center gap-2">
               <SpeakButton text={scene.narration} label="Read the narration aloud" />
+              <Button
+                size="sm"
+                variant={autoNarrate ? "secondary" : "ghost"}
+                disabled={!speechOk}
+                title={speechOk ? "Speak every scene's narration automatically" : "Speech is not available in this browser"}
+                onClick={() => {
+                  const next = !autoNarrate;
+                  setAutoNarrate(next);
+                  try {
+                    window.localStorage.setItem(NARRATE_KEY, next ? "1" : "0");
+                  } catch {
+                    /* private browsing: the toggle is best-effort */
+                  }
+                }}
+              >
+                {autoNarrate ? "Narration on" : "Auto-narrate"}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setShowScript((s) => !s)}>
                 {showScript ? "Hide script" : "Full script"}
               </Button>

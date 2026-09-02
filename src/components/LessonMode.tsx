@@ -16,7 +16,8 @@ import { useStore } from "@/state/store";
 // progress so reading stays active instead of passive. Completion and the
 // lesson streak live in the synced store (one row per user), so progress
 // follows the student across devices instead of sitting in per-device
-// localStorage.
+// localStorage. Video lessons mark their own `video:<topicId>` completion in
+// the same map, so a watching session earns the streak exactly like reading.
 
 export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => void }) {
   const lessons = useMemo(
@@ -38,6 +39,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   // When set, the video-style lesson replaces the whole lesson view; keyed by
   // topic id in the render so switching topics restarts the player cleanly.
   const [videoTopic, setVideoTopic] = useState<Topic | null>(null);
+  // Watching a video to the end completes its `video:<topicId>` entry in the
+  // same synced map the step lessons use — the streak bump comes with it.
+  const markVideoWatched = useCallback(
+    (topicId: string) => {
+      void completeLesson(`video:${topicId}`);
+    },
+    [completeLesson],
+  );
 
   const active = activeIdx !== null ? lessons[activeIdx] : null;
   const lesson = active?.lesson ?? null;
@@ -187,7 +196,24 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
 
   // ---- Video lesson --------------------------------------------------------
   if (videoTopic) {
-    return <VideoLesson key={videoTopic.id} topic={videoTopic} onExit={() => setVideoTopic(null)} />;
+    // Chain to the first not-yet-watched video after this one (wrapping), so a
+    // watching session flows topic to topic like the step lessons do.
+    const currentIndex = topics.findIndex((t) => t.id === videoTopic.id);
+    const nextTopic =
+      topics
+        .slice(currentIndex + 1)
+        .concat(topics.slice(0, Math.max(0, currentIndex)))
+        .find((t) => !completed[`video:${t.id}`]) ?? null;
+    return (
+      <VideoLesson
+        key={videoTopic.id}
+        topic={videoTopic}
+        onExit={() => setVideoTopic(null)}
+        onEnded={markVideoWatched}
+        nextTopic={nextTopic}
+        onSelectTopic={setVideoTopic}
+      />
+    );
   }
 
   // ---- Completion summary ------------------------------------------------
@@ -395,7 +421,10 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                   <p className="text-sm font-semibold text-ink">{entry.topic.title}</p>
                   <p className="text-xs text-ink3 mt-0.5">{entry.lesson.steps.length} steps</p>
                 </div>
-                {done ? <Pill tone="success">Done</Pill> : <Pill>Start</Pill>}
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  {done ? <Pill tone="success">Done</Pill> : <Pill>Start</Pill>}
+                  {completed[`video:${entry.topic.id}`] ? <Pill>Watched</Pill> : null}
+                </div>
               </button>
               <Button
                 size="sm"
