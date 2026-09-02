@@ -621,7 +621,9 @@ export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
  * on material never taught; everything with a topic drills in /practice, and
  * subject-wide recommendations review.
  */
-export function hrefForRecommendation(rec: Pick<Recommendation, "activity" | "subjectId" | "topicId">): string {
+export function hrefForRecommendation(
+  rec: Pick<Recommendation, "activity" | "subjectId"> & { topicId?: Id | null },
+): string {
   if (rec.activity === "learn" && rec.subjectId) return `/lesson?subject=${rec.subjectId}`;
   if (rec.topicId) return `/practice?topic=${rec.topicId}`;
   return "/review";

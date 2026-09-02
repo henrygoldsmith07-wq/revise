@@ -1,6 +1,7 @@
 import { allSubjects, allTopics, getTopic } from "@/domain/curriculum";
 import { misconceptionsForTopic } from "@/content";
 import { videoLessonFallback } from "@/ai/fallback";
+import { repairVideoLesson } from "@/ai/types";
 import { AI_TASKS, RESPONSE_SCHEMAS, videoLessonResponseSchema } from "@/ai/types";
 import { describe, expect, it } from "vitest";
 
@@ -75,6 +76,50 @@ describe("video lesson fallback", () => {
     const examScene = lesson.scenes.find((s) => s.kind === "exam");
     expect(examScene).toBeDefined();
     expect(examScene!.narration).toContain(withSpecPoints!.specPoints![0].ref);
+  });
+
+  it("salvages a near-miss model reply through repair", () => {
+    const nearMiss = {
+      title: "Proof and mathematical language",
+      scenes: [
+        {
+          title: "Meet the topic".repeat(20), // over the 120-char cap
+          narration: "The specification asks you to reason, not recall.",
+          onScreenText: "Reasoning over recall",
+          visual: "Title card.",
+          seconds: "12", // string, coerced
+          kind: "intro",
+        },
+        { title: "Deduction", narration: "Chain statements from a known result.", onScreenText: "Deduction", seconds: 400, kind: "teach" }, // seconds coerced down
+        { title: "Contradiction", narration: "Assume the negation.", onScreenText: "Contradiction", seconds: 9 }, // kind missing
+        { title: "Recap", narration: "Drill the deck.", onScreenText: "Recap", visual: "Summary card.", seconds: 11, kind: "recap" },
+      ],
+    };
+    const repaired = repairVideoLesson(nearMiss);
+    expect(repaired).not.toBeNull();
+    const parsed = videoLessonResponseSchema.safeParse(repaired);
+    expect(parsed.success).toBe(true);
+    expect(repaired!.scenes.length).toBe(4);
+    expect(repaired!.scenes[0]!.title.length).toBeLessThanOrEqual(120);
+    expect(repaired!.scenes[1]!.seconds).toBe(90);
+    expect(repaired!.scenes[2]!.kind).toBeUndefined();
+  });
+
+  it("drops unsalvageable scenes and refuses replies below the scene floor", () => {
+    const oneGoodScene = {
+      title: "Proof",
+      scenes: [
+        { title: "Good", narration: "A usable scene.", onScreenText: "Good", visual: "Card.", seconds: 9 },
+        { narration: "No title here.", seconds: 10 },
+        42,
+        null,
+      ],
+    };
+    const repaired = repairVideoLesson(oneGoodScene);
+    expect(repaired).toBeNull(); // one usable scene cannot meet the three-scene floor
+
+    expect(repairVideoLesson("not an object")).toBeNull();
+    expect(repairVideoLesson({ scenes: "not an array" })).toBeNull();
   });
 
   it("covers the topic's key points and common errors", () => {
