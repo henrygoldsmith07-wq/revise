@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { misconceptionsForTopic } from "@/content";
 import { getTopic, subjectLabel } from "@/domain/curriculum";
 import type { Question, Topic } from "@/domain/types";
 import {
@@ -271,30 +272,59 @@ export async function summarise(topicId: string) {
 /**
  * Video-style lesson: a storyboard a video editor could animate — timed
  * scenes with narration, on-screen text and a visual — grounded in the topic's
- * authored spec data so the video can never drift from the specification.
+ * authored spec data and misconception library so the video can never drift
+ * from the specification.
  */
 export async function videoLesson(topicId: string) {
   const topic = getTopic(topicId);
+  const misconceptions = misconceptionsForTopic(topicId);
+  const misconceptionLines = misconceptions
+    .slice(0, 3)
+    .map((m) => `- Wrong idea: "${m.statement}" — correct it with: "${m.correction}"`)
+    .join("\n");
+  const specLines = (topic?.specPoints ?? [])
+    .slice(0, 4)
+    .map((sp) => `- ${sp.ref} (${sp.aos.join(", ")}): ${sp.text}`)
+    .join("\n");
+
+  const grounding = [
+    topicContext(topic),
+    misconceptions.length ? `\nMisconceptions students actually hold here:\n${misconceptionLines}` : "",
+    specLines ? `\nSpecification statements this topic is examined under:\n${specLines}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return run(
     RESPONSE_SCHEMAS["video-lesson"],
     `You are a video lesson director for a UK revision platform.
 You storyboard short revision videos that a video editor can animate directly.
 You are accurate and concrete: every scene teaches exactly one idea from the
 specification content you are given, and you never invent content that is not
-there. Keep narration plain, conversational and exam-focused, the way a good
-teacher speaks over an animation. Use LaTeX between $ delimiters for any
-mathematics.`,
+there. Write like an experienced examiner's report delivered by a good teacher:
+specific, warm, zero filler. Never pad scenes with restatements of other
+scenes. Use LaTeX between $ delimiters for any mathematics.`,
     [
-      topicContext(topic),
+      grounding,
       "",
-      "Storyboard this topic as a revision video of roughly two to three minutes.",
-      "Use 6-8 scenes: a hook that says why the topic earns marks, one scene per key point,",
-      "a scene on the classic mistakes, and a closing recap that sends the viewer to drill the deck.",
+      "Storyboard this topic as a revision video of roughly three to four minutes.",
+      "Use 7-10 scenes in this shape:",
+      "1. A hook (kind \"intro\"): why this topic earns marks, tied to the specification statements.",
+      "2. One scene per key point (kind \"teach\"): teach the point, then show the exam wording it earns.",
+      "3. Where misconceptions are listed, one scene per misconception (kind \"misconception\"): state the wrong idea in the student's voice, then correct it. Never merge two misconceptions into one scene.",
+      "4. One scene on the classic mistakes (kind \"trap\").",
+      specLines
+        ? '5. One scene on how the exam asks about it (kind "exam"): name the spec reference and command words.'
+        : "",
+      'Finally a recap scene (kind "recap") that compresses the video to three lines and sends the viewer to drill the deck.',
+      "",
       `In each scene: "narration" is the spoken voiceover (2-4 short sentences), "onScreenText" is`,
       "the few words the viewer reads on screen, \"visual\" is what the animation shows, and",
       '"seconds" is the scene length (8-45).',
-    ].join("\n"),
-    `{ "title": string, "scenes": [{ "title": string, "narration": string, "onScreenText": string, "visual": string, "seconds": number }] }`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    `{ "title": string, "scenes": [{ "title": string, "narration": string, "onScreenText": string, "visual": string, "seconds": number, "kind": "intro" | "teach" | "misconception" | "trap" | "exam" | "recap" }] }`,
     () => videoLessonFallback(topicId),
     // Reasoning models spend most of the budget thinking before the JSON —
     // 3000 truncated every reply mid-scene (finish_reason "length").

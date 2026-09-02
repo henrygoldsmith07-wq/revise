@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { aiVideoLesson } from "@/ai/client";
-import type { AiEnvelope, VideoLessonResponse } from "@/ai/types";
+import type { AiEnvelope, VideoLessonResponse, VideoLessonScene } from "@/ai/types";
 import type { Topic } from "@/domain/types";
 import { BackIcon, ForwardIcon, PauseIcon, PlayIcon, VideoIcon, ICON_SIZE } from "./icons";
 import { SpeakButton } from "./SpeakButton";
@@ -23,6 +23,15 @@ function clock(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+const KIND_LABELS: Record<NonNullable<VideoLessonScene["kind"]>, string> = {
+  intro: "Intro",
+  teach: "Teach",
+  misconception: "Misconception",
+  trap: "Common trap",
+  exam: "In the exam",
+  recap: "Recap",
+};
 
 export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => void }) {
   const [envelope, setEnvelope] = useState<AiEnvelope<VideoLessonResponse> | null>(null);
@@ -184,6 +193,7 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
         >
           <Pill className="absolute top-3 left-3">
             Scene {sceneIdx + 1} of {scenes.length}
+            {scene.kind && scene.kind !== "teach" ? ` · ${KIND_LABELS[scene.kind]}` : ""}
           </Pill>
           <span className="absolute top-3 right-3 tabular-nums text-xs text-ink3">{clock(sceneLeft)} left</span>
           <p className="text-xl sm:text-2xl font-semibold tracking-tight text-ink max-w-md text-balance">

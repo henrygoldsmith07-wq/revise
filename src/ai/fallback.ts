@@ -1,4 +1,4 @@
-import { seedQuestionsForTopic } from "@/content";
+import { misconceptionsForTopic, seedQuestionsForTopic } from "@/content";
 import { getTopic } from "@/domain/curriculum";
 import { markQuestion } from "@/domain/marking";
 import { mistakePatterns } from "@/domain/mistakes";
@@ -225,6 +225,7 @@ export function videoLessonFallback(topicId: string): VideoLessonResponse {
       onScreenText: clamp(topic.title, 300),
       visual: `Title card for ${topic.title}${topic.specRef ? ` with its spec reference ${topic.specRef}` : ""}, over the subject's colour.`,
       seconds: duration(topic.summary),
+      kind: "intro",
     },
   ];
 
@@ -235,6 +236,20 @@ export function videoLessonFallback(topicId: string): VideoLessonResponse {
       onScreenText: clamp(firstClause(point), 300),
       visual: "The point builds on screen step by step, ending on the exact wording an examiner rewards.",
       seconds: duration(point) + 4,
+      kind: "teach",
+    });
+  }
+
+  // The authored misconception library: name the wrong idea, then correct it.
+  for (const misconception of misconceptionsForTopic(topic.id).slice(0, 2)) {
+    const narration = `A common wrong idea: ${misconception.statement} ${misconception.correction}`;
+    scenes.push({
+      title: clamp(`Misconception: ${firstClause(misconception.statement)}`, 120),
+      narration: clamp(narration, 2000),
+      onScreenText: clamp(`Wrong: ${firstClause(misconception.statement)}`, 300),
+      visual: "The misconception appears in a thought bubble, is crossed out, and the correct idea replaces it.",
+      seconds: duration(narration) + 3,
+      kind: "misconception",
     });
   }
 
@@ -245,6 +260,20 @@ export function videoLessonFallback(topicId: string): VideoLessonResponse {
       onScreenText: clamp(`Trap: ${firstClause(error)}`, 300),
       visual: "The wrong answer writes itself, a red cross strikes it out, and the correct form replaces it.",
       seconds: duration(error) + 3,
+      kind: "trap",
+    });
+  }
+
+  const specPoint = topic.specPoints?.[0];
+  if (specPoint) {
+    const narration = `In the exam, ${topic.title} is examined under ${specPoint.ref} (${specPoint.aos.join(" and ")}): ${specPoint.text}`;
+    scenes.push({
+      title: `In the exam (${specPoint.ref})`,
+      narration: clamp(narration, 2000),
+      onScreenText: clamp(`${specPoint.ref}: ${firstClause(specPoint.text)}`, 300),
+      visual: `The board's spec reference ${specPoint.ref} on screen with the assessment objectives highlighted.`,
+      seconds: duration(narration),
+      kind: "exam",
     });
   }
 
@@ -257,16 +286,20 @@ export function videoLessonFallback(topicId: string): VideoLessonResponse {
       onScreenText: "Stay close to the spec",
       visual: "A mark scheme highlights phrases that also appear in the specification summary.",
       seconds: 15,
+      kind: "exam",
     });
   }
 
   scenes.push({
     title: "Recap",
-    narration: `That's ${topic.title}: the points that earn the marks, and the traps that cost them. Close the video and drill the deck — the cards test exactly these points.`,
+    narration: `That's ${topic.title}: the points that earn the marks, the traps that cost them${
+      topic.specPoints?.length ? `, and the ${topic.specPoints.length} specification statements behind it` : ""
+    }. Close the video and drill the deck — the cards test exactly these points.`,
     onScreenText: "Now drill the deck",
     visual: `Every taught point stacks into one summary card for ${topic.title}.`,
     seconds: 12,
+    kind: "recap",
   });
 
-  return { title: topic.title, scenes: scenes.slice(0, 10) };
+  return { title: topic.title, scenes: scenes.slice(0, 14) };
 }

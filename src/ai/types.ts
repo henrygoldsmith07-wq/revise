@@ -98,11 +98,13 @@ export const videoLessonSceneSchema = z.object({
   /** What the animation or diagram shows while the narration plays. */
   visual: z.string().min(1).max(500),
   seconds: z.number().int().min(5).max(90),
+  /** Role the scene plays; the player labels scenes with it. Optional so earlier generations still parse. */
+  kind: z.enum(["intro", "teach", "misconception", "trap", "exam", "recap"]).optional(),
 });
 
 export const videoLessonResponseSchema = z.object({
   title: z.string().min(1).max(200),
-  scenes: z.array(videoLessonSceneSchema).min(3).max(10),
+  scenes: z.array(videoLessonSceneSchema).min(3).max(14),
 });
 
 /**

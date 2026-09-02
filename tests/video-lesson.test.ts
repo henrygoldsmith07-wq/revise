@@ -1,4 +1,5 @@
 import { allSubjects, allTopics, getTopic } from "@/domain/curriculum";
+import { misconceptionsForTopic } from "@/content";
 import { videoLessonFallback } from "@/ai/fallback";
 import { AI_TASKS, RESPONSE_SCHEMAS, videoLessonResponseSchema } from "@/ai/types";
 import { describe, expect, it } from "vitest";
@@ -28,12 +29,52 @@ describe("video lesson fallback", () => {
     expect(JSON.stringify(videoLessonFallback(topic.id))).toBe(JSON.stringify(videoLessonFallback(topic.id)));
   });
 
-  it("always plays at least three scenes and stays within ten", () => {
+  it("always plays at least three scenes and stays within fourteen", () => {
     for (const topic of allTopics()) {
       const lesson = videoLessonFallback(topic.id);
       expect(lesson.scenes.length, topic.id).toBeGreaterThanOrEqual(3);
-      expect(lesson.scenes.length, topic.id).toBeLessThanOrEqual(10);
+      expect(lesson.scenes.length, topic.id).toBeLessThanOrEqual(14);
     }
+  });
+
+  it("labels every scene with a valid kind", () => {
+    const kinds = ["intro", "teach", "misconception", "trap", "exam", "recap"];
+    for (const topic of allTopics()) {
+      const lesson = videoLessonFallback(topic.id);
+      expect(lesson.scenes[0]?.kind, topic.id).toBe("intro");
+      expect(lesson.scenes.at(-1)?.kind, topic.id).toBe("recap");
+      for (const scene of lesson.scenes) {
+        expect(kinds, `${topic.id}: ${scene.title}`).toContain(scene.kind);
+      }
+    }
+  });
+
+  it("addresses the authored misconceptions for topics that have them", () => {
+    const withMisconceptions = allTopics().filter(
+      (t) => misconceptionsForTopic(t.id).length > 0,
+    );
+    expect(withMisconceptions.length).toBeGreaterThan(0);
+
+    for (const topic of withMisconceptions.slice(0, 40)) {
+      const lesson = videoLessonFallback(topic.id);
+      const misconceptionScenes = lesson.scenes.filter((s) => s.kind === "misconception");
+      expect(misconceptionScenes.length, topic.id).toBe(
+        Math.min(2, misconceptionsForTopic(topic.id).length),
+      );
+      const narration = lesson.scenes.map((s) => s.narration).join(" ");
+      for (const m of misconceptionsForTopic(topic.id).slice(0, 2)) {
+        expect(narration, topic.id).toContain(m.correction);
+      }
+    }
+  });
+
+  it("names the spec reference when the topic has spec points", () => {
+    const withSpecPoints = allTopics().find((t) => t.specPoints?.length);
+    expect(withSpecPoints).toBeDefined();
+    const lesson = videoLessonFallback(withSpecPoints!.id);
+    const examScene = lesson.scenes.find((s) => s.kind === "exam");
+    expect(examScene).toBeDefined();
+    expect(examScene!.narration).toContain(withSpecPoints!.specPoints![0].ref);
   });
 
   it("covers the topic's key points and common errors", () => {
