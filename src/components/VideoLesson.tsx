@@ -40,7 +40,7 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
     };
   }, [topic.id]);
 
-  const scenes = envelope?.data.scenes ?? [];
+  const scenes = useMemo(() => envelope?.data.scenes ?? [], [envelope]);
 
   const boundaries = useMemo(() => {
     const acc: number[] = [];
@@ -105,11 +105,12 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
 
   // Callbacks live in a ref so the bindings register exactly once: the video
   // position ticks several times a second and re-registering on every tick
-  // would thrash the shortcut registry.
-  const live = useRef({ togglePlay, prevScene, nextScene });
-  live.current = { togglePlay, prevScene, nextScene };
-  const onExitRef = useRef(onExit);
-  onExitRef.current = onExit;
+  // would thrash the shortcut registry. The sync runs in an effect — refs are
+  // not written during render.
+  const live = useRef({ togglePlay, prevScene, nextScene, onExit });
+  useEffect(() => {
+    live.current = { togglePlay, prevScene, nextScene, onExit };
+  });
 
   const bindings = useMemo(
     () => [
@@ -135,7 +136,7 @@ export function VideoLesson({ topic, onExit }: { topic: Topic; onExit: () => voi
         key: "escape",
         group: "Video lesson",
         label: "Exit video",
-        run: () => onExitRef.current(),
+        run: () => live.current.onExit(),
       },
     ],
     [],
