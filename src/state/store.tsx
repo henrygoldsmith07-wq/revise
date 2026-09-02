@@ -201,11 +201,27 @@ function legacyLessonProgress(): { completed: Record<string, boolean>; streak: {
 
 /** Local-time YYYY-MM-DD for lesson streaks (a day flips at midnight, not UTC). */
 function localDayKey(offsetDays = 0): string {
-  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * Pure streak roll used by completeLesson. Several lessons finished the same
+ * day count as one streak day; a lesson on the day after the last one extends
+ * the streak; any longer gap restarts it.
+ */
+export function nextLessonStreak(
+  current: { count: number; lastDay: string },
+  today: string,
+  yesterday: string,
+): { count: number; lastDay: string } {
+  if (current.lastDay === today) return current;
+  if (current.lastDay === yesterday) return { count: current.count + 1, lastDay: today };
+  return { count: 1, lastDay: today };
 }
 
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
@@ -1019,14 +1035,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const completeLesson = useCallback<StoreValue["completeLesson"]>(
     async (lessonId) => {
       const current = snapshot?.lessonProgress ?? defaultLessonProgress(userId);
-      const today = localDayKey();
       // Several lessons finished the same day still count as one streak day.
-      const streak =
-        current.streak.lastDay === today
-          ? current.streak
-          : current.streak.lastDay === localDayKey(-1)
-            ? { count: current.streak.count + 1, lastDay: today }
-            : { count: 1, lastDay: today };
+      const streak = nextLessonStreak(current.streak, localDayKey(), localDayKey(-1));
       const next: LessonProgress = {
         ...current,
         completed: { ...current.completed, [lessonId]: true },
