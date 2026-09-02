@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { buildLesson } from "@/content/lessons";
+import { allTopics, getSubject } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
 import { useShortcuts } from "./shortcuts";
@@ -24,13 +26,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     [topics],
   );
 
-  const { lessonProgress, completeLesson } = useStore();
+  const store = useStore();
+  const { lessonProgress, completeLesson } = store;
   const completed = lessonProgress.completed;
   const streak = lessonProgress.streak;
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
   const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
-  const [summary, setSummary] = useState<{ correct: number; total: number } | null>(null);
+  const [summary, setSummary] = useState<{ correct: number; total: number; missed: { body: string; answer: string }[] } | null>(null);
 
   const active = activeIdx !== null ? lessons[activeIdx] : null;
   const lesson = active?.lesson ?? null;
@@ -79,7 +82,12 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     // the student elsewhere. The summary renders the updated streak once the
     // patch lands.
     void completeLesson(lesson.id);
-    setSummary({ correct, total: checks.length });
+    // Carry the missed checks into the summary so the student re-exposes the
+    // correction instead of only seeing a score.
+    const missed = checks
+      .filter((s) => checked[s.id] !== s.check!.correctIndex)
+      .map((s) => ({ body: s.body, answer: s.check!.options[s.check!.correctIndex] }));
+    setSummary({ correct, total: checks.length, missed });
   }, [checked, completeLesson, lesson]);
 
   const advance = useCallback(() => {
@@ -110,6 +118,27 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
       exitLesson();
     }
   }, [exitLesson, nextIdx, startLesson]);
+
+  // When this subject is finished, point at the next enrolled subject that
+  // still has lessons left, in curriculum order — momentum over dead ends.
+  // Recomputed on render: it only matters on the summary screen, where the
+  // loop over enrolled subjects is trivially cheap.
+  const currentSubjectId = topics[0]?.subjectId ?? null;
+  let upNextSubject: { subjectId: string; name: string; remaining: number } | null = null;
+  if (nextIdx === null) {
+    for (const sid of store.settings.subjectIds) {
+      if (sid === currentSubjectId) continue;
+      const remaining = allTopics([sid]).filter((t) => {
+        const l = buildLesson(t);
+        return l && !completed[l.id];
+      }).length;
+      if (remaining > 0) {
+        upNextSubject = { subjectId: sid, name: getSubject(sid)?.name ?? sid, remaining };
+        break;
+      }
+    }
+  }
+  const router = useRouter();
 
   // Keyboard: 1-4 answer the current question, Enter continues, Backspace
   // steps back, Esc leaves the lesson. Registered through the shared shortcut
@@ -184,6 +213,17 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
             </p>
           </div>
 
+          {summary.missed.length ? (
+            <ul className="text-left space-y-2 max-w-md mx-auto">
+              {summary.missed.map((m, i) => (
+                <li key={i} className="text-xs border border-line rounded-[8px] px-3 py-2">
+                  <span className="text-success font-medium">✓ {m.answer}</span>
+                  <p className="mt-1 text-ink3">{m.body}</p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
           <div className="flex items-center justify-center gap-2 flex-wrap">
             <Pill tone="accent" className="inline-flex items-center gap-1.5">
               <StreakIcon size={ICON_SIZE.sm} />
@@ -200,9 +240,24 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                 Start next lesson
               </Button>
             </div>
-          ) : (
+          ) : upNextSubject ? (
             <div className="pt-2 border-t border-line">
               <p className="text-sm text-ink3">All lessons in this subject are complete. 🎉</p>
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-3">Up next</p>
+              <p className="text-sm font-medium text-ink mt-1">
+                {upNextSubject.name} — {upNextSubject.remaining} {upNextSubject.remaining === 1 ? "lesson" : "lessons"} left
+              </p>
+              <Button
+                variant="primary"
+                className="mt-3"
+                onClick={() => router.push(`/lesson?subject=${encodeURIComponent(upNextSubject.subjectId)}`)}
+              >
+                Switch to {upNextSubject.name}
+              </Button>
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-line">
+              <p className="text-sm text-ink3">All lessons in your subjects are complete. 🎉</p>
               <Button variant="primary" className="mt-3" onClick={exitLesson}>
                 Back to lessons
               </Button>
