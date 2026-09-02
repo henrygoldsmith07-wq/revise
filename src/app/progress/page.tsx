@@ -177,8 +177,8 @@ function LessonProgressPanel({
             {bySubject.map((row) => {
               const pct = row.total ? Math.round((row.done / row.total) * 100) : 0;
               const complete = row.total > 0 && row.done === row.total;
-              return (
-                <li key={row.subjectId} className="flex items-center gap-3 text-xs">
+              const body = (
+                <>
                   <span className="w-24 shrink-0 truncate font-medium text-ink2" title={row.subjectName}>
                     {row.subjectName}
                   </span>
@@ -204,6 +204,21 @@ function LessonProgressPanel({
                       </span>
                     </>
                   )}
+                </>
+              );
+              // Deep-link straight into the subject's lesson list; a subject
+              // with no authored lessons yet has nowhere to go.
+              return row.total === 0 ? (
+                <li key={row.subjectId} className="flex items-center gap-3 text-xs">{body}</li>
+              ) : (
+                <li key={row.subjectId}>
+                  <Link
+                    href={`/lesson?subject=${encodeURIComponent(row.subjectId)}`}
+                    className="flex items-center gap-3 text-xs rounded-md px-1 py-0.5 -mx-1 hover:bg-surface2 transition-colors group"
+                    title={`Continue ${row.subjectName} lessons`}
+                  >
+                    {body}
+                  </Link>
                 </li>
               );
             })}
