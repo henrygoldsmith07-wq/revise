@@ -5,6 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { todayIso } from "@/domain/scheduling";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import type { Recommendation } from "@/domain/types";
+import { hrefForRecommendation } from "@/domain/recommender";
 import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { LessonsIcon, ICON_SIZE } from "@/components/icons";
@@ -55,7 +56,7 @@ export default function TodayPage() {
           {rest.slice(0, 3).map((rec, i) => (
             <Link
               key={`${rec.activity}-${rec.topicId ?? rec.subjectId}`}
-              href={rec.topicId ? `/practice?topic=${rec.topicId}` : `/review`}
+              href={hrefForRecommendation(rec)}
               className="flex items-center gap-2 text-xs text-ink3 hover:text-ink transition-colors group"
             >
               <span className="text-[10px] font-semibold uppercase tracking-wider text-ink3/70">
@@ -107,9 +108,7 @@ function NextBestAction({
   const topic = recommendation.topicId ? getTopic(recommendation.topicId) : null;
   const exp = recommendation.explanation;
 
-  const href = recommendation.topicId
-    ? `/practice?topic=${recommendation.topicId}`
-    : `/review`;
+  const href = hrefForRecommendation(recommendation);
 
   // Why-this bullets derived from structured explanation factors.
   const reasons: string[] = [];
