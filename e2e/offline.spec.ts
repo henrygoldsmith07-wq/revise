@@ -21,9 +21,12 @@ test.describe("offline walk", () => {
     await page.goto("/");
 
     // Either onboarding (fresh install) or Today shell — decided post-hydration.
+    // First run seeds ~4.6k records into IndexedDB before either appears; on
+    // CI's two cores, with two workers seeding in parallel, that is tens of
+    // seconds — well over the old 15s.
     const onboarding = page.getByText(/Revision that knows what to do next/i);
     const today = page.locator("main#main");
-    await expect(onboarding.or(today).first()).toBeVisible({ timeout: 15_000 });
+    await expect(onboarding.or(today).first()).toBeVisible({ timeout: 60_000 });
 
     // If onboarding is showing, walk it then land on Today.
     if ((await todayOrOnboarding(page)) === "onboarding") {
@@ -51,11 +54,18 @@ test.describe("offline walk", () => {
       const buildBtn = page.getByRole("button", { name: /Build my plan|Continue/i }).first();
       if (await buildBtn.isVisible()) await buildBtn.click();
 
-      await expect(page.locator("main#main")).toBeVisible({ timeout: 15_000 });
+      // "Build my plan" writes the plan and can trigger a settling re-load of
+      // the first boot; 60s matches the first-paint budget.
+      await expect(page.locator("main#main")).toBeVisible({ timeout: 60_000 });
     }
 
-    // Today should now have content (recommendations or empty-state CTA).
-    await expect(page.locator("main#main")).toContainText(/Today|Review|Practice|Progress|Begin|Start/i, { timeout: 10_000 });
+    // After the walk the app may still be settling its first boot (the store
+    // can re-run its load once onboarding writes land), so give Today the same
+    // generous budget the first paint got instead of a bare 10s.
+    await expect(async () => {
+      await expect(page.locator("main#main")).toBeVisible();
+      await expect(page.locator("main#main")).toContainText(/Today|Review|Practice|Progress|Begin|Start/i);
+    }).toPass({ timeout: 90_000 });
 
     // AppShell: skip link is the first tab stop (WCAG 2.4.1) — present on the
     // Today shell. Onboarding renders only its dialog, so assert after landing.

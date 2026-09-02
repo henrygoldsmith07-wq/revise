@@ -13,7 +13,7 @@ import { expect, type Page } from "@playwright/test";
  */
 export type ShellState = "onboarding" | "today";
 
-export async function todayOrOnboarding(page: Page, timeoutMs = 25_000): Promise<ShellState> {
+export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise<ShellState> {
   const onboarding = page.getByText(/Revision that knows what to do next/i);
   const today = page.locator("main#main");
   let outcome: ShellState | null = null;
