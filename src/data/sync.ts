@@ -25,6 +25,7 @@ const TABLES: Record<SyncEntity, string> = {
   examDates: "exam_dates",
   settings: "user_settings",
   streak: "streaks",
+  lessonProgress: "lesson_progress",
 };
 
 export const SYNC_QUEUE_EVENT = "revise:sync-queue";
@@ -179,7 +180,7 @@ async function pull(userId: Id): Promise<{ pulled: number; failed: number }> {
   return { pulled, failed };
 }
 
-const STORE_FOR: Record<SyncEntity, "cards" | "reviewLogs" | "attempts" | "mistakes" | "questions" | "papers" | "plannedSessions" | "examDates" | "settings" | "streak"> = {
+const STORE_FOR: Record<SyncEntity, "cards" | "reviewLogs" | "attempts" | "mistakes" | "questions" | "papers" | "plannedSessions" | "examDates" | "settings" | "streak" | "lessonProgress"> = {
   cards: "cards",
   reviewLogs: "reviewLogs",
   attempts: "attempts",
@@ -190,14 +191,15 @@ const STORE_FOR: Record<SyncEntity, "cards" | "reviewLogs" | "attempts" | "mista
   examDates: "examDates",
   settings: "settings",
   streak: "streak",
+  lessonProgress: "lessonProgress",
 };
 
 function keyFor(entity: SyncEntity, row: Record<string, unknown>): string {
-  return entity === "settings" || entity === "streak" ? String(row.userId) : String(row.id);
+  return entity === "settings" || entity === "streak" || entity === "lessonProgress" ? String(row.userId) : String(row.id);
 }
 
 function pkFor(entity: SyncEntity): string {
-  return entity === "settings" || entity === "streak" ? "user_id" : "id";
+  return entity === "settings" || entity === "streak" || entity === "lessonProgress" ? "user_id" : "id";
 }
 
 function rowId(payload: unknown): string {

@@ -70,12 +70,45 @@ export function buildLesson(topic: Topic): Lesson | null {
     });
   });
 
-  // Closing step: the traps. Each common error is worth a step so the
-  // student meets the traps *before* the exam does.
+  // Closing steps: the traps. Each common error is worth a step so the
+  // student meets the traps *before* the exam does. Where there are enough
+  // key points to stand as distractors, the trap is an active check — "which
+  // of these would the examiner penalise?" — rather than passive reading.
   topic.commonErrors.forEach((error, i) => {
+    const body = `Common trap: ${error}`;
+    if (topic.keyPoints.length >= 3) {
+      const options = shuffleStable([error, ...topic.keyPoints.slice(0, 3)], topic.id, 1000 + i);
+      steps.push({
+        id: `lesson:${topic.id}:err:${i}`,
+        body,
+        check: {
+          question: `Examiners penalise one of these in ${topic.title.toLowerCase()} — which is the trap to avoid?`,
+          options,
+          correctIndex: options.indexOf(error),
+        },
+      });
+    } else {
+      steps.push({ id: `lesson:${topic.id}:err:${i}`, body });
+    }
+  });
+
+  // Misconception steps: where the authored misconception library covers this
+  // topic, meet the wrong belief head-on — what it is, why it fails, and a
+  // check against the statements the examiner rewards.
+  misconceptionsForTopic(topic.id).forEach((misconception, i) => {
+    const options = shuffleStable(
+      [misconception.statement, ...topic.keyPoints.slice(0, 3)],
+      topic.id,
+      2000 + i,
+    );
     steps.push({
-      id: `lesson:${topic.id}:err:${i}`,
-      body: `Common trap: ${error}`,
+      id: `lesson:${topic.id}:mc:${i}`,
+      body: `${misconception.explanation}\n\nExaminer's eye: ${misconception.example} — ${misconception.correction}`,
+      check: {
+        question: `Which of these is the wrong belief, not what the examiner rewards?`,
+        options,
+        correctIndex: options.indexOf(misconception.statement),
+      },
     });
   });
 

@@ -5,6 +5,7 @@ import type {
   Card,
   ExamDate,
   Id,
+  LessonProgress,
   Mistake,
   Paper,
   PlannedSession,
@@ -84,6 +85,7 @@ export interface Snapshot {
   examDates: ExamDate[];
   settings: UserSettings;
   streak: StreakState;
+  lessonProgress: LessonProgress;
 }
 
 export const LOCAL_USER_ID = "local";
@@ -110,12 +112,22 @@ export function defaultSettings(userId: Id): UserSettings {
     aiEnabled: true,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
+    lastLessonSubject: "",
     updatedAt: new Date().toISOString(),
   };
 }
 
 export function defaultStreak(userId: Id): StreakState {
   return { userId, current: 0, longest: 0, lastActiveDate: null, xp: 0, achievements: [] };
+}
+
+export function defaultLessonProgress(userId: Id): LessonProgress {
+  return {
+    userId,
+    completed: {},
+    streak: { count: 0, lastDay: "" },
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 const SEED_VERSION = 1;
@@ -156,6 +168,8 @@ export async function loadSnapshot(userId: Id): Promise<Snapshot> {
 
   const settings = ((await db.get("settings", userId)) as UserSettings | undefined) ?? defaultSettings(userId);
   const streak = ((await db.get("streak", userId)) as StreakState | undefined) ?? defaultStreak(userId);
+  const lessonProgress =
+    ((await db.get("lessonProgress", userId)) as LessonProgress | undefined) ?? defaultLessonProgress(userId);
 
   return {
     cards: rows.cards as Card[],
@@ -168,6 +182,7 @@ export async function loadSnapshot(userId: Id): Promise<Snapshot> {
     examDates: rows.examDates as ExamDate[],
     settings,
     streak,
+    lessonProgress,
   };
 }
 
@@ -275,4 +290,10 @@ export async function saveStreak(streak: StreakState): Promise<void> {
   const db = await getDb();
   await db.put("streak", streak);
   await enqueue("streak", "upsert", streak);
+}
+
+export async function saveLessonProgress(progress: LessonProgress): Promise<void> {
+  const db = await getDb();
+  await db.put("lessonProgress", progress);
+  await enqueue("lessonProgress", "upsert", progress);
 }

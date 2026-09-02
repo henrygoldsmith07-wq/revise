@@ -214,27 +214,12 @@ function EmptyToday({ name }: { name: string }) {
 // First-run lesson callout
 // ---------------------------------------------------------------------------
 
-// Lesson completion is tracked in localStorage by LessonMode; the Today page
-// only needs to know whether *any* lesson has been finished. Same shape as
-// useGreeting below: a stable getSnapshot read during render, SSR defaulting
-// to "started" so the callout never flashes for a returning user.
-const LESSONS_COMPLETED_KEY = "revise.lessons.completed";
-
-const NO_LESSONS_SUBSCRIBE = () => () => {};
-
-function clientLessonsStarted(): boolean {
-  try {
-    const raw = localStorage.getItem(LESSONS_COMPLETED_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-    return Object.keys(map).length > 0;
-  } catch {
-    /* private browsing: fall back to hiding the callout */
-    return true;
-  }
-}
-
+// Lesson completion lives in the synced store (one snapshot row per user, the
+// same conduit as mastery and streaks), so the callout reflects progress made
+// on any device, not just this one.
 function useLessonsStarted(): boolean {
-  return useSyncExternalStore(NO_LESSONS_SUBSCRIBE, clientLessonsStarted, () => true);
+  const { lessonProgress } = useStore();
+  return Object.keys(lessonProgress.completed).length > 0;
 }
 
 function StartHereCallout({ started }: { started: boolean }) {

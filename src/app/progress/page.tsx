@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { aiDiagnose } from "@/ai/client";
 import { gradeCalibrationNarrative } from "@/domain/analytics";
 import { analyseGradeLoop, gradeConfidenceNarrative } from "@/domain/grade-loop";
-import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
+import { allSubjects, allTopics, getSubject, getTopic, topicsFor } from "@/domain/curriculum";
+import { buildLesson } from "@/content/lessons";
 import { delayedFarTransferReport, delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import type { GradePrediction } from "@/domain/grades";
 import { ACHIEVEMENTS, levelFor } from "@/domain/gamification";
@@ -28,6 +29,7 @@ import { CoverageCard } from "@/components/CoverageCard";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
 import { LearningControlsCard } from "@/components/LearningControlsCard";
 import { Button, ButtonLink, Panel, Pill, ProgressBar, SectionHeading, SourceBadge, StatTile, cx } from "@/components/ui";
+import { ICON_SIZE, LessonsIcon, StreakIcon } from "@/components/icons";
 
 // Analytics that answer one question — where are the marks? — rather than
 // showing every number the app happens to hold. Each panel ends in an action.
@@ -117,6 +119,107 @@ function evidenceShareFor(subjectId: string, store: { gradeActuals: unknown[]; a
   return Math.min(1, marked / 40);
 }
 
+function LessonProgressPanel({
+  stats,
+}: {
+  stats: {
+    total: number;
+    done: number;
+    streak: number;
+    bySubject: Array<{ subjectId: string; subjectName: string; total: number; done: number }>;
+  };
+}) {
+  const { total, done, streak, bySubject } = stats;
+  const plural = (n: number) => (n === 1 ? "lesson" : "lessons");
+  const subtitle =
+    total === 0
+      ? "Guided lessons are on the way for your subjects."
+      : done === 0
+        ? `${total} ${plural(total)} to learn before the flashcards`
+        : done === total
+          ? "Every lesson complete — revisiting keeps it sticky."
+          : `${total - done} ${plural(total - done)} left before the flashcards`;
+  const cta =
+    done === 0 ? "Start with a lesson" : done === total ? "Review lessons" : "Continue lessons";
+  return (
+    <section aria-labelledby="lesson-progress-heading">
+      <Panel className="space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="shrink-0 w-9 h-9 rounded-full bg-accentsoft text-accent flex items-center justify-center">
+              <LessonsIcon size={ICON_SIZE.md} />
+            </div>
+            <div className="min-w-0">
+              <h2 id="lesson-progress-heading" className="text-sm font-semibold tracking-tight text-ink">
+                Lessons
+              </h2>
+              <p className="text-xs text-ink3 mt-0.5">{subtitle}</p>
+            </div>
+          </div>
+          {streak > 0 ? (
+            <Pill tone="accent" className="inline-flex items-center gap-1.5">
+              <StreakIcon size={ICON_SIZE.sm} />
+              {streak}-day lesson streak
+            </Pill>
+          ) : null}
+        </div>
+
+        {total > 0 ? (
+          <ProgressBar
+            value={done / total}
+            label={`${done} of ${total} ${plural(total)} done`}
+            tone={done === total ? "success" : "accent"}
+          />
+        ) : null}
+
+        {bySubject.length > 0 ? (
+          <ul className="space-y-1.5 pt-1">
+            {bySubject.map((row) => {
+              const pct = row.total ? Math.round((row.done / row.total) * 100) : 0;
+              const complete = row.total > 0 && row.done === row.total;
+              return (
+                <li key={row.subjectId} className="flex items-center gap-3 text-xs">
+                  <span className="w-24 shrink-0 truncate font-medium text-ink2" title={row.subjectName}>
+                    {row.subjectName}
+                  </span>
+                  {row.total === 0 ? (
+                    <span className="text-ink3">Coming soon</span>
+                  ) : (
+                    <>
+                      <div
+                        className="h-1.5 flex-1 rounded-full bg-surface2 overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${row.subjectName} lessons`}
+                      >
+                        <div
+                          className={cx("h-full rounded-full", complete ? "bg-success" : "bg-accent")}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-14 shrink-0 text-right tabular-nums text-ink3">
+                        {row.done}/{row.total}
+                      </span>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        <div className="flex justify-end">
+          <ButtonLink href="/lesson" size="sm" variant={done === 0 ? "primary" : "secondary"}>
+            {cta}
+          </ButtonLink>
+        </div>
+      </Panel>
+    </section>
+  );
+}
+
 export default function ProgressPage() {
   const store = useStore();
   const subjects = useSubjects();
@@ -148,6 +251,26 @@ export default function ProgressPage() {
     const retests = delayedFarTransferRetests({ attempts: store.attempts, questions: store.questions, today });
     return { retests, report: delayedFarTransferReport(retests) };
   }, [store.attempts, store.questions, today]);
+
+  // Lessons per enrolled subject, mirroring LessonMode's derivation (the
+  // /lesson page filters by one subject at a time). Completion lives in the
+  // synced store, so this reflects progress from any device.
+  const lessonStats = useMemo(() => {
+    const bySubject = allSubjects()
+      .filter((subject) => store.settings.subjectIds.includes(subject.id))
+      .map((subject) => {
+        const lessons = allTopics([subject.id])
+          .map((topic) => buildLesson(topic))
+          .filter((lesson): lesson is NonNullable<typeof lesson> => lesson !== null);
+        const done = lessons.filter((lesson) => store.lessonProgress.completed[lesson.id] === true).length;
+        return { subjectId: subject.id, subjectName: subject.name, total: lessons.length, done };
+      });
+    const aggregate = bySubject.reduce(
+      (acc, row) => ({ total: acc.total + row.total, done: acc.done + row.done }),
+      { total: 0, done: 0 },
+    );
+    return { ...aggregate, streak: store.lessonProgress.streak.count, bySubject };
+  }, [store.settings.subjectIds, store.lessonProgress]);
 
   const totals = useMemo(() => {
     const marksMax = store.attempts.reduce((a, x) => a + x.max, 0);
@@ -216,6 +339,9 @@ export default function ProgressPage() {
         <StatTile label="Topics secure" value={totals.mastered} sub={`of ${store.mastery.length}`} />
         <StatTile label="Level" value={level.level} sub={`${level.into}/${level.needed} XP to next`} />
       </div>
+
+      {/* --- Lesson progress: guided learning before flashcards ------------- */}
+      <LessonProgressPanel stats={lessonStats} />
 
       <ExperimentPanel />
       <EfficacyPanel />

@@ -171,6 +171,19 @@ create table if not exists public.streaks (
   updated_at timestamptz not null default now()
 );
 
+-- Completed lessons + lesson streak: one row per user, so the client
+-- upserts on user_id directly, exactly like settings and streaks.
+create table if not exists public.lesson_progress (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  id uuid,
+  subject_id text,
+  topic_id text,
+  due date,
+  date date,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
 -- --- row-level security -----------------------------------------------------
 -- One policy per table, covering all four verbs. `with check` on insert and
 -- update stops a client rewriting user_id to another account's id.
@@ -180,7 +193,8 @@ declare
 begin
   foreach target in array array[
     'cards', 'review_logs', 'questions', 'attempts', 'mistakes',
-    'papers', 'planned_sessions', 'exam_dates', 'user_settings', 'streaks'
+    'papers', 'planned_sessions', 'exam_dates', 'user_settings', 'streaks',
+    'lesson_progress'
   ]
   loop
     execute format('alter table public.%I enable row level security', target);

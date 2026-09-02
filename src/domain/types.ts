@@ -714,6 +714,8 @@ export interface UserSettings {
   aiEnabled: boolean;
   /** Whether Pulse may read this account's study history. Off by default. */
   pulseEnabled: boolean;
+  /** Subject the student last studied in lessons, so /lesson lands where they left off. */
+  lastLessonSubject?: string;
   updatedAt: IsoInstant;
 }
 
@@ -867,6 +869,22 @@ export interface DeckExport {
   cards: DeckExportCard[];
 }
 
+// --- lesson progress (synced, like settings/streak) -------------------------
+
+/**
+ * Which lessons the student finished and their lesson streak. One row per
+ * user so it syncs across devices; last write wins on `updatedAt`, mirroring
+ * settings and the study streak.
+ */
+export interface LessonProgress {
+  userId: Id;
+  /** lesson id -> true once that lesson has been completed. */
+  completed: Record<string, boolean>;
+  /** Consecutive days with at least one finished lesson (local-time days). */
+  streak: { count: number; lastDay: string };
+  updatedAt: IsoInstant;
+}
+
 // --- sync ------------------------------------------------------------------
 
 export type SyncEntity =
@@ -879,7 +897,8 @@ export type SyncEntity =
   | "plannedSessions"
   | "examDates"
   | "settings"
-  | "streak";
+  | "streak"
+  | "lessonProgress";
 
 export interface OutboxItem {
   id: Id;

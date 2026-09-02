@@ -6,45 +6,14 @@ import type { Topic } from "@/domain/types";
 import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
+import { useStore } from "@/state/store";
 
 // Lesson mode: learn a topic from zero before drilling it with flashcards.
 // Steps are derived from authored curriculum data; each check question gates
-// progress so reading stays active instead of passive. Completion is tracked
-// per topic in localStorage — light-weight, offline-first, per-device — and
-// a lesson streak counts consecutive days with at least one completed lesson.
-
-const COMPLETED_KEY = "revise.lessons.completed";
-const STREAK_KEY = "revise.lessons.streak";
-
-interface Streak {
-  count: number;
-  lastDay: string; // YYYY-MM-DD in local time
-}
-
-function dayKey(offsetDays = 0): string {
-  const d = new Date(Date.now() + offsetDays * 86_400_000);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function readJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJson(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* private browsing: progress tracking is best-effort only */
-  }
-}
+// progress so reading stays active instead of passive. Completion and the
+// lesson streak live in the synced store (one row per user), so progress
+// follows the student across devices instead of sitting in per-device
+// localStorage.
 
 export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => void }) {
   const lessons = useMemo(
@@ -55,8 +24,9 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     [topics],
   );
 
-  const [completed, setCompleted] = useState<Record<string, boolean>>(() => readJson(COMPLETED_KEY, {}));
-  const [streak, setStreak] = useState<Streak>(() => readJson(STREAK_KEY, { count: 0, lastDay: "" }));
+  const { lessonProgress, completeLesson } = useStore();
+  const completed = lessonProgress.completed;
+  const streak = lessonProgress.streak;
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
   const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
@@ -104,25 +74,13 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     if (!lesson) return;
     const checks = lesson.steps.filter((s) => s.check);
     const correct = checks.filter((s) => checked[s.id] === s.check!.correctIndex).length;
-
-    const nextCompleted = { ...completed, [lesson.id]: true };
-    setCompleted(nextCompleted);
-    writeJson(COMPLETED_KEY, nextCompleted);
-
-    // Streak: consecutive days with at least one finished lesson. Finishing
-    // several lessons the same day still counts as one day on the streak.
-    const today = dayKey();
-    const nextStreak: Streak =
-      streak.lastDay === today
-        ? streak
-        : streak.lastDay === dayKey(-1)
-          ? { count: streak.count + 1, lastDay: today }
-          : { count: 1, lastDay: today };
-    setStreak(nextStreak);
-    writeJson(STREAK_KEY, nextStreak);
-
+    // Persist through the synced store — it writes IndexedDB then queues the
+    // same row for Supabase, so progress survives on this device and follows
+    // the student elsewhere. The summary renders the updated streak once the
+    // patch lands.
+    void completeLesson(lesson.id);
     setSummary({ correct, total: checks.length });
-  }, [checked, completed, lesson, streak]);
+  }, [checked, completeLesson, lesson]);
 
   const advance = useCallback(() => {
     if (!lesson || !checkAnswered) return;

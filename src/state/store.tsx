@@ -54,6 +54,7 @@ import type {
   ExamDate,
   GamificationStats,
   Id,
+  LessonProgress,
   Mistake,
   Paper,
   PaperSimulation,
@@ -70,7 +71,7 @@ import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type { MasteryInterval } from "@/domain/mastery-uncertainty";
 import * as repo from "@/data/repository";
-import { LOCAL_USER_ID } from "@/data/repository";
+import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
@@ -153,6 +154,8 @@ interface StoreValue extends Snapshot {
   upsertExamDate(exam: ExamDate): Promise<void>;
   removeExamDate(id: Id): Promise<void>;
   updateSettings(patch: Partial<UserSettings>): Promise<void>;
+  /** Mark one lesson finished and roll the lesson streak forward; returns the new progress. */
+  completeLesson(lessonId: Id): Promise<LessonProgress>;
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
   clearRevisionCheckpoint(): Promise<void>;
   syncNow(): Promise<void>;
@@ -176,6 +179,34 @@ export function useStore(): StoreValue {
 }
 
 let syncInFlight = false;
+
+/**
+ * One-time migration: before lesson progress moved into the synced store it
+ * lived in localStorage (revise.lessons.*). Returns the legacy values when
+ * they exist, so existing students keep their progress across the switch.
+ */
+function legacyLessonProgress(): { completed: Record<string, boolean>; streak: { count: number; lastDay: string } } | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const completedRaw = localStorage.getItem("revise.lessons.completed");
+    if (!completedRaw) return null;
+    const completed = JSON.parse(completedRaw) as Record<string, boolean>;
+    const streakRaw = localStorage.getItem("revise.lessons.streak");
+    const streak = streakRaw ? (JSON.parse(streakRaw) as { count: number; lastDay: string }) : { count: 0, lastDay: "" };
+    return Object.keys(completed).length ? { completed, streak } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Local-time YYYY-MM-DD for lesson streaks (a day flips at midnight, not UTC). */
+function localDayKey(offsetDays = 0): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -234,6 +265,19 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       setGradePredictionLog(gradePreds ?? []);
       setGradeActuals(gradeActs ?? []);
       setSnapshot(loaded);
+      // Import legacy localStorage lesson progress into the synced row once,
+      // so the switch to cross-device storage never resets a student.
+      const legacy = legacyLessonProgress();
+      if (legacy && Object.keys(loaded.lessonProgress.completed).length === 0) {
+        const migrated: LessonProgress = {
+          ...loaded.lessonProgress,
+          completed: legacy.completed,
+          streak: legacy.streak,
+          updatedAt: new Date().toISOString(),
+        };
+        await repo.saveLessonProgress(migrated);
+        setSnapshot((prev) => (prev ? { ...prev, lessonProgress: migrated } : prev));
+      }
       lastFingerprint.current = computeFingerprint({
         exams: loaded.examDates,
         targetGrades: loaded.settings.targetGrades,
@@ -972,6 +1016,30 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [snapshot, patch],
   );
 
+  const completeLesson = useCallback<StoreValue["completeLesson"]>(
+    async (lessonId) => {
+      const current = snapshot?.lessonProgress ?? defaultLessonProgress(userId);
+      const today = localDayKey();
+      // Several lessons finished the same day still count as one streak day.
+      const streak =
+        current.streak.lastDay === today
+          ? current.streak
+          : current.streak.lastDay === localDayKey(-1)
+            ? { count: current.streak.count + 1, lastDay: today }
+            : { count: 1, lastDay: today };
+      const next: LessonProgress = {
+        ...current,
+        completed: { ...current.completed, [lessonId]: true },
+        streak,
+        updatedAt: new Date().toISOString(),
+      };
+      await repo.saveLessonProgress(next);
+      patch((prev) => ({ ...prev, lessonProgress: next }));
+      return next;
+    },
+    [patch, snapshot, userId],
+  );
+
   const saveRevisionCheckpoint = useCallback<StoreValue["saveRevisionCheckpoint"]>(
     async (input) => {
       const checkpoint = createRevisionCheckpoint(userId, input);
@@ -1034,6 +1102,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       upsertExamDate,
       removeExamDate,
       updateSettings,
+      completeLesson,
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
       syncNow,
@@ -1091,6 +1160,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     upsertExamDate,
     removeExamDate,
     updateSettings,
+    completeLesson,
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     syncNow,

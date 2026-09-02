@@ -5,6 +5,7 @@ import type {
   Card,
   ExamDate,
   Id,
+  LessonProgress,
   Mistake,
   OutboxItem,
   Paper,
@@ -23,7 +24,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export const DB_NAME = "revise";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 interface ReviseSchema extends DBSchema {
   cards: { key: Id; value: Card; indexes: { byUser: Id; byTopic: Id; byDue: string; byTag: string } };
@@ -36,6 +37,7 @@ interface ReviseSchema extends DBSchema {
   examDates: { key: Id; value: ExamDate; indexes: { byUser: Id } };
   settings: { key: Id; value: UserSettings };
   streak: { key: Id; value: StreakState };
+  lessonProgress: { key: Id; value: LessonProgress };
   outbox: { key: Id; value: OutboxItem };
   meta: { key: string; value: { key: string; value: unknown } };
 }
@@ -50,19 +52,35 @@ export function getDb(): Promise<ReviseDB> {
   }
   dbPromise ??= openDB<ReviseSchema>(DB_NAME, DB_VERSION, {
     async upgrade(db, oldVersion, _newVersion, tx) {
+      // v2 → v3 adds the lessonProgress singleton row (one per user, like
+      // settings and streak) so lesson completion syncs across devices.
+      if (oldVersion >= 2) {
+        db.createObjectStore("lessonProgress", { keyPath: "userId" });
+        return;
+      }
       // v1 → v2 adds tags. Existing cards predate the field, and code all over
       // the app calls card.tags.something, so they are backfilled here rather
       // than defended against at every call site.
+      //
+      // Never trust oldVersion alone: a storeless "v1" db (a foreign or corrupt
+      // database squatting on this origin) has no cards store, and reading it
+      // below would abort the upgrade and brick the app's boot. Fall through to
+      // the full build in that case — there is nothing worth preserving.
       if (oldVersion >= 1) {
-        const store = tx.objectStore("cards");
-        store.createIndex("byTag", "tags", { multiEntry: true });
-        let cursor = await store.openCursor();
-        while (cursor) {
-          const card = cursor.value as Card;
-          if (!Array.isArray(card.tags)) await cursor.update({ ...card, tags: [] });
-          cursor = await cursor.continue();
+        if (!tx.objectStoreNames.contains("cards")) {
+          // fall through to the full build below
+        } else {
+          const store = tx.objectStore("cards");
+          store.createIndex("byTag", "tags", { multiEntry: true });
+          let cursor = await store.openCursor();
+          while (cursor) {
+            const card = cursor.value as Card;
+            if (!Array.isArray(card.tags)) await cursor.update({ ...card, tags: [] });
+            cursor = await cursor.continue();
+          }
+          db.createObjectStore("lessonProgress", { keyPath: "userId" });
+          return;
         }
-        return;
       }
 
       const cards = db.createObjectStore("cards", { keyPath: "id" });
@@ -101,6 +119,7 @@ export function getDb(): Promise<ReviseDB> {
 
       db.createObjectStore("settings", { keyPath: "userId" });
       db.createObjectStore("streak", { keyPath: "userId" });
+      db.createObjectStore("lessonProgress", { keyPath: "userId" });
       db.createObjectStore("outbox", { keyPath: "id" });
       db.createObjectStore("meta", { keyPath: "key" });
     },
@@ -164,7 +183,7 @@ export async function deleteMeta(key: string): Promise<void> {
 /** Wipe every store. Used by "sign out and forget this device". */
 export async function clearAll(): Promise<void> {
   const db = await getDb();
-  const stores = [...COLLECTION_STORES, "settings", "streak", "outbox", "meta"] as const;
+  const stores = [...COLLECTION_STORES, "settings", "streak", "lessonProgress", "outbox", "meta"] as const;
   const tx = db.transaction(stores, "readwrite");
   await Promise.all(stores.map((s) => tx.objectStore(s).clear()));
   await tx.done;
