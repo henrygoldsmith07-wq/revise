@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { aiVideoLesson } from "@/ai/client";
 import type { AiEnvelope, VideoLessonResponse, VideoLessonScene } from "@/ai/types";
 import { speechAvailable, speak, stopSpeaking, toSpokenText } from "@/lib/speech";
@@ -17,9 +18,35 @@ import { Button, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 // time, auto-advancing on scene duration, with the narration speakable aloud.
 // Position is kept as whole-video seconds and scenes are derived from it, so
 // seek, auto-advance and end-of-video can never disagree.
+//
+// Successful AI storyboards are cached per topic (localStorage) so re-watches
+// start instantly and stay consistent; "Regenerate" trades the cache for a
+// fresh generation.
 
 const TICK_MS = 250;
 const NARRATE_KEY = "revise.lessons.autoNarrate";
+
+const cacheKey = (topicId: string) => `revise.videoLessons.${topicId}`;
+
+function readCache(topicId: string): AiEnvelope<VideoLessonResponse> | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(topicId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AiEnvelope<VideoLessonResponse>;
+    if (parsed?.data?.scenes?.length && parsed.data.title) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(topicId: string, envelope: AiEnvelope<VideoLessonResponse>) {
+  try {
+    localStorage.setItem(cacheKey(topicId), JSON.stringify(envelope));
+  } catch {
+    /* private browsing: caching is best-effort only */
+  }
+}
 
 function clock(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -54,6 +81,7 @@ export function VideoLesson({
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [showScript, setShowScript] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [autoNarrate, setAutoNarrate] = useState<boolean>(
     () => typeof window !== "undefined" && window.localStorage.getItem(NARRATE_KEY) === "1",
   );
@@ -61,15 +89,34 @@ export function VideoLesson({
   // must run once per play-through, not once per render.
   const endedReported = useRef(false);
   const speechOk = speechAvailable();
+  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
+    const cached = readCache(topic.id);
+    if (cached) {
+      // A saved storyboard answers instantly; "Regenerate" replaces it.
+      setEnvelope(cached);
+      return;
+    }
     aiVideoLesson(topic.id).then((result) => {
-      if (!cancelled) setEnvelope(result);
+      if (cancelled) return;
+      if (result.source === "ai") writeCache(topic.id, result);
+      setEnvelope(result);
     });
     return () => {
       cancelled = true;
     };
+  }, [topic.id]);
+
+  const regenerate = useCallback(() => {
+    setRegenerating(true);
+    setEnvelope(null);
+    aiVideoLesson(topic.id).then((result) => {
+      if (result.source === "ai") writeCache(topic.id, result);
+      setEnvelope(result);
+      setRegenerating(false);
+    });
   }, [topic.id]);
 
   const scenes = useMemo(() => envelope?.data.scenes ?? [], [envelope]);
@@ -201,11 +248,11 @@ export function VideoLesson({
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="card p-8 text-center animate-pulse">
           <p className="text-sm font-semibold text-ink inline-flex items-center gap-2">
-            <VideoIcon size={ICON_SIZE.md} /> Storyboarding the video…
+            <VideoIcon size={ICON_SIZE.md} /> {regenerating ? "Generating a fresh storyboard…" : "Storyboarding the video…"}
           </p>
           <p className="text-sm text-ink3 mt-1">
-            First generation can take half a minute on the free tier. Without an AI provider the storyboard appears
-            instantly from the authored spec data.
+            First generation can take a couple of minutes on the free tier. Without an AI provider the storyboard
+            appears instantly from the authored spec data.
           </p>
         </div>
       </div>
@@ -248,8 +295,11 @@ export function VideoLesson({
               <Button size="sm" variant="secondary" onClick={() => setPosition(0)}>
                 <PlayIcon size={ICON_SIZE.sm} /> Watch again
               </Button>
+              <Button size="sm" variant="primary" onClick={() => router.push(`/practice?topic=${topic.id}`)}>
+                Drill this topic
+              </Button>
               {nextTopic && onSelectTopic ? (
-                <Button size="sm" variant="primary" onClick={() => onSelectTopic(nextTopic)}>
+                <Button size="sm" variant="ghost" onClick={() => onSelectTopic(nextTopic)}>
                   Next: {nextTopic.title}
                 </Button>
               ) : null}
@@ -263,7 +313,18 @@ export function VideoLesson({
         <div className="px-4 py-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-ink">{scene.title}</p>
-            <SourceBadge source={envelope.source} note={envelope.note} />
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={regenerating}
+                title="Ask the model for a brand-new storyboard for this topic"
+                onClick={regenerate}
+              >
+                Regenerate
+              </Button>
+              <SourceBadge source={envelope.source} note={envelope.note} />
+            </div>
           </div>
           <p className="text-xs text-ink3">
             <span className="font-semibold uppercase tracking-wide">Visual:</span> {scene.visual}

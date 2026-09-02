@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { misconceptionsForTopic } from "@/content";
 import { getTopic, subjectLabel } from "@/domain/curriculum";
+import { repairVideoLesson } from "./types";
 import type { Question, Topic } from "@/domain/types";
 import {
   diagnoseFallback,
@@ -54,6 +55,8 @@ async function run<T>(
   jsonHint: string,
   fallback: () => T,
   maxTokens = 1400,
+  /** Task-specific salvage for a near-miss reply, tried before a model retry. */
+  repair?: (raw: unknown) => T | null,
 ): Promise<AiEnvelope<T>> {
   const provider = getProvider();
   if (!provider) return { data: fallback(), source: "fallback", provider: null };
@@ -74,7 +77,11 @@ async function run<T>(
     const raw = extractJson<unknown>(text);
     if (raw == null) throw new Error("no JSON in model reply");
     const parsed = schema.safeParse(raw);
-    if (!parsed.success) throw new Error(`schema: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+    if (!parsed.success) {
+      const salvaged = repair?.(raw);
+      if (salvaged !== null && salvaged !== undefined) return salvaged;
+      throw new Error(`schema: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+    }
     return parsed.data;
   };
 
@@ -351,6 +358,7 @@ scenes. Use LaTeX between $ delimiters for any mathematics.`,
     // Reasoning models spend most of the budget thinking before the JSON —
     // 3000 truncated every reply mid-scene (finish_reason "length").
     9000,
+    repairVideoLesson,
   );
 }
 
