@@ -28,6 +28,20 @@ marking, planning, analytics, search — and only cross-device sync and
 model-written prose unavailable. See [`.env.example`](.env.example) for the
 optional Supabase and AI provider settings.
 
+### Signing in
+
+With Supabase configured, Settings → Account offers two ways in:
+**Continue with Google**, or a one-time email sign-in link. Both resolve to the
+same Supabase user when the address matches, so your cards, attempts and
+history are the same either way and every row stays reachable under the
+existing `auth.uid()` row-level security — no policy changes were needed.
+
+Google is enabled in the Supabase dashboard, not here: **Authentication →
+Providers → Google**, with a Google Cloud OAuth 2.0 Client ID whose authorised
+redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Until it
+is switched on there, the button reports Google as unconfigured and the email
+link keeps working.
+
 ## Pulse connection
 
 Revise can share its study history with Pulse, the personal evidence engine in
