@@ -12,6 +12,7 @@ import type {
   MarkResponse,
   SocraticResponse,
   SummariseResponse,
+  VideoLessonResponse,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -171,4 +172,101 @@ export function diagnoseFallback(weak: Topic[], mistakes: Mistake[]): DiagnoseRe
 function firstClause(point: string): string {
   const cut = point.search(/[:;—]| because | which /);
   return (cut > 12 ? point.slice(0, cut) : point).replace(/\.$/, "").trim();
+}
+
+/**
+ * Video-style lesson without a model: a deterministic storyboard cut from the
+ * same authored curriculum data the step-by-step lesson uses. Not generative,
+ * but a real watchable revision video for every topic — including topics with
+ * no key points, where the schema's three-scene minimum needs padding.
+ */
+export function videoLessonFallback(topicId: string): VideoLessonResponse {
+  const topic = getTopic(topicId);
+  if (!topic) {
+    return {
+      title: "Video lesson unavailable",
+      scenes: [
+        {
+          title: "Not found",
+          narration: "This topic is not in the local curriculum, so there is no lesson to play yet.",
+          onScreenText: "No lesson for this topic",
+          visual: "A static holding card with the app logo.",
+          seconds: 8,
+        },
+        {
+          title: "What to do instead",
+          narration:
+            "Pick a topic from the library — every authored topic has a video-style lesson and a step-by-step lesson.",
+          onScreenText: "Pick a topic in the library",
+          visual: "A cursor opens the library and highlights a subject.",
+          seconds: 10,
+        },
+        {
+          title: "Offline by design",
+          narration:
+            "Without an AI provider the storyboard is built from the authored specification data, so it is accurate even offline.",
+          onScreenText: "Accurate, not generative",
+          visual: "The spec document and the video frame sit side by side.",
+          seconds: 10,
+        },
+      ],
+    };
+  }
+
+  // ~13 characters of narration per second of video, clamped to a watchable band.
+  const duration = (text: string) => Math.max(8, Math.min(60, Math.round(text.length / 13)));
+  // Authored data is trusted but not length-bounded; the storyboard contract is.
+  const clamp = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`);
+
+  const scenes: VideoLessonResponse["scenes"] = [
+    {
+      title: clamp(`Meet ${topic.title}`, 120),
+      narration: clamp(topic.summary, 2000),
+      onScreenText: clamp(topic.title, 300),
+      visual: `Title card for ${topic.title}${topic.specRef ? ` with its spec reference ${topic.specRef}` : ""}, over the subject's colour.`,
+      seconds: duration(topic.summary),
+    },
+  ];
+
+  for (const point of topic.keyPoints.slice(0, 6)) {
+    scenes.push({
+      title: clamp(firstClause(point), 120),
+      narration: clamp(`${point} Say it back in your own words before the next scene.`, 2000),
+      onScreenText: clamp(firstClause(point), 300),
+      visual: "The point builds on screen step by step, ending on the exact wording an examiner rewards.",
+      seconds: duration(point) + 4,
+    });
+  }
+
+  for (const error of topic.commonErrors.slice(0, 2)) {
+    scenes.push({
+      title: "Common trap",
+      narration: clamp(`Watch out. ${error}`, 2000),
+      onScreenText: clamp(`Trap: ${firstClause(error)}`, 300),
+      visual: "The wrong answer writes itself, a red cross strikes it out, and the correct form replaces it.",
+      seconds: duration(error) + 3,
+    });
+  }
+
+  // The schema requires at least three scenes; a topic with neither key
+  // points nor errors still gets a watchable, honest middle.
+  if (scenes.length < 3) {
+    scenes.push({
+      title: "In the exam",
+      narration: `In the exam, ${topic.title} questions stay close to the specification. Learn the summary wording precisely, because that is what the mark scheme rewards.`,
+      onScreenText: "Stay close to the spec",
+      visual: "A mark scheme highlights phrases that also appear in the specification summary.",
+      seconds: 15,
+    });
+  }
+
+  scenes.push({
+    title: "Recap",
+    narration: `That's ${topic.title}: the points that earn the marks, and the traps that cost them. Close the video and drill the deck — the cards test exactly these points.`,
+    onScreenText: "Now drill the deck",
+    visual: `Every taught point stacks into one summary card for ${topic.title}.`,
+    seconds: 12,
+  });
+
+  return { title: topic.title, scenes: scenes.slice(0, 10) };
 }

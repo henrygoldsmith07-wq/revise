@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { buildLesson, summariseLesson } from "@/content/lessons";
 import { allTopics, getSubject } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
-import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
+import { AchievementIcon, StreakIcon, VideoIcon, ICON_SIZE } from "./icons";
+import { VideoLesson } from "./VideoLesson";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
 import { useStore } from "@/state/store";
@@ -34,6 +35,9 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   const [stepIdx, setStepIdx] = useState(0);
   const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
   const [summary, setSummary] = useState<{ correct: number; total: number; missed: { body: string; answer: string }[] } | null>(null);
+  // When set, the video-style lesson replaces the whole lesson view; keyed by
+  // topic id in the render so switching topics restarts the player cleanly.
+  const [videoTopic, setVideoTopic] = useState<Topic | null>(null);
 
   const active = activeIdx !== null ? lessons[activeIdx] : null;
   const lesson = active?.lesson ?? null;
@@ -179,6 +183,11 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         <EmptyState title="No lessons available" body="Pick a topic with authored key points first." />
       </div>
     );
+  }
+
+  // ---- Video lesson --------------------------------------------------------
+  if (videoTopic) {
+    return <VideoLesson key={videoTopic.id} topic={videoTopic} onExit={() => setVideoTopic(null)} />;
   }
 
   // ---- Completion summary ------------------------------------------------
@@ -377,10 +386,10 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         {lessons.map((entry, idx) => {
           const done = completed[entry.lesson.id] === true;
           return (
-            <li key={entry.lesson.id}>
+            <li key={entry.lesson.id} className="flex items-stretch gap-2">
               <button
                 onClick={() => startLesson(idx)}
-                className="w-full text-left px-4 py-3 rounded-[8px] border border-line hover:border-ink3 transition-colors flex items-center justify-between gap-3"
+                className="flex-1 min-w-0 text-left px-4 py-3 rounded-[8px] border border-line hover:border-ink3 transition-colors flex items-center justify-between gap-3"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink">{entry.topic.title}</p>
@@ -388,6 +397,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                 </div>
                 {done ? <Pill tone="success">Done</Pill> : <Pill>Start</Pill>}
               </button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setVideoTopic(entry.topic)}
+                aria-label={`Play the video lesson for ${entry.topic.title}`}
+              >
+                <VideoIcon size={ICON_SIZE.sm} /> Video
+              </Button>
             </li>
           );
         })}

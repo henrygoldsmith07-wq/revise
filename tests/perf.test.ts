@@ -67,6 +67,10 @@ describe("performance budgets", () => {
     let total = 0;
     const walk = (dir: string) => {
       for (const e of rs2(dir, { withFileTypes: true })) {
+        // `next dev` writes an unconditional compile cache under .next/dev that
+        // scales with how often the dev server ran, not with what ships — the
+        // budget is about production build bloat, so it is excluded.
+        if (dir === nextDir && e.name === "dev") continue;
         const p = j3(dir, e.name);
         if (e.isDirectory()) walk(p);
         else total += st2(p).size;

@@ -10,6 +10,7 @@ import {
   markFallback,
   socraticFallback,
   summariseFallback,
+  videoLessonFallback,
 } from "./fallback";
 import { extractJson, getProvider } from "./provider";
 import type { AiEnvelope, AiTask } from "./types";
@@ -109,6 +110,7 @@ export const payloadSchemas = {
     topicId: z.string().optional(),
     count: z.number().int().min(1).max(25).default(10),
   }),
+  "video-lesson": z.object({ topicId: z.string() }),
   ocr: z.object({
     // ~8 MB of base64 is roughly a 6 MB photo, which is plenty for a page of
     // handwriting and small enough to keep the request from timing out.
@@ -263,6 +265,40 @@ export async function summarise(topicId: string) {
     [topicContext(topic), "", "Write a one-page revision summary a student could read the night before the exam."].join("\n"),
     `{ "summary": string (markdown), "bullets": string[] }`,
     () => summariseFallback(topicId),
+  );
+}
+
+/**
+ * Video-style lesson: a storyboard a video editor could animate — timed
+ * scenes with narration, on-screen text and a visual — grounded in the topic's
+ * authored spec data so the video can never drift from the specification.
+ */
+export async function videoLesson(topicId: string) {
+  const topic = getTopic(topicId);
+  return run(
+    RESPONSE_SCHEMAS["video-lesson"],
+    `You are a video lesson director for a UK revision platform.
+You storyboard short revision videos that a video editor can animate directly.
+You are accurate and concrete: every scene teaches exactly one idea from the
+specification content you are given, and you never invent content that is not
+there. Keep narration plain, conversational and exam-focused, the way a good
+teacher speaks over an animation. Use LaTeX between $ delimiters for any
+mathematics.`,
+    [
+      topicContext(topic),
+      "",
+      "Storyboard this topic as a revision video of roughly two to three minutes.",
+      "Use 6-8 scenes: a hook that says why the topic earns marks, one scene per key point,",
+      "a scene on the classic mistakes, and a closing recap that sends the viewer to drill the deck.",
+      `In each scene: "narration" is the spoken voiceover (2-4 short sentences), "onScreenText" is`,
+      "the few words the viewer reads on screen, \"visual\" is what the animation shows, and",
+      '"seconds" is the scene length (8-45).',
+    ].join("\n"),
+    `{ "title": string, "scenes": [{ "title": string, "narration": string, "onScreenText": string, "visual": string, "seconds": number }] }`,
+    () => videoLessonFallback(topicId),
+    // Reasoning models spend most of the budget thinking before the JSON —
+    // 3000 truncated every reply mid-scene (finish_reason "length").
+    9000,
   );
 }
 
