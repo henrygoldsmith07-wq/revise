@@ -615,6 +615,18 @@ export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
   mistakes: "Mistake repair",
 };
 
+/**
+ * Where each recommendation sends the student. A "learn" recommendation is a
+ * first pass on an untouched topic — that is a lesson, not practice questions
+ * on material never taught; everything with a topic drills in /practice, and
+ * subject-wide recommendations review.
+ */
+export function hrefForRecommendation(rec: Pick<Recommendation, "activity" | "subjectId" | "topicId">): string {
+  if (rec.activity === "learn" && rec.subjectId) return `/lesson?subject=${rec.subjectId}`;
+  if (rec.topicId) return `/practice?topic=${rec.topicId}`;
+  return "/review";
+}
+
 export const ACTIVITY_BLURB: Record<ActivityKind, string> = {
   learn: "First pass over new material, then immediate self-testing.",
   flashcards: "Spaced-repetition review of cards that are due today.",
