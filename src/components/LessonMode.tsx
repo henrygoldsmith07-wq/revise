@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildLesson } from "@/content/lessons";
+import { buildLesson, summariseLesson } from "@/content/lessons";
 import { allTopics, getSubject } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
@@ -75,8 +75,6 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
 
   const finishLesson = useCallback(() => {
     if (!lesson) return;
-    const checks = lesson.steps.filter((s) => s.check);
-    const correct = checks.filter((s) => checked[s.id] === s.check!.correctIndex).length;
     // Persist through the synced store — it writes IndexedDB then queues the
     // same row for Supabase, so progress survives on this device and follows
     // the student elsewhere. The summary renders the updated streak once the
@@ -84,10 +82,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     void completeLesson(lesson.id);
     // Carry the missed checks into the summary so the student re-exposes the
     // correction instead of only seeing a score.
-    const missed = checks
-      .filter((s) => checked[s.id] !== s.check!.correctIndex)
-      .map((s) => ({ body: s.body, answer: s.check!.options[s.check!.correctIndex] }));
-    setSummary({ correct, total: checks.length, missed });
+    setSummary(summariseLesson(lesson, checked));
   }, [checked, completeLesson, lesson]);
 
   const advance = useCallback(() => {

@@ -123,6 +123,23 @@ export function buildLesson(topic: Topic): Lesson | null {
 }
 
 /**
+ * Score a finished lesson: how many checks were answered, how many correctly,
+ * and the missed ones as (step body, correct answer) pairs for the summary
+ * recap. Pure so the component stays thin and the logic stays testable.
+ */
+export function summariseLesson(
+  lesson: Lesson,
+  checked: Record<string, number>,
+): { correct: number; total: number; missed: { body: string; answer: string }[] } {
+  const checks = lesson.steps.filter((s) => s.check);
+  const correct = checks.filter((s) => checked[s.id] === s.check!.correctIndex).length;
+  const missed = checks
+    .filter((s) => checked[s.id] !== s.check!.correctIndex)
+    .map((s) => ({ body: s.body, answer: s.check!.options[s.check!.correctIndex] }));
+  return { correct, total: checks.length, missed };
+}
+
+/**
  * Build one check question from a key point. Reuses the seed-card colon
  * convention: "X: Y" becomes "X — what follows?" with Y as the answer.
  */
