@@ -10,3 +10,4 @@ public/domain-worker.js
 public/docs/
 test-results
 .hoplite/archive/
+.hoplite/attachments/
