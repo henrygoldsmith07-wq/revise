@@ -77,7 +77,7 @@ export function VideoLesson({
   nextTopic?: Topic | null;
   onSelectTopic?: (topic: Topic) => void;
 }) {
-  const [envelope, setEnvelope] = useState<AiEnvelope<VideoLessonResponse> | null>(null);
+  const [envelope, setEnvelope] = useState<AiEnvelope<VideoLessonResponse> | null>(() => readCache(topic.id));
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [showScript, setShowScript] = useState(false);
@@ -92,13 +92,10 @@ export function VideoLesson({
   const router = useRouter();
 
   useEffect(() => {
+    // A cached storyboard seeds the state during init; only a cache miss
+    // needs the network here.
+    if (readCache(topic.id)) return;
     let cancelled = false;
-    const cached = readCache(topic.id);
-    if (cached) {
-      // A saved storyboard answers instantly; "Regenerate" replaces it.
-      setEnvelope(cached);
-      return;
-    }
     aiVideoLesson(topic.id).then((result) => {
       if (cancelled) return;
       if (result.source === "ai") writeCache(topic.id, result);
