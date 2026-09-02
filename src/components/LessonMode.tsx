@@ -384,6 +384,16 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
 
   // ---- Lesson list -------------------------------------------------------
   const doneCount = lessons.filter((l) => completed[l.lesson.id]).length;
+  // Mirror the summary's "Next up" on the list: one glanceable resume card
+  // instead of making the student scan for the first un-done lesson.
+  const firstIncomplete = lessons.findIndex((l) => !completed[l.lesson.id]);
+  const resumeIdx = firstIncomplete === -1 ? 0 : firstIncomplete;
+  const resumeLabel =
+    doneCount === 0
+      ? "Start your first lesson"
+      : firstIncomplete === -1
+        ? "Review from the start"
+        : "Continue where you left off";
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -407,6 +417,17 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
           </Pill>
         </div>
       ) : null}
+
+      <button
+        onClick={() => startLesson(resumeIdx)}
+        className="w-full text-left px-4 py-3 rounded-[8px] border border-accent/40 bg-accentsoft/30 hover:border-accent transition-colors flex items-center justify-between gap-3"
+      >
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{resumeLabel}</p>
+          <p className="text-sm font-semibold text-ink mt-0.5 truncate">{lessons[resumeIdx]?.topic.title}</p>
+        </div>
+        <Pill tone="accent">Open</Pill>
+      </button>
 
       <ul className="space-y-2">
         {lessons.map((entry, idx) => {
