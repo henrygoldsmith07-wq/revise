@@ -11,3 +11,4 @@ test-results
 .hoplite/archive/
 
 .hoplite/attachments/
+public/domain-worker.js
