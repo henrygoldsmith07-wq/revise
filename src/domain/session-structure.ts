@@ -32,13 +32,20 @@ export interface SessionStructure {
  *   0.35–0.7 balanced — targeted questions, some application
  *   > 0.7    retrieval — hard retrieval + transfer, skip basics
  */
+/** The shape a topic's mastery earns — exposed so session UIs can label blocks. */
+export function shapeForMastery(mastery: number | null): SessionStructure["shape"] {
+  const m = mastery ?? 0;
+  if (m < 0.35) return "scaffolded";
+  if (m >= 0.7) return "retrieval";
+  return "balanced";
+}
+
 export function buildSessionStructure(input: {
   topicId: Id;
   mastery: number | null;
   totalMinutes: number;
   hasMistakes?: boolean;
-}): SessionStructure {
-  const { topicId, mastery, totalMinutes } = input;
+}): SessionStructure {  const { topicId, mastery, totalMinutes } = input;
   const m = mastery ?? 0;
   const segments: SessionSegment[] = [];
 

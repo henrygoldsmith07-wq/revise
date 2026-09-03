@@ -16,6 +16,7 @@ import { AudioMode } from "@/components/modes/AudioMode";
 import { ExplanationMode } from "@/components/modes/ExplanationMode";
 import { Button, EmptyState, Panel, Pill, SectionHeading, cx } from "@/components/ui";
 import { ICON_SIZE, ModesIcon } from "@/components/icons";
+import { DailySessionCard } from "@/components/DailySessionCard";
 import type { LucideIcon } from "@/components/icons";
 import { AudioIcon, PracticeIcon, ReviewIcon, TodayIcon, TutorIcon } from "@/components/icons";
 
@@ -103,6 +104,8 @@ function Study() {
   const [subjectId, setSubjectId] = useState(params.get("subject") ?? "");
   const [topicId, setTopicId] = useState(params.get("topic") ?? "");
   const [query, setQuery] = useState(params.get("q") ?? "");
+  // The daily session is the default; the six mode cards sit behind "More".
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const pool = useMemo(() => {
     const scoped = store.cards.filter(
@@ -179,11 +182,20 @@ function Study() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Study</h1>
         <p className="text-sm text-ink3 mt-0.5">
-          The same cards, worked five different ways. Spaced repetition is still the backbone — these are for when
-          you need a different angle on it.
+          One default session first. The other modes are behind “More” for when you want a different angle.
         </p>
       </header>
 
+      <DailySessionCard subjectIds={store.settings.subjectIds} />
+
+      <div>
+        <Button variant="ghost" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
+          {moreOpen ? "Hide other ways to study" : "More ways to study"}
+        </Button>
+      </div>
+
+      {moreOpen ? (
+        <>
       <Panel className="space-y-3">
         <SectionHeading title="What are you studying?" hint={`${pool.length} cards selected`} />
         <div className="flex flex-wrap gap-2">
@@ -263,6 +275,8 @@ function Study() {
           action={<Button onClick={() => { setQuery(""); setSubjectId(""); setTopicId(""); }}>Clear filter</Button>}
         />
       )}
+        </>
+      ) : null}
     </div>
   );
 }
