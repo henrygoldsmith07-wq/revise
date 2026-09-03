@@ -11,6 +11,8 @@ test("Study exposes an explanation mastery mode", async ({ page }) => {
   }
 
   await page.goto("/study");
+  // The mode picker sits behind the "More" disclosure; the daily session is the default.
+  await page.getByRole("button", { name: "More ways to study" }).click();
   await expect(today).toContainText("Explain mastery");
   await page.getByRole("button", { name: "Start explain mastery" }).click();
   await expect(today).toContainText("Explain a topic from memory");

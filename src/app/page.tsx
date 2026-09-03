@@ -10,6 +10,7 @@ import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { LessonsIcon, ICON_SIZE } from "@/components/icons";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
+import { DailySessionCard } from "@/components/DailySessionCard";
 import { buildSessionStructure } from "@/domain/session-structure";
 
 // Next Best Action IS the product. The entire home screen answers one
@@ -46,6 +47,9 @@ export default function TodayPage() {
     <div className="max-w-2xl mx-auto space-y-5">
       {/* --- First-run: learn the topic before drilling it -------------- */}
       <StartHereCallout started={lessonsStarted} />
+
+      {/* --- The default daily session ---------------------------------- */}
+      <DailySessionCard subjectIds={settings.subjectIds} />
 
       {/* --- Hero: the one thing to do right now ------------------------- */}
       <NextBestAction recommendation={primary} displayName={settings.displayName} greeting={greetingLabel} />
