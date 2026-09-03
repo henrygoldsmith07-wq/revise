@@ -5,7 +5,7 @@ import { aiMark } from "@/lib/optional-ai";
 import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { misconceptionsForTopic } from "@/content";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
-import { getTopic } from "@/domain/curriculum";
+import { getSubject, getTopic } from "@/domain/curriculum";
 import {
   buildHintLadder,
   formatHint,
@@ -327,7 +327,7 @@ export function QuestionRunner({
           <Pill>{topic?.title ?? question.subjectId}</Pill>
           {retestMistake ? <Pill tone="review">Retest</Pill> : null}
           {question.origin === "past-paper" ? <Pill tone="review">Past paper</Pill> : null}
-          <EditorialBadge source={question.source ?? null} verification={question.verification ?? null} origin={question.origin} reviewer={question.reviewer ?? null} />
+          <EditorialBadge source={question.source ?? null} verification={question.verification ?? null} origin={question.origin} reviewer={question.reviewer ?? null} contentTier={getSubject(question.subjectId)?.contentTier} />
           {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
           {farTransfer ? <Pill tone="accent">Delayed far-transfer</Pill> : null}
         </div>

@@ -127,50 +127,58 @@ export default function SettingsPage() {
       <section>
         <SectionHeading title="Subjects" hint="Only these are planned, recommended and predicted." />
         <Panel>
-          <ul className="space-y-2">
-            {allSubjects().map((subject) => {
-              const on = settings.subjectIds.includes(subject.id);
-              const grades = gradesFor(subject.id);
-              return (
-                <li key={subject.id} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-ink">{subject.name}</p>
-                    <p className="text-[11px] text-ink3 truncate">
-                      {subjectLabel(subject.id)}
-                      {subject.specCode ? ` · ${subject.specCode}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {on && grades.length ? (
-                      <Segmented
-                        ariaLabel={`Target grade for ${subject.name}`}
-                        value={settings.targetGrades[subject.id] ?? ""}
-                        onChange={(grade) =>
-                          void store.updateSettings({
-                            targetGrades: { ...settings.targetGrades, [subject.id]: grade },
-                          })
-                        }
-                        options={grades.map((g) => ({ value: g, label: g }))}
-                      />
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant={on ? "primary" : "secondary"}
-                      onClick={() =>
-                        void store.updateSettings({
-                          subjectIds: on
-                            ? settings.subjectIds.filter((id) => id !== subject.id)
-                            : [...settings.subjectIds, subject.id],
-                        })
-                      }
-                    >
-                      {on ? "Taking" : "Add"}
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          {[
+            { title: "Flagship depth", list: allSubjects().filter((s) => s.contentTier === "flagship") },
+            { title: "Reference (not spec-checked)", list: allSubjects().filter((s) => s.contentTier !== "flagship") },
+          ].map((group) => (
+            <div key={group.title} className="mb-4 last:mb-0">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2">{group.title}</p>
+              <ul className="space-y-2">
+                {group.list.map((subject) => {
+                  const on = settings.subjectIds.includes(subject.id);
+                  const grades = gradesFor(subject.id);
+                  return (
+                    <li key={subject.id} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-ink">{subject.name}</p>
+                        <p className="text-[11px] text-ink3 truncate">
+                          {subjectLabel(subject.id)}
+                          {subject.specCode ? ` · ${subject.specCode}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {on && grades.length ? (
+                          <Segmented
+                            ariaLabel={`Target grade for ${subject.name}`}
+                            value={settings.targetGrades[subject.id] ?? ""}
+                            onChange={(grade) =>
+                              void store.updateSettings({
+                                targetGrades: { ...settings.targetGrades, [subject.id]: grade },
+                              })
+                            }
+                            options={grades.map((g) => ({ value: g, label: g }))}
+                          />
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant={on ? "primary" : "secondary"}
+                          onClick={() =>
+                            void store.updateSettings({
+                              subjectIds: on
+                                ? settings.subjectIds.filter((id) => id !== subject.id)
+                                : [...settings.subjectIds, subject.id],
+                            })
+                          }
+                        >
+                          {on ? "Taking" : "Add"}
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </Panel>
       </section>
 
@@ -424,6 +432,7 @@ export default function SettingsPage() {
           </div>
         </Panel>
       </section>
+
 
       <section>
         <SectionHeading title="Privacy" hint="What leaves this device, and what never does." />

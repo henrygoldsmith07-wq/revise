@@ -1,5 +1,6 @@
 import { seedCards, seedQuestions } from "@/content";
-import { allTopics, allSubjects } from "@/domain/curriculum";
+import { allTopics } from "@/domain/curriculum";
+import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
 import type {
   Attempt,
   Card,
@@ -103,8 +104,9 @@ export function defaultSettings(userId: Id): UserSettings {
   return {
     userId,
     displayName: "Student",
-    // Every seeded subject is on by default; onboarding narrows it.
-    subjectIds: allSubjects().map((s) => s.id),
+    // New students start on the four flagship subjects. Settings/onboarding
+    // can add reference-tier boards; they are not silently enrolled.
+    subjectIds: FLAGSHIP_SUBJECTS.map((s) => s.subjectId),
     availability: [
       { weekday: 0, minutes: 90 },
       { weekday: 1, minutes: 60 },
@@ -121,6 +123,7 @@ export function defaultSettings(userId: Id): UserSettings {
     aiEnabled: true,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
+    labMode: false,
     lastLessonSubject: "",
     updatedAt: new Date().toISOString(),
   };
@@ -200,7 +203,17 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
     latestRows<Attempt>(db, "attempts", "byCreated", historyLimit, userId),
   ]);
 
-  const settings = ((await db.get("settings", userId)) as UserSettings | undefined) ?? defaultSettings(userId);
+  const stored = (await db.get("settings", userId)) as UserSettings | undefined;
+  const fallback = defaultSettings(userId);
+  const settings: UserSettings = stored
+    ? {
+        ...fallback,
+        ...stored,
+        accessibility: { ...fallback.accessibility, ...stored.accessibility },
+        labMode: stored.labMode === true,
+        pulseEnabled: stored.pulseEnabled === true,
+      }
+    : fallback;
   const streak = ((await db.get("streak", userId)) as StreakState | undefined) ?? defaultStreak(userId);
   const lessonProgress =
     ((await db.get("lessonProgress", userId)) as LessonProgress | undefined) ?? defaultLessonProgress(userId);

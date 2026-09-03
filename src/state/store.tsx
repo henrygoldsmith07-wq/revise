@@ -459,6 +459,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           subjectIds: loaded.settings.subjectIds,
         });
         setNeedsOnboarding(!(await repo.hasOnboarded(userId)));
+        setBootError(null);
         // A plan that has drifted into the past is worse than no plan: fold
         // missed sessions forward before the dashboard renders anything.
         const today = todayIso();
@@ -469,7 +470,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
         }
       } catch (error) {
-        setBootError(error instanceof Error ? error.message : String(error));
+        console.error("[store] boot failed", error);
+        bootstrapped.current = false;
+        setBootError(error instanceof Error ? error.message : "Could not load your revision data.");
       }
     })();
     // recordFunnel is a stable useCallback; startHydration likewise. The
@@ -1698,6 +1701,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     masteryUncertainty,
     applicationMastery,
     recallMastery,
+    recommendations,
+    experimentRecs,
     predictions,
     adaptiveSession,
     dueCards,
@@ -1755,6 +1760,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     joinExperiment,
     leaveExperiment,
     recordExperimentEvent,
+    recordFunnel,
+    funnelEvents,
     gradePredictionLog,
     gradeActuals,
     paperOutcomeLog,
@@ -1762,9 +1769,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     recordGradeActual,
     beginPaperOutcome,
     closePaperOutcomeRecord,
-    experimentRecs,
-    funnelEvents,
-    recordFunnel,
   ]);
 
   if (bootError) {
@@ -1783,16 +1787,28 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
-function BootScreen() {
+function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () => void } = {}) {
   return (
     <div className="min-h-dvh grid place-items-center bg-bg">
-      <div className="flex flex-col items-center gap-3 text-ink3">
-        <div className="flex gap-1.5" aria-hidden>
-          <span className="typing-dot" />
-          <span className="typing-dot" />
-          <span className="typing-dot" />
-        </div>
-        <p className="text-sm">Loading your revision data…</p>
+      <div className="flex flex-col items-center gap-3 text-ink3 max-w-sm px-6 text-center">
+        {error ? (
+          <>
+            <p className="text-sm text-ink">Could not load your revision data</p>
+            <p className="text-xs text-ink3">{error}</p>
+            <button type="button" className="btn btn-primary mt-2" onClick={onRetry}>
+              Try again
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex gap-1.5" aria-hidden>
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </div>
+            <p className="text-sm">Loading your revision data…</p>
+          </>
+        )}
       </div>
     </div>
   );

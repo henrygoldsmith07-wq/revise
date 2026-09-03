@@ -1,4 +1,5 @@
 import type { ExamBoard, Id, Qualification, Subject, Topic, Unit } from "../types";
+import { honestSubject } from "./honesty";
 
 // ---------------------------------------------------------------------------
 // The curriculum registry. Boards, qualifications and subjects are *data*, not
@@ -29,8 +30,9 @@ export function registerQualification(q: Qualification): Qualification {
 }
 
 export function registerSubject(entry: CurriculumModule): CurriculumModule {
-  modules.set(entry.subject.id, entry);
-  return entry;
+  const honest = honestSubject(entry);
+  modules.set(honest.subject.id, honest);
+  return honest;
 }
 
 export function allBoards(): ExamBoard[] {

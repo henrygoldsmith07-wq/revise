@@ -17,7 +17,8 @@ describe("AQA GCSE authored question bank", () => {
       const questions = aqaGcseQuestions.filter((question) => question.subjectId === subjectId);
       expect(questions, `${subjectId} should have six AQA GCSE questions`).toHaveLength(6);
       expect(new Set(questions.flatMap((question) => question.topicIds)).size).toBe(6);
-      expect(seedQuestionsForSubject(subjectId)).toEqual(expect.arrayContaining(questions));
+      const seededIds = new Set(seedQuestionsForSubject(subjectId).map((question) => question.id));
+      expect(questions.every((question) => seededIds.has(question.id))).toBe(true);
     }
   });
 

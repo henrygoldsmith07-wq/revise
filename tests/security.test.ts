@@ -30,4 +30,12 @@ describe("security — API route guards", () => {
     expect(route).toContain("payloadSchemas");
     expect(route).toContain("safeParse");
   });
+
+  it("/api/ai authenticates when Supabase is configured and caps body size", () => {
+    const route = readFileSync(join(process.cwd(), "src/app/api/ai/route.ts"), "utf8");
+    expect(route).toContain("getUser");
+    expect(route).toContain("status: 401");
+    expect(route).toContain("MAX_BODY_CHARS");
+    expect(route).toContain("status: 413");
+  });
 });

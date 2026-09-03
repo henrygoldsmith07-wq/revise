@@ -99,6 +99,7 @@ function Library() {
 
   const units = subjectId ? unitsFor(subjectId) : [];
   const masteryById = new Map(store.mastery.map((m) => [m.topicId, m]));
+  const subject = subjectId ? getSubject(subjectId) : undefined;
 
   return (
     <div className="space-y-5">
@@ -118,6 +119,12 @@ function Library() {
           />
         ) : null}
       </header>
+
+      {subject?.contentDisclaimer ? (
+        <p className="text-xs text-ink2 border border-line rounded-[10px] px-3 py-2.5 bg-surface2">
+          {subject.contentDisclaimer}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
