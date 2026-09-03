@@ -8,6 +8,8 @@ import {
   summariseFallback,
   videoLessonFallback,
 } from "./fallback";
+import { resilientMark } from "./marking-resilience";
+import { maskChatHistory, maskPii, maskStudentText, maskSummaryMany } from "./pii";
 import { getTopic } from "@/domain/curriculum";
 import { withMarkEvidence } from "@/domain/marking";
 import type { Mistake, Question, Topic } from "@/domain/types";
@@ -66,16 +68,44 @@ async function call<T>(task: AiTask, payload: unknown, fallback: () => T): Promi
 }
 
 export function aiExplain(topicId: string, question?: string) {
-  return call<ExplainResponse>("explain", { topicId, question }, () => explainFallback(topicId, question));
+  return call<ExplainResponse>("explain", { topicId, question: question ? maskStudentText(question) : undefined }, () =>
+    explainFallback(topicId, question),
+  );
 }
 
 export function aiSocratic(topicId: string, history: { role: "user" | "assistant"; content: string }[]) {
-  return call<SocraticResponse>("socratic", { topicId, history }, () => socraticFallback(topicId, history.length));
+  return call<SocraticResponse>("socratic", { topicId, history: maskChatHistory(history) }, () =>
+    socraticFallback(topicId, history.length),
+  );
 }
 
-export async function aiMark(question: Question, answers: Record<string, string>) {
-  const envelope = await call<MarkResponse>("mark", { question, answers }, () => markFallback(question, answers));
-  return { ...envelope, data: withMarkEvidence(question, answers, envelope.data) };
+export async function aiMark(question: Question, answers: Record<string, string>, opts?: { useLocalModel?: boolean }) {
+  // Resilience chain: semantic cache → local model (when enabled + loaded) →
+  // cloud AI → rubric fallback. The tier records which link actually graded;
+  // the DLQ enqueue happens in the caller once the real attempt is persisted.
+  // Student answers are PII-masked before anything leaves the device; the
+  // rubric fallback (and the stored attempt) always see the original text.
+  const maskByPart = new Map<string, ReturnType<typeof maskPii>>();
+  const maskedAnswers = Object.fromEntries(
+    Object.entries(answers).map(([key, value]) => {
+      const result = maskPii(value);
+      maskByPart.set(key, result);
+      return [key, result.masked];
+    }),
+  );
+  const { envelope, tier } = await resilientMark(
+    question,
+    answers,
+    (q, a) => markFallback(q, a),
+    () => call<MarkResponse>("mark", { question, answers: maskedAnswers }, () => markFallback(question, answers)),
+    opts,
+  );
+  // Disclosure is honest about *what left the device*: only the cloud AI tier
+  // transmits masked text, so only then is "details withheld" claimed. Cache,
+  // local-model and rubric grades never sent the answer anywhere.
+  const withheld =
+    tier === "ai" ? maskSummaryMany([...maskByPart.values()]) : null;
+  return { ...envelope, data: withMarkEvidence(question, answers, envelope.data), tier, withheld };
 }
 
 export function aiGenerateCards(topicId: string, count = 8) {

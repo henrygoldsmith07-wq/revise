@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { getTopic } from "@/domain/curriculum";
 import { useStore } from "@/state/store";
-import { Panel, Pill, ProgressBar, SectionHeading, StatTile } from "./ui";
+import { Panel, Pill, SectionHeading, StatTile } from "./ui";
 
 function percent(value: number | null): string {
   return value == null ? "—" : `${Math.round(value * 100)}%`;

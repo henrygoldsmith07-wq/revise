@@ -1,8 +1,7 @@
 // Assessment depth — the five assessment-specific slices that make revision feel
 // like exam prep rather than flashcard completion.
 // Pure functions: no React, no I/O.
-import type {
-  AoCode,
+import type {
   AssessmentInsight,
   Attempt,
   Calibration,
@@ -11,8 +10,7 @@ import type {
   MisconceptionTag,
   Mistake,
   PaperSimulation,
-  Question,
-  Topic,
+  Question,
   TopicMastery,
 } from "./types";
 import { gradeForPercent } from "./grades";

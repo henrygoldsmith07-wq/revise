@@ -18,8 +18,8 @@ describe("hrefForRecommendation", () => {
   });
 
   it("sends subject-wide activities to review", () => {
-    expect(hrefForRecommendation({ activity: "paper", subjectId: "s", topicId: null })).toBe("/review");
-    expect(hrefForRecommendation({ activity: "practice", subjectId: "s", topicId: null })).toBe("/review");
+    expect(hrefForRecommendation({ activity: "paper", subjectId: "s" })).toBe("/review");
+    expect(hrefForRecommendation({ activity: "practice", subjectId: "s" })).toBe("/review");
   });
 
   it("never routes a learn recommendation without a subject to practice", () => {

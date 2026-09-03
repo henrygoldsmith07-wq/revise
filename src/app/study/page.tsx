@@ -7,6 +7,7 @@ import { isDiagramCard } from "@/domain/diagrams";
 import { allTopics, getSubject, topicsFor } from "@/domain/curriculum";
 import type { StudyMode } from "@/domain/study-modes";
 import { useStore, useSubjects } from "@/state/store";
+import type { Card } from "@/domain/types";
 import { DiagramMode } from "@/components/modes/DiagramMode";
 import { LearnMode } from "@/components/modes/LearnMode";
 import { MatchGame } from "@/components/modes/MatchGame";
@@ -120,12 +121,14 @@ function Study() {
     return topicId ? scoped.filter((topic) => topic.id === topicId) : scoped;
   }, [subjectId, topicId, store.settings.subjectIds]);
 
+  const cards = store.cards;
+
   const activePool = useMemo(() => {
     if (!resumeQueueIds?.length) return pool;
-    const byId = new Map(store.cards.map((card) => [card.id, card] as const));
-    const restored = resumeQueueIds.map((id) => byId.get(id)).filter((card): card is (typeof store.cards)[number] => Boolean(card));
+    const byId = new Map(cards.map((card) => [card.id, card] as const));
+    const restored = resumeQueueIds.map((id) => byId.get(id)).filter((card): card is Card => Boolean(card));
     return restored.length ? restored : pool;
-  }, [pool, resumeQueueIds, store.cards]);
+  }, [pool, resumeQueueIds, cards]);
 
   const checkpointHref = useMemo(() => {
     const next = new URLSearchParams();

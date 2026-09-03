@@ -1,16 +1,29 @@
-import type { Id, OutboxItem, SyncEntity } from "@/domain/types";
+import type { Card, Id, LessonProgress, OutboxItem, SyncEntity, StreakState } from "@/domain/types";
+import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
+import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
+import { getDeviceIdentity, nextLamport, observeRemoteLamport } from "./device";
 
 // ---------------------------------------------------------------------------
-// Offline-first sync: a durable outbox plus a pull that merges by timestamp.
+// Offline-first sync: a durable outbox plus a pull that merges causally.
 //
-// Conflict rule: last write wins, per row, on `updated_at`. Revision data is
-// append-mostly and single-author, so a full CRDT would be a lot of machinery
-// for a case that barely arises — the one genuinely mergeable thing (FSRS card
-// state) is resolved by keeping the row with the later review, which is also
-// the one with more information in it.
+// Ordering: every queued mutation carries the device's Lamport timestamp, so
+// offline sessions drain in causal order rather than by whichever wall clock
+// was wrong (see domain/lamport.ts).
+//
+// Conflict rule: last-write-wins per row for plain entities, but the memory
+// state that FSRS tracks is *merged*, not won — cards carry a CRDT op log
+// (domain/sync-crdt.ts) whose union-and-replay keeps concurrent "Again" and
+// "Good" grades both, and grow-only singletons (lesson progress, streak)
+// merge as unions. A week offline on one device can no longer erase daily
+// progress made on another.
+//
+// Delivery: every mutation is queued under a UUID idempotency key. The server
+// records keys in `sync_writes` and rejects duplicates (see supabase/schema.sql),
+// so a hung request retried by the browser or service worker cannot double-count
+// a review.
 // ---------------------------------------------------------------------------
 
 /** Domain entity → Postgres table. Keeps snake_case confined to this module. */
@@ -35,6 +48,7 @@ export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload:
   // grow unbounded on a device that is working perfectly well.
   if (!isSupabaseConfigured) return;
   const db = await getDb();
+  const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
   await db.put("outbox", {
     id: crypto.randomUUID(),
     entity,
@@ -42,6 +56,11 @@ export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload:
     payload,
     queuedAt: new Date().toISOString(),
     attempts: 0,
+    // One UUID per *logical* mutation: the server's sync_writes ledger rejects
+    // a second delivery of the same key, so retries can never double-write.
+    idempotencyKey: crypto.randomUUID(),
+    lamport,
+    deviceId,
   });
   if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUE_EVENT));
 }
@@ -81,6 +100,8 @@ export async function sync(userId: Id): Promise<SyncResult> {
 async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number }> {
   const supabase = getSupabase();
   const db = await getDb();
+  // One settings read per drain, not per row.
+  const e2ee = await e2eeEnabledFor(userId);
   const items = (await db.getAll("outbox")) as OutboxItem[];
   let pushed = 0;
   let failed = 0;
@@ -99,10 +120,13 @@ async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number
   }
 
   for (const [entity, list] of upserts) {
-    // Later queue entries for the same row supersede earlier ones.
+    // Later queue entries for the same row supersede earlier ones — the row
+    // leaves with the newest payload, but every queued mutation's idempotency
+    // key was minted per logical mutation, so collapsing is safe: the ledger
+    // claims the surviving key, and a retried older one is a no-op by policy.
     const byId = new Map<string, OutboxItem>();
     for (const item of list) byId.set(rowId(item.payload), item);
-    const rows = [...byId.values()].map((i) => toRow(entity, i.payload, userId));
+    const rows = await Promise.all([...byId.values()].map((i) => toRow(entity, i.payload, userId, { e2ee })));
     const { error } = await supabase!.from(TABLES[entity]).upsert(rows, { onConflict: pkFor(entity) });
     if (error) {
       failed += list.length;
@@ -110,6 +134,15 @@ async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number
         await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
       }
       continue;
+    }
+    // Claim every delivered key in the ledger: a replayed request carrying one
+    // of these keys is now a server-side no-op instead of a second write.
+    // Wrapped so a ledger hiccup never blocks delivery — delivery stays
+    // possible-exactly-once, not a correctness dependency.
+    try {
+      await claimIdempotencyKeys(supabase!, userId, [...byId.values()].map((i) => i.idempotencyKey));
+    } catch {
+      /* ledger is best-effort */
     }
     pushed += rows.length;
     for (const item of list) await db.delete("outbox", item.id);
@@ -163,21 +196,92 @@ async function pull(userId: Id): Promise<{ pulled: number; failed: number }> {
 
     const store = STORE_FOR[entity];
     const tx = db.transaction(store, "readwrite");
-    for (const row of data) {
-      const local = fromRow(entity, row);
-      const existing = await tx.store.get(keyFor(entity, local));
-      if (!existing || isNewer(local, existing)) await tx.store.put(local as never);
-      pulled++;
-      const rowUpdatedAt = String(row.updated_at ?? "");
-      if (rowUpdatedAt > maxObservedUpdatedAt) maxObservedUpdatedAt = rowUpdatedAt;
+    try {
+      for (const row of data) {
+        const incoming = await fromRow(entity, row);
+        const existing = await tx.store.get(keyFor(entity, incoming));
+        const merged = mergeForEntity(entity, existing as never, incoming as never);
+        if (merged) await tx.store.put(merged as never);
+        pulled++;
+        // Fold the remote row's Lamport stamp into the local clock so future
+        // local events sort after remote history they causally follow.
+        const remoteLamport = Number((row.data as Record<string, unknown> | null)?.lamport);
+        if (Number.isFinite(remoteLamport)) await observeRemoteLamport(remoteLamport);
+        const rowUpdatedAt = String(row.updated_at ?? "");
+        if (rowUpdatedAt > maxObservedUpdatedAt) maxObservedUpdatedAt = rowUpdatedAt;
+      }
+      await tx.done;
+    } catch {
+      // A single unreadable row (E2EE key mismatch) fails the table's
+      // transaction; counting it keeps the cursor conservative so a future
+      // pull — perhaps after the key is restored — retries these rows.
+      failed++;
     }
-    await tx.done;
   }
 
   // Keep the old cursor when a table failed so reconnecting retries that
   // table instead of silently skipping rows that were never pulled.
   if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseMeta("lastPullAt", maxObservedUpdatedAt);
   return { pulled, failed };
+}
+
+/**
+ * Per-entity merge rule on pull. Plain entities keep LWW (with the newer
+ * updatedAt winning — same rule the push side applies). Memory-state entities
+ * merge through the CRDT instead of picking a winner.
+ *
+ * Returns null when the row should not be written (existing is already
+ * up to date) so the caller can skip the put.
+ */
+function mergeForEntity(
+  entity: SyncEntity,
+  existing: unknown,
+  incoming: unknown,
+): unknown {
+  const local = existing as Record<string, unknown> | undefined;
+  const remote = incoming as Record<string, unknown>;
+  if (!local) return remote;
+
+  switch (entity) {
+    case "cards":
+      // CRDT: union op logs, replay from the deterministic base. Concurrent
+      // Again + Good both survive the merge.
+      return mergeCard(local as unknown as Card, remote as unknown as Card);
+    case "lessonProgress":
+      // Grow-only union of completions + recomputed streak.
+      return mergeLessonProgress(
+        local as unknown as LessonProgress,
+        remote as unknown as LessonProgress,
+      ).merged;
+    case "streak": {
+      // Streak is grow-only in every field: count/longest/xp take maxima,
+      // achievements union, lastActiveDate takes the later one.
+      const a = local as unknown as StreakState;
+      const b = remote as unknown as StreakState;
+      return {
+        ...a,
+        current: Math.max(a.current, b.current),
+        longest: Math.max(a.longest, b.longest),
+        xp: Math.max(a.xp, b.xp),
+        achievements: [...new Set([...(a.achievements ?? []), ...(b.achievements ?? [])])],
+        lastActiveDate: (a.lastActiveDate ?? "") >= (b.lastActiveDate ?? "") ? a.lastActiveDate : b.lastActiveDate,
+      } satisfies StreakState;
+    }
+    default:
+      return isNewer(remote, local) ? remote : local;
+  }
+}
+
+/**
+ * Record delivered idempotency keys in the server-side ledger so any replay
+ * of the same mutation is rejected at the table level.
+ */
+async function claimIdempotencyKeys(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: Id, keys: string[]): Promise<void> {
+  if (!keys.length) return;
+  await supabase.from("sync_writes").upsert(
+    keys.map((key) => ({ id: key, user_id: userId })),
+    { onConflict: "id" },
+  );
 }
 
 const STORE_FOR: Record<SyncEntity, "cards" | "reviewLogs" | "attempts" | "mistakes" | "questions" | "papers" | "plannedSessions" | "examDates" | "settings" | "streak" | "lessonProgress"> = {
@@ -211,24 +315,60 @@ function rowId(payload: unknown): string {
  * The wire format keeps the domain object whole in a JSONB `data` column and
  * lifts only what the server needs to index or filter on. That keeps schema
  * migrations off the critical path: a new domain field needs no migration.
+ *
+ * With E2EE on (user settings), `data` carries an AES-GCM blob instead of the
+ * domain object — the server stores ciphertext it cannot read. The lifted
+ * index columns (due, date) stay plaintext by design: they are bookkeeping
+ * fields with no student content, and dropping them would cost the scheduler
+ * query. `due`/`date` may also be omitted at rest when encryption is on, so
+ * both shapes are read on pull.
  */
-function toRow(entity: SyncEntity, payload: unknown, userId: Id): Record<string, unknown> {
+async function toRow(entity: SyncEntity, payload: unknown, userId: Id, opts?: { e2ee?: boolean }): Promise<Record<string, unknown>> {
   const row = payload as Record<string, unknown>;
   const updatedAt = (row.updatedAt as string) ?? (row.createdAt as string) ?? new Date().toISOString();
+  const e2ee = opts?.e2ee ?? (await e2eeEnabledFor(userId));
+  const data = e2ee ? await encryptPayload(row) : row;
   return {
     id: rowId(payload),
     user_id: userId,
     subject_id: row.subjectId ?? null,
     topic_id: row.topicId ?? null,
-    due: entity === "cards" ? row.due : null,
-    date: entity === "plannedSessions" || entity === "examDates" ? row.date : null,
-    data: row,
+    due: entity === "cards" && !e2ee ? (row.due ?? null) : null,
+    date: (entity === "plannedSessions" || entity === "examDates") && !e2ee ? (row.date ?? null) : null,
+    data,
     updated_at: updatedAt,
   };
 }
 
-function fromRow(entity: SyncEntity, row: Record<string, unknown>): Record<string, unknown> {
-  const data = (row.data ?? {}) as Record<string, unknown>;
+/**
+ * The local settings row holds the E2EE preference. Read through IndexedDB
+ * directly (not the React store) so the drain works in background contexts.
+ * Missing row / missing flag = plaintext, the pre-E2EE default.
+ */
+async function e2eeEnabledFor(userId: Id): Promise<boolean> {
+  try {
+    const db = await getDb();
+    const row = (await db.get("settings", userId)) as { e2eeEnabled?: boolean } | undefined;
+    return Boolean(row?.e2eeEnabled);
+  } catch {
+    return false;
+  }
+}
+
+async function fromRow(entity: SyncEntity, row: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const raw = row.data;
+  // An encrypted row this device cannot read (key rotated, device replaced)
+  // must not abort the whole table: surface it as a named error the caller
+  // counts, the way any other row-level failure is counted.
+  if (isEncryptedPayload(raw)) {
+    try {
+      const data = await decryptPayload<Record<string, unknown>>(raw);
+      return { ...data, userId: row.user_id ?? data.userId };
+    } catch (error) {
+      throw new Error(`E2EE decrypt failed for a synced row: ${error instanceof Error ? error.message : "unknown"}`);
+    }
+  }
+  const data = (raw ?? {}) as Record<string, unknown>;
   return { ...data, userId: row.user_id ?? data.userId };
 }
 

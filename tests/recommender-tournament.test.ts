@@ -131,7 +131,7 @@ describe("runTournament", () => {
     };
     const before = runTournament([base], [], { seed: 5, maxEvents: 10 });
     const after = runTournament([flippedFuture], [], { seed: 5, maxEvents: 10 });
-    const flipped = runTournament(
+    runTournament(
       [
         {
           ...mutated,

@@ -100,7 +100,6 @@ export function detectConflict<T extends { id?: Id; userId?: Id; updatedAt: IsoI
   // Both changed — conflict unless one is the newer of the two and the other
   // is older than baseline (already handled above).
   const localNewer = isNewerByTimestamp(local, remote);
-  const remoteNewer = isNewerByTimestamp(remote, local);
   let newer: Conflict<T>["newer"];
   let winner: T;
   if (local.updatedAt === remote.updatedAt) {

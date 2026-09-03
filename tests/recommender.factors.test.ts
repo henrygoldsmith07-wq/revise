@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { recommend } from "@/domain/recommender";
 import { createCard } from "@/domain/scheduling";
-import type { Card, ExamDate, Mistake, PlannedSession, Topic, TopicMastery } from "@/domain/types";
+import type { Card, Mistake, Topic, TopicMastery } from "@/domain/types";
 
 // ---------------------------------------------------------------------------
 // The recommender is the most differentiated subsystem in Revise. These tests

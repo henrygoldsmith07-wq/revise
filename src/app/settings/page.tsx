@@ -12,6 +12,7 @@ import { aiStatus } from "@/ai/client";
 import { allSubjects, subjectLabel } from "@/domain/curriculum";
 import { buildPortabilitySnapshot, deletionPreview, portabilityFilename, privacyDisclosure } from "@/domain/portability";
 import { clearAll } from "@/data/db";
+import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
@@ -23,6 +24,30 @@ export default function SettingsPage() {
   const store = useStore();
   const { settings } = store;
   const [ai, setAi] = useState<{ available: boolean; name: string | null } | null>(null);
+  const [keyRevealed, setKeyRevealed] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyMessage, setKeyMessage] = useState<string | null>(null);
+  const [keyText, setKeyText] = useState("");
+  const [keyFp, setKeyFp] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The fingerprint only renders inside the enabled block, so there is
+    // nothing to clear when the toggle turns off.
+    if (!settings.e2eeEnabled) return;
+    void keyFingerprint().then(setKeyFp);
+  }, [settings.e2eeEnabled]);
+
+  function revealKey() {
+    if (keyRevealed) {
+      setKeyRevealed(false);
+      setKeyText("");
+      return;
+    }
+    void exportEncryptionKey().then((k) => {
+      setKeyText(k);
+      setKeyRevealed(true);
+    });
+  }
 
   useEffect(() => {
     void aiStatus().then(setAi);
@@ -220,6 +245,110 @@ export default function SettingsPage() {
       <Account />
 
       <DataControls />
+
+      <section>
+        <SectionHeading title="Sync encryption" hint="End-to-end encryption for everything that leaves this device." />
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink">Encrypt synced data (AES-GCM)</p>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                When on, every card, answer and review is encrypted with a key generated on this device before it
+                reaches the sync server. The server stores opaque ciphertext: a database breach yields nothing
+                readable. Turn it on per device; the key never leaves unless you export it below.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={settings.e2eeEnabled ? "primary" : "secondary"}
+              aria-pressed={Boolean(settings.e2eeEnabled)}
+              onClick={() => void store.updateSettings({ e2eeEnabled: !settings.e2eeEnabled })}
+            >
+              {settings.e2eeEnabled ? "On" : "Off"}
+            </Button>
+          </div>
+          {settings.e2eeEnabled ? (
+            <div className="mt-4 pt-3 border-t border-line space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Pill title="First 16 hex digits of the SHA-256 key fingerprint — confirms two devices hold the same key">
+                  Key fingerprint: {keyFp ?? "…"}
+                </Pill>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="secondary" onClick={() => void revealKey()}>
+                  {keyRevealed ? "Hide key" : "Back up key"}
+                </Button>
+                {keyRevealed ? (
+                  <textarea
+                    readOnly
+                    value={keyText}
+                    rows={2}
+                    aria-label="Your encryption key — copy it somewhere safe"
+                    className="w-full card card-2 p-2 text-[10px] font-mono break-all"
+                  />
+                ) : null}
+              </div>
+              <div>
+                <p className="text-[11px] text-ink3 mb-1">
+                  Restoring on a new device: paste the key from your backup, then pull your data.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="password"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder="Paste a backed-up key"
+                    aria-label="Paste a backed-up encryption key"
+                    className="flex-1 min-w-0 card p-2 text-xs font-mono"
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!keyInput.trim()}
+                    onClick={() =>
+                      void importEncryptionKey(keyInput.trim()).then((ok) => {
+                        setKeyMessage(ok ? "Key installed. Pull your data to decrypt it here." : "That does not look like a valid key.");
+                        if (ok) setKeyInput("");
+                      })
+                    }
+                  >
+                    Use key
+                  </Button>
+                </div>
+                {keyMessage ? (
+                  <p className="text-[11px] text-ink2 mt-1" role="status">
+                    {keyMessage}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </Panel>
+      </section>
+
+      <section>
+        <SectionHeading title="On-device marking" hint="Optional. Keeps grading working when the AI service is down." />
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink">Grade answers with the on-device model</p>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                When the AI provider is unreachable, a small language model running in this browser (WebGPU) can
+                grade practice answers instead. The first use downloads about 2GB of model weights once; nothing is
+                sent anywhere. Cloud AI is still preferred whenever it is reachable.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={settings.localAiMarking ? "primary" : "secondary"}
+              aria-pressed={Boolean(settings.localAiMarking)}
+              onClick={() => void store.updateSettings({ localAiMarking: !settings.localAiMarking })}
+            >
+              {settings.localAiMarking ? "On" : "Off"}
+            </Button>
+          </div>
+        </Panel>
+      </section>
 
       <section>
         <SectionHeading title="Pulse" hint="Off by default. Nothing is shared until you switch it on." />

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { aiDiagnose } from "@/ai/client";
 import { gradeCalibrationNarrative } from "@/domain/analytics";
-import { analyseGradeLoop, gradeConfidenceNarrative } from "@/domain/grade-loop";
+import { gradeConfidenceNarrative } from "@/domain/grade-loop";
 import { allSubjects, allTopics, getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { buildLesson } from "@/content/lessons";
 import { delayedFarTransferReport, delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
@@ -12,6 +12,7 @@ import type { GradePrediction } from "@/domain/grades";
 import { ACHIEVEMENTS, levelFor } from "@/domain/gamification";
 import { overallProgressNarrative } from "@/domain/analytics";
 import { weakTopics } from "@/domain/mastery";
+import { curveStats, ForgettingCurveChart } from "@/components/ForgettingCurve";
 import { mistakePatterns } from "@/domain/mistakes";
 import { remediationForMistake } from "@/domain/remediation";
 import { markEscalationReport } from "@/domain/mark-escalation";
@@ -235,6 +236,50 @@ function LessonProgressPanel({
   );
 }
 
+/**
+ * One forgetting curve per enrolled subject: when the student's collective
+ * memory of each subject's material is predicted to fall past the recall
+ * thresholds. Rendered from the same FSRS curve the scheduler uses, so the
+ * picture and the review queue can never disagree.
+ */
+function ForgettingCurvesSection() {
+  const store = useStore();
+  const subjects = useSubjects();
+  const now = useMemo(() => new Date(), []);
+  const perSubject = useMemo(
+    () =>
+      subjects.map((subject) => {
+        const cards = store.cards.filter((c) => c.subjectId === subject.id);
+        return { subject, cards, stats: curveStats(cards, now) };
+      }),
+    [subjects, store.cards, now],
+  );
+  const anyReviewed = perSubject.some((s) => s.stats.cards > 0 && s.stats.stability > 0);
+  if (!perSubject.length) return null;
+  return (
+    <section>
+      <SectionHeading
+        title="Memory decay"
+        hint="The forgetting curve for each subject — when this material is statistically likely to fade."
+      />
+      <div className="grid md:grid-cols-2 gap-3">
+        {perSubject.map(({ subject, cards, stats }) => (
+          <Panel key={subject.id} className="text-ink">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-semibold text-ink">{subject.name}</p>
+              <span className="text-[11px] text-ink3">{cards.length} cards</span>
+            </div>
+            <ForgettingCurveChart stats={stats} cards={cards} now={now} />
+          </Panel>
+        ))}
+      </div>
+      {!anyReviewed ? (
+        <p className="text-[11px] text-ink3 mt-2">Curves appear once flashcards have been reviewed — review a deck to start the clock.</p>
+      ) : null}
+    </section>
+  );
+}
+
 export default function ProgressPage() {
   const store = useStore();
   const subjects = useSubjects();
@@ -394,6 +439,8 @@ export default function ProgressPage() {
       </section>
 
       <RetentionMasteryPanel />
+
+      <ForgettingCurvesSection />
 
       <section>
         <SectionHeading title="Mark review queue" hint="Low-confidence AI marks are held for a second-marker decision." />
@@ -698,7 +745,10 @@ export default function ProgressPage() {
       </section>
 
       <section>
-        <SectionHeading title="Mastery by subject" hint="Every topic in the specification." />
+        <SectionHeading
+          title="Mastery by subject"
+          hint="Predicted mastery starts from the cohort average and narrows to proven mastery as you collect evidence."
+        />
         <div className="space-y-4">
           {subjects.map((subject) => {
             const rows = topicsFor(subject.id);
@@ -708,17 +758,24 @@ export default function ProgressPage() {
                 <p className="text-sm font-semibold mb-3">{subject.name}</p>
                 <ul className="grid sm:grid-cols-2 gap-x-5 gap-y-2">
                   {rows.map((topic) => {
-                    const mastery = byId.get(topic.id)?.mastery ?? 0;
+                    const row = byId.get(topic.id);
+                    const proven = row?.mastery ?? 0;
+                    // Cold-start: show the Bayesian prediction with the prior
+                    // share made honest; proven topics show the real estimate.
+                    const isPredicted = row != null && proven === 0 && (row.predictedMastery ?? 0) > 0;
+                    const shown = isPredicted ? (row.predictedMastery ?? 0) : proven;
                     return (
                       <li key={topic.id}>
                         <Link href={`/library?topic=${encodeURIComponent(topic.id)}`} className="block group">
                           <div className="flex justify-between gap-2 text-xs mb-1">
                             <span className="text-ink2 truncate group-hover:text-ink">{topic.title}</span>
-                            <span className="text-ink3 tabular-nums shrink-0">{Math.round(mastery * 100)}%</span>
+                            <span className="text-ink3 tabular-nums shrink-0" title={isPredicted ? "Predicted from cohort data — no evidence yet" : "Proven by your own evidence"}>
+                              {isPredicted ? `~${Math.round(shown * 100)}%` : `${Math.round(shown * 100)}%`}
+                            </span>
                           </div>
                           <ProgressBar
-                            value={mastery}
-                            tone={mastery >= 0.8 ? "success" : mastery >= 0.55 ? "accent" : mastery > 0 ? "review" : "danger"}
+                            value={shown}
+                            tone={isPredicted ? "accent" : shown >= 0.8 ? "success" : shown >= 0.55 ? "accent" : shown > 0 ? "review" : "danger"}
                           />
                         </Link>
                       </li>

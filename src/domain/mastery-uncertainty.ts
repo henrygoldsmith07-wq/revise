@@ -1,4 +1,4 @@
-import type { Attempt, Card, Id, Mistake, ReviewLog, Topic } from "./types";
+import type { Attempt, Card, Id, Mistake, Topic } from "./types";
 import { retrievability } from "./scheduling";
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ export function masteryIntervals(input: {
         cards: input.cardsByTopic.get(topicId) ?? [],
         attempts: input.attemptsByTopic.get(topicId) ?? [],
         mistakes: input.mistakesByTopic?.get(topicId) ?? [],
-        now: input.now,
+        ...(input.now ? { now: input.now } : {}),
       }),
     );
   }
@@ -186,7 +186,7 @@ export function empiricalDifficulties(input: {
         topic: t,
         attempts: input.attemptsByTopic.get(t.id) ?? [],
         cards: input.cardsByTopic.get(t.id) ?? [],
-        now: input.now,
+        ...(input.now ? { now: input.now } : {}),
       }),
     )
     .sort((a, b) => b.gap - a.gap);

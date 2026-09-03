@@ -21,16 +21,53 @@ import type {
 // and is immediately durable; Supabase is a replica the outbox drains into
 // when a network exists. That ordering is what makes the app work on a train,
 // in a school with blocked wifi, or with no account at all.
+//
+// Two local-only stores (never synced) support the AI-marking resilience
+// layer: `aiCache` (semantic cache of previously AI-graded answers) and
+// `aiDlq` (dead-letter queue of marks awaiting an AI re-grade). They are
+// device-local by design: a cached grade is only valid for the same student,
+// and the DLQ replays against the *local* attempt records.
 // ---------------------------------------------------------------------------
 
 export const DB_NAME = "revise";
-export const DB_VERSION = 3;
+export const DB_VERSION = 5;
+
+/** A cached AI mark: the graded result plus the embedding used to find it. */
+export interface AiCacheEntry {
+  /** questionId:partId:answerHash — exact-match tier. */
+  key: string;
+  /** questionId:partId prefix lets one query fetch a whole question's entries. */
+  scope: string;
+  /** L2-normalised embedding of "answer \u0000 mark-scheme points". Null on legacy pre-embedding entries. */
+  embedding: number[] | null;
+  /** The AI grade being cached. */
+  marked: Attempt["marked"][number];
+  /** Overall provider confidence for the mark that produced this entry. */
+  confidence: number;
+  markedBy: "ai";
+  /** When the entry was written — used for LRU eviction and staleness. */
+  createdAt: string;
+}
+
+/** A mark that never reached AI grading, queued for retry with backoff. */
+export interface AiDlqItem {
+  id: string;
+  attemptId: string;
+  question: Question;
+  answers: Record<string, string>;
+  /** Why the AI grade did not happen. */
+  reason: string;
+  queuedAt: string;
+  attempts: number;
+  nextAttemptAt: string;
+  lastError?: string;
+}
 
 interface ReviseSchema extends DBSchema {
   cards: { key: Id; value: Card; indexes: { byUser: Id; byTopic: Id; byDue: string; byTag: string } };
-  reviewLogs: { key: Id; value: ReviewLog; indexes: { byUser: Id; byCard: Id } };
+  reviewLogs: { key: Id; value: ReviewLog; indexes: { byUser: Id; byCard: Id; byReviewed: string } };
   questions: { key: Id; value: Question; indexes: { bySubject: Id } };
-  attempts: { key: Id; value: Attempt; indexes: { byUser: Id; byQuestion: Id } };
+  attempts: { key: Id; value: Attempt; indexes: { byUser: Id; byQuestion: Id; byCreated: string } };
   mistakes: { key: Id; value: Mistake; indexes: { byUser: Id; byTopic: Id } };
   papers: { key: Id; value: Paper; indexes: { byUser: Id; bySubject: Id } };
   plannedSessions: { key: Id; value: PlannedSession; indexes: { byUser: Id; byDate: string } };
@@ -40,6 +77,8 @@ interface ReviseSchema extends DBSchema {
   lessonProgress: { key: Id; value: LessonProgress };
   outbox: { key: Id; value: OutboxItem };
   meta: { key: string; value: { key: string; value: unknown } };
+  aiCache: { key: string; value: AiCacheEntry; indexes: { byScope: string } };
+  aiDlq: { key: string; value: AiDlqItem; indexes: { byNextAttempt: string } };
 }
 
 export type ReviseDB = IDBPDatabase<ReviseSchema>;
@@ -52,6 +91,26 @@ export function getDb(): Promise<ReviseDB> {
   }
   dbPromise ??= openDB<ReviseSchema>(DB_NAME, DB_VERSION, {
     async upgrade(db, oldVersion, _newVersion, tx) {
+      // v4 → v5 adds the AI-marking stores (local-only, never synced): the
+      // semantic cache of AI-graded answers and the dead-letter queue for
+      // marks that must be re-graded when a provider is reachable again.
+      if (oldVersion >= 4) {
+        const cache = db.createObjectStore("aiCache", { keyPath: "key" });
+        cache.createIndex("byScope", "scope");
+        db.createObjectStore("aiDlq", { keyPath: "id" }).createIndex("byNextAttempt", "nextAttemptAt");
+        return;
+      }
+      // v3 → v4 adds time indexes on the two append-only stores so history
+      // can be streamed oldest-first with a cursor (progressive hydration)
+      // instead of getAll()'d wholesale at boot.
+      if (oldVersion >= 3) {
+        tx.objectStore("reviewLogs").createIndex("byReviewed", "reviewedAt");
+        tx.objectStore("attempts").createIndex("byCreated", "createdAt");
+        const cache = db.createObjectStore("aiCache", { keyPath: "key" });
+        cache.createIndex("byScope", "scope");
+        db.createObjectStore("aiDlq", { keyPath: "id" }).createIndex("byNextAttempt", "nextAttemptAt");
+        return;
+      }
       // v2 → v3 adds the lessonProgress singleton row (one per user, like
       // settings and streak) so lesson completion syncs across devices.
       if (oldVersion >= 2) {
@@ -94,6 +153,7 @@ export function getDb(): Promise<ReviseDB> {
       const logs = db.createObjectStore("reviewLogs", { keyPath: "id" });
       logs.createIndex("byUser", "userId");
       logs.createIndex("byCard", "cardId");
+      logs.createIndex("byReviewed", "reviewedAt");
 
       const questions = db.createObjectStore("questions", { keyPath: "id" });
       questions.createIndex("bySubject", "subjectId");
@@ -101,6 +161,7 @@ export function getDb(): Promise<ReviseDB> {
       const attempts = db.createObjectStore("attempts", { keyPath: "id" });
       attempts.createIndex("byUser", "userId");
       attempts.createIndex("byQuestion", "questionId");
+      attempts.createIndex("byCreated", "createdAt");
 
       const mistakes = db.createObjectStore("mistakes", { keyPath: "id" });
       mistakes.createIndex("byUser", "userId");
@@ -122,6 +183,9 @@ export function getDb(): Promise<ReviseDB> {
       db.createObjectStore("lessonProgress", { keyPath: "userId" });
       db.createObjectStore("outbox", { keyPath: "id" });
       db.createObjectStore("meta", { keyPath: "key" });
+      const cache = db.createObjectStore("aiCache", { keyPath: "key" });
+      cache.createIndex("byScope", "scope");
+      db.createObjectStore("aiDlq", { keyPath: "id" }).createIndex("byNextAttempt", "nextAttemptAt");
     },
   });
   return dbPromise;
@@ -164,6 +228,47 @@ export async function removeOne(store: CollectionStore, id: Id): Promise<void> {
   await db.delete(store, id);
 }
 
+/**
+ * Stream a store's rows oldest-first in chunks via a cursor on its time
+ * index. Boot reads only the first chunk; the rest arrives in the background
+ * (progressive hydration), so a 5,000-attempt history never blocks first paint.
+ *
+ * The primary key is a random UUID — meaningless chronologically — so the
+ * cursor runs on the time index to get true oldest-first order. Async
+ * iteration keeps the event loop breathing between chunks, unlike one giant
+ * getAll() that hands the UI a single enormous allocation to parse.
+ */
+export async function* streamReviewLogs(chunkSize = 500): AsyncGenerator<ReviewLog[]> {
+  const db = await getDb();
+  let cursor = await db.transaction("reviewLogs").objectStore("reviewLogs").index("byReviewed").openCursor();
+  let chunk: ReviewLog[] = [];
+  while (cursor) {
+    chunk.push(cursor.value);
+    if (chunk.length >= chunkSize) {
+      yield chunk;
+      chunk = [];
+    }
+    cursor = await cursor.continue();
+  }
+  if (chunk.length) yield chunk;
+}
+
+/** Same as streamReviewLogs, for the attempts log. */
+export async function* streamAttempts(chunkSize = 500): AsyncGenerator<Attempt[]> {
+  const db = await getDb();
+  let cursor = await db.transaction("attempts").objectStore("attempts").index("byCreated").openCursor();
+  let chunk: Attempt[] = [];
+  while (cursor) {
+    chunk.push(cursor.value);
+    if (chunk.length >= chunkSize) {
+      yield chunk;
+      chunk = [];
+    }
+    cursor = await cursor.continue();
+  }
+  if (chunk.length) yield chunk;
+}
+
 export async function readMeta<T>(key: string): Promise<T | undefined> {
   const db = await getDb();
   const row = await db.get("meta", key);
@@ -183,7 +288,16 @@ export async function deleteMeta(key: string): Promise<void> {
 /** Wipe every store. Used by "sign out and forget this device". */
 export async function clearAll(): Promise<void> {
   const db = await getDb();
-  const stores = [...COLLECTION_STORES, "settings", "streak", "lessonProgress", "outbox", "meta"] as const;
+  const stores = [
+    ...COLLECTION_STORES,
+    "settings",
+    "streak",
+    "lessonProgress",
+    "outbox",
+    "meta",
+    "aiCache",
+    "aiDlq",
+  ] as const;
   const tx = db.transaction(stores, "readwrite");
   await Promise.all(stores.map((s) => tx.objectStore(s).clear()));
   await tx.done;

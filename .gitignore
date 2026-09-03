@@ -6,6 +6,7 @@ out
 next-env.d.ts
 coverage
 public/pdf.worker.min.mjs
+public/domain-worker.js
 public/docs/
 test-results
 .hoplite/archive/

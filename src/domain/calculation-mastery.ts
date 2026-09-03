@@ -47,10 +47,6 @@ function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
-function emptyPerformance(): CalculationPerformance {
-  return { attempts: 0, marksAwarded: 0, marksAvailable: 0, accuracy: null };
-}
-
 function performanceOf(attempts: number, marksAwarded: number, marksAvailable: number): CalculationPerformance {
   const available = round(Math.max(0, marksAvailable));
   const awarded = round(Math.max(0, Math.min(available, marksAwarded)));

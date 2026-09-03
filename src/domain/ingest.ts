@@ -81,7 +81,7 @@ export function ingestPaperPayload(payload: IngestPaperPayload): Question[] {
  * past papers are licensed. Deterministic; not random.
  */
 export function pastPaperQuestionSpecs(subjectId: Id, topicSlugs: string[]): Question[] {
-  return topicSlugs.flatMap((slug, i) => {
+  return topicSlugs.flatMap((slug) => {
     const topicId = `${subjectId}.${slug}`;
     return ingestPaperPayload({
       subjectId,

@@ -16,8 +16,6 @@
 // arithmetic slip" versus "wrong method"). Pure and deterministic.
 // ---------------------------------------------------------------------------
 
-import type { Id } from "./types";
-
 export type StepErrorKind =
   | "none"
   | "rounding-error"

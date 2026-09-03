@@ -254,10 +254,6 @@ function featuresFor(topic: TopicState, ctx: PolicyContext): number[] {
   ];
 }
 
-function matVec(A: number[][], x: number[]): number[] {
-  return A.map((row) => row.reduce((acc, v, i) => acc + v * x[i], 0));
-}
-
 function dot(a: number[], b: number[]): number {
   return a.reduce((acc, v, i) => acc + v * b[i], 0);
 }

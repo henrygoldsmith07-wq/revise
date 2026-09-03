@@ -69,4 +69,17 @@ describe("sync ↔ schema parity", () => {
     expect(block).toMatch(/data jsonb not null/);
     expect(block).toMatch(/updated_at timestamptz/);
   });
+
+  it("the sync_writes idempotency ledger exists and is RLS-covered", () => {
+    expect(schema).toMatch(/create table if not exists public\.sync_writes/);
+    const block = schema.slice(
+      schema.indexOf("public.sync_writes ("),
+      schema.indexOf(");", schema.indexOf("public.sync_writes (")),
+    );
+    // The ledger keys on the mutation's UUID, not on user_id: one row per
+    // delivered mutation, so replays collide on the primary key.
+    expect(block).toMatch(/id uuid primary key/);
+    expect(block).toMatch(/user_id uuid not null references auth\.users/);
+    expect(schema).toMatch(/'sync_writes'/); // covered by the RLS policy loop
+  });
 });

@@ -1,5 +1,6 @@
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
+import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
 import type {
   ActivityKind,
   Card,
@@ -60,6 +61,8 @@ export interface RecommendInput {
   historicalGain?: Map<Id, number>;
   /** Cross-topic total recommendations already issued — drives ε/exploration decay (default 0). */
   totalRecommendationsIssued?: number;
+  /** Minutes the student has already studied this session — drives fatigue penalties (default 0). */
+  activeMinutes?: number;
   /** When true, surface an extra exploration candidate among tied topics (default false in deterministic rank). */
   enableExploration?: boolean;
   /** RNG for exploration jitter — inject for deterministic tests (default Math.random). */
@@ -167,7 +170,8 @@ export function syntheticOutcomePairs(seed: number, n: number, subjectId: Id, to
     const noise = (rnd() - 0.5) * 10;
     const actual = Math.max(0, Math.round(predicted + noise + (rnd() > 0.5 ? 2 : -1)));
     const d = new Date(base + i * 86_400_000).toISOString().slice(0, 10);
-    out.push({ subjectId, topicId: topicIds[i % topicIds.length], predicted, actual, date: d, driverActivity: rnd() > 0.5 ? "practice" : "flashcards" });
+    const topicId = topicIds.length ? topicIds[i % topicIds.length] : undefined;
+    out.push({ subjectId, ...(topicId ? { topicId } : {}), predicted, actual, date: d, driverActivity: rnd() > 0.5 ? "practice" : "flashcards" });
   }
   return out;
 }
@@ -191,13 +195,6 @@ export function benchmarkRecommendationQuality(pairs: OutcomePair[]): {
   const correlation = denP && denA ? num / Math.sqrt(denP * denA) : 0;
   const hitRate = pairs.filter((p) => Math.abs(p.actual - p.predicted) <= 5).length / n;
   return { n, mae: Math.round(mae * 10) / 10, bias: Math.round(bias * 10) / 10, correlation: Math.round(correlation * 100) / 100, hitRate: Math.round(hitRate * 100) / 100 };
-}
-
-function avgRetentionForTopic(cards: Card[], topicId: string, now: Date): number | null {
-  const mine = cards.filter((c) => c.topicId === topicId);
-  if (!mine.length) return null;
-  const vals = mine.map((c) => retrievability(c, now));
-  return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
 function paperLabelFor(exams: ExamDate[], subjectId: Id, today: string): string | null {
@@ -520,7 +517,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
       out.push({
         activity: session.activity,
         subjectId: session.subjectId,
-        topicId: session.topicId,
+        ...(session.topicId ? { topicId: session.topicId } : {}),
         minutes: session.minutes,
         score: 28 * u,
         reason: session.reason || "Scheduled in today's plan.",
@@ -547,6 +544,26 @@ export function recommend(input: RecommendInput): Recommendation[] {
 
   // --- Phase 4 overlays: historical gain, exploration, tie-awareness ----
   applyPhase4Overlays({ out, input, today });
+
+  // --- Fatigue overlay: time-on-task + circadian penalties ---------------
+  // Applied after the plan boost: the student's own plan still wins ties, but
+  // heavy-load activities (practice, papers) are demoted when they have been
+  // studying for hours or it is late — low-load recall work floats to the top
+  // instead. The factor is recorded in the factors so the "why?" pill shows
+  // the honest reason the ranking changed.
+  const fatigueCtx: FatigueContext = {
+    activeMinutes: input.activeMinutes ?? 0,
+    hourOfDay: now.getHours(),
+  };
+  if (fatigueCtx.activeMinutes > 0 || circadianFatigue(fatigueCtx.hourOfDay) > 0) {
+    for (const r of out) {
+      const f = fatigueFactor(r.activity, fatigueCtx);
+      if (f < 1) {
+        r.score *= f;
+        if (r.factors) r.factors.fatigue = Math.round(f * 100) / 100;
+      }
+    }
+  }
 
   return dedupe(out).sort((a, b) => b.score - a.score);
 }

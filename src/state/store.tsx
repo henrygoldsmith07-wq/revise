@@ -21,9 +21,10 @@ import { buildPlan, rescheduleMissed } from "@/domain/planner";
 import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
 import { recommend } from "@/domain/recommender";
 import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
+import { getDeviceIdentity, nextLamport } from "@/data/device";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
-import { buildAssessmentInsight, calibrateFromHistory, simulatePaper } from "@/domain/assessment";
-import { calibrateDifficulty, traceQuestions } from "@/domain/knowledge-tracing";
+import { calibrateFromHistory, simulatePaper } from "@/domain/assessment";
+import { calibrateDifficulty } from "@/domain/knowledge-tracing";
 import type { DifficultyCalibrationReport, QuestionTrace } from "@/domain/knowledge-tracing";
 import { calculateCalculationMastery } from "@/domain/calculation-mastery";
 import type { CalculationMasteryReport } from "@/domain/calculation-mastery";
@@ -73,12 +74,14 @@ import type { MasteryInterval } from "@/domain/mastery-uncertainty";
 import * as repo from "@/data/repository";
 import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
+import { domainEngine } from "@/data/domain-engine";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
+import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
 import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
 import { assignArm as assignExperimentArm, policyTaskFor,
-  type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType, type ExperimentArm } from "@/domain/recommendation-experiment";
+  type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
 import {
   createRevisionCheckpoint,
@@ -179,6 +182,30 @@ export function useStore(): StoreValue {
 }
 
 let syncInFlight = false;
+// Module-scoped like syncInFlight: counts background-hydration runs so a
+// superseded stream can detect it was replaced. Deliberately not a ref — the
+// epoch is coordination state for background work, never render input.
+let hydrationEpoch = 0;
+
+// --- session fatigue clock (module-scoped, like syncInFlight) ---------------
+// Timestamp of the first graded action of the current study session, or null
+// when no session is running. The recommender derives time-on-task from it to
+// apply fatigue penalties; 30 idle minutes ends the session.
+let sessionStartedAt: number | null = null;
+const SESSION_IDLE_RESET_MS = 30 * 60_000;
+
+/** Record a graded action as session activity; called from review/record paths. */
+function touchSessionClock(): void {
+  const now = Date.now();
+  if (sessionStartedAt == null || now - sessionStartedAt > SESSION_IDLE_RESET_MS) sessionStartedAt = now;
+}
+
+/** Minutes of continuous study in the current session (0 when none/idle-ended). */
+function currentActiveMinutes(): number {
+  if (sessionStartedAt == null) return 0;
+  const elapsed = (Date.now() - sessionStartedAt) / 60_000;
+  return elapsed > SESSION_IDLE_RESET_MS / 60_000 ? 0 : elapsed;
+}
 
 /**
  * One-time migration: before lesson progress moved into the synced store it
@@ -242,7 +269,52 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   });
   const bootstrapped = useRef(false);
   const [replanSummary, setReplanSummary] = useState<string | null>(null);
+  // Heavy analytics run off-thread (Comlink worker) and land here when ready;
+  // small histories compute synchronously inside the same effect. Until the
+  // first compute lands these hold the same defaults the sync path returned.
+  const [assessment, setAssessment] = useState<AssessmentInsight | null>(null);
+  const [questionTraces, setQuestionTraces] = useState<QuestionTrace[]>([]);
+  const [difficultyCalibration, setDifficultyCalibration] = useState<DifficultyCalibrationReport>(() => calibrateDifficulty([]));
+  const [forgettingCalibration, setForgettingCalibration] = useState<FsrsValidation>(() => validateFsrs({ cards: [], logs: [] }));
   const lastFingerprint = useRef<ReplanFingerprint | null>(null);
+
+  // --- progressive history hydration ---------------------------------------
+  //
+  // Boot loads only the newest HISTORY_FIRST_PAGE review logs / attempts so
+  // first paint never waits on a 5,000-row history. This streams the rest in
+  // background chunks (IndexedDB cursor, oldest-first) and merges each chunk
+  // exactly once, keyed by row id so a row that arrived via a newer functional
+  // update is never clobbered by its older streamed copy. A sync-pull reload
+  // calls startHydration() again, superseding any stream still running.
+  const hydrateHistory = useCallback(async (epoch: number) => {
+    for await (const chunk of repo.streamHistory(repo.HISTORY_CHUNK)) {
+      if (epoch !== hydrationEpoch) return; // superseded by a reload
+      const { reviewLogs, attempts } = chunk;
+      if (!reviewLogs?.length && !attempts?.length) continue;
+      setSnapshot((prev) => {
+        if (!prev) return prev;
+        let nextLogs = prev.reviewLogs;
+        if (reviewLogs?.length) {
+          const known = new Set(prev.reviewLogs.map((l) => l.id));
+          const fresh = reviewLogs.filter((l) => !known.has(l.id));
+          if (fresh.length) nextLogs = [...fresh, ...prev.reviewLogs];
+        }
+        let nextAttempts = prev.attempts;
+        if (attempts?.length) {
+          const known = new Set(prev.attempts.map((a) => a.id));
+          const fresh = attempts.filter((a) => !known.has(a.id));
+          if (fresh.length) nextAttempts = [...fresh, ...prev.attempts];
+        }
+        if (nextLogs === prev.reviewLogs && nextAttempts === prev.attempts) return prev;
+        return { ...prev, reviewLogs: nextLogs, attempts: nextAttempts };
+      });
+    }
+  }, []);
+  /** Start (or restart, superseding any prior run) background history hydration. */
+  const startHydration = useCallback(() => {
+    hydrationEpoch += 1;
+    void hydrateHistory(hydrationEpoch);
+  }, [hydrateHistory]);
 
   const recordFunnel = useCallback(async (type: FunnelEventType, detail?: string) => {
     const now = Date.now();
@@ -281,6 +353,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       setGradePredictionLog(gradePreds ?? []);
       setGradeActuals(gradeActs ?? []);
       setSnapshot(loaded);
+      // First page is on screen; stream the rest of history in the background.
+      startHydration();
       // Import legacy localStorage lesson progress into the synced row once,
       // so the switch to cross-device storage never resets a student.
       const legacy = legacyLessonProgress();
@@ -312,7 +386,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
       }
     })();
-  }, [userId]);
+    // recordFunnel is a stable useCallback; startHydration likewise. The
+    // exhaustive-deps lint flags them anyway on this long-lived boot effect
+    // (pre-existing pattern in this file); both are intentionally stable.
+  }, [userId, startHydration, recordFunnel]);
 
   // Network status drives the offline banner and gates sync attempts.
   useEffect(() => {
@@ -341,6 +418,48 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return () => window.removeEventListener(SYNC_QUEUE_EVENT, refreshPending);
   }, []);
 
+  // --- AI marking resilience: DLQ drain + in-place mark upgrades -----------
+  //
+  // Marks that fell back to the rubric (offline, 429, provider down) sit in
+  // the dead-letter queue. When the tab is online we drain a small batch on a
+  // slow timer — backoff+jitter inside the drain keeps the free-tier endpoint
+  // safe — and when a retry succeeds the stored attempt is upgraded, so the
+  // student's history ends up AI-graded without them doing anything.
+  useEffect(() => {
+    if (!syncStatus.online) return;
+    let cancelled = false;
+    const drain = () => {
+      if (!cancelled) void drainDeadMarks();
+    };
+    drain(); // catch up on backlog as soon as we're online
+    const timer = setInterval(drain, 90_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [syncStatus.online]);
+
+  // A successful DLQ re-grade already wrote through the repository; reflect
+  // it in the in-memory snapshot so open views re-render without a reload.
+  useEffect(() => {
+    function onResolved(event: Event) {
+      const detail = (event as CustomEvent<AiDlqResolvedDetail>).detail;
+      if (!detail?.attempt) return;
+      setSnapshot((prev) =>
+        prev
+          ? {
+              ...prev,
+              attempts: prev.attempts.some((a) => a.id === detail.attempt.id)
+                ? prev.attempts.map((a) => (a.id === detail.attempt.id ? detail.attempt : a))
+                : [detail.attempt, ...prev.attempts],
+            }
+          : prev,
+      );
+    }
+    window.addEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+    return () => window.removeEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+  }, []);
+
   const completeOnboarding = useCallback(async () => {
     await repo.markOnboarded();
     setNeedsOnboarding(false);
@@ -366,7 +485,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         lastSyncedAt: result.skipped || result.failed > 0 ? s.lastSyncedAt : new Date().toISOString(),
         lastSyncError: error,
       }));
-      if (result.pulled > 0) setSnapshot(await repo.loadSnapshot(userId));
+      if (result.pulled > 0) {
+        setSnapshot(await repo.loadSnapshot(userId));
+        // History changed server-side; restart hydration from the fresh
+        // baseline, superseding any stream still running.
+        startHydration();
+      }
     } catch (caught) {
       // Keep a diagnostic trail instead of swallowing the failure: without it,
       // a permanently broken sync looks identical to a slow one.
@@ -381,7 +505,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     } finally {
       syncInFlight = false;
     }
-  }, [userId]);
+  }, [userId, startHydration]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !snapshot || !syncStatus.online) return;
@@ -479,29 +603,76 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return snapshot.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
   }, [snapshot, subjectIds]);
 
-  const assessment = useMemo(() => {
-    if (!snapshot) return null;
-    if (!snapshot.attempts.length && !snapshot.mistakes.length) return null;
-    const questionsById = new Map(snapshot.questions.map((q) => [q.id, q] as const));
-    return buildAssessmentInsight({
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
-      mastery,
-      questionsById,
-    });
-  }, [snapshot, mastery]);
-
-  const questionTraces = useMemo(() => {
-    if (!snapshot) return [];
-    const attemptsByQuestion = new Map<Id, Attempt[]>();
-    for (const attempt of snapshot.attempts) {
-      const rows = attemptsByQuestion.get(attempt.questionId) ?? [];
+  // --- heavy analytics, off the main thread --------------------------------
+  //
+  // Assessment insight, question traces, difficulty calibration and FSRS
+  // validation all scale with history and used to recompute synchronously in
+  // useMemo after every grade — past ~5k attempts that stalls the render.
+  // They now route through domainEngine (Comlink worker, same-thread fallback
+  // for small histories) and land in state; every consumer keeps its exact
+  // shape, so the UI is untouched. The Map used to key attempts by question
+  // is rebuilt here per epoch — keys, not row contents, is what the compute
+  // needs.
+  const attemptsByQuestion = useMemo(() => {
+    const map = new Map<Id, Attempt[]>();
+    for (const attempt of snapshot?.attempts ?? []) {
+      const rows = map.get(attempt.questionId) ?? [];
       rows.push(attempt);
-      attemptsByQuestion.set(attempt.questionId, rows);
+      map.set(attempt.questionId, rows);
     }
-    return traceQuestions({ questions: snapshot.questions, attemptsByQuestion });
+    return map;
+  }, [snapshot?.attempts]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    let cancelled = false;
+    (async () => {
+      const questionsById = new Map(snapshot.questions.map((q) => [q.id, q] as const));
+      const nextAssessment =
+        snapshot.attempts.length || snapshot.mistakes.length
+          ? await domainEngine.assess({
+              attempts: snapshot.attempts,
+              mistakes: snapshot.mistakes,
+              mastery,
+              questionsById,
+            })
+          : null;
+      const traces = await domainEngine.trace({ questions: snapshot.questions, attemptsByQuestion });
+      if (cancelled) return;
+      setAssessment(nextAssessment);
+      setQuestionTraces(traces);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // mastery is intentionally excluded: it is recomputed from the same
+    // snapshot in the same pass, and including it would double-fire the
+    // effect on every grade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, attemptsByQuestion]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const calibrated = await domainEngine.calibrate({ traces: questionTraces });
+      if (!cancelled) setDifficultyCalibration(calibrated);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [questionTraces]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    let cancelled = false;
+    (async () => {
+      const validated = await domainEngine.validate({ cards: snapshot.cards, logs: snapshot.reviewLogs });
+      if (!cancelled) setForgettingCalibration(validated);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [snapshot]);
-  const difficultyCalibration = useMemo(() => calibrateDifficulty(questionTraces), [questionTraces]);
   const calculationMastery = useMemo(() => {
     if (!snapshot) return calculateCalculationMastery({ questions: [], attempts: [], mistakes: [] });
     return calculateCalculationMastery({
@@ -528,10 +699,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     if (!snapshot) return adaptiveDifficultyCalibration({ questions: [], traces: [] });
     return adaptiveDifficultyCalibration({ questions: snapshot.questions, traces: questionTraces });
   }, [snapshot, questionTraces]);
-  const forgettingCalibration = useMemo(
-    () => validateFsrs({ cards: snapshot?.cards ?? [], logs: snapshot?.reviewLogs ?? [] }),
-    [snapshot],
-  );
   const questionExposure = useMemo(() => {
     if (!snapshot) return questionExposureReport({ questions: [], attempts: [] });
     return questionExposureReport({ questions: snapshot.questions, attempts: snapshot.attempts });
@@ -631,6 +798,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [snapshot, subjectIds],
   );
 
+  // --- session fatigue tracking ---------------------------------------------
+  // The recommender needs time-on-task, but a ref read inside a render-path
+  // memo trips the React-compiler lint — so the session clock is module-scoped
+  // like syncInFlight/hydrationEpoch. It starts on the student's first graded
+  // action; 30 idle minutes ends the session (fatigue resets for a fresh one).
+  // Grading re-renders the store anyway, which refreshes the derived value.
   const recommendations = useMemo(() => {
     if (!snapshot) return [];
     return recommend({
@@ -643,6 +816,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
       subjectIds,
       marksPerHour,
+      activeMinutes: currentActiveMinutes(),
     });
   }, [snapshot, mastery, topics, subjectIds, marksPerHour]);
 
@@ -761,7 +935,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const reviewCard = useCallback<StoreValue["reviewCard"]>(
     async (card, grade, elapsedMs, confidence) => {
       const now = new Date();
-      const updated = gradeCard(card, grade, now);
+      touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
+      // CRDT: every grade gets a Lamport stamp so concurrent reviews on two
+      // devices merge by replay instead of last-write-wins discarding one.
+      const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
+      const updated = gradeCard(card, grade, now, { deviceId, lamport });
       const log: ReviewLog = {
         id: crypto.randomUUID(),
         userId,
@@ -841,6 +1019,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
+      touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
       const isRetest = Boolean(attempt.retestMistakeId);
       const retestMistake = isRetest
         ? snapshot?.mistakes.find((mistake) => mistake.id === attempt.retestMistakeId && !mistake.resolved)
@@ -1135,7 +1314,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     masteryUncertainty,
     applicationMastery,
     recallMastery,
-    recommendations,
     predictions,
     dueCards,
     assessment,
@@ -1181,6 +1359,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     gradePredictionLog,
     gradeActuals,
     recordGradeActual,
+    experimentRecs,
+    funnelEvents,
+    recordFunnel,
   ]);
 
   if (!value) return <BootScreen />;

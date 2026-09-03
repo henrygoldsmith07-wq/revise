@@ -253,16 +253,4 @@ export function providerStatus(): { available: boolean; name: string | null } {
 }
 
 /** Pull the first JSON object/array out of a reply that may be fenced or prosey. */
-export function extractJson<T>(text: string): T | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = (fenced?.[1] ?? text).trim();
-  const start = candidate.search(/[[{]/);
-  if (start < 0) return null;
-  const end = Math.max(candidate.lastIndexOf("}"), candidate.lastIndexOf("]"));
-  if (end <= start) return null;
-  try {
-    return JSON.parse(candidate.slice(start, end + 1)) as T;
-  } catch {
-    return null;
-  }
-}
+export { extractJson } from "./json";

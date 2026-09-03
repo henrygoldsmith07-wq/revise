@@ -52,11 +52,14 @@ function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
     const cur = [i];
     let rowMin = i;
     for (let j = 1; j <= small.length; j++) {
-      const substitution = prev[j - 1] + (large[i - 1] === small[j - 1] ? 0 : 1);
-      let best = Math.min(prev[j] + 1, cur[j - 1] + 1, substitution);
+      const prevJm1 = prev[j - 1] ?? 0;
+      const prevJ = prev[j] ?? 0;
+      const curJm1 = cur[j - 1] ?? 0;
+      const substitution = prevJm1 + (large[i - 1] === small[j - 1] ? 0 : 1);
+      let best = Math.min(prevJ + 1, curJm1 + 1, substitution);
       // Adjacent transposition counts as a single edit.
       if (i > 1 && j > 1 && large[i - 1] === small[j - 2] && large[i - 2] === small[j - 1]) {
-        best = Math.min(best, (prev2 ? prev2[j - 2] : Number.POSITIVE_INFINITY) + 1);
+        best = Math.min(best, (prev2 ? prev2[j - 2] ?? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY) + 1);
       }
       cur[j] = best;
       if (best < rowMin) rowMin = best;
@@ -65,7 +68,7 @@ function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
     prev2 = prev;
     prev = cur;
   }
-  return prev[small.length] <= maxEdits;
+  return (prev[small.length] ?? Number.POSITIVE_INFINITY) <= maxEdits;
 }
 
 /**
@@ -124,8 +127,8 @@ function extractNumbersUncached(input: string): Array<{ raw: string; value: numb
   const out: Array<{ raw: string; value: number | null; denom?: number }> = [];
   // Fractions first so 1/2 is not read as two scalars.
   for (const m of text.matchAll(/(-?\d+(?:,\d{3})*(?:\.\d+)?)\s*\/\s*(-?\d+(?:,\d{3})*(?:\.\d+)?)/g)) {
-    const num = parseScalar(m[1]);
-    const den = parseScalar(m[2]);
+    const num = parseScalar(m[1] ?? "");
+    const den = parseScalar(m[2] ?? "");
     const val = num != null && den != null && den !== 0 ? num / den : null;
     out.push({ raw: m[0], value: val });
   }
@@ -134,8 +137,8 @@ function extractNumbersUncached(input: string): Array<{ raw: string; value: numb
   // so a scheme expecting "1.32 x 10^-3" still loosely matches "1.32" elsewhere.
   const consumed: Array<readonly [number, number]> = [];
   for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([x×])\s*10\s*\^?\s*\{?([+-]?\d+)\}?/gi)) {
-    const mantissa = parseScalar(m[1]);
-    const exponent = parseScalar(m[3]);
+    const mantissa = parseScalar(m[1] ?? "");
+    const exponent = parseScalar(m[3] ?? "");
     if (mantissa == null || exponent == null) continue;
     // Consume from the × sign onwards so the mantissa still reaches the plain path.
     const relSeparator = m[0].search(/[x×]/i);
@@ -152,7 +155,7 @@ function extractNumbersUncached(input: string): Array<{ raw: string; value: numb
   }
   // Powers written as 2^3 or 2²/³ — normalise to numeric exponent where possible
   for (const m of text.matchAll(/(\d+)\s*\^\s*(-?\d+(?:\.\d+)?)/g)) {
-    const base = parseScalar(m[1]); const exp = parseScalar(m[2]);
+    const base = parseScalar(m[1] ?? ""); const exp = parseScalar(m[2] ?? "");
     if (base != null && exp != null) out.push({ raw: m[0], value: Math.pow(base, exp) });
   }
   return out;
@@ -193,7 +196,7 @@ function unitAfter(text: string, endOfNumber: number): string | null {
   const rest = text.slice(endOfNumber, endOfNumber + 12);
   const match = rest.match(/^[ \u00a0]*((?:mol\s*\/\s*(?:dm3|l)|dm3|cm3|m3|[GMkcmnµu]?(?:J|N|Pa|V|A|W|Hz|mol|g|m|s|L|K))[\^]?\{?-?\d\}?|%)/i);
   if (!match) return null;
-  return match[1].replace(/\s+/g, "").replace(/[\u00b2\u00b3]/g, (d) => (d === "\u00b2" ? "2" : "3")).toLowerCase();
+  return (match[1] ?? "").replace(/\s+/g, "").replace(/[\u00b2\u00b3]/g, (d) => (d === "\u00b2" ? "2" : "3")).toLowerCase();
 }
 
 interface UnitHit { value: number; unit: string | null }
@@ -247,8 +250,8 @@ function numericMatch(point: string, answer: string): boolean {
   if (!given.length) return false;
   // Also accept unicode fractions like ½ ¼ ¾
   const unicodeFrac: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1/3, "⅔": 2/3 };
-  for (const ch of Object.keys(unicodeFrac)) if (answer.includes(ch)) given.push({ raw: ch, value: unicodeFrac[ch] });
-  for (const ch of Object.keys(unicodeFrac)) if (point.includes(ch)) wanted.push({ raw: ch, value: unicodeFrac[ch] });
+  for (const ch of Object.keys(unicodeFrac)) if (answer.includes(ch)) given.push({ raw: ch, value: unicodeFrac[ch] as number });
+  for (const ch of Object.keys(unicodeFrac)) if (point.includes(ch)) wanted.push({ raw: ch, value: unicodeFrac[ch] as number });
   // Unit-aware quantities are computed lazily: most scheme points carry no
   // units, and scanning the answer for "number+unit" pairs is pure waste then.
   let wantedQuantities: ReturnType<typeof quantities> | null = null;
@@ -284,7 +287,7 @@ function numericMatch(point: string, answer: string): boolean {
   // equality credits rounded answers without opening the door to distant values.
   const accept = point.match(/\(accept\s+(-?\d+(?:[.,]\d+)?)\s*\)/i);
   if (accept) {
-    const alt = Number(accept[1].replace(",", "."));
+    const alt = Number((accept[1] ?? "").replace(",", "."));
     for (const g of given) {
       const gv = g.value;
       if (gv == null) continue;
@@ -307,7 +310,7 @@ function numericMatch(point: string, answer: string): boolean {
   return false;
 }
 
-export function numericEquivalent(expected: string, actual: string, eps = 0.01): boolean {
+export function numericEquivalent(expected: string, actual: string): boolean {
   return numericMatch(expected, actual);
 }
 

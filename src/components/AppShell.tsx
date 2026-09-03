@@ -160,6 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-56 flex-col border-r border-line bg-surface z-20" aria-label="Primary">
         <div className="px-4 py-5">
           <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 22px static icon; next/image adds setup cost with no benefit here */}
             <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
             <p className="text-sm font-semibold tracking-tight">Revise</p>
           </div>
@@ -204,6 +205,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="lg:hidden sticky top-0 z-20 bg-surface border-b border-line" role="banner">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 22px static icon; next/image adds setup cost with no benefit here */}
             <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold tracking-tight">Revise</p>

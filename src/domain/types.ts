@@ -171,6 +171,41 @@ export interface Misconception {
 export type CardKind = "basic" | "cloze" | "image" | "equation" | "mistake" | "audio";
 export type RecallGrade = "again" | "hard" | "good" | "easy";
 
+/**
+ * Immutable FSRS snapshot taken just before the first Lamport-stamped grade
+ * was appended to a card's op log. Together, `base` + `log` are a complete
+ * description of the card's scheduling history: the FSRS fields are a pure
+ * function of replaying the log from the base (see domain/sync-crdt.ts).
+ * Written once, never mutated afterwards.
+ */
+export interface CardSyncBase {
+  due: IsoDate;
+  stability: number;
+  difficulty: number;
+  reps: number;
+  lapses: number;
+  state: number;
+}
+
+/**
+ * One grading event in a card's CRDT operation log. The pair
+ * `(lamport, deviceId)` is a total order — the Lamport counter orders events
+ * on one device, and the deviceId breaks ties across devices — so every
+ * replica replays the same log into the same FSRS state.
+ */
+export interface CardGradeEvent {
+  /** The grade applied, FSRS-style. */
+  grade: RecallGrade;
+  /** Wall-clock moment of the review (display + elapsed-day computation). */
+  reviewedAt: IsoInstant;
+  /** Minting device — part of the total order and of the event's identity. */
+  deviceId: string;
+  /** Minting device's Lamport counter — the other half of the total order. */
+  lamport: number;
+  /** Present only on the first event of a log: the pre-logging FSRS snapshot. */
+  base?: CardSyncBase;
+}
+
 export interface Card {
   id: Id;
   userId: Id;
@@ -205,6 +240,16 @@ export interface Card {
   suspended?: boolean;
   /** Buried cards reappear on this date. Bury is a one-day snooze. */
   buriedUntil?: IsoDate;
+  /**
+   * CRDT operation log: every grade this card has ever received, Lamport-
+   * stamped. This is the source of truth for the card's FSRS state across
+   * devices — `syncCardState` replays it, so two devices that graded the same
+   * card concurrently converge on one deterministic schedule instead of one
+   * grade silently erasing the other. Optional: cards authored before the
+   * sync upgrade have no log and fall back to last-write-wins until their
+   * next review.
+   */
+  log?: CardGradeEvent[];
   // FSRS state
   due: IsoDate;
   stability: number;
@@ -716,6 +761,17 @@ export interface UserSettings {
   pulseEnabled: boolean;
   /** Subject the student last studied in lessons, so /lesson lands where they left off. */
   lastLessonSubject?: string;
+  /**
+   * When the AI provider is unreachable, allow the on-device WebLLM model to
+   * grade formative answers (downloads ~2GB of weights once; opt-in).
+   */
+  localAiMarking?: boolean;
+  /**
+   * Encrypt everything that leaves for the sync backend with an on-device
+   * AES-GCM key. The server stores opaque blobs only; a database breach
+   * yields ciphertext, not student answers. See data/e2ee.ts.
+   */
+  e2eeEnabled?: boolean;
   updatedAt: IsoInstant;
 }
 
@@ -726,6 +782,14 @@ export interface TopicMastery {
   subjectId: Id;
   /** 0–1. Blends recall stability, question accuracy and recency. */
   mastery: number;
+  /**
+   * 0–1 Bayesian posterior blending the cohort prior with this student's
+   * evidence — what a cold-start topic shows as "Predicted mastery". Converges
+   * onto `mastery` as evidence accumulates (see `priorRemaining`).
+   */
+  predictedMastery?: number;
+  /** 0–1 share of `predictedMastery` still carried by the prior (1 = pure prior). */
+  priorRemaining?: number;
   /** 0–1 predicted probability of recall right now (forgetting curve). */
   retention: number;
   confidence: number;
@@ -749,6 +813,8 @@ export interface RecommendationFactors {
   forgetting: number;
   /** 0.7–1.4, higher when evidence is thin. */
   uncertainty: number;
+  /** Present only when fatigue/circadian penalties demoted this option (<1). */
+  fatigue?: number;
 }
 
 export interface RecommendationExplanation {
@@ -873,8 +939,11 @@ export interface DeckExport {
 
 /**
  * Which lessons the student finished and their lesson streak. One row per
- * user so it syncs across devices; last write wins on `updatedAt`, mirroring
- * settings and the study streak.
+ * user so it syncs across devices. Merged as a grow-only set (OR-set CRDT):
+ * completion events from any device are unioned by lesson id, and the streak
+ * is a pure fold over per-day completion records — so completing different
+ * lessons on different devices both survive, and a week-long offline run on
+ * one device cannot erase daily progress made on another.
  */
 export interface LessonProgress {
   userId: Id;
@@ -882,6 +951,8 @@ export interface LessonProgress {
   completed: Record<string, boolean>;
   /** Consecutive days with at least one finished lesson (local-time days). */
   streak: { count: number; lastDay: string };
+  /** lesson id -> the local day (YYYY-MM-DD) it was first completed on. */
+  completedOn?: Record<string, string>;
   updatedAt: IsoInstant;
 }
 
@@ -908,4 +979,15 @@ export interface OutboxItem {
   queuedAt: IsoInstant;
   attempts: number;
   lastError?: string;
+  /**
+   * UUID idempotency key, minted once per logical mutation. The server
+   * records it in `sync_writes` and rejects a duplicate, so a hung request
+   * retried by the browser or service worker can never double-count a
+   * review or double-award accuracy metrics.
+   */
+  idempotencyKey: string;
+  /** Logical timestamp captured when the item was queued, for causal ordering. */
+  lamport?: number;
+  /** Minting device id — pairs with lamport for causal ordering diagnostics. */
+  deviceId?: string;
 }

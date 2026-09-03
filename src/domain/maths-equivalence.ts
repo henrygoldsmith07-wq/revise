@@ -170,14 +170,14 @@ function tokenise(input: string): Token[] | null {
   const tokens: Token[] = [];
   let i = 0;
   while (i < s.length) {
-    const ch = s[i];
+    const ch = s[i] ?? "";
     if (ch === " ") {
       i++;
       continue;
     }
     if (/[0-9.]/.test(ch)) {
       const m = s.slice(i).match(/^\d+(?:\.\d+)?(?:e[+-]?\d+)?/i);
-      if (!m) return null;
+      if (!m?.[0]) return null;
       const f = decimalToFrac(m[0]);
       if (!f) return null;
       tokens.push({ t: "num", v: f });
@@ -188,7 +188,7 @@ function tokenise(input: string): Token[] | null {
       // A contiguous letter run is ONE symbol. Runs longer than one letter are
       // units/prose ("mol", "dm") — reject so `n=cV` never parses as n·c·V.
       const m = s.slice(i).match(/^[a-z]+/i);
-      if (!m) return null;
+      if (!m?.[0]) return null;
       if (m[0].length > 1) return null;
       tokens.push({ t: "var", name: m[0].toLowerCase() });
       i += m[0].length;

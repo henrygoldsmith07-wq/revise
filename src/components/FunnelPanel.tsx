@@ -42,7 +42,7 @@ export function FunnelPanel() {
       attempts,
       mistakes,
     });
-  }, [store.attempts, store.funnelEvents, store.mistakes, store.mistakes.length, store.userId]);
+  }, [store.attempts, store.funnelEvents, store.mistakes, store.userId]);
 
   return (
     <section className="space-y-3">

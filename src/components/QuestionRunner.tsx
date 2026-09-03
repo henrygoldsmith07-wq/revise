@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { aiMark } from "@/ai/client";
+import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { misconceptionsForTopic } from "@/content";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
 import { getTopic } from "@/domain/curriculum";
@@ -67,6 +68,7 @@ export function QuestionRunner({
     feedback: string;
     source: "ai" | "fallback";
     note?: string;
+    withheld?: string;
     retest?: RetestEvaluation;
     remediation: RemediationPlan;
     confidence: number | null;
@@ -81,6 +83,34 @@ export function QuestionRunner({
   }, []);
   const isMcq = question.kind === "mcq";
   const topic = getTopic(question.topicIds[0] ?? "");
+
+  // When the DLQ later re-grades this question with AI, refresh an open
+  // result view in place so the student sees the AI mark land without
+  // doing anything. Scope: this question, and only while still mounted.
+  const dlqResolvedRef = useRef(false);
+  useEffect(() => {
+    if (!result) return; // nothing to upgrade until a mark exists
+    function onResolved(event: Event) {
+      const detail = (event as CustomEvent<AiDlqResolvedDetail>).detail;
+      if (!detail || detail.questionId !== question.id || dlqResolvedRef.current) return;
+      dlqResolvedRef.current = true;
+      const upgraded = detail.attempt;
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              marked: upgraded.marked,
+              feedback: upgraded.feedback,
+              source: "ai",
+              confidence: upgraded.markConfidence ?? null,
+              escalation: undefined,
+            }
+          : prev,
+      );
+    }
+    window.addEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+    return () => window.removeEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+  }, [result, question.id]);
 
   const awarded = useMemo(() => result?.marked.reduce((a, m) => a + m.awarded, 0) ?? 0, [result]);
 
@@ -107,7 +137,9 @@ export function QuestionRunner({
     let feedback: string;
     let source: "ai" | "fallback" = "fallback";
     let note: string | undefined;
+    let markTier: string | undefined;
     let markConfidence: number | null = null;
+    let withheld: string | undefined;
 
     if (isMcq) {
       const single = markMcq(question, choice ?? -1);
@@ -117,12 +149,14 @@ export function QuestionRunner({
           ? `Correct. ${question.parts[0]?.modelAnswer ?? ""}`
           : `${single.comment} ${question.parts[0]?.modelAnswer ?? ""}`;
     } else {
-      const envelope = await aiMark(question, answers);
+      const envelope = await aiMark(question, answers, { useLocalModel: Boolean(store.settings?.localAiMarking) });
       marked = envelope.data.marked;
       feedback = envelope.data.feedback;
       source = envelope.source;
       note = envelope.note;
+      markTier = envelope.tier;
       markConfidence = source === "ai" && typeof envelope.data.confidence === "number" ? envelope.data.confidence : null;
+      withheld = envelope.withheld ?? undefined;
     }
 
     const submittedAnswers = isMcq ? { [question.parts[0]?.id ?? question.id]: String(choice) } : answers;
@@ -180,6 +214,14 @@ export function QuestionRunner({
     const persistedAttempt = farTransferLink ? { ...attempt, farTransfer: farTransferLink } : attempt;
 
     await store.recordAttempt(persistedAttempt, question);
+    // A rubric fallback grade (the AI never ran, or the provider failed) gets a
+    // second chance: queue the persisted attempt for an AI re-grade. The drain
+    // pass retries with exponential backoff + jitter and upgrades this attempt
+    // in place when the provider recovers. Cache/local tiers already carry a
+    // genuine model grade, so they are not re-queued.
+    if (markTier === "fallback") {
+      void enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" });
+    }
     setResult({
       marked,
       feedback,
@@ -190,6 +232,7 @@ export function QuestionRunner({
       confidence: markConfidence,
       escalation: escalationDecision.escalate ? escalationDecision : undefined,
       farTransfer: persistedAttempt.farTransfer,
+      withheld,
     });
     return persistedAttempt;
   }
@@ -333,6 +376,7 @@ function MarkedResult({
     feedback: string;
     source: "ai" | "fallback";
     note?: string;
+    withheld?: string;
     retest?: RetestEvaluation;
     remediation: RemediationPlan;
     confidence: number | null;
@@ -375,6 +419,24 @@ function MarkedResult({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <SourceBadge source={result.source} note={result.note} />
+          {result.withheld ? (
+            <span className="inline-flex items-center gap-1 text-[11px] text-ink2 border border-line rounded-full px-2 py-0.5">
+              <svg
+                viewBox="0 0 12 12"
+                aria-hidden="true"
+                className="w-3 h-3 shrink-0 text-ink3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 1l4.2 1.6v2.6c0 2.6-1.7 4.5-4.2 5.4-2.5-.9-4.2-2.8-4.2-5.4V2.6L6 1z" />
+                <path d="M4.4 6l1.1 1.1 2.2-2.4" />
+              </svg>
+              {result.withheld} withheld before sending
+            </span>
+          ) : null}
           {result.farTransfer ? (
             <Pill
               tone={

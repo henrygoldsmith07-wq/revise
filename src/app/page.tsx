@@ -19,7 +19,7 @@ import { buildSessionStructure } from "@/domain/session-structure";
 export default function TodayPage() {
   const store = useStore();
   const today = todayIso();
-  const { recommendations, dueCards, mistakes, streak, settings } = store;
+  const { recommendations, dueCards, mistakes, streak, settings, recordFunnel } = store;
   const greetingLabel = useGreeting();
 
   const [primary, ...rest] = recommendations;
@@ -29,11 +29,11 @@ export default function TodayPage() {
 
   useEffect(() => {
     if (!primary) return;
-    void store.recordFunnel("recommendation_displayed", `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`);
+    void recordFunnel("recommendation_displayed", `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`);
     if (!experimentArm) return;
     const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
     void recordExperimentEvent("shown", { taskId, activity: primary.activity, topicId: primary.topicId ?? null });
-  }, [experimentArm, primary, recordExperimentEvent, today]);
+  }, [experimentArm, primary, recordExperimentEvent, recordFunnel, today]);
 
   if (!primary) return (
     <div className="max-w-2xl mx-auto space-y-5">

@@ -18,7 +18,7 @@ import {
   isRevisionCheckpoint,
   type RevisionCheckpoint,
 } from "@/domain/revision-checkpoint";
-import { COLLECTION_STORES, getAll, getDb, putAll, putOne, removeOne } from "./db";
+import { COLLECTION_STORES, getAll, getDb, putAll, putOne, removeOne, streamAttempts, streamReviewLogs } from "./db";
 import type { CollectionStore } from "./db";
 import { enqueue } from "./sync";
 import { readReviseMeta, REVISE_META_KEYS, writeReviseMeta } from "./storage-namespace";
@@ -154,9 +154,16 @@ export async function ensureSeeded(userId: Id): Promise<void> {
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
 }
 
-export async function loadSnapshot(userId: Id): Promise<Snapshot> {
+/** How many history rows load synchronously at boot before the rest streams in. */
+export const HISTORY_FIRST_PAGE = 500;
+/** Everything beyond the first page streams in the background in these chunks. */
+export const HISTORY_CHUNK = 500;
+
+export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number }): Promise<Snapshot> {
   await ensureSeeded(userId);
   const db = await getDb();
+  const historyLimit = opts?.historyLimit ?? HISTORY_FIRST_PAGE;
+
   // Keyed by store name rather than destructured positionally: COLLECTION_STORES
   // is ordered for sync replay, and tying the read order to it silently swaps
   // collections the moment that order changes.
@@ -166,6 +173,16 @@ export async function loadSnapshot(userId: Id): Promise<Snapshot> {
     ),
   ) as Record<CollectionStore, unknown[]>;
 
+  // The two append-only history logs are the ones that grow without bound, so
+  // only their most recent `historyLimit` rows load synchronously — IndexedDB
+  // cursors walk the time index backwards, and the tail is what Today, the
+  // review session and recent-mistake surfaces actually read first. Older
+  // history hydrates progressively via streamHistory() without blocking boot.
+  const [reviewLogs, attempts] = await Promise.all([
+    latestRows<ReviewLog>(db, "reviewLogs", "byReviewed", historyLimit),
+    latestRows<Attempt>(db, "attempts", "byCreated", historyLimit),
+  ]);
+
   const settings = ((await db.get("settings", userId)) as UserSettings | undefined) ?? defaultSettings(userId);
   const streak = ((await db.get("streak", userId)) as StreakState | undefined) ?? defaultStreak(userId);
   const lessonProgress =
@@ -173,9 +190,9 @@ export async function loadSnapshot(userId: Id): Promise<Snapshot> {
 
   return {
     cards: rows.cards as Card[],
-    reviewLogs: rows.reviewLogs as ReviewLog[],
+    reviewLogs,
     questions: rows.questions as Question[],
-    attempts: rows.attempts as Attempt[],
+    attempts,
     mistakes: rows.mistakes as Mistake[],
     papers: rows.papers as Paper[],
     plannedSessions: rows.plannedSessions as PlannedSession[],
@@ -184,6 +201,33 @@ export async function loadSnapshot(userId: Id): Promise<Snapshot> {
     streak,
     lessonProgress,
   };
+}
+
+/**
+ * The newest `limit` rows from a store via its time index, newest-first.
+ * A bounded cursor walk — O(limit) rows touched, not O(table).
+ */
+async function latestRows<T>(db: Awaited<ReturnType<typeof getDb>>, store: "reviewLogs" | "attempts", index: "byReviewed" | "byCreated", limit: number): Promise<T[]> {
+  const tx = db.transaction(store);
+  // idb keys .index() on the store's literal name; both stores here share
+  // "byUser", so that literal is the safe overlap for the cast.
+  let cursor = await tx.objectStore(store).index(index as "byUser").openCursor(null, "prev");
+  const rows: T[] = [];
+  while (cursor && rows.length < limit) {
+    rows.push(cursor.value as T);
+    cursor = await cursor.continue();
+  }
+  return rows;
+}
+
+/**
+ * Stream the full history logs oldest-first in chunks, for progressive
+ * hydration: the store merges each chunk into its snapshot once, in the
+ * background, until the whole history is resident again.
+ */
+export async function* streamHistory(chunkSize = HISTORY_CHUNK): AsyncGenerator<{ reviewLogs?: ReviewLog[]; attempts?: Attempt[] }> {
+  for await (const chunk of streamReviewLogs(chunkSize)) yield { reviewLogs: chunk };
+  for await (const chunk of streamAttempts(chunkSize)) yield { attempts: chunk };
 }
 
 // --- writes ----------------------------------------------------------------

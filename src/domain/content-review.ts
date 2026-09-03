@@ -1,5 +1,4 @@
-import type { Id, Question, Topic, VerificationStatus } from "./types";
-import { allTopics } from "@/domain/curriculum";
+import type { Id, Question, Topic } from "./types";
 import type { SubjectCoverage } from "./coverage";
 import type { ModerationEntry } from "./moderation";
 import { entriesWithProvenanceGaps } from "./moderation";
@@ -43,7 +42,6 @@ export function regressionReport(input: {
 }): RegressionReport {
   const today = input.today ?? new Date().toISOString().slice(0,10);
   const flags: ReviewFlag[] = [];
-  const questionIds = new Set(input.questions.map((q)=> q.id));
   const topicIds = new Set(input.topics.map((t)=> t.id));
   // Topics
   for (const t of input.topics) {

@@ -34,14 +34,14 @@ export interface MistakeDraft {
 }
 
 const COMMAND_WORD_RE = /\b(state|describe|explain|calculate|suggest|compare|evaluate|discuss|justify|deduce|predict|outline|show that)\b/i;
-export function commandWordOf(parts: Array<{ prompt: string }>): ReturnType<typeof classifyMistake> extends never ? never : string {
+export function commandWordOf(): ReturnType<typeof classifyMistake> extends never ? never : string {
   // legacy shim handled in assessment.ts — kept here only for the fallback below
   return "" as unknown as string;
 }
 function detectCommandWord(prompt: string): import("./types").CommandWord {
   const m = prompt.match(COMMAND_WORD_RE);
   if (!m) return "other";
-  const w = m[1].toLowerCase();
+  const w = (m[1] ?? "").toLowerCase();
   if (w === "show that") return "show that";
   return w as import("./types").CommandWord;
 }
@@ -78,6 +78,7 @@ export function firstErrorStep(working: string[], expectedSteps: string[]): { in
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9+\-×÷^/=²³\. ]/g, " ").replace(/\s+/g, " ").trim();
   for (let i = 0; i < expectedSteps.length; i++) {
     const exp = expectedSteps[i];
+    if (exp == null) break;
     const got = working[i] ?? "";
     if (!got.trim()) return { index: i, reason: `Step ${i + 1} missing: expected "${exp.slice(0, 80)}"` };
     const expTokens = new Set(norm(exp).split(/\s+/).filter(Boolean));
@@ -102,7 +103,8 @@ export function remediationFor(mistake: Pick<Mistake, "misconception" | "ao" | "
     communication: "Use the exact technical term from the spec point.",
     recall: "Revisit the flashcard for this statement today.",
   };
-  if (mistake.category in categoryAdvice) bits.push(categoryAdvice[mistake.category]);
+  const advice = categoryAdvice[mistake.category];
+  if (advice) bits.push(advice);
   return bits.join(" ") || "Revisit the topic summary and retry a similar question.";
 }
 function timingFor(attempt: Attempt, partId: string, marks: number): Mistake["timing"] {
@@ -137,6 +139,7 @@ export function mistakesFromAttempt(
     const mistakeId = idFactory();
 
     const marksLost = marked.max - marked.awarded;
+    const timing = timingFor(attempt, marked.partId, marked.max);
     const ao = part?.aos?.[0];
     const studentAnswer = attempt.answers[marked.partId] ?? "";
     const misconceptionMatch = misconceptions.length
@@ -149,16 +152,16 @@ export function mistakesFromAttempt(
       topicId,
       questionId: question.id,
       attemptId: attempt.id,
-      partId: part?.id,
-      point: marked.missedPoints[0],
+      ...(part?.id ? { partId: part.id } : {}),
+      point: marked.missedPoints[0] ?? "",
       command: detectCommandWord(part?.prompt ?? question.stem),
       misconception: detectMisconception(marked.missedPoints),
       ...(misconceptionMatch ? { misconceptionEntryId: misconceptionMatch.entry.id } : {}),
-      ao,
+      ...(ao ? { ao } : {}),
       difficultyAtLoss: question.difficulty,
       marksLost,
-      secondsSpent: attempt.elapsedMs ? Math.round(attempt.elapsedMs / Math.max(1, attempt.marked.length) / 1000) : undefined,
-      timing: timingFor(attempt, marked.partId, marked.max),
+      ...(attempt.elapsedMs ? { secondsSpent: Math.round(attempt.elapsedMs / Math.max(1, attempt.marked.length) / 1000) } : {}),
+      ...(timing ? { timing } : {}),
       description: marked.missedPoints.length
         ? `Dropped ${marksLost} mark(s): ${marked.missedPoints.slice(0, 2).join("; ")}`
         : `Dropped ${marksLost} mark(s) on "${part?.label ?? "this question"}"`,

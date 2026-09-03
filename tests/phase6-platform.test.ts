@@ -268,17 +268,17 @@ describe("sync conflicts", () => {
   it("simulateConcurrentWrites latest wins; history is deterministic", () => {
     const baseline = { id: "x", updatedAt: "2025-06-01T00:00:00.000Z", due: "2025-06-03" } as never;
     const r1 = simulateConcurrentWrites(baseline, [
-      { label: "phone", mutate: (r) => ({ due: "2025-06-04" }) as never, offsetMs: 10_000 },
-      { label: "laptop", mutate: (r) => ({ due: "2025-06-06" }) as never, offsetMs: 20_000 },
-      { label: "tablet", mutate: (r) => ({ due: "2025-06-05" }) as never, offsetMs: 5_000 },
+      { label: "phone", mutate: () => ({ due: "2025-06-04" }) as never, offsetMs: 10_000 },
+      { label: "laptop", mutate: () => ({ due: "2025-06-06" }) as never, offsetMs: 20_000 },
+      { label: "tablet", mutate: () => ({ due: "2025-06-05" }) as never, offsetMs: 5_000 },
     ]);
     expect((r1.winner as Row).due).toBe("2025-06-06"); // laptop latest
     expect(r1.history[0].label).toBe("laptop");
     // Run again: same determinism
     const r2 = simulateConcurrentWrites(baseline, [
-      { label: "phone", mutate: (r) => ({ due: "2025-06-04" }) as never, offsetMs: 10_000 },
-      { label: "laptop", mutate: (r) => ({ due: "2025-06-06" }) as never, offsetMs: 20_000 },
-      { label: "tablet", mutate: (r) => ({ due: "2025-06-05" }) as never, offsetMs: 5_000 },
+      { label: "phone", mutate: () => ({ due: "2025-06-04" }) as never, offsetMs: 10_000 },
+      { label: "laptop", mutate: () => ({ due: "2025-06-06" }) as never, offsetMs: 20_000 },
+      { label: "tablet", mutate: () => ({ due: "2025-06-05" }) as never, offsetMs: 5_000 },
     ]);
     expect((r2.winner as Row).due).toBe((r1.winner as Row).due);
   });

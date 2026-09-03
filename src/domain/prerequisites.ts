@@ -72,8 +72,7 @@ export interface DependencyReport {
  * which downstream topics it blocks. Sorted so blocked topics come first.
  */
 export function dependencyReport(input: { topics: Topic[]; mastery: TopicMastery[] }): DependencyReport[] {
-  const masteryById = new Map(input.mastery.map((m) => [m.topicId, m]));
-  const byId = new Map(input.topics.map((t) => [t.id, t]));
+    const byId = new Map(input.topics.map((t) => [t.id, t]));
   const weakSet = new Set(input.mastery.filter((m) => m.weak).map((m) => m.topicId));
   const out: DependencyReport[] = [];
   for (const topic of input.topics) {

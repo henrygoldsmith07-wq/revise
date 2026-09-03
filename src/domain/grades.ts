@@ -46,7 +46,7 @@ export function gradeForPercent(subject: Subject, percent: number): string {
   for (const row of sorted) {
     if (percent >= row.percent) return row.grade;
   }
-  return sorted.length ? sorted[sorted.length - 1].grade : "U";
+  return sorted.length ? sorted[sorted.length - 1]?.grade ?? "U" : "U";
 }
 
 /** Find the next boundary and allocate available topic headroom towards it. */
@@ -169,9 +169,11 @@ export function calibrationReport(pairs: Array<{ predicted: number; actual: numb
   const buckets: Array<{ sumP: number; sumA: number; count: number }> = Array.from({ length: B }, () => ({ sumP: 0, sumA: 0, count: 0 }));
   for (const p of pairs) {
     const idx = Math.min(B - 1, Math.max(0, Math.floor(p.predicted * B)));
-    buckets[idx].sumP += p.predicted;
-    buckets[idx].sumA += p.actual;
-    buckets[idx].count += 1;
+    const b = buckets[idx];
+    if (!b) continue;
+    b.sumP += p.predicted;
+    b.sumA += p.actual;
+    b.count += 1;
   }
   const bins: CalibrationBin[] = buckets.map((b, i) => ({
     bucket: `${(i / B).toFixed(1)}–${((i + 1) / B).toFixed(1)}`,

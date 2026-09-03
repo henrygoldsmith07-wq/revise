@@ -11,6 +11,10 @@ export const REVISE_META_KEYS = {
   funnelEvents: "revise.funnelEvents.v1",
   gradePredictions: "revise.gradePredictions.v1",
   gradeActuals: "revise.gradeActuals.v1",
+  /** Stable per-device identity (id + label) used to order concurrent edits. */
+  device: "revise.device.v1",
+  /** Per-device Lamport counter — the logical clock behind sync ordering. */
+  lamport: "revise.lamport.v1",
 } as const;
 
 // New keys have no legacy spelling; lookups fall back gracefully.
@@ -21,6 +25,9 @@ const LEGACY_KEYS = {
   seedVersion: "seedVersion",
   revisionCheckpoint: "revisionCheckpoint",
 } as Partial<Record<keyof typeof REVISE_META_KEYS, string>>;
+
+// device and lamport have no legacy spelling; they were introduced with the
+// namespaced keys already in place.
 
 /** Read a namespaced key and migrate its old unprefixed spelling once. */
 export async function readReviseMeta<T>(name: keyof typeof REVISE_META_KEYS): Promise<T | undefined> {

@@ -340,13 +340,11 @@ function armOutcome(
   const cutoff = now.getTime() - DROPOUT_DAYS * 86_400_000;
   let neverActivated = 0;
   let inactive = 0;
-  let completedStudy = 0;
   for (const p of participants) {
     const myAttempts = attempts.filter((a) => a.anonId === p).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const lastAttempt = myAttempts.at(-1);
     if (!lastAttempt) neverActivated++;
     else if (new Date(lastAttempt.createdAt).getTime() < cutoff) inactive++;
-    else completedStudy++;
   }
   const dropoutRate = participants.size ? round((neverActivated + inactive) / participants.size) : null;
 

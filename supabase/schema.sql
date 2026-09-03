@@ -184,6 +184,22 @@ create table if not exists public.lesson_progress (
   updated_at timestamptz not null default now()
 );
 
+-- --- idempotency ledger -------------------------------------------------------
+-- The outbox retries on flaky networks, and a request that times out may have
+-- actually committed. Without a ledger, a retried push upserts the same review
+-- twice: FSRS sees a phantom extra grade, accuracy metrics double-count, and a
+-- "sync_writes" row is the server-side dedup guard.
+--
+-- Every queued mutation carries a UUID idempotency key. The client claims the
+-- key on first delivery; a replayed request hits `on conflict do nothing` and
+-- is acknowledged as already-applied instead of writing a second time.
+create table if not exists public.sync_writes (
+  id uuid primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists sync_writes_user_created_idx on public.sync_writes (user_id, created_at);
+
 -- --- row-level security -----------------------------------------------------
 -- One policy per table, covering all four verbs. `with check` on insert and
 -- update stops a client rewriting user_id to another account's id.
@@ -194,7 +210,7 @@ begin
   foreach target in array array[
     'cards', 'review_logs', 'questions', 'attempts', 'mistakes',
     'papers', 'planned_sessions', 'exam_dates', 'user_settings', 'streaks',
-    'lesson_progress'
+    'lesson_progress', 'sync_writes'
   ]
   loop
     execute format('alter table public.%I enable row level security', target);
