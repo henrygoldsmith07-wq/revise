@@ -114,7 +114,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
           startMinute: cursor,
           minutes: blockLength,
           subjectId,
-          topicId: pick.topicId,
+          ...(pick.topicId !== undefined ? { topicId: pick.topicId } : {}),
           activity: pick.activity,
           reason: pick.reason,
           status: "pending",
@@ -193,7 +193,7 @@ export function allocateBlocks(
     .sort((a, b) => b.rem - a.rem);
   let i = 0;
   while (assigned < blocks && remainders.length) {
-    const target = remainders[i % remainders.length];
+    const target = remainders[i % remainders.length]!;
     out.set(target.id, (out.get(target.id) ?? 0) + 1);
     assigned++;
     i++;
