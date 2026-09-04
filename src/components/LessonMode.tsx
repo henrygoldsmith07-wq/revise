@@ -6,10 +6,18 @@ import { buildLesson, summariseLesson } from "@/content/lessons";
 import { allTopics, getSubject } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import { AchievementIcon, StreakIcon, VideoIcon, ICON_SIZE } from "./icons";
+import { RichText } from "./RichText";
 import { VideoLesson } from "./VideoLesson";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
 import { useStore } from "@/state/store";
+
+const STEP_META = {
+  overview: { label: "Big picture", tone: "accent" },
+  core: { label: "Key idea", tone: "accent" },
+  trap: { label: "Common trap", tone: "review" },
+  misconception: { label: "Fix a misconception", tone: "danger" },
+} as const;
 
 // Lesson mode: learn a topic from zero before drilling it with flashcards.
 // Steps are derived from authored curriculum data; each check question gates
@@ -35,7 +43,11 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
   const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
-  const [summary, setSummary] = useState<{ correct: number; total: number; missed: { body: string; answer: string }[] } | null>(null);
+  const [summary, setSummary] = useState<{
+    correct: number;
+    total: number;
+    missed: { body: string; answer: string; explanation: string }[];
+  } | null>(null);
   // When set, the video-style lesson replaces the whole lesson view; keyed by
   // topic id in the render so switching topics restarts the player cleanly.
   const [videoTopic, setVideoTopic] = useState<Topic | null>(null);
@@ -220,6 +232,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   if (lesson && summary) {
     const perfect = summary.total > 0 && summary.correct === summary.total;
     const next = nextIdx !== null ? lessons[nextIdx] : null;
+    const recap = lesson.steps.filter((candidate) => candidate.kind === "core").map((candidate) => candidate.takeaway);
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between gap-3">
@@ -247,8 +260,9 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
             <ul className="text-left space-y-2 max-w-md mx-auto">
               {summary.missed.map((m, i) => (
                 <li key={i} className="text-xs border border-line rounded-[8px] px-3 py-2">
-                  <span className="text-success font-medium">✓ {m.answer}</span>
-                  <p className="mt-1 text-ink3">{m.body}</p>
+                  <RichText className="text-sm text-success">{`✓ ${m.answer}`}</RichText>
+                  <RichText className="mt-1 text-ink3">{m.body}</RichText>
+                  <RichText className="mt-2 text-ink2">{m.explanation}</RichText>
                 </li>
               ))}
             </ul>
@@ -261,6 +275,25 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
             </Pill>
             {perfect ? <Pill tone="success">Flawless</Pill> : null}
           </div>
+
+          {recap.length ? (
+            <div className="text-left space-y-3 pt-4 border-t border-line">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Lesson recap</p>
+                <p className="text-sm text-ink2 mt-1">Keep these ideas together; they are the spine of your answer.</p>
+              </div>
+              <ol className="space-y-2">
+                {recap.map((point, index) => (
+                  <li key={`${lesson.id}:recap:${index}`} className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accentsoft text-[11px] font-semibold text-accent">
+                      {index + 1}
+                    </span>
+                    <RichText className="text-sm text-ink2">{point}</RichText>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
 
           {next ? (
             <div className="pt-2 border-t border-line">
@@ -301,26 +334,70 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   // ---- Active lesson -----------------------------------------------------
   if (lesson && step) {
     const reveal = checkAnswered;
+    const stepMeta = STEP_META[step.kind];
+    const selectedCorrect = Boolean(step.check && chosen === step.check.correctIndex);
     return (
       <div className="max-w-2xl mx-auto space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Lesson</p>
             <h2 className="text-lg font-semibold">{lesson.title}</h2>
+            <p className="text-xs text-ink3 mt-1 max-w-xl">{lesson.intro}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={exitLesson}>
             Exit
           </Button>
         </div>
-        <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label={`Step ${stepIdx + 1} of ${lesson.steps.length}`} />
+        <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label="Lesson progress" />
 
         {/* keyed by step id so each new step re-mounts and plays the enter animation */}
         <Panel key={step.id} className="space-y-4 app-enter">
-          <p className="text-sm text-ink whitespace-pre-line">{step.body}</p>
+          <div className="flex items-center justify-between gap-3">
+            <Pill tone={stepMeta.tone}>{stepMeta.label}</Pill>
+            <span className="text-[11px] text-ink3 tabular-nums">
+              {stepIdx === 0 ? "Orientation" : `Step ${stepIdx} of ${lesson.steps.length - 1}`}
+            </span>
+          </div>
+          <h3 className="text-base sm:text-lg font-semibold tracking-tight text-ink">{step.title}</h3>
+
+          <RichText className="text-base text-ink">{step.body}</RichText>
+
+          <div className="pt-4 border-t border-line">
+            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Break it down</p>
+            <ol className="mt-2 space-y-2.5">
+              {step.explanationSteps.map((line, index) => (
+                <li key={`${step.id}:explanation:${index}`} className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface2 text-[11px] font-semibold text-ink3">
+                    {index + 1}
+                  </span>
+                  <RichText className="text-sm text-ink2">{line}</RichText>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          {step.examLink ? (
+            <div className="rounded-[8px] border border-line bg-surface2/50 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Exam link</p>
+              <RichText className="text-xs text-ink2 mt-1">{step.examLink}</RichText>
+            </div>
+          ) : null}
+
+          <div className="rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Remember this</p>
+            <RichText className="text-sm text-ink mt-1">{step.takeaway}</RichText>
+          </div>
 
           {step.check ? (
-            <div className="space-y-2 pt-3 border-t border-line">
-              <p className="text-sm font-medium">{step.check.question}</p>
+            <div className="space-y-3 pt-4 border-t border-line">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Check your understanding</p>
+                  <p className="text-xs text-ink3 mt-0.5">Choose the best answer, then read the explanation.</p>
+                </div>
+                <Pill tone="accent">Quick check</Pill>
+              </div>
+              <RichText className="text-sm font-medium text-ink">{step.check.question}</RichText>
               <ul className="space-y-2">
                 {step.check.options.map((option, oi) => {
                   const isChosen = chosen === oi;
@@ -339,11 +416,11 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                               : isChosen
                                 ? "border-danger text-danger"
                                 : "border-line text-ink3"
-                            : "border-line hover:border-ink3 text-ink2",
+                          : "border-line hover:border-ink3 text-ink2",
                         )}
                       >
                         <span className="text-[11px] font-mono text-ink3 shrink-0">{oi + 1}</span>
-                        <span className="min-w-0">{option}</span>
+                        <span className="min-w-0 flex-1">{option}</span>
                         {reveal && isCorrect ? <span className="ml-auto shrink-0">✓</span> : null}
                         {reveal && isChosen && !isCorrect ? <span className="ml-auto shrink-0">✗</span> : null}
                       </button>
@@ -351,8 +428,30 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                   );
                 })}
               </ul>
+              {reveal ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={cx(
+                    "rounded-[8px] border px-3 py-2.5",
+                    selectedCorrect ? "border-success/40 bg-successsoft/50" : "border-review/40 bg-reviewsoft/50",
+                  )}
+                >
+                  <p className={cx("text-sm font-semibold", selectedCorrect ? "text-success" : "text-review")}>
+                    {selectedCorrect ? "Correct — you have the idea." : "Not quite — let’s fix it."}
+                  </p>
+                  <RichText className="text-sm text-ink2 mt-1">{step.check.explanation}</RichText>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-[8px] border border-line bg-surface2/50 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Pause and say it back</p>
+              <p className="text-sm text-ink2 mt-1">
+                Explain the idea aloud or in your head without looking. When it feels clear, continue to the next step.
+              </p>
+            </div>
+          )}
         </Panel>
 
         <div className="flex items-center justify-between gap-3">
@@ -407,6 +506,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         </Button>
       </div>
 
+      <Panel className="bg-accentsoft/20 border-accent/20">
+        <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">A guided path</p>
+        <p className="text-sm text-ink2 mt-1">
+          Each lesson is deliberately small: understand the idea, break it into simple links, say it back, then pass a quick check.
+          You can pause after any step and come back later.
+        </p>
+      </Panel>
+
       {streak.count > 0 ? (
         <div className="flex items-center gap-2">
           <Pill tone="accent" className="inline-flex items-center gap-1.5">
@@ -426,6 +533,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{resumeLabel}</p>
           <p className="text-sm font-semibold text-ink mt-0.5 truncate">{lessons[resumeIdx]?.topic.title}</p>
+          <p className="text-xs text-ink3 mt-0.5 line-clamp-2">{lessons[resumeIdx]?.topic.summary}</p>
         </div>
         <Pill tone="accent">Open</Pill>
       </button>
@@ -441,7 +549,10 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink">{entry.topic.title}</p>
-                  <p className="text-xs text-ink3 mt-0.5">{entry.lesson.steps.length} steps</p>
+                  <p className="text-xs text-ink2 mt-0.5 line-clamp-2">{entry.topic.summary}</p>
+                  <p className="text-[11px] text-ink3 mt-1">
+                    {entry.lesson.steps.length} guided steps · {entry.lesson.steps.filter((candidate) => candidate.check).length} quick checks
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {done ? <Pill tone="success">Done</Pill> : <Pill>Start</Pill>}

@@ -18,13 +18,25 @@ import { misconceptionsForTopic } from "@/content";
 
 export interface LessonStep {
   id: Id;
-  /** The teaching text the student reads. */
+  /** The role this step plays in the explanation. */
+  kind: "overview" | "core" | "trap" | "misconception";
+  /** Short heading shown above the teaching text. */
+  title: string;
+  /** The authored teaching text the student reads. */
   body: string;
+  /** Short, ordered chunks that turn a dense point into a guided explanation. */
+  explanationSteps: string[];
+  /** One sentence to repeat after reading the step. */
+  takeaway: string;
+  /** Optional link to the specification wording for this idea. */
+  examLink?: string;
   /** Optional check question — the student must answer before moving on. */
   check?: {
     question: string;
     options: string[];
     correctIndex: number;
+    /** Immediate feedback shown after the learner chooses an answer. */
+    explanation: string;
   };
 }
 
@@ -48,7 +60,15 @@ export function buildLesson(topic: Topic): Lesson | null {
   // Step 0: orient — what the topic is about, from the authored summary.
   steps.push({
     id: `lesson:${topic.id}:0`,
+    kind: "overview",
+    title: "Start with the big picture",
     body: topic.summary,
+    explanationSteps: [
+      `Name the topic: ${topic.title}. The summary above is your map of what belongs together.`,
+      "Next, learn one key idea at a time — each one builds the answer you will eventually write.",
+      "At the end, explain the topic once without looking. That is how you know it has moved beyond recognition.",
+    ],
+    takeaway: `By the end, you should be able to explain ${topic.title.toLowerCase()} in your own words.`,
   });
 
   // One teaching step per key point, each closed by a check question built
@@ -61,11 +81,17 @@ export function buildLesson(topic: Topic): Lesson | null {
     const options = shuffleStable([answer, ...distractors], topic.id, i);
     steps.push({
       id: `lesson:${topic.id}:${i + 1}`,
+      kind: "core",
+      title: pointTitle(point, `Key idea ${i + 1}`),
       body: point,
+      explanationSteps: explainPoint(point),
+      takeaway: `Remember: ${sentence(point)}`,
+      ...(topic.specPoints?.[i]?.text ? { examLink: topic.specPoints[i].text } : {}),
       check: {
         question,
         options,
         correctIndex: options.indexOf(answer),
+        explanation: `The idea to keep is: ${sentence(answer)} Say it once in your own words, then connect it to the question before moving on.`,
       },
     });
   });
@@ -76,19 +102,40 @@ export function buildLesson(topic: Topic): Lesson | null {
   // of these would the examiner penalise?" — rather than passive reading.
   topic.commonErrors.forEach((error, i) => {
     const body = `Common trap: ${error}`;
+    const correction = topic.keyPoints[Math.min(i, topic.keyPoints.length - 1)];
     if (topic.keyPoints.length >= 3) {
       const options = shuffleStable([error, ...topic.keyPoints.slice(0, 3)], topic.id, 1000 + i);
       steps.push({
         id: `lesson:${topic.id}:err:${i}`,
+        kind: "trap",
+        title: "Avoid this common trap",
         body,
+        explanationSteps: [
+          `Spot the risky wording: ${error}`,
+          `Replace it with the precise idea: ${correction}`,
+          "Before you submit an answer, check that the corrected wording is explicit — do not leave the examiner to infer it.",
+        ],
+        takeaway: `Check your answer for this trap: ${error}`,
         check: {
           question: `Examiners penalise one of these in ${topic.title.toLowerCase()} — which is the trap to avoid?`,
           options,
           correctIndex: options.indexOf(error),
+          explanation: `Avoid this wording: ${error}. A safer answer makes the key idea explicit: ${correction}`,
         },
       });
     } else {
-      steps.push({ id: `lesson:${topic.id}:err:${i}`, body });
+      steps.push({
+        id: `lesson:${topic.id}:err:${i}`,
+        kind: "trap",
+        title: "Avoid this common trap",
+        body,
+        explanationSteps: [
+          `Spot the risky wording: ${error}`,
+          `Replace it with the precise idea: ${correction}`,
+          "Before you submit an answer, check that the corrected wording is explicit.",
+        ],
+        takeaway: `Check your answer for this trap: ${error}`,
+      });
     }
   });
 
@@ -103,11 +150,20 @@ export function buildLesson(topic: Topic): Lesson | null {
     );
     steps.push({
       id: `lesson:${topic.id}:mc:${i}`,
+      kind: "misconception",
+      title: "Correct a common misunderstanding",
       body: `${misconception.explanation}\n\nExaminer's eye: ${misconception.example} — ${misconception.correction}`,
+      explanationSteps: [
+        `The tempting wrong idea: ${misconception.statement}`,
+        `Why it fails: ${misconception.explanation}`,
+        `What to say instead: ${misconception.correction}`,
+      ],
+      takeaway: `Use the corrected idea: ${misconception.correction}`,
       check: {
         question: `Which of these is the wrong belief, not what the examiner rewards?`,
         options,
         correctIndex: options.indexOf(misconception.statement),
+        explanation: `That statement is the misconception. The examiner rewards this correction: ${misconception.correction}`,
       },
     });
   });
@@ -130,13 +186,63 @@ export function buildLesson(topic: Topic): Lesson | null {
 export function summariseLesson(
   lesson: Lesson,
   checked: Record<string, number>,
-): { correct: number; total: number; missed: { body: string; answer: string }[] } {
+): { correct: number; total: number; missed: { body: string; answer: string; explanation: string }[] } {
   const checks = lesson.steps.filter((s) => s.check);
   const correct = checks.filter((s) => checked[s.id] === s.check!.correctIndex).length;
   const missed = checks
     .filter((s) => checked[s.id] !== s.check!.correctIndex)
-    .map((s) => ({ body: s.body, answer: s.check!.options[s.check!.correctIndex] }));
+    .map((s) => ({
+      body: s.body,
+      answer: s.check!.options[s.check!.correctIndex],
+      explanation: s.check!.explanation,
+    }));
   return { correct, total: checks.length, missed };
+}
+
+/** Keep generated headings short enough to scan while retaining the authored wording. */
+function pointTitle(point: string, fallback: string): string {
+  const clause = firstClause(point);
+  if (!clause) return fallback;
+  return clause.length <= 72 ? clause : `${clause.slice(0, 69).trimEnd()}…`;
+}
+
+/** A compact sentence used in takeaways without changing the authored fact. */
+function sentence(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+  return clean ? `${clean}.` : text;
+}
+
+/**
+ * Turn one dense authored key point into an ordered explanation. Separators
+ * are deliberately conservative: each chunk is still the author's wording,
+ * so this helper can improve readability without inventing subject facts.
+ */
+function explainPoint(point: string): string[] {
+  const clean = point.replace(/\s+/g, " ").trim();
+  const colon = clean.indexOf(":");
+  const colonParts = colon > 18 && clean.length - colon > 12
+    ? [clean.slice(0, colon), clean.slice(colon + 1)]
+    : [];
+  const parts = colonParts.length
+    ? colonParts
+    : clean
+        .split(/\s*(?:;|—|→)\s*|\s+(?:then|therefore)\s+/i)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+  if (parts.length > 1) return parts.map((part) => sentence(part));
+
+  return [
+    "Say the rule in your own words before trying to memorise the wording.",
+    "Ask yourself why this is true, or what changes because of it.",
+    "Use the exact idea in a question before you move on.",
+  ];
+}
+
+/** The first meaningful clause is a useful, novice-friendly heading. */
+function firstClause(text: string): string {
+  const cut = text.search(/[:;—→]|\s+(?:because|which|so|therefore)\s+/i);
+  return (cut > 12 ? text.slice(0, cut) : text).replace(/[.!?]+$/, "").trim();
 }
 
 /**
