@@ -1,5 +1,4 @@
 import { getDb } from "./db";
-import type { Id } from "@/domain/types";
 import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
 
 // ---------------------------------------------------------------------------
@@ -206,7 +205,7 @@ export interface ContentIdMigrationReport {
  * row is deleted after the remapped one is written, so no legacy id survives
  * anywhere — not as a value, not as a key.
  */
-export async function migrateContentIds(userId?: Id): Promise<ContentIdMigrationReport> {
+export async function migrateContentIds(): Promise<ContentIdMigrationReport> {
   const done = await readReviseMeta<number>("contentIdMigration");
   if (done === CONTENT_ID_MIGRATION_VERSION) {
     // Defense in depth: a device that recorded the flag but was interrupted
