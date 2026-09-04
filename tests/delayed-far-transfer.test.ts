@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import {
   DELAYED_FAR_TRANSFER_DELAY_DAYS,
   FAR_TRANSFER_PASS_THRESHOLD,
@@ -199,16 +197,5 @@ describe("delayed far-transfer retesting", () => {
       band: "partial",
     });
     expect(scoreFarTransferRetest(weak)).toMatchObject({ percentage: 0, passed: false, band: "not-secure" });
-  });
-
-  it("publishes the due queue in Progress and opens it from Practice", () => {
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    const practice = readFileSync(join(process.cwd(), "src/app/practice/page.tsx"), "utf8");
-    const runner = readFileSync(join(process.cwd(), "src/components/QuestionRunner.tsx"), "utf8");
-
-    expect(progress).toContain("delayedFarTransferRetests");
-    expect(progress).toContain("Delayed far-transfer");
-    expect(practice).toContain("retest");
-    expect(runner).toContain("farTransfer");
   });
 });

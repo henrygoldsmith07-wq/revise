@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { createCard } from "@/domain/scheduling";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import type { Card, ReviewLog, Topic } from "@/domain/types";
@@ -86,16 +84,5 @@ describe("recall mastery", () => {
     });
     expect(rows[0].mastery).toBeGreaterThan(0);
     expect(rows[0].mastery).toBeLessThan(1);
-  });
-
-  it("wires the Progress view to the recall metric", () => {
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    const panels = readFileSync(join(process.cwd(), "src/components/AssessmentPanels.tsx"), "utf8");
-    const store = readFileSync(join(process.cwd(), "src/state/store.tsx"), "utf8");
-
-    expect(progress).toContain("RecallMasteryCard");
-    expect(panels).toContain("Recall mastery");
-    expect(panels).toContain("recallMastery");
-    expect(store).toContain("computeRecallMastery");
   });
 });

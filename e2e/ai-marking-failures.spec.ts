@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { todayOrOnboarding } from "./helpers";
+import { completeOnboarding, todayOrOnboarding } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // AI marking supply-chain failure drills.
@@ -37,7 +37,7 @@ async function openWrittenQuestion(page: Page): Promise<void> {
   await page.goto("/");
   const main = page.locator("main#main");
   if ((await todayOrOnboarding(page)) === "onboarding") {
-    await page.getByText(/Skip — I will set this up later/i).click();
+    await completeOnboarding(page);
     await expect(main).toBeVisible({ timeout: 15_000 });
   }
   // Default practice mode queues written questions first; the runner renders

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { aiExtractQuestions, aiOcr } from "@/lib/optional-ai";
 import { toBase64 } from "@/components/AnswerInput";
@@ -8,6 +9,7 @@ import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { tokenise } from "@/domain/marking";
 import { analysePaperWeakness } from "@/domain/paper-weakness";
+import { selectNextPaper, type PaperCandidate } from "@/domain/exam-paper-selection";
 import type { Paper, Question } from "@/domain/types";
 import { useStore, useSubjects } from "@/state/store";
 import { PaperWeaknessPanel } from "@/components/PaperWeaknessPanel";
@@ -49,6 +51,35 @@ function Papers() {
     () => store.papers.filter((p) => !subjectId || p.subjectId === subjectId),
     [store.papers, subjectId],
   );
+
+  // Which paper to sit next — ranked on coverage, weakness, difficulty,
+  // recency, previous exposure and predicted mark gain. Pure derivation over
+  // the store's slices, so the recommendation updates after every run.
+  const paperSelection = useMemo(
+    () =>
+      selectNextPaper({
+        subjectId,
+        papers,
+        questions: store.questions,
+        attempts: store.attempts,
+        mistakes: store.mistakes,
+        mastery: store.mastery,
+        topics: topicsFor(subjectId),
+        targetGrade: store.settings.targetGrades[subjectId] ?? null,
+        gradeBoundaries: getSubject(subjectId)?.gradeBoundaries,
+        now: new Date(),
+      }),
+    [subjectId, papers, store.questions, store.attempts, store.mistakes, store.mastery, store.settings.targetGrades],
+  );
+  const rankedPapers = useMemo(() => {
+    const candidates = paperSelection.candidates;
+    const candidateIds = new Set(candidates.map((c) => c.paperId));
+    // Sit-able papers first (already ranked), then questionless uploads.
+    return [
+      ...candidates.map((c) => papers.find((p) => p.id === c.paperId)).filter((p): p is Paper => Boolean(p)),
+      ...papers.filter((p) => !candidateIds.has(p.id)),
+    ];
+  }, [paperSelection.candidates, papers]);
 
   if (activePaper) {
     const checkpoint = resumeActive && resumeCheckpoint?.paperId === activePaper.id ? resumeCheckpoint : null;
@@ -96,23 +127,107 @@ function Papers() {
         </p>
       </Panel>
 
+      {paperSelection.skipped.length ? (
+        <Panel className="space-y-2">
+          <SectionHeading
+            title="Set aside for your target"
+            hint={`Target ${paperSelection.skipped[0]!.targetGrade} needs ${paperSelection.skipped[0]!.neededPercent}% — these papers sit far from that mark right now.`}
+          />
+          <ul className="space-y-1.5">
+            {paperSelection.skipped.map((s) => (
+              <li key={s.paperId} className="text-xs text-ink2">
+                <span className="font-medium text-ink">{s.title}</span> — {s.reason}
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
+
       <section>
-        <SectionHeading title="Your papers" hint="Extracted questions join the practice pool automatically." />
-        {papers.length ? (
+        <SectionHeading
+          title="Your papers"
+          hint="Ranked for what earns you most right now: syllabus coverage, weakness, difficulty, recency, exposure and predicted mark gain — the first is the one to sit next; the others show what is costing them most."
+        />
+        {rankedPapers.length ? (
           <ul className="card divide-y divide-line">
-            {papers.map((paper) => {
+            {rankedPapers.map((paper, rank) => {
+              const candidate: PaperCandidate | undefined = paperSelection.candidates.find((c) => c.paperId === paper.id);
+              const recommended = paperSelection.recommended?.paperId === paper.id;
               const attempted = store.attempts.filter((a) => paper.questionIds.includes(a.questionId));
               const scored = attempted.reduce((a, x) => a + x.awarded, 0);
               const possible = attempted.reduce((a, x) => a + x.max, 0);
               return (
-                <li key={paper.id} className="px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <li
+                  key={paper.id}
+                  className={`px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center${recommended ? " ring-1 ring-accent bg-accentsoft/30" : ""}`}
+                >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-ink truncate">{paper.title}</p>
+                    <p className="text-sm text-ink truncate">
+                      {recommended ? (
+                        <Pill tone="accent" className="mr-2 align-middle">Next paper</Pill>
+                      ) : candidate ? (
+                        <span className="text-ink3 mr-2 tabular-nums">#{rank + 1}</span>
+                      ) : null}
+                      {paper.title}
+                    </p>
                     <p className="text-[11px] text-ink3">
                       {getSubject(paper.subjectId)?.name} · {paper.questionIds.length} questions ·{" "}
                       {paper.totalMarks} marks
                       {possible ? ` · scored ${scored}/${possible}` : ""}
                     </p>
+                    {recommended && candidate ? (
+                      <p className="text-xs text-ink2 mt-1.5" role="status">
+                        {candidate.reason}
+                      </p>
+                    ) : null}
+                    {!recommended && candidate?.weakestFactor ? (
+                      <p className="text-xs text-ink3 mt-1.5">
+                        <span className="text-ink2">Held back mainly by {candidate.weakestFactor.label.toLowerCase()}</span>
+                        {" "}— {candidate.weakestFactor.detail}.
+                        {candidate.weakestFactor.fix ? (
+                          <>
+                            {" "}
+                            <Link
+                              href={candidate.weakestFactor.fix.href}
+                              className="underline decoration-ink3 underline-offset-2 hover:decoration-ink2"
+                              aria-label={
+                                candidate.weakestFactor.fix.kind === "review"
+                                  ? `Review ${candidate.weakestFactor.fix.topicTitle ?? "the weak topic"}`
+                                  : `Timed practice on ${candidate.weakestFactor.fix.topicTitle ?? "the weakest topic"}`
+                              }
+                            >
+                              {candidate.weakestFactor.fix.kind === "review"
+                                ? `Review ${candidate.weakestFactor.fix.topicTitle ?? "it"}`
+                                : `Timed run on ${candidate.weakestFactor.fix.topicTitle ?? "it"}`}
+                            </Link>
+                            {" "}first.
+                          </>
+                        ) : null}
+                      </p>
+                    ) : null}
+                    {candidate ? (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px]">
+                        <Pill title={candidate.factors.coverage.detail}>
+                          {candidate.factors.coverage.detail}
+                        </Pill>
+                        <Pill title={candidate.factors.weakness.detail}>
+                          {candidate.factors.weakness.detail}
+                        </Pill>
+                        <Pill title={`Fitted to your measured mastery on its topics`}>
+                          {candidate.factors.difficulty.detail}
+                        </Pill>
+                        <Pill>{candidate.factors.recency.detail}</Pill>
+                        <Pill>{candidate.factors.exposure.detail}</Pill>
+                        {candidate.predictedPercent != null ? (
+                          <Pill tone="accent">≈{candidate.predictedPercent}% predicted</Pill>
+                        ) : null}
+                        {candidate.recentLossMarks > 0 ? (
+                          <Pill tone="danger">
+                            {candidate.recentLossMarks} recent-loss mark{candidate.recentLossMarks === 1 ? "" : "s"} in its topics
+                          </Pill>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   <Pill className="self-start sm:self-auto" tone={paper.status === "practised" ? "success" : undefined}>{paper.status}</Pill>
                   <div className="grid grid-cols-1 sm:flex justify-end gap-1.5 w-full sm:w-auto">

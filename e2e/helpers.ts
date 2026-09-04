@@ -40,6 +40,37 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise
 }
 
 /**
+ * Completes the first screen (board → subjects → required exam dates) for a
+ * fresh profile. The funnel is the *only* thing rendered until it is done and
+ * there is no Skip, so every spec that needs a Today screen funnels through
+ * here. Defaults to AQA and its first subject with an exam ~3 months out.
+ */
+export async function completeOnboarding(
+  page: Page,
+  opts: { board?: string; subjectNames?: string[]; examDate?: string } = {},
+): Promise<void> {
+  const board = opts.board ?? "AQA";
+  // Phase 1 — exam board.
+  await page.getByRole("button", { name: new RegExp(board, "i") }).first().click();
+  await page.getByRole("button", { name: /Continue/i }).click();
+  // Phase 2 — subjects of that board (multi-select). Default: first card.
+  if (opts.subjectNames?.length) {
+    for (const name of opts.subjectNames) {
+      await page.getByRole("button", { name: new RegExp(name, "i") }).first().click();
+    }
+  } else {
+    await page.locator("button.card").first().click();
+  }
+  await page.getByRole("button", { name: /Continue/i }).click();
+  // Phase 3 — every chosen subject needs a future exam date (required).
+  const date = opts.examDate ?? new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+  const inputs = page.locator('input[type="date"]');
+  const count = await inputs.count();
+  for (let i = 0; i < count; i++) await inputs.nth(i).fill(date);
+  await page.getByRole("button", { name: /Build my plan/i }).click();
+}
+
+/**
  * Waits until the PWA worker is installed, activated and *controlling* the
  * page, so a reload can be served from the precache with no network.
  *

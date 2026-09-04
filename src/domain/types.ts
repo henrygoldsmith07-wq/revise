@@ -772,6 +772,16 @@ export interface UserSettings {
    * yields ciphertext, not student answers. See data/e2ee.ts.
    */
   e2eeEnabled?: boolean;
+  /**
+   * One-time countdown markers: the phase bucket ("early" | "technique" |
+   * "final") each subject was in the last time it was evaluated, keyed by
+   * subject id. Lets a subject entering the timed-paper fortnight be
+   * announced exactly once per transition — and re-announced if its exam is
+   * pushed back out of the window and it later re-enters.
+   */
+  examNotices?: Record<string, string>;
+  /** When on, a subject entering the timed-paper fortnight also fires a browser notification. */
+  examNotifications?: boolean;
   updatedAt: IsoInstant;
 }
 
@@ -815,6 +825,8 @@ export interface RecommendationFactors {
   uncertainty: number;
   /** Present only when fatigue/circadian penalties demoted this option (<1). */
   fatigue?: number;
+  /** Present only when technique steering applied (promote >1, demote <1). */
+  techniqueSteer?: number;
 }
 
 export interface RecommendationExplanation {
@@ -847,6 +859,10 @@ export interface Recommendation {
   /** Higher runs first. */
   score: number;
   plannedSessionId?: Id;
+  /** Set when technique steering converted this rec into a timed run (the quick-session length). */
+  techniqueQuickMinutes?: 5 | 10;
+  /** Knowledge share of lost marks for the subject when technique steering applied. */
+  techniqueKnowledgeShare?: number;
   /** Structured breakdown for the "why this?" disclosure. */
   explanation?: RecommendationExplanation;
   /** Alias for tests that want the factors without unwrapping explanation. */

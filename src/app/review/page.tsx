@@ -7,7 +7,9 @@ import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { buildReviewQueue, buryCard, isDue, previewIntervals, reinsert, setSuspended, todayIso } from "@/domain/scheduling";
 import { CUSTOM_STUDY_KEY } from "@/components/CustomStudyDialog";
 import { useShortcuts } from "@/components/shortcuts";
-import type { Card, RecallGrade } from "@/domain/types";
+import type { Card, Question, RecallGrade } from "@/domain/types";
+import { pickExamQuestionForCard } from "@/domain/card-question";
+import { classifyMistake } from "@/domain/mistake-classification";
 import { useStore } from "@/state/store";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
@@ -55,6 +57,11 @@ function ReviewSession() {
     totalMs: 0,
   }));
   const cardShownAt = useRef(0);
+  // After each graded card, one official-style exam question that tests the
+  // card's spec point appears before the next card. The queue has already
+  // advanced; "Next card" (or Enter) reveals it.
+  const [examCheck, setExamCheck] = useState<Question | null>(null);
+  const [gradedCard, setGradedCard] = useState<Card | null>(null);
 
   // A custom session hands over an explicit id list through sessionStorage.
   // Read once, at mount: re-reading would resurrect the session after it ends.
@@ -121,6 +128,20 @@ function ReviewSession() {
     return query ? `/review?${query}` : "/review?resume=1";
   }, [mode, sessionId, subjectId, topicId]);
 
+  // In mistake-repair sessions each card stands for a captured mistake. Its
+  // nine-way mark-scheme-aware class is derived live from the stored attempt
+  // and question, so the label and reason always match the current evidence
+  // (and pre-existing rows fall back to their capture-time category honestly).
+  const mistakeClass = useMemo(() => {
+    if (mode !== "mistakes" || !current?.sourceMistakeId) return null;
+    const sourceMistake = store.mistakes.find((m) => m.id === current.sourceMistakeId);
+    if (!sourceMistake) return null;
+    const question = store.questions.find((q) => q.id === sourceMistake.questionId) ?? null;
+    const attempt = store.attempts.find((a) => a.id === sourceMistake.attemptId) ?? null;
+    const part = question?.parts.find((p) => p.id === sourceMistake.partId) ?? question?.parts[0] ?? null;
+    return classifyMistake({ mistake: sourceMistake, question, part, attempt });
+  }, [current, mode, store.attempts, store.mistakes, store.questions]);
+
   useEffect(() => {
     if (!current) {
       if (resumeRequested || done.reviewed > 0) void clearRevisionCheckpoint();
@@ -151,26 +172,59 @@ function ReviewSession() {
       setQueue((q) => q.slice(1));
       setRevealed(false);
       setConfidence(null);
+      setExamCheck(null);
+      setGradedCard(null);
       cardShownAt.current = Date.now();
     },
     [current, store],
   );
 
+  const continueFromCheck = useCallback(() => {
+    if (!examCheck) return;
+    setExamCheck(null);
+    cardShownAt.current = Date.now();
+  }, [examCheck]);
+
   useShortcuts(
     [
-      { key: " ", group: "Review", label: "Show answer", disabled: revealed, run: () => setRevealed(true) },
-      { key: "enter", group: "Review", label: "Show answer", disabled: revealed, run: () => setRevealed(true) },
+      // While the exam check is up, space/enter move on to the next card.
+      {
+        key: " ",
+        group: "Review",
+        label: examCheck ? "Next card" : "Show answer",
+        disabled: Boolean(!examCheck && revealed),
+        run: () => (examCheck ? continueFromCheck() : setRevealed(true)),
+      },
+      {
+        key: "enter",
+        group: "Review",
+        label: examCheck ? "Next card" : "Show answer",
+        disabled: Boolean(!examCheck && revealed),
+        run: () => (examCheck ? continueFromCheck() : setRevealed(true)),
+      },
       ...GRADES.map((option, i) => ({
         key: String(i + 1),
         group: "Review",
         label: `Grade "${option.label}"`,
-        disabled: !revealed,
+        disabled: !revealed || Boolean(examCheck),
         run: () => void grade(option.grade),
       })),
-      { key: "s", group: "Review", label: "Suspend this card", run: () => void skipCurrent((c) => setSuspended(c, true)) },
-      { key: "b", group: "Review", label: "Bury until tomorrow", run: () => void skipCurrent((c) => buryCard(c)) },
+      {
+        key: "s",
+        group: "Review",
+        label: "Suspend this card",
+        disabled: Boolean(examCheck),
+        run: () => void skipCurrent((c) => setSuspended(c, true)),
+      },
+      {
+        key: "b",
+        group: "Review",
+        label: "Bury until tomorrow",
+        disabled: Boolean(examCheck),
+        run: () => void skipCurrent((c) => buryCard(c)),
+      },
     ],
-    [current, revealed, confidence, isPreview],
+    [current, revealed, confidence, isPreview, examCheck, continueFromCheck],
   );
 
   const grade = useCallback(
@@ -187,6 +241,11 @@ function ReviewSession() {
     // repair a card you have just proved you cannot recall.
     const rest = queue.slice(1);
     setQueue(value === "again" ? reinsert(rest, current, 4) : rest);
+    // After each card: one official-style exam question that uses this card's
+    // spec point (null when no authored question tests that exact point — the
+    // session then flows straight to the next card).
+    setGradedCard(current);
+    setExamCheck(pickExamQuestionForCard(current, store.questions));
     setDone((d) => ({
       reviewed: d.reviewed + 1,
       again: d.again + (value === "again" ? 1 : 0),
@@ -198,6 +257,32 @@ function ReviewSession() {
     },
     [current, queue, confidence, isPreview, store],
   );
+
+  if (examCheck) {
+    const meta = gradedCard ?? current;
+    const metaTopic = meta ? getTopic(meta.topicId) : null;
+    return (
+      <div className="max-w-2xl mx-auto space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-ink3 truncate">
+              {meta ? `${getSubject(meta.subjectId)?.name} · ${metaTopic?.title}` : ""}
+            </p>
+            <h1 className="text-sm font-semibold">
+              {custom ? "Custom study" : mode === "mistakes" ? "Mistake repair" : "Spaced repetition"}
+            </h1>
+          </div>
+          <ButtonLink href="/" size="sm" variant="ghost">
+            End session
+          </ButtonLink>
+        </div>
+
+        <ProgressBar value={total ? done.reviewed / total : 0} label={`${done.reviewed} of ${total}`} />
+
+        <ExamCheckPanel question={examCheck} onNext={continueFromCheck} />
+      </div>
+    );
+  }
 
   if (!current) {
     return (
@@ -243,6 +328,18 @@ function ReviewSession() {
             <SpeakButton text={revealed ? current.back : current.front} audioUrl={current.audioUrl} />
           </span>
         </div>
+
+        {mode === "mistakes" && mistakeClass ? (
+          <div className="mb-3 rounded-lg border border-line bg-surface2/40 px-3 py-2" role="note">
+            <p className="text-xs leading-relaxed text-ink2">
+              <span className="font-semibold text-ink">
+                {mistakeClass.klass.charAt(0).toUpperCase() + mistakeClass.klass.slice(1)}
+              </span>
+              <span className="text-ink3"> · {mistakeClass.confidence} confidence — </span>
+              {mistakeClass.reasons.join(" ")}
+            </p>
+          </div>
+        ) : null}
 
         <div className="flex-1">
           <RichText className="text-base text-ink">{current.front}</RichText>
@@ -332,6 +429,60 @@ function cardKindLabel(card: Card): string {
     default:
       return card.origin === "ai" ? "AI generated" : "Recall";
   }
+}
+
+const QUESTION_KIND_LABEL: Record<string, string> = {
+  mcq: "Multiple choice",
+  short: "Short answer",
+  structured: "Structured",
+  calculation: "Calculation",
+  extended: "Extended response",
+};
+
+/** One official-style exam question that tests the point on the card just graded. */
+function ExamCheckPanel({ question, onNext }: { question: Question; onNext: () => void }) {
+  const marks = question.totalMarks === 1 ? "1 mark" : `${question.totalMarks} marks`;
+  return (
+    <Panel className="fade-in">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <Pill tone="accent">Exam-style question</Pill>
+        <Pill>{marks}</Pill>
+        <Pill>{QUESTION_KIND_LABEL[question.kind] ?? question.kind}</Pill>
+      </div>
+      <p className="text-[11px] text-ink3 mb-3">
+        This question tests the point on the card you just reviewed — now try it the way it will be asked.
+      </p>
+
+      <div className="text-sm text-ink2 space-y-2">
+        <RichText className="text-ink">{question.stem}</RichText>
+        {question.parts.map((part) => (
+          <div key={part.id} className="flex gap-2">
+            <span className="font-semibold text-ink shrink-0">
+              {part.label}
+              <span className="text-ink3 font-normal"> ({part.marks === 1 ? "1 mark" : `${part.marks} marks`})</span>
+            </span>
+            <RichText className="flex-1">{part.prompt}</RichText>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-2">
+        <ButtonLink
+          href={`/practice?question=${encodeURIComponent(question.id)}`}
+          variant="primary"
+          className="min-h-[2.75rem]"
+        >
+          Answer it →
+        </ButtonLink>
+        <Button variant="ghost" className="min-h-[2.75rem]" onClick={onNext}>
+          Next card <span className="text-[10px] opacity-60">enter</span>
+        </Button>
+      </div>
+      <p className="text-[11px] text-ink3 mt-3">
+        Your place in this session is saved either way — come back whenever and the next card is waiting.
+      </p>
+    </Panel>
+  );
 }
 
 function SessionSummary({

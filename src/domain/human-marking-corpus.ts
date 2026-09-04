@@ -59,14 +59,14 @@ export const HUMAN_MARKING_CORPUS_FLOOR = {
 
 function probeQuestion(): Question {
   return {
-    id: "seed-q:probe",
+    id: "cnt:question:probe",
     subjectId: "wjec-alevel-chemistry",
     topicIds: ["wjec-alevel-chemistry.moles"],
     kind: "structured",
     stem: "Probe",
     parts: [
       {
-        id: "seed-q:probe:0",
+        id: "cnt:question:probe:0",
         label: "(a)",
         prompt: "Calculate the concentration",
         marks: 2,
@@ -77,7 +77,7 @@ function probeQuestion(): Question {
         learningClaims: ["perform calculations using n=cV"],
       },
       {
-        id: "seed-q:probe:1",
+        id: "cnt:question:probe:1",
         label: "(b)",
         prompt: "Explain the trend",
         marks: 2,
@@ -100,14 +100,14 @@ function probeQuestion(): Question {
 
 function algebraQuestion(): Question {
   return {
-    id: "seed-q:algebra",
+    id: "cnt:question:algebra",
     subjectId: "aqa-gcse-maths",
     topicIds: ["aqa-gcse-maths.algebra"],
     kind: "structured",
     stem: "Expand (x+2)(x-3).",
     parts: [
       {
-        id: "seed-q:algebra:0",
+        id: "cnt:question:algebra:0",
         label: "(a)",
         prompt: "Expand (x+2)(x-3).",
         marks: 3,
@@ -138,8 +138,8 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
       id: "chemistry-complete-correct",
       question: probeQuestion(),
       answers: {
-        "seed-q:probe:0": "n=cV, so n = 0.25 mol dm-3.",
-        "seed-q:probe:1": "Nuclear charge increases and shielding is similar, so first ionisation energy increases.",
+        "cnt:question:probe:0": "n=cV, so n = 0.25 mol dm-3.",
+        "cnt:question:probe:1": "Nuclear charge increases and shielding is similar, so first ionisation energy increases.",
       },
       humanAwards: [2, 2],
       label: "complete, correct response",
@@ -154,14 +154,14 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
     {
       id: "chemistry-answer-only",
       question: probeQuestion(),
-      answers: { "seed-q:probe:0": "0.25", "seed-q:probe:1": "" },
+      answers: { "cnt:question:probe:0": "0.25", "cnt:question:probe:1": "" },
       humanAwards: [1, 0],
       label: "answer only, no method",
     },
     {
       id: "chemistry-method-only",
       question: probeQuestion(),
-      answers: { "seed-q:probe:0": "I used n = c × V", "seed-q:probe:1": "" },
+      answers: { "cnt:question:probe:0": "I used n = c × V", "cnt:question:probe:1": "" },
       humanAwards: [1, 0],
       label: "method shown, no final answer",
     },
@@ -169,8 +169,8 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
       id: "chemistry-explanation-only",
       question: probeQuestion(),
       answers: {
-        "seed-q:probe:0": "",
-        "seed-q:probe:1": "More nuclear charge, less shielding, so ionisation energy goes up.",
+        "cnt:question:probe:0": "",
+        "cnt:question:probe:1": "More nuclear charge, less shielding, so ionisation energy goes up.",
       },
       humanAwards: [0, 2],
       label: "explanation only",
@@ -178,28 +178,28 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
     {
       id: "chemistry-wrong-content",
       question: probeQuestion(),
-      answers: { "seed-q:probe:0": "The sky is blue", "seed-q:probe:1": "The sky is blue" },
+      answers: { "cnt:question:probe:0": "The sky is blue", "cnt:question:probe:1": "The sky is blue" },
       humanAwards: [0, 0],
       label: "wrong content",
     },
     {
       id: "algebra-final-answer-only",
       question: algebraQuestion(),
-      answers: { "seed-q:algebra:0": "x^2 - x - 6" },
+      answers: { "cnt:question:algebra:0": "x^2 - x - 6" },
       humanAwards: [1],
       label: "final answer only, no working",
     },
     {
       id: "algebra-restated-question",
       question: algebraQuestion(),
-      answers: { "seed-q:algebra:0": "(x+2)(x-3)" },
+      answers: { "cnt:question:algebra:0": "(x+2)(x-3)" },
       humanAwards: [0],
       label: "restates the question (factored form) — documents rubric generosity",
     },
     {
       id: "algebra-sign-error-final",
       question: algebraQuestion(),
-      answers: { "seed-q:algebra:0": "x^2 + x - 6" },
+      answers: { "cnt:question:algebra:0": "x^2 + x - 6" },
       humanAwards: [0],
       label: "wrong final expression, sign error",
     },
@@ -207,7 +207,7 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
       id: "algebra-full-working",
       question: algebraQuestion(),
       answers: {
-        "seed-q:algebra:0": "(x+2)(x-3)\n= x^2 - 3x + 2x - 6\n= x^2 - x - 6",
+        "cnt:question:algebra:0": "(x+2)(x-3)\n= x^2 - 3x + 2x - 6\n= x^2 - x - 6",
       },
       humanAwards: [3],
       label: "full correct working",
@@ -216,7 +216,7 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
       id: "algebra-sign-error-mid-working",
       question: algebraQuestion(),
       answers: {
-        "seed-q:algebra:0": "(x+2)(x-3)\n= x^2 + 3x + 2x - 6\n= x^2 + x - 6",
+        "cnt:question:algebra:0": "(x+2)(x-3)\n= x^2 + 3x + 2x - 6\n= x^2 + x - 6",
       },
       humanAwards: [1],
       label: "sign error mid-working, wrong final",
@@ -224,7 +224,7 @@ export const HUMAN_MARKING_CORPUS: HumanMarkingCorpus = {
     {
       id: "algebra-blank",
       question: algebraQuestion(),
-      answers: { "seed-q:algebra:0": "" },
+      answers: { "cnt:question:algebra:0": "" },
       humanAwards: [0],
       label: "blank script",
     },

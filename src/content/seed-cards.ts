@@ -7,12 +7,14 @@ import type { Card, Id, Topic } from "@/domain/types";
 // curriculum and content can never drift apart: add a topic and its deck
 // exists immediately, in every subject, with no AI call and no network.
 //
-// Card ids are deterministic (`seed:<topicId>:<kind>:<index>`) so re-seeding
-// an existing user is idempotent — their FSRS history survives.
+// Card ids are deterministic (`cnt:card:<topicId>:<kind>:<index>`, namespaced
+// — see src/data/content-ids.ts) so re-seeding an existing user is idempotent
+// — their FSRS history survives — and so operator tooling purging `seed-*`
+// fixtures can never take the bank with it.
 // ---------------------------------------------------------------------------
 
 export function seedCardId(topicId: Id, kind: string, index: number): Id {
-  return `seed:${topicId}:${kind}:${index}`;
+  return `cnt:card:${topicId}:${kind}:${index}`;
 }
 
 /** Turn a key point into a question. Statements make poor prompts. */

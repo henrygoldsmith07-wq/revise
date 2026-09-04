@@ -431,8 +431,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
   return [
     {
       id: "dev-001-1mark-state",
-      questionId: "seed-q:dev-1mark",
-      partId: "seed-q:dev-1mark:a",
+      questionId: "cnt:question:dev-1mark",
+      partId: "cnt:question:dev-1mark:a",
       subject: "wjec-alevel-physics",
       specification: "A200QS",
       ...base,
@@ -453,8 +453,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-002-calculation",
-      questionId: "seed-q:dev-calc",
-      partId: "seed-q:dev-calc:a",
+      questionId: "cnt:question:dev-calc",
+      partId: "cnt:question:dev-calc:a",
       subject: "aqa-alevel-chemistry",
       specification: "7405",
       ...base,
@@ -477,8 +477,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-003-explain-partial",
-      questionId: "seed-q:dev-explain",
-      partId: "seed-q:dev-explain:a",
+      questionId: "cnt:question:dev-explain",
+      partId: "cnt:question:dev-explain:a",
       subject: "wjec-alevel-chemistry",
       specification: "A100QS",
       ...base,
@@ -499,8 +499,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-004-evaluate-extended",
-      questionId: "seed-q:dev-evaluate",
-      partId: "seed-q:dev-evaluate:a",
+      questionId: "cnt:question:dev-evaluate",
+      partId: "cnt:question:dev-evaluate:a",
       subject: "aqa-gcse-biology",
       specification: "8461",
       ...base,
@@ -522,8 +522,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-005-practical-method",
-      questionId: "seed-q:dev-practical",
-      partId: "seed-q:dev-practical:a",
+      questionId: "cnt:question:dev-practical",
+      partId: "cnt:question:dev-practical:a",
       subject: "edexcel-gcse-chemistry",
       specification: "1CH0",
       ...base,
@@ -544,8 +544,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-006-data-interpretation",
-      questionId: "seed-q:dev-data",
-      partId: "seed-q:dev-data:a",
+      questionId: "cnt:question:dev-data",
+      partId: "cnt:question:dev-data:a",
       subject: "ocr-alevel-biology",
       specification: "H420",
       ...base,
@@ -566,8 +566,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-007-contradictory",
-      questionId: "seed-q:dev-contradictory",
-      partId: "seed-q:dev-contradictory:a",
+      questionId: "cnt:question:dev-contradictory",
+      partId: "cnt:question:dev-contradictory:a",
       subject: "wjec-alevel-biology",
       specification: "A400QS",
       ...base,
@@ -589,8 +589,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-008-irrelevant-but-correct",
-      questionId: "seed-q:dev-irrelevant",
-      partId: "seed-q:dev-irrelevant:a",
+      questionId: "cnt:question:dev-irrelevant",
+      partId: "cnt:question:dev-irrelevant:a",
       subject: "aqa-gcse-physics",
       specification: "8463",
       ...base,

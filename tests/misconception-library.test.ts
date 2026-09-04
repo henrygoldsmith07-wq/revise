@@ -39,7 +39,7 @@ describe("misconception library", () => {
   it("uses unique, stable ids", () => {
     const ids = seedMisconceptions.map((m) => m.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every((id) => id.startsWith("seed-misconception:"))).toBe(true);
+    expect(ids.every((id) => id.startsWith("cnt:misconception:"))).toBe(true);
   });
 
   it("finds entries by subject, topic and id", () => {
@@ -66,7 +66,7 @@ describe("matchMisconception", () => {
       "I divided both sides of -2x < 6 by -2 and kept the sign, writing x < -3",
     );
     expect(match).not.toBeNull();
-    expect(match!.entry.id).toBe("seed-misconception:inequality-sign-reversal");
+    expect(match!.entry.id).toBe("cnt:misconception:inequality-sign-reversal");
     expect(match!.score).toBeGreaterThanOrEqual(0.5);
   });
 
@@ -152,7 +152,7 @@ describe("misconception tallies", () => {
       new Date("2025-06-01T09:00:00Z"),
       entries,
     );
-    expect(draft.mistake.misconceptionEntryId).toBe("seed-misconception:inequality-sign-reversal");
+    expect(draft.mistake.misconceptionEntryId).toBe("cnt:misconception:inequality-sign-reversal");
   });
 
   it("tallies recurring misconceptions weighted by marks lost", () => {

@@ -1,72 +1,110 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { allSubjects, subjectLabel } from "@/domain/curriculum";
+import { allQualifications, allSubjects, availableBoards, getBoard, gradesFor } from "@/domain/curriculum";
 import { todayIso } from "@/domain/scheduling";
-import type { Availability, ExamDate } from "@/domain/types";
+import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, ProgressBar, cx } from "./ui";
 import { CreditedIcon } from "./icons";
-import { useFocusTrap } from "./useFocusTrap";
 
 // ---------------------------------------------------------------------------
-// First run.
+// First screen. Not a dialog over the app — the app itself waits (AppShell
+// renders nothing else until onboarding completes), so this is a full page.
 //
-// Four questions, each of which materially changes what the app does next:
-// which subjects (scopes everything), when the exams are (drives urgency),
-// how much time there is (sizes the plan), and what grade they are chasing
-// (frames the analytics). Anything that could be inferred or defaulted is not
-// asked — there is no email step, no avatar, no tour.
-//
-// It ends by building the plan, so the student lands on a Today screen with
-// something real on it rather than an empty state telling them to come back.
+// Exactly three questions, each of which materially changes what the app does
+// next: which exam board (scopes every subject offered), which subjects on
+// that board (scopes all content), and when each exam is (drives planner
+// urgency). Everything that can be defaulted is not asked: the time budget
+// starts on the "Steady" preset and the target grade on the qualification's
+// top grade, both fine-tunable in Settings afterwards. There is no Skip —
+// nothing in the app makes sense until board, subject and exam date exist.
 // ---------------------------------------------------------------------------
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PHASES = ["Board", "Subjects", "Exam dates"] as const;
 
-const TIME_PRESETS: { label: string; hint: string; minutes: number[] }[] = [
-  { label: "Light", hint: "About 4 hours a week", minutes: [60, 30, 30, 30, 30, 30, 60] },
-  { label: "Steady", hint: "About 8 hours a week", minutes: [90, 60, 60, 60, 60, 45, 120] },
-  { label: "Hard", hint: "About 14 hours a week", minutes: [180, 90, 90, 90, 90, 60, 180] },
-];
+/** Default time budget while the student has not yet tuned Settings. */
+const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
+
+/** Subject grouped under the qualification it belongs to, for a board. */
+interface SubjectRow {
+  qualificationId: Id;
+  level: string;
+  subjects: { id: Id; name: string }[];
+}
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const store = useStore();
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [subjectIds, setSubjectIds] = useState<string[]>([]);
-  const [exams, setExams] = useState<Record<string, string>>({});
-  const [preset, setPreset] = useState(1);
-  const [target, setTarget] = useState("A");
+  const [phase, setPhase] = useState(0);
+  const [boardId, setBoardId] = useState<Id | null>(null);
+  const [subjectIds, setSubjectIds] = useState<Id[]>([]);
+  const [examDates, setExamDates] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const subjects = useMemo(() => allSubjects(), []);
+  const boards = useMemo(() => availableBoards(), []);
   const today = todayIso();
-  const steps = ["You", "Subjects", "Exams", "Time"];
-  const dialogRef = useFocusTrap(true, onDone);
+
+  const board = boardId ? (getBoard(boardId) ?? null) : null;
+
+  /** Subject rows for the chosen board, grouped by qualification level. */
+  const subjectRows = useMemo<SubjectRow[]>(() => {
+    if (!boardId) return [];
+    return allQualifications(boardId)
+      .map((qualification) => ({
+        qualificationId: qualification.id,
+        level: qualification.level,
+        subjects: allSubjects(qualification.id)
+          .map((subject) => ({ id: subject.id, name: subject.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .filter((row) => row.subjects.length > 0)
+      .sort((a, b) => a.level.localeCompare(b.level));
+  }, [boardId]);
+
+  const chosenSubjects = useMemo(
+    () =>
+      subjectRows
+        .flatMap((row) => row.subjects)
+        .filter((s) => subjectIds.includes(s.id)),
+    [subjectRows, subjectIds],
+  );
+
+  const missingDates = chosenSubjects.filter((s) => !examDates[s.id]);
+  const datesValid =
+    chosenSubjects.length > 0 &&
+    missingDates.length === 0 &&
+    chosenSubjects.every((s) => (examDates[s.id] ?? "") >= today);
+  const canContinue = phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : datesValid;
+
+  function chooseBoard(id: Id) {
+    // Changing board resets subject + date choices: they belonged to the
+    // previous board's qualifications.
+    setBoardId(id);
+    setSubjectIds([]);
+    setExamDates({});
+  }
 
   async function finish() {
+    if (!boardId) return;
     setSaving(true);
-    const availability: Availability[] = TIME_PRESETS[preset].minutes.map((minutes, weekday) => ({
-      weekday,
-      minutes,
-    }));
+    const availability: Availability[] = STEADY_MINUTES.map((minutes, weekday) => ({ weekday, minutes }));
 
     await store.updateSettings({
-      displayName: name.trim() || "Student",
+      displayName: "Student",
       subjectIds,
       availability,
-      targetGrades: Object.fromEntries(subjectIds.map((id) => [id, target])),
+      targetGrades: Object.fromEntries(subjectIds.map((id) => [id, gradesFor(id)[0] ?? "A*"])),
     });
 
-    for (const [subjectId, date] of Object.entries(exams)) {
+    for (const subject of chosenSubjects) {
+      const date = examDates[subject.id];
       if (!date) continue;
       const exam: ExamDate = {
         id: crypto.randomUUID(),
         userId: store.userId,
-        subjectId,
+        subjectId: subject.id,
         date,
-        label: `${subjects.find((s) => s.id === subjectId)?.name} exam`,
+        label: `${subject.name} exam`,
       };
       await store.upsertExamDate(exam);
     }
@@ -76,199 +114,166 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     onDone();
   }
 
-  const canContinue = step === 1 ? subjectIds.length > 0 : true;
-
   return (
-    <div
-      ref={dialogRef}
-      className="fixed inset-0 z-50 bg-bg overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="onboarding-step-title"
-      tabIndex={-1}
-    >
-      <div className="min-h-full flex items-center justify-center p-4">
-        <div className="w-full max-w-lg space-y-4 app-enter motion-safe:app-enter">
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2" aria-live="polite">
-              Step {step + 1} of {steps.length} · {steps[step]}
+    <div className="min-h-dvh bg-bg flex items-center justify-center p-4">
+      <div className="w-full max-w-xl space-y-4 app-enter motion-safe:app-enter">
+        <header className="text-center space-y-1">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Welcome</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Revision that knows what to do next</h1>
+          <p className="text-sm text-ink2">
+            Pick your exam board, your subjects and when the exams are — the plan, flashcards and questions follow.
+          </p>
+        </header>
+
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2" aria-live="polite">
+            Step {phase + 1} of {PHASES.length} · {PHASES[phase]}
+          </p>
+          <ProgressBar value={(phase + 1) / PHASES.length} label={`Step ${phase + 1} of ${PHASES.length}`} />
+        </div>
+
+        {phase === 0 ? (
+          <Panel className="space-y-3">
+            <h2 className="text-sm font-semibold">Which exam board are you studying with?</h2>
+            <p className="text-xs text-ink3 mt-0.5 -mb-1">
+              Your specification, questions and past papers follow your board&apos;s syllabus. Pick the one your school
+              uses.
             </p>
-            <ProgressBar value={(step + 1) / steps.length} label={`Step ${step + 1} of ${steps.length}`} />
-          </div>
-
-          {step === 0 ? (
-            <Panel className="space-y-3">
-              <h1 id="onboarding-step-title" className="text-xl font-semibold tracking-tight">Revision that knows what to do next</h1>
-              <p className="text-sm text-ink2">
-                Open the app, get one recommended task, do it, get marked. No deciding what to revise, no blank
-                page. Four quick questions and it is set up.
-              </p>
-              <Field label="What should we call you?" hint="Optional.">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Student"
-                  className="field"
-                  autoFocus
-                  autoComplete="nickname"
-                  aria-label="What should we call you?"
-                />
-              </Field>
-            </Panel>
-          ) : null}
-
-          {step === 1 ? (
-            <Panel className="space-y-3">
-              <div>
-                <h2 id="onboarding-step-title" className="text-sm font-semibold">Which subjects are you taking?</h2>
-                <p className="text-xs text-ink3 mt-0.5">
-                  Each comes with its specification, flashcards and exam questions already written.
-                </p>
-              </div>
-              <ul className="space-y-2">
-                {subjects.map((subject) => {
-                  const on = subjectIds.includes(subject.id);
-                  return (
-                    <li key={subject.id}>
-                      <button
-                        onClick={() =>
-                          setSubjectIds(
-                            on ? subjectIds.filter((id) => id !== subject.id) : [...subjectIds, subject.id],
-                          )
-                        }
-                        type="button"
+            <ul className="space-y-2 pt-2">
+              {boards.map((option) => {
+                const on = boardId === option.id;
+                return (
+                  <li key={option.id}>
+                    <button
+                      type="button"
+                      onClick={() => chooseBoard(option.id)}
+                      aria-pressed={on}
+                      className={cx(
+                        "w-full text-left card px-4 py-3.5 min-h-[3.5rem] flex items-center gap-3 transition-colors",
+                        on ? "border-ink3 bg-surface2" : "hover:border-ink3",
+                      )}
+                    >
+                      <span
                         className={cx(
-                          "w-full text-left card px-4 py-3 min-h-[3.25rem] flex items-center gap-3 transition-colors",
-                          on ? "border-ink3 bg-surface2" : "hover:border-ink3",
+                          "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
+                          on ? "bg-accent border-transparent text-onaccent" : "border-line",
                         )}
                       >
-                        <span
-                          className={cx(
-                            "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
-                            on ? "bg-accent border-transparent text-onaccent" : "border-line",
-                          )}
-                        >
-                          {on ? <CreditedIcon size={12} aria-hidden /> : null}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm text-ink">{subject.name}</span>
-                          <span className="block text-[11px] text-ink3 truncate">{subjectLabel(subject.id)}</span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {!subjectIds.length ? <p className="text-xs text-ink3">Pick at least one to continue.</p> : null}
-            </Panel>
-          ) : null}
-
-          {step === 2 ? (
-            <Panel className="space-y-3">
-              <div>
-                <h2 id="onboarding-step-title" className="text-sm font-semibold">When are the exams?</h2>
-                <p className="text-xs text-ink3 mt-0.5">
-                  This is what makes the plan urgent in the right places. Skip any you do not know yet.
-                </p>
-              </div>
-              {subjectIds.map((id) => (
-                <Field key={id} label={subjects.find((s) => s.id === id)?.name ?? id}>
-                  <input
-                    type="date"
-                    min={today}
-                    value={exams[id] ?? ""}
-                    onChange={(e) => setExams({ ...exams, [id]: e.target.value })}
-                    className="field"
-                    aria-label={`${subjects.find((s) => s.id === id)?.name ?? id} exam date`}
-                  />
-                </Field>
-              ))}
-              <Field label="Grade you are aiming for">
-                <div className="flex gap-1.5">
-                  {["A*", "A", "B", "C"].map((grade) => (
-                    <button
-                      key={grade}
-                      type="button"
-                      onClick={() => setTarget(grade)}
-                      aria-pressed={target === grade}
-                      aria-label={`Target grade ${grade}`}
-                      className={cx(
-                        "flex-1 py-2.5 rounded-[8px] border text-sm font-semibold transition-colors",
-                        target === grade ? "bg-accent text-onaccent border-transparent" : "border-line text-ink2",
-                      )}
-                    >
-                      {grade}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-            </Panel>
-          ) : null}
-
-          {step === 3 ? (
-            <Panel className="space-y-3">
-              <div>
-                <h2 id="onboarding-step-title" className="text-sm font-semibold">How much time do you have?</h2>
-                <p className="text-xs text-ink3 mt-0.5">
-                  The planner never schedules more than this. You can fine-tune each day later.
-                </p>
-              </div>
-              <ul className="space-y-2">
-                {TIME_PRESETS.map((option, i) => (
-                  <li key={option.label}>
-                    <button
-                      onClick={() => setPreset(i)}
-                      type="button"
-                      className={cx(
-                        "w-full text-left card px-4 py-3 min-h-[3.25rem] transition-colors",
-                        preset === i ? "border-ink3 bg-surface2" : "hover:border-ink3",
-                      )}
-                    >
-                      <span className="block text-sm text-ink">{option.label}</span>
-                      <span className="block text-[11px] text-ink3">{option.hint}</span>
-                      <span className="flex gap-1 mt-2">
-                        {option.minutes.map((minutes, weekday) => (
-                          <span key={weekday} className="flex-1 text-center">
-                            <span className="block text-[9px] text-ink3">{WEEKDAYS[weekday]}</span>
-                            <span
-                              className="block mt-0.5 rounded-[2px] bg-accent mx-auto w-full"
-                              style={{ height: `${Math.max(3, (minutes / 180) * 22)}px` }}
-                            />
-                          </span>
-                        ))}
+                        {on ? <CreditedIcon size={12} aria-hidden /> : null}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm text-ink">{option.name}</span>
+                        <span className="block text-[11px] text-ink3 truncate">{option.country}</span>
                       </span>
                     </button>
                   </li>
-                ))}
-              </ul>
-            </Panel>
-          ) : null}
+                );
+              })}
+            </ul>
+          </Panel>
+        ) : null}
 
-          <div className="flex gap-2">
-            {step > 0 ? (
-              <Button className="min-h-[3rem]" onClick={() => setStep(step - 1)}>
-                Back
-              </Button>
+        {phase === 1 && board ? (
+          <Panel className="space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold">Which subjects do you take with {board.name}?</h2>
+              <p className="text-xs text-ink3 mt-0.5">
+                Tick every subject you&apos;re sitting — each comes with its specification, flashcards and exam
+                questions already written.
+              </p>
+            </div>
+            {subjectRows.map((row) => (
+              <div key={row.qualificationId}>
+                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">
+                  {board.name} {row.level}
+                </p>
+                <ul className="space-y-2">
+                  {row.subjects.map((subject) => {
+                    const on = subjectIds.includes(subject.id);
+                    return (
+                      <li key={subject.id}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSubjectIds(on ? subjectIds.filter((id) => id !== subject.id) : [...subjectIds, subject.id])
+                          }
+                          aria-pressed={on}
+                          aria-label={`${row.level} ${subject.name}`}
+                          className={cx(
+                            "w-full text-left card px-4 py-3 min-h-[3.25rem] flex items-center gap-3 transition-colors",
+                            on ? "border-ink3 bg-surface2" : "hover:border-ink3",
+                          )}
+                        >
+                          <span
+                            className={cx(
+                              "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
+                              on ? "bg-accent border-transparent text-onaccent" : "border-line",
+                            )}
+                          >
+                            {on ? <CreditedIcon size={12} aria-hidden /> : null}
+                          </span>
+                          <span className="text-sm text-ink">{subject.name}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+            {!subjectIds.length ? <p className="text-xs text-ink3">Pick at least one subject to continue.</p> : null}
+          </Panel>
+        ) : null}
+
+        {phase === 2 ? (
+          <Panel className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold">When are the exams?</h2>
+              <p className="text-xs text-ink3 mt-0.5">
+                This is what makes the plan urgent in the right places. Every subject needs its date before you can
+                start.
+              </p>
+            </div>
+            {chosenSubjects.map((subject) => (
+              <Field key={subject.id} label={`${subject.name} exam date`}>
+                <input
+                  type="date"
+                  min={today}
+                  required
+                  value={examDates[subject.id] ?? ""}
+                  onChange={(e) => setExamDates({ ...examDates, [subject.id]: e.target.value })}
+                  className="field"
+                  aria-label={`${subject.name} exam date`}
+                />
+              </Field>
+            ))}
+            {missingDates.length ? (
+              <p className="text-xs text-ink3" role="status">
+                Add a date for: {missingDates.map((s) => s.name).join(", ")}
+              </p>
             ) : null}
-            {step < steps.length - 1 ? (
-              <Button
-                variant="primary"
-                className="flex-1 min-h-[3rem]"
-                disabled={!canContinue}
-                onClick={() => setStep(step + 1)}
-              >
-                Continue
-              </Button>
-            ) : (
-              <Button variant="primary" className="flex-1 min-h-[3rem]" disabled={saving} onClick={() => void finish()}>
-                {saving ? "Building your plan…" : "Build my plan"}
-              </Button>
-            )}
-          </div>
+          </Panel>
+        ) : null}
 
-          <button type="button" onClick={onDone} className="w-full text-center text-xs text-ink3 hover:text-ink py-2" aria-label="Skip onboarding">
-            Skip — I will set this up later
-          </button>
+        <div className="flex gap-2">
+          {phase > 0 ? (
+            <Button className="min-h-[3rem]" onClick={() => setPhase(phase - 1)}>
+              Back
+            </Button>
+          ) : null}
+          {phase < PHASES.length - 1 ? (
+            <Button
+              variant="primary"
+              className="flex-1 min-h-[3rem]"
+              disabled={!canContinue}
+              onClick={() => setPhase(phase + 1)}
+            >
+              Continue
+            </Button>
+          ) : (
+            <Button variant="primary" className="flex-1 min-h-[3rem]" disabled={saving || !canContinue} onClick={() => void finish()}>
+              {saving ? "Building your plan…" : "Build my plan"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

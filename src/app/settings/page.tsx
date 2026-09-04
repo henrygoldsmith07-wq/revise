@@ -9,14 +9,13 @@ const ARM_LABELS: Record<string, string> = {
 
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/lib/optional-ai";
-import { allSubjects, subjectLabel } from "@/domain/curriculum";
+import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
 import { buildPortabilitySnapshot, deletionPreview, portabilityFilename, privacyDisclosure } from "@/domain/portability";
 import { clearAll } from "@/data/db";
 import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
-import Link from "next/link";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -89,11 +88,49 @@ export default function SettingsPage() {
       </section>
 
       <section>
+        <SectionHeading
+          title="Exam countdown"
+          hint="One-time heads-up when a subject enters the timed-paper fortnight."
+        />
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink">Notify me when a subject is 14 days from an exam</p>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                A one-time banner on Today — timed papers and weak-topic retests now beat opening new topics — plus a
+                browser notification when your browser allows it. Never repeats for the same run-up.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={settings.examNotifications ? "primary" : "secondary"}
+              aria-pressed={Boolean(settings.examNotifications)}
+              onClick={() => {
+                const next = !settings.examNotifications;
+                if (
+                  next &&
+                  typeof window !== "undefined" &&
+                  "Notification" in window &&
+                  window.Notification.permission === "default"
+                ) {
+                  void window.Notification.requestPermission().catch(() => {});
+                }
+                void store.updateSettings({ examNotifications: next });
+              }}
+            >
+              {settings.examNotifications ? "On" : "Off"}
+            </Button>
+          </div>
+        </Panel>
+      </section>
+
+      <section>
         <SectionHeading title="Subjects" hint="Only these are planned, recommended and predicted." />
         <Panel>
           <ul className="space-y-2">
             {allSubjects().map((subject) => {
               const on = settings.subjectIds.includes(subject.id);
+              const grades = gradesFor(subject.id);
               return (
                 <li key={subject.id} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -103,19 +140,33 @@ export default function SettingsPage() {
                       {subject.specCode ? ` · ${subject.specCode}` : ""}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={on ? "primary" : "secondary"}
-                    onClick={() =>
-                      void store.updateSettings({
-                        subjectIds: on
-                          ? settings.subjectIds.filter((id) => id !== subject.id)
-                          : [...settings.subjectIds, subject.id],
-                      })
-                    }
-                  >
-                    {on ? "Taking" : "Add"}
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {on && grades.length ? (
+                      <Segmented
+                        ariaLabel={`Target grade for ${subject.name}`}
+                        value={settings.targetGrades[subject.id] ?? ""}
+                        onChange={(grade) =>
+                          void store.updateSettings({
+                            targetGrades: { ...settings.targetGrades, [subject.id]: grade },
+                          })
+                        }
+                        options={grades.map((g) => ({ value: g, label: g }))}
+                      />
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant={on ? "primary" : "secondary"}
+                      onClick={() =>
+                        void store.updateSettings({
+                          subjectIds: on
+                            ? settings.subjectIds.filter((id) => id !== subject.id)
+                            : [...settings.subjectIds, subject.id],
+                        })
+                      }
+                    >
+                      {on ? "Taking" : "Add"}
+                    </Button>
+                  </div>
                 </li>
               );
             })}
@@ -382,11 +433,7 @@ export default function SettingsPage() {
               <li key={line}>{line}</li>
             ))}
           </ul>
-          <p className="text-[11px] text-ink3 mt-3">
-            More: <Link className="underline" href="/benchmarks">Benchmarks</Link> ·{" "}
-            <Link className="underline" href="/case-study">Case study</Link> ·{" "}
-            <a className="underline" href="/docs/benchmark.md">Benchmark docs</a>
-          </p>
+
         </Panel>
       </section>
     </div>

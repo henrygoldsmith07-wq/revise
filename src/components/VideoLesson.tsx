@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { aiVideoLesson } from "@/lib/optional-ai";
+import { readCachedStoryboard, writeCachedStoryboard } from "@/data/video-storyboard-cache";
 import type { AiEnvelope, VideoLessonResponse, VideoLessonScene } from "@/ai/types";
 import { speechAvailable, speak, stopSpeaking, toSpokenText } from "@/lib/speech";
 import type { Topic } from "@/domain/types";
@@ -28,28 +29,6 @@ const TICK_MS = 250;
 /** Current wall-clock time, injectable for tests. */
 const nowMs = () => Date.now();
 const NARRATE_KEY = "revise.lessons.autoNarrate";
-
-const cacheKey = (topicId: string) => `revise.videoLessons.${topicId}`;
-
-function readCache(topicId: string): AiEnvelope<VideoLessonResponse> | null {
-  try {
-    const raw = localStorage.getItem(cacheKey(topicId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AiEnvelope<VideoLessonResponse>;
-    if (parsed?.data?.scenes?.length && parsed.data.title) return parsed;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(topicId: string, envelope: AiEnvelope<VideoLessonResponse>) {
-  try {
-    localStorage.setItem(cacheKey(topicId), JSON.stringify(envelope));
-  } catch {
-    /* private browsing: caching is best-effort only */
-  }
-}
 
 function clock(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
@@ -80,7 +59,7 @@ export function VideoLesson({
   nextTopic?: Topic | null;
   onSelectTopic?: (topic: Topic) => void;
 }) {
-  const [envelope, setEnvelope] = useState<AiEnvelope<VideoLessonResponse> | null>(() => readCache(topic.id));
+  const [envelope, setEnvelope] = useState<AiEnvelope<VideoLessonResponse> | null>(() => readCachedStoryboard(topic.id));
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [showScript, setShowScript] = useState(false);
@@ -97,11 +76,11 @@ export function VideoLesson({
   useEffect(() => {
     // A cached storyboard seeds the state during init; only a cache miss
     // needs the network here.
-    if (readCache(topic.id)) return;
+    if (readCachedStoryboard(topic.id)) return;
     let cancelled = false;
     aiVideoLesson(topic.id).then((result) => {
       if (cancelled) return;
-      if (result.source === "ai") writeCache(topic.id, result);
+      if (result.source === "ai") writeCachedStoryboard(topic.id, result);
       setEnvelope(result);
     });
     return () => {
@@ -113,7 +92,7 @@ export function VideoLesson({
     setRegenerating(true);
     setEnvelope(null);
     aiVideoLesson(topic.id).then((result) => {
-      if (result.source === "ai") writeCache(topic.id, result);
+      if (result.source === "ai") writeCachedStoryboard(topic.id, result);
       setEnvelope(result);
       setRegenerating(false);
     });

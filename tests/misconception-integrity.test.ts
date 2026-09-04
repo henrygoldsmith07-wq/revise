@@ -21,7 +21,7 @@ describe("misconception library integrity", () => {
 
   it("slugs and ids are unique", () => {
     const ids = seedMisconceptions.map((m) => m.id);
-    const slugs = ids.map((id) => id.replace("seed-misconception:", ""));
+    const slugs = ids.map((id) => id.replace("cnt:misconception:", ""));
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(slugs).size).toBe(slugs.length);
   });

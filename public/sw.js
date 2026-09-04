@@ -25,6 +25,7 @@ const APP_SHELL = [
   "/readiness",
   "/response-time",
   "/review",
+  "/schedule",
   "/settings",
   "/shared",
   "/study",
