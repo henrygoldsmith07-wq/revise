@@ -80,3 +80,91 @@ export function buildPostSessionClosure(input: PostSessionClosureInput): PostSes
     nextAction,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Tutor-grade closure — the loop's debrief, not a scorecard.
+//
+// The basic closure above reports the session. The tutor closure reports what
+// the student got out of it: what measurably improved, what is still weak,
+// what Revise learned about them (the evidence updates), and the single best
+// next action derived from the new evidence. All four lines are derived from
+// the before/after capability profiles, so they stay honest — no narration
+// beyond what the numbers show.
+// ---------------------------------------------------------------------------
+
+import {
+  CAPABILITIES,
+  capabilityState,
+  DEVELOPING_THRESHOLD,
+  type Capability,
+  type CapabilityProfile,
+} from "./capability-mastery";
+
+export interface TutorClosureLine {
+  capability: Capability;
+  text: string;
+}
+
+export interface TutorClosure {
+  base: PostSessionClosure;
+  /** Capabilities that measurably improved this session. */
+  improved: TutorClosureLine[];
+  /** Capabilities that are measured and still weak. */
+  stillWeak: TutorClosureLine[];
+  /** What Revise learned about the student this session. */
+  learned: string[];
+  /** The best next action, derived from the post-session evidence. */
+  nextBestAction: string;
+}
+
+function delta(before: number | null, after: number | null): number {
+  if (before === null || after === null) return 0;
+  return after - before;
+}
+
+export function buildTutorClosure(
+  base: PostSessionClosure,
+  before: CapabilityProfile,
+  after: CapabilityProfile,
+): TutorClosure {
+  const improved: TutorClosureLine[] = [];
+  const stillWeak: TutorClosureLine[] = [];
+  const learned: string[] = [];
+
+  for (const capability of CAPABILITIES) {
+    const b = before[capability];
+    const a = after[capability];
+    const d = delta(b.score, a.score);
+    if (b.score === null && a.score !== null) {
+      improved.push({
+        capability,
+        text: `${capability} measured for the first time (${Math.round(a.score * 100)}%)`,
+      });
+    } else if (d > 0.02) {
+      improved.push({
+        capability,
+        text: `${capability} improved ${Math.round(d * 100)} points`,
+      });
+    }
+    if (capabilityState(a) === "unknown" && capabilityState(b) === "unknown") continue;
+    if (a.score !== null && a.score < DEVELOPING_THRESHOLD) {
+      stillWeak.push({ capability, text: `${capability} is still weak (${Math.round(a.score * 100)}%)` });
+    }
+    if (b.evidence <= 0 && a.evidence > 0) {
+      learned.push(`First evidence on ${capability} — it started the session unknown.`);
+    } else if (d <= -0.02) {
+      learned.push(`${capability} evidence went backwards — the session was harder than expected.`);
+    }
+  }
+
+  const weakest = stillWeak[0];
+  const nextBestAction = weakest
+    ? `Repair ${weakest.capability} next — guided practice on the exact gap, not more of the same.`
+    : improved.length
+      ? "Convert today's gain: a transfer question in a new context."
+      : base.nextAction === "mistakes"
+        ? "Clear the mistakes queue before starting anything new."
+        : "Bank the streak: tomorrow's due reviews come first.";
+
+  return { base, improved, stillWeak, learned, nextBestAction };
+}
