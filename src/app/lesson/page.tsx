@@ -43,9 +43,9 @@ function LessonBrowser() {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">Lessons</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Learning roadmap</h1>
         <p className="text-sm text-ink3 mt-0.5">
-          Learn a topic from zero — guided steps before you drill it with flashcards.
+          Follow your subject from foundations to exam-ready ideas with detailed, step-by-step lessons.
         </p>
       </header>
 
@@ -73,4 +73,4 @@ function LessonBrowser() {
       ) : null}
     </div>
   );
-}
+}

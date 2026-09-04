@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildLesson, summariseLesson } from "@/content/lessons";
-import { allTopics, getSubject } from "@/domain/curriculum";
+import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import { AchievementIcon, StreakIcon, VideoIcon, ICON_SIZE } from "./icons";
 import { RichText } from "./RichText";
@@ -19,6 +19,11 @@ const STEP_META = {
   misconception: { label: "Fix a misconception", tone: "danger" },
 } as const;
 
+type LessonEntry = {
+  topic: Topic;
+  lesson: NonNullable<ReturnType<typeof buildLesson>>;
+};
+
 // Lesson mode: learn a topic from zero before drilling it with flashcards.
 // Steps are derived from authored curriculum data; each check question gates
 // progress so reading stays active instead of passive. Completion and the
@@ -28,11 +33,11 @@ const STEP_META = {
 // the same map, so a watching session earns the streak exactly like reading.
 
 export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => void }) {
-  const lessons = useMemo(
+  const lessons = useMemo<LessonEntry[]>(
     () =>
       topics
         .map((t) => ({ topic: t, lesson: buildLesson(t) }))
-        .filter((x): x is { topic: (typeof topics)[number]; lesson: NonNullable<ReturnType<typeof buildLesson>> } => x.lesson !== null),
+        .filter((x): x is LessonEntry => x.lesson !== null),
     [topics],
   );
 
@@ -40,6 +45,19 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   const { lessonProgress, completeLesson } = store;
   const completed = lessonProgress.completed;
   const streak = lessonProgress.streak;
+  const currentSubjectId = topics[0]?.subjectId ?? null;
+  const roadmapUnits = useMemo(
+    () =>
+      (currentSubjectId ? unitsFor(currentSubjectId) : [])
+        .map((unit) => ({
+          unit,
+          entries: lessons
+            .map((entry, index) => ({ entry, index }))
+            .filter(({ entry }) => entry.topic.unitId === unit.id),
+        }))
+        .filter((group) => group.entries.length > 0),
+    [currentSubjectId, lessons],
+  );
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
   const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
@@ -143,7 +161,6 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   // still has lessons left, in curriculum order — momentum over dead ends.
   // Recomputed on render: it only matters on the summary screen, where the
   // loop over enrolled subjects is trivially cheap.
-  const currentSubjectId = topics[0]?.subjectId ?? null;
   let upNextSubject: { subjectId: string; name: string; remaining: number } | null = null;
   if (nextIdx === null) {
     for (const sid of store.settings.subjectIds) {
@@ -481,12 +498,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     );
   }
 
-  // ---- Lesson list -------------------------------------------------------
-  const doneCount = lessons.filter((l) => completed[l.lesson.id]).length;
-  // Mirror the summary's "Next up" on the list: one glanceable resume card
-  // instead of making the student scan for the first un-done lesson. A topic
-  // counts as started once either its steps or its video are done.
-  const firstIncomplete = lessons.findIndex((l) => !completed[l.lesson.id] && !completed[`video:${l.topic.id}`]);
+  // ---- Learning roadmap ---------------------------------------------------
+  const isComplete = (entry: LessonEntry) =>
+    Boolean(completed[entry.lesson.id] || completed[`video:${entry.topic.id}`]);
+  const doneCount = lessons.filter(isComplete).length;
+  // Mirror the summary's "Next up" on the roadmap: one glanceable resume card
+  // instead of making the student scan for the first unfinished lesson. A
+  // topic counts as complete once either its guided lesson or video is done.
+  const firstIncomplete = lessons.findIndex((entry) => !isComplete(entry));
   const resumeIdx = firstIncomplete === -1 ? 0 : firstIncomplete;
   const resumeLabel =
     doneCount === 0
@@ -494,24 +513,48 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
       : firstIncomplete === -1
         ? "Review from the start"
         : "Continue where you left off";
+  const roadmapTitle = currentSubjectId ? `${getSubject(currentSubjectId)?.name ?? "Subject"} roadmap` : "Learning roadmap";
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Lessons</p>
-          <h2 className="text-lg font-semibold">Learn from the start</h2>
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Subject roadmap</p>
+          <h2 className="text-lg font-semibold">{roadmapTitle}</h2>
         </div>
         <Button size="sm" variant="ghost" onClick={onExit}>
           Exit
         </Button>
       </div>
 
-      <Panel className="bg-accentsoft/20 border-accent/20">
-        <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">A guided path</p>
-        <p className="text-sm text-ink2 mt-1">
-          Each lesson is deliberately small: understand the idea, break it into simple links, say it back, then pass a quick check.
-          You can pause after any step and come back later.
-        </p>
+      <Panel className="space-y-4 bg-accentsoft/20 border-accent/20">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Your route through the subject</p>
+            <h3 className="text-base font-semibold text-ink mt-1">Build understanding one lesson at a time</h3>
+            <p className="text-sm text-ink2 mt-1">
+              Follow the units in order. Each topic opens a detailed lesson with a plain-language explanation, exam
+              links, common traps and quick checks.
+            </p>
+          </div>
+          <Pill tone={firstIncomplete === -1 ? "success" : "accent"}>
+            {doneCount}/{lessons.length}
+          </Pill>
+        </div>
+        <ProgressBar value={doneCount / lessons.length} label={`${doneCount} of ${lessons.length} lessons complete`} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <div className="rounded-[8px] border border-line bg-surface/60 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Start here</p>
+            <p className="text-sm font-medium text-ink mt-1">{lessons[resumeIdx]?.topic.title}</p>
+          </div>
+          <div className="rounded-[8px] border border-line bg-surface/60 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Every lesson</p>
+            <p className="text-sm font-medium text-ink mt-1">Learn, say it back, then check it</p>
+          </div>
+          <div className="rounded-[8px] border border-line bg-surface/60 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Keep moving</p>
+            <p className="text-sm font-medium text-ink mt-1">Short steps build towards exam answers</p>
+          </div>
+        </div>
       </Panel>
 
       {streak.count > 0 ? (
@@ -527,6 +570,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
       ) : null}
 
       <button
+        type="button"
         onClick={() => startLesson(resumeIdx)}
         className="w-full text-left px-4 py-3 rounded-[8px] border border-accent/40 bg-accentsoft/30 hover:border-accent transition-colors flex items-center justify-between gap-3"
       >
@@ -538,35 +582,126 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         <Pill tone="accent">Open</Pill>
       </button>
 
-      <ul className="space-y-2">
-        {lessons.map((entry, idx) => {
-          const done = completed[entry.lesson.id] === true;
+      <ul className="space-y-4" aria-label="Learning roadmap units">
+        {roadmapUnits.map(({ unit, entries }, unitIndex) => {
+          const unitDone = entries.filter(({ entry }) => isComplete(entry)).length;
+          const unitCurrent = entries.some(({ index }) => index === firstIncomplete);
+          const unitComplete = unitDone === entries.length;
           return (
-            <li key={entry.lesson.id} className="flex items-stretch gap-2">
-              <button
-                onClick={() => startLesson(idx)}
-                className="flex-1 min-w-0 text-left px-4 py-3 rounded-[8px] border border-line hover:border-ink3 transition-colors flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink">{entry.topic.title}</p>
-                  <p className="text-xs text-ink2 mt-0.5 line-clamp-2">{entry.topic.summary}</p>
-                  <p className="text-[11px] text-ink3 mt-1">
-                    {entry.lesson.steps.length} guided steps · {entry.lesson.steps.filter((candidate) => candidate.check).length} quick checks
-                  </p>
+            <li key={unit.id}>
+              <section className={cx("card p-4 sm:p-5 space-y-4", unitCurrent && "border-accent/40")}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Unit {unitIndex + 1}</p>
+                    <h3 className="text-base font-semibold text-ink mt-1">{unit.title}</h3>
+                    <p className="text-xs text-ink3 mt-0.5">
+                      {unitDone} of {entries.length} lessons complete · follow this unit in order
+                    </p>
+                  </div>
+                  <Pill tone={unitComplete ? "success" : unitCurrent ? "accent" : "neutral"}>
+                    {unitComplete ? "Complete" : unitCurrent ? "Up next" : "In sequence"}
+                  </Pill>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  {done ? <Pill tone="success">Done</Pill> : <Pill>Start</Pill>}
-                  {completed[`video:${entry.topic.id}`] ? <Pill>Watched</Pill> : null}
-                </div>
-              </button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setVideoTopic(entry.topic)}
-                aria-label={`Play the video lesson for ${entry.topic.title}`}
-              >
-                <VideoIcon size={ICON_SIZE.sm} /> Video
-              </Button>
+                <ProgressBar value={unitDone / entries.length} label={`Unit ${unitIndex + 1} progress`} />
+
+                <ol className="space-y-3">
+                  {entries.map(({ entry, index }, lessonNumber) => {
+                    const done = isComplete(entry);
+                    const current = index === firstIncomplete;
+                    const coreSteps = entry.lesson.steps.filter((candidate) => candidate.kind === "core");
+                    const checks = entry.lesson.steps.filter((candidate) => candidate.check).length;
+                    const supportingSteps = entry.lesson.steps.filter(
+                      (candidate) => candidate.kind === "trap" || candidate.kind === "misconception",
+                    ).length;
+                    const estimatedMinutes = Math.max(5, Math.round(entry.lesson.steps.length * 1.5));
+                    return (
+                      <li key={entry.lesson.id} className="flex items-stretch gap-2">
+                        <div
+                          className={cx(
+                            "flex-1 min-w-0 rounded-[8px] border border-line transition-colors",
+                            current ? "border-accent/40 bg-accentsoft/10" : "hover:border-ink3",
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => startLesson(index)}
+                            className="w-full min-w-0 text-left px-3.5 py-3 flex items-start justify-between gap-3"
+                          >
+                            <div className="flex items-start gap-3 min-w-0">
+                              <span
+                                className={cx(
+                                  "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                                  done ? "bg-successsoft text-success" : current ? "bg-accent text-onaccent" : "bg-surface2 text-ink3",
+                                )}
+                              >
+                                {done ? "✓" : lessonNumber + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">
+                                    {current ? "Up next" : done ? "Complete" : `Lesson ${lessonNumber + 1}`}
+                                  </p>
+                                  {current ? <Pill tone="accent">Recommended next</Pill> : null}
+                                </div>
+                                <h4 className="text-sm font-semibold text-ink mt-1">{entry.topic.title}</h4>
+                                <p className="text-xs text-ink2 mt-0.5 line-clamp-2">{entry.topic.summary}</p>
+                                <p className="text-[11px] text-ink3 mt-1">
+                                  {entry.lesson.steps.length} steps · {checks} checks · ~{estimatedMinutes} min
+                                </p>
+                              </div>
+                            </div>
+                            <Pill tone={done ? "success" : current ? "accent" : "neutral"}>{done ? "Review" : "Open"}</Pill>
+                          </button>
+
+                          <details className="border-t border-line">
+                            <summary className="cursor-pointer px-3.5 py-2.5 text-xs font-semibold text-ink2 hover:text-ink">
+                              See detailed lesson outline
+                            </summary>
+                            <div className="px-3.5 pb-3.5 space-y-3">
+                              <div>
+                                <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">What you will learn</p>
+                                <ol className="mt-2 space-y-2">
+                                  {coreSteps.map((candidate, coreIndex) => (
+                                    <li key={`${entry.lesson.id}:outline:${candidate.id}`} className="flex items-start gap-2.5">
+                                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface2 text-[11px] font-semibold text-ink3">
+                                        {coreIndex + 1}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-ink">{candidate.title}</p>
+                                        <RichText className="text-xs text-ink2 mt-0.5">{candidate.takeaway}</RichText>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                              {supportingSteps ? (
+                                <p className="text-xs text-ink2 border-t border-line pt-3">
+                                  The lesson also covers {supportingSteps} {supportingSteps === 1 ? "common trap" : "common traps"} or
+                                  misconception{supportingSteps === 1 ? "" : "s"}, with feedback that shows what to say instead.
+                                </p>
+                              ) : null}
+                              <div className="rounded-[8px] border border-accent/20 bg-accentsoft/20 px-3 py-2.5">
+                                <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Lesson rhythm</p>
+                                <p className="text-xs text-ink2 mt-1">
+                                  Read the explanation, say the idea back without looking, then answer the quick checks before moving on.
+                                </p>
+                              </div>
+                            </div>
+                          </details>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setVideoTopic(entry.topic)}
+                          aria-label={`Play the video lesson for ${entry.topic.title}`}
+                        >
+                          <VideoIcon size={ICON_SIZE.sm} /> Video
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
             </li>
           );
         })}
