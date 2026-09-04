@@ -1,10 +1,12 @@
 import type { Card, Id, LessonProgress, OutboxItem, SyncEntity, StreakState } from "@/domain/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
 import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
 import { getDeviceIdentity, nextLamport, observeRemoteLamport } from "./device";
+import { captureTelemetry, errorClass } from "@/lib/observability";
 
 // ---------------------------------------------------------------------------
 // Offline-first sync: a durable outbox plus a pull that merges causally.
@@ -43,12 +45,14 @@ const TABLES: Record<SyncEntity, string> = {
 
 export const SYNC_QUEUE_EVENT = "revise:sync-queue";
 
-export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload: unknown): Promise<void> {
+export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload: unknown, ownerId?: Id): Promise<void> {
   // With no backend there is nothing to drain into, so queuing would only
   // grow unbounded on a device that is working perfectly well.
   if (!isSupabaseConfigured) return;
   const db = await getDb();
   const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
+  const payloadOwner = payloadRecord(payload)?.userId;
+  const resolvedOwner = ownerId ?? (typeof payloadOwner === "string" && payloadOwner.trim() ? payloadOwner : undefined);
   await db.put("outbox", {
     id: crypto.randomUUID(),
     entity,
@@ -56,6 +60,7 @@ export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload:
     payload,
     queuedAt: new Date().toISOString(),
     attempts: 0,
+    ...(resolvedOwner ? { ownerId: resolvedOwner } : {}),
     // One UUID per *logical* mutation: the server's sync_writes ledger rejects
     // a second delivery of the same key, so retries can never double-write.
     idempotencyKey: crypto.randomUUID(),
@@ -65,44 +70,89 @@ export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload:
   if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUE_EVENT));
 }
 
-export async function outboxSize(): Promise<number> {
+export async function outboxSize(userId?: Id): Promise<number> {
   if (!isSupabaseConfigured) return 0;
   const db = await getDb();
-  return db.count("outbox");
+  const items = (await db.getAll("outbox")) as OutboxItem[];
+  return userId ? items.filter((item) => isOwnedBy(item, userId)).length : items.length;
 }
+
+export type SyncSkip = "unconfigured" | "offline" | "signed-out" | "account-mismatch" | "owner-unknown";
 
 export interface SyncResult {
   pushed: number;
   pulled: number;
   failed: number;
-  skipped?: "unconfigured" | "offline" | "signed-out";
+  skipped?: SyncSkip;
+}
+
+export interface SyncOptions {
+  /** Test seam and service-worker injection; foreground code uses the browser client. */
+  client?: SupabaseClient;
+  online?: boolean;
+}
+
+/** Confirm that the active Supabase session still belongs to this queue. */
+export async function authIdentity(
+  client: Pick<SupabaseClient, "auth">,
+  userId: Id,
+): Promise<"ok" | "signed-out" | "account-mismatch"> {
+  try {
+    const { data } = await client.auth.getUser();
+    if (!data.user) return "signed-out";
+    return data.user.id === userId ? "ok" : "account-mismatch";
+  } catch {
+    return "signed-out";
+  }
 }
 
 /** After this many failed attempts an outbox item stops blocking the queue. */
 const MAX_OUTBOX_ATTEMPTS = 10;
 
 /** Push the outbox, then pull anything newer from the server. */
-export async function sync(userId: Id): Promise<SyncResult> {
-  if (!isSupabaseConfigured) return { pushed: 0, pulled: 0, failed: 0, skipped: "unconfigured" };
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
-    return { pushed: 0, pulled: 0, failed: 0, skipped: "offline" };
-  }
-  const supabase = getSupabase();
-  if (!supabase) return { pushed: 0, pulled: 0, failed: 0, skipped: "unconfigured" };
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { pushed: 0, pulled: 0, failed: 0, skipped: "signed-out" };
+export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncResult> {
+  const startedAt = Date.now();
+  const finish = (result: SyncResult): SyncResult => {
+    captureTelemetry(result.failed > 0 ? "sync.failure" : "sync.completed", {
+      status: result.failed > 0 ? "failed" : result.skipped ? "partial" : "ok",
+      durationMs: Date.now() - startedAt,
+      pushed: result.pushed,
+      pulled: result.pulled,
+      failed: result.failed,
+    });
+    return result;
+  };
+  try {
+    const configured = isSupabaseConfigured || Boolean(options.client);
+    if (!configured) return finish({ pushed: 0, pulled: 0, failed: 0, skipped: "unconfigured" });
+    const online = options.online ?? (typeof navigator === "undefined" ? true : navigator.onLine);
+    if (!online) return finish({ pushed: 0, pulled: 0, failed: 0, skipped: "offline" });
+    const supabase = options.client ?? getSupabase();
+    if (!supabase) return finish({ pushed: 0, pulled: 0, failed: 0, skipped: "unconfigured" });
+    const identity = await authIdentity(supabase, userId);
+    if (identity !== "ok") return finish({ pushed: 0, pulled: 0, failed: 0, skipped: identity });
 
-  const pushed = await drainOutbox(userId);
-  const pulled = await pull(userId);
-  return { ...pushed, pulled: pulled.pulled, failed: pushed.failed + pulled.failed };
+    const pushed = await drainOutbox(userId, supabase);
+    if (pushed.skipped) return finish({ pushed: pushed.pushed, pulled: 0, failed: pushed.failed, skipped: pushed.skipped });
+    const pulled = await pull(userId, supabase);
+    return finish({ pushed: pushed.pushed, pulled: pulled.pulled, failed: pushed.failed + pulled.failed, ...(pulled.skipped ? { skipped: pulled.skipped } : {}) });
+  } catch (error) {
+    captureTelemetry("sync.failure", {
+      status: "failed",
+      durationMs: Date.now() - startedAt,
+      errorClass: errorClass(error),
+    });
+    throw error;
+  }
 }
 
-async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number }> {
-  const supabase = getSupabase();
+async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ pushed: number; failed: number; skipped?: SyncSkip }> {
   const db = await getDb();
   // One settings read per drain, not per row.
   const e2ee = await e2eeEnabledFor(userId);
-  const items = (await db.getAll("outbox")) as OutboxItem[];
+  const allItems = (await db.getAll("outbox")) as OutboxItem[];
+  const items = allItems.filter((item) => isOwnedBy(item, userId));
+  const hasUnknownOwner = userId !== "local" && allItems.some((item) => ownerFor(item) === null);
   let pushed = 0;
   let failed = 0;
 
@@ -120,41 +170,46 @@ async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number
   }
 
   for (const [entity, list] of upserts) {
-    // Later queue entries for the same row supersede earlier ones — the row
-    // leaves with the newest payload, but every queued mutation's idempotency
-    // key was minted per logical mutation, so collapsing is safe: the ledger
-    // claims the surviving key, and a retried older one is a no-op by policy.
-    const byId = new Map<string, OutboxItem>();
-    for (const item of list) byId.set(rowId(item.payload), item);
-    const rows = await Promise.all([...byId.values()].map((i) => toRow(entity, i.payload, userId, { e2ee })));
-    const { error } = await supabase!.from(TABLES[entity]).upsert(rows, { onConflict: pkFor(entity) });
-    if (error) {
-      failed += list.length;
-      for (const item of list) {
-        await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
+    // Later queue entries for the same row supersede earlier ones. Keep the
+    // request bounded so a very large offline session cannot monopolise the
+    // connection, and so a mid-drain failure leaves a durable remainder.
+    const collapsed = collapseOutboxItems(list);
+    for (const batch of chunks(collapsed, 50)) {
+      const identity = await authIdentity(supabase, userId);
+      if (identity !== "ok") return { pushed, failed, skipped: identity };
+      const byId = new Map(batch.map((item) => [rowId(item.payload), item]));
+      const rows = await Promise.all([...byId.values()].map((i) => toRow(entity, i.payload, userId, { e2ee })));
+      const { error } = await supabase.from(TABLES[entity]).upsert(rows, { onConflict: pkFor(entity) });
+      const batchIds = new Set(batch.map((item) => item.id));
+      const originalEntries = list.filter((item) => batchIds.has(item.id) || batch.some((latest) => rowId(latest.payload) === rowId(item.payload)));
+      if (error) {
+        failed += originalEntries.length;
+        for (const item of originalEntries) {
+          await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
+        }
+        continue;
       }
-      continue;
+      try {
+        await claimIdempotencyKeys(supabase, userId, batch.flatMap((i) => i.idempotencyKey ? [i.idempotencyKey] : []));
+      } catch {
+        /* the ledger is best-effort; delivery remains durable */
+      }
+      const stillOwned = await authIdentity(supabase, userId);
+      if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned };
+      pushed += rows.length;
+      for (const item of originalEntries) await db.delete("outbox", item.id);
     }
-    // Claim every delivered key in the ledger: a replayed request carrying one
-    // of these keys is now a server-side no-op instead of a second write.
-    // Wrapped so a ledger hiccup never blocks delivery — delivery stays
-    // possible-exactly-once, not a correctness dependency.
-    try {
-      await claimIdempotencyKeys(supabase!, userId, [...byId.values()].map((i) => i.idempotencyKey));
-    } catch {
-      /* ledger is best-effort */
-    }
-    pushed += rows.length;
-    for (const item of list) await db.delete("outbox", item.id);
   }
 
   for (const [entity, list] of deletes) {
+    const identity = await authIdentity(supabase, userId);
+    if (identity !== "ok") return { pushed, failed, skipped: identity };
     const ids = [...new Set(list.map((i) => rowId(i.payload)))].filter(Boolean);
     if (!ids.length) {
       for (const item of list) await db.delete("outbox", item.id);
       continue;
     }
-    const { error } = await supabase!.from(TABLES[entity]).delete().in("id", ids);
+    const { error } = await supabase.from(TABLES[entity]).delete().eq("user_id", userId).in("id", ids);
     if (error) {
       failed += list.length;
       // Mirror the upsert path: record the failure so it is diagnosable and
@@ -164,15 +219,16 @@ async function drainOutbox(userId: Id): Promise<{ pushed: number; failed: number
       }
       continue;
     }
+    const stillOwned = await authIdentity(supabase, userId);
+    if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned };
     pushed += ids.length;
     for (const item of list) await db.delete("outbox", item.id);
   }
 
-  return { pushed, failed };
+  return { pushed, failed, ...(hasUnknownOwner ? { skipped: "owner-unknown" as const } : {}) };
 }
 
-async function pull(userId: Id): Promise<{ pulled: number; failed: number }> {
-  const supabase = getSupabase();
+async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: number; failed: number; skipped?: SyncSkip }> {
   const db = await getDb();
   const since = (await readReviseMeta<string>("lastPullAt")) ?? "1970-01-01T00:00:00.000Z";
   let pulled = 0;
@@ -183,7 +239,9 @@ async function pull(userId: Id): Promise<{ pulled: number; failed: number }> {
   let maxObservedUpdatedAt = since;
 
   for (const [entity, table] of Object.entries(TABLES) as [SyncEntity, string][]) {
-    const { data, error } = await supabase!
+    const identity = await authIdentity(supabase, userId);
+    if (identity !== "ok") return { pulled, failed, skipped: identity };
+    const { data, error } = await supabase
       .from(table)
       .select("*")
       .eq("user_id", userId)
@@ -309,6 +367,44 @@ function pkFor(entity: SyncEntity): string {
 function rowId(payload: unknown): string {
   const row = payload as { id?: string; userId?: string };
   return row.id ?? row.userId ?? "";
+}
+
+/** Collapse duplicate writes for one row, retaining the newest queued entry. */
+export function collapseOutboxItems(items: OutboxItem[]): OutboxItem[] {
+  const latest = new Map<string, OutboxItem>();
+  for (const item of items) {
+    const key = `${item.entity}:${rowId(item.payload)}`;
+    const current = latest.get(key);
+    if (!current || queueOrder(item, current) > 0) latest.set(key, item);
+  }
+  return [...latest.values()].sort(queueOrder);
+}
+
+function payloadRecord(payload: unknown): Record<string, unknown> | null {
+  return typeof payload === "object" && payload !== null && !Array.isArray(payload)
+    ? (payload as Record<string, unknown>)
+    : null;
+}
+
+function ownerFor(item: OutboxItem): Id | null {
+  if (typeof item.ownerId === "string" && item.ownerId.trim()) return item.ownerId;
+  const owner = payloadRecord(item.payload)?.userId;
+  return typeof owner === "string" && owner.trim() ? owner : null;
+}
+
+function isOwnedBy(item: OutboxItem, userId: Id): boolean {
+  const owner = ownerFor(item);
+  return owner === userId || (owner === null && userId === "local");
+}
+
+function queueOrder(a: OutboxItem, b: OutboxItem): number {
+  return a.queuedAt.localeCompare(b.queuedAt) || a.id.localeCompare(b.id);
+}
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const output: T[][] = [];
+  for (let index = 0; index < items.length; index += size) output.push(items.slice(index, index + size));
+  return output;
 }
 
 /**

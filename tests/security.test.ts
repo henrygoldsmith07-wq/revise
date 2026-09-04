@@ -13,10 +13,11 @@ describe("security — RLS + schema invariants", () => {
     }
     expect(sql).toContain("with check (user_id = auth.uid())");
   });
-  it("updated_at trigger prevents stale sync skips", () => {
+  it("updated_at trigger rejects stale duplicate-device writes", () => {
     const sql = schema();
     expect(sql).toContain("touch_updated_at");
-    expect(sql).toContain("greatest(now()");
+    expect(sql).toContain("new.updated_at <= old.updated_at");
+    expect(sql).toContain("return old;");
   });
   it("text columns that must be scoped contain user_id", () => {
     const sql = schema();

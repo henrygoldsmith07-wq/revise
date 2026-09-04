@@ -59,7 +59,9 @@ describe("performance budgets", () => {
     }
   });
   it("build artifact budget: .next (when present) is not absurd", async () => {
-    // Soft gate: local builds vary. Fail only when genuinely bloated (>80MB).
+    // Soft gate: the production artifact includes optional PDF/OCR/WebLLM
+    // assets, so leave room for those feature chunks while still catching a
+    // runaway build (>90MB).
     const { existsSync, readdirSync: rs2, statSync: st2 } = await import("fs");
     const { join: j3 } = await import("path");
     const nextDir = j3(process.cwd(), ".next");
@@ -77,6 +79,6 @@ describe("performance budgets", () => {
       }
     };
     walk(nextDir);
-    expect(total, ".next over 80MB — investigate bundle bloat").toBeLessThan(80 * 1024 * 1024);
+    expect(total, ".next over 90MB — investigate bundle bloat").toBeLessThan(90 * 1024 * 1024);
   });
 });

@@ -1,12 +1,12 @@
 "use client";
 
 import { Suspense, useMemo, useRef, useState } from "react";
-import { aiCardsFromNotes, aiOcr } from "@/ai/client";
+import { aiCardsFromNotes, aiOcr } from "@/lib/optional-ai";
 import { toBase64 } from "@/components/AnswerInput";
 import { getTopic, topicsFor } from "@/domain/curriculum";
 import { createCard } from "@/domain/scheduling";
 import type { Card } from "@/domain/types";
-import { chunkNotes, extractPdfText } from "@/lib/pdf";
+import { chunkNotes, extractPdfText } from "@/lib/optional-pdf";
 import { useStore, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
 import { Button, EmptyState, Field, Panel, Pill, ProgressBar, SectionHeading, cx } from "@/components/ui";
@@ -113,7 +113,7 @@ function Generate() {
     setStatus(null);
     setDrafts(null);
 
-    const chunks = chunkNotes(trimmed);
+    const chunks = await chunkNotes(trimmed);
     const collected: Draft[] = [];
     let usedAi = false;
 

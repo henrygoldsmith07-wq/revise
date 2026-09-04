@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { aiMark } from "@/ai/client";
+import { aiMark } from "@/lib/optional-ai";
 import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { misconceptionsForTopic } from "@/content";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { aiOcr } from "@/ai/client";
+import { aiOcr } from "@/lib/optional-ai";
 import { Button, cx } from "./ui";
 import { DictateIcon, DictateStopIcon, ICON_SIZE, PhotoIcon } from "./icons";
 

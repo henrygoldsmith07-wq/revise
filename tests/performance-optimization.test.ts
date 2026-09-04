@@ -103,10 +103,10 @@ describe("domain-engine facade (worker RPC + fallback)", () => {
 });
 
 describe("db schema supports time-ordered streaming", () => {
-  it("v4 adds the time indexes the cursors walk", () => {
+  it("the current schema keeps the time indexes the cursors walk", () => {
     const db = readFileSync(resolve(__dirname, "../src/data/db.ts"), "utf8");
     expect(db).toMatch(/createIndex\("byReviewed", "reviewedAt"\)/);
     expect(db).toMatch(/createIndex\("byCreated", "createdAt"\)/);
-    expect(db).toMatch(/DB_VERSION = 5/);
+    expect(db).toMatch(/PERSISTED_SCHEMA_VERSION/);
   });
 });

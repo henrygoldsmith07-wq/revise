@@ -1,0 +1,31 @@
+name: Revise staging sync and RLS
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 5 * * 2"
+
+permissions:
+  contents: read
+
+jobs:
+  staging-sync:
+    name: revise-staging-sync
+    runs-on: ubuntu-latest
+    env:
+      REVISE_STAGING_SUPABASE_URL: ${{ secrets.REVISE_STAGING_SUPABASE_URL }}
+      REVISE_STAGING_SUPABASE_ANON_KEY: ${{ secrets.REVISE_STAGING_SUPABASE_ANON_KEY }}
+      REVISE_STAGING_USER_A_EMAIL: ${{ secrets.REVISE_STAGING_USER_A_EMAIL }}
+      REVISE_STAGING_USER_A_PASSWORD: ${{ secrets.REVISE_STAGING_USER_A_PASSWORD }}
+      REVISE_STAGING_USER_B_EMAIL: ${{ secrets.REVISE_STAGING_USER_B_EMAIL }}
+      REVISE_STAGING_USER_B_PASSWORD: ${{ secrets.REVISE_STAGING_USER_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Verify staging schema and RLS
+        run: npm run test:staging

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { aiExtractQuestions, aiOcr } from "@/ai/client";
+import { aiExtractQuestions, aiOcr } from "@/lib/optional-ai";
 import { toBase64 } from "@/components/AnswerInput";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";

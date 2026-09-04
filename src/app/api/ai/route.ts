@@ -6,6 +6,7 @@ import { AI_TASKS } from "@/ai/types";
 import type { AiTask } from "@/ai/types";
 import type { Question } from "@/domain/types";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { captureServerTelemetry } from "@/lib/observability";
 
 // The single AI entry point. Keys never leave this process; the browser only
 // ever sees a task name and a validated payload going out, and an envelope
@@ -50,6 +51,14 @@ export async function POST(request: Request) {
 
   try {
     const result = await dispatch(task, parsed.data);
+    const envelope = result as { source?: unknown; provider?: unknown };
+    if (envelope.source === "fallback") {
+      captureServerTelemetry("ai.degraded", {
+        status: "degraded",
+        task,
+        provider: typeof envelope.provider === "string" ? envelope.provider : null,
+      });
+    }
     return NextResponse.json(result);
   } catch (error) {
     // Genuine 500s only — task-level model failures are handled inside the

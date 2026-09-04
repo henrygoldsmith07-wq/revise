@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { aiMark } from "@/ai/client";
+import { aiMark } from "@/lib/optional-ai";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import {
   examClockState,

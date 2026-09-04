@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { aiGenerateQuestions } from "@/ai/client";
+import { aiGenerateQuestions } from "@/lib/optional-ai";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { remediationForMistake } from "@/domain/remediation";
 import { rankQuestionsForExposure } from "@/domain/question-exposure";

@@ -16,15 +16,17 @@
 -- student can never read or write another's revision data.
 -- ---------------------------------------------------------------------------
 
--- Shared trigger: the client sends updated_at, but a direct write (psql, the
--- dashboard) must never leave the column stale or sync would skip the row.
+-- Shared trigger: the client sends updated_at, but a stale/duplicate device
+-- write must never replace a newer row. Returning OLD makes the comparison
+-- atomic inside the UPDATE used by Supabase upsert; no client-side race can
+-- make an older answer, card state or review log win.
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
 as $$
 begin
   if new.updated_at is null or new.updated_at <= old.updated_at then
-    new.updated_at = greatest(now(), old.updated_at + interval '1 millisecond');
+    return old;
   end if;
   return new;
 end;

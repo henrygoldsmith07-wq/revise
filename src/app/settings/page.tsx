@@ -8,7 +8,7 @@ const ARM_LABELS: Record<string, string> = {
 } as const;
 
 import { useEffect, useState } from "react";
-import { aiStatus } from "@/ai/client";
+import { aiStatus } from "@/lib/optional-ai";
 import { allSubjects, subjectLabel } from "@/domain/curriculum";
 import { buildPortabilitySnapshot, deletionPreview, portabilityFilename, privacyDisclosure } from "@/domain/portability";
 import { clearAll } from "@/data/db";

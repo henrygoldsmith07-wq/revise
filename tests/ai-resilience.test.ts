@@ -148,9 +148,9 @@ describe("resilience chain wiring (structural contracts)", () => {
     expect(runner).toMatch(/useLocalModel: Boolean\(store\.settings\?\.localAiMarking\)/);
   });
 
-  it("db v5 defines the aiCache and aiDlq stores", () => {
+  it("current schema defines the aiCache and aiDlq stores", () => {
     const db = read("src/data/db.ts");
-    expect(db).toMatch(/DB_VERSION = 5/);
+    expect(db).toMatch(/PERSISTED_SCHEMA_VERSION/);
     expect(db).toMatch(/aiCache:/);
     expect(db).toMatch(/aiDlq:/);
   });

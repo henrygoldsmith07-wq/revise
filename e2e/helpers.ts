@@ -18,6 +18,10 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise
   const today = page.locator("main#main");
   let outcome: ShellState | null = null;
   await expect(async () => {
+    const bootError = await page
+      .evaluate(() => document.querySelector("[data-boot-error]")?.getAttribute("data-boot-error") ?? null)
+      .catch(() => null);
+    if (bootError) throw new Error(`app failed to boot: ${bootError}`);
     if (await onboarding.isVisible().catch(() => false)) {
       outcome = "onboarding";
       return;

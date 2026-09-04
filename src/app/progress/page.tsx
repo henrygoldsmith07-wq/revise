@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { aiDiagnose } from "@/ai/client";
+import { aiDiagnose } from "@/lib/optional-ai";
 import { gradeCalibrationNarrative } from "@/domain/analytics";
 import { gradeConfidenceNarrative } from "@/domain/grade-loop";
 import { allSubjects, allTopics, getSubject, getTopic, topicsFor } from "@/domain/curriculum";
@@ -381,9 +381,15 @@ export default function ProgressPage() {
 
   return (
     <div className="space-y-7">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">Progress</h1>
-        <p className="text-sm text-ink3 mt-0.5">Where your marks are, and where the next ones come from.</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Progress</h1>
+          <p className="text-sm text-ink3 mt-0.5">Where your marks are, and where the next ones come from.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href="/readiness" size="sm" variant="secondary">Readiness passport</ButtonLink>
+          <ButtonLink href="/twin" size="sm" variant="secondary">Digital twin</ButtonLink>
+        </div>
       </header>
 
       <ResumeRevisionCard />

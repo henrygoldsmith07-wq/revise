@@ -15,6 +15,8 @@ import type {
   StreakState,
   UserSettings,
 } from "@/domain/types";
+import { PERSISTED_SCHEMA_VERSION } from "./persistence-schema";
+import { captureTelemetry, errorClass } from "@/lib/observability";
 
 // ---------------------------------------------------------------------------
 // IndexedDB is the *primary* store, not a cache. Every write lands here first
@@ -30,7 +32,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export const DB_NAME = "revise";
-export const DB_VERSION = 5;
+export const DB_VERSION = PERSISTED_SCHEMA_VERSION;
 
 /** A cached AI mark: the graded result plus the embedding used to find it. */
 export interface AiCacheEntry {
@@ -75,7 +77,7 @@ interface ReviseSchema extends DBSchema {
   settings: { key: Id; value: UserSettings };
   streak: { key: Id; value: StreakState };
   lessonProgress: { key: Id; value: LessonProgress };
-  outbox: { key: Id; value: OutboxItem };
+  outbox: { key: Id; value: OutboxItem; indexes: { byOwner: Id; byQueuedAt: string } };
   meta: { key: string; value: { key: string; value: unknown } };
   aiCache: { key: string; value: AiCacheEntry; indexes: { byScope: string } };
   aiDlq: { key: string; value: AiDlqItem; indexes: { byNextAttempt: string } };
@@ -89,106 +91,130 @@ export function getDb(): Promise<ReviseDB> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(new Error("IndexedDB unavailable — this must run in the browser."));
   }
-  dbPromise ??= openDB<ReviseSchema>(DB_NAME, DB_VERSION, {
+  if (dbPromise) return dbPromise;
+  const opening = openDB<ReviseSchema>(DB_NAME, DB_VERSION, {
     async upgrade(db, oldVersion, _newVersion, tx) {
-      // v4 → v5 adds the AI-marking stores (local-only, never synced): the
-      // semantic cache of AI-graded answers and the dead-letter queue for
-      // marks that must be re-graded when a provider is reachable again.
-      if (oldVersion >= 4) {
-        const cache = db.createObjectStore("aiCache", { keyPath: "key" });
-        cache.createIndex("byScope", "scope");
-        db.createObjectStore("aiDlq", { keyPath: "id" }).createIndex("byNextAttempt", "nextAttemptAt");
-        return;
+      // Migrations are strictly monotonic and idempotent. A single upgrade
+      // transaction can jump from any historical version to the current one;
+      // interrupted upgrades roll back and safely retry on the next open.
+      if (!db.objectStoreNames.contains("cards")) {
+        const cards = db.createObjectStore("cards", { keyPath: "id" });
+        cards.createIndex("byUser", "userId");
+        cards.createIndex("byTopic", "topicId");
+        cards.createIndex("byDue", "due");
+        cards.createIndex("byTag", "tags", { multiEntry: true });
       }
-      // v3 → v4 adds time indexes on the two append-only stores so history
-      // can be streamed oldest-first with a cursor (progressive hydration)
-      // instead of getAll()'d wholesale at boot.
-      if (oldVersion >= 3) {
-        tx.objectStore("reviewLogs").createIndex("byReviewed", "reviewedAt");
-        tx.objectStore("attempts").createIndex("byCreated", "createdAt");
-        const cache = db.createObjectStore("aiCache", { keyPath: "key" });
-        cache.createIndex("byScope", "scope");
-        db.createObjectStore("aiDlq", { keyPath: "id" }).createIndex("byNextAttempt", "nextAttemptAt");
-        return;
+      if (!db.objectStoreNames.contains("reviewLogs")) {
+        const logs = db.createObjectStore("reviewLogs", { keyPath: "id" });
+        logs.createIndex("byUser", "userId");
+        logs.createIndex("byCard", "cardId");
+        logs.createIndex("byReviewed", "reviewedAt");
       }
-      // v2 → v3 adds the lessonProgress singleton row (one per user, like
-      // settings and streak) so lesson completion syncs across devices.
-      if (oldVersion >= 2) {
-        db.createObjectStore("lessonProgress", { keyPath: "userId" });
-        return;
+      if (!db.objectStoreNames.contains("questions")) {
+        const questions = db.createObjectStore("questions", { keyPath: "id" });
+        questions.createIndex("bySubject", "subjectId");
       }
-      // v1 → v2 adds tags. Existing cards predate the field, and code all over
-      // the app calls card.tags.something, so they are backfilled here rather
-      // than defended against at every call site.
-      //
-      // Never trust oldVersion alone: a storeless "v1" db (a foreign or corrupt
-      // database squatting on this origin) has no cards store, and reading it
-      // below would abort the upgrade and brick the app's boot. Fall through to
-      // the full build in that case — there is nothing worth preserving.
-      if (oldVersion >= 1) {
-        if (!tx.objectStoreNames.contains("cards")) {
-          // fall through to the full build below
-        } else {
-          const store = tx.objectStore("cards");
-          store.createIndex("byTag", "tags", { multiEntry: true });
-          let cursor = await store.openCursor();
-          while (cursor) {
-            const card = cursor.value as Card;
-            if (!Array.isArray(card.tags)) await cursor.update({ ...card, tags: [] });
-            cursor = await cursor.continue();
-          }
-          db.createObjectStore("lessonProgress", { keyPath: "userId" });
-          return;
+      if (!db.objectStoreNames.contains("attempts")) {
+        const attempts = db.createObjectStore("attempts", { keyPath: "id" });
+        attempts.createIndex("byUser", "userId");
+        attempts.createIndex("byQuestion", "questionId");
+        attempts.createIndex("byCreated", "createdAt");
+      }
+      if (!db.objectStoreNames.contains("mistakes")) {
+        const mistakes = db.createObjectStore("mistakes", { keyPath: "id" });
+        mistakes.createIndex("byUser", "userId");
+        mistakes.createIndex("byTopic", "topicId");
+      }
+      if (!db.objectStoreNames.contains("papers")) {
+        const papers = db.createObjectStore("papers", { keyPath: "id" });
+        papers.createIndex("byUser", "userId");
+        papers.createIndex("bySubject", "subjectId");
+      }
+      if (!db.objectStoreNames.contains("plannedSessions")) {
+        const plan = db.createObjectStore("plannedSessions", { keyPath: "id" });
+        plan.createIndex("byUser", "userId");
+        plan.createIndex("byDate", "date");
+      }
+      if (!db.objectStoreNames.contains("examDates")) {
+        const exams = db.createObjectStore("examDates", { keyPath: "id" });
+        exams.createIndex("byUser", "userId");
+      }
+      if (!db.objectStoreNames.contains("settings")) db.createObjectStore("settings", { keyPath: "userId" });
+      if (!db.objectStoreNames.contains("streak")) db.createObjectStore("streak", { keyPath: "userId" });
+      if (!db.objectStoreNames.contains("lessonProgress")) db.createObjectStore("lessonProgress", { keyPath: "userId" });
+      if (!db.objectStoreNames.contains("outbox")) db.createObjectStore("outbox", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+      if (!db.objectStoreNames.contains("aiCache")) db.createObjectStore("aiCache", { keyPath: "key" });
+      if (!db.objectStoreNames.contains("aiDlq")) db.createObjectStore("aiDlq", { keyPath: "id" });
+
+      const cards = tx.objectStore("cards");
+      if (!cards.indexNames.contains("byUser")) cards.createIndex("byUser", "userId");
+      if (!cards.indexNames.contains("byTopic")) cards.createIndex("byTopic", "topicId");
+      if (!cards.indexNames.contains("byDue")) cards.createIndex("byDue", "due");
+      if (!cards.indexNames.contains("byTag")) cards.createIndex("byTag", "tags", { multiEntry: true });
+      if (oldVersion < 2) {
+        let cursor = await cards.openCursor();
+        while (cursor) {
+          const card = cursor.value as Card;
+          if (!Array.isArray(card.tags)) await cursor.update({ ...card, tags: [] });
+          cursor = await cursor.continue();
         }
       }
-
-      const cards = db.createObjectStore("cards", { keyPath: "id" });
-      cards.createIndex("byUser", "userId");
-      cards.createIndex("byTopic", "topicId");
-      cards.createIndex("byDue", "due");
-      // Multi-entry: one index record per tag, so tag filters stay fast as a
-      // deck grows past a few thousand cards.
-      cards.createIndex("byTag", "tags", { multiEntry: true });
-
-      const logs = db.createObjectStore("reviewLogs", { keyPath: "id" });
-      logs.createIndex("byUser", "userId");
-      logs.createIndex("byCard", "cardId");
-      logs.createIndex("byReviewed", "reviewedAt");
-
-      const questions = db.createObjectStore("questions", { keyPath: "id" });
-      questions.createIndex("bySubject", "subjectId");
-
-      const attempts = db.createObjectStore("attempts", { keyPath: "id" });
-      attempts.createIndex("byUser", "userId");
-      attempts.createIndex("byQuestion", "questionId");
-      attempts.createIndex("byCreated", "createdAt");
-
-      const mistakes = db.createObjectStore("mistakes", { keyPath: "id" });
-      mistakes.createIndex("byUser", "userId");
-      mistakes.createIndex("byTopic", "topicId");
-
-      const papers = db.createObjectStore("papers", { keyPath: "id" });
-      papers.createIndex("byUser", "userId");
-      papers.createIndex("bySubject", "subjectId");
-
-      const plan = db.createObjectStore("plannedSessions", { keyPath: "id" });
-      plan.createIndex("byUser", "userId");
-      plan.createIndex("byDate", "date");
-
-      const exams = db.createObjectStore("examDates", { keyPath: "id" });
-      exams.createIndex("byUser", "userId");
-
-      db.createObjectStore("settings", { keyPath: "userId" });
-      db.createObjectStore("streak", { keyPath: "userId" });
-      db.createObjectStore("lessonProgress", { keyPath: "userId" });
-      db.createObjectStore("outbox", { keyPath: "id" });
-      db.createObjectStore("meta", { keyPath: "key" });
-      const cache = db.createObjectStore("aiCache", { keyPath: "key" });
-      cache.createIndex("byScope", "scope");
-      db.createObjectStore("aiDlq", { keyPath: "id" }).createIndex("byNextAttempt", "nextAttemptAt");
+      const logs = tx.objectStore("reviewLogs");
+      if (!logs.indexNames.contains("byUser")) logs.createIndex("byUser", "userId");
+      if (!logs.indexNames.contains("byCard")) logs.createIndex("byCard", "cardId");
+      if (!logs.indexNames.contains("byReviewed")) logs.createIndex("byReviewed", "reviewedAt");
+      const attempts = tx.objectStore("attempts");
+      if (!attempts.indexNames.contains("byUser")) attempts.createIndex("byUser", "userId");
+      if (!attempts.indexNames.contains("byQuestion")) attempts.createIndex("byQuestion", "questionId");
+      if (!attempts.indexNames.contains("byCreated")) attempts.createIndex("byCreated", "createdAt");
+      const cache = tx.objectStore("aiCache");
+      if (!cache.indexNames.contains("byScope")) cache.createIndex("byScope", "scope");
+      const dlq = tx.objectStore("aiDlq");
+      if (!dlq.indexNames.contains("byNextAttempt")) dlq.createIndex("byNextAttempt", "nextAttemptAt");
+      const outbox = tx.objectStore("outbox");
+      if (!outbox.indexNames.contains("byOwner")) outbox.createIndex("byOwner", "ownerId");
+      if (!outbox.indexNames.contains("byQueuedAt")) outbox.createIndex("byQueuedAt", "queuedAt");
+      let outboxCursor = await outbox.openCursor();
+      while (outboxCursor) {
+        const item = outboxCursor.value as OutboxItem;
+        const payload = item.payload as { userId?: unknown } | null;
+        if (!item.ownerId && typeof payload?.userId === "string" && payload.userId.trim()) {
+          await outboxCursor.update({ ...item, ownerId: payload.userId });
+        }
+        outboxCursor = await outboxCursor.continue();
+      }
+      tx.objectStore("meta").put({
+        key: "schemaMigration",
+        value: { version: PERSISTED_SCHEMA_VERSION, status: "complete", completedAt: new Date().toISOString() },
+      });
     },
   });
+  dbPromise = opening.catch((error) => {
+    dbPromise = null;
+    captureTelemetry("migration.failure", { status: "failed", schemaVersion: DB_VERSION, errorClass: errorClass(error) });
+    throw error;
+  });
   return dbPromise;
+}
+
+/** Let recovery flows retry after a closed or failed connection. */
+export function resetDbConnection(): void {
+  dbPromise = null;
+}
+
+/** Delete local data only after an explicit recovery/reset choice. */
+export async function deleteLocalDatabase(): Promise<void> {
+  const current = dbPromise ? await dbPromise.catch(() => undefined) : undefined;
+  current?.close();
+  dbPromise = null;
+  if (typeof indexedDB === "undefined") return;
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error ?? new Error("Could not delete local database."));
+    request.onblocked = () => reject(new Error("Close other Revise tabs before resetting local data."));
+  });
 }
 
 /** Stores holding user-owned records, in the order sync should replay them. */

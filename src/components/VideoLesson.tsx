@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { aiVideoLesson } from "@/ai/client";
+import { aiVideoLesson } from "@/lib/optional-ai";
 import type { AiEnvelope, VideoLessonResponse, VideoLessonScene } from "@/ai/types";
 import { speechAvailable, speak, stopSpeaking, toSpokenText } from "@/lib/speech";
 import type { Topic } from "@/domain/types";

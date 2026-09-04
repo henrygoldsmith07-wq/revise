@@ -4,6 +4,7 @@
 .hoplite/attachments/
 .next
 coverage
+artifacts
 next-env.d.ts
 node_modules
 out

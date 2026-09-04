@@ -32,7 +32,7 @@ describe("offline feedback contracts", () => {
   it("retries the pull cursor after a failed table read", () => {
     const sync = read("src/data/sync.ts");
 
-    expect(sync).toContain("Promise<{ pulled: number; failed: number }>");
+    expect(sync).toContain("Promise<{ pulled: number; failed: number; skipped?: SyncSkip }>");
     // The cursor only advances on a fully successful pass, and it advances to
     // the newest server-authored timestamp observed — never the local clock.
     expect(sync).toContain('if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseMeta("lastPullAt", maxObservedUpdatedAt);');

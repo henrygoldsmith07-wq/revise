@@ -10,13 +10,16 @@
     "lint:check": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm test -- --run && npm run build",
+    "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm run curriculum:freshness -- --fail-on-stale && npm test -- --run && npm run build && npm run perf:budget",
+    "perf:budget": "node scripts/check-client-performance.mjs --require-build",
+    "curriculum:freshness": "node scripts/check-curriculum-freshness.mjs",
     "prebuild": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",
     "predev": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test --reporter=list",
     "test:e2e:ci": "playwright test --reporter=github,html",
+    "test:staging": "node scripts/run-staging-tests.mjs",
     "type-check:strict": "tsc --noEmit -p tsconfig.strict.json"
   },
   "dependencies": {

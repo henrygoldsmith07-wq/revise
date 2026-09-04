@@ -1,10 +1,16 @@
 import type { NextConfig } from "next";
 
+// The standalone Vercel project is served at its domain root. An embedding
+// shell can still opt into a path prefix, but it must be explicit so the
+// normal production entrypoint never becomes a 404 merely because Vercel set
+// its standard `VERCEL=1` environment flag.
+const basePath = process.env.APP_BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
   // Set by the one-origin shell (apps/ecosystem-shell) to serve this app under
   // a path prefix. Unset means "serve at the root", which is exactly how this
   // app deploys on its own today, so leaving the variable alone changes nothing.
-  basePath: process.env.APP_BASE_PATH || "",
+  basePath,
   // The Hoplite preview tunnel serves the dev server from a *.preview.usehoplite.com
   // hostname, which Next 16 otherwise treats as cross-origin and blocks from dev
   // resources (chunks fail to load and the app never hydrates in the preview).

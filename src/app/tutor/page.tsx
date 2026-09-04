@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { aiSocratic } from "@/ai/client";
+import { aiSocratic } from "@/lib/optional-ai";
 import { getTopic, topicsFor } from "@/domain/curriculum";
 import { createCard } from "@/domain/scheduling";
 import { useStore, useSubjects } from "@/state/store";

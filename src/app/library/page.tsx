@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { aiExplain, aiGenerateCards, aiSummarise } from "@/ai/client";
+import { aiExplain, aiGenerateCards, aiSummarise } from "@/lib/optional-ai";
 import type { ExplainResponse } from "@/ai/types";
 import { misconceptionsForTopic } from "@/content";
 import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";

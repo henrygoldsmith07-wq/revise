@@ -19,7 +19,19 @@ import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
 import { buildPlan, rescheduleMissed } from "@/domain/planner";
 import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
-import { recommend } from "@/domain/recommender";
+import { daysToExam, recommend } from "@/domain/recommender";
+import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
+import { buildExamReadiness, summariseExamReadiness } from "@/domain/exam-readiness";
+import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
+import {
+  abandonRevisionTwinSession,
+  buildRevisionTwinChoices,
+  completeRevisionTwinSession as completeTwinSession,
+  createRevisionTwinSession,
+  createRevisionTwinState,
+  revisionTwinReport,
+} from "@/domain/revision-twin";
+import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
 import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
 import { getDeviceIdentity, nextLamport } from "@/data/device";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
@@ -83,6 +95,9 @@ import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/gr
 import { assignArm as assignExperimentArm, policyTaskFor,
   type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
+import { StorageRecovery } from "@/components/StorageRecovery";
+import { estimateStorageQuota } from "@/data/storage-quota";
+import type { StorageQuota } from "@/data/storage-quota";
 import {
   createRevisionCheckpoint,
   type RevisionCheckpoint,
@@ -139,6 +154,13 @@ interface StoreValue extends Snapshot {
   revisionCheckpoint: RevisionCheckpoint | null;
   responseTimeCalibration: ResponseTimeCalibrationReport;
   syncStatus: SyncStatus;
+  revisionTwin: RevisionTwinState;
+  revisionTwinChoices: RevisionTwinChoice[];
+  revisionTwinReport: RevisionTwinReport;
+  examReadiness: ExamReadiness[];
+  examReadinessSummary: ExamReadinessSummary;
+  storageQuota: StorageQuota;
+  refreshStorageQuota(): Promise<void>;
   /** Build a paper simulation for the given subject/paper without mutating state. */
   previewPaper(subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null;
   // actions
@@ -161,6 +183,9 @@ interface StoreValue extends Snapshot {
   completeLesson(lessonId: Id): Promise<LessonProgress>;
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
   clearRevisionCheckpoint(): Promise<void>;
+  startRevisionTwinSession(choice: RevisionTwinChoice, title?: string): Promise<RevisionTwinSession>;
+  completeRevisionTwinSession(id: Id, actualMarks: number, actualMinutes?: number): Promise<void>;
+  abandonRevisionTwinSession(id: Id): Promise<void>;
   syncNow(): Promise<void>;
   experimentArm: ExperimentAssignment | null;
   joinExperiment(): Promise<void>;
@@ -258,6 +283,14 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [funnelEvents, setFunnelEvents] = useState<FunnelEvent[]>([]);
   const [gradePredictionLog, setGradePredictionLog] = useState<GradePredictionRecord[]>([]);
   const [gradeActuals, setGradeActuals] = useState<ActualResultRecord[]>([]);
+  const [revisionTwin, setRevisionTwin] = useState<RevisionTwinState | null>(null);
+  const [storageQuota, setStorageQuota] = useState<StorageQuota>(() => ({
+    usageBytes: null,
+    quotaBytes: null,
+    percent: null,
+    status: "unavailable",
+    checkedAt: new Date().toISOString(),
+  }));
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -268,6 +301,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     syncing: false,
   });
   const bootstrapped = useRef(false);
+  // Boot must never fail silently. If IndexedDB or a migration rejects, keep
+  // the reason visible so the student can retry instead of staring at a
+  // spinner forever.
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [bootAttempt, setBootAttempt] = useState(0);
   const [replanSummary, setReplanSummary] = useState<string | null>(null);
   // Heavy analytics run off-thread (Comlink worker) and land here when ready;
   // small histories compute synchronously inside the same effect. Until the
@@ -287,7 +325,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   // update is never clobbered by its older streamed copy. A sync-pull reload
   // calls startHydration() again, superseding any stream still running.
   const hydrateHistory = useCallback(async (epoch: number) => {
-    for await (const chunk of repo.streamHistory(repo.HISTORY_CHUNK)) {
+    for await (const chunk of repo.streamHistory(repo.HISTORY_CHUNK, userId)) {
       if (epoch !== hydrationEpoch) return; // superseded by a reload
       const { reviewLogs, attempts } = chunk;
       if (!reviewLogs?.length && !attempts?.length) continue;
@@ -309,11 +347,16 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         return { ...prev, reviewLogs: nextLogs, attempts: nextAttempts };
       });
     }
-  }, []);
+  }, [userId]);
   /** Start (or restart, superseding any prior run) background history hydration. */
   const startHydration = useCallback(() => {
     hydrationEpoch += 1;
-    void hydrateHistory(hydrationEpoch);
+    void hydrateHistory(hydrationEpoch).catch((error) => {
+      // A stream can fail after the first page has rendered (for example when
+      // a later IndexedDB row is malformed). Route it through the same
+      // recovery UI as boot failures instead of leaving a rejected promise.
+      setBootError(error instanceof Error ? error.message : String(error));
+    });
   }, [hydrateHistory]);
 
   const recordFunnel = useCallback(async (type: FunnelEventType, detail?: string) => {
@@ -337,59 +380,81 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
-    void recordFunnel("app_opened");
+    void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
-      const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs] = await Promise.all([
-        repo.loadSnapshot(userId),
-        repo.loadRevisionCheckpoint(userId),
-        readReviseMeta<ExperimentAssignment>("experimentAssignment"),
-        readReviseMeta<FunnelEvent[]>("funnelEvents"),
-        readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
-        readReviseMeta<ActualResultRecord[]>("gradeActuals"),
-      ]);
-      setRevisionCheckpoint(checkpoint ?? null);
-      setExperimentArm(assignment ?? null);
-      setFunnelEvents(funnel ?? []);
-      setGradePredictionLog(gradePreds ?? []);
-      setGradeActuals(gradeActs ?? []);
-      setSnapshot(loaded);
-      // First page is on screen; stream the rest of history in the background.
-      startHydration();
-      // Import legacy localStorage lesson progress into the synced row once,
-      // so the switch to cross-device storage never resets a student.
-      const legacy = legacyLessonProgress();
-      if (legacy && Object.keys(loaded.lessonProgress.completed).length === 0) {
-        const migrated: LessonProgress = {
-          ...loaded.lessonProgress,
-          completed: legacy.completed,
-          streak: legacy.streak,
-          updatedAt: new Date().toISOString(),
-        };
-        await repo.saveLessonProgress(migrated);
-        setSnapshot((prev) => (prev ? { ...prev, lessonProgress: migrated } : prev));
-      }
-      lastFingerprint.current = computeFingerprint({
-        exams: loaded.examDates,
-        targetGrades: loaded.settings.targetGrades,
-        availability: loaded.settings.availability,
-        sessionLengthMinutes: loaded.settings.sessionLengthMinutes,
-        subjectIds: loaded.settings.subjectIds,
-      });
-      setNeedsOnboarding(!(await repo.hasOnboarded()));
-      // A plan that has drifted into the past is worse than no plan: fold
-      // missed sessions forward before the dashboard renders anything.
-      const today = todayIso();
-      const stale = loaded.plannedSessions.some((s) => s.date < today && s.status === "pending");
-      if (stale) {
-        const healed = rescheduleMissed(loaded.plannedSessions, today, 6);
-        await repo.savePlan(healed);
-        setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
+      try {
+        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin] = await Promise.all([
+          repo.loadSnapshot(userId),
+          repo.loadRevisionCheckpoint(userId),
+          readReviseMeta<ExperimentAssignment>("experimentAssignment"),
+          readReviseMeta<FunnelEvent[]>("funnelEvents"),
+          readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
+          readReviseMeta<ActualResultRecord[]>("gradeActuals"),
+          repo.loadRevisionTwin(userId),
+        ]);
+        setRevisionCheckpoint(checkpoint ?? null);
+        setExperimentArm(assignment ?? null);
+        setFunnelEvents(funnel ?? []);
+        setGradePredictionLog(gradePreds ?? []);
+        setGradeActuals(gradeActs ?? []);
+        setRevisionTwin(twin ?? createRevisionTwinState(userId));
+        setSnapshot(loaded);
+        // First page is on screen; stream the rest of history in the background.
+        startHydration();
+        // Import legacy localStorage lesson progress into the synced row once,
+        // so the switch to cross-device storage never resets a student.
+        const legacy = legacyLessonProgress();
+        if (legacy && Object.keys(loaded.lessonProgress.completed).length === 0) {
+          const migrated: LessonProgress = {
+            ...loaded.lessonProgress,
+            completed: legacy.completed,
+            streak: legacy.streak,
+            updatedAt: new Date().toISOString(),
+          };
+          await repo.saveLessonProgress(migrated);
+          setSnapshot((prev) => (prev ? { ...prev, lessonProgress: migrated } : prev));
+        }
+        lastFingerprint.current = computeFingerprint({
+          exams: loaded.examDates,
+          targetGrades: loaded.settings.targetGrades,
+          availability: loaded.settings.availability,
+          sessionLengthMinutes: loaded.settings.sessionLengthMinutes,
+          subjectIds: loaded.settings.subjectIds,
+        });
+        setNeedsOnboarding(!(await repo.hasOnboarded(userId)));
+        // A plan that has drifted into the past is worse than no plan: fold
+        // missed sessions forward before the dashboard renders anything.
+        const today = todayIso();
+        const stale = loaded.plannedSessions.some((s) => s.date < today && s.status === "pending");
+        if (stale) {
+          const healed = rescheduleMissed(loaded.plannedSessions, today, 6);
+          await repo.savePlan(healed);
+          setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
+        }
+      } catch (error) {
+        setBootError(error instanceof Error ? error.message : String(error));
       }
     })();
     // recordFunnel is a stable useCallback; startHydration likewise. The
     // exhaustive-deps lint flags them anyway on this long-lived boot effect
     // (pre-existing pattern in this file); both are intentionally stable.
-  }, [userId, startHydration, recordFunnel]);
+  }, [userId, startHydration, recordFunnel, bootAttempt]);
+
+  const refreshStorageQuota = useCallback(async () => {
+    setStorageQuota(await estimateStorageQuota());
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void refreshStorageQuota().catch(() => undefined);
+    });
+    const timer = window.setInterval(() => void refreshStorageQuota().catch(() => undefined), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [refreshStorageQuota]);
 
   // Network status drives the offline banner and gates sync attempts.
   useEffect(() => {
@@ -411,12 +476,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const refreshPending = () => {
-      void outboxSize().then((pending) => setSyncStatus((s) => ({ ...s, pending })));
+      void outboxSize(userId).then((pending) => setSyncStatus((s) => ({ ...s, pending })));
     };
     refreshPending();
     window.addEventListener(SYNC_QUEUE_EVENT, refreshPending);
     return () => window.removeEventListener(SYNC_QUEUE_EVENT, refreshPending);
-  }, []);
+  }, [userId]);
 
   // --- AI marking resilience: DLQ drain + in-place mark upgrades -----------
   //
@@ -461,9 +526,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   }, []);
 
   const completeOnboarding = useCallback(async () => {
-    await repo.markOnboarded();
+    await repo.markOnboarded(userId);
     setNeedsOnboarding(false);
-  }, []);
+  }, [userId]);
 
   const syncNow = useCallback(async () => {
     if (!isSupabaseConfigured || syncInFlight) return;
@@ -471,7 +536,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     setSyncStatus((s) => ({ ...s, syncing: true }));
     try {
       const result = await sync(userId);
-      const pending = await outboxSize();
+      const pending = await outboxSize(userId);
       const error =
         result.failed > 0
           ? "Some changes are still waiting to sync. We’ll keep trying."
@@ -495,7 +560,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       // Keep a diagnostic trail instead of swallowing the failure: without it,
       // a permanently broken sync looks identical to a slow one.
       console.warn("[sync] failed", caught);
-      const pending = await outboxSize();
+      const pending = await outboxSize(userId);
       setSyncStatus((s) => ({
         ...s,
         syncing: false,
@@ -859,6 +924,61 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
       .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates));
   }, [snapshot, mastery, subjectIds]);
+
+  const farTransferRetests = useMemo(
+    () => delayedFarTransferRetests({ attempts: snapshot?.attempts ?? [], questions: snapshot?.questions ?? [], today: todayIso() }),
+    [snapshot],
+  );
+
+  const twinState = useMemo(() => revisionTwin ?? createRevisionTwinState(userId), [revisionTwin, userId]);
+  const twinReport = useMemo(() => revisionTwinReport(twinState), [twinState]);
+  const revisionTwinChoices = useMemo(
+    () => buildRevisionTwinChoices({ recommendations: experimentRecs, sessions: twinState.sessions }),
+    [experimentRecs, twinState.sessions],
+  );
+
+  const examReadiness = useMemo(() => {
+    if (!snapshot) return [];
+    const predictionBySubject = new Map(predictions.map((prediction) => [prediction.subjectId, prediction] as const));
+    return allSubjects()
+      .filter((subject) => subjectIds.includes(subject.id))
+      .flatMap((subject) => {
+        const prediction = predictionBySubject.get(subject.id);
+        if (!prediction) return [];
+        const topicRows = mastery.filter((row) => row.subjectId === subject.id);
+        const evidencedTopics = topicRows.filter((row) => row.cardsTotal > 0 || row.attempts > 0).length;
+        const coverageAverage = topicRows.length ? topicRows.reduce((sum, row) => sum + row.mastery, 0) / topicRows.length : 0;
+        const recallRows = recallMastery.filter((row) => row.subjectId === subject.id);
+        const recallCards = recallRows.reduce((sum, row) => sum + row.cardsTotal, 0);
+        const recallReviews = recallRows.reduce((sum, row) => sum + row.reviews, 0);
+        const retained = recallRows.filter((row) => row.cardsTotal > 0);
+        const retentionAverage = retained.length ? retained.reduce((sum, row) => sum + row.currentRetention, 0) / retained.length : null;
+        const timed = snapshot.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0);
+        const available = timed.reduce((sum, attempt) => sum + attempt.max, 0);
+        const awarded = timed.reduce((sum, attempt) => sum + Math.max(0, Math.min(attempt.max, attempt.awarded)), 0);
+        const pace = responseTimeCalibration.rows.find((row) => row.subjectId === subject.id);
+        const transfers = farTransferRetests.filter((retest) => retest.subjectId === subject.id);
+        const completedTransfers = transfers.filter((retest) => retest.status === "completed");
+        const passedTransfers = completedTransfers.filter((retest) => retest.outcome?.passed).length;
+        return [buildExamReadiness({
+          subject,
+          prediction,
+          targetGrade: snapshot.settings.targetGrades[subject.id] ?? null,
+          examDays: daysToExam(snapshot.examDates, subject.id, todayIso()),
+          coverage: { average: coverageAverage, topics: topicRows.length, evidencedTopics },
+          retention: { average: retentionAverage, cards: recallCards, reviews: recallReviews },
+          timed: { accuracy: available ? awarded / available : null, attempts: timed.length, marks: available },
+          pace: { ratio: pace?.ratio ?? null, attempts: pace?.attempts ?? 0 },
+          transfer: {
+            passRate: completedTransfers.length ? passedTransfers / completedTransfers.length : null,
+            completed: completedTransfers.length,
+            due: transfers.filter((retest) => retest.status === "due").length,
+          },
+        })];
+      });
+  }, [snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
+
+  const examReadinessSummary = useMemo(() => summariseExamReadiness(examReadiness), [examReadiness]);
   // Close the grade loop: snapshot predictions weekly so later mocks can be
   // paired against what Revise believed at the time - not retro-fitted.
   useEffect(() => {
@@ -1083,10 +1203,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   const removeCard = useCallback<StoreValue["removeCard"]>(
     async (id) => {
-      await repo.deleteCard(id);
+      await repo.deleteCard(id, userId);
       patch((prev) => ({ ...prev, cards: prev.cards.filter((c) => c.id !== id) }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const updateCards = useCallback<StoreValue["updateCards"]>(
@@ -1102,11 +1222,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const removeCards = useCallback<StoreValue["removeCards"]>(
     async (ids) => {
       if (!ids.length) return;
-      await repo.deleteCards(ids);
+      await repo.deleteCards(ids, userId);
       const gone = new Set(ids);
       patch((prev) => ({ ...prev, cards: prev.cards.filter((c) => !gone.has(c.id)) }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const addQuestions = useCallback<StoreValue["addQuestions"]>(
@@ -1195,10 +1315,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   const removeExamDate = useCallback<StoreValue["removeExamDate"]>(
     async (id) => {
-      await repo.deleteExamDate(id);
+      await repo.deleteExamDate(id, userId);
       patch((prev) => ({ ...prev, examDates: prev.examDates.filter((e) => e.id !== id) }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const updateSettings = useCallback<StoreValue["updateSettings"]>(
@@ -1244,6 +1364,45 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     setRevisionCheckpoint(null);
   }, [userId]);
 
+  const startRevisionTwinSession = useCallback<StoreValue["startRevisionTwinSession"]>(
+    async (choice, title) => {
+      const state = revisionTwin ?? createRevisionTwinState(userId);
+      if (state.sessions.some((session) => session.status === "active")) throw new Error("A revision block is already active.");
+      const session = createRevisionTwinSession({ id: crypto.randomUUID(), userId, choice, title });
+      const next: RevisionTwinState = { ...state, sessions: [session, ...state.sessions], updatedAt: new Date().toISOString() };
+      await repo.saveRevisionTwin(next);
+      setRevisionTwin(next);
+      return session;
+    },
+    [revisionTwin, userId],
+  );
+
+  const completeRevisionTwinSession = useCallback<StoreValue["completeRevisionTwinSession"]>(
+    async (id, actualMarks, actualMinutes) => {
+      const state = revisionTwin;
+      const session = state?.sessions.find((row) => row.id === id && row.status === "active");
+      if (!state || !session) return;
+      const updated = completeTwinSession(session, { actualMarks, actualMinutes });
+      const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
+      await repo.saveRevisionTwin(next);
+      setRevisionTwin(next);
+    },
+    [revisionTwin],
+  );
+
+  const abandonTwinSession = useCallback<StoreValue["abandonRevisionTwinSession"]>(
+    async (id) => {
+      const state = revisionTwin;
+      const session = state?.sessions.find((row) => row.id === id && row.status === "active");
+      if (!state || !session) return;
+      const updated = abandonRevisionTwinSession(session);
+      const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
+      await repo.saveRevisionTwin(next);
+      setRevisionTwin(next);
+    },
+    [revisionTwin],
+  );
+
   const value: StoreValue | null = useMemo(() => {
     if (!snapshot) return null;
     return {
@@ -1275,6 +1434,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       rootPrerequisiteRemediation,
       revisionCheckpoint,
       responseTimeCalibration,
+      revisionTwin: twinState,
+      revisionTwinChoices,
+      revisionTwinReport: twinReport,
+      examReadiness,
+      examReadinessSummary,
+      storageQuota,
+      refreshStorageQuota,
       previewPaper,
       syncStatus,
       reviewCard,
@@ -1294,6 +1460,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       completeLesson,
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
+      startRevisionTwinSession,
+      completeRevisionTwinSession,
+      abandonRevisionTwinSession: abandonTwinSession,
       syncNow,
       experimentArm,
       joinExperiment,
@@ -1332,6 +1501,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     rootPrerequisiteRemediation,
     revisionCheckpoint,
     responseTimeCalibration,
+    twinState,
+    revisionTwinChoices,
+    twinReport,
+    examReadiness,
+    examReadinessSummary,
+    storageQuota,
+    refreshStorageQuota,
     previewPaper,
     syncStatus,
     reviewCard,
@@ -1351,6 +1527,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     completeLesson,
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
+    startRevisionTwinSession,
+    completeRevisionTwinSession,
+    abandonTwinSession,
     syncNow,
     experimentArm,
     joinExperiment,
@@ -1364,6 +1543,18 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     recordFunnel,
   ]);
 
+  if (bootError) {
+    return (
+      <StorageRecovery
+        error={new Error(bootError)}
+        onRetry={() => {
+          setBootError(null);
+          bootstrapped.current = false;
+          setBootAttempt((attempt) => attempt + 1);
+        }}
+      />
+    );
+  }
   if (!value) return <BootScreen />;
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
