@@ -2,6 +2,7 @@ import type { Card, Id, LessonProgress, OutboxItem, SyncEntity, StreakState } fr
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
 import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
+import { remapContentIds } from "./content-ids";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
@@ -453,19 +454,24 @@ async function e2eeEnabledFor(userId: Id): Promise<boolean> {
 
 async function fromRow(entity: SyncEntity, row: Record<string, unknown>): Promise<Record<string, unknown>> {
   const raw = row.data;
+  // A not-yet-migrated device can push rows carrying legacy `seed-*` content
+  // ids; a migrated device pulling them must rewrite those references or it
+  // stores pointers the rest of the app can no longer resolve. The remap is
+  // idempotent, so double-covering with the boot migration is harmless.
+  const remap = (data: Record<string, unknown>): Record<string, unknown> => remapContentIds(data).value as Record<string, unknown>;
   // An encrypted row this device cannot read (key rotated, device replaced)
   // must not abort the whole table: surface it as a named error the caller
   // counts, the way any other row-level failure is counted.
   if (isEncryptedPayload(raw)) {
     try {
       const data = await decryptPayload<Record<string, unknown>>(raw);
-      return { ...data, userId: row.user_id ?? data.userId };
+      return remap({ ...data, userId: row.user_id ?? data.userId });
     } catch (error) {
       throw new Error(`E2EE decrypt failed for a synced row: ${error instanceof Error ? error.message : "unknown"}`);
     }
   }
   const data = (raw ?? {}) as Record<string, unknown>;
-  return { ...data, userId: row.user_id ?? data.userId };
+  return remap({ ...data, userId: row.user_id ?? data.userId });
 }
 
 function isNewer(incoming: Record<string, unknown>, existing: unknown): boolean {

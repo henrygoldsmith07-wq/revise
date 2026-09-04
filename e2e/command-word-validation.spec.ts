@@ -1,22 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { todayOrOnboarding } from "./helpers";
+import { completeOnboarding, todayOrOnboarding } from "./helpers";
 
 test("command-word validation updates while answering an exam question", async ({ page }) => {
   await page.goto("/");
 
   const today = page.locator("main#main");
   if ((await todayOrOnboarding(page)) === "onboarding") {
-    await page.getByRole("button", { name: /Continue/i }).first().click();
-    await page.waitForTimeout(300);
-    const subjectCard = page.locator("button.card").first();
-    if (await subjectCard.isVisible()) await subjectCard.click();
-    const subjectContinue = page.getByRole("button", { name: /Continue/i }).first();
-    if (await subjectContinue.isVisible()) await subjectContinue.click();
-    await page.waitForTimeout(300);
-    const examContinue = page.getByRole("button", { name: /Continue/i }).first();
-    if (await examContinue.isVisible()) await examContinue.click();
-    await page.waitForTimeout(300);
-    await page.getByRole("button", { name: /Build my plan|Continue/i }).first().click();
+    await completeOnboarding(page);
     await expect(today).toBeVisible({ timeout: 15_000 });
   }
 

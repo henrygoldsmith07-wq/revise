@@ -17,9 +17,23 @@ import { computeApplicationMastery } from "@/domain/application-mastery";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
-import { buildPlan, rescheduleMissed } from "@/domain/planner";
+import { buildPlan, rescheduleMissed, summarizePlanChange } from "@/domain/planner";
+import { buildSubjectEvidence } from "@/domain/subject-allocation";
+import { currentPhaseBuckets, techniqueEntryNotices } from "@/domain/phase-notice";
+import type { PhaseBucket, PhaseNotice, PhaseSubject } from "@/domain/phase-notice";
 import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
 import { daysToExam, recommend } from "@/domain/recommender";
+import {
+  knowledgeVsAnswering,
+  knowledgeVsAnsweringByTopic,
+  type KnowledgeAnsweringReport,
+} from "@/domain/exam-technique";
+import {
+  buildPaperOutcomeRecord,
+  closePaperOutcome,
+  paperOutcomeGainMultiplier,
+  type PaperOutcomeRecord,
+} from "@/domain/paper-outcome";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import { buildExamReadiness, summariseExamReadiness } from "@/domain/exam-readiness";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
@@ -141,6 +155,10 @@ interface StoreValue extends Snapshot {
   recurringMisconceptions: MisconceptionTally[];
   /** Why the plan last changed itself, or null when nothing has. */
   replanSummary: string | null;
+  /** What the latest manual rebuild changed, in plain language (empty = nothing material). */
+  planChangelog: string[];
+  /** One-time notice shown when a subject enters the timed-paper fortnight; null otherwise. */
+  examPhaseNotice: PhaseNotice | null;
   calibrations: Map<Id, Calibration>;
   questionTraces: QuestionTrace[];
   difficultyCalibration: DifficultyCalibrationReport;
@@ -179,6 +197,10 @@ interface StoreValue extends Snapshot {
   upsertExamDate(exam: ExamDate): Promise<void>;
   removeExamDate(id: Id): Promise<void>;
   updateSettings(patch: Partial<UserSettings>): Promise<void>;
+  /** Re-evaluate countdown phases; surfaces a one-time notice when a subject enters the timed-paper fortnight. */
+  refreshPhaseNotices(): Promise<void>;
+  /** Clear the one-time phase notice (it never re-appears for the same run-up). */
+  dismissExamPhaseNotice(): void;
   /** Mark one lesson finished and roll the lesson streak forward; returns the new progress. */
   completeLesson(lessonId: Id): Promise<LessonProgress>;
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
@@ -195,7 +217,11 @@ interface StoreValue extends Snapshot {
   funnelEvents: FunnelEvent[];
   gradePredictionLog: GradePredictionRecord[];
   gradeActuals: ActualResultRecord[];
+  paperOutcomeLog: PaperOutcomeRecord[];
+  paperOutcomeGains: Map<Id, number>;
   recordGradeActual(subjectId: Id, percent: number, kind: "mock" | "paper" | "final"): Promise<void>;
+  beginPaperOutcome(input: { subjectId: Id; paperId: Id; paperRunId?: Id; predictedMarks: number; totalMarks: number }): Promise<void>;
+  closePaperOutcome(paperRunId: Id, actualMarks: number): Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -291,6 +317,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     status: "unavailable",
     checkedAt: new Date().toISOString(),
   }));
+  // Sat papers with their sit-time prediction frozen in — the reality check
+  // that feeds the recommender's paper gain factor back from evidence.
+  const [paperOutcomeLog, setPaperOutcomeLog] = useState<PaperOutcomeRecord[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -307,6 +336,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [bootError, setBootError] = useState<string | null>(null);
   const [bootAttempt, setBootAttempt] = useState(0);
   const [replanSummary, setReplanSummary] = useState<string | null>(null);
+  const [planChangelog, setPlanChangelog] = useState<string[]>([]);
+  const [examPhaseNotice, setExamPhaseNotice] = useState<PhaseNotice | null>(null);
   // Heavy analytics run off-thread (Comlink worker) and land here when ready;
   // small histories compute synchronously inside the same effect. Until the
   // first compute lands these hold the same defaults the sync path returned.
@@ -383,7 +414,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
       try {
-        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin] = await Promise.all([
+        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin, paperOutcomes] = await Promise.all([
           repo.loadSnapshot(userId),
           repo.loadRevisionCheckpoint(userId),
           readReviseMeta<ExperimentAssignment>("experimentAssignment"),
@@ -391,6 +422,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
           readReviseMeta<ActualResultRecord[]>("gradeActuals"),
           repo.loadRevisionTwin(userId),
+          readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes"),
         ]);
         setRevisionCheckpoint(checkpoint ?? null);
         setExperimentArm(assignment ?? null);
@@ -398,6 +430,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         setGradePredictionLog(gradePreds ?? []);
         setGradeActuals(gradeActs ?? []);
         setRevisionTwin(twin ?? createRevisionTwinState(userId));
+        setPaperOutcomeLog(paperOutcomes ?? []);
         setSnapshot(loaded);
         // First page is on screen; stream the rest of history in the background.
         startHydration();
@@ -814,6 +847,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
         subjectIds: snapshot.settings.subjectIds,
         targetGrades: snapshot.settings.targetGrades,
+        evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso()),
         existing: snapshot.plannedSessions,
         previous,
       });
@@ -869,6 +903,47 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   // like syncInFlight/hydrationEpoch. It starts on the student's first graded
   // action; 30 idle minutes ends the session (fatigue resets for a fresh one).
   // Grading re-renders the store anyway, which refreshes the derived value.
+  // Knowledge-vs-answering evidence, per enrolled subject and per topic —
+  // the recommender steers on it (learn-first when knowledge-heavy, timed
+  // practice when answering-heavy) and Today's hero can explain itself.
+  const techniqueReports = useMemo(() => {
+    const bySubject = new Map<Id, KnowledgeAnsweringReport>();
+    const byTopic = new Map<Id, KnowledgeAnsweringReport>();
+    if (!snapshot) return { bySubject, byTopic };
+    for (const subjectId of subjectIds) {
+      bySubject.set(
+        subjectId,
+        knowledgeVsAnswering({
+          subjectId,
+          mistakes: snapshot.mistakes,
+          questions: snapshot.questions,
+          attempts: snapshot.attempts,
+        }),
+      );
+      for (const row of knowledgeVsAnsweringByTopic({
+        subjectId,
+        mistakes: snapshot.mistakes,
+        questions: snapshot.questions,
+        attempts: snapshot.attempts,
+      })) {
+        byTopic.set(row.topicId, row.report);
+      }
+    }
+    return { bySubject, byTopic };
+  }, [snapshot, subjectIds]);
+
+  // Per-subject multiplier for paper recommendations: >1 when sat papers keep
+  // beating their frozen predictions (more headroom than the model sees), <1
+  // when they fall short. 1.0 with fewer than two recorded outcomes.
+  const paperOutcomeGains = useMemo(() => {
+    const out = new Map<Id, number>();
+    if (!snapshot) return out;
+    for (const subjectId of subjectIds) {
+      out.set(subjectId, paperOutcomeGainMultiplier(paperOutcomeLog, subjectId));
+    }
+    return out;
+  }, [snapshot, subjectIds, paperOutcomeLog]);
+
   const recommendations = useMemo(() => {
     if (!snapshot) return [];
     return recommend({
@@ -881,9 +956,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
       subjectIds,
       marksPerHour,
+      techniqueSplit: techniqueReports.bySubject,
+      techniqueByTopic: techniqueReports.byTopic,
+      paperOutcomes: paperOutcomeLog,
       activeMinutes: currentActiveMinutes(),
     });
-  }, [snapshot, mastery, topics, subjectIds, marksPerHour]);
+  }, [snapshot, mastery, topics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog]);
 
   // Experiment arm enforcement: baseline arms see their assigned policy,
   // not the production recommender. Control sees no recommendation.
@@ -1136,6 +1214,43 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     setGradeActuals([...log.slice(-500), record]);
   }, [userId]);
 
+  // Paper-outcome loop, part 1: freeze the prediction the moment a recommended
+  // paper is started, BEFORE any question is answered. Called with the
+  // calibration-adjusted simulation for this exact paper.
+  const beginPaperOutcome = useCallback<StoreValue["beginPaperOutcome"]>(
+    async (input) => {
+      const record = buildPaperOutcomeRecord({
+        userId,
+        subjectId: input.subjectId,
+        paperId: input.paperId,
+        paperRunId: input.paperRunId,
+        predictedMarks: input.predictedMarks,
+        totalMarks: input.totalMarks,
+        satAt: new Date().toISOString(),
+      });
+      const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
+      const next = [...log.filter((o) => o.id !== record.id), record].slice(-200);
+      await writeReviseMeta("paperOutcomes", next);
+      setPaperOutcomeLog(next);
+    },
+    [userId],
+  );
+
+  // Paper-outcome loop, part 2: close the record with the actual awarded
+  // marks once marking completes. The (predicted, actual) pair then feeds
+  // paperOutcomeGainMultiplier on the next recommend() pass.
+  const closePaperOutcomeRecord = useCallback<StoreValue["closePaperOutcome"]>(
+    async (paperRunId, actualMarks) => {
+      const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
+      const target = log.find((o) => o.paperRunId === paperRunId);
+      if (!target) return; // no frozen prediction (untimed path or legacy run) — nothing to learn
+      const next = [...log.filter((o) => o.id !== target.id), closePaperOutcome(target, actualMarks)].slice(-200);
+      await writeReviseMeta("paperOutcomes", next);
+      setPaperOutcomeLog(next);
+    },
+    [],
+  );
+
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
@@ -1262,11 +1377,20 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       subjectIds: snapshot.settings.subjectIds,
       subjects,
       targetGrades: snapshot.settings.targetGrades,
+      evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso()),
       existing: snapshot.plannedSessions,
     });
+    const changelog = summarizePlanChange({
+      previous: snapshot.plannedSessions,
+      next: plan,
+      exams: snapshot.examDates,
+      subjectNames: Object.fromEntries(subjects.map((s) => [s.id, s.name])),
+      today: todayIso(),
+    });
     await repo.replacePlan(userId, plan);
+    setPlanChangelog(changelog);
     patch((prev) => ({ ...prev, plannedSessions: plan }));
-  }, [snapshot, userId, topics, mastery, patch]);
+  }, [snapshot, userId, topics, mastery, patch, setPlanChangelog]);
 
   const rescheduleMissedSessions = useCallback<StoreValue["rescheduleMissedSessions"]>(async () => {
     if (!snapshot) return;
@@ -1330,6 +1454,52 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     },
     [snapshot, patch],
   );
+
+  const refreshPhaseNotices = useCallback<StoreValue["refreshPhaseNotices"]>(async () => {
+    if (!snapshot) return;
+    const subjects: PhaseSubject[] = snapshot.settings.subjectIds.map((subjectId) => {
+      const subject = getSubject(subjectId);
+      return {
+        subjectId,
+        name: subject?.name ?? subjectId,
+        days: daysToExam(snapshot.examDates, subjectId, todayIso()),
+      };
+    });
+    const previous = (snapshot.settings.examNotices ?? {}) as Record<string, PhaseBucket | null | undefined>;
+    const notices = techniqueEntryNotices(subjects, previous);
+    // Record every subject's current bucket so a transition is announced
+    // exactly once — and a subject pushed back out of the window can be
+    // re-announced when it later re-enters.
+    const buckets = currentPhaseBuckets(subjects);
+    const examNotices: Record<string, string> = {};
+    for (const [subjectId, bucket] of Object.entries(buckets)) {
+      if (bucket) examNotices[subjectId] = bucket;
+    }
+    const changed =
+      Object.keys(examNotices).length !== Object.keys(previous).length ||
+      Object.entries(examNotices).some(([subjectId, bucket]) => previous[subjectId] !== bucket);
+    if (changed) await updateSettings({ examNotices });
+    const notice = notices[0] ?? null;
+    if (notice) setExamPhaseNotice(notice);
+    if (
+      notice &&
+      snapshot.settings.examNotifications &&
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      window.Notification.permission === "granted"
+    ) {
+      try {
+        new window.Notification(notice.title, { body: notice.body });
+      } catch {
+        // Some environments throw on construction (private browsing, iframes);
+        // the in-app banner still shows, so the notice is not lost.
+      }
+    }
+  }, [snapshot, updateSettings]);
+
+  const dismissExamPhaseNotice = useCallback<StoreValue["dismissExamPhaseNotice"]>(() => {
+    setExamPhaseNotice(null);
+  }, []);
 
   const completeLesson = useCallback<StoreValue["completeLesson"]>(
     async (lessonId) => {
@@ -1422,6 +1592,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       marksPerHour,
       recurringMisconceptions,
       replanSummary,
+      planChangelog,
+      examPhaseNotice,
       calibrations,
       questionTraces,
       difficultyCalibration,
@@ -1457,6 +1629,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       upsertExamDate,
       removeExamDate,
       updateSettings,
+      refreshPhaseNotices,
+      dismissExamPhaseNotice,
       completeLesson,
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
@@ -1472,7 +1646,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       funnelEvents,
       gradePredictionLog,
       gradeActuals,
+      paperOutcomeLog,
+      paperOutcomeGains,
       recordGradeActual,
+      beginPaperOutcome,
+      closePaperOutcome: closePaperOutcomeRecord,
     };
   }, [
     snapshot,
@@ -1489,6 +1667,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     marksPerHour,
     recurringMisconceptions,
     replanSummary,
+    planChangelog,
     calibrations,
     questionTraces,
     difficultyCalibration,
@@ -1524,6 +1703,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     upsertExamDate,
     removeExamDate,
     updateSettings,
+    refreshPhaseNotices,
+    dismissExamPhaseNotice,
+    examPhaseNotice,
     completeLesson,
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
@@ -1537,7 +1719,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     recordExperimentEvent,
     gradePredictionLog,
     gradeActuals,
+    paperOutcomeLog,
+    paperOutcomeGains,
     recordGradeActual,
+    beginPaperOutcome,
+    closePaperOutcomeRecord,
     experimentRecs,
     funnelEvents,
     recordFunnel,

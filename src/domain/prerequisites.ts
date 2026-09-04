@@ -48,6 +48,30 @@ const EDGES: PrerequisiteEdge[] = [
   { topicId: "wjec-alevel-biology.genetics-inheritance", prerequisiteId: "wjec-alevel-biology.nucleic-acids", reason: "Genetics assumes the nucleic-acid base" },
   { topicId: "aqa-alevel-biology.respiration", prerequisiteId: "aqa-alevel-biology.enzymes", reason: "Respiration is an enzyme-controlled pathway" },
   { topicId: "aqa-alevel-biology.genetics-inheritance", prerequisiteId: "aqa-alevel-biology.nucleic-acids", reason: "Genetics assumes the nucleic-acid base" },
+  { topicId: "edexcel-alevel-biology.respiration", prerequisiteId: "edexcel-alevel-biology.enzymes", reason: "Respiration is an enzyme-controlled pathway" },
+  { topicId: "ocr-alevel-biology.respiration", prerequisiteId: "ocr-alevel-biology.enzymes", reason: "Respiration is an enzyme-controlled pathway" },
+  // Photosynthesis — the repeated-miss example: when questions on
+  // photosynthesis keep failing, the cause is usually upstream (enzyme
+  // control of the Calvin cycle, or diffusion/gas transport across
+  // membranes) rather than the photosynthesis content itself.
+  { topicId: "wjec-alevel-biology.photosynthesis", prerequisiteId: "wjec-alevel-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — Calvin-cycle reactions and limiting-factor logic reuse enzyme-rate ideas" },
+  { topicId: "wjec-alevel-biology.photosynthesis", prerequisiteId: "wjec-alevel-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — Fick's law and transport mechanics come first" },
+  { topicId: "aqa-alevel-biology.photosynthesis", prerequisiteId: "aqa-alevel-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — Calvin-cycle reactions and limiting-factor logic reuse enzyme-rate ideas" },
+  { topicId: "aqa-alevel-biology.photosynthesis", prerequisiteId: "aqa-alevel-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — Fick's law and transport mechanics come first" },
+  { topicId: "edexcel-alevel-biology.photosynthesis", prerequisiteId: "edexcel-alevel-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — Calvin-cycle reactions and limiting-factor logic reuse enzyme-rate ideas" },
+  { topicId: "edexcel-alevel-biology.photosynthesis", prerequisiteId: "edexcel-alevel-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — Fick's law and transport mechanics come first" },
+  { topicId: "ocr-alevel-biology.photosynthesis", prerequisiteId: "ocr-alevel-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — Calvin-cycle reactions and limiting-factor logic reuse enzyme-rate ideas" },
+  { topicId: "ocr-alevel-biology.photosynthesis", prerequisiteId: "ocr-alevel-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — Fick's law and transport mechanics come first" },
+  // GCSE biology runs the same photosynthesis chain (its required-practical
+  // work — enzyme rate and diffusion investigations — sits on the same base).
+  { topicId: "wjec-gcse-biology.photosynthesis", prerequisiteId: "wjec-gcse-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — enzyme-rate and limiting-factor ideas come first" },
+  { topicId: "wjec-gcse-biology.photosynthesis", prerequisiteId: "wjec-gcse-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — transport mechanics come first" },
+  { topicId: "aqa-gcse-biology.photosynthesis", prerequisiteId: "aqa-gcse-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — enzyme-rate and limiting-factor ideas come first" },
+  { topicId: "aqa-gcse-biology.photosynthesis", prerequisiteId: "aqa-gcse-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — transport mechanics come first" },
+  { topicId: "edexcel-gcse-biology.photosynthesis", prerequisiteId: "edexcel-gcse-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — enzyme-rate and limiting-factor ideas come first" },
+  { topicId: "edexcel-gcse-biology.photosynthesis", prerequisiteId: "edexcel-gcse-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — transport mechanics come first" },
+  { topicId: "ocr-gcse-biology.photosynthesis", prerequisiteId: "ocr-gcse-biology.enzymes", reason: "Photosynthesis is an enzyme-controlled pathway — enzyme-rate and limiting-factor ideas come first" },
+  { topicId: "ocr-gcse-biology.photosynthesis", prerequisiteId: "ocr-gcse-biology.membranes-transport", reason: "CO₂ and O₂ cross membranes by diffusion — transport mechanics come first" },
 ];
 
 export function prerequisiteEdges(): PrerequisiteEdge[] { return [...EDGES]; }

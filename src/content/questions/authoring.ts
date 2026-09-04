@@ -1,8 +1,10 @@
 import type { AoCode, ContentSource, Id, LicensedSource, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
 
 // Compact authoring format for the seed question bank. Ids are deterministic
-// (`seed-q:<slug>`) so re-seeding never duplicates a question or orphans the
-// attempts already recorded against it.
+// (`cnt:question:<slug>`, namespaced — see src/data/content-ids.ts) so
+// re-seeding never duplicates a question or orphans the attempts already
+// recorded against it, and so operator tooling can never mistake bank rows
+// for its own fixtures.
 
 export interface PartSpec {
   label?: string;
@@ -40,7 +42,7 @@ export interface QuestionSpec {
 const SEED_CREATED_AT = "2025-01-01T00:00:00.000Z";
 
 export function defineQuestion(spec: QuestionSpec): Question {
-  const id = `seed-q:${spec.slug}`;
+  const id = `cnt:question:${spec.slug}`;
   const parts: QuestionPart[] = spec.parts.map((part, i) => ({
     id: `${id}:${i}`,
     label: part.label ?? (spec.parts.length > 1 ? `(${"abcdefgh"[i]})` : ""),

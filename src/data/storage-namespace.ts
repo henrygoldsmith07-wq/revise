@@ -12,6 +12,10 @@ export const REVISE_META_KEYS = {
   gradePredictions: "revise.gradePredictions.v1",
   gradeActuals: "revise.gradeActuals.v1",
   revisionTwin: "revise.revisionTwin.v1",
+  /** Sat papers with their sit-time prediction frozen in (outcome feedback loop). */
+  paperOutcomes: "revise.paperOutcomes.v1",
+  /** Highest applied level of the cnt: content-id namespacing migration. */
+  contentIdMigration: "revise.contentIdMigration.v1",
   /** Stable per-device identity (id + label) used to order concurrent edits. */
   device: "revise.device.v1",
   /** Per-device Lamport counter — the logical clock behind sync ordering. */

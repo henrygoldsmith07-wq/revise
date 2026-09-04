@@ -9,7 +9,8 @@ import type {
 } from "@/domain/types";
 
 // Compact authoring format for the misconception library. Ids are deterministic
-// (`seed-misconception:<slug>`) so re-seeding never duplicates an entry.
+// (`cnt:misconception:<slug>`, namespaced — see src/data/content-ids.ts) so
+// re-seeding never duplicates an entry.
 
 export interface MisconceptionSpec {
   slug: string;
@@ -31,7 +32,7 @@ const LAST_CHECKED = "2026-08-01";
 
 export function defineMisconception(spec: MisconceptionSpec): Misconception {
   return {
-    id: `seed-misconception:${spec.slug}`,
+    id: `cnt:misconception:${spec.slug}`,
     subjectId: spec.subjectId,
     topicIds: spec.topics.map((t) => `${spec.subjectId}.${t}`),
     statement: spec.statement,

@@ -1,5 +1,6 @@
 import { buildPlan, rescheduleMissed } from "./planner";
 import { toDateOnly } from "./scheduling";
+import type { SubjectEvidence } from "./subject-allocation";
 import type {
   Availability,
   ExamDate,
@@ -76,6 +77,8 @@ export interface ReplanInput {
   subjectIds: Id[];
   targetGrades: Record<Id, string>;
   existing: PlannedSession[];
+  /** Live cross-subject evidence so scarce blocks go to the strongest work. */
+  evidence?: Map<Id, SubjectEvidence>;
   /** Fingerprint of the inputs the current plan was built from, when known. */
   previous?: ReplanFingerprint;
   now?: Date;
@@ -129,6 +132,7 @@ export function replanDynamically(input: ReplanInput): ReplanResult {
       sessionLengthMinutes: input.sessionLengthMinutes,
       subjectIds: input.subjectIds,
       targetGrades: input.targetGrades,
+      evidence: input.evidence,
       horizonDays: input.horizonDays,
       now,
       existing: plan,

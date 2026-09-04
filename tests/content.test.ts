@@ -141,7 +141,7 @@ describe("seed question bank", () => {
   it("uses unique, stable ids", () => {
     const ids = seedQuestions.map((q) => q.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every((id) => id.startsWith("seed-q:"))).toBe(true);
+    expect(ids.every((id) => id.startsWith("cnt:question:"))).toBe(true);
   });
 
   it("finds questions by topic", () => {

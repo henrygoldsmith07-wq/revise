@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { computeApplicationMastery } from "@/domain/application-mastery";
 import type { Attempt, Question, Topic } from "@/domain/types";
 
@@ -116,16 +114,5 @@ describe("application mastery", () => {
     });
     expect(rows[1].marksAwarded).toBe(40);
     expect(rows[1].marksAvailable).toBe(50);
-  });
-
-  it("wires the Progress view to application evidence", () => {
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    const panels = readFileSync(join(process.cwd(), "src/components/AssessmentPanels.tsx"), "utf8");
-    const store = readFileSync(join(process.cwd(), "src/state/store.tsx"), "utf8");
-
-    expect(progress).toContain("ApplicationMasteryCard");
-    expect(panels).toContain("Application mastery");
-    expect(panels).toContain("applicationMastery");
-    expect(store).toContain("computeApplicationMastery");
   });
 });

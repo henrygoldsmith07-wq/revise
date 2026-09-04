@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { serviceWorkerReady, todayOrOnboarding } from "./helpers";
+import { completeOnboarding, serviceWorkerReady, todayOrOnboarding } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Mobile-first E2E — revision apps live on phones, so the small screen is a
@@ -38,24 +38,7 @@ const IPAD_PROFILE = {
 async function settle(page: Page): Promise<void> {
   await page.goto("/");
   if ((await todayOrOnboarding(page)) === "onboarding") {
-    const continueBtn = page.getByRole("button", { name: /Continue/i });
-    await expect(continueBtn.first()).toBeVisible();
-    await continueBtn.first().click();
-
-    await page.waitForTimeout(300);
-    const subjectCard = page.locator("button.card").first();
-    if (await subjectCard.isVisible()) await subjectCard.click();
-    const cont2 = page.getByRole("button", { name: /Continue/i }).first();
-    if (await cont2.isVisible()) await cont2.click();
-
-    await page.waitForTimeout(300);
-    const cont3 = page.getByRole("button", { name: /Continue/i }).first();
-    if (await cont3.isVisible()) await cont3.click();
-
-    await page.waitForTimeout(300);
-    const buildBtn = page.getByRole("button", { name: /Build my plan|Continue/i }).first();
-    if (await buildBtn.isVisible()) await buildBtn.click();
-
+    await completeOnboarding(page);
     await expect(page.locator("main#main")).toBeVisible({ timeout: 15_000 });
   }
 }
@@ -80,7 +63,7 @@ test.describe("mobile core loop — Pixel 7", () => {
 
     // Bottom bar is visible on mobile; desktop rail is hidden.
     await expect(mobileNav(page)).toBeVisible();
-    const tabs = ["Today", "Review", "Study", "Plan", "Progress"];
+    const tabs = ["Today", "Review", "Study", "Lessons", "Practice", "Past papers"];
     for (const tab of tabs) {
       await mobileNav(page).getByRole("link", { name: tab }).tap();
       await expect(page.locator("main#main")).toBeVisible({ timeout: 10_000 });
@@ -89,7 +72,7 @@ test.describe("mobile core loop — Pixel 7", () => {
 
   test("no horizontal overflow at Pixel width after onboarding", async ({ page }) => {
     await settle(page);
-    for (const route of ["/review", "/practice", "/progress"]) {
+    for (const route of ["/review", "/practice", "/lesson"]) {
       await page.goto(route);
       await expect(page.locator("main#main")).toBeVisible();
       expect(await hasNoHorizontalOverflow(page)).toBe(true);

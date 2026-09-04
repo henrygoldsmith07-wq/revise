@@ -6,10 +6,16 @@ import { aiExplain, aiGenerateCards, aiSummarise } from "@/lib/optional-ai";
 import type { ExplainResponse } from "@/ai/types";
 import { misconceptionsForTopic } from "@/content";
 import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";
+import { knowledgeVsAnswering } from "@/domain/exam-technique";
+import { buildSubjectGraph } from "@/domain/knowledge-graph";
 import { createCard } from "@/domain/scheduling";
+import { classifyTopic } from "@/domain/topic-status";
 import type { Card, Topic } from "@/domain/types";
 import { useStore, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
+import { KnowledgeMap } from "@/components/KnowledgeMap";
+import { TechniqueSignal } from "@/components/TechniqueSignal";
+import { TopicStatusTag } from "@/components/TopicStatusTag";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, ProgressBar, SectionHeading, Segmented, SourceBadge } from "@/components/ui";
 import { BackIcon, CreditedIcon, DeleteIcon, ICON_SIZE, MissedIcon } from "@/components/icons";
 
@@ -38,6 +44,7 @@ function Library() {
     subjectParam ?? (topicParam ? getTopic(topicParam)?.subjectId : null) ?? subjects[0]?.id ?? "",
   );
   const [topicId, setTopicId] = useState(topicParam ?? "");
+  const [view, setView] = useState<"list" | "map">("list");
 
   const topic = topicId ? getTopic(topicId) : null;
 
@@ -48,6 +55,43 @@ function Library() {
     for (const card of store.cards) counts.set(card.topicId, (counts.get(card.topicId) ?? 0) + 1);
     return counts;
   }, [store.cards]);
+
+  // The knowledge graph for the current subject: specification → topic →
+  // concept → question → mistake → flashcard → mastery → exam. Pure derivation
+  // over the store's live slices, so it updates the moment evidence lands.
+  const subjectGraph = useMemo(() => {
+    const subject = getSubject(subjectId);
+    if (!subject) return null;
+    return buildSubjectGraph(
+      {
+        subject,
+        units: unitsFor(subjectId),
+        topics: topicsFor(subjectId),
+        questions: store.questions,
+        cards: store.cards,
+        attempts: store.attempts,
+        mistakes: store.mistakes,
+        mastery: store.mastery,
+        predictions: store.predictions,
+        examDates: store.examDates,
+        targetGrades: store.settings.targetGrades,
+      },
+      new Date(),
+    );
+  }, [subjectId, store.questions, store.cards, store.attempts, store.mistakes, store.mastery, store.predictions, store.examDates, store.settings.targetGrades]);
+
+  // Same split as the topic index's TechniqueSignal, shown in the map's
+  // subject header so the graph opens with the where-marks-go verdict.
+  const technique = useMemo(
+    () =>
+      knowledgeVsAnswering({
+        subjectId,
+        mistakes: store.mistakes,
+        questions: store.questions,
+        attempts: store.attempts,
+      }),
+    [subjectId, store.attempts, store.mistakes, store.questions],
+  );
 
   if (topic) {
     return <TopicDetail topic={topic} onBack={() => setTopicId("")} highlightMisconceptionId={misconceptionParam ?? ""} />;
@@ -75,62 +119,93 @@ function Library() {
         ) : null}
       </header>
 
-      {units.map((unit) => {
-        const topics = topicsFor(subjectId).filter((t) => t.unitId === unit.id);
-        return (
-          <section key={unit.id}>
-            <SectionHeading title={unit.title} hint={`${topics.length} topics`} />
-            <ul className="card divide-y divide-line cv-list">
-              {topics.map((row) => {
-                const mastery = masteryById.get(row.id);
-                const cards = cardCountByTopic.get(row.id) ?? 0;
-                return (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      onClick={() => setTopicId(row.id)}
-                      className="w-full text-left px-4 py-3 hover:bg-surface2 transition-colors"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm text-ink truncate">{row.title}</p>
-                        <span className="text-[11px] text-ink3 tabular-nums shrink-0">
-                          {Math.round((mastery?.mastery ?? 0) * 100)}%
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-ink3 mt-0.5 truncate">
-                        {cards} cards
-                        {mastery?.cardsDue ? ` · ${mastery.cardsDue} due` : ""} · difficulty{" "}
-                        {row.intrinsicDifficulty}/5
-                        {row.specRef ? ` · ${row.specRef}` : ""}
-                      </p>
-                      <div className="mt-1.5">
-                        <ProgressBar
-                          value={mastery?.mastery ?? 0}
-                          tone={
-                            (mastery?.mastery ?? 0) >= 0.8
-                              ? "success"
-                              : (mastery?.mastery ?? 0) >= 0.55
-                                ? "accent"
-                                : (mastery?.mastery ?? 0) > 0
-                                  ? "review"
-                                  : "danger"
-                          }
-                        />
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        );
-      })}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
+          {view === "map"
+            ? "Knowledge map — the specification connected to your exam"
+            : "Topic index — open a topic to learn it"}
+        </p>
+        <Segmented
+          ariaLabel="Library view"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "list", label: "List" },
+            { value: "map", label: "Knowledge map" },
+          ]}
+        />
+      </div>
 
-      {!units.length ? (
-        <EmptyState title="No subject selected" body="Choose your subjects in settings to see their curriculum here." />
-      ) : null}
+      {view === "map" && subjectGraph ? (
+        <KnowledgeMap graph={subjectGraph} technique={technique} />
+      ) : (
+        <>
+          <TechniqueSignal subjectId={subjectId} />
+          {units.map((unit) => {
+            const topics = topicsFor(subjectId).filter((t) => t.unitId === unit.id);
+            return (
+              <section key={unit.id}>
+                <SectionHeading title={unit.title} hint={`${topics.length} topics`} />
+                <ul className="card divide-y divide-line cv-list">
+                  {topics.map((row) => {
+                    const mastery = masteryById.get(row.id);
+                    const cards = cardCountByTopic.get(row.id) ?? 0;
+                    const status = classifyTopic(mastery);
+                    const studied = Boolean(mastery && mastery.attempts > 0);
+                    return (
+                      <li key={row.id}>
+                        <button
+                          type="button"
+                          onClick={() => setTopicId(row.id)}
+                          className="w-full text-left px-4 py-3 hover:bg-surface2 transition-colors"
+                        >
+                          <div className="flex items-baseline justify-between gap-3">
+                            <p className="text-sm text-ink truncate">{row.title}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <TopicStatusTag status={status.status} explanation={status.explanation} />
+                              {studied ? (
+                                <span className="text-[11px] text-ink3 tabular-nums">
+                                  {Math.round((mastery?.mastery ?? 0) * 100)}%
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-ink3 mt-0.5 truncate">
+                            {cards} cards
+                            {mastery?.cardsDue ? ` · ${mastery.cardsDue} due` : ""} · difficulty{" "}
+                            {row.intrinsicDifficulty}/5
+                            {row.specRef ? ` · ${row.specRef}` : ""}
+                          </p>
+                          {studied ? (
+                            <div className="mt-1.5">
+                              <ProgressBar
+                                value={mastery?.mastery ?? 0}
+                                tone={
+                                  (mastery?.mastery ?? 0) >= 0.8
+                                    ? "success"
+                                    : (mastery?.mastery ?? 0) >= 0.55
+                                      ? "accent"
+                                      : "review"
+                                }
+                              />
+                            </div>
+                          ) : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
 
-      <ManualCard subjectId={subjectId} />
+          {!units.length ? (
+            <EmptyState title="No subject selected" body="Choose your subjects in settings to see their curriculum here." />
+          ) : null}
+
+          <ManualCard subjectId={subjectId} />
+        </>
+      )}
     </div>
   );
 }
@@ -164,6 +239,22 @@ function TopicDetail({
     document.getElementById(highlightMisconceptionId)?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [highlightMisconceptionId]);
   const mastery = store.mastery.find((m) => m.topicId === topic.id);
+
+  // This topic's own knowledge-vs-answering split: aggregated from this
+  // topic's losses only, so a technique-shaped leak inside an otherwise
+  // knowledge-heavy subject still shows up here. Rendered under the mastery
+  // bar; silent until the topic has losses.
+  const technique = useMemo(
+    () =>
+      knowledgeVsAnswering({
+        subjectId: topic.subjectId,
+        topicId: topic.id,
+        mistakes: store.mistakes,
+        questions: store.questions,
+        attempts: store.attempts,
+      }),
+    [topic.subjectId, topic.id, store.attempts, store.mistakes, store.questions],
+  );
 
   async function explain() {
     setBusy("explain");
@@ -259,6 +350,37 @@ function TopicDetail({
         <div className="mt-3 max-w-sm">
           <ProgressBar value={mastery?.mastery ?? 0} label="Mastery" />
         </div>
+        {technique.mistakes > 0 ? (
+          <div className="mt-3 max-w-md">
+            <p className="text-[11px] text-ink2 leading-relaxed">
+              <span className="font-medium text-ink">Knowledge vs answering</span>
+              {" — "}
+              {Math.round(technique.knowledgeShare * 100)}% knowledge ·{" "}
+              {Math.round(technique.answeringShare * 100)}% answering
+              {technique.reliable
+                ? technique.verdict === "knowledge"
+                  ? " — learn this topic first"
+                  : technique.verdict === "answering"
+                    ? " — timed questions on this topic are the fix"
+                    : " — alternate learning with timed questions"
+                : ` — too few losses yet to call it (${technique.mistakes})`}
+            </p>
+            <div
+              role="img"
+              aria-label={`Knowledge ${Math.round(technique.knowledgeShare * 100)}% of lost marks, answering ${Math.round(
+                technique.answeringShare * 100,
+              )}%`}
+              className="mt-1 flex h-1.5 overflow-hidden rounded-full bg-surface2"
+            >
+              {technique.knowledgeShare > 0 ? (
+                <span className="h-full bg-accent" style={{ width: `${technique.knowledgeShare * 100}%` }} />
+              ) : null}
+              {technique.answeringShare > 0 ? (
+                <span className="h-full bg-ink3" style={{ width: `${technique.answeringShare * 100}%` }} />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <Panel>
@@ -332,7 +454,6 @@ function TopicDetail({
         </Button>
         <ButtonLink href={`/practice?topic=${encodeURIComponent(topic.id)}`}>Practise questions</ButtonLink>
         <ButtonLink href={`/review?topic=${encodeURIComponent(topic.id)}`}>Review cards</ButtonLink>
-        <ButtonLink href={`/tutor?topic=${encodeURIComponent(topic.id)}`}>Ask the tutor</ButtonLink>
       </div>
 
       {status ? <p className="text-xs text-ink3">{status}</p> : null}

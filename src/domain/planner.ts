@@ -1,5 +1,7 @@
+import { countdownGuidance } from "./exam-countdown";
 import { daysToExam, examUrgency } from "./recommender";
 import { toDateOnly } from "./scheduling";
+import { REVIEW_CAP, allocateDay, reviewBlocksNeeded, type AllocOpportunity, type SubjectEvidence } from "./subject-allocation";
 import type {
   ActivityKind,
   Availability,
@@ -41,6 +43,13 @@ export interface PlanInput {
   targetGrades?: Record<Id, string>;
   /** Existing plan; done/skipped entries are carried through untouched. */
   existing?: PlannedSession[];
+  /**
+   * Live cross-subject evidence (due cards, open mistakes, recent losses) so
+   * scarce daily blocks go to whichever subject's work has the highest
+   * expected return. Absent, or present but evidence-free, the day keeps the
+   * deficit-weighted split.
+   */
+  evidence?: Map<Id, SubjectEvidence>;
   now?: Date;
   /** Injected so plans are reproducible in tests. */
   idFactory?: () => string;
@@ -48,21 +57,92 @@ export interface PlanInput {
 
 const DEFAULT_HORIZON = 14;
 const DEFAULT_DAY_START = 16 * 60; // 16:00 — after school, the realistic default.
+/** A plan further out than this is fiction; it is rebuilt as the date nears. */
+const MAX_HORIZON_DAYS = 90;
+
+/**
+ * Default horizon: the whole run-up to each subject's next exam. The plan is
+ * optimised to exam day, so with exams on the calendar it reaches the furthest
+ * of them (capped) rather than a rolling fortnight; without exams it stays a
+ * rolling DEFAULT_HORIZON.
+ */
+function horizonToExams(subjectIds: Id[], exams: ExamDate[], today: IsoDate): number {
+  let furthest = DEFAULT_HORIZON;
+  for (const subjectId of subjectIds) {
+    const days = daysToExam(exams, subjectId, today);
+    if (days != null && days > furthest) furthest = days;
+  }
+  return Math.min(furthest, MAX_HORIZON_DAYS);
+}
 
 export function buildPlan(input: PlanInput): PlannedSession[] {
   const now = input.now ?? new Date();
   const today = toDateOnly(now);
-  const horizon = input.horizonDays ?? DEFAULT_HORIZON;
+  const horizon = input.horizonDays ?? horizonToExams(input.subjectIds, input.exams, today);
   const blockLength = input.sessionLengthMinutes;
   const nextId = input.idFactory ?? (() => crypto.randomUUID());
 
   const kept = (input.existing ?? []).filter((s) => s.status !== "pending" || s.date < today);
+
+  // Per-subject exam deadline: a subject stops being scheduled on its exam day
+  // and after — the run-up is what the plan optimises, not the exam itself.
+  const examBySubject = new Map<Id, IsoDate>();
+  for (const subjectId of input.subjectIds) {
+    const next = input.exams
+      .filter((e) => e.subjectId === subjectId && e.date >= today)
+      .map((e) => e.date)
+      .sort()[0];
+    if (next) examBySubject.set(subjectId, next);
+  }
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
 
   // Working copy of mastery so the planner can "spend" attention within one
   // build: a topic scheduled on Monday looks less urgent by Wednesday.
   const projected = new Map(input.mastery.map((m) => [m.topicId, m.mastery]));
   const lastScheduled = new Map<Id, IsoDate>();
+
+  // Working copy of the due backlog so a review block planned for Monday stops
+  // the same cards re-appearing on Wednesday. Cards that accrue after today's
+  // snapshot are unknown to this build; the plan is rebuilt regularly, which
+  // is what keeps the projection honest.
+  const dueRemaining = new Map<Id, { due: number; overdue: number; openMistakes: number; recentLossMarks: number }>();
+  if (input.evidence) {
+    for (const [subjectId, ev] of input.evidence) {
+      dueRemaining.set(subjectId, {
+        due: ev.dueCards,
+        overdue: ev.overdueCards,
+        openMistakes: ev.openMistakes,
+        recentLossMarks: ev.recentLossMarks,
+      });
+    }
+  }
+
+  // Static per-subject shape: mean mastery, untouched-topic breadth and the
+  // target-grade gap, computable once per build.
+  const subjectProfile = new Map<Id, { masteryAvg: number; untouchedShare: number; targetBoost: number }>();
+  for (const subjectId of input.subjectIds) {
+    const rows = input.mastery.filter((m) => m.subjectId === subjectId);
+    const subjectTopics = input.topics.filter((t) => t.subjectId === subjectId);
+    const avg = rows.length ? rows.reduce((a, m) => a + m.mastery, 0) / rows.length : 0.3;
+    const studied = new Set(rows.filter((m) => m.mastery > 0).map((m) => m.topicId));
+    const untouched = subjectTopics.length
+      ? subjectTopics.filter((t) => !studied.has(t.id)).length / subjectTopics.length
+      : 0;
+    let targetBoost = 1;
+    const subject = input.subjects?.find((s) => s.id === subjectId);
+    const target = input.targetGrades?.[subjectId];
+    if (subject && target) {
+      const boundary = subject.gradeBoundaries.find((b) => b.grade === target);
+      if (boundary) {
+        // Same attainment model as subjectWeight: mastery compresses into a
+        // realistic attainment percent, so the gap is in comparable units.
+        const predicted = avg * 92 + 4;
+        const gap = boundary.percent - predicted;
+        if (gap > 0) targetBoost = 1 + Math.min(0.6, (gap / 100) * 2);
+      }
+    }
+    subjectProfile.set(subjectId, { masteryAvg: avg, untouchedShare: untouched, targetBoost });
+  }
 
   const out: PlannedSession[] = [...kept];
 
@@ -89,25 +169,84 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
     const blocks = Math.max(1, Math.floor(minutes / blockLength));
     let cursor = input.dayStartMinute ?? DEFAULT_DAY_START;
 
-    const shares = allocateBlocks(blocks, input.subjectIds, (subjectId) =>
-      subjectWeight(subjectId, input.mastery, input.exams, date, input.subjects, input.targetGrades),
-    );
+    // Subjects whose exam has passed (or is today) do not take blocks: their
+    // run-up is over, so the day's attention goes to subjects still climbing
+    // toward their own exam.
+    const active = input.subjectIds.filter((subjectId) => {
+      const exam = examBySubject.get(subjectId);
+      return !exam || date < exam;
+    });
+    if (!active.length) continue;
 
-    for (const subjectId of input.subjectIds) {
+    // Who gets the window? With live evidence the day goes to the strongest
+    // work first — a due backlog, recent losses and open mistakes outrank a
+    // subject with nothing at risk. Without evidence the deficit-weighted
+    // split stands.
+    const opportunities: AllocOpportunity[] | null = input.evidence
+      ? active.map((subjectId) => {
+          const ev = dueRemaining.get(subjectId);
+          const profile = subjectProfile.get(subjectId) ?? { masteryAvg: 0.3, untouchedShare: 0, targetBoost: 1 };
+          const days = daysToExam(input.exams, subjectId, date);
+          return {
+            subjectId,
+            dueCards: ev?.due ?? 0,
+            overdueCards: ev?.overdue ?? 0,
+            openMistakes: ev?.openMistakes ?? 0,
+            recentLossMarks: ev?.recentLossMarks ?? 0,
+            masteryAvg: profile.masteryAvg,
+            untouchedShare: profile.untouchedShare,
+            daysToExam: days,
+            urgency: examUrgency(days),
+            targetBoost: profile.targetBoost,
+            phase: countdownGuidance(days).phase,
+          };
+        })
+      : null;
+
+    let shares: Map<Id, number>;
+    let allocNotes: string[] = [];
+    if (opportunities) {
+      const outcome = allocateDay(blocks, opportunities);
+      if (!outcome.fallback) {
+        shares = outcome.shares;
+        allocNotes = outcome.notes;
+      } else {
+        shares = allocateBlocks(blocks, active, (subjectId) =>
+          subjectWeight(subjectId, input.mastery, input.exams, date, input.subjects, input.targetGrades),
+        );
+      }
+    } else {
+      shares = allocateBlocks(blocks, active, (subjectId) =>
+        subjectWeight(subjectId, input.mastery, input.exams, date, input.subjects, input.targetGrades),
+      );
+    }
+
+    let dayFirst: PlannedSession | undefined;
+    for (const subjectId of active) {
       const count = shares.get(subjectId) ?? 0;
+      const ev = dueRemaining.get(subjectId);
+      // Review blocks lead a subject's day while cards are actually due. With
+      // evidence we know the backlog per subject; without it every subject's
+      // first block stays a review, as before.
+      const reviewSlots = input.evidence
+        ? ev
+          ? Math.min(count, reviewBlocksNeeded(ev.due, ev.overdue))
+          : 0
+        : Math.min(1, count);
       for (let b = 0; b < count; b++) {
         const pick = chooseActivity({
           subjectId,
           date,
           dayOffset,
           blockIndex: b,
+          dueReviewBlocks: reviewSlots,
           topics: input.topics,
           projected,
           lastScheduled,
           exams: input.exams,
           topicById,
         });
-        out.push({
+        const session: PlannedSession = {
           id: nextId(),
           userId: input.userId,
           date,
@@ -118,17 +257,140 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
           activity: pick.activity,
           reason: pick.reason,
           status: "pending",
-        });
+        };
+        out.push(session);
+        if (!dayFirst) dayFirst = session;
         cursor += blockLength + 5; // a five-minute breather between blocks
         if (pick.topicId) {
           projected.set(pick.topicId, Math.min(1, (projected.get(pick.topicId) ?? 0) + 0.12));
           lastScheduled.set(pick.topicId, date);
         }
       }
+      if (ev && reviewSlots > 0) {
+        // A review block clears up to a block's worth of the backlog, so
+        // later days in the same horizon see the remainder rather than the
+        // same cards twice.
+        ev.due = Math.max(0, ev.due - reviewSlots * REVIEW_CAP);
+        ev.overdue = Math.max(0, ev.overdue - reviewSlots * REVIEW_CAP);
+      }
+    }
+
+    if (allocNotes.length && dayFirst && active.length > 1) {
+      const names = new Map((input.subjects ?? []).map((s) => [s.id, s.name]));
+      const human = allocNotes
+        .join(" ")
+        .replace(/(?:^|\s)(aqa-[a-z0-9-]+)/g, (_m, id: string) => ` ${names.get(id) ?? id}`)
+        .trim();
+      dayFirst.reason = `${dayFirst.reason} ${human.slice(0, 200)}`;
     }
   }
 
   return out.sort((a, b) => (a.date === b.date ? a.startMinute - b.startMinute : a.date < b.date ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
+// Rebuild changelog — what a rebuilt schedule actually changed.
+//
+// Rebuilds are derived state, so the honest feedback for "why did my week
+// move?" is a diff of the pending future work before and after the build,
+// in plain language: paper blocks added when a subject entered the technique
+// fortnight, first-pass learning stopping in the final days, review loads
+// shifting as backlogs clear. Trivia (a single block shuffling a minute) is
+// suppressed so the changelog says something or says nothing.
+// ---------------------------------------------------------------------------
+
+interface PlanSubjectAggregate {
+  activities: Partial<Record<ActivityKind, number>>;
+  learnTopics: Set<Id>;
+  start: IsoDate;
+  end: IsoDate;
+}
+
+export function summarizePlanChange(input: {
+  previous: PlannedSession[];
+  next: PlannedSession[];
+  exams: ExamDate[];
+  /** Subject display names keyed by id. */
+  subjectNames?: Record<Id, string>;
+  today: IsoDate;
+}): string[] {
+  const future = (list: PlannedSession[]) => list.filter((s) => s.status === "pending" && s.date >= input.today);
+  const prev = future(input.previous);
+  const next = future(input.next);
+  if (!prev.length && !next.length) return [];
+
+  const aggregate = (list: PlannedSession[]): Map<Id, PlanSubjectAggregate> => {
+    const bySubject = new Map<Id, PlanSubjectAggregate>();
+    for (const s of list) {
+      let row = bySubject.get(s.subjectId);
+      if (!row) {
+        row = { activities: {}, learnTopics: new Set(), start: s.date, end: s.date };
+        bySubject.set(s.subjectId, row);
+      }
+      row.activities[s.activity] = (row.activities[s.activity] ?? 0) + 1;
+      if (s.activity === "learn" && s.topicId) row.learnTopics.add(s.topicId);
+      if (s.date < row.start) row.start = s.date;
+      if (s.date > row.end) row.end = s.date;
+    }
+    return bySubject;
+  };
+
+  const before = aggregate(prev);
+  const after = aggregate(next);
+  const subjects = [...new Set([...before.keys(), ...after.keys()])];
+  const lines: string[] = [];
+
+  const count = (row: PlanSubjectAggregate | undefined, k: ActivityKind): number => row?.activities[k] ?? 0;
+
+  for (const subjectId of subjects) {
+    const a = before.get(subjectId);
+    const b = after.get(subjectId);
+    const name = input.subjectNames?.[subjectId] ?? subjectId;
+    if (!b) {
+      lines.push(`${name}'s run-up is over — no longer scheduled ahead.`);
+      continue;
+    }
+    if (!a) {
+      lines.push(`${name} joins the schedule ahead.`);
+      continue;
+    }
+
+    const parts: string[] = [];
+    const prevLearn = count(a, "learn");
+    const nextLearn = count(b, "learn");
+    const addedTopics = [...b.learnTopics].filter((t) => !a.learnTopics.has(t));
+
+    if (prevLearn > 0 && nextLearn === 0) parts.push("first-pass learning stopped");
+    else if (addedTopics.length > 0) parts.push(`${addedTopics.length} new first pass${addedTopics.length === 1 ? "" : "es"} added`);
+
+    const papers = count(b, "paper") - count(a, "paper");
+    if (papers > 0) parts.push(`${papers} timed-paper block${papers === 1 ? "" : "s"} added`);
+    else if (papers < 0) parts.push(`${-papers} timed-paper block${papers === -1 ? "" : "s"} removed`);
+
+    const reviews = count(b, "flashcards") - count(a, "flashcards");
+    if (reviews >= 2) parts.push(`${reviews} due-card review blocks added`);
+    else if (reviews <= -2) parts.push(`${-reviews} due-card review blocks freed`);
+
+    const practice = count(b, "practice") - count(a, "practice");
+    if (practice >= 2) parts.push(`${practice} exam-question blocks added`);
+    else if (practice <= -2) parts.push(`${-practice} exam-question blocks freed`);
+
+    const recall = count(b, "recall") - count(a, "recall");
+    if (recall >= 2) parts.push(`${recall} active-recall blocks added`);
+    else if (recall <= -2) parts.push(`${-recall} active-recall blocks freed`);
+
+    if (!parts.length) continue;
+
+    // When the mix moved in a countdown-driven way (papers appearing, or
+    // first-pass learning stopping outright) and an exam is inside the
+    // window, name the phase the plan has moved into.
+    const days = daysToExam(input.exams, subjectId, input.today);
+    const countdownDriven = papers !== 0 || (prevLearn > 0 && nextLearn === 0);
+    const phaseLabel = days != null && countdownDriven ? countdownGuidance(days).label : null;
+    lines.push(`${name}${phaseLabel ? ` (${phaseLabel})` : ""}: ${parts.join(", ")}.`);
+  }
+
+  return lines.slice(0, 6);
 }
 
 /**
@@ -206,6 +468,8 @@ interface ChooseInput {
   date: IsoDate;
   dayOffset: number;
   blockIndex: number;
+  /** How many of this subject's blocks today are review blocks (0 = none due). */
+  dueReviewBlocks: number;
   topics: Topic[];
   projected: Map<Id, number>;
   lastScheduled: Map<Id, IsoDate>;
@@ -216,18 +480,26 @@ interface ChooseInput {
 function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?: Id; reason: string } {
   const days = daysToExam(input.exams, input.subjectId, input.date);
 
-  // Every study day opens with due cards: reviews are time-sensitive in a way
+  // Study days open with due cards: reviews are time-sensitive in a way
   // nothing else is, and clearing them first stops the backlog compounding.
-  if (input.blockIndex === 0) {
+  // When evidence says the subject has no due cards the slot goes to real
+  // work instead of a hollow review block.
+  if (input.blockIndex < input.dueReviewBlocks) {
     return {
       activity: "flashcards",
       reason: "Clear today's due cards first — spaced repetition only works on time.",
     };
   }
 
-  // Inside the last fortnight, alternate weak-topic practice with full papers.
-  if (days != null && days <= 14 && input.blockIndex % 3 === 2) {
-    return { activity: "paper", reason: `${days} days out — timed paper practice.` };
+  // Exam countdown: timed papers step up as the date closes in — every third
+  // block through the technique fortnight, alternating with topic work inside
+  // the final week, and never in the last 72 hours or beyond the fortnight.
+  const guidance = countdownGuidance(days);
+  if (guidance.paperCadence > 0 && input.blockIndex % guidance.paperCadence === guidance.paperCadence - 1) {
+    return {
+      activity: "paper",
+      reason: `${days} day${days === 1 ? "" : "s"} out — timed paper practice.`,
+    };
   }
 
   const candidates = input.topics
@@ -246,11 +518,34 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
   if (!pick) return { activity: "flashcards", reason: "Keep recall warm." };
 
   const mastery = input.projected.get(pick.topic.id) ?? 0;
+
+  // Final days: opening a brand-new topic this close adds stress faster than
+  // marks, so the blocks stay on light, evidence-backed work instead.
+  if (mastery === 0 && guidance.phase === "final") {
+    const studied = candidates.find(
+      (c) => c.topic.id !== pick.topic.id && (input.projected.get(c.topic.id) ?? 0) > 0,
+    );
+    if (studied) {
+      return {
+        activity: "recall",
+        topicId: studied.topic.id,
+        reason: `${days} day${days === 1 ? "" : "s"} to the exam — light final recall on ${studied.topic.title}, nothing new.`,
+      };
+    }
+    return {
+      activity: "flashcards",
+      reason: `${days} day${days === 1 ? "" : "s"} to the exam — no new first passes. Keep due cards clear and protect sleep.`,
+    };
+  }
+
   if (mastery === 0) {
     return {
       activity: "learn",
       topicId: pick.topic.id,
-      reason: `First pass over ${pick.topic.title}.`,
+      reason:
+        guidance.phase === "technique"
+          ? `${days} days out — targeted first pass over ${pick.topic.title}.`
+          : `First pass over ${pick.topic.title}.`,
     };
   }
   if (mastery < 0.55) {

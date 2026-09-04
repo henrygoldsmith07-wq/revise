@@ -109,3 +109,46 @@ export function buildSessionStructure(input: {
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
+
+// ---------------------------------------------------------------------------
+// Today's review session — "15–25 minutes of due cards, then stop."
+//
+// The Today view must never present the whole queue as a dashboard. It sizes
+// one bounded session from the day's due cards and stops: no spec-point
+// totals, no "everything you owe" listing. Seconds-per-card matches the
+// /review queue builder's own 2.5 cards/minute so what Today promises is
+// exactly what /review runs.
+// ---------------------------------------------------------------------------
+
+/** One review card ≈ 24 s, matching buildReviewQueue's ~2.5 cards per minute. */
+export const REVIEW_SECONDS_PER_CARD = 24;
+
+export interface DueSessionSize {
+  /** Cards in today's session (never more than the day's due count). */
+  cards: number;
+  /** Whole minutes the session will take, floored at 1. */
+  minutes: number;
+  /** Every enrolled card due right now, uncapped. */
+  totalDue: number;
+  /** True when the session is a slice of a larger due queue. */
+  capped: boolean;
+}
+
+/**
+ * Size today's session from the raw due count. The target is the student's
+ * session length (default 20 minutes); the session never exceeds what is
+ * actually due, so a light day is a light session, and the day never runs
+ * longer than the target even when the queue is huge.
+ */
+export function sizeDueSession(
+  totalDue: number,
+  opts: { targetMinutes?: number } = {},
+): DueSessionSize {
+  const targetMinutes = clamp(Math.round(opts.targetMinutes ?? 20), 1, 60);
+  const due = Math.max(0, totalDue);
+  if (due === 0) return { cards: 0, minutes: 0, totalDue: 0, capped: false };
+  const maxCards = Math.max(1, Math.round((targetMinutes * 60) / REVIEW_SECONDS_PER_CARD));
+  const cards = Math.min(due, maxCards);
+  const minutes = Math.max(1, Math.round((cards * REVIEW_SECONDS_PER_CARD) / 60));
+  return { cards, minutes, totalDue: due, capped: cards < due };
+}

@@ -42,9 +42,14 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
     ? paper.paperSpecId
     : subject?.papers[0]?.id ?? FALLBACK_PAPER_SPEC.id;
   const [paperSpecId, setPaperSpecId] = useState(initialPaperSpecId);
+  // Correlates the frozen prediction with the closed outcome for this run.
+  const [paperRunId] = useState(() => crypto.randomUUID());
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  // The prediction is frozen the moment the paper starts — recomputing it
+  // after marking would let later mastery silently rewrite history.
+  const outcomeStartedRef = useRef(false);
   const [now, setNow] = useState(0);
   const [reviewing, setReviewing] = useState(false);
   const [exitRequested, setExitRequested] = useState(false);
@@ -152,6 +157,10 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
         }
 
         await store.addPaper({ ...paper, paperSpecId, status: "practised" });
+        // Close the outcome loop: actual awarded marks vs the frozen
+        // sit-time prediction. Feeds the paper gain factor on the next pass.
+        const actualMarks = attempts.reduce((total, attempt) => total + attempt.awarded, 0);
+        await store.closePaperOutcome(paperRunId, actualMarks);
         setResult({
           attempts,
           timedOut,
@@ -180,6 +189,22 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
     setReviewing(false);
     setExitRequested(false);
     questionStartedAt.current = timestamp;
+    // Freeze the sit-time prediction for the outcome feedback loop: the same
+    // calibration-adjusted simulation the Papers page shows, captured before
+    // any question is answered.
+    if (!outcomeStartedRef.current) {
+      outcomeStartedRef.current = true;
+      const simulation = store.previewPaper(paper.subjectId, paperSpecId, questions.map((q) => q.id));
+      if (simulation && simulation.totalMarks > 0) {
+        void store.beginPaperOutcome({
+          subjectId: paper.subjectId,
+          paperId: paper.id,
+          paperRunId,
+          predictedMarks: simulation.predictedMarks,
+          totalMarks: simulation.totalMarks,
+        });
+      }
+    }
   }
 
   function goToQuestion(nextIndex: number) {

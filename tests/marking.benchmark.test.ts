@@ -16,14 +16,14 @@ import type { Question } from "@/domain/types";
 
 function probeQuestion(overrides: Partial<Question> = {}): Question {
   return {
-    id: "seed-q:probe",
+    id: "cnt:question:probe",
     subjectId: "wjec-alevel-chemistry",
     topicIds: ["wjec-alevel-chemistry.moles"],
     kind: "structured",
     stem: "Probe",
     parts: [
-      { id: "seed-q:probe:0", label: "(a)", prompt: "Calculate the concentration", marks: 2, markScheme: ["Uses n=cV with correct units", "Answer 0.25 mol dm-3 (accept 0.24-0.26)"], modelAnswer: "n=cV", aos: ["AO2"], specPointIds: ["wjec-alevel-chemistry.moles.sp-01"], learningClaims: ["perform calculations using n=cV"] },
-      { id: "seed-q:probe:1", label: "(b)", prompt: "Explain the trend", marks: 2, markScheme: ["References increased nuclear charge and similar shielding", "Links to first ionisation energy"], modelAnswer: "Trend", aos: ["AO1"], specPointIds: ["wjec-alevel-chemistry.atomic-structure.sp-01"], learningClaims: ["explain ionisation trends"] },
+      { id: "cnt:question:probe:0", label: "(a)", prompt: "Calculate the concentration", marks: 2, markScheme: ["Uses n=cV with correct units", "Answer 0.25 mol dm-3 (accept 0.24-0.26)"], modelAnswer: "n=cV", aos: ["AO2"], specPointIds: ["wjec-alevel-chemistry.moles.sp-01"], learningClaims: ["perform calculations using n=cV"] },
+      { id: "cnt:question:probe:1", label: "(b)", prompt: "Explain the trend", marks: 2, markScheme: ["References increased nuclear charge and similar shielding", "Links to first ionisation energy"], modelAnswer: "Trend", aos: ["AO1"], specPointIds: ["wjec-alevel-chemistry.atomic-structure.sp-01"], learningClaims: ["explain ionisation trends"] },
     ],
     totalMarks: 4,
     calculatorAllowed: true,
@@ -38,14 +38,14 @@ function probeQuestion(overrides: Partial<Question> = {}): Question {
 
 function algebraQuestion(overrides: Partial<Question> = {}): Question {
   return {
-    id: "seed-q:algebra",
+    id: "cnt:question:algebra",
     subjectId: "aqa-gcse-maths",
     topicIds: ["aqa-gcse-maths.algebra"],
     kind: "structured",
     stem: "Expand (x+2)(x-3).",
     parts: [
       {
-        id: "seed-q:algebra:0",
+        id: "cnt:question:algebra:0",
         label: "(a)",
         prompt: "Expand (x+2)(x-3).",
         marks: 3,
@@ -72,28 +72,28 @@ describe("examiner-style marking validation", () => {
     const question = probeQuestion();
     // Exact wording
     const full = markQuestion(question, {
-      "seed-q:probe:0": "I used n=cV, got 0.25 mol dm-3.",
-      "seed-q:probe:1": "Nuclear charge rises, shielding similar, so ionisation energy rises.",
+      "cnt:question:probe:0": "I used n=cV, got 0.25 mol dm-3.",
+      "cnt:question:probe:1": "Nuclear charge rises, shielding similar, so ionisation energy rises.",
     });
     expect(full.awarded).toBeGreaterThanOrEqual(3);
     // No answer -> 0
     const blank = markQuestion(question, {});
     expect(blank.awarded).toBe(0);
     // Partial: only one part answered
-    const partial = markQuestion(question, { "seed-q:probe:0": "0.25 mol dm-3" });
+    const partial = markQuestion(question, { "cnt:question:probe:0": "0.25 mol dm-3" });
     expect(partial.awarded).toBeGreaterThan(0);
     expect(partial.awarded).toBeLessThan(4);
   });
 
   it("numeric match credits a correct number even with flaky prose", () => {
     const question = probeQuestion();
-    const r = markQuestion(question, { "seed-q:probe:0": "0.25", "seed-q:probe:1": "no idea" });
-    expect(r.marked.find((m) => m.partId === "seed-q:probe:0")!.awarded).toBeGreaterThan(0);
+    const r = markQuestion(question, { "cnt:question:probe:0": "0.25", "cnt:question:probe:1": "no idea" });
+    expect(r.marked.find((m) => m.partId === "cnt:question:probe:0")!.awarded).toBeGreaterThan(0);
   });
 
   it("does not reward implication: a wrong answer scores 0", () => {
     const question = probeQuestion();
-    const r = markQuestion(question, { "seed-q:probe:0": "The sky is blue", "seed-q:probe:1": "The sky is blue" });
+    const r = markQuestion(question, { "cnt:question:probe:0": "The sky is blue", "cnt:question:probe:1": "The sky is blue" });
     expect(r.awarded).toBe(0);
     expect(r.feedback).toMatch(/scheme|missing|not yet/i);
   });
@@ -157,12 +157,12 @@ describe("AI vs human benchmark — offline harness", () => {
     // Before symbolic matching, "x^2 + x - 6" was credited because it shares
     // digits (2, 6) with the scheme "x^2 - x - 6". Now a wrong pure expression
     // is rejected even though the digit overlap remains.
-    const wrong = markQuestion(algebraQuestion(), { "seed-q:algebra:0": "x^2 + x - 6" });
-    const wrongPoint = wrong.marked.find((m) => m.partId === "seed-q:algebra:0")!;
+    const wrong = markQuestion(algebraQuestion(), { "cnt:question:algebra:0": "x^2 + x - 6" });
+    const wrongPoint = wrong.marked.find((m) => m.partId === "cnt:question:algebra:0")!;
     expect(wrongPoint.creditedPoints).not.toContain("x^2 - x - 6");
 
     // While an equivalent form is still credited.
-    const factored = markQuestion(algebraQuestion(), { "seed-q:algebra:0": "(x+2)(x-3)" });
+    const factored = markQuestion(algebraQuestion(), { "cnt:question:algebra:0": "(x+2)(x-3)" });
     expect(factored.marked[0]!.creditedPoints).toContain("x^2 - x - 6");
   });
 

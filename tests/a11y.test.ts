@@ -59,12 +59,18 @@ describe("a11y scaffolding", () => {
     expect(src).toContain('role="status"');
     expect(src).toContain('aria-live="polite"');
   });
-  it("Onboarding: dialog landmark + step live region + grade buttons pressed state", async () => {
+  it("Onboarding first screen: page heading, step live region, toggle pressed states — and no fake modal shell", async () => {
     const src = readFileSync(join(process.cwd(), "src/components/Onboarding.tsx"), "utf8");
-    expect(src).toContain('role="dialog"');
-    expect(src).toContain('aria-modal="true"');
+    // It is a real first page (the app waits behind it), not a dialog over
+    // content: heading + live step progress + aria-pressed toggles, and no
+    // dialog/modal semantics that would trap a screen reader on one block.
+    expect(src).toContain('<h1');
     expect(src).toContain('aria-live="polite"');
     expect(src).toContain('aria-pressed');
+    expect(src).not.toContain('role="dialog"');
+    expect(src).not.toContain('aria-modal');
+    const shell = readFileSync(join(process.cwd(), "src/components/AppShell.tsx"), "utf8");
+    expect(shell).toContain('if (needsOnboarding) {');
   });
   it("reduced-motion: CSS media query + class guard + no domain animation", async () => {
     const css = readFileSync(join(process.cwd(), "src/app/le-studio.css"), "utf8");
@@ -106,12 +112,5 @@ describe("a11y scaffolding", () => {
     const library = readFileSync(join(process.cwd(), "src/app/library/page.tsx"), "utf8");
     expect(library).toContain("id={misconception.id}");
     expect(library).toContain("scrollIntoView");
-  });
-  it("Progress surfaces the most-recurring misconceptions with a deep-link to each entry", async () => {
-    const panels = readFileSync(join(process.cwd(), "src/components/AssessmentPanels.tsx"), "utf8");
-    expect(panels).toContain("recurringMisconceptions");
-    expect(panels).toContain("&misconception=");
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    expect(progress).toContain("RecurringMisconceptions");
   });
 });

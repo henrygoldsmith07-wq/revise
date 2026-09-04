@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
+import { diagnosePrerequisiteWeakness, type PrerequisiteDiagnosis } from "@/domain/prerequisite-diagnosis";
 import { remediationForMistake } from "@/domain/remediation";
 import { rankQuestionsForExposure } from "@/domain/question-exposure";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
@@ -15,6 +16,9 @@ import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { parseQuickSessionMinutes, type QuickSessionMinutes } from "@/domain/quick-session";
+import { buildWeakTopicExam } from "@/domain/weak-topic-exam";
+import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
+import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
 import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionMode";
 import { RichText } from "@/components/RichText";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
@@ -61,6 +65,11 @@ function Practice() {
   const [topicId, setTopicId] = useState(topicParam ?? farTransferRetest?.topicIds[0] ?? "");
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
+  const [weakExam, setWeakExam] = useState(() => params.get("weak") === "1");
+  const weakExamPlan = useMemo(
+    () => buildWeakTopicExam({ mistakes: store.mistakes, questions: store.questions }),
+    [store.mistakes, store.questions],
+  );
   const [sessionAttempts, setSessionAttempts] = useState<Attempt[]>([]);
   const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>({});
   const [closed, setClosed] = useState(false);
@@ -94,6 +103,29 @@ function Practice() {
         : null,
     [originalAttempt, retestMistake, retestQuestion],
   );
+
+  // Repeated misses on the selected topic? If so, is the real weakness one of
+  // its prerequisites? When it is, steer there instead of building yet another
+  // queue of the failing topic's own questions. Skipped in retest / weak-topic
+  // / far-transfer modes, which have their own focused intent.
+  const prereqDiagnosis: PrerequisiteDiagnosis | null = useMemo(() => {
+    if (weakExam || retestMistake || farTransferRetest || !topicId) return null;
+    const topic = getTopic(topicId);
+    if (!topic) return null;
+    return diagnosePrerequisiteWeakness({
+      topicId,
+      topics: topicsFor(topic.subjectId),
+      attempts: store.attempts,
+      mistakes: store.mistakes,
+      mastery: store.mastery,
+      cards: store.cards,
+      now: new Date(),
+    });
+  }, [topicId, weakExam, retestMistake, farTransferRetest, store.attempts, store.mistakes, store.mastery, store.cards]);
+  const prereqTarget =
+    prereqDiagnosis?.failing && prereqDiagnosis.verdict && prereqDiagnosis.verdict.kind !== "topic-itself"
+      ? getTopic(prereqDiagnosis.verdict.prereqTopicId)
+      : undefined;
 
   /**
    * Order the pool once, then hold it. Marking an answer changes mastery and
@@ -278,6 +310,10 @@ function Practice() {
 
   const topics = subjectId ? topicsFor(subjectId) : [];
 
+  if (weakExam) {
+    return <WeakTopicExamMode onExit={() => setWeakExam(false)} />;
+  }
+
   if (quickMinutes) {
     return (
       <QuickSessionMode
@@ -346,6 +382,33 @@ function Practice() {
         </Panel>
       ) : null}
 
+      {weakExamPlan.questionIds.length ? (
+        <section>
+          <SectionHeading title="This week's misses" hint="Questions behind marks dropped in the last 7 days — re-sat now that the mark scheme is known." />
+          <button
+            type="button"
+            onClick={() => setWeakExam(true)}
+            className="card p-4 text-left hover:border-ink3 transition-colors w-full"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">Weak-topic exam</p>
+                <p className="text-xs text-ink3 mt-1">
+                  {weakExamPlan.questionIds.length} question{weakExamPlan.questionIds.length === 1 ? "" : "s"} ·{" "}
+                  {weakExamPlan.totalMarks} marks ·{" "}
+                  {weakExamPlan.topics
+                    .map((topic) => getTopic(topic.topicId)?.title ?? topic.topicId)
+                    .join(", ")}
+                </p>
+              </div>
+              <Pill tone="danger" className="shrink-0">
+                {weakExamPlan.totalMarks} marks lost
+              </Pill>
+            </div>
+          </button>
+        </section>
+      ) : null}
+
       <QuickSessionPicker onSelect={setQuickMinutes} />
 
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
@@ -386,6 +449,14 @@ function Practice() {
 
       {note ? <p className="text-xs text-ink3">{note}</p> : null}
 
+      {prereqDiagnosis && prereqTarget && current ? (
+        <PrerequisiteCheck
+          diagnosis={prereqDiagnosis}
+          targetTitle={getTopic(topicId)?.title ?? topicId}
+          prereq={{ id: prereqTarget.id, title: prereqTarget.title }}
+        />
+      ) : null}
+
       {retestMistake && current ? (
         <Panel className="card-2 border-l-4 border-l-accent">
           <div className="flex flex-wrap items-center gap-2">
@@ -411,8 +482,8 @@ function Practice() {
       ) : retestId ? (
         <Panel>
           <p className="text-sm text-ink2">That mistake or its source question is no longer available.</p>
-          <ButtonLink href="/progress" variant="primary" className="inline-block mt-3">
-            Return to Progress
+          <ButtonLink href="/" variant="primary" className="inline-block mt-3">
+            Back to Today
           </ButtonLink>
         </Panel>
       ) : null}
@@ -466,8 +537,8 @@ function Practice() {
             }}
           />
           {retestMistake ? (
-            <ButtonLink href="/progress" variant="primary" className="inline-block">
-              Back to Progress
+            <ButtonLink href="/" variant="primary" className="inline-block">
+              Back to Today
             </ButtonLink>
           ) : null}
         </>

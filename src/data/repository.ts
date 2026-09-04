@@ -23,6 +23,7 @@ import { StorageRecoveryError } from "./storage-recovery";
 import { isRevisionTwinState, type RevisionTwinState } from "@/domain/revision-twin";
 import { COLLECTION_STORES, getAll, getDb, putAll, putOne, removeOne, streamAttempts, streamReviewLogs } from "./db";
 import type { CollectionStore } from "./db";
+import { migrateContentIds } from "./content-ids";
 import { enqueue } from "./sync";
 import { readReviseMeta, readReviseUserMeta, REVISE_META_KEYS, writeReviseMeta, writeReviseUserMeta } from "./storage-namespace";
 
@@ -138,14 +139,22 @@ export function defaultLessonProgress(userId: Id): LessonProgress {
   };
 }
 
-const SEED_VERSION = 1;
+// v2: ids are namespaced under cnt: (see src/data/content-ids.ts); the bank
+// mints namespaced ids and a data migration remaps every persisted legacy id.
+const SEED_VERSION = 2;
 
 /**
  * Install the authored curriculum content for a user. Deterministic ids make
  * this idempotent: a re-run adds topics that appeared since last time and
  * leaves every existing card's FSRS history untouched.
+ *
+ * The cnt: content-id migration runs first: legacy `seed-*` ids (which
+ * collided with operator tooling) are rewritten before the bank tops up, so
+ * a pre-namespace device reseeds against already-remapped rows and never
+ * reintroduces a legacy id. Idempotent and effectively free when it has run.
  */
 export async function ensureSeeded(userId: Id): Promise<void> {
+  await migrateContentIds(userId);
   const installed = await readReviseMeta<number>("seedVersion");
   const existing = await getAll<Card>("cards");
   const known = new Set(existing.map((c) => c.id));

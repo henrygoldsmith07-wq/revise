@@ -74,6 +74,11 @@ describe("performance budgets", () => {
         // budget is about production build bloat, so it is excluded.
         if (dir === nextDir && e.name === "dev") continue;
         const p = j3(dir, e.name);
+        // Server `.js.map` files are debug artifacts `next build` emits for the
+        // server graph (none exist under static/). They are never downloaded by
+        // a browser, so like .next/dev they measure the toolchain, not what
+        // ships to clients.
+        if (!e.isDirectory() && e.name.endsWith(".js.map")) continue;
         if (e.isDirectory()) walk(p);
         else total += st2(p).size;
       }

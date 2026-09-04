@@ -149,7 +149,7 @@ describe("misconception library integration", () => {
       undefined,
       misconceptions,
     );
-    expect(action.misconceptionEntry?.id).toBe("seed-misconception:inequality-sign-reversal");
+    expect(action.misconceptionEntry?.id).toBe("cnt:misconception:inequality-sign-reversal");
     expect(action.misconception).toMatch(/sign stays the same/i);
     expect(action.action).toMatch(/reverse the inequality sign/i);
   });
@@ -176,6 +176,6 @@ describe("misconception library integration", () => {
       topic,
       misconceptions,
     );
-    expect(plan.actions[0]?.misconceptionEntry?.id).toBe("seed-misconception:inequality-sign-reversal");
+    expect(plan.actions[0]?.misconceptionEntry?.id).toBe("cnt:misconception:inequality-sign-reversal");
   });
 });

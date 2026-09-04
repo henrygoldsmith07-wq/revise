@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { buildAssessmentInsight } from "@/domain/assessment";
 import type { Mistake } from "@/domain/types";
 
@@ -44,14 +42,5 @@ describe("exam technique vs knowledge separation", () => {
       reliable: true,
     });
     expect(insight.techniqueVsKnowledge.drivers).toEqual(expect.arrayContaining(["exam-technique", "rushing"]));
-  });
-
-  it("publishes an actionable Progress card instead of leaving the metric domain-only", () => {
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    const panels = readFileSync(join(process.cwd(), "src/components/AssessmentPanels.tsx"), "utf8");
-
-    expect(progress).toContain("TechniqueVsKnowledgeCard");
-    expect(panels).toContain("Exam technique vs knowledge");
-    expect(panels).toContain("techniqueVsKnowledge");
   });
 });

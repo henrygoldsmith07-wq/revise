@@ -1,6 +1,8 @@
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
 import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
+import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
+import { paperOutcomeGainMultiplier } from "./paper-outcome";
 import type {
   ActivityKind,
   Card,
@@ -15,6 +17,7 @@ import type {
   Topic,
   TopicMastery,
 } from "./types";
+import type { PaperOutcomeRecord } from "./paper-outcome";
 
 // ---------------------------------------------------------------------------
 // "What should I do right now?" — scored as
@@ -59,6 +62,12 @@ export interface RecommendInput {
   adaptiveDifficultyOffset?: Map<Id, number>;
   /** Historical per-topic marks-gained-per-hour derived from actual outcomes (overrides marksPerHour when both present). */
   historicalGain?: Map<Id, number>;
+  /** Knowledge-vs-answering report per subject; steers what kind of work the ranking prefers. */
+  techniqueSplit?: Map<Id, KnowledgeAnsweringReport>;
+  /** Per-topic reports (each topic's own losses aggregated); preferred over the subject report for topic-level recs. */
+  techniqueByTopic?: Map<Id, KnowledgeAnsweringReport>;
+  /** Sat-paper (predicted, actual) outcome records; feeds the paper gain factor back from reality. */
+  paperOutcomes?: PaperOutcomeRecord[];
   /** Cross-topic total recommendations already issued — drives ε/exploration decay (default 0). */
   totalRecommendationsIssued?: number;
   /** Minutes the student has already studied this session — drives fatigue penalties (default 0). */
@@ -461,7 +470,13 @@ export function recommend(input: RecommendInput): Recommendation[] {
     if (avg < 0.6 && (days == null || days > 21)) continue;
     const minutes = Math.min(block * 2, 90);
     // A paper's gain is calibration + stamina: modelled as (1 - avg) * ~6 marks scaled to paper size.
-    const examGain = (1 - avg) * 9 + (days != null && days <= 21 ? 3 : 0);
+    // Reality check: sat papers compared against their frozen predictions drift the gain —
+    // beating the prediction means more recoverable headroom than the static mastery model
+    // sees (multiplier >1); repeatedly falling short demotes papers until technique catches up.
+    const outcomeMultiplier = input.paperOutcomes
+      ? paperOutcomeGainMultiplier(input.paperOutcomes, subjectId)
+      : 1;
+    const examGain = ((1 - avg) * 9 + (days != null && days <= 21 ? 3 : 0)) * outcomeMultiplier;
     const u = urgency(subjectId);
     const weak = 1 + (1 - avg) * 0.5;
     const avgRetention = rows.reduce((a, m) => a + (m.retention ?? 0.5), 0) / rows.length;
@@ -545,6 +560,14 @@ export function recommend(input: RecommendInput): Recommendation[] {
   // --- Phase 4 overlays: historical gain, exploration, tie-awareness ----
   applyPhase4Overlays({ out, input, today });
 
+  // --- Technique steering: what KIND of work pays, per scope -----------
+  // Topic-level recs steer on their own topic's losses; subject-wide recs
+  // read the subject split. Knowledge leak → learn/repair promoted, drilling
+  // demoted; answering leak → a named timed run attached to practice.
+  if (input.techniqueSplit && input.techniqueSplit.size > 0) {
+    applyTechniqueSteering({ out, input, today });
+  }
+
   // --- Fatigue overlay: time-on-task + circadian penalties ---------------
   // Applied after the plan boost: the student's own plan still wins ties, but
   // heavy-load activities (practice, papers) are demoted when they have been
@@ -566,6 +589,62 @@ export function recommend(input: RecommendInput): Recommendation[] {
   }
 
   return dedupe(out).sort((a, b) => b.score - a.score);
+}
+
+// ---------------------------------------------------------------------------
+// Technique steering: what KIND of work pays, per scope.
+//
+// The knowledge-vs-answering split says where marks are actually being lost.
+// A topic-level report (that topic's own losses) is preferred; subject-level
+// recs — flashcards, papers, mistake repair — read the subject report. When
+// knowledge is the leak, learning and repair work is promoted and heavy
+// question drilling is demoted (more questions on unknown content is
+// busywork). When answering is the leak, a timed run is attached directly to
+// practice — "practise technique" is not a plan, so the rec names the exact
+// quick-session box the app can run. Mixed or unproven scopes steer nothing:
+// the overlay never invents a direction the evidence cannot support.
+// ---------------------------------------------------------------------------
+
+const TECHNIQUE_PROMOTE = { knowledge: 1.12, answering: 1.1 } as const;
+const TECHNIQUE_DEMOTE = { knowledge: 0.88, answering: 0.9 } as const;
+
+function applyTechniqueSteering(ctx: { out: Recommendation[]; input: RecommendInput; today: IsoDate }): void {
+  const { out, input: recInput } = ctx;
+  const subjectSplit = recInput.techniqueSplit;
+  const topicSplit = recInput.techniqueByTopic;
+  if (!subjectSplit) return;
+
+  for (const r of out) {
+    // Topic recs steer only on their own topic's losses; subject-wide recs
+    // (flashcards, papers, mistake repair) read the subject-level split.
+    const report = r.topicId ? topicSplit?.get(r.topicId) : subjectSplit.get(r.subjectId);
+    if (!report || !report.reliable) continue;
+    if (report.verdict !== "knowledge" && report.verdict !== "answering") continue;
+    const leak = report.verdict;
+
+    const promotes =
+      leak === "knowledge"
+        ? r.activity === "learn" || r.activity === "flashcards" || r.activity === "mistakes"
+        : r.activity === "practice" || r.activity === "paper";
+    const steer = promotes ? TECHNIQUE_PROMOTE[leak] : TECHNIQUE_DEMOTE[leak];
+    r.score *= steer;
+    if (r.factors) r.factors.techniqueSteer = steer;
+    r.techniqueKnowledgeShare = report.knowledgeShare;
+
+    // An answering leak converts the practice rec into a named timed run —
+    // but never overrides the student's own plan (planned sessions keep
+    // their reason, the boost already biasing them is enough).
+    if (leak === "answering" && r.activity === "practice" && !r.plannedSessionId) {
+      const timed = timedSessionRecommendation(report);
+      if (timed) {
+        r.techniqueQuickMinutes = timed.minutes;
+        r.techniqueKnowledgeShare = report.knowledgeShare;
+        r.reason = `Timed run: ${timed.questionCount} questions against the clock — answering is the leak here (~${Math.round(
+          report.answeringShare * 100,
+        )}% of lost marks), not knowledge.`;
+      }
+    }
+  }
 }
 
 /** Phase 4 overlays: historical gain, exploration, tie annotation. Separated so rank invariants remain testable. */
@@ -639,8 +718,14 @@ export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
  * subject-wide recommendations review.
  */
 export function hrefForRecommendation(
-  rec: Pick<Recommendation, "activity" | "subjectId"> & { topicId?: Id | null },
+  rec: Pick<Recommendation, "activity" | "subjectId"> & { topicId?: Id | null; techniqueQuickMinutes?: 5 | 10 | null },
 ): string {
+  // Technique steering converts practice into a named timed run; it opens
+  // the clocked quick session, scoped to the subject (not one topic) so the
+  // run samples wherever the answering leak actually lives.
+  if (rec.activity === "practice" && rec.techniqueQuickMinutes) {
+    return `/practice?quick=${rec.techniqueQuickMinutes}&subject=${rec.subjectId}`;
+  }
   if (rec.activity === "learn" && rec.subjectId) return `/lesson?subject=${rec.subjectId}`;
   if (rec.topicId) return `/practice?topic=${rec.topicId}`;
   return "/review";
