@@ -51,6 +51,20 @@ export interface Lesson {
   /** Deterministic id: `lesson:<topicId>` — re-derivation is idempotent. */
 }
 
+/** A small, roadmap-sized lesson that focuses on one specification point. */
+export interface RoadmapLesson extends Lesson {
+  /** The full requirement this checkpoint teaches, used in the roadmap card. */
+  focus: string;
+  /** One-based position within the parent topic's checkpoints. */
+  checkpointIndex: number;
+  checkpointTotal: number;
+}
+
+export interface RoadmapLessonEntry {
+  topic: Topic;
+  lesson: RoadmapLesson;
+}
+
 /** Build a full lesson for a topic from its authored data. Deterministic. */
 export function buildLesson(topic: Topic): Lesson | null {
   if (!topic.keyPoints.length) return null;
@@ -279,6 +293,40 @@ function distractorKeyPoints(topic: Topic, excludeIndex: number): string[] {
     .map((p) => (p.length > 80 ? p.slice(0, 77) + "…" : p));
 }
 
+/** Remove duplicate answer choices while preserving authored order. */
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const clean = value.replace(/\s+/g, " ").trim();
+    if (!clean || seen.has(clean)) return false;
+    seen.add(clean);
+    return true;
+  });
+}
+
+/** Build a check directly from one specification requirement. */
+function checkFromSpecPoint(
+  topic: Topic,
+  specPoint: NonNullable<Topic["specPoints"]>[number],
+  index: number,
+): NonNullable<LessonStep["check"]> {
+  const options = shuffleStable(
+    uniqueStrings([
+      specPoint.text,
+      ...(topic.specPoints ?? []).filter((point) => point.id !== specPoint.id).map((point) => point.text),
+      ...topic.keyPoints,
+    ]).slice(0, 4),
+    topic.id,
+    3000 + index,
+  );
+  return {
+    question: `Which statement matches this ${topic.title.toLowerCase()} checkpoint?`,
+    options,
+    correctIndex: options.indexOf(specPoint.text),
+    explanation: `This checkpoint asks you to know: ${sentence(specPoint.text)} Connect it to the wider topic before moving on.`,
+  };
+}
+
 /** Deterministic shuffle (no Math.random — same contract as seed cards). */
 function shuffleStable(items: string[], topicId: Id, index: number): string[] {
   const arr = [...items];
@@ -297,6 +345,160 @@ export function buildLessons(topics: Topic[]): Lesson[] {
   return topics
     .map(buildLesson)
     .filter((l): l is Lesson => l !== null);
+}
+
+/**
+ * Expand the flat topic curriculum into a complete learning route.
+ *
+ * A topic is a useful chapter heading, but its specification points are the
+ * actual checklist of things a student must know. The roadmap therefore gives
+ * each spec point its own short lesson, while retaining the authored topic
+ * lesson as the source of explanations and common traps. This makes a long
+ * syllabus feel like a sequence of small, finishable steps rather than one
+ * intimidating card per chapter.
+ */
+export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
+  return topics.flatMap((topic) => {
+    const base = buildLesson(topic);
+    if (!base) return [];
+
+    const specPoints = topic.specPoints?.filter((point) => point.text.trim().length > 0) ?? [];
+    if (!specPoints.length) {
+      return [
+        {
+          topic,
+          lesson: {
+            ...base,
+            focus: topic.summary,
+            checkpointIndex: 1,
+            checkpointTotal: 1,
+          },
+        },
+      ];
+    }
+
+    const coreSteps = base.steps.filter((step) => step.kind === "core");
+    const misconceptions = misconceptionsForTopic(topic.id);
+
+    return specPoints.map((specPoint, index) => {
+      const checkpointIndex = index + 1;
+      const lessonId = `${base.id}:checkpoint:${specPoint.id}`;
+      const focusTitle = pointTitle(specPoint.text, `Checkpoint ${checkpointIndex}`);
+      const sourceStep = coreSteps[index] ?? coreSteps[Math.max(0, coreSteps.length - 1)];
+      const sourceBody = sourceStep?.body && sourceStep.body !== specPoint.text ? sourceStep.body : null;
+      const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
+      const steps: LessonStep[] = [
+        {
+          id: `${lessonId}:overview`,
+          kind: "overview",
+          title: "Know the target",
+          body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
+          explanationSteps: [
+            `Start with the requirement in plain English: ${specPoint.text}`,
+            `Link it to the wider topic: ${topic.title}.`,
+            "You will finish by saying the point back without looking.",
+          ],
+          takeaway: `I can explain ${specPoint.text.toLowerCase()}.`,
+          examLink,
+        },
+        {
+          id: `${lessonId}:core`,
+          kind: "core",
+          title: focusTitle,
+          body: sourceBody ? `${specPoint.text}\n\nConnect it to this core idea: ${sourceBody}` : specPoint.text,
+          explanationSteps: [
+            `Translate the checkpoint into a sentence you would use in an answer: ${specPoint.text}`,
+            ...(sourceStep?.explanationSteps?.slice(0, 2) ?? explainPoint(specPoint.text).slice(0, 2)),
+            "Say the complete idea once, including the condition or consequence the question asks for.",
+          ],
+          takeaway: `Remember: ${sentence(specPoint.text)}`,
+          examLink,
+          check: checkFromSpecPoint(topic, specPoint, index),
+        },
+        {
+          id: `${lessonId}:apply`,
+          kind: "core",
+          title: "Use it in an exam answer",
+          body: `When a question tests this checkpoint, start with the precise requirement: ${specPoint.text}`,
+          explanationSteps: [
+            "Underline the command word so you answer the task, not just the topic.",
+            `Use the checkpoint wording: ${specPoint.text}`,
+            "Add the relevant mechanism, comparison, calculation or evidence if the question asks for it.",
+          ],
+          takeaway: `Exam habit: begin with ${sentence(specPoint.text)}`,
+        },
+      ];
+
+      const error = topic.commonErrors[index % Math.max(1, topic.commonErrors.length)];
+      if (error) {
+        const trapOptions = shuffleStable(
+          uniqueStrings([error, specPoint.text, ...topic.keyPoints]),
+          topic.id,
+          4000 + index,
+        );
+        steps.push({
+          id: `${lessonId}:trap`,
+          kind: "trap",
+          title: "Avoid a common exam trap",
+          body: `Common trap: ${error}`,
+          explanationSteps: [
+            `Spot the risky wording: ${error}`,
+            `Replace it with the precise checkpoint: ${specPoint.text}`,
+            "Before you submit, check that the corrected wording is explicit.",
+          ],
+          takeaway: `Check your answer for this trap: ${error}`,
+          check: {
+            question: `Which wording should you avoid when answering ${topic.title.toLowerCase()}?`,
+            options: trapOptions,
+            correctIndex: trapOptions.indexOf(error),
+            explanation: `Avoid this wording: ${error}. Keep the requirement precise: ${specPoint.text}`,
+          },
+        });
+      }
+
+      const misconception = misconceptions[index];
+      if (misconception) {
+        const options = shuffleStable(
+          uniqueStrings([misconception.statement, specPoint.text, ...topic.keyPoints]),
+          topic.id,
+          5000 + index,
+        );
+        steps.push({
+          id: `${lessonId}:misconception`,
+          kind: "misconception",
+          title: "Correct a common misunderstanding",
+          body: `${misconception.explanation}\n\nExaminer's eye: ${misconception.example} — ${misconception.correction}`,
+          explanationSteps: [
+            `The tempting wrong idea: ${misconception.statement}`,
+            `Why it fails: ${misconception.explanation}`,
+            `What to say instead: ${misconception.correction}`,
+          ],
+          takeaway: `Use the corrected idea: ${misconception.correction}`,
+          check: {
+            question: "Which statement is the misconception, not what the examiner rewards?",
+            options,
+            correctIndex: options.indexOf(misconception.statement),
+            explanation: `That statement is the misconception. The examiner rewards: ${misconception.correction}`,
+          },
+        });
+      }
+
+      return {
+        topic,
+        lesson: {
+          id: lessonId,
+          topicId: topic.id,
+          subjectId: topic.subjectId,
+          title: focusTitle,
+          intro: `Checkpoint ${checkpointIndex} of ${specPoints.length} for ${topic.title}: read the explanation, apply it, and pass the quick checks.`,
+          steps,
+          focus: specPoint.text,
+          checkpointIndex,
+          checkpointTotal: specPoints.length,
+        },
+      };
+    });
+  });
 }
 
 /** A suggested learning order: curriculum order (units/topics are ordered). */

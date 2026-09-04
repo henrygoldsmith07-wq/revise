@@ -2,9 +2,10 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildLesson, summariseLesson } from "@/content/lessons";
+import { buildRoadmapLessons, summariseLesson } from "@/content/lessons";
 import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
+import type { RoadmapLessonEntry } from "@/content/lessons";
 import { AchievementIcon, StreakIcon, VideoIcon, ICON_SIZE } from "./icons";
 import { RichText } from "./RichText";
 import { VideoLesson } from "./VideoLesson";
@@ -19,10 +20,7 @@ const STEP_META = {
   misconception: { label: "Fix a misconception", tone: "danger" },
 } as const;
 
-type LessonEntry = {
-  topic: Topic;
-  lesson: NonNullable<ReturnType<typeof buildLesson>>;
-};
+type LessonEntry = RoadmapLessonEntry;
 
 // Lesson mode: learn a topic from zero before drilling it with flashcards.
 // Steps are derived from authored curriculum data; each check question gates
@@ -33,13 +31,7 @@ type LessonEntry = {
 // the same map, so a watching session earns the streak exactly like reading.
 
 export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => void }) {
-  const lessons = useMemo<LessonEntry[]>(
-    () =>
-      topics
-        .map((t) => ({ topic: t, lesson: buildLesson(t) }))
-        .filter((x): x is LessonEntry => x.lesson !== null),
-    [topics],
-  );
+  const lessons = useMemo<LessonEntry[]>(() => buildRoadmapLessons(topics), [topics]);
 
   const store = useStore();
   const { lessonProgress, completeLesson } = store;
@@ -81,6 +73,15 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   const active = activeIdx !== null ? lessons[activeIdx] : null;
   const lesson = active?.lesson ?? null;
   const step = lesson && !summary ? lesson.steps[stepIdx] : null;
+  const isEntryComplete = useCallback(
+    (entry: LessonEntry) =>
+      Boolean(
+        completed[entry.lesson.id] ||
+          completed[`video:${entry.topic.id}`] ||
+          completed[`lesson:${entry.topic.id}`],
+      ),
+    [completed],
+  );
   const chosen = step?.id ? checked[step.id] : undefined;
   // Only steps that carry a check question gate progress. The intro summary
   // and the common-trap closers are plain reading — they must never block the
@@ -108,13 +109,13 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     // Suggest the first not-yet-completed lesson *after* this one; if every
     // later lesson is done, wrap around to the earliest remaining.
     for (let i = activeIdx + 1; i < lessons.length; i++) {
-      if (!completed[lessons[i].lesson.id]) return i;
+      if (!isEntryComplete(lessons[i])) return i;
     }
     for (let i = 0; i < activeIdx; i++) {
-      if (!completed[lessons[i].lesson.id]) return i;
+      if (!isEntryComplete(lessons[i])) return i;
     }
     return null;
-  }, [activeIdx, completed, lessons]);
+  }, [activeIdx, isEntryComplete, lessons]);
 
   const finishLesson = useCallback(() => {
     if (!lesson) return;
@@ -165,10 +166,9 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   if (nextIdx === null) {
     for (const sid of store.settings.subjectIds) {
       if (sid === currentSubjectId) continue;
-      const remaining = allTopics([sid]).filter((t) => {
-        const l = buildLesson(t);
-        return l && !completed[l.id];
-      }).length;
+      const remaining = buildRoadmapLessons(allTopics([sid])).filter(
+        (entry) => !isEntryComplete(entry),
+      ).length;
       if (remaining > 0) {
         upNextSubject = { subjectId: sid, name: getSubject(sid)?.name ?? sid, remaining };
         break;
@@ -315,7 +315,8 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
           {next ? (
             <div className="pt-2 border-t border-line">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Next up</p>
-              <p className="text-sm font-medium text-ink mt-1">{next.topic.title}</p>
+              <p className="text-sm font-medium text-ink mt-1">{next.lesson.title}</p>
+              <p className="text-xs text-ink3 mt-0.5">{next.topic.title}</p>
               <Button variant="primary" className="mt-3" onClick={continueFromSummary}>
                 Start next lesson
               </Button>
@@ -499,13 +500,11 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   }
 
   // ---- Learning roadmap ---------------------------------------------------
-  const isComplete = (entry: LessonEntry) =>
-    Boolean(completed[entry.lesson.id] || completed[`video:${entry.topic.id}`]);
-  const doneCount = lessons.filter(isComplete).length;
+  const doneCount = lessons.filter(isEntryComplete).length;
   // Mirror the summary's "Next up" on the roadmap: one glanceable resume card
   // instead of making the student scan for the first unfinished lesson. A
   // topic counts as complete once either its guided lesson or video is done.
-  const firstIncomplete = lessons.findIndex((entry) => !isComplete(entry));
+  const firstIncomplete = lessons.findIndex((entry) => !isEntryComplete(entry));
   const resumeIdx = firstIncomplete === -1 ? 0 : firstIncomplete;
   const resumeLabel =
     doneCount === 0
@@ -513,9 +512,10 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
       : firstIncomplete === -1
         ? "Review from the start"
         : "Continue where you left off";
+  const overallProgress = lessons.length ? doneCount / lessons.length : 0;
   const roadmapTitle = currentSubjectId ? `${getSubject(currentSubjectId)?.name ?? "Subject"} roadmap` : "Learning roadmap";
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <div className="max-w-4xl mx-auto space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Subject roadmap</p>
@@ -526,36 +526,40 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         </Button>
       </div>
 
-      <Panel className="space-y-4 bg-accentsoft/20 border-accent/20">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Your route through the subject</p>
-            <h3 className="text-base font-semibold text-ink mt-1">Build understanding one lesson at a time</h3>
-            <p className="text-sm text-ink2 mt-1">
-              Follow the units in order. Each topic opens a detailed lesson with a plain-language explanation, exam
-              links, common traps and quick checks.
-            </p>
-          </div>
-          <Pill tone={firstIncomplete === -1 ? "success" : "accent"}>
-            {doneCount}/{lessons.length}
-          </Pill>
-        </div>
-        <ProgressBar value={doneCount / lessons.length} label={`${doneCount} of ${lessons.length} lessons complete`} />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-          <div className="rounded-[8px] border border-line bg-surface/60 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Start here</p>
-            <p className="text-sm font-medium text-ink mt-1">{lessons[resumeIdx]?.topic.title}</p>
-          </div>
-          <div className="rounded-[8px] border border-line bg-surface/60 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Every lesson</p>
-            <p className="text-sm font-medium text-ink mt-1">Learn, say it back, then check it</p>
-          </div>
-          <div className="rounded-[8px] border border-line bg-surface/60 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Keep moving</p>
-            <p className="text-sm font-medium text-ink mt-1">Short steps build towards exam answers</p>
+      <section className="overflow-hidden rounded-2xl border-2 border-accent/30 bg-surface2 shadow-sm">
+        <div className="bg-accent px-4 py-4 text-onaccent sm:px-6 sm:py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.14em] font-bold opacity-75">Your learning path</p>
+              <h3 className="mt-1 text-xl font-bold tracking-tight">{roadmapTitle}</h3>
+              <p className="mt-1 max-w-xl text-sm opacity-85">
+                Follow the path from foundations to exam-ready ideas. Each node opens a short, step-by-step lesson.
+              </p>
+            </div>
+            <div className="shrink-0 rounded-2xl border-2 border-onaccent/30 px-3 py-2 text-center">
+              <p className="text-2xl font-bold leading-none tabular-nums">{doneCount}</p>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-75">of {lessons.length}</p>
+            </div>
           </div>
         </div>
-      </Panel>
+        <div className="space-y-3 px-4 py-4 sm:px-6">
+          <ProgressBar value={overallProgress} label={`${doneCount} of ${lessons.length} lessons complete`} tone="success" />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink2">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
+              Completed
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full border-2 border-accent bg-surface" aria-hidden="true" />
+              Recommended next
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-surface2" aria-hidden="true" />
+              Ready when you are
+            </span>
+          </div>
+        </div>
+      </section>
 
       {streak.count > 0 ? (
         <div className="flex items-center gap-2">
@@ -572,41 +576,72 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
       <button
         type="button"
         onClick={() => startLesson(resumeIdx)}
-        className="w-full text-left px-4 py-3 rounded-[8px] border border-accent/40 bg-accentsoft/30 hover:border-accent transition-colors flex items-center justify-between gap-3"
+        className="group w-full rounded-2xl border-2 border-accent/50 bg-surface2 px-4 py-4 text-left shadow-sm transition hover:border-accent hover:bg-surface sm:px-5"
       >
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{resumeLabel}</p>
-          <p className="text-sm font-semibold text-ink mt-0.5 truncate">{lessons[resumeIdx]?.topic.title}</p>
-          <p className="text-xs text-ink3 mt-0.5 line-clamp-2">{lessons[resumeIdx]?.topic.summary}</p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-lg font-bold text-onaccent shadow-[0_3px_0_var(--accent)]" aria-hidden="true">
+              {firstIncomplete === -1 ? "↻" : "▶"}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-bold">{resumeLabel}</p>
+              <p className="mt-0.5 truncate text-sm font-bold text-ink">{lessons[resumeIdx]?.lesson.title}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink2">
+                {lessons[resumeIdx]?.topic.title} · {lessons[resumeIdx]?.lesson.focus}
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 text-sm font-bold text-ink transition-transform group-hover:translate-x-0.5">
+            {firstIncomplete === -1 ? "Review" : "Start"} <span aria-hidden="true">→</span>
+          </span>
         </div>
-        <Pill tone="accent">Open</Pill>
       </button>
 
-      <ul className="space-y-4" aria-label="Learning roadmap units">
+      <ul className="space-y-6" aria-label="Learning roadmap units">
         {roadmapUnits.map(({ unit, entries }, unitIndex) => {
-          const unitDone = entries.filter(({ entry }) => isComplete(entry)).length;
+          const unitDone = entries.filter(({ entry }) => isEntryComplete(entry)).length;
           const unitCurrent = entries.some(({ index }) => index === firstIncomplete);
           const unitComplete = unitDone === entries.length;
+          const unitProgress = entries.length ? unitDone / entries.length : 0;
           return (
             <li key={unit.id}>
-              <section className={cx("card p-4 sm:p-5 space-y-4", unitCurrent && "border-accent/40")}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Unit {unitIndex + 1}</p>
-                    <h3 className="text-base font-semibold text-ink mt-1">{unit.title}</h3>
-                    <p className="text-xs text-ink3 mt-0.5">
+              <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+                <header className="flex items-start justify-between gap-4 bg-accent px-4 py-4 text-onaccent sm:px-6">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] uppercase tracking-[0.14em] font-bold opacity-75">Unit {unitIndex + 1}</p>
+                      <span className="rounded-full border border-onaccent/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                        {unitComplete ? "Complete" : unitCurrent ? "Your next unit" : "In your path"}
+                      </span>
+                    </div>
+                    <h3 className="mt-1 text-lg font-bold tracking-tight">{unit.title}</h3>
+                    <p className="mt-0.5 text-xs opacity-80">
                       {unitDone} of {entries.length} lessons complete · follow this unit in order
                     </p>
                   </div>
-                  <Pill tone={unitComplete ? "success" : unitCurrent ? "accent" : "neutral"}>
-                    {unitComplete ? "Complete" : unitCurrent ? "Up next" : "In sequence"}
-                  </Pill>
-                </div>
-                <ProgressBar value={unitDone / entries.length} label={`Unit ${unitIndex + 1} progress`} />
+                  <div className="w-24 shrink-0 pt-1 sm:w-32">
+                    <div
+                      className="h-2 overflow-hidden rounded-full bg-onaccent/20"
+                      role="progressbar"
+                      aria-label={`Unit ${unitIndex + 1} progress`}
+                      aria-valuenow={Math.round(unitProgress * 100)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div className="h-full rounded-full bg-onaccent transition-[width] duration-700" style={{ width: `${Math.round(unitProgress * 100)}%` }} />
+                    </div>
+                    <p className="mt-1 text-right text-[10px] font-semibold opacity-80">{Math.round(unitProgress * 100)}%</p>
+                  </div>
+                </header>
 
-                <ol className="space-y-3">
+                <div className="relative px-3 py-6 sm:px-8 sm:py-8">
+                  <div
+                    className="pointer-events-none absolute bottom-8 left-8 top-8 w-1 rounded-full bg-line sm:left-1/2 sm:-translate-x-1/2"
+                    aria-hidden="true"
+                  />
+                  <ol className="relative space-y-6 sm:space-y-8">
                   {entries.map(({ entry, index }, lessonNumber) => {
-                    const done = isComplete(entry);
+                    const done = isEntryComplete(entry);
                     const current = index === firstIncomplete;
                     const coreSteps = entry.lesson.steps.filter((candidate) => candidate.kind === "core");
                     const checks = entry.lesson.steps.filter((candidate) => candidate.check).length;
@@ -614,93 +649,131 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                       (candidate) => candidate.kind === "trap" || candidate.kind === "misconception",
                     ).length;
                     const estimatedMinutes = Math.max(5, Math.round(entry.lesson.steps.length * 1.5));
+                    const cardTone = current
+                      ? "border-accent bg-surface2"
+                      : done
+                        ? "border-line bg-surface2/70"
+                        : "border-line bg-surface";
+                    const nodeTone = done
+                      ? "border-accent bg-accent text-onaccent shadow-[0_4px_0_var(--accent)]"
+                      : current
+                        ? "border-accent bg-surface text-accent shadow-[0_4px_0_var(--accent)] ring-4 ring-surface2"
+                        : "border-line bg-surface2 text-ink3 shadow-[0_4px_0_var(--line)]";
                     return (
-                      <li key={entry.lesson.id} className="flex items-stretch gap-2">
+                      <li key={entry.lesson.id} className="relative grid grid-cols-[4rem_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1fr)] sm:items-center sm:gap-0">
                         <div
                           className={cx(
-                            "flex-1 min-w-0 rounded-[8px] border border-line transition-colors",
-                            current ? "border-accent/40 bg-accentsoft/10" : "hover:border-ink3",
+                            "order-2 min-w-0 overflow-hidden rounded-2xl border-2 shadow-sm transition-colors sm:order-none sm:row-start-1",
+                            cardTone,
+                            lessonNumber % 2 === 0
+                              ? "sm:col-start-1 sm:justify-self-end sm:mr-5"
+                              : "sm:col-start-3 sm:justify-self-start sm:ml-5",
                           )}
                         >
-                          <button
-                            type="button"
-                            onClick={() => startLesson(index)}
-                            className="w-full min-w-0 text-left px-3.5 py-3 flex items-start justify-between gap-3"
-                          >
-                            <div className="flex items-start gap-3 min-w-0">
-                              <span
-                                className={cx(
-                                  "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-                                  done ? "bg-successsoft text-success" : current ? "bg-accent text-onaccent" : "bg-surface2 text-ink3",
-                                )}
-                              >
-                                {done ? "✓" : lessonNumber + 1}
-                              </span>
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">
-                                    {current ? "Up next" : done ? "Complete" : `Lesson ${lessonNumber + 1}`}
+                          <div className="flex items-stretch gap-1.5 p-1.5">
+                            <button
+                              type="button"
+                              onClick={() => startLesson(index)}
+                              className="group min-w-0 flex-1 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-surface2 sm:px-3"
+                            >
+                              <div className="flex min-w-0 items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-[10px] uppercase tracking-wide text-ink3 font-bold">
+                                      {current ? "Up next" : done ? "Complete" : `Lesson ${lessonNumber + 1}`}
+                                    </p>
+                                    {current ? <Pill tone="accent">Recommended next</Pill> : null}
+                                  </div>
+                                  <h4 className="mt-1 text-sm font-bold text-ink">{entry.lesson.title}</h4>
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-ink2">
+                                    {entry.topic.title} · checkpoint {entry.lesson.checkpointIndex} of {entry.lesson.checkpointTotal}
                                   </p>
-                                  {current ? <Pill tone="accent">Recommended next</Pill> : null}
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-ink2">{entry.lesson.focus}</p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink3">
+                                    <span>{entry.lesson.steps.length} steps</span>
+                                    <span className="h-1 w-1 rounded-full bg-line" aria-hidden="true" />
+                                    <span>{checks} checks</span>
+                                    <span className="h-1 w-1 rounded-full bg-line" aria-hidden="true" />
+                                    <span>~{estimatedMinutes} min</span>
+                                  </div>
                                 </div>
-                                <h4 className="text-sm font-semibold text-ink mt-1">{entry.topic.title}</h4>
-                                <p className="text-xs text-ink2 mt-0.5 line-clamp-2">{entry.topic.summary}</p>
-                                <p className="text-[11px] text-ink3 mt-1">
-                                  {entry.lesson.steps.length} steps · {checks} checks · ~{estimatedMinutes} min
-                                </p>
+                                <span className="shrink-0 pt-0.5 text-xs font-bold text-ink transition-transform group-hover:translate-x-0.5">
+                                  {done ? "Review" : "Open"} <span aria-hidden="true">→</span>
+                                </span>
                               </div>
-                            </div>
-                            <Pill tone={done ? "success" : current ? "accent" : "neutral"}>{done ? "Review" : "Open"}</Pill>
-                          </button>
+                            </button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="self-center px-2 sm:px-2.5"
+                              onClick={() => setVideoTopic(entry.topic)}
+                              aria-label={`Play the video lesson for ${entry.topic.title}`}
+                            >
+                              <VideoIcon size={ICON_SIZE.sm} /> <span className="hidden sm:inline">Video</span>
+                            </Button>
+                          </div>
 
                           <details className="border-t border-line">
-                            <summary className="cursor-pointer px-3.5 py-2.5 text-xs font-semibold text-ink2 hover:text-ink">
-                              See detailed lesson outline
+                            <summary className="cursor-pointer list-none px-3.5 py-2.5 text-xs font-bold text-ink2 transition hover:bg-surface2 hover:text-ink">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="text-ink" aria-hidden="true">＋</span>
+                                See detailed lesson outline
+                              </span>
                             </summary>
-                            <div className="px-3.5 pb-3.5 space-y-3">
+                            <div className="space-y-3 px-3.5 pb-3.5">
                               <div>
-                                <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">What you will learn</p>
+                                <p className="text-[10px] uppercase tracking-wide text-ink3 font-bold">What you will learn</p>
                                 <ol className="mt-2 space-y-2">
                                   {coreSteps.map((candidate, coreIndex) => (
                                     <li key={`${entry.lesson.id}:outline:${candidate.id}`} className="flex items-start gap-2.5">
-                                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface2 text-[11px] font-semibold text-ink3">
+                                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface2 text-[11px] font-bold text-ink">
                                         {coreIndex + 1}
                                       </span>
                                       <div className="min-w-0">
-                                        <p className="text-xs font-semibold text-ink">{candidate.title}</p>
-                                        <RichText className="text-xs text-ink2 mt-0.5">{candidate.takeaway}</RichText>
+                                        <p className="text-xs font-bold text-ink">{candidate.title}</p>
+                                        <RichText className="mt-0.5 text-xs text-ink2">{candidate.takeaway}</RichText>
                                       </div>
                                     </li>
                                   ))}
                                 </ol>
                               </div>
                               {supportingSteps ? (
-                                <p className="text-xs text-ink2 border-t border-line pt-3">
+                                <p className="border-t border-line pt-3 text-xs text-ink2">
                                   The lesson also covers {supportingSteps} {supportingSteps === 1 ? "common trap" : "common traps"} or
                                   misconception{supportingSteps === 1 ? "" : "s"}, with feedback that shows what to say instead.
                                 </p>
                               ) : null}
-                              <div className="rounded-[8px] border border-accent/20 bg-accentsoft/20 px-3 py-2.5">
-                                <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Lesson rhythm</p>
-                                <p className="text-xs text-ink2 mt-1">
+                              <div className="rounded-xl border border-line bg-surface2 px-3 py-2.5">
+                                <p className="text-[10px] uppercase tracking-wide text-ink font-bold">Lesson rhythm</p>
+                                <p className="mt-1 text-xs text-ink2">
                                   Read the explanation, say the idea back without looking, then answer the quick checks before moving on.
                                 </p>
                               </div>
                             </div>
                           </details>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setVideoTopic(entry.topic)}
-                          aria-label={`Play the video lesson for ${entry.topic.title}`}
-                        >
-                          <VideoIcon size={ICON_SIZE.sm} /> Video
-                        </Button>
+
+                        <div className="order-1 flex flex-col items-center sm:order-none sm:col-start-2 sm:row-start-1 sm:justify-self-center">
+                          <button
+                            type="button"
+                            onClick={() => startLesson(index)}
+                            className={cx(
+                              "flex h-14 w-14 items-center justify-center rounded-full border-4 text-base font-extrabold transition hover:scale-105 focus-visible:scale-105",
+                              nodeTone,
+                            )}
+                            aria-label={`${done ? "Review" : "Open"} lesson ${lessonNumber + 1}: ${entry.topic.title}`}
+                          >
+                            {done ? "✓" : lessonNumber + 1}
+                          </button>
+                          <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-ink3">
+                            {done ? "Done" : current ? "Start" : "Next"}
+                          </span>
+                        </div>
                       </li>
                     );
                   })}
-                </ol>
+                  </ol>
+                </div>
               </section>
             </li>
           );

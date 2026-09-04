@@ -12,12 +12,16 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   await page.goto("/lesson");
   const main = page.locator("main#main");
   await expect(main).toContainText("Learning roadmap");
-  await expect(main).toContainText("Your route through the subject");
+  await expect(main).toContainText("Your learning path");
   await expect(main).toContainText("Unit 1");
   await expect(main).toContainText("Recommended next");
 
-  const outline = main.getByText("See detailed lesson outline", { exact: true }).first();
+  const outline = main.locator("summary").filter({ hasText: "See detailed lesson outline" }).first();
   await expect(outline).toBeVisible();
   await outline.click();
   await expect(main).toContainText("What you will learn");
+
+  await main.getByRole("button", { name: /Open lesson 1:/i }).first().click();
+  await expect(main).toContainText("Checkpoint 1 of");
+  await expect(main).toContainText("Know the target");
 });
