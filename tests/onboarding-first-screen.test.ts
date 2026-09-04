@@ -6,13 +6,14 @@ import { allQualifications, allSubjects, availableBoards, gradesFor } from "@/do
 const src = (p: string) => resolve(process.cwd(), p);
 
 // ---------------------------------------------------------------------------
-// First screen: pick board + subject + exam date. Everything else waits.
+// First screen: pick board + subject + optional exam date. Everything else waits.
 //
 // The app hard-gates on onboarding (AppShell renders only Onboarding until
 // repo.markOnboarded), so the funnel IS the product for a new student. It
 // must offer only boards with real content, collect subjects on one board,
-// require an exam date per chosen subject, default the rest (time budget,
-// target grade) and never offer a Skip that leaves a hollow profile.
+// allow a known exam date or a clear date-later path, default the rest (time
+// budget, target grade) and never offer a global Skip that leaves a hollow
+// profile.
 // ---------------------------------------------------------------------------
 
 describe("availableBoards: only boards with content are offered", () => {
@@ -57,13 +58,18 @@ describe("first screen collects exactly board → subjects → exam dates", () =
     expect(srcText).toContain("setExamDates({})");
   });
 
-  it("requires a future exam date for every chosen subject before building", () => {
+  it("accepts future dates and lets students skip dates they do not know yet", () => {
     expect(srcText).toContain("When are the exams?");
-    expect(srcText).toContain("required");
+    expect(srcText).toContain("(optional)");
+    expect(srcText).not.toContain("required");
     expect(srcText).toContain('aria-label={`${subject.name} exam date`}');
     expect(srcText).toContain("missingDates");
+    expect(srcText).toContain("invalidDates");
     expect(srcText).toContain("datesValid");
-    expect(srcText).toContain('(examDates[s.id] ?? "") >= today');
+    expect(srcText).toContain("canSkipExamDates");
+    expect(srcText).toContain("I don&apos;t know the dates yet");
+    expect(srcText).toContain("add dates later in Settings");
+    expect(srcText).toContain("if (!date) continue");
   });
 
   it("defaults time budget and target grade instead of asking; keeps only three steps", () => {
@@ -76,7 +82,7 @@ describe("first screen collects exactly board → subjects → exam dates", () =
     expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates"]');
   });
 
-  it("never offers a Skip that leaves a hollow profile", () => {
+  it("does not offer a global Skip that leaves a hollow profile", () => {
     expect(srcText).not.toContain("Skip — I will set this up later");
     expect(srcText).not.toContain('aria-label="Skip onboarding"');
   });

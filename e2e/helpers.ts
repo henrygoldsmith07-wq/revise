@@ -40,14 +40,15 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise
 }
 
 /**
- * Completes the first screen (board → subjects → required exam dates) for a
- * fresh profile. The funnel is the *only* thing rendered until it is done and
- * there is no Skip, so every spec that needs a Today screen funnels through
- * here. Defaults to AQA and its first subject with an exam ~3 months out.
+ * Completes the first screen (board → subjects → optional exam dates) for a
+ * fresh profile. The funnel is the *only* thing rendered until it is done, so
+ * every spec that needs a Today screen funnels through here. Defaults to AQA
+ * and its first subject with an exam ~3 months out. Set skipExamDates to
+ * exercise the date-later path.
  */
 export async function completeOnboarding(
   page: Page,
-  opts: { board?: string; subjectNames?: string[]; examDate?: string } = {},
+  opts: { board?: string; subjectNames?: string[]; examDate?: string; skipExamDates?: boolean } = {},
 ): Promise<void> {
   const board = opts.board ?? "AQA";
   // Phase 1 — exam board.
@@ -62,7 +63,11 @@ export async function completeOnboarding(
     await page.locator("button.card").first().click();
   }
   await page.getByRole("button", { name: /Continue/i }).click();
-  // Phase 3 — every chosen subject needs a future exam date (required).
+  // Phase 3 — add future exam dates when known, or leave them blank for now.
+  if (opts.skipExamDates) {
+    await page.getByRole("button", { name: /I don.?t know the dates yet/i }).click();
+    return;
+  }
   const date = opts.examDate ?? new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
   const inputs = page.locator('input[type="date"]');
   const count = await inputs.count();

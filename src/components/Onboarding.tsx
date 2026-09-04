@@ -17,8 +17,8 @@ import { CreditedIcon } from "./icons";
 // that board (scopes all content), and when each exam is (drives planner
 // urgency). Everything that can be defaulted is not asked: the time budget
 // starts on the "Steady" preset and the target grade on the qualification's
-// top grade, both fine-tunable in Settings afterwards. There is no Skip —
-// nothing in the app makes sense until board, subject and exam date exist.
+// top grade, both fine-tunable in Settings afterwards. Exam dates are useful
+// but optional: a student can skip them and add them later in Settings.
 // ---------------------------------------------------------------------------
 
 const PHASES = ["Board", "Subjects", "Exam dates"] as const;
@@ -70,10 +70,16 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   );
 
   const missingDates = chosenSubjects.filter((s) => !examDates[s.id]);
+  const invalidDates = chosenSubjects.filter((s) => {
+    const date = examDates[s.id];
+    return Boolean(date && date < today);
+  });
+  const enteredDatesValid = invalidDates.length === 0;
   const datesValid =
     chosenSubjects.length > 0 &&
     missingDates.length === 0 &&
-    chosenSubjects.every((s) => (examDates[s.id] ?? "") >= today);
+    enteredDatesValid;
+  const canSkipExamDates = chosenSubjects.length > 0 && enteredDatesValid;
   const canContinue = phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : datesValid;
 
   function chooseBoard(id: Id) {
@@ -227,10 +233,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {phase === 2 ? (
           <Panel className="space-y-3">
             <div>
-              <h2 className="text-sm font-semibold">When are the exams?</h2>
+              <h2 className="text-sm font-semibold">When are the exams? <span className="text-ink3 font-normal">(optional)</span></h2>
               <p className="text-xs text-ink3 mt-0.5">
-                This is what makes the plan urgent in the right places. Every subject needs its date before you can
-                start.
+                If you know a date, add it so the plan can pace revision towards it. If you do not know yet, skip this
+                step and add dates later in Settings.
               </p>
             </div>
             {chosenSubjects.map((subject) => (
@@ -238,7 +244,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 <input
                   type="date"
                   min={today}
-                  required
                   value={examDates[subject.id] ?? ""}
                   onChange={(e) => setExamDates({ ...examDates, [subject.id]: e.target.value })}
                   className="field"
@@ -248,13 +253,20 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             ))}
             {missingDates.length ? (
               <p className="text-xs text-ink3" role="status">
-                Add a date for: {missingDates.map((s) => s.name).join(", ")}
+                {missingDates.length === chosenSubjects.length
+                  ? "No dates yet is fine — choose ‘I don’t know the dates yet’ below, or add them later in Settings."
+                  : `Still to add: ${missingDates.map((s) => s.name).join(", ")}. You can also skip now and add them later in Settings.`}
+              </p>
+            ) : null}
+            {invalidDates.length ? (
+              <p className="text-xs text-danger" role="status">
+                Choose today or a future date, or clear the date and skip for now.
               </p>
             ) : null}
           </Panel>
         ) : null}
 
-        <div className="flex gap-2">
+        <div className={cx("flex gap-2", phase === PHASES.length - 1 && "flex-col sm:flex-row")}>
           {phase > 0 ? (
             <Button className="min-h-[3rem]" onClick={() => setPhase(phase - 1)}>
               Back
@@ -270,9 +282,24 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               Continue
             </Button>
           ) : (
-            <Button variant="primary" className="flex-1 min-h-[3rem]" disabled={saving || !canContinue} onClick={() => void finish()}>
-              {saving ? "Building your plan…" : "Build my plan"}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                className="min-h-[3rem] flex-1"
+                disabled={saving || !canSkipExamDates}
+                onClick={() => void finish()}
+              >
+                I don&apos;t know the dates yet
+              </Button>
+              <Button
+                variant="primary"
+                className="min-h-[3rem] flex-1"
+                disabled={saving || !canContinue}
+                onClick={() => void finish()}
+              >
+                {saving ? "Building your plan…" : "Build my plan"}
+              </Button>
+            </>
           )}
         </div>
       </div>

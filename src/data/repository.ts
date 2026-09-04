@@ -154,7 +154,7 @@ const SEED_VERSION = 2;
  * reintroduces a legacy id. Idempotent and effectively free when it has run.
  */
 export async function ensureSeeded(userId: Id): Promise<void> {
-  await migrateContentIds(userId);
+  await migrateContentIds();
   const installed = await readReviseMeta<number>("seedVersion");
   const existing = await getAll<Card>("cards");
   const known = new Set(existing.map((c) => c.id));
