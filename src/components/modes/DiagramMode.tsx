@@ -90,11 +90,14 @@ function DiagramRound({
       </div>
 
       <p className="text-sm text-ink">{title}</p>
+      <p className="text-xs text-ink3">
+        <span className="font-semibold text-ink2">Active recall:</span> choose a label from memory, then tap the point it belongs to. Wrong placements stay off the diagram so the correction is clear.
+      </p>
 
       <Panel className="p-2 sm:p-3">
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={spec.imageUrl} alt="" className="w-full h-auto rounded-[8px] select-none" draggable={false} />
+          <img src={spec.imageUrl} alt={`Unlabelled diagram for ${title}`} className="w-full h-auto rounded-[8px] select-none" draggable={false} />
           {spec.hotspots.map((hotspot) => {
             const done = round.placed[hotspot.id];
             return (

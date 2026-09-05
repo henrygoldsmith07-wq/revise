@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import type { Recommendation } from "@/domain/types";
@@ -15,13 +16,25 @@ import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
 
-// Today answers one question: "what should I do right now?" — and then stops.
+// The roadmap derives lessons from the authored curriculum, which is a much
+// larger client chunk than Today needs for its bounded review action. Load it
+// after the shell hydrates so the home route stays quick while the path still
+// appears in the same screen.
+const TodayRoadmap = dynamic(() => import("@/components/TodayRoadmap"), {
+  ssr: false,
+  loading: () => <TodayRoadmapLoading />,
+});
+
+// Today answers one question first: "what should I do right now?" The bounded
+// action stays dominant, with a compact roadmap underneath so the student can
+// see where today's work fits without opening a second screen.
 //
 // The answer is a bounded session: the due cards that fit in 15–25 minutes,
 // nothing more. No spec-point totals, no "2,216 things you owe" dashboard, no
 // after-this queue trailing into tomorrow's plan. If a session was interrupted
 // mid-way, resuming it replaces today's fresh session. Only when nothing is
-// due does Today fall back to the recommender's next best task.
+// due does Today fall back to the recommender's next best task; the roadmap is
+// context and a next learning checkpoint, not another analytics dashboard.
 
 export default function TodayPage() {
   const store = useStore();
@@ -90,10 +103,14 @@ export default function TodayPage() {
         <PhaseEntryNotice />
         <CountdownPhaseBanner />
         {revisionCheckpoint ? (
-          <ResumeRevisionCard />
+          <>
+            <ResumeRevisionCard />
+            <TodayRoadmap preferredSubjectId={primary?.subjectId} />
+          </>
         ) : (
           <>
             <TodayReviewSession session={session} displayName={settings.displayName} greeting={greetingLabel} />
+            <TodayRoadmap preferredSubjectId={primary?.subjectId} />
             {pace ? <PaceForecastLine forecast={pace} /> : null}
             <ExamOutlook />
           </>
@@ -106,20 +123,24 @@ export default function TodayPage() {
     return <EmptyToday name={settings.displayName} />;
   }
 
-  // Nothing due today: one next task instead of an empty screen. Still one
-  // call to action — no queue, no dashboard beneath it.
+  // Nothing due today: one next task instead of an empty screen. The roadmap
+  // below is a continuation path, not a competing queue or dashboard.
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
       {revisionCheckpoint ? (
-        <ResumeRevisionCard />
+        <>
+          <ResumeRevisionCard />
+          <TodayRoadmap preferredSubjectId={primary.subjectId} />
+        </>
       ) : (
         <>
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold" role="status">
             Nothing due right now
           </p>
           <NextBestAction recommendation={primary} displayName={settings.displayName} greeting={greetingLabel} />
+          <TodayRoadmap preferredSubjectId={primary.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />
         </>
@@ -313,7 +334,22 @@ function EmptyToday({ name }: { name: string }) {
           Set up exams
         </Link>
       </div>
+      <TodayRoadmap />
     </div>
+  );
+}
+
+function TodayRoadmapLoading() {
+  return (
+    <section aria-label="Today's learning roadmap" className="card p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-ink3 font-bold">Learning roadmap</p>
+          <p className="mt-1 text-sm text-ink3">Loading your next checkpoints…</p>
+        </div>
+        <span className="h-2 w-20 rounded-full bg-surface2 animate-pulse" aria-hidden="true" />
+      </div>
+    </section>
   );
 }
 

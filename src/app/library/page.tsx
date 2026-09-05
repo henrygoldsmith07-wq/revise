@@ -452,6 +452,7 @@ function TopicDetail({
         <Button onClick={() => void generate()} disabled={busy !== null}>
           {busy === "cards" ? "Generating…" : "Generate flashcards"}
         </Button>
+        <ButtonLink href={`/practice?mode=recall&topic=${encodeURIComponent(topic.id)}`}>Active recall</ButtonLink>
         <ButtonLink href={`/practice?topic=${encodeURIComponent(topic.id)}`}>Practise questions</ButtonLink>
         <ButtonLink href={`/review?topic=${encodeURIComponent(topic.id)}`}>Review cards</ButtonLink>
       </div>

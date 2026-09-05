@@ -4,7 +4,7 @@
 // only job is making sure the app itself loads with no network. Bump
 // CACHE_VERSION to invalidate previously cached shells.
 
-const CACHE_VERSION = "revise-v3";
+const CACHE_VERSION = "revise-v4";
 // Precaches every App Router shell so the whole app loads offline.
 // Keep this in sync with src/app/*/page.tsx — tests/perf.test.ts fails when a
 // route is missing, and scripts/validate-curriculum.mjs also reports drift.
@@ -35,6 +35,14 @@ const APP_SHELL = [
   "/manifest.webmanifest",
   "/icon.svg",
   "/icon-maskable.svg",
+  // Authored Label a diagram assets: precache them so the first diagram round
+  // is available offline, even before the browser has fetched the image once.
+  "/diagrams/animal-cell.svg",
+  "/diagrams/alveolus.svg",
+  "/diagrams/series-circuit.svg",
+  "/diagrams/free-body.svg",
+  "/diagrams/probability-venn.svg",
+  "/diagrams/energy-profile.svg",
 ];
 
 self.addEventListener("install", (event) => {

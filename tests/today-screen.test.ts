@@ -85,6 +85,14 @@ describe("Today screen — 15–25 minutes of due cards, then stop", () => {
     expect(source).not.toContain('title="Other options"');
     expect(source).not.toContain("Need less time?");
   });
+
+  it("keeps the roadmap available as a compact continuation path", () => {
+    const source = page();
+    expect(source).toContain("TodayRoadmap");
+    expect(source).toContain("preferredSubjectId");
+    expect(source).toContain('import("@/components/TodayRoadmap")');
+    expect(source).toContain("TodayRoadmapLoading");
+  });
 });
 
 describe("Today recommendation fallback details", () => {

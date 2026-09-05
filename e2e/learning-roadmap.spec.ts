@@ -9,6 +9,12 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   await completeOnboarding(page, { skipExamDates: true });
   await expect(page.locator("main#main")).toBeVisible({ timeout: 60_000 });
 
+  await page.goto("/");
+  const today = page.locator("main#main");
+  await expect(today).toContainText("Learning roadmap");
+  await expect(today).toContainText(/Continue roadmap|Review roadmap/);
+  await expect(today).toContainText("Unit 1");
+
   await page.goto("/lesson");
   const main = page.locator("main#main");
   await expect(main).toContainText("Learning roadmap");
@@ -24,4 +30,10 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   await main.getByRole("button", { name: /Open lesson 1:/i }).first().click();
   await expect(main).toContainText("Checkpoint 1 of");
   await expect(main).toContainText("Know the target");
+
+  const recall = main.getByRole("textbox", { name: "Your active recall answer" });
+  await expect(recall).toBeVisible();
+  await recall.fill("I can explain the checkpoint from memory before checking the model.");
+  await main.getByRole("button", { name: "Show model answer" }).click();
+  await expect(main).toContainText("Now compare");
 });

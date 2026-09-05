@@ -31,6 +31,7 @@ import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-dept
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
+export { authoredDiagrams, diagramForTopic } from "./diagram-cards";
 export { CONTENT_SCHEMAS, contentCardSchema, contentQuestionPartSchema, contentQuestionSchema, contentTopicSchema } from "./schema";
 
 /** The authored question bank. Uploaded and AI-generated questions live in

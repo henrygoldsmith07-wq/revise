@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { seedMisconceptions, seedQuestions, seedQuestionsForSubject, seedQuestionsForTopic } from "@/content";
 import { makeCloze, seedCardsForTopic } from "@/content/seed-cards";
+import { isDiagramCard, parseDiagram } from "@/domain/diagrams";
 import {
   allSubjects,
   allTopics,
@@ -73,6 +74,26 @@ describe("seed cards", () => {
   it("covers every topic in the specification", () => {
     for (const topic of allTopics()) {
       expect(seedCardsForTopic(topic, "u").length).toBeGreaterThan(0);
+    }
+  });
+
+  it("seeds original diagram cards for the core label-a-diagram subjects", () => {
+    for (const candidate of [
+      { subject: "biology", slug: "cell-structure" },
+      { subject: "physics", slug: "electric-circuits" },
+      { subject: "maths", slug: "probability" },
+      { subject: "chemistry", slug: "energetics" },
+    ]) {
+      const topic = allTopics().find(
+        (entry) => entry.subjectId.includes(candidate.subject) && entry.id.endsWith(`.${candidate.slug}`),
+      );
+      expect(topic, `${candidate.subject}/${candidate.slug} topic`).toBeDefined();
+      const diagramCards = seedCardsForTopic(topic!, "u").filter(isDiagramCard);
+      expect(diagramCards, `${candidate.subject}/${candidate.slug} diagram`).toHaveLength(1);
+      const diagram = parseDiagram(diagramCards[0]!);
+      expect(diagram?.imageUrl).toBe(diagramCards[0]!.imageUrl);
+      expect(diagram?.hotspots.length).toBeGreaterThanOrEqual(4);
+      expect(diagramCards[0]!.kind).toBe("image");
     }
   });
 

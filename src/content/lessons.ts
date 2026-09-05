@@ -8,8 +8,8 @@
 // errors, misconceptions) so it is real content, offline-first, and can never
 // drift from the spec — the same contract the seed cards use.
 //
-// A lesson is a short sequence of steps: read a point, then answer one check
-// question to move on. Steps are derived deterministically from the topic's
+// A lesson is a short sequence of steps: read a point, retrieve it from memory,
+// then answer one check question to move on. Steps are derived deterministically from the topic's
 // authored data (same contract as seed cards: deterministic ids, no drift).
 // ---------------------------------------------------------------------------
 

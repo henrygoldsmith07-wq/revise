@@ -1,5 +1,7 @@
 import { createCard } from "@/domain/scheduling";
+import { serialiseDiagram } from "@/domain/diagrams";
 import type { Card, Id, Topic } from "@/domain/types";
+import { diagramForTopic } from "./diagram-cards";
 
 // ---------------------------------------------------------------------------
 // Every topic ships with revision content on day one. Cards are derived from
@@ -112,6 +114,40 @@ export function seedCardsForTopic(topic: Topic, userId: Id, now: Date = new Date
       );
     }
   });
+
+  // Diagram cards are authored alongside the topic rather than generated at
+  // runtime. Their image and hotspot payload stay deterministic, so every
+  // exam-board variant gets the same offline labelling exercise without an AI
+  // call, while the card still participates in the normal review deck.
+  const diagram = diagramForTopic(topic);
+  if (diagram) {
+    const linkedSp = topic.specPoints?.slice(0, 2).map((sp) => sp.id);
+    cards.push(
+      createCard(
+        {
+          id: seedCardId(topic.id, "diagram", 0),
+          userId,
+          subjectId: topic.subjectId,
+          topicId: topic.id,
+          front: diagram.front,
+          back: serialiseDiagram(diagram.spec),
+          kind: "image",
+          imageUrl: diagram.spec.imageUrl,
+          note: "Active recall: choose each label from memory, then tap the hotspot it belongs to.",
+          origin: "seed",
+          specPointIds: linkedSp,
+          source: topic.source ?? "authored",
+          licensedSource: topic.licensedSource ?? null,
+          verification: topic.verification,
+          reviewer: topic.reviewer ?? null,
+          lastChecked: topic.lastChecked ?? null,
+          specVersion: topic.specVersion,
+          tags: ["seed", ...diagram.tags, topic.id.split(".").pop() ?? ""],
+        } as Parameters<typeof createCard>[0],
+        now,
+      ),
+    );
+  }
 
   // Common errors become "what is wrong with this?" cards — pre-emptive
   // mistake cards, before the student has had to make the mistake themselves.

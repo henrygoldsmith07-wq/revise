@@ -22,16 +22,44 @@ const STEP_META = {
 
 type LessonEntry = RoadmapLessonEntry;
 
-// Lesson mode: learn a topic from zero before drilling it with flashcards.
-// Steps are derived from authored curriculum data; each check question gates
-// progress so reading stays active instead of passive. Completion and the
-// lesson streak live in the synced store (one row per user), so progress
-// follows the student across devices instead of sitting in per-device
-// localStorage. Video lessons mark their own `video:<topicId>` completion in
-// the same map, so a watching session earns the streak exactly like reading.
+function recallPrompt(step: NonNullable<LessonEntry["lesson"]["steps"]>[number]): string {
+  switch (step.kind) {
+    case "overview":
+      return "Without looking back, what is this topic or checkpoint about? Give the one-sentence big picture.";
+    case "trap":
+      return "What wording or move should you avoid, and what would you say instead?";
+    case "misconception":
+      return "What is the tempting wrong idea, and what is the corrected explanation?";
+    case "core":
+    default:
+      return "Write the key idea in one clear sentence, including the condition or consequence the examiner rewards.";
+  }
+}
 
-export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => void }) {
+// Lesson mode: learn a topic from zero before drilling it with flashcards.
+// Steps are derived from authored curriculum data; an active-recall attempt
+// and any check question gate progress so reading stays active instead of
+// passive. Completion and the lesson streak live in the synced store (one row
+// per user), so progress follows the student across devices instead of sitting
+// in per-device localStorage. Video lessons are an optional companion — the
+// written, interactive route remains the default and never needs a video to
+// complete.
+
+export function LessonMode({
+  topics,
+  onExit,
+  initialTopicId,
+}: {
+  topics: Topic[];
+  onExit: () => void;
+  /** Optional deep link used by mock preparation to open a tested topic. */
+  initialTopicId?: string;
+}) {
   const lessons = useMemo<LessonEntry[]>(() => buildRoadmapLessons(topics), [topics]);
+  const initialLessonIdx = useMemo(
+    () => (initialTopicId ? lessons.findIndex((entry) => entry.topic.id === initialTopicId) : -1),
+    [initialTopicId, lessons],
+  );
 
   const store = useStore();
   const { lessonProgress, completeLesson } = store;
@@ -50,9 +78,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         .filter((group) => group.entries.length > 0),
     [currentSubjectId, lessons],
   );
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [activeIdx, setActiveIdx] = useState<number | null>(() => (initialLessonIdx >= 0 ? initialLessonIdx : null));
   const [stepIdx, setStepIdx] = useState(0);
   const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
+  // Recall answers stay local to the active lesson. They are deliberately not
+  // persisted or sent to a provider: the value is a prompt to retrieve before
+  // seeing the authored takeaway, not another answer-history data source.
+  const [recallDraft, setRecallDraft] = useState<Record<string, string>>({});
+  const [recallRevealed, setRecallRevealed] = useState<Record<string, boolean>>({});
   const [summary, setSummary] = useState<{
     correct: number;
     total: number;
@@ -83,17 +116,19 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     [completed],
   );
   const chosen = step?.id ? checked[step.id] : undefined;
-  // Only steps that carry a check question gate progress. The intro summary
-  // and the common-trap closers are plain reading — they must never block the
-  // student, or the lesson dead-ends on step one.
+  const recallDone = !step?.id || Boolean(recallRevealed[step.id]);
+  // Check questions and active recall both gate progress. Every step asks the
+  // student to produce the idea before the authored answer is shown.
   const hasCheck = Boolean(step?.check);
-  const checkAnswered = !hasCheck || chosen !== undefined;
+  const checkAnswered = recallDone && (!hasCheck || chosen !== undefined);
   const isLast = lesson ? stepIdx === lesson.steps.length - 1 : false;
 
   const startLesson = useCallback((idx: number) => {
     setActiveIdx(idx);
     setStepIdx(0);
     setChecked({});
+    setRecallDraft({});
+    setRecallRevealed({});
     setSummary(null);
   }, []);
 
@@ -101,6 +136,8 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     setActiveIdx(null);
     setStepIdx(0);
     setChecked({});
+    setRecallDraft({});
+    setRecallRevealed({});
     setSummary(null);
   }, []);
 
@@ -118,7 +155,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   }, [activeIdx, isEntryComplete, lessons]);
 
   const finishLesson = useCallback(() => {
-    if (!lesson) return;
+    if (!lesson || !checkAnswered) return;
     // Persist through the synced store — it writes IndexedDB then queues the
     // same row for Supabase, so progress survives on this device and follows
     // the student elsewhere. The summary renders the updated streak once the
@@ -127,7 +164,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
     // Carry the missed checks into the summary so the student re-exposes the
     // correction instead of only seeing a score.
     setSummary(summariseLesson(lesson, checked));
-  }, [checked, completeLesson, lesson]);
+  }, [checked, checkAnswered, completeLesson, lesson]);
 
   const advance = useCallback(() => {
     if (!lesson || !checkAnswered) return;
@@ -144,11 +181,16 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
 
   const answer = useCallback(
     (optionIdx: number) => {
-      if (!step?.id || checkAnswered) return;
+      if (!step?.id || !recallDone || checkAnswered) return;
       setChecked((prev) => ({ ...prev, [step.id!]: optionIdx }));
     },
-    [checkAnswered, step],
+    [checkAnswered, recallDone, step],
   );
+
+  const revealRecall = useCallback(() => {
+    if (!step?.id || !recallDraft[step.id]?.trim()) return;
+    setRecallRevealed((previous) => ({ ...previous, [step.id!]: true }));
+  }, [recallDraft, step]);
 
   const continueFromSummary = useCallback(() => {
     if (nextIdx !== null) {
@@ -181,21 +223,32 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
   // steps back, Esc leaves the lesson. Registered through the shared shortcut
   // registry so the keys show up in the global `?` sheet.
   const answerKeys = lesson && !summary && step?.check ? step.check.options.map((_, oi) => String(oi + 1)) : [];
+  const currentRecallDraft = step?.id ? recallDraft[step.id] ?? "" : "";
   useShortcuts(
     [
       ...answerKeys.map((key) => ({
         key,
         group: "Lesson",
         label: `Answer option ${key}`,
-        disabled: !lesson || !!summary || !step?.check || checkAnswered,
+        disabled: !lesson || !!summary || !step?.check || !recallDone || checkAnswered,
         run: () => answer(Number(key) - 1),
       })),
       {
         key: "enter",
         group: "Lesson",
-        label: summary ? "Next lesson" : checkAnswered ? (isLast ? "Finish lesson" : "Continue") : "Continue",
-        disabled: !lesson || (!summary && !checkAnswered),
-        run: summary ? continueFromSummary : advance,
+        label: summary
+          ? "Next lesson"
+          : !recallDone
+            ? currentRecallDraft.trim()
+              ? "Reveal recall answer"
+              : "Write your recall"
+            : checkAnswered
+              ? isLast
+                ? "Finish lesson"
+                : "Continue"
+              : "Continue",
+        disabled: !lesson || (!summary && (!recallDone ? !currentRecallDraft.trim() : !checkAnswered)),
+        run: summary ? continueFromSummary : !recallDone ? revealRecall : advance,
       },
       {
         key: "backspace",
@@ -212,7 +265,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
         run: exitLesson,
       },
     ],
-    [advance, answer, checkAnswered, continueFromSummary, exitLesson, goBack, isLast, lesson, step, stepIdx, summary],
+    [advance, answer, checkAnswered, continueFromSummary, currentRecallDraft, exitLesson, goBack, isLast, lesson, recallDone, revealRecall, step, stepIdx, summary],
   );
 
   if (!lessons.length) {
@@ -351,7 +404,10 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
 
   // ---- Active lesson -----------------------------------------------------
   if (lesson && step) {
-    const reveal = checkAnswered;
+    // The authored takeaway is available after the student has made a recall
+    // attempt. The multiple-choice explanation is still held until an option
+    // is selected, so both retrieval and application remain active.
+    const checkReveal = hasCheck && chosen !== undefined;
     const stepMeta = STEP_META[step.kind];
     const selectedCorrect = Boolean(step.check && chosen === step.check.correctIndex);
     return (
@@ -360,7 +416,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
           <div>
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Lesson</p>
             <h2 className="text-lg font-semibold">{lesson.title}</h2>
-            <p className="text-xs text-ink3 mt-1 max-w-xl">{lesson.intro}</p>
+            <p className="text-xs text-ink3 mt-1 max-w-xl">{lesson.intro} Written teaching, worked application and quick checks are the default; video is optional.</p>
           </div>
           <Button size="sm" variant="ghost" onClick={exitLesson}>
             Exit
@@ -401,9 +457,40 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
             </div>
           ) : null}
 
-          <div className="rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Remember this</p>
-            <RichText className="text-sm text-ink mt-1">{step.takeaway}</RichText>
+          <div className="rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-3 space-y-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Active recall</p>
+                <p className="text-sm font-medium text-ink mt-1">{recallPrompt(step)}</p>
+                <p className="text-xs text-ink3 mt-1">Retrieve the idea first, then compare your wording with the model takeaway.</p>
+              </div>
+              <Pill tone="accent">Answer first</Pill>
+            </div>
+            {!recallDone ? (
+              <>
+                <textarea
+                  value={currentRecallDraft}
+                  onChange={(event) =>
+                    step.id && setRecallDraft((previous) => ({ ...previous, [step.id]: event.target.value }))
+                  }
+                  rows={3}
+                  placeholder="Write what you remember…"
+                  aria-label="Your active recall answer"
+                  className="field text-sm"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="primary" size="sm" onClick={revealRecall} disabled={!currentRecallDraft.trim()}>
+                    Show model answer
+                  </Button>
+                  <span className="text-[11px] text-ink3">Your answer stays on this device for this lesson only.</span>
+                </div>
+              </>
+            ) : (
+              <div role="status" aria-live="polite" className="rounded-[8px] border border-success/30 bg-successsoft/50 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Now compare</p>
+                <RichText className="text-sm text-ink mt-1">{step.takeaway}</RichText>
+              </div>
+            )}
           </div>
 
           {step.check ? (
@@ -423,12 +510,12 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                   return (
                     <li key={oi}>
                       <button
-                        disabled={reveal}
+                        disabled={!recallDone || checkReveal}
                         onClick={() => answer(oi)}
                         aria-pressed={isChosen}
                         className={cx(
                           "w-full text-left text-sm px-3 py-2 rounded-[8px] border transition-colors flex items-center gap-2",
-                          reveal
+                          checkReveal
                             ? isCorrect
                               ? "border-success text-success"
                               : isChosen
@@ -439,14 +526,14 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                       >
                         <span className="text-[11px] font-mono text-ink3 shrink-0">{oi + 1}</span>
                         <span className="min-w-0 flex-1">{option}</span>
-                        {reveal && isCorrect ? <span className="ml-auto shrink-0">✓</span> : null}
-                        {reveal && isChosen && !isCorrect ? <span className="ml-auto shrink-0">✗</span> : null}
+                        {checkReveal && isCorrect ? <span className="ml-auto shrink-0">✓</span> : null}
+                        {checkReveal && isChosen && !isCorrect ? <span className="ml-auto shrink-0">✗</span> : null}
                       </button>
                     </li>
                   );
                 })}
               </ul>
-              {reveal ? (
+              {checkReveal ? (
                 <div
                   role="status"
                   aria-live="polite"
@@ -478,11 +565,11 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
           </Button>
           {isLast ? (
             <Button variant="primary" onClick={finishLesson} disabled={!checkAnswered}>
-              Finish lesson
+              {checkAnswered ? "Finish lesson" : recallDone ? "Answer the check" : "Complete active recall"}
             </Button>
           ) : (
             <Button variant="primary" disabled={!checkAnswered} onClick={advance}>
-              {checkAnswered ? "Next" : "Answer to continue"}
+              {checkAnswered ? "Next" : recallDone ? "Choose an answer" : "Complete active recall"}
             </Button>
           )}
         </div>
@@ -533,7 +620,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
               <p className="text-[11px] uppercase tracking-[0.14em] font-bold opacity-75">Your learning path</p>
               <h3 className="mt-1 text-xl font-bold tracking-tight">{roadmapTitle}</h3>
               <p className="mt-1 max-w-xl text-sm opacity-85">
-                Follow the path from foundations to exam-ready ideas. Each node opens a short, step-by-step lesson.
+                Follow the path from foundations to exam-ready ideas. Each node opens written teaching, worked application and quick checks — video is optional support.
               </p>
             </div>
             <div className="shrink-0 rounded-2xl border-2 border-onaccent/30 px-3 py-2 text-center">
@@ -690,7 +777,7 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                                   </p>
                                   <p className="mt-0.5 line-clamp-2 text-xs text-ink2">{entry.lesson.focus}</p>
                                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink3">
-                                    <span>{entry.lesson.steps.length} steps</span>
+                                    <span>{entry.lesson.steps.length} recalls</span>
                                     <span className="h-1 w-1 rounded-full bg-line" aria-hidden="true" />
                                     <span>{checks} checks</span>
                                     <span className="h-1 w-1 rounded-full bg-line" aria-hidden="true" />
@@ -710,6 +797,28 @@ export function LessonMode({ topics, onExit }: { topics: Topic[]; onExit: () => 
                               aria-label={`Play the video lesson for ${entry.topic.title}`}
                             >
                               <VideoIcon size={ICON_SIZE.sm} /> <span className="hidden sm:inline">Video</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="self-center px-2 sm:px-2.5"
+                              onClick={() =>
+                                router.push(
+                                  `/practice?mode=recall&subject=${encodeURIComponent(entry.topic.subjectId)}&topic=${encodeURIComponent(entry.topic.id)}`,
+                                )
+                              }
+                              aria-label={`Recall ${entry.topic.title} from memory`}
+                            >
+                              <span aria-hidden="true">↺</span> <span className="hidden sm:inline">Recall</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="self-center px-2 sm:px-2.5"
+                              onClick={() => router.push(`/practice?subject=${encodeURIComponent(entry.topic.subjectId)}&topic=${encodeURIComponent(entry.topic.id)}`)}
+                              aria-label={`Practise questions for ${entry.topic.title}`}
+                            >
+                              <span aria-hidden="true">?</span> <span className="hidden sm:inline">Practice</span>
                             </Button>
                           </div>
 

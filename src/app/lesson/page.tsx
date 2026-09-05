@@ -24,6 +24,7 @@ function LessonBrowser() {
     () => allSubjects().filter((s) => store.settings.subjectIds.includes(s.id)),
     [store.settings.subjectIds],
   );
+  const topicParam = params.get("topic");
 
   // Land the student where they left off: an explicit ?subject= link wins,
   // then the subject they last studied (synced through settings, so it
@@ -34,6 +35,7 @@ function LessonBrowser() {
     return subjects.some((s) => s.id === candidate) ? candidate : subjects[0]?.id ?? "";
   });
   const topics = useMemo(() => (subjectId ? allTopics([subjectId]) : []), [subjectId]);
+  const initialTopicId = topicParam && topics.some((topic) => topic.id === topicParam) ? topicParam : undefined;
 
   const changeSubject = (value: string) => {
     setSubjectId(value);
@@ -68,7 +70,12 @@ function LessonBrowser() {
       {subjectId ? (
         <>
           <CommutePack topics={topics} />
-          <LessonMode topics={topics} onExit={() => setSubjectId("")} />
+          <LessonMode
+            key={`${subjectId}:${initialTopicId ?? ""}`}
+            topics={topics}
+            initialTopicId={initialTopicId}
+            onExit={() => setSubjectId("")}
+          />
         </>
       ) : null}
     </div>

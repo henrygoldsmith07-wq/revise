@@ -13,6 +13,7 @@ import { selectNextPaper, type PaperCandidate } from "@/domain/exam-paper-select
 import type { Paper, Question } from "@/domain/types";
 import { useStore, useSubjects } from "@/state/store";
 import { PaperWeaknessPanel } from "@/components/PaperWeaknessPanel";
+import { MockStudyPlan } from "@/components/MockStudyPlan";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
@@ -46,6 +47,7 @@ function Papers() {
     resumeCheckpoint?.paperId ? store.papers.find((paper) => paper.id === resumeCheckpoint.paperId) ?? null : null,
   );
   const [examPaper, setExamPaper] = useState<Paper | null>(null);
+  const [plannedPaperId, setPlannedPaperId] = useState<string | null>(null);
 
   const papers = useMemo(
     () => store.papers.filter((p) => !subjectId || p.subjectId === subjectId),
@@ -80,6 +82,17 @@ function Papers() {
       ...papers.filter((p) => !candidateIds.has(p.id)),
     ];
   }, [paperSelection.candidates, papers]);
+
+  // Keep a preparation route visible for the best sit-able mock, while still
+  // allowing the student to choose a different paper from its own card.
+  const defaultPlanPaper = useMemo(
+    () =>
+      papers.find((paper) => paper.id === paperSelection.recommended?.paperId) ??
+      papers.find((paper) => paper.questionIds.length > 0) ??
+      null,
+    [paperSelection.recommended?.paperId, papers],
+  );
+  const plannedPaper = papers.find((paper) => paper.id === plannedPaperId) ?? defaultPlanPaper;
 
   if (activePaper) {
     const checkpoint = resumeActive && resumeCheckpoint?.paperId === activePaper.id ? resumeCheckpoint : null;
@@ -126,6 +139,18 @@ function Papers() {
           Choose <span className="font-semibold">Full exam conditions</span> beside any extracted paper below. The run is timed to the selected paper format, saves each answer only when you submit, and records the marked paper for later review.
         </p>
       </Panel>
+
+      {plannedPaper ? (
+        <MockStudyPlan
+          paper={plannedPaper}
+          questions={store.questions}
+          topics={topicsFor(plannedPaper.subjectId)}
+          mastery={store.mastery}
+          attempts={store.attempts}
+          mistakes={store.mistakes}
+          onStartMock={() => setExamPaper(plannedPaper)}
+        />
+      ) : null}
 
       {paperSelection.skipped.length ? (
         <Panel className="space-y-2">
@@ -231,6 +256,15 @@ function Papers() {
                   </div>
                   <Pill className="self-start sm:self-auto" tone={paper.status === "practised" ? "success" : undefined}>{paper.status}</Pill>
                   <div className="grid grid-cols-1 sm:flex justify-end gap-1.5 w-full sm:w-auto">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="w-full sm:w-auto"
+                      disabled={!paper.questionIds.length}
+                      onClick={() => setPlannedPaperId(paper.id)}
+                    >
+                      Plan prep
+                    </Button>
                     <Button
                       size="sm"
                       className="w-full sm:w-auto"

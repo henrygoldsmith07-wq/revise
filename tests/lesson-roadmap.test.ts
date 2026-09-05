@@ -63,4 +63,12 @@ describe("learning roadmap", () => {
     expect(source).toContain("What you will learn");
     expect(source).toContain("Recommended next");
   });
+
+  it("makes retrieval the gate before a model takeaway or next step", () => {
+    expect(source).toContain("recallRevealed");
+    expect(source).toContain("Your active recall answer");
+    expect(source).toContain("Show model answer");
+    expect(source).toContain("Retrieve the idea first");
+    expect(source).toContain("mode=recall");
+  });
 });

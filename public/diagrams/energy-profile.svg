@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Unlabelled reaction energy profile</title>
+  <desc id="desc">A reaction pathway showing reactants, an activation-energy peak and products.</desc>
+  <rect width="720" height="420" fill="#fafafa"/>
+  <path d="M92 350V55M92 350h570" stroke="#202020" stroke-width="5"/>
+  <path d="m82 70 10-15 10 15M647 340l15 10-15 10" fill="none" stroke="#202020" stroke-width="4"/>
+  <path d="M122 260h128c35 0 38-142 112-142s78 142 118 142h116" fill="none" stroke="#202020" stroke-width="7" stroke-linecap="round"/>
+  <path d="M122 260h128M480 260h116" stroke="#707070" stroke-width="3" stroke-dasharray="8 7"/>
+  <path d="M362 118V260M350 118h24M350 260h24" stroke="#202020" stroke-width="3"/>
+  <path d="M596 260V310M584 310h24" stroke="#202020" stroke-width="3"/>
+  <circle cx="180" cy="260" r="8" fill="#202020"/><circle cx="548" cy="260" r="8" fill="#202020"/>
+</svg>

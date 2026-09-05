@@ -300,7 +300,10 @@ export function VideoLesson({
               <Button size="sm" variant="secondary" onClick={() => setPosition(0)}>
                 <PlayIcon size={ICON_SIZE.sm} /> Watch again
               </Button>
-              <Button size="sm" variant="primary" onClick={() => router.push(`/practice?topic=${topic.id}`)}>
+              <Button size="sm" variant="primary" onClick={() => router.push(`/practice?mode=recall&topic=${encodeURIComponent(topic.id)}`)}>
+                ↺ Recall this topic
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => router.push(`/practice?topic=${encodeURIComponent(topic.id)}`)}>
                 Drill this topic
               </Button>
               {nextTopic && onSelectTopic ? (

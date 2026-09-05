@@ -58,8 +58,8 @@ const MODES: {
   {
     mode: "diagram",
     label: "Label a diagram",
-    blurb: "Drag labels onto the right points.",
-    when: "For the figures examiners keep asking you to label.",
+    blurb: "Retrieve each label, then tap the right point.",
+    when: "For the figures examiners keep asking you to label from memory.",
     Icon: ModesIcon,
   },
   {
