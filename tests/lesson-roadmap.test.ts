@@ -62,6 +62,9 @@ describe("learning roadmap", () => {
     expect(source).toContain("See detailed lesson outline");
     expect(source).toContain("What you will learn");
     expect(source).toContain("Recommended next");
+    expect(source).toContain("How it works");
+    expect(source).toContain("Follow in order");
+    expect(source).toContain("Process steps");
   });
 
   it("makes retrieval the gate before a model takeaway or next step", () => {

@@ -410,6 +410,7 @@ export function LessonMode({
     const checkReveal = hasCheck && chosen !== undefined;
     const stepMeta = STEP_META[step.kind];
     const selectedCorrect = Boolean(step.check && chosen === step.check.correctIndex);
+    const isProcessExplanation = step.explanationMode === "process";
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-start justify-between gap-3">
@@ -437,8 +438,21 @@ export function LessonMode({
           <RichText className="text-base text-ink">{step.body}</RichText>
 
           <div className="pt-4 border-t border-line">
-            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Break it down</p>
-            <ol className="mt-2 space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
+                {isProcessExplanation ? "How it works" : "Break it down"}
+              </p>
+              {isProcessExplanation ? <Pill tone="accent">Follow in order</Pill> : null}
+            </div>
+            {isProcessExplanation ? (
+              <p className="mt-1 text-xs text-ink3">
+                Break it down from the starting condition, through each change, to the final result.
+              </p>
+            ) : null}
+            <ol
+              className="mt-2 space-y-2.5"
+              aria-label={isProcessExplanation ? "Process steps" : "Explanation steps"}
+            >
               {step.explanationSteps.map((line, index) => (
                 <li key={`${step.id}:explanation:${index}`} className="flex items-start gap-2.5">
                   <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface2 text-[11px] font-semibold text-ink3">

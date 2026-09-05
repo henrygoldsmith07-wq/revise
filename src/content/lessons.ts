@@ -26,6 +26,8 @@ export interface LessonStep {
   body: string;
   /** Short, ordered chunks that turn a dense point into a guided explanation. */
   explanationSteps: string[];
+  /** Whether the explanation should be read as an ordered process or a concept. */
+  explanationMode?: "concept" | "process";
   /** One sentence to repeat after reading the step. */
   takeaway: string;
   /** Optional link to the specification wording for this idea. */
@@ -89,6 +91,7 @@ export function buildLesson(topic: Topic): Lesson | null {
   // from the point itself (the colon split used by seed cards keeps the
   // question and answer consistent with the cards the student will meet).
   topic.keyPoints.forEach((point, i) => {
+    const pointExplanation = explainPoint(point);
     const { question, answer, distractors } = checkFromKeyPoint(topic, point, i);
     // Shuffle first, then record where the answer landed — recording the
     // index before shuffling would point at whatever option ended up first.
@@ -98,14 +101,15 @@ export function buildLesson(topic: Topic): Lesson | null {
       kind: "core",
       title: pointTitle(point, `Key idea ${i + 1}`),
       body: point,
-      explanationSteps: explainPoint(point),
+      explanationSteps: pointExplanation.steps,
+      explanationMode: pointExplanation.mode,
       takeaway: `Remember: ${sentence(point)}`,
       ...(topic.specPoints?.[i]?.text ? { examLink: topic.specPoints[i].text } : {}),
       check: {
         question,
         options,
         correctIndex: options.indexOf(answer),
-        explanation: `The idea to keep is: ${sentence(answer)} Say it once in your own words, then connect it to the question before moving on.`,
+        explanation: checkExplanation(pointExplanation, answer),
       },
     });
   });
@@ -226,37 +230,326 @@ function sentence(text: string): string {
   return clean ? `${clean}.` : text;
 }
 
+type ExplanationMode = "concept" | "process";
+
+interface PointExplanation {
+  mode: ExplanationMode;
+  steps: string[];
+}
+
+interface ProcessClause {
+  text: string;
+  /** The connector immediately before this clause, if the author supplied one. */
+  connector?: string;
+}
+
 /**
- * Turn one dense authored key point into an ordered explanation. Separators
- * are deliberately conservative: each chunk is still the author's wording,
- * so this helper can improve readability without inventing subject facts.
+ * Verbs that normally describe a change, mechanism or exam procedure. This is
+ * intentionally a small, conservative vocabulary: the helper may rearrange
+ * punctuation, but it must never invent a scientific or mathematical fact.
  */
-function explainPoint(point: string): string[] {
+const PROCESS_ACTIONS = /\b(?:adds?|allows?|applies?|binds?|breaks?|carries?|causes?|changes?|checks?|chooses?|combines?|compares?|concludes?|converts?|decreases?|denatur(?:e|es|ed|ation)|detects?|diffuses?|divides?|drives?|enters?|exits?|falls?|flows?|forms?|generates?|halves?|holds?|identifies?|increases?|integrates?|joins?|leads?|limits?|loads?|measures?|moves?|names?|needs?|opens?|pairs?|pumps?|produces?|provides?|reaches?|releases?|removes?|requires?|retains?|returns?|rises?|separates?|shifts?|solves?|speeds?|splits?|state(?:s|d)?|stretches?|substitutes?|travels?|unloads?|uses?|writes?|yields?)\b/i;
+
+/**
+ * Turn one dense authored key point into a content-bearing explanation.
+ *
+ * The old fallback asked students to explain a rule without giving them the
+ * rule's mechanism. Here, authored clauses are kept intact and labelled in
+ * order. A process point therefore reads as a chain (condition → change →
+ * result), while a definition still gets a concrete meaning and an exam use.
+ */
+function explainPoint(point: string): PointExplanation {
   const clean = point.replace(/\s+/g, " ").trim();
-  const colon = clean.indexOf(":");
-  const colonParts = colon > 18 && clean.length - colon > 12
-    ? [clean.slice(0, colon), clean.slice(colon + 1)]
-    : [];
-  const parts = colonParts.length
-    ? colonParts
-    : clean
-        .split(/\s*(?:;|—|→)\s*|\s+(?:then|therefore)\s+/i)
-        .map((part) => part.trim())
-        .filter(Boolean);
+  const clauses = splitProcessClauses(clean);
 
-  if (parts.length > 1) return parts.map((part) => sentence(part));
+  if (isProcessPoint(clean, clauses)) {
+    return {
+      mode: "process",
+      steps: clauses.length > 1 ? formatProcessClauses(clauses) : processFallback(clean),
+    };
+  }
 
+  return {
+    mode: "concept",
+    steps: conceptExplanation(clean),
+  };
+}
+
+/** Split authored punctuation and causal connectors without changing words. */
+function splitProcessClauses(text: string): ProcessClause[] {
+  if (!text) return [];
+
+  // A colon in an authored point is normally a heading followed by its
+  // mechanism (for example, "Faraday: induced EMF ..."). Treat it like the
+  // other visible process separators, but avoid short time/ratio labels.
+  const marked = splitMarkedText(text);
+  return marked
+    .flatMap(expandTopLevelColon)
+    .flatMap(expandProcessClause)
+    .filter((clause) => clause.text.length > 0);
+}
+
+function expandTopLevelColon(clause: ProcessClause): ProcessClause[] {
+  const colon = topLevelIndexOf(clause.text, ":");
+  if (colon <= 18 || clause.text.length - colon <= 12) return [clause];
   return [
-    "Say the rule in your own words before trying to memorise the wording.",
-    "Ask yourself why this is true, or what changes because of it.",
-    "Use the exact idea in a question before you move on.",
+    { text: clause.text.slice(0, colon).trim(), connector: clause.connector },
+    { text: clause.text.slice(colon + 1).trim(), connector: "colon" },
   ];
+}
+
+function splitMarkedText(text: string): ProcessClause[] {
+  const marker = /(;|—|→|⇒|->|\s+then\s+|\s+therefore\s+|\s+so\s+(?!that\b)|\s+because\s+|\s+since\s+|\s+which\s+(?:means|causes)\s+)/gi;
+  const clauses: ProcessClause[] = [];
+  let cursor = 0;
+  let connector: string | undefined;
+
+  for (const match of text.matchAll(marker)) {
+    const matchIndex = match.index ?? cursor;
+    if (isInsideBalancedGroup(text, matchIndex)) continue;
+    const chunk = text.slice(cursor, matchIndex).trim();
+    if (chunk) clauses.push({ text: chunk, connector });
+    connector = match[0].trim().toLowerCase();
+    cursor = matchIndex + match[0].length;
+  }
+
+  const tail = text.slice(cursor).trim();
+  if (tail) clauses.push({ text: tail, connector });
+  return clauses.length ? clauses : [{ text: text.trim() }];
+}
+
+/** Expand comma-separated steps and independent clauses when they are real actions. */
+function expandProcessClause(clause: ProcessClause): ProcessClause[] {
+  const text = clause.text.replace(/\s+/g, " ").trim();
+  if (!text || !PROCESS_ACTIONS.test(text)) return [{ ...clause, text }];
+
+  const commaParts = splitTopLevelCommas(text)
+    .map((part) => part.replace(/^(?:and|then)\s+/i, "").trim())
+    .filter(Boolean);
+  const parts = commaParts.length > 1 ? commaParts : [text];
+  return parts.flatMap((part, index) =>
+    splitIndependentAnd({
+      text: part,
+      connector: index === 0 ? clause.connector : "comma",
+    }),
+  );
+}
+
+function splitIndependentAnd(clause: ProcessClause): ProcessClause[] {
+  const boundaries = [...clause.text.matchAll(/\s+and\s+/gi)].filter((boundary) =>
+    !isInsideBalancedGroup(clause.text, boundary.index ?? 0),
+  );
+  if (!boundaries.length) return [clause];
+
+  const pieces: ProcessClause[] = [];
+  let cursor = 0;
+  let connector = clause.connector;
+  for (const boundary of boundaries) {
+    const index = boundary.index ?? cursor;
+    const left = clause.text.slice(cursor, index).trim();
+    const right = clause.text.slice(index + boundary[0].length).trim();
+    const firstRightWord = right.match(/^[A-Za-z][A-Za-z-]*/)?.[0] ?? "";
+    const actionMatch = left.match(PROCESS_ACTIONS);
+    const sharedSubject = actionMatch?.index && actionMatch.index > 0
+      ? left.slice(0, actionMatch.index).trim()
+      : "";
+    const rightStartsAction = PROCESS_ACTIONS.test(firstRightWord);
+    const independent =
+      left.length > 0 &&
+      right.length > 0 &&
+      PROCESS_ACTIONS.test(left) &&
+      PROCESS_ACTIONS.test(right) &&
+      (!rightStartsAction || sharedSubject.length > 0);
+
+    if (independent) {
+      pieces.push({ text: left, connector });
+      connector = "and";
+      cursor = index + boundary[0].length;
+      // Authors often omit a repeated subject in a compact process point:
+      // "condensation forms a bond and releases water". Carry that subject
+      // forward so the split remains a complete explanation rather than an
+      // orphaned verb fragment.
+      if (rightStartsAction && sharedSubject) {
+        pieces.push({ text: `${sharedSubject} ${right}`, connector });
+        return pieces;
+      }
+    }
+  }
+
+  const tail = clause.text.slice(cursor).trim();
+  if (tail) pieces.push({ text: tail, connector });
+  return pieces.length ? pieces : [clause];
+}
+
+/** Return a separator index only when it is outside brackets and inline maths. */
+function topLevelIndexOf(text: string, separator: string): number {
+  let depth = 0;
+  let inMath = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === "$" && text[index - 1] !== "\\") {
+      inMath = !inMath;
+      continue;
+    }
+    if (inMath) continue;
+    if (character === "(" || character === "[" || character === "{") depth += 1;
+    else if (character === ")" || character === "]" || character === "}") depth = Math.max(0, depth - 1);
+    else if (depth === 0 && text.startsWith(separator, index)) return index;
+  }
+  return -1;
+}
+
+/** Whether a candidate separator sits inside brackets or inline maths. */
+function isInsideBalancedGroup(text: string, index: number): boolean {
+  let depth = 0;
+  let inMath = false;
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    const character = text[cursor];
+    if (character === "$" && text[cursor - 1] !== "\\") {
+      inMath = !inMath;
+      continue;
+    }
+    if (inMath) continue;
+    if (character === "(" || character === "[" || character === "{") depth += 1;
+    else if (character === ")" || character === "]" || character === "}") depth = Math.max(0, depth - 1);
+  }
+  return inMath || depth > 0;
+}
+
+/** Split commas that separate authored clauses, not commas inside notation. */
+function splitTopLevelCommas(text: string): string[] {
+  const parts: string[] = [];
+  let cursor = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== "," || isInsideBalancedGroup(text, index)) continue;
+    parts.push(text.slice(cursor, index));
+    cursor = index + 1;
+  }
+  parts.push(text.slice(cursor));
+  return parts;
+}
+
+function isProcessPoint(text: string, clauses: ProcessClause[]): boolean {
+  if (clauses.length > 1) return true;
+  // A comma-separated chain such as "condition, mechanism and outcome" is a
+  // process even when the author did not use an arrow or semicolon.
+  const hasTopLevelComma = splitTopLevelCommas(text).length > 1;
+  const hasTopLevelMarker = splitMarkedText(text).length > 1;
+  return (
+    hasTopLevelMarker ||
+    (PROCESS_ACTIONS.test(text) && hasTopLevelComma) ||
+    (PROCESS_ACTIONS.test(text) && /\b(?:to|from|into|when|if|as|until)\b/i.test(text))
+  );
+}
+
+function formatProcessClauses(clauses: ProcessClause[]): string[] {
+  const total = clauses.length;
+  return clauses.map((clause, index) => {
+    const text = clause.text.replace(/^(?:and|then)\s+/i, "").replace(/[,:;]+$/, "").trim();
+    const connector = clause.connector ?? "";
+    const label = processLabel(text, connector, index, total);
+    const arrowStage =
+      connector === "→" &&
+      index > 0 &&
+      !/^[a-z]+\s+(?:is|are|was|were|has|have|needs?|uses?|forms?|changes?|moves?|goes?)\b/i.test(text) &&
+      !/[=<>]/.test(text) &&
+      text.split(/\s+/).length <= 5;
+    const listRequirement =
+      connector === "comma" &&
+      !PROCESS_ACTIONS.test(text) &&
+      !/[=<>]/.test(text) &&
+      text.split(/\s+/).length <= 5;
+    const readable = arrowStage
+      ? `the next stage is ${text}`
+      : listRequirement
+        ? `also required: ${text}`
+        : text;
+    return `${label}: ${sentence(readable)}`;
+  });
+}
+
+function processLabel(text: string, connector: string, index: number, total: number): string {
+  const lower = text.toLowerCase();
+  if (index === 0 && /^(?:when|if|above|below|at|under|after|before|once|as|during|without)\b/.test(lower)) {
+    return "Condition";
+  }
+  if (/\b(?:because|since)\b/.test(connector)) return "Why";
+  if (/\b(?:therefore|so|leading|resulting|causing|which)\b/.test(connector)) return "Result";
+  if (/\bthen\b/.test(connector)) return "Next";
+  if (index === 0) return "Start";
+  if (index === total - 1 && total >= 3 && /\b(?:denatur\w*|produces?|releases?|returns?|concludes?|yields?|outcome|result)\b/i.test(lower)) {
+    return "Result";
+  }
+  return total === 2 ? "Next" : `Step ${index + 1}`;
+}
+
+/** Use the first authored action to make a useful fallback for a one-clause process. */
+function processFallback(text: string): string[] {
+  const usesToConvert = text.match(/^(.+?)\s+uses\s+(.+?)\s+to\s+convert\s+(.+?)\s+into\s+(.+?)[.!?]?$/i);
+  if (usesToConvert) {
+    const [, subject, resource, input, output] = usesToConvert;
+    return [
+      `Start: ${sentence(subject)}`,
+      `Input: ${sentence(`${resource} acts on ${input}`)}`,
+      `Change: ${sentence(`${subject} uses ${resource} to convert ${input}`)}`,
+      `Result: the output is ${sentence(output).toLowerCase()}`,
+    ];
+  }
+
+  const converts = text.match(/^(.+?)\s+converts?\s+(.+?)\s+into\s+(.+?)[.!?]?$/i);
+  if (converts) {
+    const [, subject, input, output] = converts;
+    return [
+      `Start: ${sentence(subject)}`,
+      `Input: ${sentence(input)}`,
+      `Change: ${sentence(`${subject} converts ${input} into ${output}`)}`,
+      `Result: the output is ${sentence(output).toLowerCase()}`,
+    ];
+  }
+
+  const action = text.match(PROCESS_ACTIONS);
+  if (action?.index && action.index > 0) {
+    const subject = text.slice(0, action.index).trim();
+    const change = text.slice(action.index).trim();
+    return [
+      `Start: ${sentence(subject)}`,
+      `Change: ${sentence(`${subject} ${change}`)}`,
+      `Result: ${sentence(text)}`,
+    ];
+  }
+  return [
+    `Process: ${sentence(text)}`,
+    "Mechanism: keep the condition and the change together as you explain it.",
+    `Result: ${sentence(text)}`,
+  ];
+}
+
+function conceptExplanation(text: string): string[] {
+  const authoredText = sentence(text);
+  return [
+    `Core idea: ${sentence(text)}`,
+    "Notice the relationship: keep the condition, comparison or cause attached to the key term.",
+    `Apply it: use the idea above — ${authoredText} — to explain a new example, not just to repeat the definition.`,
+  ];
+}
+
+function checkExplanation(explanation: PointExplanation, answer: string): string {
+  if (explanation.mode === "process") {
+    return `Follow the process in order: ${explanation.steps.join(" → ")} Say it once in your own words, then connect it to the question before moving on.`;
+  }
+  return `The idea to keep is: ${sentence(answer)} Say it once in your own words, then connect it to the question before moving on.`;
 }
 
 /** The first meaningful clause is a useful, novice-friendly heading. */
 function firstClause(text: string): string {
-  const cut = text.search(/[:;—→]|\s+(?:because|which|so|therefore)\s+/i);
-  return (cut > 12 ? text.slice(0, cut) : text).replace(/[.!?]+$/, "").trim();
+  const marker = /[:;—→⇒]|\s+(?:because|which|so|therefore)\s+/gi;
+  for (const match of text.matchAll(marker)) {
+    const cut = match.index ?? -1;
+    if (cut > 12 && !isInsideBalancedGroup(text, cut)) {
+      return text.slice(0, cut).replace(/[.!?]+$/, "").trim();
+    }
+  }
+  return text.replace(/[.!?]+$/, "").trim();
 }
 
 /**
@@ -310,6 +603,7 @@ function checkFromSpecPoint(
   specPoint: NonNullable<Topic["specPoints"]>[number],
   index: number,
 ): NonNullable<LessonStep["check"]> {
+  const pointExplanation = explainPoint(specPoint.text);
   const options = shuffleStable(
     uniqueStrings([
       specPoint.text,
@@ -323,7 +617,10 @@ function checkFromSpecPoint(
     question: `Which statement matches this ${topic.title.toLowerCase()} checkpoint?`,
     options,
     correctIndex: options.indexOf(specPoint.text),
-    explanation: `This checkpoint asks you to know: ${sentence(specPoint.text)} Connect it to the wider topic before moving on.`,
+    explanation:
+      pointExplanation.mode === "process"
+        ? `Follow this checkpoint in order: ${pointExplanation.steps.join(" → ")} Connect it to the wider topic before moving on.`
+        : `This checkpoint asks you to know: ${sentence(specPoint.text)} Connect it to the wider topic before moving on.`,
   };
 }
 
@@ -386,6 +683,9 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
       const focusTitle = pointTitle(specPoint.text, `Checkpoint ${checkpointIndex}`);
       const sourceStep = coreSteps[index] ?? coreSteps[Math.max(0, coreSteps.length - 1)];
       const sourceBody = sourceStep?.body && sourceStep.body !== specPoint.text ? sourceStep.body : null;
+      const checkpointExplanation = explainPoint(specPoint.text);
+      const sourceExplanation = sourceStep?.explanationSteps ?? [];
+      const isProcess = sourceStep?.explanationMode === "process" || checkpointExplanation.mode === "process";
       const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
       const steps: LessonStep[] = [
         {
@@ -408,9 +708,10 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           body: sourceBody ? `${specPoint.text}\n\nConnect it to this core idea: ${sourceBody}` : specPoint.text,
           explanationSteps: [
             `Translate the checkpoint into a sentence you would use in an answer: ${specPoint.text}`,
-            ...(sourceStep?.explanationSteps?.slice(0, 2) ?? explainPoint(specPoint.text).slice(0, 2)),
+            ...(sourceExplanation.length ? sourceExplanation.slice(0, 3) : checkpointExplanation.steps.slice(0, 3)),
             "Say the complete idea once, including the condition or consequence the question asks for.",
           ],
+          explanationMode: isProcess ? "process" : "concept",
           takeaway: `Remember: ${sentence(specPoint.text)}`,
           examLink,
           check: checkFromSpecPoint(topic, specPoint, index),
@@ -420,11 +721,18 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           kind: "core",
           title: "Use it in an exam answer",
           body: `When a question tests this checkpoint, start with the precise requirement: ${specPoint.text}`,
-          explanationSteps: [
-            "Underline the command word so you answer the task, not just the topic.",
-            `Use the checkpoint wording: ${specPoint.text}`,
-            "Add the relevant mechanism, comparison, calculation or evidence if the question asks for it.",
-          ],
+          explanationSteps: isProcess
+            ? [
+                "Read the process from its starting condition to the final result; keep every change in order.",
+                ...checkpointExplanation.steps.slice(0, 3),
+                "Finish by stating the result or consequence in the context of the question.",
+              ]
+            : [
+                "Underline the command word so you answer the task, not just the topic.",
+                `Use the checkpoint wording: ${specPoint.text}`,
+                "Add the relevant mechanism, comparison, calculation or evidence if the question asks for it.",
+              ],
+          explanationMode: isProcess ? "process" : "concept",
           takeaway: `Exam habit: begin with ${sentence(specPoint.text)}`,
         },
       ];
