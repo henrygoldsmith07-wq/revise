@@ -1,11 +1,13 @@
 import type { Id, IsoInstant } from "./types";
 
-export type RevisionActivity = "practice" | "review" | "paper" | "study";
+export type RevisionActivity = "practice" | "review" | "paper" | "study" | "adaptive";
 
 export interface RevisionCheckpointInput {
   activity: RevisionActivity;
   title: string;
   href: string;
+  /** Optional topic pin for adaptive sessions that re-rank after a step. */
+  topicId?: Id;
   position: number;
   total: number;
   queueIds?: Id[];
@@ -21,8 +23,8 @@ export interface RevisionCheckpoint extends RevisionCheckpointInput {
   updatedAt: IsoInstant;
 }
 
-const ACTIVITIES = new Set<RevisionActivity>(["practice", "review", "paper", "study"]);
-const ROUTES = ["/practice", "/review", "/papers", "/study"];
+const ACTIVITIES = new Set<RevisionActivity>(["practice", "review", "paper", "study", "adaptive"]);
+const ROUTES = ["/practice", "/review", "/papers", "/study", "/adaptive-session"];
 
 export function createRevisionCheckpoint(
   userId: Id,
@@ -51,6 +53,7 @@ export function isRevisionCheckpoint(value: unknown): value is RevisionCheckpoin
     typeof checkpoint.title === "string" &&
     checkpoint.title.trim().length > 0 &&
     isLocalRoute(checkpoint.href) &&
+    (checkpoint.topicId === undefined || typeof checkpoint.topicId === "string") &&
     typeof checkpoint.position === "number" &&
     Number.isInteger(checkpoint.position) &&
     checkpoint.position >= 0 &&
@@ -77,6 +80,8 @@ export function revisionActivityLabel(activity: RevisionActivity): string {
       return "Past paper";
     case "study":
       return "Study mode";
+    case "adaptive":
+      return "Adaptive session";
   }
 }
 

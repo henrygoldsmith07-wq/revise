@@ -12,6 +12,7 @@ const APP_SHELL = [
   "/",
   "/benchmarks",
   "/answer-corpus",
+  "/adaptive-session",
   "/cards",
   "/case-study",
   "/generate",

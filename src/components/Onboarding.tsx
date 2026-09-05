@@ -5,7 +5,8 @@ import { allQualifications, allSubjects, availableBoards, getBoard, gradesFor } 
 import { todayIso } from "@/domain/scheduling";
 import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStore } from "@/state/store";
-import { Button, Field, Panel, ProgressBar, cx } from "./ui";
+import { Button, Field, Panel, Pill, ProgressBar, cx } from "./ui";
+import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
 
 // ---------------------------------------------------------------------------
@@ -30,7 +31,7 @@ const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
 interface SubjectRow {
   qualificationId: Id;
   level: string;
-  subjects: { id: Id; name: string }[];
+  subjects: { id: Id; name: string; detail: string }[];
 }
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
@@ -54,7 +55,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         qualificationId: qualification.id,
         level: qualification.level,
         subjects: allSubjects(qualification.id)
-          .map((subject) => ({ id: subject.id, name: subject.name }))
+          .map((subject) => ({ id: subject.id, name: subject.name, detail: qualification.level }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .filter((row) => row.subjects.length > 0)
@@ -182,49 +183,62 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {phase === 1 && board ? (
           <Panel className="space-y-4">
             <div>
-              <h2 className="text-sm font-semibold">Which subjects do you take with {board.name}?</h2>
-              <p className="text-xs text-ink3 mt-0.5">
-                Tick every subject you&apos;re sitting — each comes with its specification, flashcards and exam
-                questions already written.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold">Which subjects do you take with {board.name}?</h2>
+                  <p className="text-xs text-ink3 mt-0.5">
+                    Choose every subject you&apos;re sitting. You can change this later, and each choice brings its
+                    specification, lessons, flashcards and exam questions with it.
+                  </p>
+                </div>
+                <div className="shrink-0 rounded-xl border border-line bg-surface2 px-3 py-2 text-center" aria-live="polite">
+                  <p className="text-lg font-semibold leading-none tabular-nums">{subjectIds.length}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-wide text-ink3 font-semibold">
+                    {subjectIds.length === 1 ? "subject" : "subjects"} selected
+                  </p>
+                </div>
+              </div>
+
+              {chosenSubjects.length ? (
+                <div className="mt-3 rounded-xl border border-line bg-surface2/60 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Your selection</p>
+                    <Button size="sm" variant="ghost" className="px-2 py-1 text-[11px]" onClick={() => setSubjectIds([])}>
+                      Clear all
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Selected subjects">
+                    {chosenSubjects.map((subject) => (
+                      <Pill key={subject.id} tone="accent">
+                        {subject.name}
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl border border-dashed border-line bg-surface2/40 px-3 py-2.5 text-xs text-ink3" role="status">
+                  Start by choosing at least one subject below.
+                </p>
+              )}
             </div>
             {subjectRows.map((row) => (
-              <div key={row.qualificationId}>
-                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">
-                  {board.name} {row.level}
-                </p>
-                <ul className="space-y-2">
-                  {row.subjects.map((subject) => {
-                    const on = subjectIds.includes(subject.id);
-                    return (
-                      <li key={subject.id}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSubjectIds(on ? subjectIds.filter((id) => id !== subject.id) : [...subjectIds, subject.id])
-                          }
-                          aria-pressed={on}
-                          aria-label={`${row.level} ${subject.name}`}
-                          className={cx(
-                            "w-full text-left card px-4 py-3 min-h-[3.25rem] flex items-center gap-3 transition-colors",
-                            on ? "border-ink3 bg-surface2" : "hover:border-ink3",
-                          )}
-                        >
-                          <span
-                            className={cx(
-                              "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
-                              on ? "bg-accent border-transparent text-onaccent" : "border-line",
-                            )}
-                          >
-                            {on ? <CreditedIcon size={12} aria-hidden /> : null}
-                          </span>
-                          <span className="text-sm text-ink">{subject.name}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+              <section key={row.qualificationId} className="rounded-xl border border-line bg-surface2/40 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
+                    {board.name} {row.level}
+                  </p>
+                  <p className="text-[11px] text-ink3 tabular-nums">
+                    {row.subjects.filter((subject) => subjectIds.includes(subject.id)).length} of {row.subjects.length}
+                  </p>
+                </div>
+                <SubjectPicker
+                  options={row.subjects}
+                  selectedIds={subjectIds}
+                  onChange={setSubjectIds}
+                  selectionMode="multiple"
+                  ariaLabel={`${row.level} subjects`}
+                />
+              </section>
             ))}
             {!subjectIds.length ? <p className="text-xs text-ink3">Pick at least one subject to continue.</p> : null}
           </Panel>

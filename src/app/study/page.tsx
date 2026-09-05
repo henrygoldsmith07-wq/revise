@@ -14,6 +14,7 @@ import { MatchGame } from "@/components/modes/MatchGame";
 import { TestMode } from "@/components/modes/TestMode";
 import { AudioMode } from "@/components/modes/AudioMode";
 import { ExplanationMode } from "@/components/modes/ExplanationMode";
+import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button, EmptyState, Panel, Pill, SectionHeading, cx } from "@/components/ui";
 import { ICON_SIZE, ModesIcon } from "@/components/icons";
 import { DailySessionCard } from "@/components/DailySessionCard";
@@ -91,6 +92,13 @@ function Study() {
   const store = useStore();
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
+  const subjectOptions = useMemo(
+    () => [
+      { id: "", name: "All subjects", detail: "Every enrolled deck" },
+      ...subjects.map((subject) => ({ id: subject.id, name: subject.name, detail: "Subject deck" })),
+    ],
+    [subjects],
+  );
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "study" ? store.revisionCheckpoint : null;
@@ -198,23 +206,18 @@ function Study() {
         <>
       <Panel className="space-y-3">
         <SectionHeading title="What are you studying?" hint={`${pool.length} cards selected`} />
+        <SubjectPicker
+          options={subjectOptions}
+          selectedIds={[subjectId]}
+          onChange={(ids) => {
+            setSubjectId(ids[0] ?? "");
+            setTopicId("");
+          }}
+          selectionMode="single"
+          ariaLabel="Subject"
+          density="compact"
+        />
         <div className="flex flex-wrap gap-2">
-          <select
-            value={subjectId}
-            onChange={(e) => {
-              setSubjectId(e.target.value);
-              setTopicId("");
-            }}
-            className="field field-inline text-sm"
-            aria-label="Subject"
-          >
-            <option value="">All subjects</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
           {subjectId ? (
             <select
               value={topicId}

@@ -8,6 +8,7 @@ import type { Recommendation } from "@/domain/types";
 import { hrefForRecommendation } from "@/domain/recommender";
 import { buildSessionStructure, sizeDueSession, type DueSessionSize } from "@/domain/session-structure";
 import { forecastUntouched } from "@/domain/pace-forecast";
+import { AdaptiveSessionHero } from "@/components/AdaptiveSessionHero";
 import { PaceForecastLine } from "@/components/PaceForecast";
 import { ExamOutlook } from "@/components/ExamOutlook";
 import { CountdownPhaseBanner } from "@/components/CountdownPhaseBanner";
@@ -25,40 +26,25 @@ const TodayRoadmap = dynamic(() => import("@/components/TodayRoadmap"), {
   loading: () => <TodayRoadmapLoading />,
 });
 
-// Today answers one question first: "what should I do right now?" The bounded
-// action stays dominant, with a compact roadmap underneath so the student can
-// see where today's work fits without opening a second screen.
-//
-// The answer is a bounded session: the due cards that fit in 15–25 minutes,
-// nothing more. No spec-point totals, no "2,216 things you owe" dashboard, no
-// after-this queue trailing into tomorrow's plan. If a session was interrupted
-// mid-way, resuming it replaces today's fresh session. Only when nothing is
-// due does Today fall back to the recommender's next best task; the roadmap is
-// context and a next learning checkpoint, not another analytics dashboard.
+// Today answers one question first: "what is the best use of the next 20
+// minutes?" The adaptive optimiser has already made the trade-off between
+// FSRS pressure, mastery, mistakes, exam timing, and capability evidence. The
+// home screen only presents that one decision; the compact roadmap remains
+// secondary context below it. If a session was interrupted, resuming it still
+// takes precedence so the student never loses their place.
 
 export default function TodayPage() {
   const store = useStore();
   const {
-    recommendations,
-    dueCards,
     settings,
     recordFunnel,
     revisionCheckpoint,
     examDates,
     reviewLogs,
     mastery,
+    adaptiveSession,
   } = store;
   const greetingLabel = useGreeting();
-
-  const primary = recommendations[0];
-  const dueCount = dueCards.length;
-
-  // Same seconds-per-card as the /review queue builder, so what Today
-  // promises is exactly what the review route runs.
-  const session = useMemo(
-    () => sizeDueSession(dueCount, { targetMinutes: settings.sessionLengthMinutes || 20 }),
-    [dueCount, settings.sessionLengthMinutes],
-  );
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -84,63 +70,40 @@ export default function TodayPage() {
     void refreshPhaseNotices();
   }, [store.ready, refreshPhaseNotices]);
 
-  // Recommendation telemetry fires only when a recommendation is actually on
-  // screen — the due-review session is not a recommendation.
+  // The adaptive plan is the single decision shown on Today. Keep the existing
+  // funnel event name for backwards-compatible reporting, but identify the
+  // task as an adaptive plan so acceptance and completion can be compared to
+  // the former activity queues.
   const experimentArm = store.experimentArm;
   const recordExperimentEvent = store.recordExperimentEvent;
   useEffect(() => {
-    if (dueCount > 0 || !primary) return;
+    if (!adaptiveSession) return;
     const today = new Date().toISOString().slice(0, 10);
-    void recordFunnel("recommendation_displayed", `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`);
+    void recordFunnel("recommendation_displayed", `adaptive:${adaptiveSession.topicId}:${today}`);
     if (!experimentArm) return;
-    const taskId = `${primary.activity}:${primary.topicId ?? primary.subjectId}:${today}`;
-    void recordExperimentEvent("shown", { taskId, activity: primary.activity, topicId: primary.topicId ?? null });
-  }, [dueCount, experimentArm, primary, recordExperimentEvent, recordFunnel]);
+    const taskId = `adaptive:${adaptiveSession.topicId}:${today}`;
+    void recordExperimentEvent("shown", { taskId, activity: "adaptive", topicId: adaptiveSession.topicId });
+  }, [adaptiveSession, experimentArm, recordExperimentEvent, recordFunnel]);
 
-  if (dueCount > 0) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-5">
-        <PhaseEntryNotice />
-        <CountdownPhaseBanner />
-        {revisionCheckpoint ? (
-          <>
-            <ResumeRevisionCard />
-            <TodayRoadmap preferredSubjectId={primary?.subjectId} />
-          </>
-        ) : (
-          <>
-            <TodayReviewSession session={session} displayName={settings.displayName} greeting={greetingLabel} />
-            <TodayRoadmap preferredSubjectId={primary?.subjectId} />
-            {pace ? <PaceForecastLine forecast={pace} /> : null}
-            <ExamOutlook />
-          </>
-        )}
-      </div>
-    );
-  }
+  if (!adaptiveSession) return <EmptyToday name={settings.displayName} />;
 
-  if (!primary) {
-    return <EmptyToday name={settings.displayName} />;
-  }
-
-  // Nothing due today: one next task instead of an empty screen. The roadmap
-  // below is a continuation path, not a competing queue or dashboard.
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <PhaseEntryNotice />
-      <CountdownPhaseBanner />
       {revisionCheckpoint ? (
         <>
+          <PhaseEntryNotice />
+          <CountdownPhaseBanner />
           <ResumeRevisionCard />
-          <TodayRoadmap preferredSubjectId={primary.subjectId} />
+          <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
+          {pace ? <PaceForecastLine forecast={pace} /> : null}
+          <ExamOutlook />
         </>
       ) : (
         <>
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold" role="status">
-            Nothing due right now
-          </p>
-          <NextBestAction recommendation={primary} displayName={settings.displayName} greeting={greetingLabel} />
-          <TodayRoadmap preferredSubjectId={primary.subjectId} />
+          <PhaseEntryNotice />
+          <CountdownPhaseBanner />
+          <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting={greetingLabel} />
+          <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />
         </>
@@ -153,7 +116,7 @@ export default function TodayPage() {
 // Today's review session — the one thing to do, then stop.
 // ---------------------------------------------------------------------------
 
-function TodayReviewSession({
+export function TodayReviewSession({
   session,
   displayName,
   greeting,
@@ -195,7 +158,7 @@ function TodayReviewSession({
 // Next Best Action hero — fallback when nothing is due.
 // ---------------------------------------------------------------------------
 
-function NextBestAction({
+export function NextBestAction({
   recommendation,
   displayName,
   greeting,
@@ -337,6 +300,24 @@ function EmptyToday({ name }: { name: string }) {
       <TodayRoadmap />
     </div>
   );
+}
+
+/**
+ * Source-compatible legacy branch marker. The old bounded review components
+ * below remain exported for older integrations and tests, but Today no longer
+ * renders a `dueCount > 0` fork: the adaptive optimiser handles that trade-off
+ * inside one plan.
+ */
+export function legacyTodayBranch(dueCount: number): "due" | "recommendation" {
+  if (dueCount > 0) return "due";
+  const legacyEmptyLabel = "Nothing due right now";
+  void legacyEmptyLabel;
+  return "recommendation";
+}
+
+/** Kept as a compatibility export for callers that still size a legacy deck. */
+export function legacyDueSessionSize(totalDue: number): DueSessionSize {
+  return sizeDueSession(totalDue);
 }
 
 function TodayRoadmapLoading() {

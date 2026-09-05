@@ -43,6 +43,9 @@ function ReviewSession() {
   const topicId = params.get("topic");
   const mode = params.get("mode");
   const sessionId = params.get("session");
+  const limitParam = params.get("limit");
+  const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : NaN;
+  const limitOverride = Number.isFinite(parsedLimit) ? Math.min(50, Math.max(1, parsedLimit)) : null;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "review" ? store.revisionCheckpoint : null;
@@ -109,7 +112,8 @@ function ReviewSession() {
     // A custom session is already ordered and limited by the dialog; passing it
     // back through the scheduler's queue builder would undo both.
     if (custom) return pool;
-    const limit = mode === "mistakes" ? 20 : Math.max(10, Math.ceil(store.settings.sessionLengthMinutes * 2.5));
+    const limit =
+      limitOverride ?? (mode === "mistakes" ? 20 : Math.max(10, Math.ceil(store.settings.sessionLengthMinutes * 2.5)));
     return buildReviewQueue(pool, limit);
   });
 
@@ -123,10 +127,11 @@ function ReviewSession() {
     if (topicId) next.set("topic", topicId);
     if (mode) next.set("mode", mode);
     if (sessionId) next.set("session", sessionId);
+    if (limitOverride) next.set("limit", String(limitOverride));
     next.set("resume", "1");
     const query = next.toString();
     return query ? `/review?${query}` : "/review?resume=1";
-  }, [mode, sessionId, subjectId, topicId]);
+  }, [limitOverride, mode, sessionId, subjectId, topicId]);
 
   // In mistake-repair sessions each card stands for a captured mistake. Its
   // nine-way mark-scheme-aware class is derived live from the stored attempt

@@ -23,6 +23,8 @@ import { currentPhaseBuckets, techniqueEntryNotices } from "@/domain/phase-notic
 import type { PhaseBucket, PhaseNotice, PhaseSubject } from "@/domain/phase-notice";
 import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
 import { daysToExam, recommend } from "@/domain/recommender";
+import { buildAdaptiveSession } from "@/domain/adaptive-session";
+import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import {
   knowledgeVsAnswering,
   knowledgeVsAnsweringByTopic,
@@ -146,6 +148,8 @@ interface StoreValue extends Snapshot {
   applicationMastery: ApplicationMasteryRow[];
   recallMastery: RecallMasteryRow[];
   recommendations: Recommendation[];
+  /** One ranked, bounded sequence for the next focused learning window. */
+  adaptiveSession: AdaptiveSessionPlan | null;
   predictions: GradePrediction[];
   dueCards: Card[];
   assessment: AssessmentInsight | null;
@@ -963,6 +967,28 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     });
   }, [snapshot, mastery, topics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog]);
 
+  // Unlike `recommendations`, this is not a list of competing activity
+  // queues. It is one optimiser pass over the same snapshot, then one
+  // sequence for the winning topic. Today and /adaptive-session consume this
+  // exact value so the hero cannot drift from the route it opens.
+  const adaptiveSession = useMemo(() => {
+    if (!snapshot) return null;
+    return buildAdaptiveSession({
+      topics,
+      cards: snapshot.cards,
+      reviewLogs: snapshot.reviewLogs,
+      questions: snapshot.questions,
+      attempts: snapshot.attempts,
+      mistakes: snapshot.mistakes,
+      mastery,
+      exams: snapshot.examDates,
+      subjectIds,
+      recallMastery,
+      applicationMastery,
+      targetMinutes: 20,
+    });
+  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery]);
+
   // Experiment arm enforcement: baseline arms see their assigned policy,
   // not the production recommender. Control sees no recommendation.
   const experimentRecs = useMemo(() => {
@@ -1586,6 +1612,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       applicationMastery,
       recallMastery,
       recommendations: experimentRecs,
+      adaptiveSession,
       predictions,
       dueCards,
       assessment,
@@ -1662,6 +1689,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     applicationMastery,
     recallMastery,
     predictions,
+    adaptiveSession,
     dueCards,
     assessment,
     marksPerHour,
