@@ -15,7 +15,6 @@ export const AI_TASKS = [
   "extract-questions",
   "ocr",
   "cards-from-notes",
-  "video-lesson",
 ] as const;
 
 export type AiTask = (typeof AI_TASKS)[number];
@@ -88,78 +87,6 @@ export const summariseResponseSchema = z.object({
   bullets: z.array(z.string().min(1).max(400)).max(10).default([]),
 });
 
-/** One scene of a video-style lesson: what is said, shown and for how long. */
-export const videoLessonSceneSchema = z.object({
-  title: z.string().min(1).max(120),
-  /** The spoken voiceover for the scene. */
-  narration: z.string().min(1).max(2000),
-  /** The few words the viewer reads on screen. */
-  onScreenText: z.string().min(1).max(300),
-  /** What the animation or diagram shows while the narration plays. */
-  visual: z.string().min(1).max(500),
-  seconds: z.number().int().min(5).max(90),
-  /** Role the scene plays; the player labels scenes with it. Optional so earlier generations still parse. */
-  kind: z.enum(["intro", "teach", "misconception", "trap", "exam", "recap"]).optional(),
-});
-
-export const videoLessonResponseSchema = z.object({
-  title: z.string().min(1).max(200),
-  scenes: z.array(videoLessonSceneSchema).min(3).max(14),
-});
-
-/**
- * Salvage a near-miss model reply instead of discarding it: reasoning models
- * frequently return the right storyboard with small contract violations (a
- * 121-character title, seconds as a string, a scene missing its visual).
- * Coerce what is coercible, drop scenes that are beyond saving, and only give
- * up when fewer than three usable scenes remain.
- */
-export function repairVideoLesson(raw: unknown): VideoLessonResponse | null {
-  if (typeof raw !== "object" || raw === null) return null;
-  const source = raw as Record<string, unknown>;
-  if (!Array.isArray(source.scenes)) return null;
-
-  const clamp = (value: unknown, max: number): string | null => {
-    if (typeof value !== "string") return null;
-    const text = value.trim();
-    return text ? (text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`) : null;
-  };
-  const seconds = (value: unknown): number | null => {
-    const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-    if (!Number.isFinite(n)) return null;
-    return Math.max(5, Math.min(90, Math.round(n)));
-  };
-  const kinds = ["intro", "teach", "misconception", "trap", "exam", "recap"] as const;
-  const kind = (value: unknown): VideoLessonScene["kind"] => {
-    if (typeof value !== "string") return undefined;
-    return (kinds as readonly string[]).includes(value) ? (value as VideoLessonScene["kind"]) : undefined;
-  };
-
-  const scenes = source.scenes
-    .map((scene): VideoLessonScene | null => {
-      if (typeof scene !== "object" || scene === null) return null;
-      const s = scene as Record<string, unknown>;
-      const title = clamp(s.title, 120);
-      const narration = clamp(s.narration, 2000);
-      const onScreenText = clamp(s.onScreenText ?? s.title, 300);
-      const visual = clamp(s.visual ?? "The key idea animates on screen.", 500);
-      const secs = seconds(s.seconds) ?? durationEstimate(narration ?? "");
-      if (!title || !narration || !onScreenText || !visual || !secs) return null;
-      return { title, narration, onScreenText, visual, seconds: secs, kind: kind(s.kind) };
-    })
-    .filter((s): s is VideoLessonScene => s !== null)
-    .slice(0, 14);
-
-  if (scenes.length < 3) return null;
-  const title = clamp(source.title, 200) ?? "Video lesson";
-  return { title, scenes };
-}
-
-/** Rough spoken-length estimate used when a scene's duration is unusable. */
-function durationEstimate(text: string): number {
-  return Math.max(8, Math.min(60, Math.round(text.length / 13)));
-}
-
 /**
  * The response registry is shared by the server and browser. Keeping the
  * wrappers here prevents a provider or API change from widening one boundary
@@ -176,7 +103,6 @@ export const RESPONSE_SCHEMAS = {
   "extract-questions": z.object({ questions: z.array(generatedQuestionSchema).min(1).max(40) }),
   ocr: ocrResponseSchema,
   "cards-from-notes": z.object({ cards: z.array(generatedCardSchema).min(1).max(25) }),
-  "video-lesson": videoLessonResponseSchema,
 } satisfies Record<AiTask, z.ZodType>;
 
 export type GeneratedCard = z.infer<typeof generatedCardSchema>;
@@ -187,8 +113,6 @@ export type SocraticResponse = z.infer<typeof socraticResponseSchema>;
 export type DiagnoseResponse = z.infer<typeof diagnoseResponseSchema>;
 export type OcrResponse = z.infer<typeof ocrResponseSchema>;
 export type SummariseResponse = z.infer<typeof summariseResponseSchema>;
-export type VideoLessonScene = z.infer<typeof videoLessonSceneSchema>;
-export type VideoLessonResponse = z.infer<typeof videoLessonResponseSchema>;
 
 /** Every AI response carries how it was produced, and the UI always shows it. */
 export interface AiEnvelope<T> {

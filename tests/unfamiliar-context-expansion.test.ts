@@ -7,7 +7,7 @@ const ALL_SUBJECTS = allSubjects();
 describe("unfamiliar-context question expansion", () => {
   it("adds one unfamiliar-context question for every topic across all board and qualification subjects", () => {
     expect(ALL_SUBJECTS).toHaveLength(32);
-    expect(unfamiliarContextQuestions).toHaveLength(440);
+    expect(unfamiliarContextQuestions).toHaveLength(475);
 
     for (const subject of ALL_SUBJECTS) {
       const questions = unfamiliarContextQuestions.filter((question) => question.subjectId === subject.id);

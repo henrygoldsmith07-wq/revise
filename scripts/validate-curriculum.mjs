@@ -14,7 +14,9 @@ function parseTopics() {
   for (const file of files) {
     const text = readFileSync(join(dir, file), "utf8");
     const ids = [...text.matchAll(/slug:\s*"([^"]+)"/g)].map((m) => m[1]);
-    const topicIds = [...text.matchAll(/title:\s*"[^"]+"[\s\S]{0,300}?specRef/g)].length;
+    const topicIds = file === "wjec-alevel-expansions.ts"
+      ? [...text.matchAll(/specRef:\s*"/g)].length
+      : [...text.matchAll(/title:\s*"[^"]+"[\s\S]{0,300}?specRef/g)].length;
     all.push({ file, slugs: ids, topicCount: topicIds });
   }
   return all;
@@ -63,11 +65,15 @@ for (const t of topics) {
   if (!/specPoints|specVersion/.test(text)) errors.push(`${t.file}: no specPoints/specVersion - fine-grained coverage not modelled yet`);
   if (!/source:\s*"authored"/.test(text)) errors.push(`${t.file}: missing source tag`);
   // Statement-level: every subject must have specPoints on every topic.
-  const spCount = (text.match(/specPoints\s*:\s*\[/g) || []).length;
+  const spCount = t.file === "wjec-alevel-expansions.ts"
+    ? (text.match(/point\(\s*"/g) || []).length
+    : (text.match(/specPoints\s*:\s*\[/g) || []).length;
   const topicCount = t.topicCount || 1;
   if (spCount < topicCount) errors.push(`${t.file}: every topic must have specPoints (${spCount}/${topicCount})`);
   // Validate statement provenance shape: each specPoint must have ref/text/aos
-  const refs = [...text.matchAll(/ref:\s*"([^"]+)"/g)].length;
+  const refs = t.file === "wjec-alevel-expansions.ts"
+    ? (text.match(/point\(\s*"([^"]+)"/g) || []).length
+    : [...text.matchAll(/ref:\s*"([^"]+)"/g)].length;
   if (refs < spCount) errors.push(`${t.file}: specPoints with empty ref`);
   // Questions: statement mapping
   for (const file of ["physics.ts","chemistry.ts","biology.ts","maths.ts"] ) {
@@ -100,7 +106,9 @@ if (stale.length) {
 const minStatements = { "wjec-physics.ts": 60, "wjec-chemistry.ts": 60, "wjec-biology.ts": 60, "wjec-maths.ts": 40, "aqa-physics.ts": 60, "aqa-chemistry.ts": 60, "aqa-biology.ts": 60, "aqa-maths.ts": 40, "edexcel-physics.ts": 60, "edexcel-chemistry.ts": 60, "edexcel-biology.ts": 60, "edexcel-maths.ts": 40, "ocr-physics.ts": 60, "ocr-chemistry.ts": 60, "ocr-biology.ts": 60, "ocr-maths.ts": 40 };
 for (const t of topics) {
   const text2 = readFileSync(join(ROOT, `src/domain/curriculum/${t.file}`), "utf8");
-  const refCount = (text2.match(/ref:\s*"Unit|ref:\s*"Pure|ref:\s*"Applied/g) || []).length;
+  const refCount = t.file === "wjec-alevel-expansions.ts"
+    ? (text2.match(/point\(\s*"(?:Unit|Pure|Applied)/g) || []).length
+    : (text2.match(/ref:\s*"Unit|ref:\s*"Pure|ref:\s*"Applied/g) || []).length;
   const min = minStatements[t.file] ?? 40;
   if (refCount < min) errors.push(`${t.file}: only ${refCount} specPoint statements — expected >=${min}`);
 }

@@ -68,3 +68,241 @@ The product has the evidence and learning primitives, but the home decision is m
 
 - Whether the next iteration should embed the question/lesson blocks in one route instead of returning to the existing activity surfaces.
 - After implementation, inspect the rendered Today hero and confirm the roadmap remains secondary rather than competing with Start.
+
+## Improvement state: high-quality guided lessons
+
+### Goal and observable outcome
+
+Every guided lesson should take a learner from a clear target to usable exam
+performance, not just recognition of a definition. A complete lesson should
+make the success criteria visible, explain the authored idea in order, require
+active recall, provide an answer-hidden application, teach the relevant exam
+move, and end with feedback that can be acted on.
+
+### Baseline evidence
+
+- 440 authored topics produced 440 lessons, averaging 8.2 steps (`npm test -- --run tests/lesson-coverage.test.ts`).
+- Core steps had ordered explanations and checks, but the generated lesson
+  contract had no explicit learning objectives, no application/model-answer
+  block, and no exam-command guidance.
+- Roadmap checkpoint explanations joined spec points to key points by array
+  index, which could silently attach an unrelated supporting fact when the two
+  authored lists differed in granularity.
+
+### Diagnosis
+
+The content source is strong enough to teach from, but the delivery layer
+stopped at explanation plus recognition. The main quality risks were unclear
+success criteria, passive transfer from explanation to exam answer, and an
+unsafe positional link between specification requirements and supporting facts.
+
+### Decisions
+
+- Add optional lesson metadata so older persisted or test-created lesson
+  objects remain compatible.
+- Derive objectives, applications, model answers and checklists only from the
+  existing authored topic/spec text; do not invent unsupported facts or add a
+  network dependency.
+- Keep application answers hidden until the learner chooses to reveal them,
+  after the active-recall gate.
+- Match supporting key points by meaningful vocabulary with a confidence
+  threshold; when evidence is weak, teach the checkpoint itself rather than
+  presenting a false connection.
+- Keep the client lightweight: no question-bank import or media player is added
+  to the lesson route. Lessons are written, interactive and available offline.
+
+### Status
+
+- [x] add explicit objectives and bounded lesson estimates
+- [x] add step-level objectives and command-word exam guidance
+- [x] add answer-hidden application, model response and self-marking checklist
+- [x] prevent unsafe positional spec-point/key-point joins
+- [x] add curriculum-wide regression coverage for the new lesson contract
+- [x] run full lint, type, test, build and browser verification
+
+### Verification log
+
+2026-09-06: `npm run verify` passed — lint, regular and strict TypeScript,
+curriculum validation/freshness (32 specs, 0 stale), 166 test files / 1,346
+passing tests (2 staging tests skipped), production build, and client
+performance budget. The focused lesson contract suite passed (18 tests).
+
+2026-09-06: `npx playwright test e2e/learning-roadmap.spec.ts --reporter=list`
+passed (1/1). Browser coverage included onboarding, roadmap outline, active
+recall gating, step advance, application prompt, model-answer reveal and
+self-marking checklist.
+
+2026-09-06: After the final checkpoint-answer refinement, focused lesson tests
+(14 tests), strict TypeScript, lint, production build and `npm run perf:budget`
+passed again. The final build reports 569,219 raw / 171,515 gzip bytes for the
+initial route assets and remains within the configured budget.
+
+### Delegation ledger
+
+- No subagents used; edits and verification were performed serially because the
+  shared lesson generator and component are tightly coupled.
+
+## Improvement state: complete written curriculum lessons
+
+### Goal and observable outcome
+
+Every authored topic must appear in the learning roadmap as a real written
+lesson. The lesson should teach the source material in order, require retrieval
+and application, and never depend on a video player or a separate media cache.
+
+### Baseline evidence
+
+- The roadmap already generated a lesson for the current 440-topic curriculum,
+  but `buildLesson` returned `null` whenever a future topic had no `keyPoints`.
+- The lesson hub still mounted a commute pack, a video player and a video AI
+  task/cache alongside the written lesson.
+- Completion could be granted by a `video:<topicId>` key, which made progress
+  diverge from the written checkpoint path.
+
+### Decisions
+
+- Use dedicated key points first, specification statements second, and a topic
+  summary as a final authored fallback so no populated topic disappears.
+- Keep the full written sequence as the only lesson experience: objectives,
+  explanation, active recall, application, exam technique and checks.
+- Remove the video player, commute pack, storyboard cache, video AI task and
+  stale completion path rather than leaving an unreachable feature contract.
+- Make curriculum tests assert one lesson per current topic and one roadmap
+  entry per topic when no specification sub-points exist.
+
+### Status
+
+- [x] add durable authored-source fallbacks for specification-only topics
+- [x] require every current topic to produce a lesson in regression tests
+- [x] remove video UI, cache, offline pack and AI contracts
+- [x] update roadmap, Today and study-plan copy to describe written learning
+- [x] run final lint, type, test, build and browser verification
+
+### Verification log
+
+2026-09-06: `npm run verify` passed — lint, regular and strict TypeScript,
+curriculum validation/freshness (32 specs, 0 stale), 164 test files / 1,323
+passing tests (2 staging tests skipped), production build and client performance
+budget. Focused lesson coverage/roadmap/teaching tests passed (18 tests),
+including a specification-only topic fallback.
+
+2026-09-06: `npx playwright test e2e/learning-roadmap.spec.ts --reporter=list`
+passed (1/1). Browser coverage included the written roadmap, active recall,
+application/model-answer reveal and an assertion that the lesson hub exposes no
+video or commute-pack UI. The final lesson generator build and performance
+budget were rerun after adding the specification-only fallback assertion.
+
+## Improvement state: WJEC A-level flagship expansion
+
+### Goal and observable outcome
+
+Biology, Chemistry, Physics and Mathematics should expose the full high-value
+WJEC A-level scope as written lessons, not only as broad topic labels. Each
+new area needs authored key ideas, common traps, specification-linked
+statements, active-recall checks and an exam-style application.
+
+### Baseline evidence
+
+- Before this pass the flagship packs contained 15 Maths topics, 14 Biology
+  topics, 15 Chemistry topics and 11 Physics topics.
+- The largest omissions were Biology reproduction/microbiology/options,
+  Chemistry thermodynamics/p-block/proteins/practical analysis, Physics
+  capacitance/options/practical analysis, and Maths Poisson/inference/model
+  selection detail.
+- The existing lesson generator could already turn authored `keyPoints`,
+  `commonErrors` and `specPoints` into written lessons and cards; the missing
+  work was curriculum scope and linked exam practice.
+
+### Decisions
+
+- Keep the existing core curriculum modules stable and append reviewed WJEC
+  extension units with deterministic topic/order IDs.
+- Author the extension in `src/domain/curriculum/wjec-alevel-expansions.ts`
+  with a shared provenance tag (`authored/WJEC-2024-v1-expansion`) so every
+  claim inherits the same checked metadata and spec version.
+- Add one structured four-part exam question per new topic in
+  `src/content/questions/wjec-alevel-expansion.ts`; each part maps directly to
+  one new `specPoint` and carries a learning claim.
+- Keep lessons written and active-recall driven. No videos or heavyweight
+  media are reintroduced.
+
+### Delivered scope
+
+- Biology: 23 topics total, including nutrition, microbiology, nervous
+  coordination, human and plant reproduction, genetic technologies, immunity,
+  musculoskeletal anatomy, and neurobiology/behaviour.
+- Chemistry: 21 topics total, including entropy/feasibility, p-block trends,
+  stereoisomerism, amino acids/proteins, organic synthesis and practical
+  analysis.
+- Physics: 17 topics total, including capacitance, alternating currents,
+  medical physics, sports physics, energy/environment and practical
+  investigations.
+- Mathematics: 21 topics total, including Poisson/discrete uniform models,
+  inference errors, continuous distributions, correlation/Normal-mean tests,
+  modelling assumptions and moments/statics.
+- The expansion adds 27 topics, 108 specification-linked statements, 27
+  structured questions and a corresponding set of authored retrieval cards
+  and written lesson checkpoints.
+
+### Status
+
+- [x] add missing WJEC scope as authored topic specs
+- [x] link every new statement to an exam-style question part
+- [x] verify each new topic builds a written lesson with ordered explanations,
+  active recall and answer-hidden application
+- [x] add regression tests for topic counts, provenance, statement coverage
+  and lesson readiness
+- [x] complete the full repository verification/build pass after the content
+  expansion
+
+### Verification log
+
+2026-09-06: Focused WJEC expansion, coverage, content-schema and lesson suites
+passed: 7 files, 70 tests. TypeScript and lint also passed. The audit now
+reports 21 Maths topics/79 statements, 23 Biology topics/106 statements, 21
+Chemistry topics/100 statements and 17 Physics topics/100 statements; Physics
+zero-question statements remained at the pre-pack ceiling of 26 because every
+new Physics statement is mapped to a new question part.
+
+2026-09-06: `npm run verify` passed: lint, regular and strict TypeScript,
+curriculum validation/freshness, 165 test files passed (1 skipped), 1,327
+tests passed (2 skipped), production build and client performance-budget
+checks.
+
+## Improvement state: WJEC second-pass explicit coverage
+
+### Goal and diagnosis
+
+The first WJEC expansion added breadth, but several high-value requirements
+were still only implied inside broad lessons. This pass makes the practical,
+mechanistic and modelling-heavy areas explicit so students can learn and test
+them as standalone lessons.
+
+### Delivered scope
+
+- Biology: human impact/conservation and biological practical skills.
+- Chemistry: organic mechanisms and electrochemical cells.
+- Physics: orbits/wider-universe evidence and electromagnetic induction.
+- Mathematics: conditional probability and differential equations in context.
+- Added 8 authored topics, 32 specification-linked statements and 8
+  structured four-part exam questions. The curriculum now generates 475
+  lessons, with data/source/transfer coverage extended to every topic.
+
+### Status
+
+- [x] add explicit second-pass topics with checked provenance
+- [x] link every new statement to an exam question part and coverage-family
+  questions
+- [x] verify lesson generation, active recall and answer-hidden applications
+- [x] complete the full repository verification/build pass after this pass
+
+### Verification log
+
+2026-09-06: TypeScript passed; focused WJEC, coverage-family, schema and
+lesson suites passed: 7 files, 27 tests. Curriculum validation passed with
+475 total topics and freshness passed for 32 specs with 0 stale records.
+
+2026-09-06: `npm run verify` passed: lint, regular and strict TypeScript,
+curriculum validation/freshness, 165 test files passed (1 skipped), 1,327
+tests passed (2 skipped), production build and client performance-budget
+checks.

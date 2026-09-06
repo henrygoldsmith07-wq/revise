@@ -20,6 +20,21 @@ describe("guided lesson explanations", () => {
     }
   });
 
+  it("gives each lesson visible success criteria and each core idea a real application", () => {
+    for (const lesson of lessons) {
+      expect(lesson.learningObjectives?.length, lesson.id).toBeGreaterThan(0);
+      expect(lesson.estimatedMinutes, lesson.id).toBeGreaterThanOrEqual(6);
+      expect(lesson.estimatedMinutes, lesson.id).toBeLessThanOrEqual(20);
+      for (const step of lesson.steps.filter((candidate) => candidate.kind === "core")) {
+        expect(step.objective?.trim(), `${lesson.id}/${step.id}`).toBeTruthy();
+        expect(step.application, `${lesson.id}/${step.id}`).toBeDefined();
+        expect(step.application?.prompt.trim(), `${lesson.id}/${step.id}`).toBeTruthy();
+        expect(step.application?.modelAnswer.trim(), `${lesson.id}/${step.id}`).toBeTruthy();
+        expect(step.application?.successCriteria.length, `${lesson.id}/${step.id}`).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
   it("turns compound authored points into ordered chunks without changing their wording", () => {
     const topic = allTopics(["aqa-gcse-biology"]).find((candidate) => candidate.id === "aqa-gcse-biology.biological-molecules");
     expect(topic).toBeDefined();

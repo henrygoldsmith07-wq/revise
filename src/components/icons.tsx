@@ -27,7 +27,6 @@ import {
   Database,
   Clock,
   FileText,
-  Film,
   Flame,
   GraduationCap,
   LayoutGrid,
@@ -118,7 +117,6 @@ export const WarningIcon = TriangleAlert;
 export const HelpIcon = CircleHelp;
 export const PlayIcon = Play;
 export const PauseIcon = Pause;
-export const VideoIcon = Film;
 
 /** Sizes used across the app. Anything outside these is a design mistake. */
 export const ICON_SIZE = {

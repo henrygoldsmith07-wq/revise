@@ -6,7 +6,6 @@ import {
   markFallback,
   socraticFallback,
   summariseFallback,
-  videoLessonFallback,
 } from "./fallback";
 import { resilientMark } from "./marking-resilience";
 import { maskChatHistory, maskPii, maskStudentText, maskSummaryMany } from "./pii";
@@ -25,7 +24,6 @@ import type {
   OcrResponse,
   SocraticResponse,
   SummariseResponse,
-  VideoLessonResponse,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -122,11 +120,6 @@ export function aiGenerateQuestions(topicId: string, count = 2, difficulty?: num
 
 export function aiSummarise(topicId: string) {
   return call<SummariseResponse>("summarise", { topicId }, () => summariseFallback(topicId));
-}
-
-/** Storyboard a topic as a video-style lesson (timed scenes with narration). */
-export function aiVideoLesson(topicId: string) {
-  return call<VideoLessonResponse>("video-lesson", { topicId }, () => videoLessonFallback(topicId));
 }
 
 export function aiDiagnose(topicIds: string[], mistakes: Mistake[]) {

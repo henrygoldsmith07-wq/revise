@@ -28,6 +28,7 @@ import { ocrAuthoredQuestions } from "./questions/ocr-authored";
 import { extendedResponseQuestions } from "./questions/extended-responses";
 import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
 import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
+import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -55,6 +56,7 @@ export const seedQuestions: Question[] = [
   ...chemistryExtraQuestions,
   ...physicsQuestions,
   ...physicsExtraQuestions,
+  ...wjecAlevelExpansionQuestions,
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,
@@ -76,6 +78,7 @@ export { unfamiliarContextQuestions };
 export { authenticSourceQuestions };
 export { ocrAuthoredQuestions };
 export { extendedResponseQuestions };
+export { wjecAlevelExpansionQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

@@ -6,9 +6,8 @@ import { buildRoadmapLessons, summariseLesson } from "@/content/lessons";
 import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import type { RoadmapLessonEntry } from "@/content/lessons";
-import { AchievementIcon, StreakIcon, VideoIcon, ICON_SIZE } from "./icons";
+import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
 import { RichText } from "./RichText";
-import { VideoLesson } from "./VideoLesson";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
 import { useStore } from "@/state/store";
@@ -41,9 +40,8 @@ function recallPrompt(step: NonNullable<LessonEntry["lesson"]["steps"]>[number])
 // and any check question gate progress so reading stays active instead of
 // passive. Completion and the lesson streak live in the synced store (one row
 // per user), so progress follows the student across devices instead of sitting
-// in per-device localStorage. Video lessons are an optional companion — the
-// written, interactive route remains the default and never needs a video to
-// complete.
+// in per-device localStorage. The lesson route is deliberately written and
+// interactive: every checkpoint teaches, retrieves and applies the idea.
 
 export function LessonMode({
   topics,
@@ -86,23 +84,15 @@ export function LessonMode({
   // seeing the authored takeaway, not another answer-history data source.
   const [recallDraft, setRecallDraft] = useState<Record<string, string>>({});
   const [recallRevealed, setRecallRevealed] = useState<Record<string, boolean>>({});
+  // Application answers stay hidden until the learner chooses to compare.
+  // Keeping this separate from recall means a student can revisit a step
+  // without losing their active-recall gate.
+  const [applicationRevealed, setApplicationRevealed] = useState<Record<string, boolean>>({});
   const [summary, setSummary] = useState<{
     correct: number;
     total: number;
     missed: { body: string; answer: string; explanation: string }[];
   } | null>(null);
-  // When set, the video-style lesson replaces the whole lesson view; keyed by
-  // topic id in the render so switching topics restarts the player cleanly.
-  const [videoTopic, setVideoTopic] = useState<Topic | null>(null);
-  // Watching a video to the end completes its `video:<topicId>` entry in the
-  // same synced map the step lessons use — the streak bump comes with it.
-  const markVideoWatched = useCallback(
-    (topicId: string) => {
-      void completeLesson(`video:${topicId}`);
-    },
-    [completeLesson],
-  );
-
   const active = activeIdx !== null ? lessons[activeIdx] : null;
   const lesson = active?.lesson ?? null;
   const step = lesson && !summary ? lesson.steps[stepIdx] : null;
@@ -110,7 +100,6 @@ export function LessonMode({
     (entry: LessonEntry) =>
       Boolean(
         completed[entry.lesson.id] ||
-          completed[`video:${entry.topic.id}`] ||
           completed[`lesson:${entry.topic.id}`],
       ),
     [completed],
@@ -129,6 +118,7 @@ export function LessonMode({
     setChecked({});
     setRecallDraft({});
     setRecallRevealed({});
+    setApplicationRevealed({});
     setSummary(null);
   }, []);
 
@@ -138,6 +128,7 @@ export function LessonMode({
     setChecked({});
     setRecallDraft({});
     setRecallRevealed({});
+    setApplicationRevealed({});
     setSummary(null);
   }, []);
 
@@ -276,28 +267,6 @@ export function LessonMode({
     );
   }
 
-  // ---- Video lesson --------------------------------------------------------
-  if (videoTopic) {
-    // Chain to the first not-yet-watched video after this one (wrapping), so a
-    // watching session flows topic to topic like the step lessons do.
-    const currentIndex = topics.findIndex((t) => t.id === videoTopic.id);
-    const nextTopic =
-      topics
-        .slice(currentIndex + 1)
-        .concat(topics.slice(0, Math.max(0, currentIndex)))
-        .find((t) => !completed[`video:${t.id}`]) ?? null;
-    return (
-      <VideoLesson
-        key={videoTopic.id}
-        topic={videoTopic}
-        onExit={() => setVideoTopic(null)}
-        onEnded={markVideoWatched}
-        nextTopic={nextTopic}
-        onSelectTopic={setVideoTopic}
-      />
-    );
-  }
-
   // ---- Completion summary ------------------------------------------------
   if (lesson && summary) {
     const perfect = summary.total > 0 && summary.correct === summary.total;
@@ -325,6 +294,20 @@ export function LessonMode({
               {summary.correct} of {summary.total} check questions correct
             </p>
           </div>
+
+          {lesson.learningObjectives?.length ? (
+            <div className="text-left rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-3">
+              <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">What you can now do</p>
+              <ul className="mt-2 space-y-1.5">
+                {lesson.learningObjectives.map((objective, index) => (
+                  <li key={`${lesson.id}:objective:${index}`} className="flex items-start gap-2 text-sm text-ink2">
+                    <span className="mt-1 text-accent" aria-hidden="true">✓</span>
+                    <RichText className="text-sm text-ink2">{objective}</RichText>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {summary.missed.length ? (
             <ul className="text-left space-y-2 max-w-md mx-auto">
@@ -417,13 +400,35 @@ export function LessonMode({
           <div>
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Lesson</p>
             <h2 className="text-lg font-semibold">{lesson.title}</h2>
-            <p className="text-xs text-ink3 mt-1 max-w-xl">{lesson.intro} Written teaching, worked application and quick checks are the default; video is optional.</p>
+            <p className="text-xs text-ink3 mt-1 max-w-xl whitespace-pre-line">{lesson.intro}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={exitLesson}>
             Exit
           </Button>
         </div>
         <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label="Lesson progress" />
+
+        {stepIdx === 0 && lesson.learningObjectives?.length ? (
+          <Panel className="space-y-3 border-accent/30 bg-accentsoft/20">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Your success criteria</p>
+                <p className="mt-1 text-sm text-ink2">By the end, you should be able to do these things without looking back.</p>
+              </div>
+              {lesson.estimatedMinutes ? <Pill tone="accent">~{lesson.estimatedMinutes} min</Pill> : null}
+            </div>
+            <ul className="space-y-1.5">
+              {lesson.learningObjectives.map((objective, index) => (
+                <li key={`${lesson.id}:active-objective:${index}`} className="flex items-start gap-2 text-sm text-ink2">
+                  <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-onaccent" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <RichText className="text-sm text-ink2">{objective}</RichText>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        ) : null}
 
         {/* keyed by step id so each new step re-mounts and plays the enter animation */}
         <Panel key={step.id} className="space-y-4 app-enter">
@@ -436,6 +441,13 @@ export function LessonMode({
           <h3 className="text-base sm:text-lg font-semibold tracking-tight text-ink">{step.title}</h3>
 
           <RichText className="text-base text-ink">{step.body}</RichText>
+
+          {step.objective ? (
+            <div className="rounded-[8px] border border-line bg-surface2/60 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">What you should be able to do</p>
+              <RichText className="mt-1 text-sm text-ink2">{step.objective}</RichText>
+            </div>
+          ) : null}
 
           <div className="pt-4 border-t border-line">
             <div className="flex items-center justify-between gap-3">
@@ -571,6 +583,53 @@ export function LessonMode({
               </p>
             </div>
           )}
+
+          {step.examTechnique ? (
+            <div className="rounded-[8px] border border-line bg-surface2/50 px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Exam technique</p>
+              <RichText className="mt-1 text-sm text-ink2">{step.examTechnique}</RichText>
+            </div>
+          ) : null}
+
+          {step.application ? (
+            <div className="space-y-3 rounded-[8px] border border-accent/30 bg-accentsoft/20 px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Apply it</p>
+                  <p className="mt-1 text-sm font-medium text-ink">Try the answer before you reveal the model.</p>
+                </div>
+                {step.application.commandWord ? <Pill tone="accent">{step.application.commandWord}</Pill> : null}
+              </div>
+              <RichText className="text-sm text-ink2">{step.application.prompt}</RichText>
+              {!applicationRevealed[step.id] ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setApplicationRevealed((previous) => ({ ...previous, [step.id]: true }))}
+                >
+                  Reveal model answer
+                </Button>
+              ) : (
+                <div role="status" aria-live="polite" className="space-y-3 rounded-[8px] border border-success/30 bg-successsoft/40 px-3 py-2.5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Model answer</p>
+                    <RichText className="mt-1 text-sm text-ink2">{step.application.modelAnswer}</RichText>
+                  </div>
+                  <div className="border-t border-success/20 pt-2.5">
+                    <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Self-marking checklist</p>
+                    <ul className="mt-1.5 space-y-1">
+                      {step.application.successCriteria.map((criterion, index) => (
+                        <li key={`${step.id}:criterion:${index}`} className="flex items-start gap-2 text-xs text-ink2">
+                          <span className="text-success" aria-hidden="true">✓</span>
+                          <RichText className="text-xs text-ink2">{criterion}</RichText>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
         </Panel>
 
         <div className="flex items-center justify-between gap-3">
@@ -604,7 +663,7 @@ export function LessonMode({
   const doneCount = lessons.filter(isEntryComplete).length;
   // Mirror the summary's "Next up" on the roadmap: one glanceable resume card
   // instead of making the student scan for the first unfinished lesson. A
-  // topic counts as complete once either its guided lesson or video is done.
+  // A topic is complete only after its guided written checkpoint is complete.
   const firstIncomplete = lessons.findIndex((entry) => !isEntryComplete(entry));
   const resumeIdx = firstIncomplete === -1 ? 0 : firstIncomplete;
   const resumeLabel =
@@ -634,7 +693,7 @@ export function LessonMode({
               <p className="text-[11px] uppercase tracking-[0.14em] font-bold opacity-75">Your learning path</p>
               <h3 className="mt-1 text-xl font-bold tracking-tight">{roadmapTitle}</h3>
               <p className="mt-1 max-w-xl text-sm opacity-85">
-                Follow the path from foundations to exam-ready ideas. Each node opens written teaching, worked application and quick checks — video is optional support.
+                Follow the path from foundations to exam-ready ideas. Each node opens written teaching, active recall, worked application and quick checks.
               </p>
             </div>
             <div className="shrink-0 rounded-2xl border-2 border-onaccent/30 px-3 py-2 text-center">
@@ -645,6 +704,12 @@ export function LessonMode({
         </div>
         <div className="space-y-3 px-4 py-4 sm:px-6">
           <ProgressBar value={overallProgress} label={`${doneCount} of ${lessons.length} lessons complete`} tone="success" />
+          {lessons[resumeIdx]?.lesson.learningObjectives?.length ? (
+            <div className="rounded-xl border border-line bg-surface px-3 py-2.5">
+              <p className="text-[10px] uppercase tracking-wide text-ink3 font-bold">What you will be able to do next</p>
+              <p className="mt-1 text-sm text-ink2">{lessons[resumeIdx].lesson.learningObjectives[0]}</p>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink2">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
@@ -749,7 +814,7 @@ export function LessonMode({
                     const supportingSteps = entry.lesson.steps.filter(
                       (candidate) => candidate.kind === "trap" || candidate.kind === "misconception",
                     ).length;
-                    const estimatedMinutes = Math.max(5, Math.round(entry.lesson.steps.length * 1.5));
+                    const estimatedMinutes = entry.lesson.estimatedMinutes ?? Math.max(5, Math.round(entry.lesson.steps.length * 1.5));
                     const cardTone = current
                       ? "border-accent bg-surface2"
                       : done
@@ -791,7 +856,7 @@ export function LessonMode({
                                   </p>
                                   <p className="mt-0.5 line-clamp-2 text-xs text-ink2">{entry.lesson.focus}</p>
                                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink3">
-                                    <span>{entry.lesson.steps.length} recalls</span>
+                                    <span>{entry.lesson.steps.length} guided steps</span>
                                     <span className="h-1 w-1 rounded-full bg-line" aria-hidden="true" />
                                     <span>{checks} checks</span>
                                     <span className="h-1 w-1 rounded-full bg-line" aria-hidden="true" />
@@ -803,15 +868,6 @@ export function LessonMode({
                                 </span>
                               </div>
                             </button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="self-center px-2 sm:px-2.5"
-                              onClick={() => setVideoTopic(entry.topic)}
-                              aria-label={`Play the video lesson for ${entry.topic.title}`}
-                            >
-                              <VideoIcon size={ICON_SIZE.sm} /> <span className="hidden sm:inline">Video</span>
-                            </Button>
                             <Button
                               size="sm"
                               variant="secondary"
@@ -844,6 +900,19 @@ export function LessonMode({
                               </span>
                             </summary>
                             <div className="space-y-3 px-3.5 pb-3.5">
+                              {entry.lesson.learningObjectives?.length ? (
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wide text-ink3 font-bold">Success criteria</p>
+                                  <ul className="mt-2 space-y-1.5">
+                                    {entry.lesson.learningObjectives.slice(0, 3).map((objective, objectiveIndex) => (
+                                      <li key={`${entry.lesson.id}:objective-outline:${objectiveIndex}`} className="flex items-start gap-2 text-xs text-ink2">
+                                        <span className="text-accent" aria-hidden="true">✓</span>
+                                        <RichText className="text-xs text-ink2">{objective}</RichText>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
                               <div>
                                 <p className="text-[10px] uppercase tracking-wide text-ink3 font-bold">What you will learn</p>
                                 <ol className="mt-2 space-y-2">
@@ -869,7 +938,7 @@ export function LessonMode({
                               <div className="rounded-xl border border-line bg-surface2 px-3 py-2.5">
                                 <p className="text-[10px] uppercase tracking-wide text-ink font-bold">Lesson rhythm</p>
                                 <p className="mt-1 text-xs text-ink2">
-                                  Read the explanation, say the idea back without looking, then answer the quick checks before moving on.
+                                  Read the explanation, retrieve it without looking, try the application, reveal the model answer, then answer the quick checks before moving on.
                                 </p>
                               </div>
                             </div>

@@ -139,7 +139,7 @@ export function MockStudyPlan({
             <div className="flex items-baseline justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Your study route</p>
-                <p className="text-xs text-ink2 mt-0.5">Written teaching → active recall → exam questions. Video is optional support, not a prerequisite.</p>
+                <p className="text-xs text-ink2 mt-0.5">Written teaching → active recall → worked application → exam questions. Every block is designed to be completed actively.</p>
               </div>
               <span className="text-[11px] text-ink3 shrink-0">{plan.steps.length} steps</span>
             </div>

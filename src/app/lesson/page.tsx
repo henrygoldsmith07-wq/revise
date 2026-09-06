@@ -3,7 +3,6 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LessonMode } from "@/components/LessonMode";
-import { CommutePack } from "@/components/CommutePack";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import { allSubjects, allTopics } from "@/domain/curriculum";
 import { useStore } from "@/state/store";
@@ -93,7 +92,6 @@ function LessonBrowser() {
 
       {subjectId ? (
         <>
-          <CommutePack topics={topics} />
           <LessonMode
             key={`${subjectId}:${initialTopicId ?? ""}`}
             topics={topics}

@@ -1,5 +1,6 @@
 import type { AoCode, Question, QuestionKind } from "@/domain/types";
 import { defineQuestions } from "./authoring";
+import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /** Original transfer questions that place familiar ideas in unfamiliar settings. */
 
@@ -558,4 +559,5 @@ export const unfamiliarContextQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
+  ...wjecAlevelCoverageQuestions({ id: "transfer", prefix: "Unfamiliar context:", reviewer: "authored/unfamiliar-context-review", kind: "extended" }),
 ];

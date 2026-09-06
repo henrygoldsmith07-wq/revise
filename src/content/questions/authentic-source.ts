@@ -1,5 +1,6 @@
 import type { AoCode, Question, QuestionKind } from "@/domain/types";
 import { defineQuestions } from "./authoring";
+import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /**
  * Original source-stimulus material written in the style of field notes,
@@ -550,4 +551,5 @@ export const authenticSourceQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
+  ...wjecAlevelCoverageQuestions({ id: "source", prefix: "Source extract:", reviewer: "authored/authentic-source-review", kind: "structured" }),
 ];

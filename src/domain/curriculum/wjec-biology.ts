@@ -1,12 +1,13 @@
 import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
+import { wjecBiologyExpansion } from "./wjec-alevel-expansions";
 
 // WJEC A Level Biology (A400QS). Grouped by the specification's broad content
 // areas; check the current WJEC spec for exact assessment objectives.
 const SUBJECT_ID = "wjec-alevel-biology";
 
-const { units, topics } = buildUnits(SUBJECT_ID, [
+const baseCurriculum = buildUnits(SUBJECT_ID, [
   {
     slug: "basic-biochemistry",
     title: "Basic Biochemistry and Cell Organisation",
@@ -460,6 +461,16 @@ const { units, topics } = buildUnits(SUBJECT_ID, [
     ],
   },
 ]);
+
+const expandedCurriculum = buildUnits(SUBJECT_ID, wjecBiologyExpansion);
+const units = [
+  ...baseCurriculum.units,
+  ...expandedCurriculum.units.map((unit, index) => ({ ...unit, order: baseCurriculum.units.length + index })),
+];
+const topics = [
+  ...baseCurriculum.topics,
+  ...expandedCurriculum.topics.map((topic, index) => ({ ...topic, order: baseCurriculum.topics.length + index })),
+];
 
 export const wjecBiology: CurriculumModule = registerSubject({
   subject: {

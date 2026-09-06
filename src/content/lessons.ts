@@ -28,6 +28,12 @@ export interface LessonStep {
   explanationSteps: string[];
   /** Whether the explanation should be read as an ordered process or a concept. */
   explanationMode?: "concept" | "process";
+  /** The observable capability this step is meant to build. */
+  objective?: string;
+  /** A small, answer-hidden application so the learner must use the idea. */
+  application?: LessonApplication;
+  /** Exam-writing move to practise for this step, when one is identifiable. */
+  examTechnique?: string;
   /** One sentence to repeat after reading the step. */
   takeaway: string;
   /** Optional link to the specification wording for this idea. */
@@ -42,6 +48,17 @@ export interface LessonStep {
   };
 }
 
+export interface LessonApplication {
+  /** Prompt shown before the learner reveals the model response. */
+  prompt: string;
+  /** Authored answer assembled from the same curriculum evidence as the step. */
+  modelAnswer: string;
+  /** Short checklist for self-marking, not a second hidden mark scheme. */
+  successCriteria: string[];
+  /** The command word or answer shape the learner should practise. */
+  commandWord?: string;
+}
+
 export interface Lesson {
   id: Id;
   topicId: Id;
@@ -50,6 +67,10 @@ export interface Lesson {
   /** Short intro shown before the first step. */
   intro: string;
   steps: LessonStep[];
+  /** Explicit success criteria shown before the student starts. */
+  learningObjectives?: string[];
+  /** Honest, bounded estimate for a complete guided pass. */
+  estimatedMinutes?: number;
   /** Deterministic id: `lesson:<topicId>` — re-derivation is idempotent. */
 }
 
@@ -67,11 +88,36 @@ export interface RoadmapLessonEntry {
   lesson: RoadmapLesson;
 }
 
+/**
+ * Pick the strongest authored source available for a lesson.
+ *
+ * Most topics have dedicated key points, but the curriculum contract also
+ * permits a specification-only topic. Those topics must not disappear from
+ * the roadmap: the specification statement is still enough to build a small,
+ * honest lesson. A summary is the final safety net for an authored topic that
+ * has neither list populated.
+ */
+function authoredKeyPoints(topic: Topic): string[] {
+  const keyPoints = uniqueStrings(topic.keyPoints);
+  if (keyPoints.length) return keyPoints;
+
+  const specificationPoints = uniqueStrings(
+    (topic.specPoints ?? []).map((point) => point.text),
+  );
+  if (specificationPoints.length) return specificationPoints;
+
+  const summary = topic.summary.replace(/\s+/g, " ").trim();
+  return summary ? [summary] : [];
+}
+
 /** Build a full lesson for a topic from its authored data. Deterministic. */
 export function buildLesson(topic: Topic): Lesson | null {
-  if (!topic.keyPoints.length) return null;
+  const keyPoints = authoredKeyPoints(topic);
+  if (!keyPoints.length) return null;
 
   const steps: LessonStep[] = [];
+  const learningObjectives = buildLearningObjectives(topic);
+  const estimatedMinutes = estimateLessonMinutes(topic);
 
   // Step 0: orient — what the topic is about, from the authored summary.
   steps.push({
@@ -79,10 +125,11 @@ export function buildLesson(topic: Topic): Lesson | null {
     kind: "overview",
     title: "Start with the big picture",
     body: topic.summary,
+    objective: `See how ${topic.title.toLowerCase()} fits together before learning the individual details.`,
     explanationSteps: [
       `Name the topic: ${topic.title}. The summary above is your map of what belongs together.`,
       "Next, learn one key idea at a time — each one builds the answer you will eventually write.",
-      "At the end, explain the topic once without looking. That is how you know it has moved beyond recognition.",
+      "You will retrieve the idea, apply it to an exam-style prompt, and then check the wording before moving on.",
     ],
     takeaway: `By the end, you should be able to explain ${topic.title.toLowerCase()} in your own words.`,
   });
@@ -90,7 +137,7 @@ export function buildLesson(topic: Topic): Lesson | null {
   // One teaching step per key point, each closed by a check question built
   // from the point itself (the colon split used by seed cards keeps the
   // question and answer consistent with the cards the student will meet).
-  topic.keyPoints.forEach((point, i) => {
+  keyPoints.forEach((point, i) => {
     const pointExplanation = explainPoint(point);
     const { question, answer, distractors } = checkFromKeyPoint(topic, point, i);
     // Shuffle first, then record where the answer landed — recording the
@@ -101,8 +148,11 @@ export function buildLesson(topic: Topic): Lesson | null {
       kind: "core",
       title: pointTitle(point, `Key idea ${i + 1}`),
       body: point,
+      objective: objectiveForPoint(point),
       explanationSteps: pointExplanation.steps,
       explanationMode: pointExplanation.mode,
+      application: buildApplication(topic, point, pointExplanation, undefined, "understand"),
+      examTechnique: examTechniqueFor(point),
       takeaway: `Remember: ${sentence(point)}`,
       ...(topic.specPoints?.[i]?.text ? { examLink: topic.specPoints[i].text } : {}),
       check: {
@@ -120,14 +170,15 @@ export function buildLesson(topic: Topic): Lesson | null {
   // of these would the examiner penalise?" — rather than passive reading.
   topic.commonErrors.forEach((error, i) => {
     const body = `Common trap: ${error}`;
-    const correction = topic.keyPoints[Math.min(i, topic.keyPoints.length - 1)];
-    if (topic.keyPoints.length >= 3) {
-      const options = shuffleStable([error, ...topic.keyPoints.slice(0, 3)], topic.id, 1000 + i);
+    const correction = keyPoints[Math.min(i, keyPoints.length - 1)];
+    if (keyPoints.length >= 3) {
+      const options = shuffleStable([error, ...keyPoints.slice(0, 3)], topic.id, 1000 + i);
       steps.push({
         id: `lesson:${topic.id}:err:${i}`,
         kind: "trap",
         title: "Avoid this common trap",
         body,
+        objective: `Spot and correct this recurring error: ${error}`,
         explanationSteps: [
           `Spot the risky wording: ${error}`,
           `Replace it with the precise idea: ${correction}`,
@@ -147,6 +198,7 @@ export function buildLesson(topic: Topic): Lesson | null {
         kind: "trap",
         title: "Avoid this common trap",
         body,
+        objective: `Spot and correct this recurring error: ${error}`,
         explanationSteps: [
           `Spot the risky wording: ${error}`,
           `Replace it with the precise idea: ${correction}`,
@@ -162,7 +214,7 @@ export function buildLesson(topic: Topic): Lesson | null {
   // check against the statements the examiner rewards.
   misconceptionsForTopic(topic.id).forEach((misconception, i) => {
     const options = shuffleStable(
-      [misconception.statement, ...topic.keyPoints.slice(0, 3)],
+      [misconception.statement, ...keyPoints.slice(0, 3)],
       topic.id,
       2000 + i,
     );
@@ -171,6 +223,7 @@ export function buildLesson(topic: Topic): Lesson | null {
       kind: "misconception",
       title: "Correct a common misunderstanding",
       body: `${misconception.explanation}\n\nExaminer's eye: ${misconception.example} — ${misconception.correction}`,
+      objective: `Replace the tempting wrong idea with the explanation an examiner can credit.`,
       explanationSteps: [
         `The tempting wrong idea: ${misconception.statement}`,
         `Why it fails: ${misconception.explanation}`,
@@ -191,8 +244,10 @@ export function buildLesson(topic: Topic): Lesson | null {
     topicId: topic.id,
     subjectId: topic.subjectId,
     title: topic.title,
-    intro: `A short lesson on ${topic.title.toLowerCase()} — read each step, answer the checks, and the deck will stick.`,
+    intro: buildLessonIntro(topic, learningObjectives, estimatedMinutes),
     steps,
+    learningObjectives,
+    estimatedMinutes,
   };
 }
 
@@ -228,6 +283,162 @@ function pointTitle(point: string, fallback: string): string {
 function sentence(text: string): string {
   const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
   return clean ? `${clean}.` : text;
+}
+
+const COMMAND_WORDS = [
+  "show that",
+  "state",
+  "describe",
+  "explain",
+  "compare",
+  "calculate",
+  "suggest",
+  "evaluate",
+  "discuss",
+  "justify",
+  "deduce",
+  "predict",
+  "outline",
+  "distinguish",
+  "identify",
+  "interpret",
+  "relate",
+  "apply",
+  "derive",
+  "demonstrate",
+  "use",
+] as const;
+
+/**
+ * Turn the authored requirements into success criteria the learner can see
+ * before starting. The wording is deliberately conservative: it reframes the
+ * source, but never adds a new scientific or mathematical claim.
+ */
+function buildLearningObjectives(topic: Topic): string[] {
+  const requirements = [
+    ...(topic.specPoints ?? []).map((point) => point.text),
+    ...authoredKeyPoints(topic),
+  ];
+  return uniqueStrings(requirements.map(objectiveForPoint)).slice(0, 5);
+}
+
+function objectiveForPoint(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+  if (!clean) return "Explain the idea clearly and use it in context.";
+  const lower = clean.charAt(0).toLowerCase() + clean.slice(1);
+  if (/^be able to\b/i.test(clean)) return `${clean}.`;
+  if (COMMAND_WORDS.some((word) => new RegExp(`^${word.replace(" ", "\\s+")}\\b`, "i").test(clean))) {
+    return `Be able to ${lower}.`;
+  }
+  return `Explain that ${lower}.`;
+}
+
+function estimateLessonMinutes(topic: Topic): number {
+  const core = Math.max(1, authoredKeyPoints(topic).length);
+  const support = Math.min(4, topic.commonErrors.length) + Math.min(3, misconceptionsForTopic(topic.id).length);
+  return Math.max(8, Math.min(20, 5 + Math.ceil(core * 1.5) + support));
+}
+
+function estimateCheckpointMinutes(topic: Topic, hasMisconception: boolean, hasTrap: boolean): number {
+  const support = (hasMisconception ? 2 : 0) + (hasTrap ? 1 : 0);
+  return Math.max(6, Math.min(14, 6 + support + Math.ceil(Math.max(1, authoredKeyPoints(topic).length) / 3)));
+}
+
+function buildLessonIntro(topic: Topic, objectives: string[], minutes: number): string {
+  const firstObjective = objectives[0] ?? `explain ${topic.title.toLowerCase()} in your own words`;
+  return [
+    `In about ${minutes} minutes, you will build a usable understanding of ${topic.title.toLowerCase()}.`,
+    `Success looks like this: ${firstObjective}`,
+    "The rhythm is understand → retrieve → apply → check. Try the answer before revealing the model response.",
+  ].join("\n\n");
+}
+
+type ApplicationPurpose = "understand" | "exam";
+
+/** Build an answer-hidden application from authored evidence only. */
+function buildApplication(
+  topic: Topic,
+  point: string,
+  explanation: PointExplanation,
+  specPoint?: NonNullable<Topic["specPoints"]>[number],
+  purpose: ApplicationPurpose = "understand",
+  supportingExplanation: string[] = [],
+): LessonApplication {
+  const commandWord = commandWordForText(specPoint?.text ?? point);
+  // Keep the checkpoint explanation as the spine even when a related key
+  // point is available. Supporting evidence enriches the answer; it must not
+  // replace the requirement and accidentally turn the model answer into a
+  // response to a different question.
+  const modelLines = uniqueStrings([...explanation.steps, ...supportingExplanation]).slice(0, 6);
+  const modelAnswer = modelLines.map(stripExplanationLabel).join("\n");
+  const successCriteria = uniqueStrings(
+    modelLines.map(stripExplanationLabel).concat(
+      explanation.mode === "process"
+        ? ["Keep the starting condition, each change and the final result in the correct order."]
+        : ["State the idea precisely, then link it to the condition, comparison or consequence in the question."],
+    ),
+  ).slice(0, 5);
+
+  const prompt = purpose === "exam"
+    ? `Write a complete answer for this checkpoint: ${sentence(point)} Include the key term and the link that makes the claim convincing.`
+    : explanation.mode === "process"
+      ? `Without looking back, teach ${topic.title.toLowerCase()} by walking through this process: ${sentence(point)} Include the starting condition, the changes and the result.`
+      : `Use this idea in a new ${topic.title.toLowerCase()} question. Write one sentence that states the idea and one that links it to a condition or consequence: ${pointTitle(point, "the key idea")}.`;
+
+  return {
+    prompt,
+    modelAnswer,
+    successCriteria,
+    ...(commandWord ? { commandWord } : {}),
+  };
+}
+
+function stripExplanationLabel(text: string): string {
+  return text.replace(/^(?:Start|Condition|Input|Change|Next|Step \d+|Result|Why|Process|Mechanism|Core idea|Notice the relationship|Apply it|also required):\s*/i, "").trim();
+}
+
+function commandWordForText(text: string): string | undefined {
+  const clean = text.trim().toLowerCase();
+  return COMMAND_WORDS.find((word) => new RegExp(`^${word.replace(" ", "\\s+")}\\b`, "i").test(clean));
+}
+
+function examTechniqueFor(text: string): string {
+  switch (commandWordForText(text)) {
+    case "state":
+      return "State means be exact and concise: give the fact the question asks for, without an unnecessary explanation.";
+    case "describe":
+      return "Describe means report the relevant features or sequence. Do not replace observations with an unsupported reason.";
+    case "explain":
+      return "Explain means make the link explicit: connect the cause, mechanism or evidence to the result with because or therefore.";
+    case "compare":
+      return "Compare both sides and make the relationship explicit using words such as whereas, higher, lower or similar.";
+    case "calculate":
+      return "Calculate means show the method, substitute carefully, give the result and include a unit where one applies.";
+    case "evaluate":
+      return "Evaluate the evidence or limitation, balance the strongest points, then finish with a clear judgement.";
+    case "justify":
+      return "Justify the claim with an explicit reason; do not leave the examiner to infer why your choice follows.";
+    case "show that":
+      return "Show the working that leads to the stated result, then make the final result visible and unambiguous.";
+    case "distinguish":
+      return "Distinguish the two ideas by naming the feature that separates them; do not describe only one side.";
+    case "identify":
+      return "Identify the exact feature or value requested before adding any explanation.";
+    case "interpret":
+      return "Interpret the evidence first, then link the pattern to the relevant idea or conclusion.";
+    case "relate":
+      return "Relate the named feature to its function or consequence; make the connection explicit.";
+    case "apply":
+      return "Apply the rule to the new context, showing which details in the question trigger it.";
+    case "derive":
+      return "Derive the result in clear steps so each transformation can be checked.";
+    case "demonstrate":
+      return "Demonstrate the claim with the relevant evidence or working, then state what it shows.";
+    case "use":
+      return "Use the given information, not a memorised answer, and make the link to the question explicit.";
+    default:
+      return "Use the exact subject vocabulary from the explanation and answer the command word before adding extra detail.";
+  }
 }
 
 type ExplanationMode = "concept" | "process";
@@ -580,7 +791,7 @@ function checkFromKeyPoint(topic: Topic, point: string, index: number): {
 
 /** Other key points from the same topic serve as plausible distractors. */
 function distractorKeyPoints(topic: Topic, excludeIndex: number): string[] {
-  return topic.keyPoints
+  return authoredKeyPoints(topic)
     .filter((_, i) => i !== excludeIndex)
     .slice(0, 2)
     .map((p) => (p.length > 80 ? p.slice(0, 77) + "…" : p));
@@ -604,12 +815,15 @@ function checkFromSpecPoint(
   index: number,
 ): NonNullable<LessonStep["check"]> {
   const pointExplanation = explainPoint(specPoint.text);
+  const choices = uniqueStrings([
+    specPoint.text,
+    ...(topic.specPoints ?? []).filter((point) => point.id !== specPoint.id).map((point) => point.text),
+    ...authoredKeyPoints(topic),
+  ]).slice(0, 4);
   const options = shuffleStable(
-    uniqueStrings([
-      specPoint.text,
-      ...(topic.specPoints ?? []).filter((point) => point.id !== specPoint.id).map((point) => point.text),
-      ...topic.keyPoints,
-    ]).slice(0, 4),
+    choices.length >= 2
+      ? choices
+      : [...choices, `This checkpoint is not part of ${topic.title}.`],
     topic.id,
     3000 + index,
   );
@@ -622,6 +836,55 @@ function checkFromSpecPoint(
         ? `Follow this checkpoint in order: ${pointExplanation.steps.join(" → ")} Connect it to the wider topic before moving on.`
         : `This checkpoint asks you to know: ${sentence(specPoint.text)} Connect it to the wider topic before moving on.`,
   };
+}
+
+/** Match a spec requirement to a supporting key point by meaning, not index. */
+function relevantCoreStep(
+  coreSteps: LessonStep[],
+  requirement: string,
+  fallbackIndex: number,
+): LessonStep | undefined {
+  if (!coreSteps.length) return undefined;
+  const target = meaningfulTerms(requirement);
+  if (!target.length) return undefined;
+
+  let bestStep: LessonStep | undefined;
+  let bestScore = -1;
+  let bestIndex = Number.POSITIVE_INFINITY;
+  coreSteps.forEach((step, index) => {
+    const candidate = meaningfulTerms(step.body);
+    const score = target.reduce((total, term) => total + (candidate.some((word) => relatedTerm(word, term)) ? 1 : 0), 0);
+    if (score > bestScore || (score === bestScore && Math.abs(index - fallbackIndex) < Math.abs(bestIndex - fallbackIndex))) {
+      bestStep = step;
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  // One shared word such as "cell" or "energy" is not enough evidence to
+  // attach a supporting fact. The checkpoint can still teach itself safely.
+  return bestStep && bestScore >= Math.min(2, target.length) ? bestStep : undefined;
+}
+
+function meaningfulTerms(text: string): string[] {
+  const stopWords = new Set([
+    "and", "the", "for", "from", "with", "including", "into", "this", "that", "when", "where", "how", "what", "why",
+    "describe", "explain", "state", "compare", "calculate", "identify", "interpret", "distinguish", "outline", "use", "apply",
+  ]);
+  return [...new Set(
+    text
+      .toLowerCase()
+      .replace(/\$[^$]+\$/g, " ")
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length >= 4 && !stopWords.has(word)),
+  )];
+}
+
+function relatedTerm(left: string, right: string): boolean {
+  if (left === right) return true;
+  const singularLeft = left.endsWith("s") ? left.slice(0, -1) : left;
+  const singularRight = right.endsWith("s") ? right.slice(0, -1) : right;
+  return singularLeft === singularRight || singularLeft.startsWith(singularRight) || singularRight.startsWith(singularLeft);
 }
 
 /** Deterministic shuffle (no Math.random — same contract as seed cards). */
@@ -637,7 +900,7 @@ function shuffleStable(items: string[], topicId: Id, index: number): string[] {
   return arr;
 }
 
-/** Build lessons for a whole set of topics, skipping empty ones. */
+/** Build lessons for every topic with at least one authored source field. */
 export function buildLessons(topics: Topic[]): Lesson[] {
   return topics
     .map(buildLesson)
@@ -658,6 +921,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
   return topics.flatMap((topic) => {
     const base = buildLesson(topic);
     if (!base) return [];
+    const keyPoints = authoredKeyPoints(topic);
 
     const specPoints = topic.specPoints?.filter((point) => point.text.trim().length > 0) ?? [];
     if (!specPoints.length) {
@@ -681,22 +945,30 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
       const checkpointIndex = index + 1;
       const lessonId = `${base.id}:checkpoint:${specPoint.id}`;
       const focusTitle = pointTitle(specPoint.text, `Checkpoint ${checkpointIndex}`);
-      const sourceStep = coreSteps[index] ?? coreSteps[Math.max(0, coreSteps.length - 1)];
+      // Specification points and key points are authored independently; an
+      // array-index join silently teaches the wrong fact when one list is
+      // reordered or has a different granularity. Only borrow a supporting
+      // explanation when its vocabulary overlaps the checkpoint; otherwise
+      // stay with the checkpoint itself rather than presenting a false link.
+      const sourceStep = relevantCoreStep(coreSteps, specPoint.text, index);
       const sourceBody = sourceStep?.body && sourceStep.body !== specPoint.text ? sourceStep.body : null;
       const checkpointExplanation = explainPoint(specPoint.text);
       const sourceExplanation = sourceStep?.explanationSteps ?? [];
       const isProcess = sourceStep?.explanationMode === "process" || checkpointExplanation.mode === "process";
       const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
+      const trap = topic.commonErrors[index % Math.max(1, topic.commonErrors.length)];
+      const misconception = misconceptions[index];
       const steps: LessonStep[] = [
         {
           id: `${lessonId}:overview`,
           kind: "overview",
           title: "Know the target",
           body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
+          objective: objectiveForPoint(specPoint.text),
           explanationSteps: [
             `Start with the requirement in plain English: ${specPoint.text}`,
             `Link it to the wider topic: ${topic.title}.`,
-            "You will finish by saying the point back without looking.",
+            "You will finish by retrieving the idea, applying it and saying the point back without looking.",
           ],
           takeaway: `I can explain ${specPoint.text.toLowerCase()}.`,
           examLink,
@@ -706,12 +978,22 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           kind: "core",
           title: focusTitle,
           body: sourceBody ? `${specPoint.text}\n\nConnect it to this core idea: ${sourceBody}` : specPoint.text,
+          objective: objectiveForPoint(specPoint.text),
           explanationSteps: [
             `Translate the checkpoint into a sentence you would use in an answer: ${specPoint.text}`,
             ...(sourceExplanation.length ? sourceExplanation.slice(0, 3) : checkpointExplanation.steps.slice(0, 3)),
             "Say the complete idea once, including the condition or consequence the question asks for.",
           ],
           explanationMode: isProcess ? "process" : "concept",
+          application: buildApplication(
+            topic,
+            specPoint.text,
+            checkpointExplanation,
+            specPoint,
+            "understand",
+            sourceExplanation.slice(0, 4),
+          ),
+          examTechnique: examTechniqueFor(specPoint.text),
           takeaway: `Remember: ${sentence(specPoint.text)}`,
           examLink,
           check: checkFromSpecPoint(topic, specPoint, index),
@@ -721,6 +1003,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           kind: "core",
           title: "Use it in an exam answer",
           body: `When a question tests this checkpoint, start with the precise requirement: ${specPoint.text}`,
+          objective: `Use this checkpoint in a complete answer, not as an isolated definition.`,
           explanationSteps: isProcess
             ? [
                 "Read the process from its starting condition to the final result; keep every change in order.",
@@ -733,14 +1016,22 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
                 "Add the relevant mechanism, comparison, calculation or evidence if the question asks for it.",
               ],
           explanationMode: isProcess ? "process" : "concept",
+          application: buildApplication(
+            topic,
+            specPoint.text,
+            checkpointExplanation,
+            specPoint,
+            "exam",
+            sourceExplanation.slice(0, 4),
+          ),
+          examTechnique: examTechniqueFor(specPoint.text),
           takeaway: `Exam habit: begin with ${sentence(specPoint.text)}`,
         },
       ];
 
-      const error = topic.commonErrors[index % Math.max(1, topic.commonErrors.length)];
-      if (error) {
+      if (trap) {
         const trapOptions = shuffleStable(
-          uniqueStrings([error, specPoint.text, ...topic.keyPoints]),
+          uniqueStrings([trap, specPoint.text, ...keyPoints]),
           topic.id,
           4000 + index,
         );
@@ -748,26 +1039,26 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           id: `${lessonId}:trap`,
           kind: "trap",
           title: "Avoid a common exam trap",
-          body: `Common trap: ${error}`,
+          body: `Common trap: ${trap}`,
+          objective: `Spot and correct this recurring error: ${trap}`,
           explanationSteps: [
-            `Spot the risky wording: ${error}`,
+            `Spot the risky wording: ${trap}`,
             `Replace it with the precise checkpoint: ${specPoint.text}`,
             "Before you submit, check that the corrected wording is explicit.",
           ],
-          takeaway: `Check your answer for this trap: ${error}`,
+          takeaway: `Check your answer for this trap: ${trap}`,
           check: {
             question: `Which wording should you avoid when answering ${topic.title.toLowerCase()}?`,
             options: trapOptions,
-            correctIndex: trapOptions.indexOf(error),
-            explanation: `Avoid this wording: ${error}. Keep the requirement precise: ${specPoint.text}`,
+            correctIndex: trapOptions.indexOf(trap),
+            explanation: `Avoid this wording: ${trap}. Keep the requirement precise: ${specPoint.text}`,
           },
         });
       }
 
-      const misconception = misconceptions[index];
       if (misconception) {
         const options = shuffleStable(
-          uniqueStrings([misconception.statement, specPoint.text, ...topic.keyPoints]),
+          uniqueStrings([misconception.statement, specPoint.text, ...keyPoints]),
           topic.id,
           5000 + index,
         );
@@ -776,6 +1067,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           kind: "misconception",
           title: "Correct a common misunderstanding",
           body: `${misconception.explanation}\n\nExaminer's eye: ${misconception.example} — ${misconception.correction}`,
+          objective: `Replace the tempting wrong idea with the explanation an examiner can credit.`,
           explanationSteps: [
             `The tempting wrong idea: ${misconception.statement}`,
             `Why it fails: ${misconception.explanation}`,
@@ -798,8 +1090,14 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           topicId: topic.id,
           subjectId: topic.subjectId,
           title: focusTitle,
-          intro: `Checkpoint ${checkpointIndex} of ${specPoints.length} for ${topic.title}: read the explanation, apply it, and pass the quick checks.`,
+          intro: `Checkpoint ${checkpointIndex} of ${specPoints.length}. ${buildLessonIntro(
+            topic,
+            [objectiveForPoint(specPoint.text)],
+            estimateCheckpointMinutes(topic, Boolean(misconception), Boolean(trap)),
+          )}`,
           steps,
+          learningObjectives: [objectiveForPoint(specPoint.text)],
+          estimatedMinutes: estimateCheckpointMinutes(topic, Boolean(misconception), Boolean(trap)),
           focus: specPoint.text,
           checkpointIndex,
           checkpointTotal: specPoints.length,

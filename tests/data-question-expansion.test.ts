@@ -7,7 +7,7 @@ const ALL_SUBJECTS = allSubjects();
 describe("data-question expansion", () => {
   it("adds one data question for every topic across all board and qualification subjects", () => {
     expect(ALL_SUBJECTS).toHaveLength(32);
-    expect(dataExpansionQuestions).toHaveLength(440);
+    expect(dataExpansionQuestions).toHaveLength(475);
 
     for (const subject of ALL_SUBJECTS) {
       const questions = dataExpansionQuestions.filter((question) => question.subjectId === subject.id);

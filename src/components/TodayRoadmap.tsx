@@ -41,7 +41,6 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
     (entry: RoadmapLessonEntry) =>
       Boolean(
         completed[entry.lesson.id] ||
-          completed[`video:${entry.topic.id}`] ||
           completed[`lesson:${entry.topic.id}`],
       ),
     [completed],

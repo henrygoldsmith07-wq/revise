@@ -48,8 +48,7 @@ The app is one loop — **board → topic → card → exam question** — and n
 |------|-----------|
 | **Onboarding** | First screen only: board → subjects → required exam dates. Nothing renders until it is complete. |
 | **Topic status** | Every topic reads in plain language — covered, shaky, untouched — with a what-to-do-next sentence, never a raw score pretending to be a grade. |
-| **Lessons** | Guided step lessons per topic that gate progress with check questions, so reading stays active; a lesson streak rewards finishing. |
-| **Video lessons** | Every topic also plays as a short video-style lesson: timed scenes with narration, on-screen text and a visual cue, storyboarded by the configured AI provider (free OpenRouter models by default) and rebuilt offline from the same authored spec data when no provider is reachable. |
+| **Lessons** | Every authored topic follows a written, step-by-step lesson: clear objectives, process explanations, active recall, worked application, exam technique and check questions; a lesson streak rewards finishing. |
 | **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, and failed cards reinserted within the same session. Today sizes one bounded review session (15–25 minutes) and stops — the loop, not a dashboard. |
 | **Study modes** | The same card pool worked five ways — including Learn (recognition → typed production), Match (timed pairing), hands-free Listen and Diagram labelling. |
 | **Exam questions after cards** | Right after each reviewed card, an official-style exam question on that same spec point appears when one exists — revision turns into exam practice in place. |
@@ -58,7 +57,7 @@ The app is one loop — **board → topic → card → exam question** — and n
 | **Past papers** | Upload or photograph a paper and mark scheme, extract questions, map them to topics, practise them question-by-question or sit them in full exam conditions with a fixed clock, no in-paper aids, auto-submit and marking after the paper, then close with full-denominator scoring and a repair route. |
 | **Honest pace forecast** | At this pace, N topics stay untouched before the exam date — a real projection from the last seven days of reviews, never a fake pass percentage. |
 | **Keyboard** | Shortcuts throughout, with a `?` sheet generated from the live bindings. |
-| **Offline** | IndexedDB-first with a durable outbox; installable PWA; a commute pack pre-loads topic video lessons while online so the whole loop works on a train. |
+| **Offline** | IndexedDB-first with a durable outbox; installable PWA; the complete written lesson, recall and practice loop works without a connection. |
 
 ## Depth first: flagship subject combinations
 

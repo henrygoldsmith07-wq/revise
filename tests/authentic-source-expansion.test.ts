@@ -7,7 +7,7 @@ const ALL_SUBJECTS = allSubjects();
 describe("authentic source-material expansion", () => {
   it("adds one source-stimulus question for every topic across all board and qualification subjects", () => {
     expect(ALL_SUBJECTS).toHaveLength(32);
-    expect(authenticSourceQuestions).toHaveLength(440);
+    expect(authenticSourceQuestions).toHaveLength(475);
 
     for (const subject of ALL_SUBJECTS) {
       const questions = authenticSourceQuestions.filter((question) => question.subjectId === subject.id);

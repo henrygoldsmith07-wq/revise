@@ -59,7 +59,7 @@ These exist today and are the foundation the roadmap builds on:
 - Teacher-marking comparison (measure the marker against a human teacher, not
   only against the rubric).
 - Explanation library for common misconceptions *(shipped — `src/content/misconceptions/`)*.
-- Video/visual explanations.
+- Rich written explanations with diagrams, process steps and active-recall checks *(shipped — roadmap lessons)*.
 
 ## 4. Input & accessibility
 

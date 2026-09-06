@@ -21,6 +21,7 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   await expect(main).toContainText("Your learning path");
   await expect(main).toContainText("Unit 1");
   await expect(main).toContainText("Recommended next");
+  await expect(main).not.toContainText(/video|commute pack/i);
 
   const outline = main.locator("summary").filter({ hasText: "See detailed lesson outline" }).first();
   await expect(outline).toBeVisible();
@@ -36,4 +37,9 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   await recall.fill("I can explain the checkpoint from memory before checking the model.");
   await main.getByRole("button", { name: "Show model answer" }).click();
   await expect(main).toContainText("Now compare");
+
+  await main.getByRole("button", { name: "Next" }).click();
+  await expect(main).toContainText("Apply it");
+  await main.getByRole("button", { name: "Reveal model answer" }).click();
+  await expect(main).toContainText("Self-marking checklist");
 });

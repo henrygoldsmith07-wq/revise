@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allSubjects, allTopics } from "@/domain/curriculum";
 import { buildLessons } from "@/content/lessons";
 import { misconceptionsForTopic } from "@/content";
+import type { Topic } from "@/domain/types";
 
 // Coverage measurement for the lesson engine: how many topics yield a lesson,
 // how many steps they average, and how much of the authored misconception
@@ -11,10 +12,35 @@ describe("lesson coverage", () => {
   const topics = allTopics(allSubjectIds);
   const lessons = buildLessons(topics);
 
-  it("every topic with authored key points yields a lesson", () => {
-    const skipped = topics.filter((t) => !t.keyPoints.length).map((t) => t.id);
-    const withKeyPoints = topics.length - skipped.length;
-    expect(lessons.length).toBe(withKeyPoints);
+  it("every authored topic yields a lesson", () => {
+    expect(lessons).toHaveLength(topics.length);
+    expect(new Set(lessons.map((lesson) => lesson.topicId)).size).toBe(topics.length);
+  });
+
+  it("keeps a specification-only topic on the roadmap", () => {
+    const topic: Topic = {
+      id: "coverage.spec-only",
+      subjectId: "coverage.subject",
+      unitId: "coverage.unit",
+      title: "Specification-only topic",
+      order: 1,
+      intrinsicDifficulty: 2,
+      summary: "A concise authored summary still gives the learner a map.",
+      keyPoints: [],
+      commonErrors: [],
+      specPoints: [
+        {
+          id: "coverage.spec-only.point-1",
+          ref: "1.1",
+          text: "State the defining feature and connect it to the topic.",
+          aos: ["AO1"],
+        },
+      ],
+    };
+    const lesson = buildLessons([topic])[0];
+    expect(lesson?.topicId).toBe(topic.id);
+    expect(lesson?.steps.some((step) => step.kind === "core" && step.application)).toBe(true);
+    expect(lesson?.steps.find((step) => step.kind === "core")?.check?.options.length).toBeGreaterThanOrEqual(2);
   });
 
   it("lessons average at least eight steps", () => {

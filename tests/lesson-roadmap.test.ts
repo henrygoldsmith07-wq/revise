@@ -24,22 +24,24 @@ describe("learning roadmap", () => {
       const entries = buildRoadmapLessons(topics);
       const expectedCount = topics.reduce((total, topic) => {
         const points = topic.specPoints?.filter((point) => point.text.trim().length > 0) ?? [];
-        return total + (points.length || (topic.keyPoints.length ? 1 : 0));
+        return total + (points.length || 1);
       }, 0);
 
       expect(entries.length, subject.id).toBe(expectedCount);
       for (const topic of topics) {
         const topicEntries = entries.filter((entry) => entry.topic.id === topic.id);
         const pointCount = topic.specPoints?.filter((point) => point.text.trim().length > 0).length || 1;
-        if (!topic.keyPoints.length) {
-          expect(topicEntries, topic.id).toHaveLength(0);
-          continue;
-        }
         expect(topicEntries, topic.id).toHaveLength(pointCount);
         topicEntries.forEach((entry, index) => {
           expect(entry.lesson.checkpointIndex, entry.lesson.id).toBe(index + 1);
           expect(entry.lesson.checkpointTotal, entry.lesson.id).toBe(pointCount);
           expect(entry.lesson.steps.length, entry.lesson.id).toBeGreaterThanOrEqual(4);
+          expect(entry.lesson.learningObjectives?.length, entry.lesson.id).toBeGreaterThan(0);
+          expect(entry.lesson.estimatedMinutes, entry.lesson.id).toBeGreaterThanOrEqual(6);
+          expect(
+            entry.lesson.steps.filter((step) => step.kind === "core").every((step) => Boolean(step.application)),
+            entry.lesson.id,
+          ).toBe(true);
           expect(entry.lesson.focus.trim(), entry.lesson.id).not.toBe("");
           expect(new Set(entry.lesson.steps.map((step) => step.id)).size, entry.lesson.id).toBe(entry.lesson.steps.length);
           for (const step of entry.lesson.steps) {
@@ -62,6 +64,10 @@ describe("learning roadmap", () => {
     expect(source).toContain("See detailed lesson outline");
     expect(source).toContain("What you will learn");
     expect(source).toContain("Recommended next");
+    expect(source).toContain("What you should be able to do");
+    expect(source).toContain("Reveal model answer");
+    expect(source).toContain("Self-marking checklist");
+    expect(source).toContain("Your success criteria");
     expect(source).toContain("How it works");
     expect(source).toContain("Follow in order");
     expect(source).toContain("Process steps");

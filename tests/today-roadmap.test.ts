@@ -9,8 +9,8 @@ describe("Today learning roadmap", () => {
     expect(roadmap).toContain("buildRoadmapLessons(topics)");
     expect(roadmap).toContain("lessonProgress.completed");
     expect(roadmap).toContain("completed[entry.lesson.id]");
-    expect(roadmap).toContain("completed[`video:${entry.topic.id}`]");
     expect(roadmap).toContain("completed[`lesson:${entry.topic.id}`]");
+    expect(roadmap).not.toContain("video:");
   });
 
   it("shows a next checkpoint, overall progress and every populated unit", () => {
