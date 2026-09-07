@@ -7,6 +7,14 @@ import { misconceptionsForTopic } from "@/content";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
 import { getTopic } from "@/domain/curriculum";
 import {
+  buildHintLadder,
+  formatHint,
+  HINT_TIERS,
+  hintEvidenceSource,
+  nextHint,
+  type HintTier,
+} from "@/domain/hints";
+import {
   completeDelayedFarTransfer,
   scheduleDelayedFarTransfer,
   type DelayedFarTransferRetest,
@@ -36,6 +44,13 @@ export interface QuestionDraft {
   choice: number | null;
 }
 
+const TIER_HINT_CTA: Record<HintTier, string> = {
+  cue: "Reveal a small cue",
+  prompt: "Reveal what to think about",
+  scaffold: "Reveal the answer structure",
+  "worked-solution": "Reveal a worked solution",
+};
+
 export function QuestionRunner({
   question,
   mode = "practice",
@@ -47,6 +62,7 @@ export function QuestionRunner({
   draft,
   onDraftChange,
   onFinished,
+  hintBudget,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -58,6 +74,11 @@ export function QuestionRunner({
   draft?: QuestionDraft;
   onDraftChange?: (draft: QuestionDraft) => void;
   onFinished?: (attempt: Attempt) => void;
+  /**
+   * Hint tiers available for this question. Defaults to the full ladder;
+   * the independent rung passes 0 so the evidence stays unaided.
+   */
+  hintBudget?: number;
 }) {
   const store = useStore();
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
@@ -83,6 +104,25 @@ export function QuestionRunner({
   }, []);
   const isMcq = question.kind === "mcq";
   const topic = getTopic(question.topicIds[0] ?? "");
+  // The hint ladder is deterministic content from the question and topic —
+  // no model call — and every tier used is recorded on the attempt so the
+  // tutor's evidence stays honest about assisted wins.
+  const ladder = useMemo(
+    () => buildHintLadder(question, topic ? { keyPoints: topic.keyPoints, commonErrors: topic.commonErrors } : undefined),
+    [question, topic],
+  );
+  const allowedTiers: HintTier[] = useMemo(
+    () => HINT_TIERS.slice(0, Math.max(0, Math.min(HINT_TIERS.length, hintBudget ?? HINT_TIERS.length))),
+    [hintBudget],
+  );
+  const [usedTiers, setUsedTiers] = useState<HintTier[]>([]);
+  const [hintsOpen, setHintsOpen] = useState(false);
+  const visibleHints = useMemo(() => ladder.filter((h) => usedTiers.includes(h.tier)), [ladder, usedTiers]);
+  const upcoming = useMemo(
+    () => ladder.filter((h) => allowedTiers.includes(h.tier)).find((h) => !usedTiers.includes(h.tier)) ?? null,
+    [ladder, allowedTiers, usedTiers],
+  );
+  const evidenceSource = hintEvidenceSource(usedTiers.length ? usedTiers[usedTiers.length - 1]! : null);
 
   // When the DLQ later re-grades this question with AI, refresh an open
   // result view in place so the student sees the AI mark land without
@@ -193,6 +233,7 @@ export function QuestionRunner({
 
       elapsedMs,
       mode,
+      ...(usedTiers.length ? { hintTier: usedTiers[usedTiers.length - 1]! } : {}),
       ...(paperId ? { paperId } : {}),
       ...(paperSpecId ? { paperSpecId } : {}),
       ...(paperRunId ? { paperRunId } : {}),
@@ -332,6 +373,38 @@ export function QuestionRunner({
 
         {!result && retestMistake?.resolved ? (
           <p className="text-xs text-success mt-5">This mistake is already resolved. Return to Progress to choose another repair.</p>
+        ) : null}
+        {!result && upcoming ? (
+          <div className="mt-5">
+            <Button
+              variant="secondary"
+              className="w-full min-h-11"
+              aria-expanded={hintsOpen}
+              onClick={() => {
+                const next = nextHint(ladder, usedTiers);
+                if (next) {
+                  setHintsOpen(true);
+                  setUsedTiers((prev) => (prev.includes(next.tier) ? prev : [...prev, next.tier]));
+                }
+              }}
+            >
+              {TIER_HINT_CTA[upcoming.tier]}
+            </Button>
+          </div>
+        ) : null}
+        {hintsOpen && visibleHints.length ? (
+          <div className="mt-2 space-y-2" aria-live="polite">
+            {visibleHints.map((hint) => (
+              <p key={hint.tier} className="card card-2 p-3 text-sm text-ink2">
+                {formatHint(hint)}
+              </p>
+            ))}
+            {evidenceSource !== "independent" ? (
+              <p className="text-[11px] text-ink3">
+                Hint used — evidence: {evidenceSource}. The mark is kept, but mastery counts it at reduced weight.
+              </p>
+            ) : null}
+          </div>
         ) : null}
         {!result && !retestMistake?.resolved ? (
           <Button

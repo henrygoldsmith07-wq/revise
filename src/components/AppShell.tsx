@@ -232,7 +232,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line elev-nav pb-safe"
         aria-label="Primary sections (mobile)"
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {NAV.filter((item) => item.primary).map((item) => (
             <Link
               key={item.href}

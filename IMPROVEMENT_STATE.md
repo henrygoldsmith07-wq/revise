@@ -306,3 +306,49 @@ lesson suites passed: 7 files, 27 tests. Curriculum validation passed with
 curriculum validation/freshness, 165 test files passed (1 skipped), 1,327
 tests passed (2 skipped), production build and client performance-budget
 checks.
+
+## Improvement state: adaptive-tutor evidence hardening + mobile nav
+
+### Goal and observable outcome
+
+Wire the existing adaptive-tutor domain primitives into the live
+review/practice surfaces so every answer replans honestly: hints cost
+evidence (independent 1 / assisted 0.5 / viewed 0.15), repair never
+closes on view, and the adaptive ladder's evidence rungs run unaided.
+Separately, keep all six primary mobile nav items on one row.
+
+### Decisions
+
+- `Attempt.hintTier` (optional `"cue" | "prompt" | "scaffold" |
+  "worked-solution"`) carries the highest hint tier used before submit.
+  `QuestionRunner` enforces it per rung via `hintBudget` (default: full
+  ladder; independent/transfer rungs pass 0).
+- `computeApplicationMastery` multiplies awarded marks by
+  `hintEvidenceMultiplier(attempt.hintTier ?? null)`; denominators stay
+  whole so hint-gaming cannot inflate mastery.
+- Hint-tier types/weights live in `src/domain/hint-tiers.ts` (no imports)
+  so strict-checked modules need not transitively import
+  `capability-mastery.ts`, whose indexed-access paths already fail
+  `noUncheckedIndexedAccess` (pre-existing, out of scope). The weights
+  mirror `EVIDENCE_WEIGHT` 1:1; parity is pinned by
+  `tests/adaptive-tutor.test.ts`.
+- `review/page.tsx` renders `buildRepairPlan` + `repairProgress` state
+  alongside (not instead of) `classifyMistake`; the never-closes-on-view
+  gate is unchanged.
+- Mobile nav: `AppShell.tsx` `grid-cols-5` → `grid-cols-6` for the six
+  primary items; pinned by a source-contract test and an e2e single-row
+  bounding-box assertion.
+
+### Status
+
+- [x] hint ladder UI + `hintTier` on submitted attempts
+- [x] hint-weighted application mastery + new test
+- [x] adaptive-step hint budgets (`?adaptiveStep=` → `hintBudget`)
+- [x] repair-plan/progress rendered on the review mistakes surface
+- [x] mobile nav one-row fix + unit + e2e regression tests
+
+### Verification log
+
+2026-09-07: `npm run verify` passed: lint, regular and strict
+TypeScript, curriculum validation/freshness, full vitest suite,
+production build, and client performance-budget checks.

@@ -68,6 +68,13 @@ test.describe("mobile core loop — Pixel 7", () => {
       await mobileNav(page).getByRole("link", { name: tab }).tap();
       await expect(page.locator("main#main")).toBeVisible({ timeout: 10_000 });
     }
+
+    // All six primary items stay on one row — no wrapping to a second line.
+    const rows = await mobileNav(page).getByRole("link").evaluateAll((links) =>
+      links.map((link) => Math.round(link.getBoundingClientRect().top)),
+    );
+    expect(rows).toHaveLength(6);
+    expect(new Set(rows).size).toBe(1);
   });
 
   test("no horizontal overflow at Pixel width after onboarding", async ({ page }) => {

@@ -46,6 +46,11 @@ function Practice() {
   const questionParam = params.get("question");
   const retestId = params.get("retest");
   const mode = params.get("mode") === "recall" ? "recall" : "practice";
+  // Adaptive ladder rungs arrive as ?adaptiveStep=supported|independent|transfer.
+  // Supported keeps the full hint ladder; the evidence rungs pass 0 so the
+  // attempt stays unaided and mastery counts it at full weight.
+  const adaptiveStep = params.get("adaptiveStep");
+  const adaptiveHintBudget = adaptiveStep === "independent" || adaptiveStep === "transfer" ? 0 : undefined;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "practice" ? store.revisionCheckpoint : null;
@@ -522,6 +527,7 @@ function Practice() {
             mode={mode}
             retestMistake={retestMistake}
             farTransfer={farTransferRetest}
+            hintBudget={adaptiveHintBudget}
             draft={questionDrafts[current.id]}
             onDraftChange={(draft) => setQuestionDrafts((previous) => ({ ...previous, [current.id]: draft }))}
             onFinished={(attempt) => {
