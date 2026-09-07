@@ -10,6 +10,7 @@ import { useShortcuts } from "@/components/shortcuts";
 import type { Card, Question, RecallGrade } from "@/domain/types";
 import { pickExamQuestionForCard } from "@/domain/card-question";
 import { classifyMistake } from "@/domain/mistake-classification";
+import { buildRepairPlan, repairProgress } from "@/domain/mistake-repair";
 import { useStore } from "@/state/store";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
@@ -146,6 +147,29 @@ function ReviewSession() {
     const part = question?.parts.find((p) => p.id === sourceMistake.partId) ?? question?.parts[0] ?? null;
     return classifyMistake({ mistake: sourceMistake, question, part, attempt });
   }, [current, mode, store.attempts, store.mistakes, store.questions]);
+
+  // The repair pipeline alongside the classification: targeted micro-practice
+  // and transfer items from the topic's own bank, plus the progress gate.
+  // It never closes on view — repairProgress.canClose needs a real retest.
+  const repairPlan = useMemo(() => {
+    if (mode !== "mistakes" || !current?.sourceMistakeId) return null;
+    const sourceMistake = store.mistakes.find((m) => m.id === current.sourceMistakeId);
+    if (!sourceMistake) return null;
+    const topicQuestions = store.questions.filter(
+      (q) => q.id !== sourceMistake.questionId && q.topicIds.includes(sourceMistake.topicId),
+    );
+    const ids = topicQuestions.map((q) => q.id);
+    // Micro-practice takes the first items; the transfer test draws from
+    // beyond them so it is a new context, falling back to the same pool
+    // when the bank is too small to partition.
+    const transferIds = ids.slice(2).length ? ids.slice(2) : ids;
+    return buildRepairPlan(sourceMistake, ids, transferIds);
+  }, [current, mode, store.mistakes, store.questions]);
+  const repairState = useMemo(() => {
+    if (mode !== "mistakes" || !current?.sourceMistakeId) return null;
+    const sourceMistake = store.mistakes.find((m) => m.id === current.sourceMistakeId);
+    return sourceMistake ? repairProgress(sourceMistake) : null;
+  }, [current, mode, store.mistakes]);
 
   useEffect(() => {
     if (!current) {
@@ -343,6 +367,22 @@ function ReviewSession() {
               <span className="text-ink3"> · {mistakeClass.confidence} confidence — </span>
               {mistakeClass.reasons.join(" ")}
             </p>
+            {repairPlan ? (
+              <>
+                <ol className="mt-2 space-y-1 text-xs text-ink2" aria-label="Repair plan">
+                  {repairPlan.steps.map((step) => (
+                    <li key={step.kind}>
+                      <span className="font-semibold text-ink">{step.label}:</span> {step.detail}
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-[11px] text-ink3">
+                  {repairState?.canClose
+                    ? "Retest passed — this repair can close."
+                    : repairPlan.closeCondition}
+                </p>
+              </>
+            ) : null}
           </div>
         ) : null}
 

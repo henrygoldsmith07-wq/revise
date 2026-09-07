@@ -1,3 +1,4 @@
+import { hintEvidenceMultiplier } from "./hint-tiers";
 import type { Attempt, Id, IsoInstant, Question, Topic } from "./types";
 
 export type ApplicationEvidence = "unmeasured" | "emerging" | "reliable";
@@ -49,12 +50,15 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
     if (!topicIds.length) continue;
     const share = 1 / topicIds.length;
     const question = questionById.get(attempt.questionId);
+    // Hint-assisted marks count at the hint tier's evidence weight, so
+    // hint-gaming cannot inflate application mastery.
+    const credit = hintEvidenceMultiplier(attempt.hintTier ?? null);
     for (const topicId of topicIds) {
       const row = byTopic.get(topicId) ?? { awarded: 0, max: 0, observations: [] };
-      row.awarded += attempt.awarded * share;
+      row.awarded += attempt.awarded * share * credit;
       row.max += attempt.max * share;
       row.observations.push({
-        awarded: attempt.awarded * share,
+        awarded: attempt.awarded * share * credit,
         max: attempt.max * share,
         createdAt: attempt.createdAt,
         difficulty: question?.difficulty ?? null,

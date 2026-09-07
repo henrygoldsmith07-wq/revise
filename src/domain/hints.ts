@@ -12,11 +12,9 @@
 // ---------------------------------------------------------------------------
 
 import type { Question } from "./types";
-import { EVIDENCE_WEIGHT, type EvidenceSource } from "./capability-mastery";
+import type { HintTier } from "./hint-tiers";
 
-/** Escalating support tiers, cheapest first. */
-export const HINT_TIERS = ["cue", "prompt", "scaffold", "worked-solution"] as const;
-export type HintTier = (typeof HINT_TIERS)[number];
+export { HINT_TIERS, hintEvidenceMultiplier, hintEvidenceSource, type HintTier } from "./hint-tiers";
 
 export interface Hint {
   tier: HintTier;
@@ -30,18 +28,6 @@ const TIER_LABELS: Record<HintTier, string> = {
   scaffold: "Scaffold",
   "worked-solution": "Worked solution",
 };
-
-/** Evidence weight for a success that needed this tier of support. */
-export function hintEvidenceSource(tier: HintTier | null): EvidenceSource {
-  if (tier === null) return "independent";
-  if (tier === "cue") return "assisted";
-  if (tier === "prompt") return "assisted";
-  return "viewed";
-}
-
-export function hintEvidenceMultiplier(tier: HintTier | null): number {
-  return EVIDENCE_WEIGHT[hintEvidenceSource(tier)];
-}
 
 /**
  * Build the hint ladder for a question from its own content. Every tier is

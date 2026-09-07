@@ -515,6 +515,8 @@ export interface Attempt {
   /** A high-scoring source answer or its completed delayed transfer check. */
   farTransfer?: FarTransferAttemptLink;
   confidence?: 1 | 2 | 3 | 4 | 5;
+  /** Highest hint tier used before submitting, from the adaptive hint ladder. */
+  hintTier?: "cue" | "prompt" | "scaffold" | "worked-solution";
   elapsedMs: number;
   mode: "practice" | "paper" | "recall";
   /** Optional provenance for attempts completed inside a paper sitting. */

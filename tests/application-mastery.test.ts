@@ -115,4 +115,20 @@ describe("application mastery", () => {
     expect(rows[1].marksAwarded).toBe(40);
     expect(rows[1].marksAvailable).toBe(50);
   });
+
+  it("counts hint-assisted marks at reduced evidence weight", () => {
+    const rows = computeApplicationMastery({
+      topics: [topic("a")],
+      questions: [question("q1", ["a"]), question("q2", ["a"])],
+      attempts: [
+        attempt("a1", "q1", ["a"], 10),
+        attempt("a2", "q2", ["a"], 10, "practice", { hintTier: "worked-solution" }),
+      ],
+    });
+    const row = rows.find((r) => r.topicId === "a");
+    // Independent 10 + worked-solution 10×0.15 over 20 available.
+    expect(row?.marksAwarded).toBeCloseTo(11.5, 5);
+    expect(row?.marksAvailable).toBe(20);
+    expect(row?.mastery).toBeCloseTo(0.575, 5);
+  });
 });
