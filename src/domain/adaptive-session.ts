@@ -23,8 +23,10 @@ import {
   type CapabilityState,
 } from "./capability-mastery";
 import { deriveCapabilityProfiles } from "./capability-source";
+import { readinessStopFor } from "./adaptive-stop";
 import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
+import type { ExamReadiness } from "./exam-readiness";
 import type {
   Attempt,
   Card,
@@ -66,6 +68,8 @@ export interface AdaptiveSessionStep {
   cardIds: Id[];
   questionIds: Id[];
   mistakeIds: Id[];
+  /** Why this block is in today's plan, in the student's language. */
+  why?: string;
 }
 
 /** Normalised signals used by the single topic optimiser. */
@@ -126,6 +130,8 @@ export interface AdaptiveSessionPlan {
   evidence: AdaptiveEvidence;
   steps: AdaptiveSessionStep[];
   startHref: string;
+  /** Set when readiness evidence already proves this topic — core rungs dropped. */
+  stoppedEarly?: { reason: string };
 }
 
 export interface AdaptiveSessionInput {
@@ -141,6 +147,8 @@ export interface AdaptiveSessionInput {
   /** Recall/application evidence powers the capability-aware sequence. */
   recallMastery?: RecallMasteryRow[];
   applicationMastery?: ApplicationMasteryRow[];
+  /** Exam-readiness rows for these subjects; a ready topic may stop early. */
+  readiness?: ExamReadiness[];
   /** Defaults to the product's 20-minute promise; direct callers may test 12–25. */
   targetMinutes?: number;
   now?: Date;
@@ -201,6 +209,7 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     recallMastery: input.recallMastery ?? [],
     applicationMastery: input.applicationMastery ?? [],
     attempts: input.attempts,
+    questions: input.questions,
   });
   const cardsByTopic = groupBy(input.cards, (card) => card.topicId);
   const logsByTopic = groupBy(input.reviewLogs, (log) => log.topicId);
@@ -253,7 +262,8 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   const mistakes = mistakesByTopic.get(topic.id) ?? [];
   const attempts = attemptsByTopic.get(topic.id) ?? [];
   const profile = profiles[topic.id] ?? emptyProfile();
-  const steps = buildSteps({ topic, selected, cards: cardsByTopic.get(topic.id) ?? [], questions, attempts, mistakes, profile, targetMinutes });
+  const stop = readinessStopFor(input.readiness ?? [], topic.subjectId);
+  const steps = buildSteps({ topic, selected, cards: cardsByTopic.get(topic.id) ?? [], questions, attempts, mistakes, profile, targetMinutes, stopTopicDone: stop.stop });
   const totalMinutes = steps.reduce((sum, step) => sum + step.minutes, 0);
   const startHref = `/adaptive-session?topic=${encodeURIComponent(topic.id)}&start=1`;
   const key = `${today}:${topic.id}`;
@@ -270,6 +280,7 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     evidence: selected.evidence,
     steps,
     startHref,
+    ...(stop.stop && stop.reason ? { stoppedEarly: { reason: stop.reason } } : {}),
   };
 }
 
@@ -397,10 +408,12 @@ interface StepInput {
   mistakes: Mistake[];
   profile: CapabilityProfile;
   targetMinutes: number;
+  /** True while this topic's readiness says the core loop may stop early. */
+  stopTopicDone: boolean;
 }
 
 function buildSteps(input: StepInput): AdaptiveSessionStep[] {
-  const { topic, selected, cards, questions, attempts, mistakes, profile, targetMinutes } = input;
+  const { topic, selected, cards, questions, attempts, mistakes, profile, targetMinutes, stopTopicDone } = input;
   const dueCardIds = selected.evidence.dueCardIds.slice(0, 3);
   const delayedCardIds = dueCardIds.length
     ? dueCardIds
@@ -450,8 +463,9 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       minutes: 2,
       label: `${count} ${selected.evidence.overdueCount ? "overdue" : "due"} retrieval${count === 1 ? "" : "s"}`,
       description: "Recall the answer before you reveal it; FSRS grades decide what returns next.",
-      href: `/review?topic=${encodeURIComponent(topic.id)}&limit=${dueCardIds.length}&from=adaptive`,
+      href: reviewHref(topic.id, `limit=${dueCardIds.length}`),
       cardIds: dueCardIds,
+      why: `${count} card${count === 1 ? " is" : "s are"} due — recall first so today's work builds on what is actually there.`,
     });
   }
 
@@ -463,8 +477,9 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       minutes: 2,
       label: "Repair the misconception",
       description: "Name the tempting wrong idea, then replace it with the examiner-safe explanation.",
-      href: `/review?mode=mistakes&topic=${encodeURIComponent(topic.id)}&limit=${mistakeIds.length}&from=adaptive`,
+      href: reviewHref(topic.id, `mode=mistakes&limit=${mistakeIds.length}`),
       mistakeIds,
+      why: `${mistakeIds.length} open misconception${mistakeIds.length === 1 ? "" : "s"} — the same lost mark returns unless the wrong idea is replaced.`,
     });
   }
 
@@ -476,7 +491,8 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       minutes: 2,
       label: "Explain the gap",
       description: "Write what you remember first, then open the short step-by-step explanation.",
-      href: `/lesson?subject=${encodeURIComponent(topic.subjectId)}&topic=${encodeURIComponent(topic.id)}&from=adaptive`,
+      href: `/lesson?subject=${encodeURIComponent(topic.subjectId)}&topic=${encodeURIComponent(topic.id)}&from=adaptive&return=${encodeURIComponent(`/adaptive-session?topic=${encodeURIComponent(topic.id)}&start=1&resume=1`)}`,
+      why: `Your ${selected.evidence.focus} evidence is ${selected.evidence.focusState} — teaching lands on the gap instead of a page of prose.`,
     });
   }
 
@@ -490,10 +506,11 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       description: "Use one prompt or hint if needed; the support fades before the next block.",
       href: practiceHref(topic.id, supported.id, "supported"),
       questionIds: [supported.id],
+      why: "Scaffolded attempt first — support that counts as weaker evidence, then fades.",
     });
   }
 
-  if (independent) {
+  if (independent && !stopTopicDone) {
     add({
       ...common,
       id: `${topic.id}:independent-application`,
@@ -503,10 +520,11 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       description: "Answer without notes or hints. This is the evidence rung, not a practice preview.",
       href: practiceHref(topic.id, independent.id, "independent"),
       questionIds: [independent.id],
+      why: "Unaided success is the only proof that counts — this rung carries full evidence weight.",
     });
   }
 
-  if (transfer) {
+  if (transfer && !stopTopicDone) {
     add({
       ...common,
       id: `${topic.id}:transfer`,
@@ -516,6 +534,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       description: "Apply the same idea in a new context, closer to what an exam will ask.",
       href: practiceHref(topic.id, transfer.id, "transfer"),
       questionIds: [transfer.id],
+      why: "Same idea, new clothing — transfer is what the exam actually tests.",
     });
   }
 
@@ -528,8 +547,9 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
     minutes: 2,
     label: "Schedule delayed retrieval",
     description: "Queue one short check for tomorrow so today's gain has to survive a delay.",
-    href: `/review?topic=${encodeURIComponent(topic.id)}&limit=1&from=adaptive`,
+    href: reviewHref(topic.id, `limit=1`),
     cardIds: delayedCardIds,
+    why: "Today's gain only counts if it survives a delay — this check proves it.",
   });
 
   fitToBudget(steps, targetMinutes);
@@ -575,7 +595,13 @@ function fitToBudget(steps: AdaptiveSessionStep[], target: number): void {
 }
 
 function practiceHref(topicId: Id, questionId: Id, step: string): string {
-  return `/practice?topic=${encodeURIComponent(topicId)}&question=${encodeURIComponent(questionId)}&adaptiveStep=${step}&from=adaptive`;
+  const back = `/adaptive-session?topic=${encodeURIComponent(topicId)}&start=1&resume=1`;
+  return `/practice?topic=${encodeURIComponent(topicId)}&question=${encodeURIComponent(questionId)}&adaptiveStep=${step}&from=adaptive&return=${encodeURIComponent(back)}`;
+}
+
+function reviewHref(topicId: Id, extra: string): string {
+  const back = `/adaptive-session?topic=${encodeURIComponent(topicId)}&start=1&resume=1`;
+  return `/review?topic=${encodeURIComponent(topicId)}&${extra}&from=adaptive&return=${encodeURIComponent(back)}`;
 }
 
 function reasonFor(candidate: AdaptiveTopicCandidate, topicTitle: string): string {

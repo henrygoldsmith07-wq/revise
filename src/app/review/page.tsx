@@ -44,6 +44,10 @@ function ReviewSession() {
   const topicId = params.get("topic");
   const mode = params.get("mode");
   const sessionId = params.get("session");
+  // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
+  // finishing here hands the student back to the same tutor step — the loop
+  // continues inside one flow instead of stranding them on a queue page.
+  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
   const limitParam = params.get("limit");
   const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : NaN;
   const limitOverride = Number.isFinite(parsedLimit) ? Math.min(50, Math.max(1, parsedLimit)) : null;
@@ -301,10 +305,16 @@ function ReviewSession() {
               {custom ? "Custom study" : mode === "mistakes" ? "Mistake repair" : "Spaced repetition"}
             </h1>
           </div>
-          <ButtonLink href="/" size="sm" variant="ghost">
-            End session
+          <ButtonLink href={returnHref ?? "/"} size="sm" variant="ghost">
+            {returnHref ? "Back to tutor" : "End session"}
           </ButtonLink>
         </div>
+
+      {returnHref ? (
+        <p className="text-[11px] text-ink3">
+          Opened from your adaptive session — grades here replan the next step automatically.
+        </p>
+      ) : null}
 
         <ProgressBar value={total ? done.reviewed / total : 0} label={`${done.reviewed} of ${total}`} />
 
@@ -320,6 +330,7 @@ function ReviewSession() {
         again={done.again}
         minutes={Math.max(1, Math.round(done.totalMs / 60_000))}
         sessionId={sessionId}
+        returnHref={returnHref}
       />
     );
   }
@@ -338,7 +349,7 @@ function ReviewSession() {
             {custom ? "Custom study" : mode === "mistakes" ? "Mistake repair" : "Spaced repetition"}
           </h1>
         </div>
-        <ButtonLink href="/" size="sm" variant="ghost">End session</ButtonLink>
+        <ButtonLink href={returnHref ?? "/"} size="sm" variant="ghost">{returnHref ? "Back to tutor" : "End session"}</ButtonLink>
       </div>
 
       {isPreview ? (
@@ -535,11 +546,13 @@ function SessionSummary({
   again,
   minutes,
   sessionId,
+  returnHref,
 }: {
   reviewed: number;
   again: number;
   minutes: number;
   sessionId: string | null;
+  returnHref: string | null;
 }) {
   const store = useStore();
   const logged = useRef(false);
@@ -559,7 +572,9 @@ function SessionSummary({
         title="Nothing due here"
         body="Spaced repetition deliberately leaves gaps — reviewing early wastes the effect. Pick another activity and come back when cards fall due."
         action={
-          <ButtonLink href="/" variant="primary">Back to today</ButtonLink>
+          returnHref
+            ? <ButtonLink href={returnHref} variant="primary">Back to the tutor step</ButtonLink>
+            : <ButtonLink href="/" variant="primary">Back to today</ButtonLink>
         }
       />
     );
@@ -576,7 +591,7 @@ function SessionSummary({
     <PostSessionClosure
       closure={closure}
       hint="Every card has been rescheduled by FSRS from how you graded it."
-      secondary={{ href: "/practice", label: "Practise questions" }}
+      secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise questions" }}
     />
   );
 }

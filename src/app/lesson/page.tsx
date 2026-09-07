@@ -35,6 +35,7 @@ function LessonBrowser() {
     [subjects],
   );
   const topicParam = params.get("topic");
+  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
 
   // Land the student where they left off: an explicit ?subject= link wins,
   // then the subject they last studied (synced through settings, so it
@@ -92,6 +93,11 @@ function LessonBrowser() {
 
       {subjectId ? (
         <>
+          {returnHref ? (
+            <p className="text-[11px] text-ink3">
+              Opened from your adaptive session — <a className="underline hover:text-ink" href={returnHref}>back to the tutor step</a> when the gap is filled.
+            </p>
+          ) : null}
           <LessonMode
             key={`${subjectId}:${initialTopicId ?? ""}`}
             topics={topics}

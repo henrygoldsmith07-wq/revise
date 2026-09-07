@@ -95,6 +95,7 @@ export function QuestionRunner({
     confidence: number | null;
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
+    nextAction: { label: string; href: null; why: string };
   } | null>(null);
   // Stamped after mount: reading the clock during render makes the render
   // impure and would restart the timer on every re-render.
@@ -216,6 +217,8 @@ export function QuestionRunner({
       confidence: source === "ai" ? markConfidence : rubricConf,
     });
     const markEscalation = createMarkEscalationRecord(escalationDecision, createdAt);
+    const awarded = marked.reduce((a, m) => a + m.awarded, 0);
+    const max = marked.reduce((a, m) => a + m.max, 0);
     const attempt: Attempt = {
       id: attemptId,
       userId: store.userId,
@@ -224,8 +227,8 @@ export function QuestionRunner({
       topicIds: question.topicIds,
       answers: submittedAnswers,
       marked,
-      awarded: marked.reduce((a, m) => a + m.awarded, 0),
-      max: marked.reduce((a, m) => a + m.max, 0),
+      awarded,
+      max,
       feedback,
       markedBy,
       markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
@@ -255,6 +258,43 @@ export function QuestionRunner({
     const persistedAttempt = farTransferLink ? { ...attempt, farTransfer: farTransferLink } : attempt;
 
     await store.recordAttempt(persistedAttempt, question);
+    // The score heading above answers "what did this attempt teach us": an
+    // independent full-mark answer is mastery evidence at full weight, while
+    // hint-supported or partial answers say which capability still needs work.
+    // The next action stays inside this flow — micro-practice, an unaided
+    // retry, or a transfer check — never a redirect to another page.
+    const supportUsed = usedTiers.length > 0;
+    const retestOpen = Boolean(retestMistake && retest?.status !== "resolved");
+    const nextAction: { label: string; href: null; why: string } =
+      awarded < max
+        ? {
+            label: "Micro-practice the missed point",
+            href: null,
+            why: `You dropped ${max - awarded} of ${max} marks here — two targeted items on exactly this point, then an unaided retry.`,
+          }
+        : supportUsed
+          ? {
+              label: "Retry unaided for full evidence",
+              href: null,
+              why: "Full marks with support count at reduced weight — one clean unaided answer proves the capability.",
+            }
+          : question.difficulty < 4
+            ? {
+                label: "Prove it in a new context",
+                href: null,
+                why: "Independent success on familiar ground — transfer to unfamiliar clothing is the exam test.",
+              }
+            : retestOpen
+              ? {
+                  label: "Close the open mistake",
+                  href: null,
+                  why: "The retest is still open — the missed point needs one more earned pass before it closes.",
+                }
+              : {
+                  label: "Bank it — next best action",
+                  href: null,
+                  why: "Strong unaided evidence. The tutor loop moves on to the next weakest capability.",
+                };
     // A rubric fallback grade (the AI never ran, or the provider failed) gets a
     // second chance: queue the persisted attempt for an AI re-grade. The drain
     // pass retries with exponential backoff + jitter and upgrades this attempt
@@ -274,6 +314,7 @@ export function QuestionRunner({
       escalation: escalationDecision.escalate ? escalationDecision : undefined,
       farTransfer: persistedAttempt.farTransfer,
       withheld,
+      nextAction,
     });
     return persistedAttempt;
   }
@@ -455,6 +496,7 @@ function MarkedResult({
     confidence: number | null;
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
+    nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
   answers: Record<string, string>;
@@ -700,6 +742,11 @@ function MarkedResult({
 
       <div className="mt-4 pt-4 border-t border-line space-y-3">
         <RichText className="text-sm">{result.feedback}</RichText>
+        <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
+          <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
+          <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
+        </div>
         {/* Ask: what did this one attempt teach us? */}
         {result.marked.some((m) => m.missedPoints.length) ? (
           <div className="flex flex-wrap gap-1.5">

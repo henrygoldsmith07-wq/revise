@@ -970,24 +970,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   // Unlike `recommendations`, this is not a list of competing activity
   // queues. It is one optimiser pass over the same snapshot, then one
   // sequence for the winning topic. Today and /adaptive-session consume this
-  // exact value so the hero cannot drift from the route it opens.
-  const adaptiveSession = useMemo(() => {
-    if (!snapshot) return null;
-    return buildAdaptiveSession({
-      topics,
-      cards: snapshot.cards,
-      reviewLogs: snapshot.reviewLogs,
-      questions: snapshot.questions,
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
-      mastery,
-      exams: snapshot.examDates,
-      subjectIds,
-      recallMastery,
-      applicationMastery,
-      targetMinutes: 20,
-    });
-  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery]);
+  // exact value so the hero cannot drift from the route it opens. The memo
+  // body lives after `examReadiness` (readiness gates adaptive stopping);
+  // this binding keeps the return shape stable for consumers above it.
 
   // Experiment arm enforcement: baseline arms see their assigned policy,
   // not the production recommender. Control sees no recommendation.
@@ -1083,6 +1068,31 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   }, [snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
 
   const examReadinessSummary = useMemo(() => summariseExamReadiness(examReadiness), [examReadiness]);
+
+  // Unlike `recommendations`, this is not a list of competing activity
+  // queues. It is one optimiser pass over the same snapshot, then one
+  // sequence for the winning topic. Today and /adaptive-session consume this
+  // exact value so the hero cannot drift from the route it opens. Declared
+  // after `examReadiness`: readiness gates adaptive stopping, so the
+  // optimiser reads the computed rows rather than preceding them.
+  const adaptiveSession = useMemo(() => {
+    if (!snapshot) return null;
+    return buildAdaptiveSession({
+      topics,
+      cards: snapshot.cards,
+      reviewLogs: snapshot.reviewLogs,
+      questions: snapshot.questions,
+      attempts: snapshot.attempts,
+      mistakes: snapshot.mistakes,
+      mastery,
+      exams: snapshot.examDates,
+      subjectIds,
+      recallMastery,
+      applicationMastery,
+      readiness: examReadiness,
+      targetMinutes: 20,
+    });
+  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery, examReadiness]);
   // Close the grade loop: snapshot predictions weekly so later mocks can be
   // paired against what Revise believed at the time - not retro-fitted.
   useEffect(() => {

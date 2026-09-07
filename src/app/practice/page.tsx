@@ -51,6 +51,10 @@ function Practice() {
   // attempt stays unaided and mastery counts it at full weight.
   const adaptiveStep = params.get("adaptiveStep");
   const adaptiveHintBudget = adaptiveStep === "independent" || adaptiveStep === "transfer" ? 0 : undefined;
+  // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
+  // marking here replans the runner's next step and hands the student back
+  // to it — one tutor flow, not a redirect between pages.
+  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "practice" ? store.revisionCheckpoint : null;
@@ -259,7 +263,7 @@ function Practice() {
       <PostSessionClosure
         closure={closure}
         hint="Your answers are recorded and dropped marks are available in the mistake queue."
-        secondary={{ href: "/practice", label: "Practise another topic" }}
+        secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise another topic" }}
       />
     );
   }
@@ -542,10 +546,15 @@ function Practice() {
               });
             }}
           />
-          {retestMistake ? (
+          {retestMistake && !returnHref ? (
             <ButtonLink href="/" variant="primary" className="inline-block">
               Back to Today
             </ButtonLink>
+          ) : null}
+          {returnHref ? (
+            <p className="text-[11px] text-ink3">
+              Opened from your adaptive session — this mark replans the next step automatically.
+            </p>
           ) : null}
         </>
       ) : (

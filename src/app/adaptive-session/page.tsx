@@ -47,6 +47,7 @@ function AdaptiveSession() {
       subjectIds: store.settings.subjectIds,
       recallMastery: store.recallMastery,
       applicationMastery: store.applicationMastery,
+      readiness: store.examReadiness,
       targetMinutes: 20,
       topicId: requestedTopicId ?? checkpointTopicId,
     });
@@ -64,17 +65,18 @@ function AdaptiveSession() {
     store.settings.subjectIds,
     store.recallMastery,
     store.applicationMastery,
+    store.examReadiness,
     checkpointTopicId,
     topics,
   ]);
 
-  // Once the runner starts, keep the chosen ladder stable for its lifetime.
-  // Review/practice completion changes the underlying evidence (and therefore
-  // Today’s next plan), but it must not make the current step disappear or
-  // reorder underneath a student who is returning to this same session.
+  // The runner holds the topic but replans the ladder after every answer:
+  // grading or marking records new evidence in the store, and the memo below
+  // rebuilds the steps from it, so the next rung always reflects what the
+  // student just proved. Completed steps stay completable: replanning only
+  // ever reorders the steps at or after the current position, never behind
+  // it, so work already done is never lost or re-asked.
   const [frozenPlan] = useState<AdaptiveSessionPlan | null>(() => computedPlan);
-  const plan = frozenPlan ?? computedPlan;
-
   const checkpoint =
     store.revisionCheckpoint?.activity === "adaptive" &&
     (!requestedTopicId || store.revisionCheckpoint.href.includes(encodeURIComponent(requestedTopicId)))
@@ -84,11 +86,25 @@ function AdaptiveSession() {
   // A persisted checkpoint can outlive a curriculum/evidence change that
   // shortens the regenerated ladder. Keep the student inside the current
   // plan rather than rendering an empty step and silently resetting it.
-  const initialPosition =
-    plan && requestedPosition >= 0
-      ? Math.min(requestedPosition, Math.max(0, plan.steps.length - 1))
-      : requestedPosition;
+  const initialPosition = (() => {
+    const target = frozenPlan ?? computedPlan;
+    if (!target || requestedPosition < 0) return requestedPosition;
+    return Math.min(requestedPosition, Math.max(0, target.steps.length - 1));
+  })();
   const [stepIndex, setStepIndex] = useState(initialPosition);
+  const plan = useMemo(() => {
+    const base = frozenPlan ?? computedPlan;
+    if (!base || stepIndex < 0) return base;
+    const doneIds = new Set(base.steps.slice(0, stepIndex).map((s) => s.id));
+    const upcoming = computedPlan && computedPlan.topicId === base.topicId
+      ? computedPlan.steps.filter((s) => !doneIds.has(s.id))
+      : base.steps.slice(stepIndex);
+    if (!upcoming.length) return base;
+    const kept = base.steps.slice(0, stepIndex);
+    const totalMinutes = kept.reduce((sum, s) => sum + s.minutes, 0) +
+      upcoming.reduce((sum, s) => sum + s.minutes, 0);
+    return { ...base, steps: [...kept, ...upcoming], totalMinutes };
+  }, [frozenPlan, computedPlan, stepIndex]);
   const [finished, setFinished] = useState(false);
   const [recallDraft, setRecallDraft] = useState("");
   const [recallRevealed, setRecallRevealed] = useState(false);
@@ -144,6 +160,11 @@ function AdaptiveSession() {
           </h1>
           <p className="text-lg text-ink mt-2">{subject?.name ?? plan.subjectId} — {plan.topicTitle}</p>
           <p className="text-sm text-ink3 mt-1">{plan.reason}</p>
+          {plan.stoppedEarly ? (
+            <p className="mt-2 rounded-[8px] border border-line bg-surface2 px-3 py-2 text-xs text-ink2" role="note">
+              <span className="font-semibold text-ink">Stopping early: </span>{plan.stoppedEarly.reason}
+            </p>
+          ) : null}
         </header>
 
         <PlanOutline plan={plan} />
@@ -185,6 +206,12 @@ function AdaptiveSession() {
       </div>
 
       <ProgressBar value={(stepIndex + 1) / plan.steps.length} label={`Step ${stepIndex + 1} of ${plan.steps.length}`} />
+
+      {step.why ? (
+        <p className="rounded-[8px] border border-line bg-surface2 px-3 py-2 text-xs text-ink2" role="note">
+          <span className="font-semibold text-ink">Why this step: </span>{step.why}
+        </p>
+      ) : null}
 
       <AdaptiveStepPanel
         step={step}
@@ -235,6 +262,7 @@ function PlanOutline({ plan }: { plan: AdaptiveSessionPlan }) {
             <div className="min-w-0">
               <p className="text-sm font-medium text-ink">{step.label}</p>
               <p className="text-xs text-ink3 mt-0.5">{step.description}</p>
+              {step.why ? <p className="text-[11px] text-ink2 mt-0.5">{step.why}</p> : null}
             </div>
           </li>
         ))}
