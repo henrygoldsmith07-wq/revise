@@ -93,7 +93,18 @@ export async function completeOnboarding(
  * on it is deterministic rather than a timing guess.
  */
 export async function serviceWorkerReady(page: Page, timeoutMs = 30_000): Promise<void> {
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), undefined, {
-    timeout: timeoutMs,
-  });
+  // Readiness = a registered worker with an active install, not a
+  // `controller`. A controller only attaches on the navigation *after*
+  // registration, so waiting on it before the specs' warm reload can never
+  // settle on a fresh profile — the exact 30s timeout failing in CI. The
+  // worker precaches the shell at install, so an active registration means
+  // the follow-up reload is servable offline.
+  await page.waitForFunction(async () => {
+    try {
+      const regs = await navigator.serviceWorker?.getRegistrations() ?? [];
+      return regs.some((r) => Boolean(r.active));
+    } catch {
+      return false;
+    }
+  }, undefined, { timeout: timeoutMs });
 }

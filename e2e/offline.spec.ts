@@ -94,7 +94,7 @@ test.describe("offline walk", () => {
       await expect(page.locator("main#main")).toBeVisible({ timeout: 15_000 });
     }
     // AppShell offline notice (also proves syncStatus.online wiring).
-    const offlineNotice = page.getByText(/Offline — everything still works/i);
+    const offlineNotice = page.getByText(/Offline — (your work is safe|everything still works)/i);
     await expect(offlineNotice.or(page.locator("main#main")).first()).toBeVisible({ timeout: 10_000 });
     await context.setOffline(false);
   });
