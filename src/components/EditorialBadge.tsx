@@ -8,12 +8,17 @@ export function EditorialBadge({
   verification,
   origin,
   reviewer,
+  contentTier,
 }: {
   source?: string | null;
   verification?: string | null;
   origin?: string | null;
   reviewer?: string | null;
+  contentTier?: string | null;
 }) {
+  if (contentTier === "reference") {
+    return <Pill tone="review">Reference · not spec-checked</Pill>;
+  }
   if (verification === "verified") {
     return (
       <Pill tone="success">

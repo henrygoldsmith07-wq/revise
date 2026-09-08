@@ -17,7 +17,8 @@ describe("AQA GCSE practical question bank", () => {
       const questions = aqaGcsePracticalQuestions.filter((question) => question.subjectId === subjectId);
       expect(questions, `${subjectId} should have four practical questions`).toHaveLength(4);
       expect(new Set(questions.flatMap((question) => question.topicIds)).size).toBe(4);
-      expect(seedQuestionsForSubject(subjectId)).toEqual(expect.arrayContaining(questions));
+      const seededIds = new Set(seedQuestionsForSubject(subjectId).map((question) => question.id));
+      expect(questions.every((question) => seededIds.has(question.id))).toBe(true);
     }
   });
 

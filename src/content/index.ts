@@ -1,4 +1,5 @@
 import type { Id, Misconception, Question } from "@/domain/types";
+import { honestQuestion } from "@/domain/curriculum/honesty";
 import { biologyQuestions } from "./questions/biology";
 import { biologyAqaQuestions } from "./questions/biology-aqa";
 import { biologyAqaExtraQuestions } from "./questions/biology-aqa-extra";
@@ -70,7 +71,7 @@ export const seedQuestions: Question[] = [
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
   ...wjecRepairDepthQuestions,
-];
+].map(honestQuestion);
 
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
 export { gcseExpansionQuestions };

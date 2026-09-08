@@ -54,8 +54,10 @@ export function classifyDepth(question: Question): DepthCategory {
   for (const part of question.parts) {
     for (const ao of part.aos ?? []) aoWeights[ao] = (aoWeights[ao] ?? 0) + 1;
   }
-  if (aoWeights.AO3 > 0 && aoWeights.AO3 >= (aoWeights.AO2 ?? 0)) return "transfer";
-  if (question.totalMarks >= 3 || aoWeights.AO2 > 0) return "application";
+  const ao3 = aoWeights.AO3 ?? 0;
+  const ao2 = aoWeights.AO2 ?? 0;
+  if (ao3 > 0 && ao3 >= ao2) return "transfer";
+  if (question.totalMarks >= 3 || ao2 > 0) return "application";
   return "recall";
 }
 

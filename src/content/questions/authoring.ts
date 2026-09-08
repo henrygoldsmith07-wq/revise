@@ -55,7 +55,9 @@ export function defineQuestion(spec: QuestionSpec): Question {
     modelAnswer: part.answer,
     aos: part.aos,
     specPointIds: (part as { specPointIds?: string[] }).specPointIds,
-    learningClaims: (part as { learningClaims?: string[] }).learningClaims,
+    learningClaims: part.learningClaims?.length
+      ? part.learningClaims
+      : [part.prompt.replace(/^\([a-z]\)\s*/i, "").replace(/\.+$/, "").trim()].filter(Boolean),
     ...(part.capabilityIds ? { capabilityIds: part.capabilityIds } : {}),
     ...(part.calculationRules ? { calculationRules: part.calculationRules } : {}),
   }));

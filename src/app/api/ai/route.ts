@@ -1,3 +1,5 @@
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { providerStatus } from "@/ai/provider";
 import * as tasks from "@/ai/tasks";
@@ -15,12 +17,42 @@ import { captureServerTelemetry } from "@/lib/observability";
 export const runtime = "nodejs";
 
 const LIMIT = { ratePerMinute: 20, burst: 10 };
+const MAX_BODY_CHARS = 1_500_000;
+const MAX_OCR_CHARS = 1_200_000;
+
+async function requireAiUser(): Promise<NextResponse | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) return null;
+
+  const cookieStore = await cookies();
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll: () => cookieStore.getAll(),
+      setAll: (items) => {
+        try {
+          for (const item of items) cookieStore.set(item.name, item.value, item.options);
+        } catch {
+          // A read-only cookie store is still sufficient to authenticate.
+        }
+      },
+    },
+  });
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) {
+    return NextResponse.json({ error: "Sign in to use AI features." }, { status: 401 });
+  }
+  return null;
+}
 
 export async function GET() {
   return NextResponse.json(providerStatus());
 }
 
 export async function POST(request: Request) {
+  const unauth = await requireAiUser();
+  if (unauth) return unauth;
+
   const limit = rateLimit(clientKey(request), LIMIT);
   if (!limit.ok) {
     return NextResponse.json(
@@ -29,9 +61,19 @@ export async function POST(request: Request) {
     );
   }
 
+  let raw: string;
+  try {
+    raw = await request.text();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  if (raw.length > MAX_BODY_CHARS) {
+    return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
+  }
+
   let body: { task?: string; payload?: unknown };
   try {
-    body = await request.json();
+    body = JSON.parse(raw) as { task?: string; payload?: unknown };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -47,6 +89,13 @@ export async function POST(request: Request) {
       { error: `Invalid payload: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}` },
       { status: 400 },
     );
+  }
+
+  if (task === "ocr") {
+    const image = (parsed.data as { image?: string }).image ?? "";
+    if (image.length > MAX_OCR_CHARS) {
+      return NextResponse.json({ error: "Image payload is too large." }, { status: 413 });
+    }
   }
 
   try {

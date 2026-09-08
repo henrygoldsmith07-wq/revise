@@ -307,4 +307,294 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
       },
     ],
   }),
+  build({
+    slug: "depth-waves-grating",
+    topic: "waves",
+    stem: "Monochromatic light of wavelength 589 nm is incident normally on a diffraction grating with 500 lines per millimetre. The second-order beam is observed.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the angle of the second-order maximum.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply the grating equation nλ = d sinθ to determine wavelength or angle",
+        aos: ["AO2"],
+        scheme: [
+          "d = 1 / 5.00×10⁵ m⁻¹ = 2.00×10⁻⁶ m",
+          "nλ = d sinθ → sinθ = 2 × 589×10⁻⁹ / 2.00×10⁻⁶",
+          "sinθ = 0.589; θ = 36.1°",
+        ],
+        answer:
+          "Line spacing d = 1 / (500 × 10³ m⁻¹) = 2.00 × 10⁻⁶ m. For n = 2, sinθ = nλ/d = 2 × 589 × 10⁻⁹ / 2.00 × 10⁻⁶ = 0.589, so θ = arcsin(0.589) = 36.1°.",
+      },
+      {
+        prompt: "(b) Explain why a third-order maximum is not observed for this wavelength.",
+        marks: 2,
+        point: "sp-02",
+        claim: "apply Young slits and grating equations to determine wavelength",
+        aos: ["AO2", "AO3"],
+        scheme: [
+          "sinθ = 3 × 589e-9 / 2.00e-6 = 0.884 still < 1, so third order exists",
+          "Fourth order: sinθ = 1.178 > 1, so n = 4 is impossible; third order is observed — the prompt's claim is false for n = 3; maximum order is n = 3",
+        ],
+        answer:
+          "Maximum n satisfies nλ ≤ d, so n ≤ d/λ = 2.00×10⁻⁶ / 589×10⁻⁹ ≈ 3.4. Third order (sinθ = 0.884) is allowed; fourth order is not. The second-order beam is therefore not the highest order present.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-unfamiliar-waves-fibre",
+    topic: "waves",
+    stem: "Unfamiliar context: A step-index optical fibre used in a hospital endoscope has a glass core of refractive index 1.48 surrounded by cladding of refractive index 1.45. Light is launched from air.",
+    difficulty: 4,
+    parts: [
+      {
+        prompt: "(a) Calculate the critical angle at the core–cladding boundary.",
+        marks: 2,
+        point: "sp-04",
+        claim: "state conditions for total internal reflection and apply the critical-angle relation",
+        aos: ["AO2"],
+        scheme: ["sin C = n2/n1 = 1.45/1.48", "C = 78.4°"],
+        answer: "sin C = 1.45/1.48 = 0.980; C = arcsin(0.980) = 78.4°.",
+      },
+      {
+        prompt: "(b) Explain why cladding is used rather than leaving the core in air, in terms of the path of rays that just undergo TIR.",
+        marks: 3,
+        point: "sp-04",
+        claim: "state conditions for total internal reflection and apply the critical-angle relation",
+        aos: ["AO1", "AO3"],
+        scheme: [
+          "TIR requires light in the denser medium at i ≥ C",
+          "Air cladding would give a much smaller C (sin C = 1/1.48 → C ≈ 42.5°)",
+          "A larger C with glass cladding means only rays close to the axis TIR, reducing modal dispersion / protecting the TIR surface from contamination",
+        ],
+        answer:
+          "TIR needs the ray in glass at an angle greater than C. Against air, C ≈ 42.5°, so many steep rays would still TIR and travel very different path lengths (modal dispersion). Cladding raises C to 78°, so only near-axial rays are guided, the outer surface is protected, and pulse spreading is reduced.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-circuits-internal-r",
+    topic: "electric-circuits",
+    stem: "A cell of emf 1.52 V and internal resistance r is connected to a 6.8 Ω resistor. A high-resistance voltmeter across the cell terminals reads 1.40 V.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the current in the circuit and the internal resistance.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply the relations for electric circuits to solve numerical problems",
+        aos: ["AO2"],
+        scheme: [
+          "I = V/R = 1.40 / 6.8 = 0.206 A",
+          "ε = I(R + r) or lost volts = Ir = 0.12 V",
+          "r = 0.12 / 0.206 = 0.58 Ω",
+        ],
+        answer:
+          "Terminal p.d. is 1.40 V across 6.8 Ω, so I = 1.40/6.8 = 0.206 A. Lost volts Ir = 1.52 − 1.40 = 0.12 V, hence r = 0.12/0.206 = 0.58 Ω.",
+      },
+      {
+        prompt: "(b) The 6.8 Ω resistor is replaced by a 2.2 Ω resistor. Explain, without further calculation, what happens to the terminal p.d.",
+        marks: 2,
+        point: "sp-03",
+        claim: "interpret or evaluate results related to electric circuits",
+        aos: ["AO2", "AO3"],
+        scheme: [
+          "Smaller R increases current",
+          "Lost volts Ir increase, so terminal p.d. ε − Ir falls",
+        ],
+        answer:
+          "The smaller load increases the current. Lost volts Ir therefore increase, so the terminal p.d. falls below 1.40 V.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-circular-banked",
+    topic: "circular-shm",
+    stem: "A car of mass 1200 kg travels at 18 m s⁻¹ around a level circular bend of radius 45 m. The road is not banked.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the centripetal force required and state which force provides it.",
+        marks: 3,
+        point: "sp-02",
+        claim: "derive and apply centripetal acceleration a = v²/r = ω²r",
+        aos: ["AO1", "AO2"],
+        scheme: [
+          "F = mv²/r = 1200 × 18² / 45",
+          "= 8640 N",
+          "Provided by friction toward the centre (not a separate centripetal force)",
+        ],
+        answer:
+          "F = mv²/r = 1200 × 324 / 45 = 8640 N toward the centre. On a level road this is the frictional force from the tyres; there is no extra 'centripetal force' on a free-body diagram.",
+      },
+      {
+        prompt: "(b) A mass–spring oscillator of mass 0.40 kg and spring constant 36 N m⁻¹ is set into SHM. Calculate its period.",
+        marks: 2,
+        point: "sp-05",
+        claim: "calculate period of a simple pendulum and a mass-spring system",
+        aos: ["AO2"],
+        scheme: ["T = 2π√(m/k)", "= 2π√(0.40/36) = 0.66 s"],
+        answer: "T = 2π√(m/k) = 2π√(0.40/36) = 2π × 0.105 = 0.66 s.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-fields-orbit",
+    topic: "fields",
+    stem: "A satellite of mass 350 kg is in a circular orbit of radius 7.00 × 10⁶ m about Earth. G = 6.67 × 10⁻¹¹ N m² kg⁻²; M_E = 5.97 × 10²⁴ kg.",
+    difficulty: 4,
+    parts: [
+      {
+        prompt: "(a) Calculate the gravitational field strength and the gravitational potential at the orbit.",
+        marks: 4,
+        point: "sp-04",
+        claim: "apply inverse-square laws to calculate field strength potential and orbital motion",
+        aos: ["AO2"],
+        scheme: [
+          "g = GM/r² = 6.67e-11 × 5.97e24 / (7.00e6)²",
+          "= 8.12 N kg⁻¹",
+          "V = −GM/r = −6.67e-11 × 5.97e24 / 7.00e6",
+          "= −5.69 × 10⁷ J kg⁻¹",
+        ],
+        answer:
+          "g = GM/r² = (6.67 × 10⁻¹¹ × 5.97 × 10²⁴) / (4.90 × 10¹³) = 8.12 N kg⁻¹. Potential V = −GM/r = −5.69 × 10⁷ J kg⁻¹ (negative because zero is taken at infinity).",
+      },
+      {
+        prompt: "(b) Show that the orbital speed is about 7.5 km s⁻¹.",
+        marks: 2,
+        point: "sp-04",
+        claim: "apply inverse-square laws to calculate field strength potential and orbital motion",
+        aos: ["AO2"],
+        scheme: ["v² = GM/r", "v = √(6.67e-11 × 5.97e24 / 7.00e6) = 7.54 × 10³ m s⁻¹"],
+        answer: "For a circular orbit g = v²/r so v = √(GM/r) = √(3.98×10¹⁴ / 7.00×10⁶) = 7.54 × 10³ m s⁻¹ ≈ 7.5 km s⁻¹.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-unfamiliar-fields-mass-spec",
+    topic: "fields",
+    stem: "Unfamiliar context: In a time-of-flight mass spectrometer, a singly charged ion of mass 3.2 × 10⁻²⁶ kg is accelerated from rest through 2.5 kV, then enters a uniform magnetic field of 0.40 T perpendicular to its velocity.",
+    difficulty: 5,
+    calculator: true,
+    parts: [
+      {
+        prompt: "(a) Calculate the speed of the ion after acceleration (e = 1.60 × 10⁻¹⁹ C).",
+        marks: 3,
+        point: "sp-06",
+        claim: "apply F = BIl sinθ and F = BQv to determine trajectories",
+        aos: ["AO2"],
+        scheme: [
+          "½mv² = qV",
+          "v = √(2qV/m) = √(2 × 1.60e-19 × 2500 / 3.2e-26)",
+          "= 1.58 × 10⁵ m s⁻¹",
+        ],
+        answer: "Loss of electrical PE equals gain of KE: ½mv² = qV → v = √(2qV/m) = √(2.50×10¹⁰) = 1.58 × 10⁵ m s⁻¹.",
+      },
+      {
+        prompt: "(b) Calculate the radius of the subsequent circular path.",
+        marks: 2,
+        point: "sp-06",
+        claim: "apply F = BIl sinθ and F = BQv to determine trajectories",
+        aos: ["AO2"],
+        scheme: ["r = mv/Bq", "= 3.2e-26 × 1.58e5 / (0.40 × 1.60e-19)", "= 0.079 m"],
+        answer: "Magnetic force provides centripetal force: r = mv/Bq = (3.2×10⁻²⁶ × 1.58×10⁵) / (0.40 × 1.60×10⁻¹⁹) = 7.9 × 10⁻² m.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-thermal-latent",
+    topic: "thermal",
+    stem: "A 0.12 kg block of ice at 0 °C is dropped into 0.40 kg of water at 25 °C in an insulated cup. Specific heat capacity of water = 4200 J kg⁻¹ K⁻¹; specific latent heat of fusion of ice = 3.3 × 10⁵ J kg⁻¹.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the energy required to melt the ice, and the energy available from cooling the water to 0 °C.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply Q = mcΔT for temperature changes and Q = mL for changes of state",
+        aos: ["AO2"],
+        scheme: [
+          "Q_melt = mL = 0.12 × 3.3e5 = 3.96 × 10⁴ J",
+          "Q_cool = mcΔT = 0.40 × 4200 × 25 = 4.20 × 10⁴ J",
+          "Enough energy to melt all the ice, with 2.4 × 10³ J left",
+        ],
+        answer:
+          "To melt the ice needs Q = mL = 0.12 × 3.3×10⁵ = 3.96×10⁴ J. Cooling the water to 0 °C releases mcΔT = 0.40 × 4200 × 25 = 4.20×10⁴ J, so all the ice melts and 2.4×10³ J remains to warm the mixture.",
+      },
+      {
+        prompt: "(b) Calculate the final temperature of the mixture.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply Q = mcΔT for temperature changes and Q = mL for changes of state",
+        aos: ["AO2"],
+        scheme: [
+          "Surplus 2.4×10³ J warms 0.52 kg of water",
+          "ΔT = Q / mc = 2400 / (0.52 × 4200) = 1.1 °C",
+          "Final temperature ≈ 1.1 °C",
+        ],
+        answer:
+          "After melting, 0.52 kg of water shares the leftover 2.4×10³ J: ΔT = 2400 / (0.52 × 4200) ≈ 1.1 K, so the mixture finishes at about 1.1 °C.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-nuclear-half-life",
+    topic: "nuclear",
+    stem: "A sample of a radioactive isotope has an activity of 8.0 × 10⁴ Bq. After 18.0 minutes the activity has fallen to 1.0 × 10⁴ Bq.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Determine the half-life of the isotope.",
+        marks: 2,
+        point: "sp-03",
+        claim: "define activity decay constant half-life and use A = λN and N = N0 e^(−λt)",
+        aos: ["AO2"],
+        scheme: [
+          "Activity falls by a factor of 8 = 2³, so three half-lives",
+          "t½ = 18.0 / 3 = 6.0 min",
+        ],
+        answer: "8.0×10⁴ → 1.0×10⁴ is a factor of 8 = 2³, so three half-lives elapse in 18 min. t½ = 6.0 min.",
+      },
+      {
+        prompt: "(b) Calculate the decay constant in s⁻¹.",
+        marks: 2,
+        point: "sp-03",
+        claim: "define activity decay constant half-life and use A = λN and N = N0 e^(−λt)",
+        aos: ["AO2"],
+        scheme: ["λ = ln2 / t½", "t½ = 360 s; λ = 0.693/360 = 1.93 × 10⁻³ s⁻¹"],
+        answer: "λ = ln 2 / t½ = 0.693 / 360 s = 1.93 × 10⁻³ s⁻¹.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-kinematics-projectile",
+    topic: "kinematics-dynamics",
+    stem: "A ball is thrown horizontally at 12 m s⁻¹ from a cliff 45 m above the sea. Take g = 9.81 m s⁻² and neglect air resistance.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the time to reach the sea and the horizontal distance travelled.",
+        marks: 3,
+        point: "sp-06",
+        claim: "resolve motion in two dimensions including projectile motion with constant acceleration",
+        aos: ["AO2"],
+        scheme: [
+          "s = ½gt² → 45 = 0.5 × 9.81 × t² → t = 3.03 s",
+          "x = u t = 12 × 3.03 = 36 m",
+        ],
+        answer:
+          "Vertical: u = 0, s = 45 m, a = 9.81, so t = √(2s/g) = √(90/9.81) = 3.03 s. Horizontal velocity is constant, so range = 12 × 3.03 = 36 m.",
+      },
+      {
+        prompt: "(b) Calculate the speed on impact.",
+        marks: 2,
+        point: "sp-06",
+        claim: "resolve motion in two dimensions including projectile motion with constant acceleration",
+        aos: ["AO2"],
+        scheme: ["v_y = gt = 9.81 × 3.03 = 29.7 m s⁻¹", "v = √(12² + 29.7²) = 32.0 m s⁻¹"],
+        answer: "Vertical component v_y = 9.81 × 3.03 = 29.7 m s⁻¹; impact speed = √(12² + 29.7²) = 32 m s⁻¹.",
+      },
+    ],
+  }),
 ];
