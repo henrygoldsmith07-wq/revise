@@ -65,8 +65,19 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         qualificationId: qualification.id,
         level: qualification.level,
         subjects: allSubjects(qualification.id)
-          .map((subject) => ({ id: subject.id, name: subject.name, detail: qualification.level }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
+          .map((subject) => ({
+            id: subject.id,
+            name: subject.name,
+            detail:
+              subject.contentTier === "flagship"
+                ? `${qualification.level} · Flagship`
+                : `${qualification.level} · Reference · not spec-checked`,
+          }))
+          .sort((a, b) => {
+            const aRef = a.detail.includes("Reference") ? 1 : 0;
+            const bRef = b.detail.includes("Reference") ? 1 : 0;
+            return aRef - bRef || a.name.localeCompare(b.name);
+          }),
       }))
       .filter((row) => row.subjects.length > 0)
       .sort((a, b) => a.level.localeCompare(b.level));
@@ -199,8 +210,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold">Which subjects do you take with {board.name}?</h2>
                   <p className="text-xs text-ink3 mt-0.5">
-                    Choose every subject you&apos;re sitting. You can change this later, and each choice brings its
-                    specification, lessons, flashcards and exam questions with it.
+                    Choose every subject you&apos;re sitting. Flagship subjects are authored against the spec;
+                    reference-tier boards reuse that outline and are labelled as not spec-checked.
                   </p>
                 </div>
                 <div className="shrink-0 rounded-xl border border-line bg-surface2 px-3 py-2 text-center" aria-live="polite">

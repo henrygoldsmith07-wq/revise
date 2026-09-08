@@ -9,7 +9,7 @@ const ROOT = join(import.meta.dirname, "..");
 
 function parseTopics() {
   const dir = join(ROOT, "src/domain/curriculum");
-  const files = readdirSync(dir).filter((f) => f !== "helpers.ts" && f !== "index.ts" && f !== "registry.ts" && f.endsWith(".ts"));
+  const files = readdirSync(dir).filter((f) => !["helpers.ts", "index.ts", "registry.ts", "honesty.ts"].includes(f) && f.endsWith(".ts"));
   const all = [];
   for (const file of files) {
     const text = readFileSync(join(dir, file), "utf8");

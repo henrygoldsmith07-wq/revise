@@ -7,11 +7,15 @@ highest-value thing you should do next.
 Open the app → get a recommended task → complete it → get marked instantly →
 progress updates → next task.
 
-Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE** —
-**440 topics, 718 seed questions**, every topic with `specPoints` and provenance —
-as real, authored revision content. The architecture is board-agnostic: adding
-a new board or qualification means adding one curriculum module and changing
-nothing else.
+Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
+Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
+authored against the specification. The other 28 are **reference-tier**: a
+cloned outline for navigation, labelled unverified, with GCSE paper structures
+taken from the spec manifest rather than the A-level clone. Adding a board
+still means one curriculum module and nothing else changing.
+
+New students start on the four flagships. Settings and onboarding group subjects
+as Flagship vs Reference so cloned boards cannot look spec-checked.
 
 ## Running it
 

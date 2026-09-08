@@ -50,12 +50,14 @@ export function classifyDepth(question: Question): DepthCategory {
   if (/misconception/.test(slug)) return "misconception";
   if (/synoptic|extended-response|evidence-expansion|case-study/.test(slug)) return "synoptic";
   if (question.totalMarks >= 6) return "synoptic";
-  const aoWeights = { AO1: 0, AO2: 0, AO3: 0 } as Record<string, number>;
+  const aoWeights = { AO1: 0, AO2: 0, AO3: 0 } as Record<"AO1" | "AO2" | "AO3", number>;
   for (const part of question.parts) {
     for (const ao of part.aos ?? []) aoWeights[ao] = (aoWeights[ao] ?? 0) + 1;
   }
-  if (aoWeights.AO3 > 0 && aoWeights.AO3 >= (aoWeights.AO2 ?? 0)) return "transfer";
-  if (question.totalMarks >= 3 || aoWeights.AO2 > 0) return "application";
+  const ao3 = aoWeights.AO3 ?? 0;
+  const ao2 = aoWeights.AO2 ?? 0;
+  if (ao3 > 0 && ao3 >= ao2) return "transfer";
+  if (question.totalMarks >= 3 || ao2 > 0) return "application";
   return "recall";
 }
 

@@ -49,6 +49,13 @@ export interface Subject {
   gradeBoundaries: { grade: string; percent: number }[];
   /** Which spec document this subject's content tracks, and when it was last checked. */
   spec?: SubjectSpec;
+  /**
+   * Flagship subjects are authored against that board's spec. Reference subjects
+   * reuse a flagship outline for navigation and must not be labelled "checked".
+   */
+  contentTier?: "flagship" | "reference";
+  /** Shown in the UI when contentTier is "reference". */
+  contentDisclaimer?: string;
 }
 
 export interface Unit {
@@ -808,6 +815,11 @@ export interface UserSettings {
   aiEnabled: boolean;
   /** Whether Pulse may read this account's study history. Off by default. */
   pulseEnabled: boolean;
+  /**
+   * Lab routes (benchmarks, teacher, corpora, case study) stay off the student
+   * nav until this is switched on in Settings.
+   */
+  labMode: boolean;
   /** Subject the student last studied in lessons, so /lesson lands where they left off. */
   lastLessonSubject?: string;
   /**
