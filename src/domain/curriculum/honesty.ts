@@ -64,7 +64,7 @@ function honestTopic(topic: Topic, flagship: boolean, subjectId: string): Topic 
     ...topic,
     verification: downgradeVerification(topic.verification, false),
     reviewer: stripCrossBoardReviewer(topic.reviewer, subjectId),
-    ...(topic.specPoints !== undefined
+    ...(topic.specPoints
       ? {
           specPoints: topic.specPoints.map((sp) => ({
             ...sp,
@@ -83,7 +83,7 @@ export function honestSubject(entry: CurriculumModule): CurriculumModule {
     ...entry.subject,
     papers,
     contentTier: flagship ? "flagship" : "reference",
-    ...(!flagship ? { contentDisclaimer: REFERENCE_DISCLAIMER } : {}),
+    ...(flagship ? {} : { contentDisclaimer: REFERENCE_DISCLAIMER }),
   };
   return {
     subject,
