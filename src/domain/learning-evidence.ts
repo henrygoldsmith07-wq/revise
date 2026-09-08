@@ -1,5 +1,34 @@
 import type { Attempt, Question } from "./types";
 
+function normaliseAnswer(text: string): string {
+  return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function tokenSimilarity(a: string, b: string): number {
+  const left = new Set(normaliseAnswer(a).split(" ").filter(Boolean));
+  const right = new Set(normaliseAnswer(b).split(" ").filter(Boolean));
+  if (!left.size || !right.size) return 0;
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared++;
+  return shared / Math.max(left.size, right.size);
+}
+
+/**
+ * Detect an answer that is effectively a pasted/copied model answer. Short
+ * numerical or vocabulary responses are deliberately exempt: matching `2 N`
+ * or `mitosis` is evidence of recall, not evidence that the model was copied.
+ */
+export function answerLooksCopied(question: Question, answers: Record<string, string>): boolean {
+  if (question.kind === "mcq") return false;
+  return question.parts.some((part) => {
+    const answer = normaliseAnswer(answers[part.id] ?? "");
+    const model = normaliseAnswer(part.modelAnswer ?? "");
+    const tokens = answer.split(" ").filter(Boolean);
+    if (!answer || tokens.length < 5 || model.split(" ").filter(Boolean).length < 5) return false;
+    return answer === model || (answer.length >= 32 && tokenSimilarity(answer, model) >= 0.92);
+  });
+}
+
 /** A mark under review cannot establish mastery, even when it is full marks. */
 export function trustworthyAttempt(attempt: Attempt): boolean {
   return attempt.markedBy !== "self" && attempt.markEscalation?.status !== "pending" &&
@@ -10,7 +39,7 @@ export function trustworthyAttempt(attempt: Attempt): boolean {
 }
 
 export function independentAttempt(attempt: Attempt): boolean {
-  return trustworthyAttempt(attempt) && !attempt.hintTier && !attempt.repairTeachingSeen && attempt.mode !== "recall";
+  return trustworthyAttempt(attempt) && !attempt.hintTier && !attempt.repairTeachingSeen && !attempt.copiedAnswer && attempt.mode !== "recall";
 }
 
 export function questionFamily(question: Question): string {

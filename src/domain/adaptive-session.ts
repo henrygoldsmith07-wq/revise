@@ -43,6 +43,8 @@ import type {
   ReviewLog,
   Topic,
   TopicMastery,
+  InterventionAttemptContext,
+  InterventionOutcomeRecord,
 } from "./types";
 
 export const ADAPTIVE_SESSION_MINUTES = 20;
@@ -100,6 +102,8 @@ export interface AdaptiveSessionStep {
   params?: AdaptiveStepParams;
   capabilityId?: Id;
   teaching?: boolean;
+  /** Evidence context attached to the attempt for effect calibration. */
+  intervention?: InterventionAttemptContext;
 }
 
 /** Normalised signals used by the single topic optimiser. */
@@ -186,6 +190,8 @@ export interface AdaptiveSessionInput {
   now?: Date;
   /** Used by the runner when resuming a plan after an activity changed evidence. */
   topicId?: Id;
+  /** Observed intervention chains used to replace policy priors. */
+  interventionOutcomes?: InterventionOutcomeRecord[];
 }
 
 /**
@@ -297,7 +303,7 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   const stop = readinessStopFor(input.readiness ?? [], topic.subjectId);
   const steps = buildSteps({ topic, selected, cards: cardsByTopic.get(topic.id) ?? [], questions, attempts, mistakes, profile, targetMinutes, stopTopicDone: stop.stop });
   const mapped = questions.some((q) => q.parts.some((p) => p.capabilityIds?.some((id) => wjecCapabilities.some((n) => n.id === id))));
-  const action = mapped ? selectLearningAction({ topicId: topic.id, nodes: wjecCapabilities, questions, attempts, mistakes, now, remainingMinutes: targetMinutes }) : undefined;
+  const action = mapped ? selectLearningAction({ topicId: topic.id, nodes: wjecCapabilities, questions, attempts, mistakes, now, remainingMinutes: targetMinutes, interventionOutcomes: input.interventionOutcomes }) : undefined;
   if (mapped) {
     const retrieval = steps.filter((s) => s.kind === "overdue-retrieval" || s.kind === "delayed-retrieval");
     const delayed = retrieval.find((s) => s.kind === "delayed-retrieval");
@@ -495,6 +501,24 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
     questionIds: [] as Id[],
     mistakeIds: [] as Id[],
   };
+  const priorState: InterventionAttemptContext["priorState"] =
+    selected.evidence.focusState === "unknown" ? "unknown" :
+      selected.evidence.focusState === "emerging" ? "weak" : selected.evidence.focusState;
+  const focusCapabilityId: Id = selected.evidence.focus;
+  const contextFor = (stepId: Id, kind: InterventionAttemptContext["kind"], activity: NonNullable<InterventionAttemptContext["activity"]>, plannedMinutes: number,
+    support: InterventionAttemptContext["support"], capabilityId = focusCapabilityId, chainId = `${topic.id}:${capabilityId}`): InterventionAttemptContext => ({
+      id: `${topic.id}:intervention:${stepId}`,
+      chainId,
+      kind,
+      capabilityId,
+      topicId: topic.id,
+      priorState,
+      plannedMinutes,
+      support,
+      activity,
+    });
+  const capabilityForQuestion = (question: Question): Id =>
+    question.parts.flatMap((part) => part.capabilityIds ?? [])[0] ?? focusCapabilityId;
 
   if (dueCardIds.length) {
     const count = dueCardIds.length;
@@ -508,6 +532,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       href: reviewHref(topic.id, `limit=${dueCardIds.length}`),
       cardIds: dueCardIds,
       why: `${count} card${count === 1 ? " is" : "s are"} due — recall first so today's work builds on what is actually there.`,
+      intervention: contextFor(`${topic.id}:overdue-retrieval`, "retention", "retrieval", 2, "none"),
     });
   }
 
@@ -522,6 +547,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       href: reviewHref(topic.id, `mode=mistakes&limit=${mistakeIds.length}`),
       mistakeIds,
       why: `${mistakeIds.length} open misconception${mistakeIds.length === 1 ? "" : "s"} — the same lost mark returns unless the wrong idea is replaced.`,
+      intervention: contextFor(`${topic.id}:misconception-repair`, "guided", "teaching", 2, "scaffold"),
     });
   }
 
@@ -535,6 +561,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       description: "Write what you remember first, then open the short step-by-step explanation.",
       href: `/lesson?subject=${encodeURIComponent(topic.subjectId)}&topic=${encodeURIComponent(topic.id)}&from=adaptive&return=${encodeURIComponent(`/adaptive-session?topic=${encodeURIComponent(topic.id)}&start=1&resume=1`)}`,
       why: `Your ${selected.evidence.focus} evidence is ${selected.evidence.focusState} — teaching lands on the gap instead of a page of prose.`,
+      intervention: contextFor(`${topic.id}:explanation`, "guided", "teaching", 2, "scaffold"),
     });
   }
 
@@ -550,6 +577,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       questionIds: [supported.id],
       why: "Scaffolded attempt first — support that counts as weaker evidence, then fades.",
       params: { support: "supported", hintBudget: 3 },
+      intervention: contextFor(`${topic.id}:supported-practice:${supported.id}`, "guided", "question", 4, "scaffold", capabilityForQuestion(supported)),
     });
   }
 
@@ -565,6 +593,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       questionIds: [independent.id],
       why: "Unaided success is the only proof that counts — this rung carries full evidence weight.",
       params: { support: "independent", hintBudget: 0 },
+      intervention: contextFor(`${topic.id}:independent-application:${independent.id}`, "independent", "question", 4, "none", capabilityForQuestion(independent)),
     });
   }
 
@@ -580,6 +609,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       questionIds: [transfer.id],
       why: "Same idea, new clothing — transfer is what the exam actually tests.",
       params: { support: "independent", hintBudget: 0 },
+      intervention: contextFor(`${topic.id}:transfer:${transfer.id}`, "transfer", "question", 4, "none", capabilityForQuestion(transfer)),
     });
   }
 
@@ -595,6 +625,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
     href: reviewHref(topic.id, `limit=1`),
     cardIds: delayedCardIds,
     why: "Today's gain only counts if it survives a delay — this check proves it.",
+    intervention: contextFor(`${topic.id}:delayed-retrieval`, "retention", "retrieval", 2, "none"),
   });
 
   fitToBudget(steps, targetMinutes);
@@ -797,6 +828,8 @@ export interface AdaptiveReplanInput {
   prereqQuestions?: Question[];
   /** The verdict a prerequisite diagnosis produced, when it points upstream. */
   prereq?: AdaptivePrereqVerdict | null;
+  /** Observed intervention chains used to replan after every answer. */
+  interventionOutcomes?: InterventionOutcomeRecord[];
   now?: Date;
 }
 
@@ -827,12 +860,14 @@ export function resultFromQuestionAttempt(input: {
   awarded: number;
   max: number;
   hintTier: HintTier | null;
+  /** A copied model answer is a successful mark, never independent evidence. */
+  copiedAnswer?: boolean;
   gaveUp?: boolean;
 }): AdaptiveStepResult {
   if (input.gaveUp) return "gave-up";
   const ratio = input.max > 0 ? input.awarded / input.max : 0;
   if (ratio < ADAPTIVE_PASS_RATIO) return "missed";
-  return input.hintTier === null ? "passed-independent" : "passed-assisted";
+  return input.hintTier === null && !input.copiedAnswer ? "passed-independent" : "passed-assisted";
 }
 
 /** Classify one card-retrieval pass from the grades the student gave. */
@@ -885,7 +920,7 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
     const scheduled = completed.some((r) => r.kind === "delayed-retrieval" && r.result === "scheduled");
     const action = count < ADAPTIVE_MAX_QUESTION_ATTEMPTS && !scheduled ? selectLearningAction({
       topicId: plan.topicId, nodes: wjecCapabilities, questions, attempts, mistakes,
-      now: input.now ?? new Date(), remainingMinutes: remaining,
+      now: input.now ?? new Date(), remainingMinutes: remaining, interventionOutcomes: input.interventionOutcomes,
     }) : undefined;
     if (action) return { steps: [learningActionStep(action, plan.topicId, plan.subjectId, completed.length + 1)],
       done: false, stopped: false, reason: action.reason };
@@ -969,8 +1004,30 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
   const openWithoutRepair = openMistakes.filter((mistake) => !resolvedIds.has(mistake.id));
 
   const steps: AdaptiveSessionStep[] = [];
+  const priorState: InterventionAttemptContext["priorState"] =
+    plan.evidence.focusState === "unknown" ? "unknown" :
+      plan.evidence.focusState === "emerging" ? "weak" : plan.evidence.focusState;
+  const defaultCapabilityId: Id = plan.evidence.focus;
+  const defaultIntervention = (stepId: Id, kind: InterventionAttemptContext["kind"], activity: NonNullable<InterventionAttemptContext["activity"]>, plannedMinutes: number,
+    support: InterventionAttemptContext["support"], capabilityId = defaultCapabilityId, chainId = `${plan.topicId}:${capabilityId}`, topicId = plan.topicId): InterventionAttemptContext => ({
+      id: `${plan.topicId}:intervention:${stepId}`,
+      chainId,
+      kind,
+      capabilityId,
+      topicId,
+      priorState,
+      plannedMinutes,
+      support,
+      activity,
+    });
   const pushStep = (kind: AdaptiveStepKind, seq: number, partial: Partial<AdaptiveSessionStep> = {}) => {
-    steps.push({ ...baseStep(plan, kind, seq), ...partial, minutes: REBUILT_STEP_MINUTES[kind] });
+    const step = { ...baseStep(plan, kind, seq), ...partial, minutes: REBUILT_STEP_MINUTES[kind] };
+    if (!step.intervention) {
+      const activity = kind === "overdue-retrieval" || kind === "delayed-retrieval" ? "retrieval" : "teaching";
+      const interventionKind = activity === "retrieval" ? "retention" : "guided";
+      step.intervention = defaultIntervention(step.id, interventionKind, activity, step.minutes, activity === "teaching" ? "scaffold" : "none");
+    }
+    steps.push(step);
   };
   const pushQuestionStep = (
     kind: AdaptiveStepKind,
@@ -983,6 +1040,15 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
       questionIds: [question.id],
       params: { support: opts.support, hintBudget: opts.hintBudget },
       href: practiceHref(plan.topicId, question.id, kind),
+      intervention: defaultIntervention(
+        `${kind}:${seq}:${question.id}`,
+        kind === "transfer" ? "transfer" : kind === "prerequisite-repair" ? "diagnose" : opts.support === "supported" ? "guided" : "independent",
+        "question",
+        REBUILT_STEP_MINUTES[kind],
+        opts.support === "supported" ? "scaffold" : "none",
+        question.parts.flatMap((part) => part.capabilityIds ?? [])[0] ?? defaultCapabilityId,
+        opts.mistakeId ?? `${plan.topicId}:${question.parts.flatMap((part) => part.capabilityIds ?? [])[0] ?? defaultCapabilityId}`,
+      ),
     };
     if (kind === "misconception-repair" && opts.mistakeId) partial.mistakeIds = [opts.mistakeId];
     pushStep(kind, seq, partial);
@@ -1075,6 +1141,7 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
     const prereqQuestion =
       prereqOrdered.find((question) => inBand(question, "supported")) ?? prereqOrdered[0];
     if (prereqQuestion) {
+      const prereqCapabilityId = prereqQuestion.parts.flatMap((part) => part.capabilityIds ?? [])[0] ?? defaultCapabilityId;
       steps.push({
         ...baseStep(plan, "prerequisite-repair", prereqRecords.length + 1),
         topicId: prereq.prereqTopicId,
@@ -1084,6 +1151,16 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
         questionIds: [prereqQuestion.id],
         params: { support: "supported", hintBudget: 2 },
         href: practiceHref(prereq.prereqTopicId, prereqQuestion.id, "prerequisite-repair"),
+        intervention: defaultIntervention(
+          `prerequisite-repair:${prereqRecords.length + 1}:${prereqQuestion.id}`,
+          "diagnose",
+          "question",
+          REBUILT_STEP_MINUTES["prerequisite-repair"],
+          "scaffold",
+          prereqCapabilityId,
+          `${prereq.prereqTopicId}:${prereqCapabilityId}`,
+          prereq.prereqTopicId,
+        ),
       });
       reason = "Two misses on the same topic point upstream — a two-minute foundation check replaces another similar question here.";
     }
@@ -1189,7 +1266,18 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
   // loop even when every budgeted minute is gone.
   if (!scheduled) {
     const delayed = steps.find((step) => step.kind === "delayed-retrieval");
-    if (delayed && !trimmed.some((step) => step.kind === "delayed-retrieval")) trimmed.push(delayed);
+    if (delayed && !trimmed.some((step) => step.kind === "delayed-retrieval")) {
+      trimmed.push(delayed.intervention ? delayed : {
+        ...delayed,
+        intervention: defaultIntervention(
+          `${delayed.id}:schedule`,
+          "retention",
+          "retrieval",
+          delayed.minutes,
+          "none",
+        ),
+      });
+    }
   }
 
   const evidenceSatisfied =
@@ -1225,6 +1313,17 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
 function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, seq: number): AdaptiveSessionStep {
   const kind: AdaptiveStepKind = action.kind === "guided" ? "misconception-repair" :
     action.kind === "transfer" ? "transfer" : "independent-application";
+  const intervention: InterventionAttemptContext = {
+    id: `${topicId}:intervention:${seq}:${action.question.id}`,
+    ...(action.mistakeId ? { chainId: action.mistakeId } : { chainId: `${topicId}:${action.capabilityId}` }),
+    kind: action.kind,
+    capabilityId: action.capabilityId,
+    topicId,
+    priorState: action.priorState,
+    plannedMinutes: action.minutes,
+    support: action.teaching ? "scaffold" : "none",
+    activity: "question",
+  };
   return {
     id: `${topicId}:skill:${seq}:${action.question.id}`, kind,
     label: action.kind === "diagnose" ? "Check the smallest gap" : action.kind === "retention" ? "Check what stayed with you" : STEP_LABELS[kind],
@@ -1232,6 +1331,7 @@ function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, 
     topicId, subjectId, questionIds: [action.question.id], cardIds: [],
     mistakeIds: action.mistakeId && action.kind !== "diagnose" ? [action.mistakeId] : [],
     capabilityId: action.capabilityId, teaching: action.teaching,
+    intervention,
     href: practiceHref(topicId, action.question.id, kind),
     params: { support: action.teaching ? "supported" : "independent", hintBudget: action.teaching ? 3 : 0 },
   };

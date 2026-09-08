@@ -1,4 +1,4 @@
-import type { AoCode, ContentSource, Id, LicensedSource, LearningQuestionMetadata, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
+import type { AoCode, ContentSource, HumanVerificationRecord, Id, LicensedSource, LearningQuestionMetadata, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
 
 // Compact authoring format for the seed question bank. Ids are deterministic
 // (`cnt:question:<slug>`, namespaced — see src/data/content-ids.ts) so
@@ -37,6 +37,7 @@ export interface QuestionSpec {
   lastChecked?: string | null;
   reviewer?: string | null;
   specVersion?: string;
+  humanVerification?: HumanVerificationRecord;
   aos?: AoCode[];
   specPointIds?: string[];
   learning?: LearningQuestionMetadata;
@@ -89,6 +90,7 @@ export function defineQuestion(spec: QuestionSpec): Question {
     aos: aos.length ? aos : undefined,
     specPointIds: specPointIds.length ? specPointIds : undefined,
     createdAt: SEED_CREATED_AT,
+    ...(spec.humanVerification ? { humanVerification: spec.humanVerification } : {}),
     ...(spec.learning ? { learning: spec.learning } : {}),
   };
 }

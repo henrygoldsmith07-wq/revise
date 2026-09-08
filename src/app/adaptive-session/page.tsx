@@ -18,6 +18,7 @@ import {
 import { diagnosePrerequisiteWeakness } from "@/domain/prerequisite-diagnosis";
 import { buryCard } from "@/domain/scheduling";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
+import { createInterventionObservation } from "@/domain/intervention-calibration";
 import { wjecCapabilities } from "@/content/capabilities";
 import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
@@ -85,6 +86,7 @@ function AdaptiveSession() {
       recallMastery: store.recallMastery,
       applicationMastery: store.applicationMastery,
       readiness: store.examReadiness,
+      interventionOutcomes: store.interventionOutcomes,
       targetMinutes: 20,
       topicId: requestedTopicId ?? checkpointTopicId,
     });
@@ -103,6 +105,7 @@ function AdaptiveSession() {
     store.recallMastery,
     store.applicationMastery,
     store.examReadiness,
+    store.interventionOutcomes,
     checkpointTopicId,
     topics,
   ]);
@@ -318,6 +321,20 @@ function AdaptiveSession() {
           onDone={recordStep}
           onRetrievalComplete={(outcome: RetrievalOutcome) => {
             if (!run) return;
+            if (activeStep.intervention) {
+              const passed = outcome.grades.length > 0 && !outcome.grades.includes("again");
+              void store.recordInterventionOutcome(createInterventionObservation({
+                userId: store.userId,
+                subjectId: plan.subjectId,
+                context: activeStep.intervention,
+                activity: "retrieval",
+                result: outcome.grades.length ? (passed ? "passed" : "missed") : "viewed",
+                awarded: outcome.grades.filter((grade) => grade !== "again").length,
+                max: outcome.grades.length,
+                at: new Date().toISOString(),
+                actualMinutes: activeStep.minutes,
+              }));
+            }
             recordStep({
               stepId: activeStep.id,
               kind: activeStep.kind,
@@ -426,7 +443,7 @@ function StepPanel({
 
   const finishQuestion = (attempt: Attempt, hintTier: AdaptiveStepRecord["hintTier"], gaveUp: boolean) => {
     const effectiveHint = hintTier ?? (attempt.repairTeachingSeen ? "scaffold" : null);
-    const result = resultFromQuestionAttempt({ awarded: attempt.awarded, max: attempt.max, hintTier: effectiveHint, gaveUp });
+    const result = resultFromQuestionAttempt({ awarded: attempt.awarded, max: attempt.max, hintTier: effectiveHint, copiedAnswer: attempt.copiedAnswer, gaveUp });
     let resolvedMistakeId: Id | undefined;
     if (mistake && question && attempt.retestMistakeId === mistake.id) {
       const evaluation = evaluateMistakeRetest(mistake, question, attempt, store.attempts, store.questions);
@@ -460,9 +477,14 @@ function StepPanel({
         availableCards.length ? (
           <AdaptiveRetrievalBlock cards={availableCards} onComplete={onRetrievalComplete} />
         ) : (
-          <p className="text-xs text-ink3" role="status">
-            These cards were already handled — moving on.
-          </p>
+          <div className="space-y-3">
+            <p className="text-xs text-ink3" role="status">
+              These cards were already handled — moving on.
+            </p>
+            <Button variant="primary" size="sm" onClick={() => onRetrievalComplete({ grades: [], missedItemIds: [] })}>
+              Continue
+            </Button>
+          </div>
         )
       ) : null}
 
@@ -472,19 +494,32 @@ function StepPanel({
           draft={recallDraft}
           revealed={recallRevealed}
           onDraft={setRecallDraft}
-          onReveal={() => setRecallRevealed(true)}
-          onDone={() =>
-            onDone({
-              stepId: step.id,
-              kind: step.kind,
-              minutes: step.minutes,
-              result: "viewed",
-              awardedMarks: 0,
-              maxMarks: 0,
-              hintTier: null,
-              elapsedMs: 0,
-            })
-          }
+           onReveal={() => setRecallRevealed(true)}
+           onDone={() => {
+             if (step.intervention) {
+               void store.recordInterventionOutcome(createInterventionObservation({
+                 userId: store.userId,
+                 subjectId: plan.subjectId,
+                 context: step.intervention,
+                 activity: "teaching",
+                 result: "viewed",
+                 awarded: 1,
+                 max: 1,
+                 at: new Date().toISOString(),
+                 actualMinutes: step.minutes,
+               }));
+             }
+             onDone({
+               stepId: step.id,
+               kind: step.kind,
+               minutes: step.minutes,
+               result: "viewed",
+               awardedMarks: 0,
+               maxMarks: 0,
+               hintTier: null,
+               elapsedMs: 0,
+             });
+           }}
         />
       ) : null}
 
@@ -501,7 +536,7 @@ function StepPanel({
               ) : null}
               {step.capabilityId ? <p className="text-sm text-ink mt-2">{wjecCapabilities.find((node) => node.id === step.capabilityId)?.explanation}</p> : null}
             </div>
-          ) : (
+           ) : (
             <p className="text-xs text-ink2">
               Contrast the tempting wrong idea with the credited one, then re-apply it independently below.
             </p>
@@ -513,6 +548,7 @@ function StepPanel({
               support={support}
               retestMistake={mistake}
               repairTeachingSeen={Boolean(mistake)}
+              intervention={step.intervention}
               onComplete={({ attempt, hintTier, gaveUp }) => finishQuestion(attempt, hintTier, gaveUp)}
             />
           ) : (
@@ -533,6 +569,7 @@ function StepPanel({
             question={question}
             support={support}
             retestMistake={mistake}
+            intervention={step.intervention}
             onComplete={({ attempt, hintTier, gaveUp }) => finishQuestion(attempt, hintTier, gaveUp)}
           />
         ) : (
@@ -540,7 +577,20 @@ function StepPanel({
             <p className="text-sm text-ink2">No question is available for this rung in the current bank.</p>
             <Button
               variant="primary"
-              onClick={() =>
+              onClick={() => {
+                if (step.intervention) {
+                  void store.recordInterventionOutcome(createInterventionObservation({
+                    userId: store.userId,
+                    subjectId: plan.subjectId,
+                    context: step.intervention,
+                    activity: step.intervention.activity === "retrieval" ? "retrieval" : "teaching",
+                    result: "viewed",
+                    awarded: 0,
+                    max: 0,
+                    at: new Date().toISOString(),
+                    actualMinutes: step.minutes,
+                  }));
+                }
                 onDone({
                   stepId: step.id,
                   kind: step.kind,
@@ -550,8 +600,8 @@ function StepPanel({
                   maxMarks: 0,
                   hintTier: null,
                   elapsedMs: 0,
-                })
-              }
+                });
+              }}
             >
               Mark this rung as not attemptable
             </Button>
@@ -573,7 +623,20 @@ function StepPanel({
             onClick={async () => {
               if (scheduled) return;
               if (scheduleCards.length) {
-                await store.updateCards(scheduleCards.map((card) => buryCard(card, 1)));
+               await store.updateCards(scheduleCards.map((card) => buryCard(card, 1)));
+              }
+              if (step.intervention) {
+                void store.recordInterventionOutcome(createInterventionObservation({
+                  userId: store.userId,
+                  subjectId: plan.subjectId,
+                  context: step.intervention,
+                  activity: "retrieval",
+                  result: "scheduled",
+                  awarded: 0,
+                  max: 0,
+                  at: new Date().toISOString(),
+                  actualMinutes: step.minutes,
+                }));
               }
               setScheduled(true);
               onDone({
@@ -822,5 +885,6 @@ function replanWithCurrentEvidence(
     attempts: topicAttempts,
     prereqQuestions,
     prereq,
+    interventionOutcomes: store.interventionOutcomes,
   });
 }

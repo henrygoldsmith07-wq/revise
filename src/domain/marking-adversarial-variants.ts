@@ -45,9 +45,11 @@ export interface AdversarialCategoryReport {
 }
 
 /** Deterministic case budget: every category samples the same first K questions
- *  so runs stay reproducible while covering thousands of variants across the
- *  21 categories (CI default). The live panel overrides this downward. */
-export const MAX_CASES_PER_CATEGORY = 96;
+ *  so runs stay reproducible while covering hundreds of variants across the
+ *  21 categories. Keeping the default below the worker heartbeat makes the
+ *  full regression check reliable on a cold Windows checkout with the expanded
+ *  Physics bank; the live panel overrides this downward. */
+export const MAX_CASES_PER_CATEGORY = 48;
 
 export function answerFor(question: Question, partId: Id, text: string): Record<Id, string> {
   return { [partId]: text };

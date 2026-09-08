@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { buildHintLadder, nextHint } from "@/domain/hints";
 import type { HintTier } from "@/domain/hints";
-import type { Attempt, Mistake, Question } from "@/domain/types";
+import type { Attempt, InterventionAttemptContext, Mistake, Question } from "@/domain/types";
 import { QuestionRunner } from "./QuestionRunner";
 import { Button, Pill } from "./ui";
 
@@ -28,12 +28,14 @@ export function AdaptiveQuestionBlock({
   support,
   retestMistake,
   repairTeachingSeen = false,
+  intervention,
   onComplete,
 }: {
   question: Question;
   support: "supported" | "independent";
   retestMistake?: Mistake | null;
   repairTeachingSeen?: boolean;
+  intervention?: InterventionAttemptContext;
   onComplete: (outcome: AdaptiveQuestionOutcome) => void;
 }) {
   const [revealedTiers, setRevealedTiers] = useState<HintTier[]>([]);
@@ -117,6 +119,7 @@ export function AdaptiveQuestionBlock({
         hintBudget={0}
         externalHintTier={highestTier}
         repairTeachingSeen={repairTeachingSeen}
+        intervention={intervention}
         onFinished={(attempt) => {
           if (submittedRef.current) return;
           submittedRef.current = true;

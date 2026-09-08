@@ -172,6 +172,12 @@ export function mistakesFromAttempt(
       marksLost,
       ...(attempt.elapsedMs ? { secondsSpent: Math.round(attempt.elapsedMs / Math.max(1, attempt.marked.length) / 1000) } : {}),
       ...(timing ? { timing } : {}),
+      ...(attempt.workingAnalysis?.find((row) => row.partId === marked.partId && row.firstIncorrectStep != null)
+        ? {
+            firstIncorrectStep: attempt.workingAnalysis.find((row) => row.partId === marked.partId)!.firstIncorrectStep!,
+            workingErrorKind: attempt.workingAnalysis.find((row) => row.partId === marked.partId)!.firstErrorKind,
+          }
+        : {}),
       description: marked.missedPoints.length
         ? `Dropped ${marksLost} mark(s): ${marked.missedPoints.slice(0, 2).join("; ")}`
         : `Dropped ${marksLost} mark(s) on "${part?.label ?? "this question"}"`,

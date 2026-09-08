@@ -204,6 +204,7 @@ describe("result classification", () => {
     expect(resultFromQuestionAttempt({ awarded: 2, max: 2, hintTier: null })).toBe("passed-independent");
     expect(resultFromQuestionAttempt({ awarded: 2, max: 2, hintTier: "cue" })).toBe("passed-assisted");
     expect(resultFromQuestionAttempt({ awarded: 2, max: 2, hintTier: "scaffold" })).toBe("passed-assisted");
+    expect(resultFromQuestionAttempt({ awarded: 2, max: 2, hintTier: null, copiedAnswer: true })).toBe("passed-assisted");
     expect(resultFromQuestionAttempt({ awarded: 1, max: 2, hintTier: null })).toBe("missed");
     expect(resultFromQuestionAttempt({ awarded: 0, max: 2, hintTier: "worked-solution" })).toBe("missed");
     expect(resultFromQuestionAttempt({ awarded: 2, max: 2, hintTier: null, gaveUp: true })).toBe("gave-up");

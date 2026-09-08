@@ -605,6 +605,7 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     mistakes: store.mistakes,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    interventionOutcomes: store.interventionOutcomes,
     settings: store.settings,
     streak: store.streak,
   });

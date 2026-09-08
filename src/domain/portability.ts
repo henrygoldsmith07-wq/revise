@@ -38,6 +38,9 @@ export interface PortabilitySnapshot {
   plannedSessions: unknown[];
   examDatesCount: number;
   examDates: unknown[];
+  /** Immediate, transfer and delayed-retention intervention evidence. */
+  interventionOutcomesCount: number;
+  interventionOutcomes: unknown[];
   settings: UserSettings | null;
   streak: unknown | null;
   // Round-trippable: the app's seed content is *not* duplicated into the
@@ -56,6 +59,7 @@ export interface PortabilityInput {
   mistakes: unknown[];
   plannedSessions: unknown[];
   examDates: unknown[];
+  interventionOutcomes?: unknown[];
   settings?: UserSettings | null;
   streak?: unknown | null;
   seedVersion?: number;
@@ -81,6 +85,8 @@ export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySn
     plannedSessions: input.plannedSessions,
     examDatesCount: input.examDates.length,
     examDates: input.examDates,
+    interventionOutcomesCount: input.interventionOutcomes?.length ?? 0,
+    interventionOutcomes: input.interventionOutcomes ?? [],
     settings: input.settings ?? null,
     streak: input.streak ?? null,
     seedVersion: input.seedVersion ?? 1,

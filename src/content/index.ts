@@ -31,6 +31,7 @@ import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
 import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
+import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -71,6 +72,10 @@ export const seedQuestions: Question[] = [
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
   ...wjecRepairDepthQuestions,
+  // Keep the generated Physics depth pack after the curated bank so a fresh
+  // learner sees reviewed authored items first. Coverage and adaptive
+  // selection are keyed by ids, not array position.
+  ...wjecPhysicsDeepQuestions,
 ].map(honestQuestion);
 
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
@@ -82,6 +87,7 @@ export { authenticSourceQuestions };
 export { ocrAuthoredQuestions };
 export { extendedResponseQuestions };
 export { wjecAlevelExpansionQuestions };
+export { wjecPhysicsDeepQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

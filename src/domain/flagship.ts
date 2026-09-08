@@ -45,6 +45,20 @@ export type DepthCategory = "recall" | "application" | "transfer" | "misconcepti
  * 3–5 mark application; everything else recall.
  */
 export function classifyDepth(question: Question): DepthCategory {
+  // Generated and authored depth packs carry an explicit demand. Honour it
+  // before inferring from ids/marks so the coverage ledger reports the actual
+  // learning design (including calculation and explanation as application
+  // practice) rather than flattening every new item into an AO/mark heuristic.
+  switch (question.learning?.demand) {
+    case "recall": return "recall";
+    case "misconception": return "misconception";
+    case "transfer": return "transfer";
+    case "synoptic": return "synoptic";
+    case "application":
+    case "explanation":
+    case "calculation": return "application";
+    default: break;
+  }
   const slug = question.id.toLowerCase();
   if (/unfamiliar/.test(slug)) return "transfer";
   if (/misconception/.test(slug)) return "misconception";

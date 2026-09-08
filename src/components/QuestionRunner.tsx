@@ -20,6 +20,8 @@ import {
   type DelayedFarTransferRetest,
 } from "@/domain/delayed-far-transfer";
 import { markMcq, rubricConfidence } from "@/domain/marking";
+import { answerLooksCopied } from "@/domain/learning-evidence";
+import { analyseAttemptWorking } from "@/domain/working-analysis";
 import { EditorialBadge } from "./EditorialBadge";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
 import type { RetestEvaluation } from "@/domain/mistakes";
@@ -27,7 +29,7 @@ import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/ma
 import type { LowConfidenceMarkDecision } from "@/domain/mark-escalation";
 import { planRemediation, type RemediationAction } from "@/domain/remediation";
 import type { RemediationPlan } from "@/domain/remediation";
-import type { Attempt, Id, MarkedPart, Mistake, Question } from "@/domain/types";
+import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { AnswerInput } from "./AnswerInput";
 import { RichText } from "./RichText";
@@ -65,6 +67,7 @@ export function QuestionRunner({
   hintBudget,
   externalHintTier,
   repairTeachingSeen = false,
+  intervention,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -83,6 +86,7 @@ export function QuestionRunner({
   hintBudget?: number;
   externalHintTier?: HintTier | null;
   repairTeachingSeen?: boolean;
+  intervention?: InterventionAttemptContext;
 }) {
   const store = useStore();
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
@@ -97,6 +101,8 @@ export function QuestionRunner({
     retest?: RetestEvaluation;
     remediation: RemediationPlan;
     confidence: number | null;
+    copiedAnswer?: boolean;
+    workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
     nextAction: { label: string; href: null; why: string };
@@ -207,6 +213,8 @@ export function QuestionRunner({
     }
 
     const submittedAnswers = isMcq ? { [question.parts[0]?.id ?? question.id]: String(choice) } : answers;
+    const copiedAnswer = answerLooksCopied(question, submittedAnswers);
+    const workingAnalysis = analyseAttemptWorking(question, submittedAnswers, marked);
     const markedBy: Attempt["markedBy"] = source === "ai" ? "ai" : "rubric";
     const attemptId = crypto.randomUUID();
     // Feedback-read telemetry: fires once the result view has been on screen
@@ -239,6 +247,9 @@ export function QuestionRunner({
       markedBy,
       markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
       markEscalation,
+      ...(copiedAnswer ? { copiedAnswer: true } : {}),
+      ...(workingAnalysis.length ? { workingAnalysis } : {}),
+      ...(intervention ? { intervention } : {}),
 
       elapsedMs,
       mode,
@@ -270,7 +281,7 @@ export function QuestionRunner({
     // hint-supported or partial answers say which capability still needs work.
     // The next action stays inside this flow — micro-practice, an unaided
     // retry, or a transfer check — never a redirect to another page.
-    const supportUsed = Boolean(highestUsedTier) || repairTeachingSeen;
+    const supportUsed = Boolean(highestUsedTier) || repairTeachingSeen || copiedAnswer;
     const retestOpen = Boolean(retestMistake && retest?.status !== "resolved");
     const nextAction: { label: string; href: null; why: string } =
       awarded < max
@@ -318,6 +329,8 @@ export function QuestionRunner({
       retest,
       remediation,
       confidence: markConfidence,
+      copiedAnswer,
+      workingAnalysis,
       escalation: escalationDecision.escalate ? escalationDecision : undefined,
       farTransfer: persistedAttempt.farTransfer,
       withheld,
@@ -501,6 +514,8 @@ function MarkedResult({
     retest?: RetestEvaluation;
     remediation: RemediationPlan;
     confidence: number | null;
+    copiedAnswer?: boolean;
+    workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
     nextAction: { label: string; href: null; why: string };
@@ -579,6 +594,7 @@ function MarkedResult({
               {result.confidence === null ? "AI confidence unavailable" : `AI confidence ${Math.round(result.confidence * 100)}%`}
             </Pill>
           ) : null}
+          {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}
         </div>
       </div>
       {result.escalation ? (
@@ -646,6 +662,18 @@ function MarkedResult({
               Restudy: {result.remediation.headline.targetKeyPoint}
             </p>
           ) : null}
+        </div>
+      ) : null}
+
+      {result.workingAnalysis?.some((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0) ? (
+        <div className="mt-4 card card-2 p-3 bg-surface2" role="status">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Working check</p>
+          {result.workingAnalysis.filter((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0).map((row) => (
+            <p key={row.partId} className="text-xs text-ink2 mt-1">
+              {row.firstIncorrectStep != null ? `First divergence at step ${row.firstIncorrectStep + 1}: ${row.firstErrorKind.replace(/-/g, " ")}. ` : "Working is consistent. "}
+              {[row.methodMarksAwarded ? `${row.methodMarksAwarded} method` : "", row.followThroughMarksAwarded ? `${row.followThroughMarksAwarded} follow-through` : "", row.errorCarriedForward ? "error carried forward" : "", row.unitMarksAwarded ? `${row.unitMarksAwarded} unit` : "", row.precisionMarksAwarded ? `${row.precisionMarksAwarded} precision` : ""].filter(Boolean).join(", ")}
+            </p>
+          ))}
         </div>
       ) : null}
 

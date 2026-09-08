@@ -12,7 +12,8 @@
 import { isNumericPoint, numericEquivalent, perPointThreshold, pointCoverage } from "./marking";
 import { findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
-import type { Question, QuestionPart } from "./types";
+import { diagnoseWorking } from "./step-diagnosis";
+import type { AttemptWorkingEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 export interface StudentStep {
   index: number;
@@ -357,4 +358,58 @@ export function firstIncorrectStep(part: QuestionPart, answer: string): WorkingA
 /** Convenience: does this response's working match the model throughout? */
 export function consistentWithModel(part: QuestionPart, answer: string): boolean {
   return firstIncorrectStep(part, answer).consistentWithModel;
+}
+
+/**
+ * Persist the examiner-useful part of working analysis alongside an attempt.
+ * This is deliberately small: the full text remains the student's answer,
+ * while the first divergence and mark components make the next intervention
+ * explainable and allow method/units/precision trends to be measured.
+ */
+export function analyseAttemptWorking(
+  question: Question,
+  answers: Record<string, string>,
+  marked: readonly MarkedPart[],
+): AttemptWorkingEvidence[] {
+  // Working diagnosis is meaningful only when the authored item declares a
+  // calculation rubric (or is explicitly a calculation). Running the prose
+  // matcher over explanation answers creates false "method errors" and then
+  // sends the learner down an irrelevant arithmetic repair path.
+  if (question.kind !== "calculation" && !question.parts.some((part) => (part.calculationRules?.length ?? 0) > 0)) return [];
+  return question.parts.flatMap((part) => {
+    // A structured item can contain a prose part beside a calculation. Only
+    // analyse the parts whose authored rubric can support working diagnosis;
+    // treating prose as arithmetic would create a false method error.
+    if (question.kind !== "calculation" && !(part.calculationRules?.length ?? 0)) return [];
+    const answer = answers[part.id] ?? "";
+    const analysis = firstIncorrectStep(part, answer);
+    const diagnosis = diagnoseWorking({ modelSteps: analysis.modelSteps, answer, similarityFn: stepSimilarity });
+    const firstIncorrectIndex = analysis.firstIncorrect?.stepIndex ?? (diagnosis.firstErrorIndex ?? null);
+    const firstErrorKind = diagnosis.firstErrorIndex != null
+      ? diagnosis.kind
+      : analysis.firstIncorrect
+        ? "method-error"
+        : "none";
+    const result = marked.find((candidate) => candidate.partId === part.id);
+    const evidence = result?.evidence ?? [];
+    const count = (kind: NonNullable<QuestionPart["calculationRules"]>[number]["kind"]): number => {
+      const rules = part.calculationRules?.filter((rule) => rule.kind === kind) ?? [];
+      return rules.filter((rule) => evidence.find((point) => point.point === part.markScheme[part.calculationRules?.indexOf(rule) ?? -1])?.status === "credited").length;
+    };
+    const methodMarksAwarded = count("method");
+    const accuracyMarksAwarded = count("accuracy");
+    const followThroughMarksAwarded = count("follow-through");
+    return [{
+      partId: part.id,
+      firstIncorrectStep: firstIncorrectIndex,
+      firstErrorKind,
+      consistentWithModel: analysis.consistentWithModel,
+      methodMarksAwarded,
+      accuracyMarksAwarded,
+      followThroughMarksAwarded,
+      ...(followThroughMarksAwarded > 0 && accuracyMarksAwarded === 0 ? { errorCarriedForward: true } : {}),
+      unitMarksAwarded: count("unit"),
+      precisionMarksAwarded: count("precision"),
+    }];
+  });
 }

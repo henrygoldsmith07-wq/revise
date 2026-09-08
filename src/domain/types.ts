@@ -69,6 +69,20 @@ export type AoCode = "AO1" | "AO2" | "AO3";
 export type VerificationStatus = "unverified" | "checked" | "verified";
 export type ContentSource = "authored" | "licensed" | "generated" | "past-paper" | "import" | "adapted" | "unreviewed";
 
+/** Separate checks stop a single "verified" stamp hiding a weak component. */
+export interface HumanVerificationRecord {
+  status: "pending" | "approved" | "changes-requested";
+  reviewerId?: Id;
+  reviewedAt?: IsoInstant;
+  checks: {
+    question: boolean;
+    marking: boolean;
+    workedSolution: boolean;
+    capabilityMapping: boolean;
+  };
+  notes?: string;
+}
+
 /** Cite a licensed source when provenance is "licensed". Paraphrased claims stay compliant without verbatim text. */
 export interface LicensedSource {
   /** Human citation, e.g. "Edexcel GCE Mathematics spec 9MA0, §2.1 (2024)" */
@@ -469,6 +483,8 @@ export interface Question {
   specPointIds?: Id[];
   /** Persisted question-specific validation lifecycle; moderation remains a separate publishing gate. */
   validation?: QuestionValidationRecord;
+  /** Component-level editorial review for flagship question content. */
+  humanVerification?: HumanVerificationRecord;
   /** Set when extracted from an uploaded paper. */
   paperId?: Id;
   paperQuestionNumber?: string;
@@ -569,6 +585,12 @@ export interface Attempt {
   hintTier?: "cue" | "prompt" | "scaffold" | "worked-solution";
   /** The repair explanation/credited point was visible before submission. */
   repairTeachingSeen?: boolean;
+  /** True when the submitted response substantially matches the authored answer. */
+  copiedAnswer?: boolean;
+  /** First-error and mark-component evidence for calculation working. */
+  workingAnalysis?: AttemptWorkingEvidence[];
+  /** The adaptive intervention that produced this immediate observation. */
+  intervention?: InterventionAttemptContext;
   elapsedMs: number;
   mode: "practice" | "paper" | "recall";
   /** Optional provenance for attempts completed inside a paper sitting. */
@@ -578,6 +600,73 @@ export interface Attempt {
   /** Links a targeted practice attempt back to the open mistake it is testing. */
   retestMistakeId?: Id;
   createdAt: IsoInstant;
+}
+
+export type WorkingErrorKind =
+  | "none"
+  | "rounding-error"
+  | "unit-error"
+  | "arithmetic-slip"
+  | "incorrect-rearrangement"
+  | "substitution-error"
+  | "method-error";
+
+export interface AttemptWorkingEvidence {
+  partId: Id;
+  firstIncorrectStep: number | null;
+  firstErrorKind: WorkingErrorKind;
+  consistentWithModel: boolean;
+  methodMarksAwarded: number;
+  accuracyMarksAwarded: number;
+  followThroughMarksAwarded: number;
+  /** True when a later mark follows the student's earlier value (ECF). */
+  errorCarriedForward?: boolean;
+  unitMarksAwarded: number;
+  precisionMarksAwarded: number;
+}
+
+export type InterventionKind = "diagnose" | "guided" | "independent" | "transfer" | "retention";
+export type InterventionPriorState = "unknown" | "weak" | "developing" | "secure";
+export type InterventionSupport = "none" | "cue" | "prompt" | "scaffold" | "worked-solution";
+export type InterventionActivity = "question" | "retrieval" | "teaching";
+export type InterventionObservationResult = "passed" | "missed" | "viewed" | "scheduled";
+
+/** Context carried on an attempt so intervention effects can be followed. */
+export interface InterventionAttemptContext {
+  id: Id;
+  /** Stable repair/intervention chain id used to join later transfer checks. */
+  chainId?: Id;
+  kind: InterventionKind;
+  capabilityId: Id;
+  topicId: Id;
+  priorState: InterventionPriorState;
+  plannedMinutes: number;
+  support: InterventionSupport;
+  /** Question attempts, card retrievals and teaching gates share one event path. */
+  activity?: InterventionActivity;
+}
+
+export interface InterventionOutcomeRecord {
+  id: Id;
+  /** Joins immediate, transfer and delayed observations for one repair chain. */
+  chainId?: Id;
+  /** Non-question activities are retained for intervention audits but never
+   * counted as mark-based durable evidence. */
+  activity?: InterventionActivity;
+  userId: Id;
+  subjectId: Id;
+  topicId: Id;
+  capabilityId: Id;
+  kind: InterventionKind;
+  priorState: InterventionPriorState;
+  plannedMinutes: number;
+  actualMinutes: number;
+  support: InterventionSupport;
+  immediate: { awarded: number; max: number; independent: boolean; attemptId: Id; at: IsoInstant; result?: InterventionObservationResult };
+  transfer?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant };
+  delayedRetention?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant };
+  createdAt: IsoInstant;
+  updatedAt: IsoInstant;
 }
 
 export type CommandWord =
@@ -645,6 +734,9 @@ export interface Mistake {
   description: string;
   /** Classification used to spot repeat patterns across topics. */
   category: "recall" | "method" | "arithmetic" | "interpretation" | "communication" | "unclassified";
+  /** Physics working diagnosis, when a calculation response was analysable. */
+  firstIncorrectStep?: number;
+  workingErrorKind?: WorkingErrorKind;
   cardId?: Id;
   resolved: boolean;
   createdAt: IsoInstant;

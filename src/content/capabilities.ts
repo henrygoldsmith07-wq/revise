@@ -1,7 +1,57 @@
 import { validateCapabilityGraph, type CapabilityNode } from "@/domain/capability-graph";
+import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
+
+const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
+
+/**
+ * Stable capability id for a WJEC Physics specification statement.
+ *
+ * Spec point ids are already stable (`subject.topic.sp-01`), but keeping the
+ * capability namespace separate means a future editorial split can add a
+ * second capability without invalidating attempts recorded against this one.
+ */
+export function physicsCapabilityIdForSpecPoint(specPointId: string): string {
+  const parts = specPointId.split(".");
+  const topicSlug = parts.at(-2) ?? "unknown-topic";
+  const point = parts.at(-1) ?? "sp-00";
+  return `phys.${topicSlug}.${point}`;
+}
+
+/** Return all Physics capability ids represented by a list of spec points. */
+export function physicsCapabilityIdsForSpecPoints(specPointIds: readonly string[]): string[] {
+  return [...new Set(specPointIds.filter((id) => id.startsWith(`${PHYSICS_SUBJECT_ID}.`)).map(physicsCapabilityIdForSpecPoint))];
+}
+
+/**
+ * One diagnosable node per WJEC Physics specification statement. The ordered
+ * edge inside a topic is deliberately conservative: a later statement can be
+ * attempted only after the preceding statement has evidence, while topics do
+ * not form a giant cross-topic chain. This gives the tutor a useful smallest
+ * upstream probe without turning an unknown in one topic into a prerequisite
+ * for the whole course.
+ */
+export const wjecPhysicsCapabilities: CapabilityNode[] = wjecPhysics.topics.flatMap((topic) => {
+  const points = topic.specPoints ?? [];
+  return points.map((point, index) => {
+    const id = physicsCapabilityIdForSpecPoint(point.id);
+    const previous = points[index - 1];
+    const prerequisites = previous && index > 0
+      ? [physicsCapabilityIdForSpecPoint(previous.id)]
+      : [];
+    return {
+      id,
+      subjectId: PHYSICS_SUBJECT_ID,
+      topicId: topic.id,
+      label: point.text.length > 92 ? `${point.text.slice(0, 89).trimEnd()}…` : point.text,
+      specPointIds: [point.id],
+      prerequisites,
+      explanation: `To demonstrate this capability, you need to ${point.text.replace(/[.]$/, "")}. Start from the definitions and relationships in the statement, then show the result in the requested context.`,
+    } satisfies CapabilityNode;
+  });
+});
 
 /** Initial reviewed-in-code skill chains. Exact board-reference verification is still editorial work. */
-export const wjecCapabilities: CapabilityNode[] = [
+const legacyWjecCapabilities: CapabilityNode[] = [
   { id: "bio.active-site", subjectId: "wjec-alevel-biology", topicId: "wjec-alevel-biology.enzymes", label: "Link active-site shape to specificity", specPointIds: ["wjec-alevel-biology.enzymes.sp-01"], prerequisites: [],
     explanation: "The active site's shape and chemical properties are complementary to the substrate. Binding forms an enzyme–substrate complex; enzyme specificity depends on this interaction." },
   { id: "bio.saturation", subjectId: "wjec-alevel-biology", topicId: "wjec-alevel-biology.enzymes", label: "Explain enzyme saturation", specPointIds: ["wjec-alevel-biology.enzymes.sp-03"], prerequisites: ["bio.active-site"],
@@ -26,6 +76,14 @@ export const wjecCapabilities: CapabilityNode[] = [
     explanation: "Solve f′(x) = 0. A positive f″ at the point gives a local minimum and a negative f″ a local maximum. If f″ is zero, check the derivative's sign on both sides." },
   { id: "math.optimisation", subjectId: "wjec-alevel-maths", topicId: "wjec-alevel-maths.differentiation", label: "Optimise a model within its domain", specPointIds: ["wjec-alevel-maths.differentiation.sp-04"], prerequisites: ["math.stationary"],
     explanation: "Use the constraint to write the objective in one variable. State its feasible domain. Differentiate, solve for stationary points, then compare valid candidates with endpoints and justify the optimum in context." },
+];
+
+/** All WJEC nodes, including the original stable ids kept for old attempts. */
+export const wjecCapabilities: CapabilityNode[] = [
+  ...legacyWjecCapabilities,
+  ...wjecPhysicsCapabilities,
+  // Chemistry, Biology and Maths nodes above remain intentionally small until
+  // their own flagship content reaches the same depth as Physics.
 ];
 
 /** Fail content validation early if an author introduces a dangling edge or cycle. */

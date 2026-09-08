@@ -14,6 +14,8 @@ function numberOf(expression: string): number | null {
 }
 const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-12, Math.abs(b) * 0.005);
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const SCALAR = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?";
+const NUMERIC_EXPRESSION = new RegExp(`^(${SCALAR}(?:\\s*[+*/-]\\s*${SCALAR})*)\\s*(.*)$`);
 
 interface Line { text: string; expression: string; raw: string; value: number; unit: string }
 function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
@@ -24,9 +26,17 @@ function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
   if (matching.length !== 1) return undefined;
   const text = matching[0]!;
   const segments = text.split("=").slice(1).map((s) => s.trim());
-  const final = segments.at(-1)?.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)\s*([^=]*)$/);
-  if (!final || !Number.isFinite(Number(final[1]))) return undefined;
-  return { text, expression: segments.length >= 2 ? segments[0]! : "", raw: final[1]!, value: Number(final[1]), unit: final[2]!.trim() };
+  // Accept a small, explicit arithmetic grammar on the final line as well as
+  // a bare number. Students commonly leave an equivalent fraction such as
+  // `6/1` or a simple rearrangement in their answer; reducing it here lets
+  // the numeric, unit and precision checks judge the working rather than the
+  // notation. Unrecognised algebra still falls through to review.
+  const final = segments.at(-1)?.match(NUMERIC_EXPRESSION);
+  if (!final) return undefined;
+  const raw = final[1]!.trim();
+  const parsed = numberOf(raw) ?? Number(raw);
+  if (!Number.isFinite(parsed)) return undefined;
+  return { text, expression: segments.length >= 2 ? segments[0]! : "", raw, value: parsed, unit: final[2]!.trim() };
 }
 
 /** Conservative supported grammar. Unrecognised working is queued for review, not a confident zero. */

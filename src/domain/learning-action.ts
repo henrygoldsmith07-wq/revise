@@ -1,41 +1,55 @@
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
 import { isTransferQuestion, questionCapabilities, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
-import type { Attempt, Mistake, Question } from "./types";
+import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
+import { humanVerifiedPhysicsQuestion } from "./physics-content-review";
+import type { Attempt, InterventionOutcomeRecord, Mistake, Question, InterventionPriorState } from "./types";
 
 export interface LearningAction {
   kind: "diagnose" | "guided" | "independent" | "transfer" | "retention";
   question: Question;
   capabilityId: string;
+  priorState: InterventionPriorState;
   mistakeId?: string;
   teaching: boolean;
   minutes: number;
   reason: string;
   /** An explicit policy prior, not a measured causal effect or calibrated prediction. */
   expectedGainPerMinute: number;
-  calibrated: false;
+  calibrated: boolean;
+  calibrationSampleSize: number;
+  contentTrust: "human-verified" | "needs-human-review";
 }
 
 export function selectLearningAction(input: {
   topicId: string; nodes: readonly CapabilityNode[]; questions: readonly Question[];
   attempts: readonly Attempt[]; mistakes: readonly Mistake[]; now: Date; remainingMinutes?: number;
+  interventionOutcomes?: readonly InterventionOutcomeRecord[];
 }): LearningAction | undefined {
   const { topicId, nodes, questions, attempts, now } = input;
   const evidence = deriveSkillEvidence(nodes, questions, attempts);
+  const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
   const candidates: LearningAction[] = [];
   const eligible = questions.filter((q) => q.topicIds.includes(topicId) && q.learning &&
     !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? ""));
   const add = (kind: LearningAction["kind"], capabilityId: string, pool: Question[], reason: string, mistake?: Mistake) => {
-    for (const question of pool) {
+    const trustedPool = (kind === "transfer" || kind === "retention")
+      ? pool.filter(humanVerifiedPhysicsQuestion)
+      : [];
+    const selectedPool = trustedPool.length ? trustedPool : pool;
+    for (const question of selectedPool) {
       const minutes = Math.max(0.5, question.learning?.expectedMinutes ?? question.totalMarks * 0.75);
       if (minutes > (input.remainingMinutes ?? Infinity)) continue;
       const lost = mistake?.marksLost ?? evidence.get(capabilityId)?.lostMarks ?? 1;
       const gap = 1 - (evidence.get(capabilityId)?.accuracy ?? 0.35);
-      const gainPrior = { diagnose: 0.35, guided: 0.45, independent: 0.6, transfer: 0.7, retention: 0.8 }[kind];
-      candidates.push({ kind, question, capabilityId, ...(mistake ? { mistakeId: mistake.id } : {}),
+      const effect = effectivenessFor(kind, capabilityId, calibrations);
+      const trust = humanVerifiedPhysicsQuestion(question) ? "human-verified" as const : "needs-human-review" as const;
+      candidates.push({ kind, question, capabilityId, priorState: evidence.get(capabilityId)?.state ?? "unknown", ...(mistake ? { mistakeId: mistake.id } : {}),
         teaching: kind === "guided", minutes, reason,
-        expectedGainPerMinute: gainPrior * Math.min(5, Math.max(1, lost)) * (0.4 + gap) / minutes,
-        calibrated: false });
+        expectedGainPerMinute: effect.gainPerMinute * Math.min(5, Math.max(1, lost)) * (0.4 + gap),
+        calibrated: effect.calibrated,
+        calibrationSampleSize: effect.sampleSize,
+        contentTrust: trust });
     }
   };
   const open = input.mistakes.filter((m) => !m.resolved && m.topicId === topicId);
@@ -84,6 +98,7 @@ export function selectLearningAction(input: {
     }
   }
   return candidates.sort((a, b) =>
+    b.expectedGainPerMinute - a.expectedGainPerMinute ||
     Number(b.kind === "retention") - Number(a.kind === "retention") ||
-    b.expectedGainPerMinute - a.expectedGainPerMinute || a.question.id.localeCompare(b.question.id))[0];
+    a.question.id.localeCompare(b.question.id))[0];
 }

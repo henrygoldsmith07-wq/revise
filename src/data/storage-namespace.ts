@@ -14,6 +14,8 @@ export const REVISE_META_KEYS = {
   revisionTwin: "revise.revisionTwin.v1",
   /** Sat papers with their sit-time prediction frozen in (outcome feedback loop). */
   paperOutcomes: "revise.paperOutcomes.v1",
+  /** Immediate, transfer and delayed-retention evidence for interventions. */
+  interventionOutcomes: "revise.interventionOutcomes.v1",
   /** Highest applied level of the cnt: content-id namespacing migration. */
   contentIdMigration: "revise.contentIdMigration.v1",
   /** One adaptive session run: executed steps + outcomes, for resumable replanning. */

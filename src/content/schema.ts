@@ -19,6 +19,19 @@ const calculationRuleSchema = z.object({
   significantFigures: z.number().int().min(1).max(10).optional(),
 }).passthrough();
 
+const humanVerificationSchema = z.object({
+  status: z.enum(["pending", "approved", "changes-requested"]),
+  reviewerId: id.optional(),
+  reviewedAt: isoInstant.optional(),
+  checks: z.object({
+    question: z.boolean(),
+    marking: z.boolean(),
+    workedSolution: z.boolean(),
+    capabilityMapping: z.boolean(),
+  }),
+  notes: z.string().optional(),
+}).passthrough();
+
 export const contentQuestionPartSchema = z.object({
   id,
   label: z.string(),
@@ -47,6 +60,7 @@ export const contentQuestionSchema = z.object({
   difficulty: z.number().int().min(1).max(5),
   origin: z.enum(["seed", "ai", "past-paper"]),
   createdAt: isoInstant,
+  humanVerification: humanVerificationSchema.optional(),
   learning: z.object({
     familyId: id, contextId: id,
     demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),

@@ -67,7 +67,7 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
   if (!passed) {
     record(mistake.capabilityIds?.length === 1 ? "diagnosed" : "detected");
     delete repair.dueAt;
-  } else if (priorStage === "taught" && attempt.hintTier !== "worked-solution") {
+  } else if (priorStage === "taught" && attempt.hintTier !== "worked-solution" && !attempt.copiedAnswer) {
     record("guided-success");
   } else if (priorStage === "guided-success" && independent && question.learning &&
     ["application", "calculation", "transfer", "synoptic"].includes(question.learning.demand)) {

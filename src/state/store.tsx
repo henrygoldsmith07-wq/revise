@@ -94,6 +94,7 @@ import type {
   StreakState,
   TopicMastery,
   UserSettings,
+  InterventionOutcomeRecord,
 } from "@/domain/types";
 import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
@@ -105,6 +106,8 @@ import { domainEngine } from "@/data/domain-engine";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
 import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
+import { attachDelayedRetentionOutcome, attachTransferOutcome, calibrateInterventions, createInterventionOutcome } from "@/domain/intervention-calibration";
+import type { InterventionCalibration } from "@/domain/intervention-calibration";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
 import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
 import { assignArm as assignExperimentArm, policyTaskFor,
@@ -225,6 +228,10 @@ interface StoreValue extends Snapshot {
   recordGradeActual(subjectId: Id, percent: number, kind: "mock" | "paper" | "final"): Promise<void>;
   beginPaperOutcome(input: { subjectId: Id; paperId: Id; paperRunId?: Id; predictedMarks: number; totalMarks: number }): Promise<void>;
   closePaperOutcome(paperRunId: Id, actualMarks: number): Promise<void>;
+  /** Immediate → transfer → delayed-retention intervention evidence. */
+  interventionOutcomes: InterventionOutcomeRecord[];
+  interventionCalibrations: Map<string, InterventionCalibration>;
+  recordInterventionOutcome(outcome: InterventionOutcomeRecord): Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -323,6 +330,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   // Sat papers with their sit-time prediction frozen in — the reality check
   // that feeds the recommender's paper gain factor back from evidence.
   const [paperOutcomeLog, setPaperOutcomeLog] = useState<PaperOutcomeRecord[]>([]);
+  const [interventionOutcomes, setInterventionOutcomes] = useState<InterventionOutcomeRecord[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -417,7 +425,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
       try {
-        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin, paperOutcomes] = await Promise.all([
+        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin, paperOutcomes, savedInterventions] = await Promise.all([
           repo.loadSnapshot(userId),
           repo.loadRevisionCheckpoint(userId),
           readReviseMeta<ExperimentAssignment>("experimentAssignment"),
@@ -426,6 +434,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           readReviseMeta<ActualResultRecord[]>("gradeActuals"),
           repo.loadRevisionTwin(userId),
           readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes"),
+          readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes"),
         ]);
         setRevisionCheckpoint(checkpoint ?? null);
         setExperimentArm(assignment ?? null);
@@ -434,6 +443,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         setGradeActuals(gradeActs ?? []);
         setRevisionTwin(twin ?? createRevisionTwinState(userId));
         setPaperOutcomeLog(paperOutcomes ?? []);
+        // The metadata key predates account-scoped storage, so keep other
+        // learners' rows on disk but never let them influence this learner's
+        // calibration or appear in the adaptive planner.
+        setInterventionOutcomes((savedInterventions ?? []).filter((row) => row.userId === userId));
         setSnapshot(loaded);
         // First page is on screen; stream the rest of history in the background.
         startHydration();
@@ -1092,9 +1105,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       recallMastery,
       applicationMastery,
       readiness: examReadiness,
+      interventionOutcomes,
       targetMinutes: 20,
     });
-  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery, examReadiness]);
+  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery, examReadiness, interventionOutcomes]);
   // Close the grade loop: snapshot predictions weekly so later mocks can be
   // paired against what Revise believed at the time - not retro-fitted.
   useEffect(() => {
@@ -1283,6 +1297,19 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [],
   );
 
+  const recordInterventionOutcome = useCallback<StoreValue["recordInterventionOutcome"]>(
+    async (outcome) => {
+      if (outcome.userId !== userId) throw new Error("Cannot record intervention evidence for another user.");
+      const all = (await readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes")) ?? [];
+      const own = all.filter((row) => row.userId === userId);
+      const nextOwn = [...own.filter((row) => row.id !== outcome.id), outcome];
+      const nextAll = [...all.filter((row) => row.userId !== userId), ...nextOwn].slice(-2000);
+      await writeReviseMeta("interventionOutcomes", nextAll);
+      setInterventionOutcomes(nextOwn);
+    },
+    [userId],
+  );
+
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
@@ -1318,6 +1345,33 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       const drafts = mistakesFromAttempt(attempt, question, undefined, new Date(attempt.createdAt), misconceptions)
         .filter((draft) => !draft.mistake.partId || !repairedParts.has(draft.mistake.partId));
       await repo.saveLearningResult(attempt, [...updatedMistakes, ...drafts.map((d) => d.mistake)], drafts.map((d) => d.card));
+      // Intervention evidence is appended only after the attempt is safely in
+      // the learning-result transaction. Transfer and retention rungs attach
+      // to the open chain from the same capability; they never manufacture a
+      // durable result from an immediate same-question success.
+      if (attempt.intervention) {
+        const context = attempt.intervention;
+        const all = (await readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes")) ?? [];
+        const current = all.filter((row) => row.userId === attempt.userId);
+        const related = [...current].reverse().find((row) => row.userId === attempt.userId && row.capabilityId === context.capabilityId &&
+          (row.activity ?? "question") === "question" &&
+          Date.parse(row.createdAt) <= Date.parse(attempt.createdAt) &&
+          (!context.chainId ? !row.chainId : row.chainId === context.chainId) &&
+          (context.kind === "transfer" ? !row.transfer : context.kind === "retention" ? Boolean(row.transfer) && !row.delayedRetention : false));
+        let next: InterventionOutcomeRecord[];
+        if (related && context.kind === "transfer") {
+          const updated = attachTransferOutcome(related, attempt);
+          next = [...current.filter((row) => row.id !== related.id), updated];
+        } else if (related && context.kind === "retention") {
+          const updated = attachDelayedRetentionOutcome(related, attempt);
+          next = [...current.filter((row) => row.id !== related.id), updated];
+        } else {
+          next = [...current, createInterventionOutcome({ userId: attempt.userId, subjectId: attempt.subjectId, context, attempt })];
+        }
+        const nextAll = [...all.filter((row) => row.userId !== attempt.userId), ...next].slice(-2000);
+        await writeReviseMeta("interventionOutcomes", nextAll);
+        if (attempt.userId === userId) setInterventionOutcomes(next);
+      }
       setSnapshot((prev) => {
         if (!prev) return prev;
         const next: Snapshot = {
@@ -1334,7 +1388,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       });
       return [...updatedMistakes, ...drafts.map((d) => d.mistake)];
     },
-    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent],
+    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent, userId],
   );
 
   const addCards = useCallback<StoreValue["addCards"]>(
@@ -1682,6 +1736,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       recordGradeActual,
       beginPaperOutcome,
       closePaperOutcome: closePaperOutcomeRecord,
+      interventionOutcomes,
+      interventionCalibrations: calibrateInterventions(interventionOutcomes),
+      recordInterventionOutcome,
     };
   }, [
     snapshot,
@@ -1692,7 +1749,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     masteryUncertainty,
     applicationMastery,
     recallMastery,
-    recommendations,
     experimentRecs,
     predictions,
     adaptiveSession,
@@ -1760,6 +1816,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     recordGradeActual,
     beginPaperOutcome,
     closePaperOutcomeRecord,
+    interventionOutcomes,
+    recordInterventionOutcome,
   ]);
 
   if (bootError) {
