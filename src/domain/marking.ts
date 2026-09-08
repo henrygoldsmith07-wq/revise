@@ -1,4 +1,5 @@
 import { symbolicMatch } from "./maths-equivalence";
+import { markCalculationWorking } from "./calculation-rubric";
 import type { MarkEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -470,7 +471,7 @@ export function withMarkEvidence<T extends { marked: MarkedPart[] }>(
     marked: result.marked.map((marked) => {
       const part = question.parts.find((candidate) => candidate.id === marked.partId);
       return part
-        ? { ...marked, evidence: evidenceForMarkedPart(part, answers[part.id] ?? "", marked) }
+        ? { ...marked, evidence: part.calculationRules && marked.evidence ? marked.evidence : evidenceForMarkedPart(part, answers[part.id] ?? "", marked) }
         : marked;
     }),
   } as T;
@@ -499,7 +500,18 @@ function polarityConflict(point: string, answer: string): boolean {
 }
 
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
+  const calculation = markCalculationWorking(part, answer);
+  if (calculation) return calculation;
   const trimmed = (answer ?? "").trim();
+  // The authored complete answer must remain reachable. Its wording is not
+  // evidence of cheating or support; the runner records actual hint exposure.
+  // Limit this contract to explicitly skill-mapped content with one point per mark.
+  if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
+    trimmed.replace(/\s+/g, " ") === part.modelAnswer.trim().replace(/\s+/g, " ")) {
+    const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
+      creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
+    return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
+  }
   const credited: string[] = [];
   const missed: string[] = [];
   const givenTokens = new Set(

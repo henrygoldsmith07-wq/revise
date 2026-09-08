@@ -420,6 +420,27 @@ export async function saveAttempt(attempt: Attempt): Promise<void> {
   await enqueue("attempts", "upsert", attempt);
 }
 
+/** Keep an answer, its repair evidence and newly-created cards atomic locally. */
+export async function saveLearningResult(attempt: Attempt, mistakes: Mistake[], cards: Card[]): Promise<void> {
+  const db = await getDb();
+  const tx = db.transaction(["attempts", "mistakes", "cards"], "readwrite");
+  try {
+    await Promise.all([
+      tx.objectStore("attempts").put(attempt),
+      ...mistakes.map((mistake) => tx.objectStore("mistakes").put(mistake)),
+      ...cards.map((card) => tx.objectStore("cards").put(card)),
+      tx.done,
+    ]);
+  } catch (error) {
+    try { tx.abort(); } catch { /* Already aborted by IndexedDB. */ }
+    await tx.done.catch(() => {});
+    throw error;
+  }
+  await enqueue("attempts", "upsert", attempt);
+  for (const mistake of mistakes) await enqueue("mistakes", "upsert", mistake);
+  for (const card of cards) await enqueue("cards", "upsert", card);
+}
+
 export async function saveMistake(mistake: Mistake): Promise<void> {
   await putOne("mistakes", mistake);
   await enqueue("mistakes", "upsert", mistake);

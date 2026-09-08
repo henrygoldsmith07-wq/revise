@@ -8,11 +8,10 @@ import { predictGrade } from "@/domain/grades";
 import type { GradePrediction } from "@/domain/grades";
 import { computeTopicMastery } from "@/domain/mastery";
 import {
-  applyRetestToMistake,
   evaluateMistakeRetest,
   mistakesFromAttempt,
-  shouldResolve,
 } from "@/domain/mistakes";
+import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
 import { computeApplicationMastery } from "@/domain/application-mastery";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
@@ -1187,16 +1186,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       await repo.saveCard(updated);
       await repo.saveReviewLog(log);
 
-      // A mistake card that has been recalled reliably closes its mistake.
-      let resolvedMistakes: Mistake[] = [];
-      if (updated.sourceMistakeId && shouldResolve(updated)) {
-        const mistake = snapshot?.mistakes.find((m) => m.id === updated.sourceMistakeId);
-        if (mistake && !mistake.resolved) {
-          const closed = { ...mistake, resolved: true, resolvedAt: now.toISOString() };
-          await repo.saveMistake(closed);
-          resolvedMistakes = [closed];
-        }
-      }
+      // Card recall updates retention, but cannot prove independent exam repair.
+      const deferred = (snapshot?.mistakes ?? []).flatMap((mistake) => {
+        const next = deferRepairAfterRetrieval(mistake, updated, log);
+        return next === mistake ? [] : [next];
+      });
+      if (deferred.length) await repo.saveMistakes(deferred);
 
       setSnapshot((prev) => {
         if (!prev) return prev;
@@ -1204,13 +1199,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           ...prev,
           cards: prev.cards.map((c) => (c.id === updated.id ? updated : c)),
           reviewLogs: [...prev.reviewLogs, log],
-          mistakes: resolvedMistakes.length
-            ? prev.mistakes.map((m) => resolvedMistakes.find((r) => r.id === m.id) ?? m)
-            : prev.mistakes,
+          mistakes: prev.mistakes.map((mistake) => deferred.find((m) => m.id === mistake.id) ?? mistake),
         };
         void bumpGamification(
           prev.streak,
-          grade === "again" ? XP.review : XP.correctReview + (resolvedMistakes.length ? XP.mistakeResolved : 0),
+          grade === "again" ? XP.review : XP.correctReview,
           {},
           next,
         ).then((streak) => patch((p) => ({ ...p, streak })));
@@ -1298,12 +1291,14 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       if (isRetest && !retestMistake) {
         throw new Error("Cannot retest an unavailable or already resolved mistake.");
       }
-      const retestEvaluation = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt) : undefined;
-      const updatedMistake = retestMistake && retestEvaluation
-        ? applyRetestToMistake(retestMistake, retestEvaluation, attempt)
-        : undefined;
+      const retestEvaluation = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, snapshot?.attempts, snapshot?.questions) : undefined;
+      if (retestEvaluation?.status === "not-applicable") throw new Error("This question does not test the captured weakness.");
+      const updatedMistakes = (snapshot?.mistakes ?? []).flatMap((mistake) => {
+        const updated = advanceMistakeRepair(mistake, question, attempt, snapshot?.attempts, snapshot?.questions);
+        return updated === mistake ? [] : [updated];
+      });
+      const updatedById = new Map(updatedMistakes.map((m) => [m.id, m]));
 
-      await repo.saveAttempt(attempt);
       // Prospective experiment telemetry: derive started/completed events
       // from the recorded attempt so no extra student action is required.
       if (experimentArm) {
@@ -1312,24 +1307,20 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         void recordExperimentEvent("started", { taskId: expTaskId, activity: attempt.mode, topicId: expTopicId }, new Date(new Date(attempt.createdAt).getTime() - Math.max(0, attempt.elapsedMs || 0)).toISOString());
         void recordExperimentEvent("completed", { taskId: expTaskId, activity: attempt.mode, topicId: expTopicId }, attempt.createdAt);
       }
-      if (updatedMistake) await repo.saveMistake(updatedMistake);
 
       // A failed retest updates the original mistake in place. It must not
       // create another card for the same gap.
       const misconceptions = [...new Set(question.topicIds.flatMap((id) => misconceptionsForTopic(id)))];
-      const drafts = isRetest ? [] : mistakesFromAttempt(attempt, question, undefined, undefined, misconceptions);
-      if (drafts.length) {
-        await repo.saveMistakes(drafts.map((d) => d.mistake));
-        await repo.saveCards(drafts.map((d) => d.card));
-      }
+      const repairedParts = new Set(updatedMistakes.flatMap((m) => repairTargetParts(m, question)));
+      const drafts = mistakesFromAttempt(attempt, question, undefined, new Date(attempt.createdAt), misconceptions)
+        .filter((draft) => !draft.mistake.partId || !repairedParts.has(draft.mistake.partId));
+      await repo.saveLearningResult(attempt, [...updatedMistakes, ...drafts.map((d) => d.mistake)], drafts.map((d) => d.card));
       setSnapshot((prev) => {
         if (!prev) return prev;
         const next: Snapshot = {
           ...prev,
-          attempts: [...prev.attempts, attempt],
-          mistakes: updatedMistake
-            ? prev.mistakes.map((mistake) => (mistake.id === updatedMistake.id ? updatedMistake : mistake))
-            : [...prev.mistakes, ...drafts.map((d) => d.mistake)],
+          attempts: [...prev.attempts.filter((a) => a.id !== attempt.id), attempt],
+          mistakes: [...prev.mistakes.map((mistake) => updatedById.get(mistake.id) ?? mistake), ...drafts.map((d) => d.mistake)],
           cards: [...prev.cards, ...drafts.map((d) => d.card)],
         };
         const retestXp = retestEvaluation?.status === "resolved" ? XP.mistakeResolved : 0;
@@ -1338,7 +1329,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         );
         return next;
       });
-      return updatedMistake ? [updatedMistake] : drafts.map((d) => d.mistake);
+      return [...updatedMistakes, ...drafts.map((d) => d.mistake)];
     },
     [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent],
   );

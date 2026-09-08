@@ -304,12 +304,12 @@ describe("mistake repair", () => {
     expect(plan.steps[3].questionIds).toEqual(["q9"]);
   });
 
-  it("never closes on view — only a retest that resolved it", () => {
+  it("never treats viewing, a retest count or a legacy resolved flag as retention evidence", () => {
     expect(repairProgress(mistake).canClose).toBe(false);
     const viewed = { ...mistake, resolved: true, retestCount: 0 } as unknown as Mistake;
     expect(repairProgress(viewed).canClose).toBe(false);
     const retested = { ...mistake, resolved: true, retestCount: 2 } as unknown as Mistake;
-    expect(repairProgress(retested).canClose).toBe(true);
+    expect(repairProgress(retested).canClose).toBe(false);
   });
 });
 

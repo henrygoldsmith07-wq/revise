@@ -7,6 +7,7 @@ import type {
   IsoDate,
   Question,
 } from "./types";
+import { independentAttempt, isTransferQuestion, questionFamily } from "./learning-evidence";
 
 export const DELAYED_FAR_TRANSFER_DELAY_DAYS = 7;
 export const FAR_TRANSFER_SOURCE_THRESHOLD = 0.8;
@@ -103,6 +104,9 @@ export function selectFarTransferCandidate(
   const candidates = questions
     .filter((candidate) => candidate.subjectId === source.subjectId)
     .filter((candidate) => candidate.id !== source.id && !attempted.has(candidate.id))
+    .filter((candidate) => isTransferQuestion(candidate) && questionFamily(candidate) !== questionFamily(source))
+    .filter((candidate) => candidate.learning?.contextId !== source.learning?.contextId)
+    .filter((candidate) => !questions.some((q) => attempted.has(q.id) && questionFamily(q) === questionFamily(candidate)))
     .filter((candidate) => normalise(candidate.stem) !== sourceStem)
     .map((candidate) => {
       const sharedSpecPointIds = overlap(sourceSpecPoints, questionSpecPointIds(candidate));
@@ -116,7 +120,7 @@ export function selectFarTransferCandidate(
         noveltyScore: noveltyScore(source, candidate),
       };
     })
-    .filter((candidate) => candidate.sharedSpecPointIds.length || candidate.sharedLearningClaims.length || candidate.sharedTopicIds.length)
+    .filter((candidate) => candidate.sharedSpecPointIds.length || candidate.sharedLearningClaims.length)
     .sort((a, b) => {
       // Mapped spec points and learning claims are stronger evidence than a
       // shared topic, while novelty breaks ties inside the same anchor.
@@ -150,7 +154,7 @@ function score(attempt: Attempt): number {
 
 function eligibleSource(attempt: Attempt): boolean {
   return (
-    !attempt.farTransfer &&
+    !attempt.farTransfer && independentAttempt(attempt) &&
     attempt.max > 0 &&
     score(attempt) >= FAR_TRANSFER_SOURCE_THRESHOLD &&
     attempt.markEscalation?.status !== "pending"
@@ -202,7 +206,10 @@ export function scoreFarTransferRetest(retestAttempt: Attempt): FarTransferOutco
 export function completeDelayedFarTransfer(
   retest: DelayedFarTransferRetest,
   attempt: Attempt,
-): FarTransferAttemptLink {
+): FarTransferAttemptLink | undefined {
+  if (!independentAttempt(attempt) || attempt.questionId !== retest.candidateQuestionId ||
+    attempt.userId !== retest.userId || attempt.subjectId !== retest.subjectId ||
+    Date.parse(attempt.createdAt) < Date.parse(`${retest.scheduledFor}T00:00:00Z`)) return undefined;
   return {
     retestId: retest.retestId,
     role: "retest",
@@ -255,14 +262,17 @@ export function delayedFarTransferRetests(input: {
     });
     if (!link) continue;
 
-    const completed = completedByRetestId.get(link.retestId);
+    const candidate = completedByRetestId.get(link.retestId);
+    const completed = candidate && candidate.userId === sourceAttempt.userId && candidate.subjectId === sourceAttempt.subjectId &&
+      candidate.questionId === link.candidateQuestionId && independentAttempt(candidate) &&
+      candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && candidate.createdAt.slice(0, 10) >= link.scheduledFor ? candidate : undefined;
     records.set(link.retestId, {
       ...link,
       userId: sourceAttempt.userId,
       subjectId: sourceAttempt.subjectId,
       topicIds: sourceAttempt.topicIds,
       status: completed ? "completed" : link.scheduledFor <= today ? "due" : "scheduled",
-      outcome: completed?.farTransfer?.outcome,
+      outcome: completed ? scoreFarTransferRetest(completed) : undefined,
     });
   }
 

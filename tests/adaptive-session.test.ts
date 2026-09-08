@@ -58,6 +58,7 @@ function question(id: string, difficulty: 1 | 2 | 3 | 4 | 5): Question {
     totalMarks: 2,
     calculatorAllowed: true,
     difficulty,
+    ...(difficulty >= 4 ? { learning: { familyId: id, contextId: id, demand: "transfer" as const, expectedMinutes: 4 } } : {}),
     origin: difficulty >= 4 ? "past-paper" : "seed",
     createdAt: NOW.toISOString(),
   };

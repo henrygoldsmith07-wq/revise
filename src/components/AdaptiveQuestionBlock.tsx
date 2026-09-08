@@ -27,11 +27,13 @@ export function AdaptiveQuestionBlock({
   question,
   support,
   retestMistake,
+  repairTeachingSeen = false,
   onComplete,
 }: {
   question: Question;
   support: "supported" | "independent";
   retestMistake?: Mistake | null;
+  repairTeachingSeen?: boolean;
   onComplete: (outcome: AdaptiveQuestionOutcome) => void;
 }) {
   const [revealedTiers, setRevealedTiers] = useState<HintTier[]>([]);
@@ -112,10 +114,13 @@ export function AdaptiveQuestionBlock({
         key={`${question.id}:${support}`}
         question={question}
         retestMistake={retestMistake ?? undefined}
+        hintBudget={0}
+        externalHintTier={highestTier}
+        repairTeachingSeen={repairTeachingSeen}
         onFinished={(attempt) => {
           if (submittedRef.current) return;
           submittedRef.current = true;
-          onComplete({ attempt, hintTier: highestTier, gaveUp });
+          onComplete({ attempt, hintTier: attempt.hintTier ?? null, gaveUp });
         }}
       />
     </div>

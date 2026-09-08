@@ -5,6 +5,19 @@ const nonEmpty = z.string().trim().min(1);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const isoInstant = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/);
 const ao = z.enum(["AO1", "AO2", "AO3"]);
+const calculationOperand = z.union([z.number().finite(), id]);
+const calculationRuleSchema = z.object({
+  kind: z.enum(["method", "accuracy", "follow-through", "unit", "precision"]),
+  label: nonEmpty,
+  aliases: z.array(nonEmpty).optional(),
+  expected: z.number().finite(),
+  method: z.object({
+    operator: z.enum(["+", "-", "*", "/"]),
+    operands: z.tuple([calculationOperand, calculationOperand]),
+  }).optional(),
+  unitAliases: z.array(nonEmpty).optional(),
+  significantFigures: z.number().int().min(1).max(10).optional(),
+}).passthrough();
 
 export const contentQuestionPartSchema = z.object({
   id,
@@ -16,6 +29,8 @@ export const contentQuestionPartSchema = z.object({
   aos: z.array(ao).optional(),
   specPointIds: z.array(id).optional(),
   learningClaims: z.array(nonEmpty).optional(),
+  capabilityIds: z.array(id).min(1).optional(),
+  calculationRules: z.array(calculationRuleSchema).optional(),
 }).passthrough();
 
 export const contentQuestionSchema = z.object({
@@ -32,6 +47,11 @@ export const contentQuestionSchema = z.object({
   difficulty: z.number().int().min(1).max(5),
   origin: z.enum(["seed", "ai", "past-paper"]),
   createdAt: isoInstant,
+  learning: z.object({
+    familyId: id, contextId: id,
+    demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
+    expectedMinutes: z.number().finite().positive().max(120),
+  }).optional(),
 }).passthrough().superRefine((question, ctx) => {
   const marks = question.parts.reduce((sum, part) => sum + part.marks, 0);
   if (question.totalMarks !== marks) {

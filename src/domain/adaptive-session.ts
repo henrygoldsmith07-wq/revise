@@ -24,6 +24,9 @@ import {
 } from "./capability-mastery";
 import { deriveCapabilityProfiles } from "./capability-source";
 import { readinessStopFor } from "./adaptive-stop";
+import { wjecCapabilities } from "@/content/capabilities";
+import { selectLearningAction, type LearningAction } from "./learning-action";
+import { isTransferQuestion } from "./learning-evidence";
 import type { HintTier } from "./hints";
 import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
@@ -95,6 +98,8 @@ export interface AdaptiveSessionStep {
   why?: string;
   /** How this rung must be run (hints on/off); independent rungs carry 0 budget. */
   params?: AdaptiveStepParams;
+  capabilityId?: Id;
+  teaching?: boolean;
 }
 
 /** Normalised signals used by the single topic optimiser. */
@@ -157,6 +162,8 @@ export interface AdaptiveSessionPlan {
   startHref: string;
   /** Set when readiness evidence already proves this topic — core rungs dropped. */
   stoppedEarly?: { reason: string };
+  /** Replan one mapped skill action after every submitted answer. */
+  learningPolicy?: "capability-evidence-v1";
 }
 
 export interface AdaptiveSessionInput {
@@ -289,6 +296,14 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   const profile = profiles[topic.id] ?? emptyProfile();
   const stop = readinessStopFor(input.readiness ?? [], topic.subjectId);
   const steps = buildSteps({ topic, selected, cards: cardsByTopic.get(topic.id) ?? [], questions, attempts, mistakes, profile, targetMinutes, stopTopicDone: stop.stop });
+  const mapped = questions.some((q) => q.parts.some((p) => p.capabilityIds?.some((id) => wjecCapabilities.some((n) => n.id === id))));
+  const action = mapped ? selectLearningAction({ topicId: topic.id, nodes: wjecCapabilities, questions, attempts, mistakes, now, remainingMinutes: targetMinutes }) : undefined;
+  if (mapped) {
+    const retrieval = steps.filter((s) => s.kind === "overdue-retrieval" || s.kind === "delayed-retrieval");
+    const delayed = retrieval.find((s) => s.kind === "delayed-retrieval");
+    steps.splice(0, steps.length, ...retrieval.filter((s) => s.kind !== "delayed-retrieval"),
+      ...(action ? [learningActionStep(action, topic.id, topic.subjectId, 0)] : []), ...(delayed ? [{ ...delayed, minutes: 1 }] : []));
+  }
   const totalMinutes = steps.reduce((sum, step) => sum + step.minutes, 0);
   const startHref = `/adaptive-session?topic=${encodeURIComponent(topic.id)}&start=1`;
   const key = `${today}:${topic.id}`;
@@ -301,10 +316,11 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     targetMinutes,
     totalMinutes,
     score: selected.score,
-    reason: reasonFor(selected, topic.title),
+    reason: action?.reason ?? reasonFor(selected, topic.title),
     evidence: selected.evidence,
     steps,
     startHref,
+    ...(mapped ? { learningPolicy: "capability-evidence-v1" as const } : {}),
     ...(stop.stop && stop.reason ? { stoppedEarly: { reason: stop.reason } } : {}),
   };
 }
@@ -329,7 +345,8 @@ interface ScoreData {
 function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
   const dueCards = input.cards.filter((card) => isDue(card, input.today));
   const overdueCards = dueCards.filter((card) => card.due < input.today);
-  const openMistakes = input.mistakes.filter((mistake) => !mistake.resolved);
+  const openMistakes = input.mistakes.filter((mistake) => !mistake.resolved &&
+    !(mistake.repair?.stage === "transfer" && mistake.repair.dueAt && Date.parse(mistake.repair.dueAt) > input.now.getTime()));
   const marksLost = openMistakes.reduce((sum, mistake) => sum + Math.max(0, mistake.marksLost), 0);
   const retention = input.cards.length
     ? average(input.cards.map((card) => retrievability(card, input.now)))
@@ -461,7 +478,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
   const supported = pickQuestion((question) => question.difficulty <= 2);
   const independent = pickQuestion((question) => question.difficulty >= 3 && question.difficulty <= 4);
   const transfer = pickQuestion(
-    (question) => question.difficulty >= 4 || question.origin === "past-paper",
+    (question) => isTransferQuestion(question) && !attemptedIds.has(question.id),
   );
 
   const focusEvidence = profile[selected.evidence.focus];
@@ -780,6 +797,7 @@ export interface AdaptiveReplanInput {
   prereqQuestions?: Question[];
   /** The verdict a prerequisite diagnosis produced, when it points upstream. */
   prereq?: AdaptivePrereqVerdict | null;
+  now?: Date;
 }
 
 export interface AdaptiveReplan {
@@ -832,7 +850,7 @@ function inBand(question: Question, band: "supported" | "independent" | "transfe
   const difficulty = difficultyNumber(question);
   if (band === "supported") return difficulty <= 2;
   if (band === "independent") return difficulty >= 3 && difficulty <= 4;
-  return difficulty >= 4 || question.origin === "past-paper";
+  return isTransferQuestion(question);
 }
 
 function baseStep(plan: AdaptiveSessionPlan, kind: AdaptiveStepKind, seq: number): AdaptiveSessionStep {
@@ -859,6 +877,27 @@ function baseStep(plan: AdaptiveSessionPlan, kind: AdaptiveStepKind, seq: number
  */
 export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveReplan {
   const { plan, completed, questions, cards, mistakes, attempts, prereq, prereqQuestions } = input;
+
+  if (plan.learningPolicy === "capability-evidence-v1") {
+    const spent = completed.reduce((sum, r) => sum + (r.elapsedMs > 0 ? r.elapsedMs / 60_000 : r.minutes), 0);
+    const remaining = Math.max(0, plan.targetMinutes - spent);
+    const count = completed.filter((r) => QUESTION_STEP_KINDS.has(r.kind)).length;
+    const scheduled = completed.some((r) => r.kind === "delayed-retrieval" && r.result === "scheduled");
+    const action = count < ADAPTIVE_MAX_QUESTION_ATTEMPTS && !scheduled ? selectLearningAction({
+      topicId: plan.topicId, nodes: wjecCapabilities, questions, attempts, mistakes,
+      now: input.now ?? new Date(), remainingMinutes: remaining,
+    }) : undefined;
+    if (action) return { steps: [learningActionStep(action, plan.topicId, plan.subjectId, completed.length + 1)],
+      done: false, stopped: false, reason: action.reason };
+    const delayed = plan.steps.find((s) => s.kind === "delayed-retrieval");
+    const delayedStep = !scheduled && delayed && remaining > 0 ? { ...delayed, minutes: Math.min(1, remaining) } : undefined;
+    const waiting = mistakes.find((m) => !m.resolved && m.repair?.stage === "transfer" && m.repair.dueAt);
+    const reason = count >= ADAPTIVE_MAX_QUESTION_ATTEMPTS ? DONE_REASON_CAPPED : waiting?.repair?.dueAt
+      ? `Transfer is demonstrated. The repair stays open until an independent check after ${waiting.repair.dueAt.slice(0, 10)}.`
+      : "No further fresh mapped check fits this session. Remaining skills stay unproven; more targeted content or a later check is needed.";
+    return { steps: delayedStep ? [delayedStep] : [],
+      done: scheduled || !delayed || remaining <= 0, stopped: true, reason };
+  }
 
   const spent = completed.reduce((sum, record) => sum + Math.max(0, record.minutes), 0);
   const remaining = Math.max(0, plan.targetMinutes - spent);
@@ -915,6 +954,7 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
       const fromFresh = fresh.find((question) => inBand(question, band)) ?? (prefer === "any" ? fresh[0] : undefined);
       if (fromFresh) return fromFresh;
     }
+    if (band === "transfer") return undefined;
     const fromRetry = retryPool.find((question) => inBand(question, band)) ?? (prefer === "any" ? retryPool[0] : undefined);
     return fromRetry;
   };
@@ -1180,6 +1220,21 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
   }
 
   return { steps: trimmed, done, reason, stopped };
+}
+
+function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, seq: number): AdaptiveSessionStep {
+  const kind: AdaptiveStepKind = action.kind === "guided" ? "misconception-repair" :
+    action.kind === "transfer" ? "transfer" : "independent-application";
+  return {
+    id: `${topicId}:skill:${seq}:${action.question.id}`, kind,
+    label: action.kind === "diagnose" ? "Check the smallest gap" : action.kind === "retention" ? "Check what stayed with you" : STEP_LABELS[kind],
+    description: action.reason, why: action.reason, minutes: action.minutes,
+    topicId, subjectId, questionIds: [action.question.id], cardIds: [],
+    mistakeIds: action.mistakeId && action.kind !== "diagnose" ? [action.mistakeId] : [],
+    capabilityId: action.capabilityId, teaching: action.teaching,
+    href: practiceHref(topicId, action.question.id, kind),
+    params: { support: action.teaching ? "supported" : "independent", hintBudget: action.teaching ? 3 : 0 },
+  };
 }
 
 // ---------------------------------------------------------------------------

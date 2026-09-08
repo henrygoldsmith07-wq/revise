@@ -39,6 +39,7 @@ function question(
     totalMarks: 2,
     calculatorAllowed: true,
     difficulty: 3,
+    learning: { familyId: id, contextId: id, demand: "transfer", expectedMinutes: 3 },
     origin: "seed",
     specPointIds: ["physics.fields.sp-01"],
     createdAt: "2026-07-01T09:00:00.000Z",

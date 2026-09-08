@@ -1,4 +1,4 @@
-import type { AoCode, ContentSource, Id, LicensedSource, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
+import type { AoCode, ContentSource, Id, LicensedSource, LearningQuestionMetadata, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
 
 // Compact authoring format for the seed question bank. Ids are deterministic
 // (`cnt:question:<slug>`, namespaced — see src/data/content-ids.ts) so
@@ -16,6 +16,8 @@ export interface PartSpec {
   aos?: AoCode[];
   specPointIds?: string[];
   learningClaims?: string[];
+  capabilityIds?: string[];
+  calculationRules?: QuestionPart["calculationRules"];
 }
 
 export interface QuestionSpec {
@@ -37,6 +39,7 @@ export interface QuestionSpec {
   specVersion?: string;
   aos?: AoCode[];
   specPointIds?: string[];
+  learning?: LearningQuestionMetadata;
 }
 
 const SEED_CREATED_AT = "2025-01-01T00:00:00.000Z";
@@ -53,6 +56,8 @@ export function defineQuestion(spec: QuestionSpec): Question {
     aos: part.aos,
     specPointIds: (part as { specPointIds?: string[] }).specPointIds,
     learningClaims: (part as { learningClaims?: string[] }).learningClaims,
+    ...(part.capabilityIds ? { capabilityIds: part.capabilityIds } : {}),
+    ...(part.calculationRules ? { calculationRules: part.calculationRules } : {}),
   }));
 
   const aos =
@@ -82,6 +87,7 @@ export function defineQuestion(spec: QuestionSpec): Question {
     aos: aos.length ? aos : undefined,
     specPointIds: specPointIds.length ? specPointIds : undefined,
     createdAt: SEED_CREATED_AT,
+    ...(spec.learning ? { learning: spec.learning } : {}),
   };
 }
 

@@ -538,6 +538,7 @@ function Practice() {
             question={current}
             mode={mode}
             retestMistake={retestMistake}
+            repairTeachingSeen={Boolean(retestRemediation)}
             farTransfer={farTransferRetest}
             hintBudget={adaptiveHintBudget}
             draft={questionDrafts[current.id]}

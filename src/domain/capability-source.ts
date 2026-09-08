@@ -22,6 +22,7 @@ import {
   type TopicCapabilityMap,
 } from "./capability-mastery";
 import type { Attempt, Id, Question } from "./types";
+import { independentAttempt } from "./learning-evidence";
 
 export interface CapabilitySourceInput {
   recallMastery: RecallMasteryRow[];
@@ -38,10 +39,13 @@ export function transferEvidenceFromAttempts(attempts: Attempt[]): Array<{ topic
   const out: Array<{ topicId: Id; score: number }> = [];
   for (const attempt of attempts) {
     const link = attempt.farTransfer;
-    if (!link || link.role !== "source" || !link.outcome) continue;
+    if (!link || link.role !== "retest" || !link.outcome || !independentAttempt(attempt) ||
+      attempt.questionId !== link.candidateQuestionId || attempt.createdAt.slice(0, 10) < link.scheduledFor) continue;
+    const source = attempts.find((a) => a.id === link.sourceAttemptId && a.userId === attempt.userId);
+    if (!source || !independentAttempt(source)) continue;
     const topicId = attempt.topicIds[0];
     if (!topicId) continue;
-    out.push({ topicId, score: Math.max(0, Math.min(1, link.outcome.percentage / 100)) });
+    out.push({ topicId, score: Math.max(0, Math.min(1, attempt.awarded / attempt.max)) });
   }
   return out;
 }

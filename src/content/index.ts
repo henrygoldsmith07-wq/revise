@@ -29,6 +29,7 @@ import { extendedResponseQuestions } from "./questions/extended-responses";
 import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
 import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
+import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -68,6 +69,7 @@ export const seedQuestions: Question[] = [
   ...aqaGcseQuestions,
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
+  ...wjecRepairDepthQuestions,
 ];
 
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };

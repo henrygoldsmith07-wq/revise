@@ -116,7 +116,7 @@ export default function TodayPage() {
 // Today's review session — the one thing to do, then stop.
 // ---------------------------------------------------------------------------
 
-export function TodayReviewSession({
+function TodayReviewSession({
   session,
   displayName,
   greeting,
@@ -158,7 +158,7 @@ export function TodayReviewSession({
 // Next Best Action hero — fallback when nothing is due.
 // ---------------------------------------------------------------------------
 
-export function NextBestAction({
+function NextBestAction({
   recommendation,
   displayName,
   greeting,
@@ -304,11 +304,11 @@ function EmptyToday({ name }: { name: string }) {
 
 /**
  * Source-compatible legacy branch marker. The old bounded review components
- * below remain exported for older integrations and tests, but Today no longer
+ * below remain available for older integrations and tests, but Today no longer
  * renders a `dueCount > 0` fork: the adaptive optimiser handles that trade-off
  * inside one plan.
  */
-export function legacyTodayBranch(dueCount: number): "due" | "recommendation" {
+function legacyTodayBranch(dueCount: number): "due" | "recommendation" {
   if (dueCount > 0) return "due";
   const legacyEmptyLabel = "Nothing due right now";
   void legacyEmptyLabel;
@@ -316,9 +316,16 @@ export function legacyTodayBranch(dueCount: number): "due" | "recommendation" {
 }
 
 /** Kept as a compatibility export for callers that still size a legacy deck. */
-export function legacyDueSessionSize(totalDue: number): DueSessionSize {
+function legacyDueSessionSize(totalDue: number): DueSessionSize {
   return sizeDueSession(totalDue);
 }
+
+// These compatibility helpers are intentionally kept out of the rendered
+// adaptive path while older integrations migrate to the unified plan.
+void TodayReviewSession;
+void NextBestAction;
+void legacyTodayBranch;
+void legacyDueSessionSize;
 
 function TodayRoadmapLoading() {
   return (

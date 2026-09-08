@@ -292,6 +292,48 @@ export interface QuestionPart {
   specPointIds?: Id[];
   /** Which learning claims earn the marks for this part (paraphrased, 1:1 with markScheme when present). */
   learningClaims?: string[];
+  /** Explicit, reviewed skill mapping; never inferred from a whole-topic score. */
+  capabilityIds?: Id[];
+  /** Optional explicit one-rule-per-mark calculation rubric. */
+  calculationRules?: CalculationMarkRule[];
+}
+
+export interface CalculationMarkRule {
+  kind: "method" | "accuracy" | "follow-through" | "unit" | "precision";
+  /** Named working line, e.g. F or a. Aliases are authored, not guessed by OCR. */
+  label: string;
+  aliases?: string[];
+  expected: number;
+  method?: { operator: "+" | "-" | "*" | "/"; operands: [number | string, number | string] };
+  unitAliases?: string[];
+  significantFigures?: number;
+}
+
+export type LearningDemand = "recall" | "explanation" | "application" | "misconception" | "calculation" | "transfer" | "synoptic";
+
+export interface LearningQuestionMetadata {
+  /** Questions that differ only in numbers or wording share a family. */
+  familyId: Id;
+  contextId: Id;
+  demand: LearningDemand;
+  expectedMinutes: number;
+}
+
+export type MistakeRepairStage = "detected" | "diagnosed" | "taught" | "guided-success" | "independent-success" | "transfer" | "delayed-retention" | "resolved";
+
+export interface MistakeRepairEvidence {
+  attemptId: Id;
+  questionId: Id;
+  at: IsoInstant;
+  stage: MistakeRepairStage;
+}
+
+export interface MistakeRepairState {
+  version: 1;
+  stage: MistakeRepairStage;
+  evidence: MistakeRepairEvidence[];
+  /** A full elapsed delay after the last relevant practice/exposure. */
+  dueAt?: IsoInstant;
 }
 
 export type QuestionValidationStage = "draft" | "in_review" | "validated" | "needs_changes" | "rejected" | "retired";
@@ -424,6 +466,7 @@ export interface Question {
   paperId?: Id;
   paperQuestionNumber?: string;
   createdAt: IsoInstant;
+  learning?: LearningQuestionMetadata;
 }
 
 export type MarkEvidenceStatus = "credited" | "missed" | "unreported";
@@ -517,6 +560,8 @@ export interface Attempt {
   confidence?: 1 | 2 | 3 | 4 | 5;
   /** Highest hint tier used before submitting, from the adaptive hint ladder. */
   hintTier?: "cue" | "prompt" | "scaffold" | "worked-solution";
+  /** The repair explanation/credited point was visible before submission. */
+  repairTeachingSeen?: boolean;
   elapsedMs: number;
   mode: "practice" | "paper" | "recall";
   /** Optional provenance for attempts completed inside a paper sitting. */
@@ -602,6 +647,8 @@ export interface Mistake {
   /** Most recent targeted retest, whether or not it earned the point. */
   lastRetestAttemptId?: Id;
   lastRetestedAt?: IsoInstant;
+  capabilityIds?: Id[];
+  repair?: MistakeRepairState;
 }
 
 export interface AssessmentInsight {

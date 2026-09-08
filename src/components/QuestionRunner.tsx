@@ -63,6 +63,8 @@ export function QuestionRunner({
   onDraftChange,
   onFinished,
   hintBudget,
+  externalHintTier,
+  repairTeachingSeen = false,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -79,6 +81,8 @@ export function QuestionRunner({
    * the independent rung passes 0 so the evidence stays unaided.
    */
   hintBudget?: number;
+  externalHintTier?: HintTier | null;
+  repairTeachingSeen?: boolean;
 }) {
   const store = useStore();
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
@@ -123,7 +127,9 @@ export function QuestionRunner({
     () => ladder.filter((h) => allowedTiers.includes(h.tier)).find((h) => !usedTiers.includes(h.tier)) ?? null,
     [ladder, allowedTiers, usedTiers],
   );
-  const evidenceSource = hintEvidenceSource(usedTiers.length ? usedTiers[usedTiers.length - 1]! : null);
+  const highestUsedTier = HINT_TIERS.filter((tier) => usedTiers.includes(tier) || tier === externalHintTier ||
+    (repairTeachingSeen && tier === "scaffold")).at(-1) ?? null;
+  const evidenceSource = hintEvidenceSource(highestUsedTier);
 
   // When the DLQ later re-grades this question with AI, refresh an open
   // result view in place so the student sees the AI mark land without
@@ -236,7 +242,8 @@ export function QuestionRunner({
 
       elapsedMs,
       mode,
-      ...(usedTiers.length ? { hintTier: usedTiers[usedTiers.length - 1]! } : {}),
+      ...(highestUsedTier ? { hintTier: highestUsedTier } : {}),
+      ...(repairTeachingSeen ? { repairTeachingSeen: true } : {}),
       ...(paperId ? { paperId } : {}),
       ...(paperSpecId ? { paperSpecId } : {}),
       ...(paperRunId ? { paperRunId } : {}),
@@ -244,7 +251,7 @@ export function QuestionRunner({
       createdAt,
     };
 
-    const retest = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt) : undefined;
+    const retest = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, store.attempts, store.questions) : undefined;
     const remediation = planRemediation(question, submittedAnswers, marked, topic, misconceptionsForTopic(question.topicIds[0] ?? ""));
 
     const farTransferLink = farTransfer
@@ -263,7 +270,7 @@ export function QuestionRunner({
     // hint-supported or partial answers say which capability still needs work.
     // The next action stays inside this flow — micro-practice, an unaided
     // retry, or a transfer check — never a redirect to another page.
-    const supportUsed = usedTiers.length > 0;
+    const supportUsed = Boolean(highestUsedTier) || repairTeachingSeen;
     const retestOpen = Boolean(retestMistake && retest?.status !== "resolved");
     const nextAction: { label: string; href: null; why: string } =
       awarded < max
@@ -286,9 +293,9 @@ export function QuestionRunner({
               }
             : retestOpen
               ? {
-                  label: "Close the open mistake",
+                  label: "Continue the repair",
                   href: null,
-                  why: "The retest is still open — the missed point needs one more earned pass before it closes.",
+                  why: "The missed point stays open until fresh independent, transfer and delayed checks demonstrate the repair.",
                 }
               : {
                   label: "Bank it — next best action",
@@ -621,7 +628,7 @@ function MarkedResult({
           {result.retest.status === "resolved" ? (
             <p className="text-[11px] text-success mt-2">The mistake has been removed from your open repair queue.</p>
           ) : result.retest.status === "still-open" ? (
-            <p className="text-[11px] text-ink2 mt-2">Repeat the remediation above, then retest this question again.</p>
+            <p className="text-[11px] text-ink2 mt-2">Continue your adaptive session for the next evidence check.</p>
           ) : null}
         </div>
       ) : null}

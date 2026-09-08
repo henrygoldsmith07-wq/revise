@@ -73,13 +73,16 @@ export function repairProgress(mistake: Mistake): {
   const retested = (mistake.retestCount ?? 0) > 0;
   // A retest "passes" when the mistake was resolved off the back of one; the
   // count alone never proves quality, so resolution is the carried signal.
-  const retestsPassed = mistake.resolved && retested ? 1 : 0;
+  const evidence = Array.isArray(mistake.repair?.evidence) ? mistake.repair.evidence : [];
+  const canClose = mistake.repair?.stage === "resolved" &&
+    evidence.some((e) => e.stage === "delayed-retention");
+  const retestsPassed = evidence.filter((e) => ["guided-success", "independent-success", "transfer", "delayed-retention"].includes(e.stage)).length;
   return {
     retested,
     retestsPassed,
     // The only close path: a retest was actually attempted and the mistake
     // resolved off the back of it. A viewed answer satisfies neither.
-    canClose: mistake.resolved && retested,
+    canClose,
   };
 }
 

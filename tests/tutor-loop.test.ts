@@ -44,6 +44,7 @@ function question(id: string, kind: Question["kind"] = "short", difficulty: Ques
     totalMarks: 2,
     calculatorAllowed: true,
     difficulty,
+    ...(difficulty >= 4 ? { learning: { familyId: id, contextId: id, demand: "transfer" as const, expectedMinutes: 4 } } : {}),
     origin: "seed",
     createdAt: NOW.toISOString(),
   };

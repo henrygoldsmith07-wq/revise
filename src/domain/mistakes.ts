@@ -1,5 +1,6 @@
 import { matchMisconception } from "./misconception-library";
 import { createCard } from "./scheduling";
+import { advanceMistakeRepair, repairTargetParts, REPAIR_STAGE_LABELS } from "./repair-evidence";
 import type { Attempt, Card, Id, Misconception, Mistake, Question } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -145,6 +146,13 @@ export function mistakesFromAttempt(
     const misconceptionMatch = misconceptions.length
       ? matchMisconception(misconceptions, marked.missedPoints.join("; "), studentAnswer)
       : null;
+    const initialStage = part?.capabilityIds?.length === 1 ? "diagnosed" as const : "detected" as const;
+    const repairEvidence = [
+      { attemptId: attempt.id, questionId: question.id, at: attempt.createdAt, stage: "detected" as const },
+      ...(initialStage === "diagnosed"
+        ? [{ attemptId: attempt.id, questionId: question.id, at: attempt.createdAt, stage: "diagnosed" as const }]
+        : []),
+    ];
     const mistake: Mistake = {
       id: mistakeId,
       userId: attempt.userId,
@@ -153,6 +161,8 @@ export function mistakesFromAttempt(
       questionId: question.id,
       attemptId: attempt.id,
       ...(part?.id ? { partId: part.id } : {}),
+      ...(part?.capabilityIds?.length ? { capabilityIds: part.capabilityIds } : {}),
+      repair: { version: 1, stage: initialStage, evidence: repairEvidence },
       point: marked.missedPoints[0] ?? "",
       command: detectCommandWord(part?.prompt ?? question.stem),
       misconception: detectMisconception(marked.missedPoints),
@@ -207,6 +217,7 @@ export interface RetestEvaluation {
   point: string | null;
   pointRelearned: boolean;
   feedback: string;
+  updatedMistake?: Mistake;
 }
 
 /**
@@ -219,6 +230,8 @@ export function evaluateMistakeRetest(
   mistake: Mistake,
   question: Question,
   attempt: Attempt,
+  history: readonly Attempt[] = [],
+  questions: readonly Question[] = [question],
 ): RetestEvaluation {
   const point = mistake.point ?? null;
   const notApplicable = (feedback: string): RetestEvaluation => ({
@@ -233,14 +246,15 @@ export function evaluateMistakeRetest(
 
   if (
     attempt.questionId !== question.id ||
-    (mistake.questionId && mistake.questionId !== question.id) ||
+    !repairTargetParts(mistake, question).length ||
     (attempt.retestMistakeId && attempt.retestMistakeId !== mistake.id)
   ) {
     return notApplicable("This attempt is not linked to the question that created the mistake.");
   }
 
-  const marked = mistake.partId
-    ? attempt.marked.find((part) => part.partId === mistake.partId)
+  const targetParts = repairTargetParts(mistake, question);
+  const marked = targetParts.length
+    ? attempt.marked.find((part) => targetParts.includes(part.partId))
     : attempt.marked.length === 1
       ? attempt.marked[0]
       : undefined;
@@ -250,7 +264,8 @@ export function evaluateMistakeRetest(
 
   const pointRelearned = point ? marked.creditedPoints.includes(point) : marked.awarded >= marked.max;
   const fullPart = marked.awarded >= marked.max;
-  const resolved = fullPart && pointRelearned;
+  const updatedMistake = advanceMistakeRepair(mistake, question, attempt, history, questions);
+  const resolved = updatedMistake.resolved && updatedMistake.repair?.stage === "resolved";
 
   return {
     mistakeId: mistake.id,
@@ -259,9 +274,10 @@ export function evaluateMistakeRetest(
     max: marked.max,
     point,
     pointRelearned,
+    updatedMistake,
     feedback: resolved
       ? `Retest earned ${marked.awarded}/${marked.max} and recovered the missed point${point ? `: ${point}` : "."}`
-      : `Retest earned ${marked.awarded}/${marked.max}. The original mistake stays open until the affected part is complete and the missed point is credited.`,
+      : `Retest earned ${marked.awarded}/${marked.max}. ${updatedMistake.repair ? REPAIR_STAGE_LABELS[updatedMistake.repair.stage] : "Gap still open"}. ${fullPart && pointRelearned ? "The point was recovered; fresh independent, transfer and delayed evidence are needed to resolve it." : "Repair the missed point before the next independent check."}`,
   };
 }
 
@@ -272,6 +288,7 @@ export function applyRetestToMistake(
   attempt: Attempt,
 ): Mistake {
   if (evaluation.status === "not-applicable") return mistake;
+  if (evaluation.updatedMistake) return evaluation.updatedMistake;
 
   const updated: Mistake = {
     ...mistake,
@@ -279,10 +296,8 @@ export function applyRetestToMistake(
     lastRetestAttemptId: attempt.id,
     lastRetestedAt: attempt.createdAt,
   };
-  if (evaluation.status === "resolved") {
-    updated.resolved = true;
-    updated.resolvedAt = attempt.createdAt;
-  }
+  // Legacy evaluations without the evidence transition may record a retest,
+  // but cannot manufacture durable resolution from a caller-supplied status.
   return updated;
 }
 

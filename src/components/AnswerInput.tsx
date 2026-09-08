@@ -55,6 +55,7 @@ export function AnswerInput({
 }) {
   const [listening, setListening] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [photoDraft, setPhotoDraft] = useState<string | null>(null);
   const speechAvailable = useSyncExternalStore(NO_SUBSCRIBE, speechSupported, speechUnsupportedOnServer);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -108,11 +109,11 @@ export function AnswerInput({
         setStatus(result.note ?? "Could not transcribe that image — type your answer instead.");
         return;
       }
-      onChange(value ? `${value}\n${result.data.text}` : result.data.text);
+      setPhotoDraft(result.data.text);
       setStatus(
         result.data.confidence < 0.6
-          ? "Transcribed, but the handwriting was hard to read — check it before submitting."
-          : "Transcribed. Check it reads as you wrote it.",
+          ? "Some handwriting was unclear. Check the signs, powers and units in the transcription."
+          : "Check the transcription against your working before using it.",
       );
     } catch {
       setStatus("Could not read that photo — type your answer instead.");
@@ -121,6 +122,21 @@ export function AnswerInput({
 
   return (
     <div>
+      {photoDraft !== null ? (
+        <div className="mb-3 space-y-2 rounded-lg border border-line p-3">
+          <label className="text-sm font-medium">Check your handwritten working
+            <textarea className="field mt-2" aria-label="Handwriting transcription" rows={5} value={photoDraft} onChange={(e) => setPhotoDraft(e.target.value)} />
+          </label>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" onClick={() => {
+              onChange(valueRef.current ? `${valueRef.current}\n${photoDraft}` : photoDraft);
+              setPhotoDraft(null);
+              setStatus("Your checked transcription has been added to the answer.");
+            }}>Use this transcription</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setPhotoDraft(null)}>Discard</Button>
+          </div>
+        </div>
+      ) : null}
       <label htmlFor={id} className="sr-only">
         Your answer
       </label>

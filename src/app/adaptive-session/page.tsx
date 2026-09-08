@@ -18,6 +18,7 @@ import {
 import { diagnosePrerequisiteWeakness } from "@/domain/prerequisite-diagnosis";
 import { buryCard } from "@/domain/scheduling";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
+import { wjecCapabilities } from "@/content/capabilities";
 import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { useStore } from "@/state/store";
@@ -424,10 +425,11 @@ function StepPanel({
   );
 
   const finishQuestion = (attempt: Attempt, hintTier: AdaptiveStepRecord["hintTier"], gaveUp: boolean) => {
-    const result = resultFromQuestionAttempt({ awarded: attempt.awarded, max: attempt.max, hintTier, gaveUp });
+    const effectiveHint = hintTier ?? (attempt.repairTeachingSeen ? "scaffold" : null);
+    const result = resultFromQuestionAttempt({ awarded: attempt.awarded, max: attempt.max, hintTier: effectiveHint, gaveUp });
     let resolvedMistakeId: Id | undefined;
     if (mistake && question && attempt.retestMistakeId === mistake.id) {
-      const evaluation = evaluateMistakeRetest(mistake, question, attempt);
+      const evaluation = evaluateMistakeRetest(mistake, question, attempt, store.attempts, store.questions);
       if (evaluation.status === "resolved") resolvedMistakeId = mistake.id;
     }
     onDone({
@@ -437,7 +439,7 @@ function StepPanel({
       result,
       awardedMarks: attempt.awarded,
       maxMarks: attempt.max,
-      hintTier,
+      hintTier: effectiveHint,
       ...(attempt.questionId ? { itemId: attempt.questionId } : {}),
       ...(resolvedMistakeId ? { resolvedMistakeId } : {}),
       elapsedMs: attempt.elapsedMs,
@@ -490,13 +492,14 @@ function StepPanel({
         <div className="space-y-3">
           {mistake ? (
             <div className="rounded-[8px] border border-danger/30 bg-dangersoft/40 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-wide text-danger font-semibold">The misconception to repair</p>
+              <p className="text-[11px] uppercase tracking-wide text-danger font-semibold">The skill to repair</p>
               <p className="text-sm text-ink mt-1">{mistake.description}</p>
               {mistake.point ? (
                 <p className="text-xs text-ink3 mt-1">
                   The mark needed: “{mistake.point}”. Contrast your answer with that point, then re-earn it below.
                 </p>
               ) : null}
+              {step.capabilityId ? <p className="text-sm text-ink mt-2">{wjecCapabilities.find((node) => node.id === step.capabilityId)?.explanation}</p> : null}
             </div>
           ) : (
             <p className="text-xs text-ink2">
@@ -507,8 +510,9 @@ function StepPanel({
             <AdaptiveQuestionBlock
               key={`repair:${question.id}:${mistake?.id ?? "none"}`}
               question={question}
-              support="independent"
+              support={support}
               retestMistake={mistake}
+              repairTeachingSeen={Boolean(mistake)}
               onComplete={({ attempt, hintTier, gaveUp }) => finishQuestion(attempt, hintTier, gaveUp)}
             />
           ) : (
@@ -528,6 +532,7 @@ function StepPanel({
             key={`${step.kind}:${question.id}`}
             question={question}
             support={support}
+            retestMistake={mistake}
             onComplete={({ attempt, hintTier, gaveUp }) => finishQuestion(attempt, hintTier, gaveUp)}
           />
         ) : (

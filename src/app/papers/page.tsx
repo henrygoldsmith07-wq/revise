@@ -465,7 +465,7 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
  * topic's title and key points. Cheap, deterministic and offline; the student
  * can always re-file a question by practising it from the topic they expect.
  */
-export function mapToTopics(subjectId: string, text: string, limit = 2): string[] {
+function mapToTopics(subjectId: string, text: string, limit = 2): string[] {
   const words = tokenise(text);
   const scored = topicsFor(subjectId)
     .map((topic) => {
