@@ -408,3 +408,110 @@ application-mastery) green; full `npm test` green (166 files,
 1337 passed); `tsc --noEmit` + strict + `lint:check` clean; live
 Preview verified: fresh onboarding → Today hero → adaptive runner with
 "Why this step" → review step hands back to the tutor.
+## Improvement state: one continuous adaptive tutor
+
+### Goal and observable outcome
+
+An adaptive session should be genuinely adaptive *during* the session, not a
+fixed menu of steps the student clicks through and leaves for other surfaces.
+After every meaningful action the tutor records the evidence, updates the
+relevant capability, classifies the independence/support level, repairs
+mistakes, reconsiders the next pedagogical action, and keeps going in the same
+route — the student experiences question → feedback → adapted next step, never
+session → open question page → navigate back → next block → open lesson page.
+
+Success signals:
+
+- the /adaptive-session route embeds retrieval, questions, hints, repairs and
+  prerequisite detours inline instead of deep-linking to review/practice;
+- after each recorded step the remaining sequence is re-derived from fresh
+  stored evidence (support fades or returns, teaching is skipped after
+  independent recall, repairs and prerequisite detours are inserted, the run
+  stops when the evidence or time budget says so);
+- completed steps never disappear from history and a refresh/Pause/Resume
+  restores the same run;
+- assisted/worked-solution success never counts as independent evidence, and
+  unknown capabilities stay unknown;
+- the mistake-repair pipeline and hint ladder are actually executed in the
+  live experience, with early hint tiers free of credited answer content;
+- the learning-loop effectiveness calculation is explicit and correct;
+- closing the session answers what improved, what is fragile, what was
+  repaired, what Revise learned, and the best next action.
+
+### Baseline evidence and diagnosis
+
+- `buildAdaptiveSession` produced a good 20-minute ladder, but each step was a
+  card/lesson/question block that routed the student to the review, lesson or
+  practice surface; the remaining sequence did not change as evidence arrived.
+- `learning-loop.ts` conflated outcomes when computing whether a teaching
+  intervention "improved" performance, so an assisted or viewed outcome could
+  look like progress.
+- The hint ladder could surface the credited answer content before the
+  student had exhausted the useful scaffolding tiers.
+- Existing marking, review/FSRS persistence, mistake evaluation, prerequisite
+  diagnosis and feedback remediation already worked — they needed embedding,
+  not reimplementation.
+
+### Decisions
+
+- Keep `buildAdaptiveSession` as the plan anchor (subject/topic/duration stay
+  stable); add `replanAdaptiveSession`, a pure re-derivation of the remaining
+  steps from the completed record history plus fresh stored evidence. Replan
+  runs after every recorded step and is deterministic — no loops, completed
+  history is never rewritten, and a paused run replays to the same position.
+- Keep the one canonical runner: `QuestionRunner` (with its marking,
+  remediation and delayed-far-transfer wiring) is embedded in the session via
+  a thin `AdaptiveQuestionBlock`; card retrieval is embedded via
+  `AdaptiveRetrievalBlock` writing through the same `reviewCard` FSRS path as
+  /review. No second planner or second evidence store was added.
+- Hints appear only on supported rungs and are capped below the worked
+  solution; the worked solution requires an explicit give-up and down-weights
+  the resulting evidence. Retrieval confidence is captured before the reveal.
+- Persist each run (per user, keyed by plan) in the existing revise-user meta
+  namespace and write the standard revision checkpoint for Pause/Resume.
+- Session close uses qualitative evidence bands (improved / fragile /
+  repaired / later / learned / best next action) rather than XP-style scores.
+
+### Delivered scope
+
+- Domain (`src/domain/adaptive-session.ts`): step-outcome classification,
+  `replanAdaptiveSession` with support fading/returning, misconception repair
+  insertion, prerequisite-repair detour, adaptive stopping, delayed-retrieval
+  terminal scheduling, and `summariseAdaptiveRun` for the closing screen.
+- Domain (`src/domain/learning-loop.ts`): explicit, precedence-correct
+  effectiveness computation that keeps unknown outcomes unknown.
+- Domain (`src/domain/hints.ts`): early tiers no longer leak the credited
+  answer for the question being answered; the top tier is the give-up path.
+- UI: rewritten `/adaptive-session` page as a continuous loop (intro → inline
+  steps → evidence-based summary), plus `AdaptiveQuestionBlock` and
+  `AdaptiveRetrievalBlock` components.
+- Tests: `tests/adaptive-replan.test.ts` (continuous adaptation, unknown
+  evidence, repair rules, session stability), `tests/hint-ladder.test.ts`
+  (no early leakage, weaker evidence with support), and
+  `tests/learning-loop-effectiveness.test.ts` (no baseline, small samples,
+  improvement, regression, delayed evidence).
+
+### Status
+
+- [x] continuous replan engine in the adaptive domain with tests
+- [x] explicit learning-loop effectiveness computation with tests
+- [x] non-leaking hint ladder with tests
+- [x] inline retrieval and question blocks reusing the canonical runner/store
+- [x] rewrite the adaptive route as one continuous session with pause/resume
+  and an evidence-based closing summary
+- [x] full lint, regular and strict TypeScript, test suite and build pass
+
+### Verification log
+
+2026-09-07: Focused suites passed — adaptive replan (12 tests), hint ladder
+(5 tests), learning-loop effectiveness (5 tests), today-screen source checks
+(2 tests). Full suite: 168 test files passed (1 skipped), 1,350 tests passed
+(2 skipped). `npm run lint:check`, `npm run type-check`,
+`npm run type-check:strict` and `npm run build` all passed.
+
+### Delegation ledger
+
+- No subagents used; edits and verification were performed serially. Work was
+  carried out in a fresh `revise/` clone inside the shared Forq workspace
+  because the conversation's checkout pointed at a different repository; all
+  changes above are confined to that clone and are uncommitted.

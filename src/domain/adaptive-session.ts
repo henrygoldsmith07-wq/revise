@@ -24,6 +24,7 @@ import {
 } from "./capability-mastery";
 import { deriveCapabilityProfiles } from "./capability-source";
 import { readinessStopFor } from "./adaptive-stop";
+import type { HintTier } from "./hints";
 import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
 import type { ExamReadiness } from "./exam-readiness";
@@ -35,6 +36,7 @@ import type {
   IsoDate,
   Mistake,
   Question,
+  RecallGrade,
   ReviewLog,
   Topic,
   TopicMastery,
@@ -51,7 +53,28 @@ export type AdaptiveStepKind =
   | "supported-practice"
   | "independent-application"
   | "transfer"
+  | "prerequisite-repair"
   | "delayed-retrieval";
+
+/** Execution parameters a step's runner needs, beyond the ids it targets. */
+export interface AdaptiveStepParams {
+  /** Whether this rung may offer hints. Independent rungs never may. */
+  support: "supported" | "independent";
+  /** Highest hint tier a supported rung offers before the worked solution. */
+  hintBudget: number;
+}
+
+/** Plain-language labels the runner/UI reads off a step. */
+export const STEP_LABELS: Record<AdaptiveStepKind, string> = {
+  "overdue-retrieval": "Retrieval",
+  "misconception-repair": "Repair the misconception",
+  explanation: "Explain the gap",
+  "supported-practice": "Supported question",
+  "independent-application": "Independent application",
+  transfer: "Unfamiliar transfer",
+  "prerequisite-repair": "Fix the foundation first",
+  "delayed-retrieval": "Schedule delayed retrieval",
+};
 
 /** The individual blocks the adaptive runner exposes to the student. */
 export interface AdaptiveSessionStep {
@@ -61,7 +84,7 @@ export interface AdaptiveSessionStep {
   label: string;
   /** One sentence explaining the purpose of the block. */
   description: string;
-  /** Existing tested route that executes this block. */
+  /** Existing tested route that executes this block (fallback link). */
   href: string;
   topicId: Id;
   subjectId: Id;
@@ -70,6 +93,8 @@ export interface AdaptiveSessionStep {
   mistakeIds: Id[];
   /** Why this block is in today's plan, in the student's language. */
   why?: string;
+  /** How this rung must be run (hints on/off); independent rungs carry 0 budget. */
+  params?: AdaptiveStepParams;
 }
 
 /** Normalised signals used by the single topic optimiser. */
@@ -507,6 +532,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       href: practiceHref(topic.id, supported.id, "supported"),
       questionIds: [supported.id],
       why: "Scaffolded attempt first — support that counts as weaker evidence, then fades.",
+      params: { support: "supported", hintBudget: 3 },
     });
   }
 
@@ -521,6 +547,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       href: practiceHref(topic.id, independent.id, "independent"),
       questionIds: [independent.id],
       why: "Unaided success is the only proof that counts — this rung carries full evidence weight.",
+      params: { support: "independent", hintBudget: 0 },
     });
   }
 
@@ -535,6 +562,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       href: practiceHref(topic.id, transfer.id, "transfer"),
       questionIds: [transfer.id],
       why: "Same idea, new clothing — transfer is what the exam actually tests.",
+      params: { support: "independent", hintBudget: 0 },
     });
   }
 
@@ -648,4 +676,637 @@ function groupBy<T>(items: T[], key: (item: T) => Id): Map<Id, T[]> {
     map.set(id, list);
   }
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// Continuous in-session adaptation — the live tutor loop.
+//
+// buildAdaptiveSession picks the session; this section decides what happens
+// INSIDE it. Every executed step becomes a recorded outcome and replanning
+// re-derives the remaining sequence from those outcomes plus the evidence the
+// step just created, so the sequence adapts to evidence rather than to a
+// fixed countdown. Guardrails keep it stable: one topic (plus at most one
+// short prerequisite detour), one time budget, never a loop.
+//
+//   independent success  ⇒ drop unneeded support and teaching;
+//   assisted success     ⇒ weaker evidence, an independent retry still owed;
+//   failure              ⇒ repair the misconception, raise support, or
+//                          (on repetition) detour to the prerequisite;
+//   transfer success     ⇒ schedule delayed retrieval and stop drilling;
+//   repeated failure     ⇒ close the rung honestly instead of looping.
+//
+// Pure and deterministic: no React, storage, network or model calls.
+// ---------------------------------------------------------------------------
+
+/** Kinds executed as one markable question pass (also the only retestable kinds). */
+export const QUESTION_STEP_KINDS: ReadonlySet<AdaptiveStepKind> = new Set([
+  "supported-practice",
+  "independent-application",
+  "transfer",
+  "misconception-repair",
+  "prerequisite-repair",
+]);
+
+/** Minutes a rebuilt mid-session step claims from the remaining budget. */
+const REBUILT_STEP_MINUTES: Record<AdaptiveStepKind, number> = {
+  "overdue-retrieval": 2,
+  "misconception-repair": 3,
+  explanation: 2,
+  "supported-practice": 4,
+  "independent-application": 4,
+  transfer: 4,
+  "prerequisite-repair": 3,
+  "delayed-retrieval": 1,
+};
+
+/** Marks ratio a question attempt needs to count as a pass. */
+export const ADAPTIVE_PASS_RATIO = 0.7;
+/** Question attempts per topic before the tutor closes instead of looping. */
+export const ADAPTIVE_MAX_QUESTION_ATTEMPTS = 5;
+/** Times the same retrieval card may fail before teaching replaces retrying. */
+export const ADAPTIVE_MAX_RETRIEVAL_FAILS = 2;
+/** Misconception-repair attempts per session (each one is an independent retest). */
+export const ADAPTIVE_MAX_REPAIR_ATTEMPTS = 2;
+
+export type AdaptiveStepResult =
+  | "passed-independent"
+  | "passed-assisted"
+  | "missed"
+  | "gave-up"
+  | "scheduled"
+  | "viewed";
+
+/** One executed step's outcome, kept in run order for replay and replanning. */
+export interface AdaptiveStepRecord {
+  stepId: Id;
+  kind: AdaptiveStepKind;
+  minutes: number;
+  result: AdaptiveStepResult;
+  /** Marks earned on this rung's question (0 for non-question rungs). */
+  awardedMarks: number;
+  maxMarks: number;
+  /** Highest hint tier reached, or null when none was used. */
+  hintTier: HintTier | null;
+  /** The question attempted or the last card shown for this step. */
+  itemId?: Id;
+  /** Retrieval cards still missed when this step ended. */
+  missedItemIds?: Id[];
+  /** Mistake resolved by this step's retest, when one was. */
+  resolvedMistakeId?: Id;
+  elapsedMs: number;
+}
+
+/** The distilled verdict of a prerequisite diagnosis (page passes it in). */
+export interface AdaptivePrereqVerdict {
+  prereqTopicId: Id;
+  prereqTopicTitle: string;
+  kind: "prereq-first" | "prereq-unmeasured";
+}
+
+export interface AdaptiveReplanInput {
+  /** The session as chosen on Today (anchor: topic, focus, budget, original rungs). */
+  plan: AdaptiveSessionPlan;
+  /** Executed steps in order — the run's evidence so far. */
+  completed: AdaptiveStepRecord[];
+  /** The topic's question bank, including any questions just attempted. */
+  questions: Question[];
+  /** The topic's cards in their persisted state. */
+  cards: Card[];
+  /** Unresolved mistakes on the topic right now (including just-created ones). */
+  mistakes: Mistake[];
+  /** All attempts on the topic so far (before the run and during it). */
+  attempts: Attempt[];
+  /** The prerequisite topic's questions, when a detour is being offered. */
+  prereqQuestions?: Question[];
+  /** The verdict a prerequisite diagnosis produced, when it points upstream. */
+  prereq?: AdaptivePrereqVerdict | null;
+}
+
+export interface AdaptiveReplan {
+  /** The next steps, in order. Never repeats an executed step id. */
+  steps: AdaptiveSessionStep[];
+  /** True when the tutor is satisfied — no more steps to run. */
+  done: boolean;
+  /** One line saying why the next step (or the stop) happens. */
+  reason: string;
+  /** True when the run was capped (attempt/exhaustion) rather than satisfied. */
+  stopped: boolean;
+}
+
+export const DONE_REASON_BUDGET =
+  "Your time budget for this session is used up — the gain is scheduled to be tested after a delay.";
+export const DONE_REASON_EVIDENCE =
+  "Independent application is demonstrated and transfer held — further similar questions would be unnecessary drilling.";
+export const DONE_REASON_CAPPED =
+  "This rung has been tried enough times in one session; repeating it now would be drilling, not learning. The open points are queued for repair.";
+
+/**
+ * Classify one question-rung execution from its marks and support use.
+ * Even the smallest hint demotes an otherwise-full success to assisted
+ * evidence: only a hint-free pass can be independent proof.
+ */
+export function resultFromQuestionAttempt(input: {
+  awarded: number;
+  max: number;
+  hintTier: HintTier | null;
+  gaveUp?: boolean;
+}): AdaptiveStepResult {
+  if (input.gaveUp) return "gave-up";
+  const ratio = input.max > 0 ? input.awarded / input.max : 0;
+  if (ratio < ADAPTIVE_PASS_RATIO) return "missed";
+  return input.hintTier === null ? "passed-independent" : "passed-assisted";
+}
+
+/** Classify one card-retrieval pass from the grades the student gave. */
+export function resultFromRetrievalGrades(grades: RecallGrade[]): AdaptiveStepResult {
+  return grades.some((grade) => grade === "again") ? "missed" : "passed-independent";
+}
+
+function difficultyNumber(question: Question): number {
+  return typeof question.difficulty === "number" && Number.isFinite(question.difficulty)
+    ? question.difficulty
+    : 3;
+}
+
+function inBand(question: Question, band: "supported" | "independent" | "transfer"): boolean {
+  const difficulty = difficultyNumber(question);
+  if (band === "supported") return difficulty <= 2;
+  if (band === "independent") return difficulty >= 3 && difficulty <= 4;
+  return difficulty >= 4 || question.origin === "past-paper";
+}
+
+function baseStep(plan: AdaptiveSessionPlan, kind: AdaptiveStepKind, seq: number): AdaptiveSessionStep {
+  const id = `${plan.topicId}:${kind}${seq > 0 ? `-${seq}` : ""}`;
+  return {
+    id,
+    kind,
+    minutes: REBUILT_STEP_MINUTES[kind],
+    label: STEP_LABELS[kind],
+    description: "",
+    href: practiceHref(plan.topicId, "", kind),
+    topicId: plan.topicId,
+    subjectId: plan.subjectId,
+    cardIds: [],
+    questionIds: [],
+    mistakeIds: [],
+  };
+}
+
+/**
+ * Re-derive the rest of a session from what has actually happened.
+ * Called after every meaningful step; the caller replaces its remaining
+ * queue with the returned steps (never mutating completed history).
+ */
+export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveReplan {
+  const { plan, completed, questions, cards, mistakes, attempts, prereq, prereqQuestions } = input;
+
+  const spent = completed.reduce((sum, record) => sum + Math.max(0, record.minutes), 0);
+  const remaining = Math.max(0, plan.targetMinutes - spent);
+  const executed = new Set(completed.map((record) => record.stepId));
+  // Steps of the original ladder that have not run yet (original order).
+  const tail = plan.steps.filter((step) => !executed.has(step.id));
+
+  const questionRecords = completed.filter((record) => QUESTION_STEP_KINDS.has(record.kind));
+  const retrievalRecords = completed.filter((record) => record.kind === "overdue-retrieval");
+  const repairRecords = completed.filter((record) => record.kind === "misconception-repair");
+  const prereqRecords = completed.filter((record) => record.kind === "prerequisite-repair");
+  const explanations = completed.filter((record) => record.kind === "explanation");
+  const supportedPassedIndependent = completed.some(
+    (record) => record.kind === "supported-practice" && record.result === "passed-independent",
+  );
+  const independentPassedIndependent = completed.some(
+    (record) => record.kind === "independent-application" && record.result === "passed-independent",
+  );
+  const transferPassedIndependent = completed.some(
+    (record) => record.kind === "transfer" && record.result === "passed-independent",
+  );
+  const scheduled = completed.some((record) => record.kind === "delayed-retrieval" && record.result === "scheduled");
+  const lastRetrieval = retrievalRecords.at(-1);
+  const availableCardIds = new Set(
+    cards
+      .filter((card) => !card.suspended)
+      .map((card) => card.id),
+  );
+
+  // Question pools: fresh = never attempted anywhere; retryable = missed here.
+  const ordered = [...questions].sort(
+    (a, b) => difficultyNumber(a) - difficultyNumber(b) || a.id.localeCompare(b.id),
+  );
+  const usedThisRun = new Set(
+    completed
+      .map((record) => record.itemId)
+      .filter((id): id is Id => Boolean(id)),
+  );
+  const attemptedEver = new Set(attempts.map((attempt) => attempt.questionId));
+  const fresh = ordered.filter((question) => !usedThisRun.has(question.id) && !attemptedEver.has(question.id));
+  const missedIds = new Set(
+    completed
+      .filter((record) => record.result === "missed" || record.result === "gave-up")
+      .map((record) => record.itemId)
+      .filter((id): id is Id => Boolean(id)),
+  );
+  const retryPool = ordered.filter((question) => missedIds.has(question.id));
+
+  const pickQuestion = (
+    band: "supported" | "independent" | "transfer",
+    prefer: "fresh" | "retry" | "any" = "fresh",
+  ): Question | undefined => {
+    if (prefer !== "retry") {
+      const fromFresh = fresh.find((question) => inBand(question, band)) ?? (prefer === "any" ? fresh[0] : undefined);
+      if (fromFresh) return fromFresh;
+    }
+    const fromRetry = retryPool.find((question) => inBand(question, band)) ?? (prefer === "any" ? retryPool[0] : undefined);
+    return fromRetry;
+  };
+
+  const openMistakes = mistakes.filter((mistake) => !mistake.resolved);
+  const resolvedIds = new Set(
+    completed
+      .map((record) => record.resolvedMistakeId)
+      .filter((id): id is Id => Boolean(id)),
+  );
+  // Mistakes still open that this run has not already repaired (by retest).
+  const openWithoutRepair = openMistakes.filter((mistake) => !resolvedIds.has(mistake.id));
+
+  const steps: AdaptiveSessionStep[] = [];
+  const pushStep = (kind: AdaptiveStepKind, seq: number, partial: Partial<AdaptiveSessionStep> = {}) => {
+    steps.push({ ...baseStep(plan, kind, seq), ...partial, minutes: REBUILT_STEP_MINUTES[kind] });
+  };
+  const pushQuestionStep = (
+    kind: AdaptiveStepKind,
+    seq: number,
+    question: Question | undefined,
+    opts: { support: "supported" | "independent"; hintBudget: number; mistakeId?: Id },
+  ): boolean => {
+    if (!question) return false;
+    const partial: Partial<AdaptiveSessionStep> = {
+      questionIds: [question.id],
+      params: { support: opts.support, hintBudget: opts.hintBudget },
+      href: practiceHref(plan.topicId, question.id, kind),
+    };
+    if (kind === "misconception-repair" && opts.mistakeId) partial.mistakeIds = [opts.mistakeId];
+    pushStep(kind, seq, partial);
+    return true;
+  };
+
+  let reason = "";
+  let stopped = false;
+
+  // --- A. Retrieval: retry missed cards once; teach instead of retrying twice.
+  if (lastRetrieval && lastRetrieval.result === "missed") {
+    const fails = retrievalRecords.length;
+    const stillMissed = (lastRetrieval.missedItemIds ?? []).filter((id) => availableCardIds.has(id));
+    if (fails < ADAPTIVE_MAX_RETRIEVAL_FAILS && stillMissed.length) {
+      // Failed recall → retrieval cue → immediate retry of exactly those cards.
+      pushStep("overdue-retrieval", fails, {
+        cardIds: stillMissed,
+        label: "Retry the missed retrieval",
+        description: "The cards you missed come back now, while the attempt is fresh.",
+        href: `/review?topic=${encodeURIComponent(plan.topicId)}&limit=${stillMissed.length}&from=adaptive`,
+      });
+      reason =
+        "A retrieval came back as a miss — the same cards are retried once while the attempt is fresh, before anything new.";
+    } else if (fails >= ADAPTIVE_MAX_RETRIEVAL_FAILS && explanations.length === 0) {
+      // Repeated recall failure: stop cycling the card, teach the gap first.
+      pushStep("explanation", explanations.length + 1, {
+        description: "Recall failed twice — read the short explanation, then apply it with support.",
+        href: `/lesson?subject=${encodeURIComponent(plan.subjectId)}&topic=${encodeURIComponent(plan.topicId)}&from=adaptive`,
+      });
+      const supported = pickQuestion("supported", "any");
+      if (supported) {
+        pushQuestionStep("supported-practice", questionRecords.length + 1, supported, {
+          support: "supported",
+          hintBudget: 3,
+        });
+      }
+      reason = "The same card failed twice — more retrieval would just cycle it. Teaching, then one supported attempt, replaces the retry.";
+    }
+  }
+
+  // --- B. A fresh question miss with an open mistake ⇒ misconception repair.
+  const lastQuestion = questionRecords.at(-1);
+  const lastMissedOrGaveUp =
+    lastQuestion && (lastQuestion.result === "missed" || lastQuestion.result === "gave-up");
+  if (
+    lastMissedOrGaveUp &&
+    lastQuestion?.kind !== "misconception-repair" &&
+    lastQuestion?.kind !== "prerequisite-repair" &&
+    openWithoutRepair.length > 0 &&
+    repairRecords.length < ADAPTIVE_MAX_REPAIR_ATTEMPTS &&
+    !steps.some((step) => step.kind === "misconception-repair") &&
+    !tail.some((step) => step.kind === "misconception-repair")
+  ) {
+    // Repair targets the mistake with a source question when one exists — the
+    // retest is an independent re-answer, which is the only thing that can
+    // resolve it. Otherwise it runs as a supported re-application that re-tests
+    // the same idea in a new attempt; contrast copy still precedes it.
+    const target = openWithoutRepair[0];
+    const sourceQuestion = target?.questionId
+      ? ordered.find((candidate) => candidate.id === target.questionId)
+      : undefined;
+    const question = sourceQuestion ?? pickQuestion("supported", "retry");
+    const canResolve = Boolean(sourceQuestion);
+    pushQuestionStep("misconception-repair", repairRecords.length + 1, question, {
+      support: "independent",
+      hintBudget: 0,
+      ...(canResolve && target ? { mistakeId: target.id } : {}),
+    });
+    reason = "A dropped mark exposed a misconception — contrast it and re-earn the point independently before anything new.";
+  }
+
+  // --- C. Repeated failure on this topic ⇒ short prerequisite detour.
+  const topicQuestionMisses = questionRecords.filter(
+    (record) =>
+      (record.kind === "supported-practice" ||
+        record.kind === "independent-application" ||
+        record.kind === "transfer") &&
+      (record.result === "missed" || record.result === "gave-up"),
+  ).length;
+  if (
+    topicQuestionMisses >= 2 &&
+    prereq &&
+    prereqRecords.length === 0 &&
+    (prereqQuestions?.length ?? 0) > 0 &&
+    !steps.some((step) => step.kind === "prerequisite-repair")
+  ) {
+    const prereqOrdered = [...(prereqQuestions ?? [])].sort(
+      (a, b) => difficultyNumber(a) - difficultyNumber(b) || a.id.localeCompare(b.id),
+    );
+    const prereqQuestion =
+      prereqOrdered.find((question) => inBand(question, "supported")) ?? prereqOrdered[0];
+    if (prereqQuestion) {
+      steps.push({
+        ...baseStep(plan, "prerequisite-repair", prereqRecords.length + 1),
+        topicId: prereq.prereqTopicId,
+        label: `Fix ${prereq.prereqTopicTitle} first`,
+        description:
+          "This topic keeps breaking because an earlier skill is not secure. One short question on the foundation, then back here.",
+        questionIds: [prereqQuestion.id],
+        params: { support: "supported", hintBudget: 2 },
+        href: practiceHref(prereq.prereqTopicId, prereqQuestion.id, "prerequisite-repair"),
+      });
+      reason = "Two misses on the same topic point upstream — a two-minute foundation check replaces another similar question here.";
+    }
+  }
+
+  // --- D. Independent-application failure ⇒ raise support before transfer.
+  const lastIndependent = [...completed]
+    .reverse()
+    .find((record) => record.kind === "independent-application");
+  if (
+    lastIndependent &&
+    (lastIndependent.result === "missed" || lastIndependent.result === "gave-up") &&
+    !independentPassedIndependent &&
+    !steps.some((step) => step.kind === "supported-practice" || step.kind === "misconception-repair") &&
+    !tail.some((step) => step.kind === "supported-practice")
+  ) {
+    // Increase support: a supported attempt (fresh or the missed question) then
+    // the independent rung is owed again — assisted success is not enough.
+    const supported = pickQuestion("supported", "any");
+    if (supported) {
+      pushQuestionStep("supported-practice", questionRecords.length + 2, supported, {
+        support: "supported",
+        hintBudget: 3,
+      });
+      const independent = pickQuestion("independent", "fresh");
+      if (independent) {
+        pushQuestionStep("independent-application", questionRecords.length + 3, independent, {
+          support: "independent",
+          hintBudget: 0,
+        });
+      }
+      reason = "Independent application missed — support returns for one attempt, then the independent rung is owed again.";
+    }
+  }
+
+  // --- E. Independent success removes unnecessary teaching/support.
+  const explanationInTail = tail.findIndex((step) => step.kind === "explanation");
+  if (
+    explanationInTail >= 0 &&
+    !explanations.length &&
+    (supportedPassedIndependent || independentPassedIndependent) &&
+    !steps.some((step) => step.kind === "explanation")
+  ) {
+    tail.splice(explanationInTail, 1);
+    reason = reason || "Independent success already proves the gap is closed — the planned teaching step is skipped.";
+  }
+
+  // --- F. Keep the remaining original rungs, in order.
+  steps.push(...tail);
+
+  // --- G. Drop rungs whose evidence is already satisfied.
+  const satisfiedTransfer = steps.findIndex((step) => step.kind === "transfer");
+  if (transferPassedIndependent && satisfiedTransfer >= 0) {
+    steps.splice(satisfiedTransfer, 1);
+  }
+
+  // --- H. Attempt cap: never drill the SAME topic more than MAX times. Repair
+  // and the single prerequisite detour are bounded by their own rules, so they
+  // survive the cap — the cap exists to stop same-topic rung loops.
+  const TOPIC_RUNGS: ReadonlySet<AdaptiveStepKind> = new Set([
+    "supported-practice",
+    "independent-application",
+    "transfer",
+  ]);
+  const executedTopicAttempts = questionRecords.filter((record) => TOPIC_RUNGS.has(record.kind)).length;
+  const plannedTopicRungs = steps.filter((step) => TOPIC_RUNGS.has(step.kind)).length;
+  if (executedTopicAttempts + plannedTopicRungs > ADAPTIVE_MAX_QUESTION_ATTEMPTS && executedTopicAttempts > 0) {
+    const kept: AdaptiveSessionStep[] = [];
+    for (const step of steps) {
+      if (!TOPIC_RUNGS.has(step.kind)) kept.push(step);
+    }
+    steps.splice(0, steps.length, ...kept);
+    stopped = true;
+    reason = reason || DONE_REASON_CAPPED;
+  }
+
+  // --- I. Delayed retrieval is structural: always the final rung once.
+  if (!scheduled && !steps.some((step) => step.kind === "delayed-retrieval")) {
+    const delayedCardIds = (plan.steps.at(-1)?.cardIds ?? []).slice(0, 1);
+    steps.push({
+      ...baseStep(plan, "delayed-retrieval", scheduled ? 1 : 0),
+      cardIds: delayedCardIds,
+      label: "Schedule delayed retrieval",
+      description: "Queue one short check for tomorrow so today's gain has to survive a delay.",
+      href: `/review?topic=${encodeURIComponent(plan.topicId)}&limit=1&from=adaptive`,
+    });
+  }
+
+  // --- J. Fit the remaining time budget. Delayed retrieval is structural:
+  // it survives even when every budgeted minute is already spent.
+  const trimmed: AdaptiveSessionStep[] = [];
+  let allotted = 0;
+  for (const step of steps) {
+    const isDelayed = step.kind === "delayed-retrieval";
+    if (isDelayed && scheduled) continue; // already done; nothing left
+    if (!isDelayed && remaining <= 0) continue; // a rung cannot start with no time
+    const stepMinutes = isDelayed ? Math.max(0, Math.min(1, remaining - allotted)) : step.minutes;
+    if (!isDelayed && allotted + stepMinutes > remaining) continue;
+    trimmed.push(step);
+    allotted += stepMinutes;
+  }
+  // A structural final step that reports "schedule later" still closes the
+  // loop even when every budgeted minute is gone.
+  if (!scheduled) {
+    const delayed = steps.find((step) => step.kind === "delayed-retrieval");
+    if (delayed && !trimmed.some((step) => step.kind === "delayed-retrieval")) trimmed.push(delayed);
+  }
+
+  const evidenceSatisfied =
+    independentPassedIndependent &&
+    (transferPassedIndependent || !ordered.some((question) => inBand(question, "transfer")));
+  const hasUndoneRungs = trimmed.some((step) => step.kind !== "delayed-retrieval");
+  const done = trimmed.length === 0 || (!hasUndoneRungs && scheduled);
+
+  if (!reason && trimmed.length) {
+    const nextKind = trimmed[0].kind;
+    reason =
+      nextKind === "delayed-retrieval"
+        ? "The evidence rungs are done — the only step left is to queue the delayed check."
+        : nextKind === "explanation"
+          ? "The next rung needs the short explanation first."
+          : nextKind === "supported-practice"
+            ? "The next attempt runs with support available — the minimum that gets you there."
+            : nextKind === "independent-application"
+              ? "Support has done its job — the next rung is answered alone."
+              : nextKind === "transfer"
+                ? "The idea held on familiar ground — now the same idea in a new context."
+                : nextKind === "misconception-repair"
+                  ? "Repair comes before new material: re-earn the dropped point first."
+                  : "Keep the sequence moving — one clear action at a time.";
+  }
+  if (done && !reason) {
+    reason = evidenceSatisfied ? DONE_REASON_EVIDENCE : scheduled ? DONE_REASON_BUDGET : DONE_REASON_CAPPED;
+  }
+
+  return { steps: trimmed, done, reason, stopped };
+}
+
+// ---------------------------------------------------------------------------
+// Run summary — the session debrief from the run's own evidence.
+// ---------------------------------------------------------------------------
+
+export interface AdaptiveRunSummary {
+  /** What measurably improved, per rung. */
+  improved: string[];
+  /** What is still fragile or unproven. */
+  fragile: string[];
+  /** Mistakes repaired by an independent retest this run. */
+  repaired: string[];
+  /** What happens later (delayed checks). */
+  later: string[];
+  /** What Revise learned about the student's support needs. */
+  learned: string[];
+  /** The single best next action, from the run evidence. */
+  bestNext: string;
+  /** Marks earned across the run's question rungs (0/0 when none ran). */
+  marks: { awarded: number; max: number };
+}
+
+const RUNG_LABELS: Partial<Record<AdaptiveStepKind, string>> = {
+  "supported-practice": "Supported application",
+  "independent-application": "Independent application",
+  transfer: "Unfamiliar transfer",
+  "misconception-repair": "Misconception repair",
+  "prerequisite-repair": "Prerequisite repair",
+};
+
+/** The tutor-grade debrief for a finished run, straight from its records. */
+export function summariseAdaptiveRun(input: {
+  plan: AdaptiveSessionPlan;
+  completed: AdaptiveStepRecord[];
+  openMistakeIds: Id[];
+}): AdaptiveRunSummary {
+  const { plan, completed, openMistakeIds } = input;
+  const questionRecords = completed.filter((record) => QUESTION_STEP_KINDS.has(record.kind));
+  const questionPasses = questionRecords.filter((record) => record.result === "passed-independent");
+  const assistedPasses = questionRecords.filter((record) => record.result === "passed-assisted");
+  const questionMisses = questionRecords.filter(
+    (record) => record.result === "missed" || record.result === "gave-up",
+  );
+  const repairEvidence = completed.filter((record) => record.resolvedMistakeId);
+  const stillMissedRetrieval = completed
+    .filter((record) => record.kind === "overdue-retrieval" && record.result === "missed")
+    .flatMap((record) => record.missedItemIds ?? []);
+  const scheduledLater = completed.filter(
+    (record) => record.kind === "delayed-retrieval" && record.result === "scheduled",
+  );
+
+  const improved: string[] = [];
+  const fragile: string[] = [];
+  const repaired: string[] = [];
+  const learned: string[] = [];
+  const later: string[] = [];
+
+  for (const pass of questionPasses) {
+    const label = RUNG_LABELS[pass.kind] ?? "Application";
+    if (pass.maxMarks > 0 && pass.awardedMarks === pass.maxMarks) {
+      improved.push(`${label} of ${plan.topicTitle} demonstrated without support (full marks).`);
+    } else {
+      improved.push(`${label} on ${plan.topicTitle} passed without support.`);
+    }
+  }
+
+  if (assistedPasses.length) {
+    learned.push(
+      `Some successes needed a cue or prompt — ${assistedPasses.length} assisted pass${assistedPasses.length === 1 ? "" : "es"} counted as weaker evidence than independent work.`,
+    );
+  }
+
+  const fragileKinds = new Set<AdaptiveStepKind>();
+  for (const miss of questionMisses) {
+    fragileKinds.add(miss.kind);
+  }
+  const fragiles = [...fragileKinds]
+    .map((kind) => RUNG_LABELS[kind] ?? kind)
+    .filter((label): label is string => Boolean(label));
+  if (fragiles.length) {
+    fragile.push(`Still fragile: ${fragiles.join(" and ").toLowerCase()} missed a mark this session.`);
+  }
+  if (stillMissedRetrieval.length) {
+    fragile.push(
+      `${stillMissedRetrieval.length} retrieval${stillMissedRetrieval.length === 1 ? "" : "s"} did not hold — the topic's recall schedule needs another pass.`,
+    );
+  }
+  if (openMistakeIds.length) {
+    fragile.push(
+      `${openMistakeIds.length} open mistake${openMistakeIds.length === 1 ? "" : "s"} remain${openMistakeIds.length === 1 ? "s" : ""} to repair across sessions.`,
+    );
+  }
+
+  const repairedLines = repairEvidence.map((record) => {
+    const label = RUNG_LABELS[record.kind] ?? "A retest";
+    return `${label} re-earned its point independently — the mistake is closed.`;
+  });
+  if (repairedLines.length) {
+    repaired.push(...repairedLines);
+  }
+
+  if (scheduledLater.length) {
+    later.push("Delayed retrieval scheduled — the gain is only proven once it survives a delay.");
+  } else {
+    later.push("A delayed retrieval check is the next scheduled event for this topic.");
+  }
+
+  if (!improved.length && !repairedLines.length && !questionMisses.length) {
+    improved.push("This session's work is recorded; no new marks were earned or lost.");
+  }
+
+  const marks = {
+    awarded: questionRecords.reduce((sum, record) => sum + record.awardedMarks, 0),
+    max: questionRecords.reduce((sum, record) => sum + record.maxMarks, 0),
+  };
+
+  let bestNext: string;
+  if (openMistakeIds.length) {
+    bestNext = "Clear the open mistakes first — each needs an independent retest before it closes.";
+  } else if (fragiles.length) {
+    bestNext = "Revisit the fragile rung with support in the next session before new material.";
+  } else if (!scheduledLater.length) {
+    bestNext = "Queue the delayed retrieval so today's gain is tested after a delay.";
+  } else {
+    bestNext = "Move to the next best topic — this one has earned a delay before more practice.";
+  }
+
+  return { improved, fragile, repaired: repairedLines, later, learned, bestNext, marks };
 }

@@ -49,23 +49,38 @@ export function buildHintLadder(question: Question, topic?: { keyPoints: string[
     hints.push({ tier: "prompt", text: `Think about: ${keyPoint}` });
   }
 
-  const parts = (question.parts ?? []).filter((p) => p.markScheme);
-  const markScheme = parts[0]?.markScheme;
-  if (markScheme) {
-    hints.push({ tier: "scaffold", text: `The mark scheme credits: ${markScheme}` });
-  } else if (keyPoint) {
-    hints.push({ tier: "scaffold", text: `Structure the answer around: ${keyPoint}` });
+  // The scaffold gives the *shape* of a mark-earning answer — part structure,
+  // how many credited points to plan, what to avoid — never the credited
+  // points themselves. The question's own mark scheme stays hidden until the
+  // worked-solution tier (shown only once the student has given up), so a
+  // student cannot reverse-engineer the exact answer from the early rungs.
+  const parts = question.parts ?? [];
+  const marksTotal = parts.reduce((sum, part) => sum + (part.marks || 0), 0);
+  const structure: string[] = [];
+  if (parts.length > 1) {
+    structure.push(
+      `answer in ${parts.length} parts — ${parts.map((part) => (part.label ? `“${part.label}”` : "the next part")).join(", then ")}`,
+    );
   }
+  structure.push(
+    marksTotal > 0
+      ? `plan ${marksTotal} distinct point${marksTotal === 1 ? "" : "s"} — one idea per mark, each stated, then linked to the case`
+      : "state each idea once, then link it to the case in the question",
+  );
+  if (topic?.commonErrors?.length) {
+    structure.push(`avoid the classic trap: ${topic.commonErrors[0]}`);
+  }
+  hints.push({ tier: "scaffold", text: `Structure the answer: ${structure.join("; ")}.` });
 
   if (keyPoint) {
-    // The top tier is always reachable: a worked walk-through from the key
-    // point through the credited points (or the topic's classic error).
-    const stretch = markScheme ?? topic?.commonErrors[0];
+    // The top tier is always reachable, but only after the lower tiers are
+    // spent — and in the UI only via an explicit give-up action. It is the
+    // point where the credited material may finally be shown.
+    const markScheme = parts.find((p) => p.markScheme?.length)?.markScheme;
+    const credited = markScheme ? `the credited points — ${markScheme.join(" · ")}` : `the topic's key point — ${keyPoint}`;
     hints.push({
       tier: "worked-solution",
-      text: stretch
-        ? `Worked through: start from “${keyPoint}”, then hit the credited points — ${stretch}`
-        : `Worked through: answer the question using “${keyPoint}” at every step.`,
+      text: `Worked through: start from “${keyPoint}”, then hit ${credited} in the order the question asks.`,
     });
   }
 

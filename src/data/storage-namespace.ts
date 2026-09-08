@@ -16,6 +16,8 @@ export const REVISE_META_KEYS = {
   paperOutcomes: "revise.paperOutcomes.v1",
   /** Highest applied level of the cnt: content-id namespacing migration. */
   contentIdMigration: "revise.contentIdMigration.v1",
+  /** One adaptive session run: executed steps + outcomes, for resumable replanning. */
+  adaptiveRun: "revise.adaptiveRun.v1",
   /** Stable per-device identity (id + label) used to order concurrent edits. */
   device: "revise.device.v1",
   /** Per-device Lamport counter — the logical clock behind sync ordering. */
