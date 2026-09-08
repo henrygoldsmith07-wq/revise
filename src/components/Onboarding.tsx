@@ -1,9 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { allQualifications, allSubjects, availableBoards, getBoard, gradesFor } from "@/domain/curriculum";
+import { allQualifications, allSubjects, allTopics, availableBoards, getBoard, gradesFor } from "@/domain/curriculum";
 import { todayIso } from "@/domain/scheduling";
 import type { Availability, ExamDate, Id } from "@/domain/types";
+import { seedQuestionsForTopic } from "@/content";
+import {
+  DIAGNOSTIC_BUDGET,
+  newDiagnosticSession,
+  nextDiagnosticQuestion,
+  type DiagnosticQuestionRef,
+} from "@/domain/diagnostic-intake";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, ProgressBar, cx } from "./ui";
 import { SubjectPicker } from "./SubjectPicker";
@@ -20,9 +27,12 @@ import { CreditedIcon } from "./icons";
 // starts on the "Steady" preset and the target grade on the qualification's
 // top grade, both fine-tunable in Settings afterwards. Exam dates are useful
 // but optional: a student can skip them and add them later in Settings.
+// A short self-check follows so Today starts from measured known/weak/
+// unknown evidence instead of a cohort prior — eight quick taps at most,
+// skippable, and it never blocks finishing onboarding.
 // ---------------------------------------------------------------------------
 
-const PHASES = ["Board", "Subjects", "Exam dates"] as const;
+const PHASES = ["Board", "Subjects", "Exam dates", "Quick check"] as const;
 
 /** Default time budget while the student has not yet tuned Settings. */
 const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
@@ -81,7 +91,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     missingDates.length === 0 &&
     enteredDatesValid;
   const canSkipExamDates = chosenSubjects.length > 0 && enteredDatesValid;
-  const canContinue = phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : datesValid;
+  const onDatesPhase = phase === PHASES.length - 2;
+  const onCheckPhase = phase === PHASES.length - 1;
+  const canContinue = phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : onCheckPhase ? true : datesValid;
 
   function chooseBoard(id: Id) {
     // Changing board resets subject + date choices: they belonged to the
@@ -244,7 +256,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </Panel>
         ) : null}
 
-        {phase === 2 ? (
+        {phase === 2 && onDatesPhase ? (
           <Panel className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold">When are the exams? <span className="text-ink3 font-normal">(optional)</span></h2>
@@ -268,7 +280,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             {missingDates.length ? (
               <p className="text-xs text-ink3" role="status">
                 {missingDates.length === chosenSubjects.length
-                  ? "No dates yet is fine — choose ‘I don’t know the dates yet’ below, or add them later in Settings."
+                  ? "No dates yet is fine — choose ‘Skip dates for now’ below, or add them later in Settings."
                   : `Still to add: ${missingDates.map((s) => s.name).join(", ")}. You can also skip now and add them later in Settings.`}
               </p>
             ) : null}
@@ -280,13 +292,17 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </Panel>
         ) : null}
 
-        <div className={cx("flex gap-2", phase === PHASES.length - 1 && "flex-col sm:flex-row")}>
+        {onCheckPhase ? (
+          <QuickCheck subjectIds={subjectIds} />
+        ) : null}
+
+        <div className={cx("flex gap-2", (onDatesPhase || onCheckPhase) && "flex-col sm:flex-row")}>
           {phase > 0 ? (
             <Button className="min-h-[3rem]" onClick={() => setPhase(phase - 1)}>
               Back
             </Button>
           ) : null}
-          {phase < PHASES.length - 1 ? (
+          {!onDatesPhase && !onCheckPhase ? (
             <Button
               variant="primary"
               className="flex-1 min-h-[3rem]"
@@ -295,28 +311,186 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             >
               Continue
             </Button>
-          ) : (
+          ) : null}
+          {onDatesPhase ? (
             <>
+              <Button
+                variant="primary"
+                className="flex-1 min-h-[3rem]"
+                disabled={!canContinue}
+                onClick={() => setPhase(phase + 1)}
+              >
+                Continue
+              </Button>
               <Button
                 variant="secondary"
                 className="min-h-[3rem] flex-1"
                 disabled={saving || !canSkipExamDates}
+                onClick={() => setPhase(phase + 1)}
+              >
+                Skip dates for now
+              </Button>
+            </>
+          ) : null}
+          {onCheckPhase ? (
+            <>
+              <Button
+                variant="secondary"
+                className="min-h-[3rem] flex-1"
+                disabled={saving}
                 onClick={() => void finish()}
               >
-                I don&apos;t know the dates yet
+                Skip the check
               </Button>
               <Button
                 variant="primary"
                 className="min-h-[3rem] flex-1"
-                disabled={saving || !canContinue}
+                disabled={saving}
                 onClick={() => void finish()}
               >
                 {saving ? "Building your plan…" : "Build my plan"}
               </Button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quick check — the lightweight initial diagnostic. Up to eight self-marked
+// probes (two per topic) across the student's subjects: recall first, then
+// application when recall passes. Known / weak / unknown lands in the store
+// as review evidence before Today first renders, so the tutor starts from
+// measurement instead of a cohort prior. Fully skippable — finishing
+// onboarding never depends on it.
+// ---------------------------------------------------------------------------
+
+function QuickCheck({ subjectIds }: { subjectIds: Id[] }) {
+  const store = useStore();
+  const [started, setStarted] = useState(false);
+  const topics = useMemo(() => {
+    const pool = allTopics(subjectIds.length ? subjectIds : undefined);
+    return pool.slice(0, Math.max(4, Math.min(8, pool.length)));
+  }, [subjectIds]);
+  const [state, setState] = useState(() => newDiagnosticSession(topics.map((t) => t.id)));
+  const [answers, setAnswers] = useState<Record<string, "known" | "weak" | "unknown">>({});
+
+  const pools = useMemo<Record<string, DiagnosticQuestionRef[]>>(() => {
+    const out: Record<string, DiagnosticQuestionRef[]> = {};
+    for (const topic of topics) {
+      const bank = seedQuestionsForTopic(topic.id);
+      const recall = bank[0];
+      const application = bank[1] ?? bank[0];
+      const refs: DiagnosticQuestionRef[] = [];
+      if (recall) refs.push({ id: recall.id, topicId: topic.id, capability: "recall", difficulty: 2 });
+      if (application) refs.push({ id: application.id, topicId: topic.id, capability: "application", difficulty: 3 });
+      out[topic.id] = refs;
+    }
+    return out;
+  }, [topics]);
+
+  const current = nextDiagnosticQuestion(state, pools);
+  const currentTopic = topics.find((t) => t.id === current?.topicId);
+  const doneCount = state.askedTotal;
+
+  async function answerSelfMark(mark: "known" | "weak" | "unknown") {
+    if (!current) return;
+    setAnswers((prev) => ({ ...prev, [current.id]: mark }));
+    // Honest self-marks become review evidence on a real seeded card:
+    // known = recalled, weak = struggled, unknown = no evidence (kept
+    // unknown, never weak). The card is the topic's first seeded card, so
+    // FSRS grades land on the deck the student will actually study.
+    if (mark !== "unknown") {
+      const seed = store.cards.find((c) => c.topicId === current.topicId);
+      if (seed) {
+        await store.reviewCard(seed, mark === "known" ? "good" : "again", 0);
+      }
+    }
+    // Advance the intake without fabricating capability scores: the review
+    // evidence above is the measurement; the intake tracks budget.
+    const remaining = state.remaining.filter((t) => t !== current.topicId || mark === "known");
+    const asked = { ...state.asked, [current.topicId]: (state.asked[current.topicId] ?? 0) + 1 };
+    const askedTotal = state.askedTotal + 1;
+    setState({
+      ...state,
+      remaining: mark === "unknown" ? state.remaining.filter((t) => t !== current.topicId) : remaining,
+      asked,
+      askedTotal,
+      done: remaining.length === 0 || askedTotal >= DIAGNOSTIC_BUDGET,
+    });
+  }
+
+  if (!topics.length) {
+    return (
+      <Panel className="space-y-2">
+        <h2 className="text-sm font-semibold">Quick check</h2>
+        <p className="text-xs text-ink3">Choose a subject first — the check draws from its topics.</p>
+      </Panel>
+    );
+  }
+
+  if (!started) {
+    return (
+      <Panel className="space-y-3">
+        <h2 className="text-sm font-semibold">Quick check <span className="text-ink3 font-normal">(optional, ~2 min)</span></h2>
+        <p className="text-xs text-ink3">
+          Eight quick self-marks across your topics — known, weak, or unknown. Today then starts from
+          measurement instead of guessing. Unknown stays unknown; it is never treated as weak.
+        </p>
+        <Button variant="primary" className="w-full min-h-[3rem]" onClick={() => setStarted(true)}>
+          Start the quick check
+        </Button>
+      </Panel>
+    );
+  }
+
+  if (!current || state.done) {
+    const known = Object.values(answers).filter((a) => a === "known").length;
+    const weak = Object.values(answers).filter((a) => a === "weak").length;
+    const unknown = Object.values(answers).filter((a) => a === "unknown").length;
+    return (
+      <Panel className="space-y-2" aria-live="polite">
+        <h2 className="text-sm font-semibold">Check complete</h2>
+        <p className="text-xs text-ink2">
+          {known} known · {weak} weak · {unknown} unknown{unknown ? " (kept unknown, never weak)" : ""}. Today will build from this.
+        </p>
+        <p className="text-[11px] text-ink3">Continue to finish onboarding — your plan builds from this evidence.</p>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Quick check</h2>
+        <p className="text-[11px] text-ink3 tabular-nums" aria-live="polite">
+          {doneCount + 1} of {Math.min(DIAGNOSTIC_BUDGET, topics.length * 2)}
+        </p>
+      </div>
+      <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
+        {currentTopic?.title ?? current.topicId} · {current.capability === "recall" ? "Recall" : "Application"}
+      </p>
+      <p className="text-sm text-ink">
+        {current.capability === "recall"
+          ? `Without notes: what do you remember about ${currentTopic?.title ?? "this topic"}?`
+          : `Could you answer an exam question on ${currentTopic?.title ?? "this topic"} right now?`}
+      </p>
+      {currentTopic?.keyPoints[0] ? (
+        <p className="text-[11px] text-ink3">Mark honestly — this sets where Today starts, not a grade.</p>
+      ) : null}
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="secondary" className="min-h-[3rem]" onClick={() => void answerSelfMark("known")}>
+          Known
+        </Button>
+        <Button variant="secondary" className="min-h-[3rem]" onClick={() => void answerSelfMark("weak")}>
+          Weak
+        </Button>
+        <Button variant="secondary" className="min-h-[3rem]" onClick={() => void answerSelfMark("unknown")}>
+          Unknown
+        </Button>
+      </div>
+    </Panel>
   );
 }

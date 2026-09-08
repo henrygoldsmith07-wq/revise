@@ -45,7 +45,7 @@ describe("availableBoards: only boards with content are offered", () => {
   });
 });
 
-describe("first screen collects exactly board → subjects → exam dates", () => {
+describe("first screen collects board → subjects → exam dates → quick check", () => {
   const srcText = readFileSync(src("src/components/Onboarding.tsx"), "utf8");
 
   it("starts with the exam board, then subjects of that board", () => {
@@ -67,19 +67,19 @@ describe("first screen collects exactly board → subjects → exam dates", () =
     expect(srcText).toContain("invalidDates");
     expect(srcText).toContain("datesValid");
     expect(srcText).toContain("canSkipExamDates");
-    expect(srcText).toContain("I don&apos;t know the dates yet");
+    expect(srcText).toContain("Skip dates for now");
     expect(srcText).toContain("add dates later in Settings");
     expect(srcText).toContain("if (!date) continue");
   });
 
-  it("defaults time budget and target grade instead of asking; keeps only three steps", () => {
+  it("defaults time budget and target grade instead of asking; board → subjects → dates → quick check", () => {
     expect(srcText).toContain("STEADY_MINUTES");
     expect(srcText).toContain("gradesFor(id)[0]");
     // The old wizard's extra asks are gone.
     expect(srcText).not.toContain("What should we call you?");
     expect(srcText).not.toContain("How much time do you have?");
     expect(srcText).not.toContain("TIME_PRESETS");
-    expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates"]');
+    expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates", "Quick check"]');
   });
 
   it("does not offer a global Skip that leaves a hollow profile", () => {

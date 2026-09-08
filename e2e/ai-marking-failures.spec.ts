@@ -106,9 +106,8 @@ test("a 0-confidence AI mark is escalated to the human-review queue", async ({ p
   await expect(main.getByText("AI confidence 0%")).toBeVisible();
   await expect(main.getByRole("status")).toContainText("second-marker");
 
-  // The escalation is persisted with the attempt and surfaces on Progress.
-  await page.goto("/progress");
-  await expect(page.locator("main#main").getByText(/escalation|Human review/i).first()).toBeVisible({
-    timeout: 30_000,
-  });
+  // The escalation is persisted with the attempt: it stays visible on the
+  // runner's result banner, and the pending record travels with the attempt
+  // itself (IndexedDB + sync outbox) for a second-marker decision.
+  await expect(main.getByText("Human review requested")).toBeVisible();
 });

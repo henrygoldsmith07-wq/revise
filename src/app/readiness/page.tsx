@@ -49,8 +49,8 @@ export default function ReadinessPage() {
       </details>
 
       <nav aria-label="Readiness follow-up" className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink3">
-        <Link href="/progress" className="hover:text-ink hover:underline">Open full evidence →</Link>
-        <Link href="/planner" className="hover:text-ink hover:underline">Adjust the plan →</Link>
+        <Link href="/practice" className="hover:text-ink hover:underline">Practise the highest-yield gap →</Link>
+        <Link href="/schedule" className="hover:text-ink hover:underline">Adjust the plan →</Link>
       </nav>
     </div>
   );

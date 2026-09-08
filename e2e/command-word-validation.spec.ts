@@ -10,7 +10,7 @@ test("command-word validation updates while answering an exam question", async (
     await expect(today).toBeVisible({ timeout: 15_000 });
   }
 
-  await page.goto("/practice?question=seed-q:maths-quadratic-discriminant");
+  await page.goto("/practice?question=cnt:question:maths-quadratic-discriminant");
   await expect(today).toContainText("Show that");
   await expect(today).toContainText("Start with the verb");
 

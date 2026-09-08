@@ -32,6 +32,10 @@ export function AdaptiveSessionHero({
         {subject?.name ?? session.subjectId} — {session.topicTitle}
       </p>
 
+      {session.stoppedEarly ? (
+        <p className="text-xs text-ink2 mt-1" role="note">{session.stoppedEarly.reason}</p>
+      ) : null}
+
       <ButtonLink href={session.startHref} variant="primary" size="md" className="mt-4 w-full sm:w-auto min-h-[3rem] text-base">
         Start
       </ButtonLink>

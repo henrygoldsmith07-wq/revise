@@ -13,18 +13,24 @@
 
 import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
+import { hintEvidenceSource } from "./hint-tiers";
 import {
   emptyProfile,
   recordAttemptObservations,
   type CapabilityProfile,
+  type EvidenceSource,
   type TopicCapabilityMap,
 } from "./capability-mastery";
-import type { Attempt, Id } from "./types";
+import type { Attempt, Id, Question } from "./types";
 
 export interface CapabilitySourceInput {
   recallMastery: RecallMasteryRow[];
   applicationMastery: ApplicationMasteryRow[];
   attempts: Attempt[];
+  /** Question bank, for per-attempt capability attribution (kind/AO-aware). */
+  questions?: Question[];
+  /** Explanations written this session feed the explanation capability. */
+  explanations?: Array<{ topicId: Id; score: number }>;
 }
 
 /** Attempts with a completed far-transfer retest carry transfer evidence. */
@@ -79,6 +85,36 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
       source: "independent",
       score: row.accuracy,
     }))).application;
+  }
+
+  // Per-attempt explanation observations: extended-kind answers are the only
+  // per-attempt explanation signal (application/recall/retention/transfer
+  // stay on their existing row derivations, which already weight hint
+  // support — adding per-attempt application observations here would
+  // double-count the same attempts). Hint support downgrades the source.
+  const questionsById = new Map((input.questions ?? []).map((q) => [q.id, q] as const));
+  for (const attempt of input.attempts) {
+    if (attempt.max <= 0 || attempt.mode === "recall") continue;
+    const question = questionsById.get(attempt.questionId);
+    if (question?.kind !== "extended") continue;
+    const score = Math.max(0, Math.min(1, attempt.awarded / attempt.max));
+    const source: EvidenceSource = hintEvidenceSource(attempt.hintTier ?? null);
+    for (const topicId of [...new Set(attempt.topicIds)].filter((id) => id)) {
+      const profile = profileFor(topicId);
+      profile.explanation = recordAttemptObservations(profile, [{ capability: "explanation", source, score }]).explanation;
+    }
+  }
+
+  // Explanation evidence from free-text explanations (adaptive explanation
+  // rung, explanation study mode): already scored against authored idea
+  // anchors by the caller, so record the score directly.
+  for (const explanation of input.explanations ?? []) {
+    const profile = profileFor(explanation.topicId);
+    profile.explanation = recordAttemptObservations(profile, [{
+      capability: "explanation",
+      source: "independent",
+      score: Math.max(0, Math.min(1, explanation.score)),
+    }]).explanation;
   }
 
   for (const { topicId, score } of transferEvidenceFromAttempts(input.attempts)) {

@@ -352,3 +352,59 @@ Separately, keep all six primary mobile nav items on one row.
 2026-09-07: `npm run verify` passed: lint, regular and strict
 TypeScript, curriculum validation/freshness, full vitest suite,
 production build, and client performance-budget checks.
+
+## Improvement state: continuous tutor loop
+
+### Goal
+
+One continuous learning loop — diagnose → attempt → scaffold → teach →
+practise → independent success → transfer → repair → retrieve later →
+exam proof — where every answer replans the next action from fresh
+evidence, Today shows one best action, and readiness gates both
+planning and stopping. No new modes; the existing review, practice,
+lesson, and paper surfaces execute the loop's steps.
+
+### Decisions
+
+- Evidence after every answer: `deriveCapabilityProfiles` now also reads
+  per-attempt signals (extended-kind answers feed explanation; hint
+  support downgrades the source via `hintEvidenceSource`) plus
+  caller-scored free-text explanations. Row derivations are untouched,
+  so application/recall evidence is never double-counted.
+- The adaptive runner replans upcoming steps from new store evidence
+  after each answer (completed steps are kept, never re-asked) and every
+  step carries `from=adaptive&return=` so review/practice/lesson hand
+  back to the same tutor step with a "Back to tutor" path.
+- Adaptive stopping (`src/domain/adaptive-stop.ts`): a `ready` readiness
+  row with no high-severity blocker and no exam within 14 days drops the
+  independent/transfer rungs; retrieval and delayed proof always survive.
+  Readiness rows feed `buildAdaptiveSession` in the store and the
+  resume path; the hero and runner surfaces explain the stop.
+- Quick check onboarding phase: up to 8 self-marks (recall → application
+  per topic) graded as review evidence on real seeded cards; unknown
+  stays unknown and the check is fully skippable. `e2e/helpers.ts`
+  updated for the 4-phase funnel.
+- Every marked answer ends with a "what this taught us" next action
+  inside the same flow (micro-practice → unaided retry → transfer →
+  close the mistake → bank it), derived from awarded/max, hint support,
+  difficulty, and retest state — never a page redirect.
+- Mobile nav one-row fix (`grid-cols-6`) preserved and still pinned by
+  unit + e2e regression tests.
+
+### Status
+
+- [x] per-answer evidence attribution (explanation/hint-weighted)
+- [x] runner replans upcoming steps; return-to-tutor links everywhere
+- [x] readiness-gated adaptive stopping with surfaces
+- [x] onboarding quick check + e2e helper update
+- [x] in-flow next action after every marked answer
+- [x] full vitest suite (1337 passed), strict types, lint clean
+
+### Verification log
+
+2026-09-07: focused suites (tutor-loop, adaptive-session, adaptive-tutor,
+adaptive-today, onboarding-first-screen, mobile-exam-ui,
+application-mastery) green; full `npm test` green (166 files,
+1337 passed); `tsc --noEmit` + strict + `lint:check` clean; live
+Preview verified: fresh onboarding → Today hero → adaptive runner with
+"Why this step" → review step hands back to the tutor.

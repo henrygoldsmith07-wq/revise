@@ -4,35 +4,24 @@
 // only job is making sure the app itself loads with no network. Bump
 // CACHE_VERSION to invalidate previously cached shells.
 
-const CACHE_VERSION = "revise-v4";
+const CACHE_VERSION = "revise-v5";
 // Precaches every App Router shell so the whole app loads offline.
 // Keep this in sync with src/app/*/page.tsx — tests/perf.test.ts fails when a
 // route is missing, and scripts/validate-curriculum.mjs also reports drift.
 const APP_SHELL = [
   "/",
-  "/benchmarks",
-  "/answer-corpus",
   "/adaptive-session",
-  "/cards",
-  "/case-study",
-  "/generate",
   "/lesson",
   "/library",
   "/papers",
-  "/planner",
   "/practice",
-  "/progress",
-  "/question-evidence",
   "/readiness",
-  "/response-time",
   "/review",
   "/schedule",
   "/settings",
   "/shared",
   "/study",
-  "/tutor",
   "/twin",
-  "/teacher",
   "/manifest.webmanifest",
   "/icon.svg",
   "/icon-maskable.svg",

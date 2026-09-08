@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
+import { remapContentIdString } from "@/data/content-ids";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { diagnosePrerequisiteWeakness, type PrerequisiteDiagnosis } from "@/domain/prerequisite-diagnosis";
 import { remediationForMistake } from "@/domain/remediation";
@@ -51,6 +52,10 @@ function Practice() {
   // attempt stays unaided and mastery counts it at full weight.
   const adaptiveStep = params.get("adaptiveStep");
   const adaptiveHintBudget = adaptiveStep === "independent" || adaptiveStep === "transfer" ? 0 : undefined;
+  // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
+  // marking here replans the runner's next step and hands the student back
+  // to it — one tutor flow, not a redirect between pages.
+  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "practice" ? store.revisionCheckpoint : null;
@@ -65,7 +70,10 @@ function Practice() {
   const farTransferRetest = retestId
     ? farTransferRetests.find((retest) => retest.retestId === retestId && retest.status !== "completed")
     : undefined;
-  const requestedQuestionParam = farTransferRetest?.candidateQuestionId ?? questionParam;
+  // Legacy deep links (?question=seed-q:...) predate the cnt: namespace
+  // (see src/data/content-ids.ts) — remap so they keep resolving to the
+  // seeded bank instead of landing on an empty queue.
+  const requestedQuestionParam = farTransferRetest?.candidateQuestionId ?? (questionParam ? remapContentIdString(questionParam) : questionParam);
   const [subjectId, setSubjectId] = useState(subjectParam ?? farTransferRetest?.subjectId ?? subjects[0]?.id ?? "");
   const [topicId, setTopicId] = useState(topicParam ?? farTransferRetest?.topicIds[0] ?? "");
   const quickParam = params.get("quick");
@@ -141,12 +149,16 @@ function Practice() {
    */
   const orderFor = (subject: string, topic: string): string[] => {
     if (retestQuestion) return [retestQuestion.id];
-    let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
-    if (requestedQuestionParam) pool = pool.filter((q) => q.id === requestedQuestionParam);
-    else {
-      if (subject) pool = pool.filter((q) => q.subjectId === subject);
-      if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
+    // An explicit ?question= deep link names one bank item (e.g. command-word
+    // spec, ⌘K search): resolve it directly instead of filtering it out when
+    // its subject is not enrolled. Every other path stays in-subject.
+    if (requestedQuestionParam) {
+      const direct = questionsById.get(requestedQuestionParam);
+      if (direct) return [direct.id];
     }
+    let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
+    if (subject) pool = pool.filter((q) => q.subjectId === subject);
+    if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
     // Exposure control keeps unseen questions ahead of secure repeats, while
     // still allowing weak questions back into the queue when they need work.
     return rankQuestionsForExposure({
@@ -259,7 +271,7 @@ function Practice() {
       <PostSessionClosure
         closure={closure}
         hint="Your answers are recorded and dropped marks are available in the mistake queue."
-        secondary={{ href: "/practice", label: "Practise another topic" }}
+        secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise another topic" }}
       />
     );
   }
@@ -542,10 +554,15 @@ function Practice() {
               });
             }}
           />
-          {retestMistake ? (
+          {retestMistake && !returnHref ? (
             <ButtonLink href="/" variant="primary" className="inline-block">
               Back to Today
             </ButtonLink>
+          ) : null}
+          {returnHref ? (
+            <p className="text-[11px] text-ink3">
+              Opened from your adaptive session — this mark replans the next step automatically.
+            </p>
           ) : null}
         </>
       ) : (

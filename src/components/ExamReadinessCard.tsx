@@ -52,7 +52,7 @@ function actionHref(subjectId: string, action: ReadinessAction): string {
     case "timed":
       return `/practice?subject=${subject}&mode=practice`;
     case "transfer":
-      return "/progress";
+      return `/practice?subject=${subject}`;
     case "practice":
       return `/practice?subject=${subject}`;
   }
