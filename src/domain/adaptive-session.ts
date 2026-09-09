@@ -27,6 +27,7 @@ import { readinessStopFor } from "./adaptive-stop";
 import { wjecCapabilities } from "@/content/capabilities";
 import { selectLearningAction, type LearningAction } from "./learning-action";
 import { isTransferQuestion } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
 import type { HintTier } from "./hints";
 import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
@@ -248,6 +249,7 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     applicationMastery: input.applicationMastery ?? [],
     attempts: input.attempts,
     questions: input.questions,
+    trustedQuestion: trustedAssessmentContent,
   });
   const cardsByTopic = groupBy(input.cards, (card) => card.topicId);
   const logsByTopic = groupBy(input.reviewLogs, (log) => log.topicId);

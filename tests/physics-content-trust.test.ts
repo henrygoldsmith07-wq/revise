@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { wjecPhysicsDeepQuestions as bank } from "@/content/questions/wjec-physics-deep";
-import { physicsContentFingerprint, applyHumanVerification, humanVerifiedPhysicsQuestion, buildPhysicsReviewQueue } from "@/domain/physics-content-review";
+import { physicsContentFingerprint, applyHumanVerification, humanVerifiedPhysicsQuestion, buildPhysicsReviewQueue, verifiedPhysicsPaperProvenance } from "@/domain/physics-content-review";
 import { authenticPaperEvidence, isTransferQuestion } from "@/domain/learning-evidence";
 import { analyseExperiment, type AnalyseExperimentInput } from "@/domain/recommendation-experiment";
 import { buildPredictionOutcomePairs } from "@/domain/learning-controls";
 import { attachTransferOutcome, attachDelayedRetentionOutcome, createInterventionOutcome, calibratedGain, calibrateInterventions } from "@/domain/intervention-calibration";
 import { markCalculationWorking, contradictoryWorkingStep } from "@/domain/calculation-rubric";
-import { firstIncorrectStep } from "@/domain/working-analysis";
+import { analyseAttemptWorking, firstIncorrectStep } from "@/domain/working-analysis";
 import type { Attempt, Question, QuestionPart } from "@/domain/types";
 
 // Test-only human attestations; no production content is approved here.
@@ -28,14 +28,15 @@ const source = bank.find((q) => q.id.endsWith("loaded-divider"))!;
 const transfer = bank.find((q) => q.id.endsWith("cold-room-alarm"))!;
 const context = { id: "step", chainId: "repair", capabilityId: "phys.circuit.divider", topicId: source.topicIds[0]!,
   kind: "guided" as const, priorState: "weak" as const, priorAccuracy: 0.25, plannedMinutes: 3, support: "scaffold" as const };
-const initial = () => createInterventionOutcome({ userId: "learner", subjectId: source.subjectId, context, question: source, attempt: attempt(source, "initial", 1) });
+const initial = (question: Question = source) => createInterventionOutcome({ userId: "learner", subjectId: question.subjectId, context, question, attempt: attempt(question, "initial", 1) });
 
 describe("Physics content trust boundaries", () => {
   it("requires all six checks and invalidates approval after content changes", () => {
     const reviewed = approve(transfer);
     expect(humanVerifiedPhysicsQuestion(reviewed)).toBe(true);
     expect(isTransferQuestion(transfer, source)).toBe(false);
-    expect(isTransferQuestion(reviewed, source)).toBe(true);
+    expect(isTransferQuestion(reviewed, source)).toBe(false);
+    expect(isTransferQuestion(reviewed, approve(source))).toBe(true);
     expect(humanVerifiedPhysicsQuestion({ ...reviewed, stem: reviewed.stem + " Changed." })).toBe(false);
     const missing = { ...reviewed.humanVerification!, checks: { ...reviewed.humanVerification!.checks, examRealism: false } };
     expect(applyHumanVerification(reviewed, missing).verification).toBe("unverified");
@@ -50,7 +51,10 @@ describe("Physics content trust boundaries", () => {
     for (const invalid of [{ ...a, hintTier: "cue" as const }, { ...a, userId: "other" }, { ...a, markConfidence: 0.1 },
       { ...a, copiedAnswer: true }]) expect(attachTransferOutcome(row, invalid, evidence)).toBe(row);
     expect(attachTransferOutcome(row, a, { ...evidence, history: [...evidence.history, { ...a, id: "old" }] })).toBe(row);
-    const joined = attachTransferOutcome(row, a, evidence);
+    const trustedSource = approve(source);
+    const trustedRow = initial(trustedSource);
+    const trustedEvidence = { question: reviewed, questions: [trustedSource, reviewed], history: [attempt(trustedSource, "trusted-initial", 1)] };
+    const joined = attachTransferOutcome(trustedRow, a, trustedEvidence);
     expect(joined.transfer?.trusted).toBe(true);
     expect(joined.actualMinutes).toBe(4);
     expect(attachTransferOutcome(joined, a, evidence)).toBe(joined);
@@ -58,19 +62,21 @@ describe("Physics content trust boundaries", () => {
   it("requires a third unseen family, a full unpractised week, and counts failed retention", () => {
     const reviewed = approve(transfer);
     const a = attempt(reviewed, "transfer", 2);
-    const row = attachTransferOutcome(initial(), a, { question: reviewed, questions: [source, reviewed], history: [] });
+    const trustedSource = approve(source);
+    const row = attachTransferOutcome(initial(trustedSource), a, { question: reviewed, questions: [trustedSource, reviewed], history: [] });
     const retention = approve({ ...transfer, id: "test-only-retention",
       learning: { ...transfer.learning!, familyId: "test-only-third-family", contextId: "test-only-new-context" } });
     const later = { ...attempt(retention, "retention", 10), awarded: 0,
       marked: retention.parts.map((part) => ({ partId: part.id, awarded: 0, max: part.marks,
         creditedPoints: [], missedPoints: part.markScheme, comment: "" })) };
-    const evidence = { question: retention, questions: [source, reviewed, retention], history: [a] };
+    const evidence = { question: retention, questions: [trustedSource, reviewed, retention], history: [a] };
     expect(attachDelayedRetentionOutcome(row, { ...later, createdAt: attempt(retention, "early", 3).createdAt }, evidence)).toBe(row);
     expect(attachDelayedRetentionOutcome(row, later, { ...evidence, lastLearningAt: attempt(source, "teaching", 7).createdAt })).toBe(row);
     const complete = attachDelayedRetentionOutcome(row, later, evidence);
     expect(complete.actualMinutes).toBe(6);
     expect(complete.delayedRetention?.awarded).toBe(0);
     expect(calibratedGain(complete)).toBeCloseTo((0.4 - 0.25) / 6);
+    expect(calibratedGain({ ...complete, immediate: { ...complete.immediate, trusted: false } })).toBeNull();
     expect(calibrateInterventions(Array(100).fill(complete)).get("guided:phys.circuit.divider")?.sampleSize).toBe(1);
     expect(calibrateInterventions([complete]).get("guided:phys.circuit.divider")?.reliable).toBe(false);
     expect(calibratedGain({ ...complete, priorAccuracy: 0.9 })).toBeLessThan(0);
@@ -90,10 +96,16 @@ describe("Physics content trust boundaries", () => {
 
 describe("authentic Physics papers and prospective outcomes", () => {
   it("requires reviewed first-exposure paper evidence and excludes mixed-trust sittings", () => {
-    const paperQuestion = approve({ ...transfer, source: "past-paper", paperId: "original-paper", paperQuestionNumber: "3(a)" });
+    const paperQuestion = approve({ ...transfer, source: "past-paper", paperId: "original-paper", paperQuestionNumber: "3(a)", paperProvenance: {
+      board: "WJEC", specification: "A200QS", paperId: "original-paper", questionNumber: "3(a)",
+      sourceUrl: "https://www.wjec.co.uk/test-only/original-paper.pdf", sourceDigest: "sha256:test-only",
+      status: "verified", verifiedBy: "test-only", verifiedAt: "2026-09-08T00:00:00Z",
+    } });
+    expect(verifiedPhysicsPaperProvenance(paperQuestion)).toBe(true);
     const response = { ...attempt(paperQuestion, "paper", 2), mode: "paper" as const, paperRunId: "sitting", paperId: "original-paper" };
     expect(authenticPaperEvidence(response, paperQuestion, [], [paperQuestion])).toBe(true);
     expect(authenticPaperEvidence(response, transfer, [], [transfer])).toBe(false);
+    expect(humanVerifiedPhysicsQuestion({ ...paperQuestion, paperProvenance: undefined })).toBe(false);
     expect(authenticPaperEvidence(response, paperQuestion, [{ ...response, id: "prior", createdAt: attempt(source, "old", 1).createdAt }], [paperQuestion])).toBe(false);
     const generatedResponse = { ...attempt(source, "generated", 2), mode: "paper" as const, paperRunId: "sitting" };
     expect(buildPredictionOutcomePairs({ attempts: [response, generatedResponse], questions: [paperQuestion, source] })).toEqual([]);
@@ -106,7 +118,8 @@ describe("authentic Physics papers and prospective outcomes", () => {
         takenAt: "2026-01-01T00:00:00Z", assessmentVersion: "matched-forms-v1" }],
       finalAssessments: [{ anonId: "test-learner", subjectId: source.subjectId, percent: 75, maxMarks: 80,
         takenAt: "2026-01-12T00:00:00Z", assessmentVersion: "matched-forms-v1", matchesBaselineVersion: true,
-        heldOutFamilies: true, humanMarked: true, delayedDays: 7, revisionMinutes: 60 }],
+        heldOutFamilies: true, humanMarked: true, delayedDays: 7, revisionMinutes: 60,
+        delayedAssessment: { percent: 75, maxMarks: 80, takenAt: "2026-01-19T00:00:00Z", assessmentVersion: "matched-forms-v1", heldOutFamilies: true, humanMarked: true } }],
     };
     const report = analyseExperiment(input);
     expect(report.primaryOutcomes[0]?.marksGainedPerHour).toBe(20);
@@ -149,6 +162,11 @@ describe("Physics calculation marking integrity", () => {
     expect(contradictoryWorkingStep("F = 6 N\nF = 8 N")).toBe(1);
     expect(contradictoryWorkingStep("F = 2 * 3 = 8 N")).toBe(0);
     expect(firstIncorrectStep({ ...part, modelAnswer: "F = 6 N" }, "F = 6 N\nF = 8 N").consistentWithModel).toBe(false);
+    const workingPart: QuestionPart = { ...part, id: "working-part", prompt: "Calculate the force.", markScheme: ["F = 6 N"], modelAnswer: "F = 6 N",
+      calculationRules: [{ kind: "accuracy", label: "F", expected: 6 }] };
+    const question: Question = { ...source, kind: "calculation", parts: [workingPart], totalMarks: workingPart.marks };
+    const marked = [{ partId: "working-part", awarded: 0, max: workingPart.marks, creditedPoints: [], missedPoints: workingPart.markScheme, comment: "" }];
+    expect(analyseAttemptWorking(question, { "working-part": "F = 6 N\nF = 8 N" }, marked)[0]?.firstErrorKind).toBe("contradictory-working");
   });
   it("keeps SI symbol case and explicit precision meaningful", () => {
     const unitPart = { ...part, calculationRules: [{ kind: "unit" as const, label: "p", expected: 2, unitAliases: ["Pa"] }] };

@@ -1,4 +1,4 @@
-import { independentAttempt, isTransferQuestion, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
+import { independentAttempt, isTransferQuestion, questionFamilies, partLearningMetadata, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Card, Mistake, MistakeRepairStage, MistakeRepairState, Question, ReviewLog } from "./types";
 import { trustedAssessmentContent } from "./physics-content-review";
 
@@ -61,24 +61,31 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
   // Persisted repair evidence preserves family exposure even if the caller only has a partial history.
   const source = questions.find((q) => q.id === mistake.questionId);
   const knownQuestionIds = new Set([mistake.questionId, ...(old?.evidence.map((e) => e.questionId) ?? [])]);
+  const knownFamilies = new Set(questions
+    .filter((candidate) => knownQuestionIds.has(candidate.id))
+    .flatMap((candidate) => questionFamilies(candidate)));
   const fresh = !knownQuestionIds.has(question.id) && unseenQuestion(question, previous, questions) &&
-    !questions.some((q) => knownQuestionIds.has(q.id) && q.learning?.familyId && q.learning.familyId === question.learning?.familyId);
+    !questionFamilies(question).some((family) => knownFamilies.has(family));
   const independent = independentAttempt(attempt) && fresh;
+  const targetDemands = targetParts
+    .map((id) => question.parts.find((part) => part.id === id))
+    .map((part) => part ? partLearningMetadata(question, part)?.demand : undefined)
+    .filter((demand): demand is NonNullable<typeof demand> => Boolean(demand));
+  const independentDemand = targetDemands.some((demand) => ["application", "calculation", "transfer", "synoptic"].includes(demand));
   const priorStage = repair.stage;
   if (!passed) {
     record(mistake.capabilityIds?.length === 1 ? "diagnosed" : "detected");
     delete repair.dueAt;
   } else if (priorStage === "taught" && attempt.hintTier !== "worked-solution" && !attempt.copiedAnswer) {
     record("guided-success");
-  } else if (priorStage === "guided-success" && independent && question.learning &&
-    ["application", "calculation", "transfer", "synoptic"].includes(question.learning.demand)) {
+  } else if (priorStage === "guided-success" && independent && independentDemand) {
     record("independent-success");
   } else if (priorStage === "independent-success" && independent && source && isTransferQuestion(question, source)) {
     record("transfer");
     repair.dueAt = new Date(Date.parse(attempt.createdAt) + REPAIR_RETENTION_DELAY_MS).toISOString();
   } else if (priorStage === "transfer") {
     if (independent && trustedAssessmentContent(question) && repair.dueAt && Date.parse(attempt.createdAt) >= Date.parse(repair.dueAt) &&
-      question.learning && ["application", "calculation", "transfer", "synoptic"].includes(question.learning.demand)) {
+      independentDemand) {
       record("delayed-retention");
       record("resolved");
       delete repair.dueAt;

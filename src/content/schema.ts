@@ -35,6 +35,27 @@ const humanVerificationSchema = z.object({
   notes: z.string().optional(),
 }).passthrough();
 
+const paperProvenanceSchema = z.object({
+  board: nonEmpty,
+  specification: nonEmpty,
+  specificationVersion: nonEmpty.optional(),
+  paperId: id,
+  questionNumber: nonEmpty,
+  sourceUrl: z.string().url(),
+  sourceDigest: nonEmpty,
+  status: z.enum(["pending", "verified", "rejected"]),
+  verifiedBy: id.optional(),
+  verifiedAt: isoInstant.optional(),
+  notes: z.string().optional(),
+}).passthrough();
+
+const learningPartSchema = z.object({
+  familyId: id,
+  contextId: id,
+  demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
+  reasoningMoves: z.array(nonEmpty).min(1).max(8),
+}).passthrough();
+
 export const contentQuestionPartSchema = z.object({
   id,
   label: z.string(),
@@ -46,6 +67,7 @@ export const contentQuestionPartSchema = z.object({
   specPointIds: z.array(id).optional(),
   learningClaims: z.array(nonEmpty).optional(),
   capabilityIds: z.array(id).min(1).optional(),
+  learning: learningPartSchema.optional(),
   calculationRules: z.array(calculationRuleSchema).optional(),
 }).passthrough();
 
@@ -64,10 +86,12 @@ export const contentQuestionSchema = z.object({
   origin: z.enum(["seed", "ai", "past-paper"]),
   createdAt: isoInstant,
   humanVerification: humanVerificationSchema.optional(),
+  paperProvenance: paperProvenanceSchema.optional(),
   learning: z.object({
     familyId: id, contextId: id,
     demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
     expectedMinutes: z.number().finite().positive().max(120),
+    reasoningMoves: z.array(nonEmpty).min(1).max(8).optional(),
   }).optional(),
 }).passthrough().superRefine((question, ctx) => {
   const marks = question.parts.reduce((sum, part) => sum + part.marks, 0);

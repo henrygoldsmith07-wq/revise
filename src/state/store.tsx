@@ -13,6 +13,7 @@ import {
 } from "@/domain/mistakes";
 import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
 import { computeApplicationMastery } from "@/domain/application-mastery";
+import { trustedAssessmentContent } from "@/domain/physics-content-review";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
@@ -659,6 +660,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       reviewLogs: snapshot.reviewLogs,
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
+      questions: snapshot.questions,
+      trustedQuestion: trustedAssessmentContent,
     });
   }, [snapshot, topics]);
 
@@ -711,6 +714,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       topics,
       questions: snapshot.questions,
       attempts: snapshot.attempts,
+      trustedQuestion: trustedAssessmentContent,
     });
   }, [snapshot, topics]);
 
@@ -1000,15 +1004,22 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     const masteryRows = mastery.map((m) => ({
       topicId: m.topicId,
       mastery: m.mastery ?? 0,
-      lastStudiedAt: null as string | null,
+      // Preserve the same recency tie-break used by the pure experiment
+      // policy. Returning null here made equal-mastery topics appear random.
+      lastStudiedAt: m.lastStudiedAt,
     }));
     const today = todayIso();
-    const dueByTopic = new Map<Id, number>();
+    const dueByTopic = new Map<Id, { count: number; oldestDue: string }>();
     for (const card of snapshot.cards) {
-      if (card.due <= today) dueByTopic.set(card.topicId, (dueByTopic.get(card.topicId) ?? 0) + 1);
+      if (card.due > today) continue;
+      const current = dueByTopic.get(card.topicId) ?? { count: 0, oldestDue: card.due };
+      dueByTopic.set(card.topicId, {
+        count: current.count + 1,
+        oldestDue: card.due < current.oldestDue ? card.due : current.oldestDue,
+      });
     }
-    const dueCounts = [...dueByTopic.entries()].map(([topicId, due]) => ({
-      topicId, due, oldestDue: today as string,
+    const dueCounts = [...dueByTopic.entries()].map(([topicId, row]) => ({
+      topicId, due: row.count, oldestDue: row.oldestDue,
     }));
     const pick = policyTaskFor(arm, { mastery: masteryRows, dueCounts });
     if (!pick || !pick.topicId) return recommendations;

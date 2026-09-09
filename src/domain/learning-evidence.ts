@@ -1,5 +1,5 @@
-import type { Attempt, Question } from "./types";
-import { trustedAssessmentContent } from "./physics-content-review";
+import type { Attempt, LearningDemand, Question, QuestionPart } from "./types";
+import { trustedAssessmentContent, verifiedPhysicsPaperProvenance } from "./physics-content-review";
 
 function normaliseAnswer(text: string): string {
   return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
@@ -44,7 +44,34 @@ export function independentAttempt(attempt: Attempt): boolean {
 }
 
 export function questionFamily(question: Question): string {
-  return question.learning?.familyId ?? question.id;
+  return question.learning?.familyId ?? question.parts.map((part) => part.learning?.familyId).find(Boolean) ?? question.id;
+}
+
+/** Part-level family/demand, falling back to legacy question metadata. */
+export function partLearningMetadata(question: Question, part: QuestionPart) {
+  return part.learning ?? (question.learning ? {
+    familyId: question.learning.familyId,
+    contextId: question.learning.contextId,
+    demand: question.learning.demand,
+    reasoningMoves: question.learning.reasoningMoves ?? [],
+  } : undefined);
+}
+
+export function partFamily(question: Question, part: QuestionPart): string {
+  return partLearningMetadata(question, part)?.familyId ?? questionFamily(question);
+}
+
+/** All authored families represented by a question, including mixed structured parts. */
+export function questionFamilies(question: Question): string[] {
+  // A question-level family is an explicit author override for legacy or
+  // cloned structured items. Otherwise preserve every part-level family.
+  if (question.learning?.familyId) return [question.learning.familyId];
+  return [...new Set(question.parts.map((part) => partFamily(question, part)).filter(Boolean))];
+}
+
+/** Demands represented by a question, used by the planner when parts are mixed. */
+export function questionDemands(question: Question): LearningDemand[] {
+  return [...new Set(question.parts.map((part) => partLearningMetadata(question, part)?.demand ?? question.learning?.demand).filter((demand): demand is LearningDemand => Boolean(demand)))];
 }
 
 export function questionCapabilities(question: Question): string[] {
@@ -54,28 +81,40 @@ export function questionCapabilities(question: Question): string[] {
 /** Transfer is an authored demand and a different context, never a difficulty label. */
 export function isTransferQuestion(question: Question, source?: Question): boolean {
   if (!trustedAssessmentContent(question)) return false;
-  const meta = question.learning;
-  if (!meta || !["transfer", "synoptic"].includes(meta.demand)) return false;
+  // A trusted target cannot turn an unreviewed source into trusted transfer
+  // evidence. Drafts can be practised, but the whole chain must start from a
+  // reviewed Physics item before transfer or delayed repair is attachable.
+  if (source && !trustedAssessmentContent(source)) return false;
+  const metas = question.parts.map((part) => partLearningMetadata(question, part)).filter(Boolean);
+  if (!metas.length || !metas.some((meta) => ["transfer", "synoptic"].includes(meta!.demand))) return false;
   if (!source) return true;
-  return question.subjectId === source.subjectId && questionFamily(question) !== questionFamily(source) &&
-    meta.contextId !== source.learning?.contextId &&
+  const sourceMetas = source.parts.map((part) => partLearningMetadata(source, part)).filter(Boolean);
+  const sourceFamilies = new Set(sourceMetas.map((meta) => meta!.familyId));
+  const sourceContexts = new Set(sourceMetas.map((meta) => meta!.contextId));
+  return question.subjectId === source.subjectId &&
+    metas.some((meta) => !sourceFamilies.has(meta!.familyId) && !sourceContexts.has(meta!.contextId)) &&
     questionCapabilities(question).some((id) => questionCapabilities(source).includes(id));
 }
 
 /** A renamed or renumbered variant is still familiar evidence. */
 export function unseenQuestion(question: Question, history: readonly Attempt[], questions: readonly Question[]): boolean {
   const byId = new Map(questions.map((q) => [q.id, q]));
+  const families = new Set(questionFamilies(question));
   return !history.some((a) => a.questionId === question.id ||
-    (byId.has(a.questionId) && questionFamily(byId.get(a.questionId)!) === questionFamily(question)));
+    (byId.has(a.questionId) && questionFamilies(byId.get(a.questionId)!).some((family) => families.has(family))));
 }
 
 /** A paper-mode flag alone cannot authenticate an unseen exam performance. */
 export function authenticPaperEvidence(attempt: Attempt, question: Question | undefined,
   history: readonly Attempt[], questions: readonly Question[]): boolean {
+  const provenance = question?.paperProvenance;
   if (!question || question.source !== "past-paper" || !trustedAssessmentContent(question) ||
-    !question.paperId || !question.paperQuestionNumber?.trim() ||
+    !verifiedPhysicsPaperProvenance(question) || !provenance ||
     !independentAttempt(attempt) || attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId ||
-    attempt.subjectId !== question.subjectId || attempt.max !== question.totalMarks ||
+    attempt.subjectId !== question.subjectId || attempt.paperId !== question.paperId ||
+    attempt.paperId !== provenance.paperId ||
+    (attempt.paperSpecId !== undefined && attempt.paperSpecId !== provenance.specification) ||
+    attempt.max !== question.totalMarks ||
     !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
   return unseenQuestion(question, history.filter((row) => row.userId === attempt.userId &&
     row.id !== attempt.id && row.createdAt <= attempt.createdAt), questions);

@@ -393,11 +393,13 @@ export function analyseAttemptWorking(
     const analysis = firstIncorrectStep(part, answer);
     const diagnosis = diagnoseWorking({ modelSteps: analysis.modelSteps, answer, similarityFn: stepSimilarity });
     const firstIncorrectIndex = analysis.firstIncorrect?.stepIndex ?? (diagnosis.firstErrorIndex ?? null);
-    const firstErrorKind = diagnosis.firstErrorIndex != null
-      ? diagnosis.kind
-      : analysis.firstIncorrect
-        ? "method-error"
-        : "none";
+    const firstErrorKind = analysis.firstIncorrect?.reason === "contradictory-working"
+      ? "contradictory-working"
+      : diagnosis.firstErrorIndex != null
+        ? diagnosis.kind
+        : analysis.firstIncorrect
+          ? "method-error"
+          : "none";
     const result = marked.find((candidate) => candidate.partId === part.id);
     const evidence = result?.evidence ?? [];
     const count = (kind: NonNullable<QuestionPart["calculationRules"]>[number]["kind"]): number => {

@@ -23,6 +23,8 @@ export interface ApplicationMasteryInput {
   topics: Topic[];
   questions: Question[];
   attempts: Attempt[];
+  /** Physics drafts can be practised, but their marks are not mastery evidence. */
+  trustedQuestion?: (question: Question) => boolean;
 }
 
 interface Observation {
@@ -43,6 +45,7 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
   const topicById = new Map(input.topics.map((topic) => [topic.id, topic]));
   const questionById = new Map(input.questions.map((question) => [question.id, question]));
   const byTopic = new Map<Id, Accumulator>();
+  const trustedQuestion = input.trustedQuestion ?? (() => true);
 
   for (const attempt of input.attempts) {
     if (attempt.mode === "recall" || attempt.max <= 0 || attempt.markEscalation?.status === "pending") continue;
@@ -50,6 +53,10 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
     if (!topicIds.length) continue;
     const share = 1 / topicIds.length;
     const question = questionById.get(attempt.questionId);
+    if (question && !trustedQuestion(question)) continue;
+    // A Physics attempt without a bank row cannot be authenticated against a
+    // reviewed question, so it must not silently become application mastery.
+    if (!question && attempt.subjectId === "wjec-alevel-physics") continue;
     // Hint-assisted marks count at the hint tier's evidence weight, so
     // hint-gaming cannot inflate application mastery.
     const credit = hintEvidenceMultiplier(attempt.hintTier ?? null);

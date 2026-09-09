@@ -499,6 +499,82 @@ function polarityConflict(point: string, answer: string): boolean {
   );
 }
 
+/**
+ * Authored answers are a useful floor for explicitly mapped content, but the
+ * floor must not depend on sentence order or harmless numeric notation. A
+ * canonical multiset of content tokens lets an answer such as
+ * "0.40 m" -> "2/5 m", or a reordered chain of sentences, reach the same
+ * authored result without accepting added claims, changed values or
+ * paraphrases that still need rubric marking.
+ */
+function canonicalAuthoredAnswer(text: string): string[] {
+  // Model answers recur across every adversarial variant and every retry of a
+  // question. Keep the canonical form bounded so the full authored-answer
+  // equivalence path does not repeatedly rescan the same prose.
+  const cached = AUTHORED_CANONICAL_CACHE.get(text);
+  if (cached) return cached;
+  const expanded = text
+    .replace(/[−–—]/g, "-")
+    .replace(
+      /([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[x×]\s*10\s*\^?\s*\{?([+-]?\d+)\}?/gi,
+      (_match, mantissa: string, exponent: string) => String(Number(mantissa) * 10 ** Number(exponent)),
+    );
+  const tokenPattern =
+    /-?\d+(?:,\d{3})*(?:\.\d+)?\s*\/\s*-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:,\d{3})*(?:\.\d+)?(?:e[+-]?\d+)?|[a-z]+/gi;
+  const fragments = expanded.split(/(?<=[.!?])\s+/).map((fragment) => {
+    const tokens: string[] = [];
+    for (const match of fragment.matchAll(tokenPattern)) {
+      const raw = match[0] ?? "";
+      if (/^[a-z]+$/i.test(raw)) {
+        const word = stem(raw.toLowerCase());
+        if (word && !STOP_WORDS.has(word)) tokens.push("w:" + word);
+        continue;
+      }
+      const numeric = extractNumbersCached(raw.replace(/\s+/g, "")).find((hit) => hit.value != null)?.value;
+      if (numeric != null && Number.isFinite(numeric)) tokens.push("n:" + numeric.toPrecision(12));
+      else tokens.push("r:" + raw.toLowerCase());
+    }
+    return tokens.sort().join("|");
+  }).filter(Boolean);
+  const result = fragments.sort();
+  if (AUTHORED_CANONICAL_CACHE.size > 1024) AUTHORED_CANONICAL_CACHE.clear();
+  AUTHORED_CANONICAL_CACHE.set(text, result);
+  return result;
+}
+
+const AUTHORED_CANONICAL_CACHE = new Map<string, string[]>();
+
+function authoredAnswerEquivalent(part: QuestionPart, answer: string): boolean {
+  const model = part.modelAnswer?.trim();
+  if (!model || !answer.trim()) return false;
+  const compact = (text: string) => text.replace(/\s+/g, " ");
+  if (compact(model) === compact(answer.trim())) return true;
+  const expected = canonicalAuthoredAnswer(model);
+  const actual = canonicalAuthoredAnswer(answer);
+  if (expected.length === 0 || expected.length !== actual.length) return false;
+  return expected.every((fragment, index) => {
+    if (fragment === actual[index]) return true;
+    const wanted = fragment.split("|");
+    const given = actual[index]!.split("|");
+    if (wanted.length !== given.length) return false;
+    const used = new Set<number>();
+    return wanted.every((token) => {
+      const match = given.findIndex((candidate, candidateIndex) => {
+        if (used.has(candidateIndex)) return false;
+        if (token === candidate) return true;
+        // A single transposed/substituted letter in a content word is normal
+        // handwriting/OCR noise. Numeric tokens stay exact after canonical
+        // value conversion; a changed number must still go through the rubric.
+        return token.startsWith("w:") && candidate.startsWith("w:") &&
+          withinEditDistance(token.slice(2), candidate.slice(2), 1);
+      });
+      if (match < 0) return false;
+      used.add(match);
+      return true;
+    });
+  });
+}
+
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
   const calculation = markCalculationWorking(part, answer);
   if (calculation) return calculation;
@@ -507,7 +583,7 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // evidence of cheating or support; the runner records actual hint exposure.
   // Limit this contract to explicitly skill-mapped content with one point per mark.
   if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
-    trimmed.replace(/\s+/g, " ") === part.modelAnswer.trim().replace(/\s+/g, " ")) {
+    authoredAnswerEquivalent(part, trimmed)) {
     const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
       creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
     return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };

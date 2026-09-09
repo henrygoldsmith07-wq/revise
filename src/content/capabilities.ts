@@ -1,4 +1,4 @@
-import { validateCapabilityGraph, type CapabilityNode } from "@/domain/capability-graph";
+import { validateCapabilityGraph, validatePrerequisiteRationales, type CapabilityNode } from "@/domain/capability-graph";
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 
 const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
@@ -77,11 +77,42 @@ export const physicsPrerequisites: Record<string, string[]> = {
   "nuclear.sp-07": ["phys.nuclear.sp-06"],
 };
 
+/** Subject-expert rationale for each cross-topic edge in the initial Physics graph. */
+const physicsPrerequisiteRationales: Record<string, string> = {
+  "kinematics-dynamics.sp-08|phys.momentum.sp-01": "Impulse is the area under a force-time graph, so the learner must first represent momentum and its change as a signed quantity.",
+  "energy-power.sp-05|phys.materials.sp-04": "Elastic energy in the system is obtained from the force-extension area before it is compared with gravitational or kinetic energy.",
+  "energy-power.sp-01|phys.kinematics-dynamics.sp-01": "Work and energy problems use the displacement and vector-direction convention established when motion is resolved.",
+  "materials.sp-04|phys.energy-power.sp-04": "The force-extension area is a work calculation; this link makes the energy interpretation explicit rather than treating the graph as a separate rule.",
+  "momentum.sp-03|phys.energy-power.sp-02": "Distinguishing elastic from inelastic collisions requires comparing the kinetic-energy store before and after momentum is conserved.",
+  "momentum.sp-04|phys.kinematics-dynamics.sp-05": "Average force is a rate of change of momentum, so the learner needs the velocity and acceleration representation used for changing motion.",
+  "momentum.sp-05|phys.kinematics-dynamics.sp-01": "Resolving a two-dimensional collision requires the vector-component convention introduced with scalar and vector motion.",
+  "circular-shm.sp-02|phys.acceleration": "Centripetal acceleration is a specific application of the acceleration concept and its direction, not an additional force.",
+  "circular-shm.sp-03|phys.acceleration": "The SHM sign condition is a statement about acceleration's direction, so the general acceleration concept is a necessary prerequisite.",
+  "circular-shm.sp-05|phys.materials.sp-02": "The mass-spring period depends on the spring constant, so Hooke behaviour supplies the restoring-force model.",
+  "circular-shm.sp-06|phys.energy-power.sp-02": "Energy interchange in SHM is tracked using kinetic and potential-energy stores and conservation of energy.",
+  "circular-shm.sp-07|phys.energy-power.sp-06": "Damping and resonance transfer energy through non-conservative forces, so the learner must account for dissipation and efficiency.",
+  "fields.sp-03|phys.energy-power.sp-01": "Potential is work done per unit mass or charge, so the work definition anchors the potential-energy interpretation.",
+  "fields.sp-04|phys.circular-shm.sp-02": "An orbit is maintained by an inward acceleration supplied by the field, linking inverse-square force to centripetal motion.",
+  "fields.sp-06|phys.circular-shm.sp-02": "The path of a moving charge in a magnetic field is circular because the magnetic force supplies centripetal acceleration.",
+  "thermal.sp-04|phys.momentum.sp-04": "Gas pressure comes from momentum transfer in molecular collisions, which is quantified as a rate of change of momentum.",
+  "thermal.sp-05|phys.energy-power.sp-02": "The first-law energy balance compares internal-energy change with work and energy transfers already defined for mechanical systems.",
+  "quantum.sp-04|phys.momentum.sp-01": "The de Broglie relation uses momentum, so the learner must distinguish a particle's momentum from its kinetic-energy value.",
+  "quantum.sp-04|phys.waves.sp-08": "Electron diffraction is interpreted through the same wavelength and interference ideas used for wave diffraction.",
+  "quantum.sp-07|phys.quantum.sp-01": "Electron-volt conversions and transitions depend on the photon-energy relation established for a single quantum.",
+};
+
+function rationaleForPhysicsEdge(targetKey: string, prerequisiteId: string): string | undefined {
+  return physicsPrerequisiteRationales[`${targetKey}|${prerequisiteId}`];
+}
+
 export const wjecPhysicsCapabilities: CapabilityNode[] = wjecPhysics.topics.flatMap((topic) => {
   const points = topic.specPoints ?? [];
   return points.map((point) => {
     const id = physicsCapabilityIdForSpecPoint(point.id);
     const prerequisites = physicsPrerequisites[id.replace(/^phys\./, "")] ?? [];
+    const prerequisiteRationales = Object.fromEntries(prerequisites
+      .map((prerequisiteId) => [prerequisiteId, rationaleForPhysicsEdge(id.replace(/^phys\./, ""), prerequisiteId)] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[1])));
     return {
       id,
       subjectId: PHYSICS_SUBJECT_ID,
@@ -89,6 +120,7 @@ export const wjecPhysicsCapabilities: CapabilityNode[] = wjecPhysics.topics.flat
       label: point.text.length > 92 ? `${point.text.slice(0, 89).trimEnd()}…` : point.text,
       specPointIds: [point.id],
       prerequisites,
+      ...(Object.keys(prerequisiteRationales).length ? { prerequisiteRationales } : {}),
       explanation: `To demonstrate this capability, you need to ${point.text.replace(/[.]$/, "")}. Start from the definitions and relationships in the statement, then show the result in the requested context.`,
     } satisfies CapabilityNode;
   });
@@ -153,4 +185,9 @@ export const wjecCapabilities: CapabilityNode[] = [
 export const wjecCapabilityGraphErrors = validateCapabilityGraph(wjecCapabilities);
 if (wjecCapabilityGraphErrors.length) {
   throw new Error(`Invalid WJEC capability graph: ${wjecCapabilityGraphErrors.join("; ")}`);
+}
+
+export const wjecPhysicsPrerequisiteErrors = validatePrerequisiteRationales(wjecCapabilities, PHYSICS_SUBJECT_ID);
+if (wjecPhysicsPrerequisiteErrors.length) {
+  throw new Error(`Missing WJEC Physics prerequisite rationales: ${wjecPhysicsPrerequisiteErrors.join("; ")}`);
 }

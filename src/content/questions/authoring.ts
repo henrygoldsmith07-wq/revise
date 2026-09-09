@@ -1,4 +1,4 @@
-import type { AoCode, ContentSource, HumanVerificationRecord, Id, LicensedSource, LearningQuestionMetadata, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
+import type { AoCode, ContentSource, HumanVerificationRecord, Id, LicensedSource, LearningPartMetadata, LearningQuestionMetadata, PaperQuestionProvenance, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
 
 // Compact authoring format for the seed question bank. Ids are deterministic
 // (`cnt:question:<slug>`, namespaced — see src/data/content-ids.ts) so
@@ -17,6 +17,8 @@ export interface PartSpec {
   specPointIds?: string[];
   learningClaims?: string[];
   capabilityIds?: string[];
+  /** Part-level demand/family metadata for structured quality questions. */
+  learning?: LearningPartMetadata;
   calculationRules?: QuestionPart["calculationRules"];
 }
 
@@ -38,6 +40,7 @@ export interface QuestionSpec {
   reviewer?: string | null;
   specVersion?: string;
   humanVerification?: HumanVerificationRecord;
+  paperProvenance?: PaperQuestionProvenance;
   aos?: AoCode[];
   specPointIds?: string[];
   learning?: LearningQuestionMetadata;
@@ -60,6 +63,7 @@ export function defineQuestion(spec: QuestionSpec): Question {
       ? part.learningClaims
       : [part.prompt.replace(/^\([a-z]\)\s*/i, "").replace(/\.+$/, "").trim()].filter(Boolean),
     ...(part.capabilityIds ? { capabilityIds: part.capabilityIds } : {}),
+    ...(part.learning ? { learning: part.learning } : {}),
     ...(part.calculationRules ? { calculationRules: part.calculationRules } : {}),
   }));
 
@@ -91,6 +95,7 @@ export function defineQuestion(spec: QuestionSpec): Question {
     specPointIds: specPointIds.length ? specPointIds : undefined,
     createdAt: SEED_CREATED_AT,
     ...(spec.humanVerification ? { humanVerification: spec.humanVerification } : {}),
+    ...(spec.paperProvenance ? { paperProvenance: spec.paperProvenance } : {}),
     ...(spec.learning ? { learning: spec.learning } : {}),
   };
 }

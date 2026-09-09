@@ -1,4 +1,4 @@
-import type { Id, Question } from "./types";
+import type { Id, PaperQuestionProvenance, Question } from "./types";
 import { defineQuestion } from "@/content/questions/authoring";
 import type { QuestionSpec } from "@/content/questions/authoring";
 
@@ -21,6 +21,8 @@ export interface IngestPaperPayload {
   year?: number;
   series?: string;
   paperSpecId?: Id;
+  /** Immutable source manifest supplied by an authenticated importer. */
+  paperProvenance?: Omit<PaperQuestionProvenance, "paperId" | "questionNumber"> & { paperId?: Id };
   /** One spec per question; each maps to a topic and spec points. */
   questions: Array<{
     topics: string[]; // topic slugs, not qualified ids
@@ -30,8 +32,14 @@ export interface IngestPaperPayload {
     kind?: Question["kind"];
     options?: string[];
     correctIndex?: number;
+    paperQuestionNumber?: string;
   }>;
 }
+
+export type AuthenticatedPhysicsPaperPayload = Omit<IngestPaperPayload, "subjectId" | "paperProvenance"> & {
+  subjectId: "wjec-alevel-physics";
+  paperProvenance: Omit<PaperQuestionProvenance, "questionNumber"> & { questionNumber?: string };
+};
 
 export function slugForIngested(subjectId: Id, index: number, year?: number): string {
   return `past-${subjectId.split(".").pop()}-y${year ?? 2024}-q${index+1}`;
@@ -58,7 +66,9 @@ export function ingestPaperPayload(payload: IngestPaperPayload): Question[] {
       correctIndex: q.correctIndex,
       source: "past-paper" as const,
       verification: "checked" as const,
-      specVersion: "2024-1.0",
+      // Preserve the manifest's version so an authenticated import remains
+      // tied to the exact WJEC specification it was checked against.
+      specVersion: payload.paperProvenance?.specificationVersion ?? "2024-1.0",
       parts: q.parts.map((pt) => ({
         prompt: pt.prompt,
         marks: pt.marks,
@@ -67,12 +77,43 @@ export function ingestPaperPayload(payload: IngestPaperPayload): Question[] {
         specPointIds: pt.specPointIds,
         aos: pt.aos,
       })),
+      ...(payload.paperProvenance ? {
+        paperProvenance: {
+          ...payload.paperProvenance,
+          paperId: payload.paperProvenance.paperId ?? payload.paperSpecId ?? `${payload.subjectId}.unidentified-paper`,
+          questionNumber: q.paperQuestionNumber ?? String(i + 1),
+        },
+      } : {}),
     };
     const built = defineQuestion(spec);
     // Override origin/source to past-paper (defineQuestion defaults to seed/authored).
-    out.push({ ...built, origin: "past-paper", source: "past-paper" });
+    out.push({
+      ...built,
+      origin: "past-paper",
+      source: "past-paper",
+      ...(payload.paperProvenance ? {
+        paperId: payload.paperProvenance.paperId ?? payload.paperSpecId ?? `${payload.subjectId}.unidentified-paper`,
+        paperQuestionNumber: q.paperQuestionNumber ?? String(i + 1),
+      } : {}),
+    });
   }
   return out;
+}
+
+/**
+ * Import a WJEC Physics paper only after its source manifest has been
+ * authenticated. Pending manifests belong in the review queue; this helper
+ * intentionally refuses them so a caller cannot accidentally mark a paper as
+ * trusted merely because extraction succeeded.
+ */
+export function ingestAuthenticatedPhysicsPaper(payload: AuthenticatedPhysicsPaperPayload): Question[] {
+  const provenance = payload.paperProvenance;
+  if (provenance.board.toLowerCase() !== "wjec" || provenance.status !== "verified" ||
+    !provenance.paperId || !provenance.sourceDigest.trim() || !/^https:\/\//i.test(provenance.sourceUrl) ||
+    !provenance.verifiedBy || !provenance.verifiedAt || !Number.isFinite(Date.parse(provenance.verifiedAt))) {
+    throw new Error("WJEC Physics paper provenance must be verified with a source digest and named reviewer before import");
+  }
+  return ingestPaperPayload(payload);
 }
 
 /**

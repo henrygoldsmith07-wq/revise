@@ -319,11 +319,11 @@ function AdaptiveSession() {
           store={store}
           replanReason={replanReason}
           onDone={recordStep}
-          onRetrievalComplete={(outcome: RetrievalOutcome) => {
+          onRetrievalComplete={async (outcome: RetrievalOutcome) => {
             if (!run) return;
             if (activeStep.intervention) {
               const passed = outcome.grades.length > 0 && !outcome.grades.includes("again");
-              void store.recordInterventionOutcome(createInterventionObservation({
+              await store.recordInterventionOutcome(createInterventionObservation({
                 userId: store.userId,
                 subjectId: plan.subjectId,
                 context: activeStep.intervention,
@@ -412,7 +412,7 @@ function StepPanel({
   store: ReturnType<typeof useStore>;
   replanReason: string | null;
   onDone: (record: AdaptiveStepRecord) => void;
-  onRetrievalComplete: (outcome: RetrievalOutcome) => void;
+  onRetrievalComplete: (outcome: RetrievalOutcome) => void | Promise<void>;
 }) {
   const availableCards: Card[] = step.cardIds.length
     ? store.cards.filter((card) => step.cardIds.includes(card.id) && !card.suspended)
@@ -495,9 +495,9 @@ function StepPanel({
           revealed={recallRevealed}
           onDraft={setRecallDraft}
            onReveal={() => setRecallRevealed(true)}
-           onDone={() => {
+           onDone={async () => {
              if (step.intervention) {
-               void store.recordInterventionOutcome(createInterventionObservation({
+               await store.recordInterventionOutcome(createInterventionObservation({
                  userId: store.userId,
                  subjectId: plan.subjectId,
                  context: step.intervention,
@@ -577,9 +577,9 @@ function StepPanel({
             <p className="text-sm text-ink2">No question is available for this rung in the current bank.</p>
             <Button
               variant="primary"
-              onClick={() => {
+              onClick={async () => {
                 if (step.intervention) {
-                  void store.recordInterventionOutcome(createInterventionObservation({
+                  await store.recordInterventionOutcome(createInterventionObservation({
                     userId: store.userId,
                     subjectId: plan.subjectId,
                     context: step.intervention,
@@ -626,7 +626,7 @@ function StepPanel({
                await store.updateCards(scheduleCards.map((card) => buryCard(card, 1)));
               }
               if (step.intervention) {
-                void store.recordInterventionOutcome(createInterventionObservation({
+                await store.recordInterventionOutcome(createInterventionObservation({
                   userId: store.userId,
                   subjectId: plan.subjectId,
                   context: step.intervention,
@@ -672,7 +672,7 @@ function ExplanationGate({
   revealed: boolean;
   onDraft: (value: string) => void;
   onReveal: () => void;
-  onDone: () => void;
+  onDone: () => void | Promise<void>;
 }) {
   const topic = getTopic(plan.topicId);
   return (

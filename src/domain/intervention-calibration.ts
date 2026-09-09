@@ -1,6 +1,6 @@
 import type { Attempt, InterventionActivity, InterventionAttemptContext, InterventionKind, InterventionObservationResult, InterventionOutcomeRecord, IsoInstant, Question } from "./types";
-import { independentAttempt, isTransferQuestion, questionCapabilities, questionFamily, unseenQuestion } from "./learning-evidence";
-import { trustedAssessmentContent } from "./physics-content-review";
+import { independentAttempt, isTransferQuestion, partFamily, questionCapabilities, unseenQuestion } from "./learning-evidence";
+import { PHYSICS_SUBJECT_ID, trustedAssessmentContent } from "./physics-content-review";
 
 export const INTERVENTION_PRIORS: Record<InterventionKind, number> = {
   diagnose: 0.015,
@@ -16,6 +16,8 @@ export interface InterventionCalibration {
   key: string;
   kind: InterventionKind;
   capabilityId?: string;
+  /** Present for the subject-level fallback calibration. */
+  subjectId?: string;
   sampleSize: number;
   reliable: boolean;
   durableGainPerMinute: number;
@@ -26,6 +28,11 @@ export interface InterventionCalibration {
 
 export function interventionKey(kind: InterventionKind, capabilityId?: string): string {
   return capabilityId ? `${kind}:${capabilityId}` : kind;
+}
+
+/** Stable subject-scoped key used when a capability has too little evidence. */
+export function interventionFamilyKey(kind: InterventionKind, subjectId: string): string {
+  return `${kind}:subject:${subjectId}`;
 }
 
 function validScore(row: { awarded: number; max: number }): number | null {
@@ -40,6 +47,7 @@ export function durableOutcomeScore(outcome: InterventionOutcomeRecord): number 
     !outcome.transfer?.trusted || !outcome.delayedRetention?.trusted ||
     !outcome.immediateFamilyId || !outcome.transfer.familyId || !outcome.delayedRetention.familyId ||
     new Set([outcome.immediateFamilyId, outcome.transfer.familyId, outcome.delayedRetention.familyId]).size !== 3 ||
+    (outcome.subjectId === PHYSICS_SUBJECT_ID && outcome.immediate.trusted !== true) ||
     Date.parse(outcome.transfer.at) <= Date.parse(outcome.immediate.at) ||
     Date.parse(outcome.delayedRetention.at) - Date.parse(outcome.transfer.at) < RETENTION_DELAY) return null;
   const immediate = validScore(outcome.immediate);
@@ -70,7 +78,10 @@ export function calibrateInterventions(
 ): Map<string, InterventionCalibration> {
   const minimumSample = Math.max(20, options.minimumSample ?? 20);
   const priorWeight = Math.max(20, options.priorWeight ?? 20);
-  const groups = new Map<string, InterventionOutcomeRecord[]>();
+  const groups = new Map<string, {
+    rows: InterventionOutcomeRecord[];
+    scope: "capability" | "subject";
+  }>();
   const seen = new Set<string>();
   for (const outcome of outcomes) {
     // Replayed rows and the same chain cannot inflate sample size.
@@ -79,20 +90,19 @@ export function calibrateInterventions(
     seen.add(identity);
     // Capability ids are subject-scoped; never borrow effects across subjects.
     const key = interventionKey(outcome.kind, outcome.capabilityId);
-    const list = groups.get(key) ?? [];
-    list.push(outcome);
-    groups.set(key, list);
+    const capabilityGroup = groups.get(key) ?? { rows: [], scope: "capability" as const };
+    capabilityGroup.rows.push(outcome);
+    groups.set(key, capabilityGroup);
     // A capability-specific sample also informs the intervention family when
     // a capability has not yet accumulated enough evidence on its own.
-    const family = `${interventionKey(outcome.kind)}:${outcome.subjectId}`;
-    if (family !== key) {
-      const familyList = groups.get(family) ?? [];
-      familyList.push(outcome);
-      groups.set(family, familyList);
-    }
+    const family = interventionFamilyKey(outcome.kind, outcome.subjectId);
+    const familyGroup = groups.get(family) ?? { rows: [], scope: "subject" as const };
+    familyGroup.rows.push(outcome);
+    groups.set(family, familyGroup);
   }
   const result = new Map<string, InterventionCalibration>();
-  for (const [key, rows] of groups) {
+  for (const [key, group] of groups) {
+    const rows = group.rows;
     const first = rows[0]!;
     const gains = rows.map(calibratedGain).filter((value): value is number => value != null);
     const delayedScores = rows.map((row) => row.delayedRetention ? validScore(row.delayedRetention) : null).filter((value): value is number => value != null);
@@ -108,7 +118,7 @@ export function calibrateInterventions(
     result.set(key, {
       key,
       kind: first.kind,
-      ...(key.includes(":") ? { capabilityId: first.capabilityId } : {}),
+      ...(group.scope === "capability" ? { capabilityId: first.capabilityId } : { subjectId: first.subjectId }),
       sampleSize: gains.length,
       reliable: reliability,
       durableGainPerMinute: estimate,
@@ -123,9 +133,15 @@ export function effectivenessFor(
   kind: InterventionKind,
   capabilityId: string,
   calibrations: ReadonlyMap<string, InterventionCalibration>,
+  subjectId?: string,
 ): { gainPerMinute: number; calibrated: boolean; sampleSize: number } {
   const exact = calibrations.get(interventionKey(kind, capabilityId));
-  const chosen = exact;
+  const family = subjectId ? calibrations.get(interventionFamilyKey(kind, subjectId)) : undefined;
+  // Prefer a reliable capability estimate. If it is not reliable yet, use a
+  // reliable subject estimate built from complete chains across capabilities.
+  // This lets scarce capability evidence benefit from a conservative pooled
+  // estimate without allowing one small or stale group to override the prior.
+  const chosen = exact?.reliable ? exact : family?.reliable ? family : exact ?? family;
   return chosen
     ? { gainPerMinute: chosen.reliable ? Math.max(0, chosen.durableGainPerMinute) : INTERVENTION_PRIORS[kind], calibrated: chosen.reliable, sampleSize: chosen.sampleSize }
     : { gainPerMinute: INTERVENTION_PRIORS[kind], calibrated: false, sampleSize: 0 };
@@ -153,6 +169,11 @@ function capabilityScore(attempt: Attempt, question: Question | undefined, capab
   return { awarded, max };
 }
 
+function familyForCapability(question: Question, capabilityId: string): string {
+  if (question.learning?.familyId) return question.learning.familyId;
+  return partFamily(question, question.parts.find((part) => part.capabilityIds?.includes(capabilityId)) ?? question.parts[0]!);
+}
+
 /** Start an outcome record at the moment an adaptive intervention is submitted. */
 export function createInterventionOutcome(input: {
   userId: string;
@@ -164,6 +185,7 @@ export function createInterventionOutcome(input: {
 }): InterventionOutcomeRecord {
   const { context, attempt } = input;
   const score = capabilityScore(attempt, input.question, context.capabilityId);
+  const immediateTrusted = Boolean(input.question && input.question.subjectId === input.subjectId && trustedAssessmentContent(input.question));
   return {
     // The context identifies the planned rung; the attempt identifies this
     // concrete observation. Reusing a step slot across two sessions must not
@@ -171,7 +193,7 @@ export function createInterventionOutcome(input: {
     id: attempt.id,
     ...(score ? { evidenceVersion: 2 as const } : {}),
     immediateQuestionId: attempt.questionId,
-    ...(input.question ? { immediateFamilyId: questionFamily(input.question) } : {}),
+    ...(input.question ? { immediateFamilyId: familyForCapability(input.question, context.capabilityId) } : {}),
     ...(context.priorAccuracy !== undefined ? { priorAccuracy: context.priorAccuracy } : {}),
     timeMeasured: Number.isFinite(attempt.elapsedMs) && attempt.elapsedMs > 0,
     ...(context.chainId ? { chainId: context.chainId } : {}),
@@ -192,6 +214,7 @@ export function createInterventionOutcome(input: {
       attemptId: attempt.id,
       at: attempt.createdAt,
       result: (score?.max ?? attempt.max) > 0 && (score?.awarded ?? attempt.awarded) / (score?.max ?? attempt.max) >= 0.7 ? "passed" : "missed",
+      ...(input.subjectId === PHYSICS_SUBJECT_ID ? { trusted: immediateTrusted } : {}),
     },
     createdAt: attempt.createdAt,
     updatedAt: attempt.createdAt,
@@ -257,12 +280,13 @@ export interface OutcomeEvidenceContext {
 
 function validFollowUp(outcome: InterventionOutcomeRecord, attempt: Attempt, evidence?: OutcomeEvidenceContext): evidence is OutcomeEvidenceContext {
   if (!evidence || !independentFor(attempt) || attempt.userId !== outcome.userId || attempt.subjectId !== outcome.subjectId ||
+    (outcome.subjectId === PHYSICS_SUBJECT_ID && outcome.immediate.trusted !== true) ||
     attempt.questionId !== evidence.question.id || !trustedAssessmentContent(evidence.question) ||
     !questionCapabilities(evidence.question).includes(outcome.capabilityId) ||
     !capabilityScore(attempt, evidence.question, outcome.capabilityId) ||
     Date.parse(attempt.createdAt) <= Date.parse(outcome.createdAt) ||
     attempt.questionId === outcome.immediateQuestionId ||
-    questionFamily(evidence.question) === outcome.immediateFamilyId ||
+    familyForCapability(evidence.question, outcome.capabilityId) === outcome.immediateFamilyId ||
     !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
   const prior = evidence.history.filter((row) => row.userId === attempt.userId && row.id !== attempt.id &&
     Date.parse(row.createdAt) <= Date.parse(attempt.createdAt));
@@ -280,7 +304,7 @@ export function attachTransferOutcome(
     ...outcome,
     actualMinutes: outcome.actualMinutes + attempt.elapsedMs / 60_000,
     transfer: { ...score, independent: true, questionId: attempt.questionId, attemptId: attempt.id, at: attempt.createdAt,
-      familyId: questionFamily(evidence.question), trusted: true },
+      familyId: familyForCapability(evidence.question, outcome.capabilityId), trusted: true },
     updatedAt: attempt.createdAt,
   };
 }
@@ -292,7 +316,7 @@ export function attachDelayedRetentionOutcome(
   evidence?: OutcomeEvidenceContext,
 ): InterventionOutcomeRecord {
   if (outcome.delayedRetention || !outcome.transfer || !validFollowUp(outcome, attempt, evidence) ||
-    questionFamily(evidence.question) === outcome.transfer.familyId) return outcome;
+    familyForCapability(evidence.question, outcome.capabilityId) === outcome.transfer.familyId) return outcome;
   // Every intervening attempt at this capability restarts the unpractised delay.
   const byId = new Map(evidence.questions.map((question) => [question.id, question]));
   const lastPractice = evidence.history.filter((row) => {
@@ -308,7 +332,7 @@ export function attachDelayedRetentionOutcome(
     ...outcome,
     actualMinutes: outcome.actualMinutes + attempt.elapsedMs / 60_000,
     delayedRetention: { ...score, independent: true, questionId: attempt.questionId, attemptId: attempt.id, at: attempt.createdAt,
-      familyId: questionFamily(evidence.question), trusted: true },
+      familyId: familyForCapability(evidence.question, outcome.capabilityId), trusted: true },
     updatedAt: attempt.createdAt,
   };
 }

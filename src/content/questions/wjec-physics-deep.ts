@@ -21,12 +21,22 @@ function item(slug: string, topic: string, point: number, demand: LearningDemand
     specPointIds: [specId],
     capabilityIds: [capability ?? `phys.${topic}.sp-${String(point).padStart(2, "0")}`],
   }, ...extraParts];
+  const familyId = `physics-quality:${slug}`;
+  const annotatedParts = parts.map((part, index) => ({
+    ...part,
+    learning: part.learning ?? {
+      familyId,
+      contextId: `${slug}:context-${index + 1}`,
+      demand,
+      reasoningMoves: [`${demand} reasoning in the stated physical context`],
+    },
+  }));
   return defineQuestion({
     slug: `physics-quality-${slug}`, subjectId: SUBJECT,
     topics: [...new Set([topic, ...extraParts.flatMap((part) => (part.specPointIds ?? []).map((id) => id.split(".").at(-2)!))])],
     kind: extraParts.length ? "structured" : demand === "calculation" ? "calculation" : "short",
     stem: extraParts.length ? "Answer each part. Show your reasoning and numerical working." : prompt,
-    parts, difficulty: ["transfer", "synoptic"].includes(demand) ? 4 : demand === "recall" ? 1 : 3,
+    parts: annotatedParts, difficulty: ["transfer", "synoptic"].includes(demand) ? 4 : demand === "recall" ? 1 : 3,
     source: "generated", verification: "unverified", reviewer: null, lastChecked: null,
     learning: { demand, familyId: `physics-quality:${slug}`, contextId: slug,
       expectedMinutes: Math.max(1, parts.reduce((sum, part) => sum + part.marks, 0) * 1.5) },

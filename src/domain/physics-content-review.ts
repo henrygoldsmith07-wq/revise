@@ -1,4 +1,5 @@
 import { auditLearningDepth } from "./learning-depth";
+import { auditPhysicsAssessmentQuality, type PhysicsAssessmentQualityAudit } from "./physics-assessment-quality";
 import type { CapabilityNode } from "./capability-graph";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
@@ -10,10 +11,11 @@ export function physicsContentFingerprint(question: Question): string {
   const text = JSON.stringify([question.id, question.subjectId, question.topicIds,
     question.specPointIds, question.stem, question.parts, question.totalMarks,
     question.learning, question.options, question.correctIndex, question.calculatorAllowed,
-    question.source, question.origin, question.licensedSource, question.paperId, question.paperQuestionNumber, question.specVersion]);
+    question.source, question.origin, question.licensedSource, question.paperId, question.paperQuestionNumber,
+    question.paperProvenance, question.specVersion]);
   let hash = 2166136261;
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return `physics-review-v1:${(hash >>> 0).toString(16)}`;
+  return `physics-review-v2:${(hash >>> 0).toString(16)}`;
 }
 
 export type PhysicsReviewQueueRow = {
@@ -33,11 +35,28 @@ function completeChecks(record: HumanVerificationRecord | undefined): boolean {
 export function humanVerifiedPhysicsQuestion(question: Question): boolean {
   return question.subjectId === PHYSICS_SUBJECT_ID && question.verification === "verified" && completeChecks(question.humanVerification) &&
     question.humanVerification?.contentFingerprint === physicsContentFingerprint(question) &&
+    (question.source !== "past-paper" || verifiedPhysicsPaperProvenance(question)) &&
     !["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "");
 }
 
 export function trustedAssessmentContent(question: Question): boolean {
   return question.subjectId !== PHYSICS_SUBJECT_ID || humanVerifiedPhysicsQuestion(question);
+}
+
+/**
+ * A paper item is authentic only when its WJEC source manifest was checked by
+ * a named reviewer. This is deliberately separate from question-content
+ * approval: provenance and marking quality are two independent gates.
+ */
+export function verifiedPhysicsPaperProvenance(question: Question): boolean {
+  const provenance = question.paperProvenance;
+  return question.subjectId === PHYSICS_SUBJECT_ID && question.source === "past-paper" &&
+    Boolean(question.paperId && question.paperQuestionNumber?.trim() && provenance &&
+      provenance.status === "verified" && provenance.board.toLowerCase() === "wjec" &&
+      provenance.paperId === question.paperId && provenance.questionNumber === question.paperQuestionNumber &&
+      provenance.specification.trim() && /^https:\/\//i.test(provenance.sourceUrl) && provenance.sourceDigest.trim() &&
+      provenance.verifiedBy && provenance.verifiedAt && Number.isFinite(Date.parse(provenance.verifiedAt)) &&
+      (!provenance.specificationVersion || !question.specVersion || provenance.specificationVersion === question.specVersion));
 }
 
 /** Questions requiring editorial review before they can provide trusted transfer evidence. */
@@ -78,6 +97,8 @@ export interface PhysicsContentReadiness {
   unreviewedQuestionCount: number;
   reviewQueue: PhysicsReviewQueueRow[];
   gaps: Array<{ topicId: Id; specPointId: Id; demands: string[] }>;
+  /** Detailed variation, mapping and review audit over the whole Physics bank. */
+  quality: PhysicsAssessmentQualityAudit;
 }
 
 /** One auditable gate for releasing Physics as a deeply assessable flagship. */
@@ -90,16 +111,18 @@ export function physicsContentReadiness(input: {
   const questions = input.questions.filter((question) => question.subjectId === PHYSICS_SUBJECT_ID);
   // Release depth must be counted from approved content, not the draft inventory.
   const audit = auditLearningDepth(topics, questions.filter(humanVerifiedPhysicsQuestion), input.nodes);
+  const quality = auditPhysicsAssessmentQuality({ topics, questions, nodes: input.nodes, trustedQuestion: humanVerifiedPhysicsQuestion });
   const reviewQueue = buildPhysicsReviewQueue(questions);
   const trustedQuestionCount = questions.filter(humanVerifiedPhysicsQuestion).length;
   const gaps = audit.rows.filter((row) => row.gaps.length).map((row) => ({ topicId: row.topicId, specPointId: row.specPointId, demands: row.gaps }));
   return {
-    ready: audit.statements > 0 && audit.statementsWithFullDepth === audit.statements && reviewQueue.length === 0,
+    ready: audit.statements > 0 && audit.statementsWithFullDepth === audit.statements && reviewQueue.length === 0 && quality.releaseReady,
     statements: audit.statements,
     statementsWithFullDepth: audit.statementsWithFullDepth,
     trustedQuestionCount,
     unreviewedQuestionCount: reviewQueue.length,
     reviewQueue,
     gaps,
+    quality,
   };
 }

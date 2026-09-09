@@ -31,7 +31,7 @@ export function AdaptiveRetrievalBlock({
   onComplete,
 }: {
   cards: Card[];
-  onComplete: (outcome: RetrievalOutcome) => void;
+  onComplete: (outcome: RetrievalOutcome) => void | Promise<void>;
 }) {
   const store = useStore();
   const [index, setIndex] = useState(0);
@@ -67,7 +67,7 @@ export function AdaptiveRetrievalBlock({
       setConfidence(null);
       if (index >= cards.length - 1) {
         finishedRef.current = true;
-        onComplete({
+        await onComplete({
           grades: nextGrades,
           missedItemIds: cards.filter((_, i) => nextGrades[i] === "again").map((card) => card.id),
         });

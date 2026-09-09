@@ -1,4 +1,4 @@
-import type { AoCode, Question } from "@/domain/types";
+import type { AoCode, LearningDemand, Question } from "@/domain/types";
 import { defineQuestion } from "./authoring";
 
 /**
@@ -30,6 +30,27 @@ interface ItemSpec {
   parts: PartSpec[];
 }
 
+/** Explicit demand labels for the first authored Physics depth pass. */
+const FLAGSHIP_DEMANDS: Record<string, readonly LearningDemand[]> = {
+  "depth-energy-fx-graph": ["calculation", "synoptic"],
+  "depth-energy-gpe-epelastic": ["calculation", "calculation"],
+  "depth-materials-strain-energy-density": ["application", "calculation"],
+  "depth-unfamiliar-materials-climbing-rope": ["transfer", "calculation"],
+  "depth-momentum-impulse-average-force": ["calculation", "application"],
+  "depth-misconception-momentum-ke": ["misconception"],
+  "depth-unfamiliar-quantum-electron-diffraction": ["transfer", "calculation"],
+  "depth-synoptic-quantum-transitions-efficiency": ["synoptic", "synoptic"],
+  "depth-waves-grating": ["calculation", "transfer"],
+  "depth-unfamiliar-waves-fibre": ["transfer", "calculation"],
+  "depth-circuits-internal-r": ["calculation", "explanation"],
+  "depth-circular-banked": ["calculation", "application"],
+  "depth-fields-orbit": ["calculation", "explanation"],
+  "depth-unfamiliar-fields-mass-spec": ["transfer", "calculation"],
+  "depth-thermal-latent": ["calculation", "transfer"],
+  "depth-nuclear-half-life": ["calculation", "explanation"],
+  "depth-kinematics-projectile": ["calculation", "transfer"],
+};
+
 function build(item: ItemSpec): Question {
   const prefix = `wjec-alevel-physics.${item.topic}`;
   return defineQuestion({
@@ -44,7 +65,7 @@ function build(item: ItemSpec): Question {
     reviewer: "authored/flagship-depth-review",
     lastChecked: "2026-08-22",
     specVersion: "2024-1.0",
-    parts: item.parts.map((part) => ({
+    parts: item.parts.map((part, index) => ({
       prompt: part.prompt,
       marks: part.marks,
       scheme: part.scheme,
@@ -52,6 +73,13 @@ function build(item: ItemSpec): Question {
       aos: part.aos,
       specPointIds: [`${prefix}.${part.point}`],
       learningClaims: [part.claim],
+      capabilityIds: [`phys.${item.topic}.${part.point}`],
+      learning: FLAGSHIP_DEMANDS[item.slug]?.[index] ? {
+        familyId: `physics-flagship:${item.slug}`,
+        contextId: `physics-flagship:${item.slug}:part-${index + 1}`,
+        demand: FLAGSHIP_DEMANDS[item.slug]![index]!,
+        reasoningMoves: [`${FLAGSHIP_DEMANDS[item.slug]![index]!} reasoning with the authored data`],
+      } : undefined,
     })),
   });
 }

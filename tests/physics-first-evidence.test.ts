@@ -5,7 +5,7 @@ import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 import { auditLearningDepth } from "@/domain/learning-depth";
 import { applyHumanVerification, buildPhysicsReviewQueue, physicsContentReadiness, humanVerifiedPhysicsQuestion, physicsContentFingerprint } from "@/domain/physics-content-review";
 import { answerLooksCopied, independentAttempt } from "@/domain/learning-evidence";
-import { calibrateInterventions, durableOutcomeScore, effectivenessFor } from "@/domain/intervention-calibration";
+import { calibrateInterventions, durableOutcomeScore, effectivenessFor, interventionFamilyKey } from "@/domain/intervention-calibration";
 import { deriveSkillEvidence, smallestUnprovenCapability, validateCapabilityGraph } from "@/domain/capability-graph";
 import type { Attempt, InterventionOutcomeRecord } from "@/domain/types";
 
@@ -28,7 +28,7 @@ function outcome(i: number): InterventionOutcomeRecord {
     plannedMinutes: 3,
     actualMinutes: 3,
     support: "scaffold",
-    immediate: { awarded: 1, max: 1, independent: false, attemptId: `a-${i}`, at },
+    immediate: { awarded: 1, max: 1, independent: false, trusted: true, attemptId: `a-${i}`, at },
     transfer: { awarded: 2, max: 2, independent: true, trusted: true, familyId: `q-t-${i}`, questionId: `q-t-${i}`, attemptId: `t-${i}`, at: new Date(Date.parse(at) + 60000).toISOString() },
     delayedRetention: { awarded: 2, max: 2, independent: true, trusted: true, familyId: `q-d-${i}`, questionId: `q-d-${i}`, attemptId: `d-${i}`, at: new Date(Date.parse(at) + 8 * 86400000).toISOString() },
     createdAt: at,
@@ -123,5 +123,18 @@ describe("Physics-first coverage and evidence", () => {
     const incomplete = { ...rows[0]!, delayedRetention: undefined };
     expect(durableOutcomeScore(incomplete)).toBeNull();
     expect(calibrateInterventions([incomplete])).toHaveLength(0);
+  });
+
+  it("falls back to a reliable subject calibration while a capability sample is small", () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({
+      ...outcome(i),
+      id: `family-intervention-${i}`,
+      capabilityId: `phys.family-capability-${i}`,
+    }));
+    const calibrations = calibrateInterventions(rows);
+    expect(calibrations.get("guided:phys.family-capability-0")?.reliable).toBe(false);
+    expect(calibrations.get(interventionFamilyKey("guided", "wjec-alevel-physics"))?.reliable).toBe(true);
+    expect(effectivenessFor("guided", "phys.unseen-capability", calibrations, "wjec-alevel-physics"))
+      .toMatchObject({ calibrated: true, sampleSize: 20 });
   });
 });

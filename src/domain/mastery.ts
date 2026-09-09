@@ -1,5 +1,5 @@
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
-import type { Attempt, Card, Id, Mistake, ReviewLog, Topic, TopicMastery } from "./types";
+import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
 // Mastery is the number every other engine reads: the planner sizes sessions
@@ -54,6 +54,9 @@ export interface MasteryInput {
   reviewLogs: ReviewLog[];
   attempts: Attempt[];
   mistakes: Mistake[];
+  /** Optional bank snapshot used to exclude unreviewed Physics marks. */
+  questions?: Question[];
+  trustedQuestion?: (question: Question) => boolean;
   now?: Date;
 }
 
@@ -68,7 +71,12 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
 
   const cardsByTopic = groupBy(input.cards, (c) => c.topicId);
   const attemptsByTopic = new Map<Id, Attempt[]>();
+  const questionById = new Map((input.questions ?? []).map((question) => [question.id, question]));
+  const trustedQuestion = input.trustedQuestion ?? (() => true);
   for (const attempt of input.attempts) {
+    const question = questionById.get(attempt.questionId);
+    if (question && !trustedQuestion(question)) continue;
+    if (!question && attempt.subjectId === "wjec-alevel-physics" && input.questions) continue;
     for (const topicId of attempt.topicIds) {
       const list = attemptsByTopic.get(topicId) ?? [];
       list.push(attempt);

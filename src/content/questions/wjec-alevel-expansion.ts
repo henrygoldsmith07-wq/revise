@@ -1,10 +1,51 @@
-import type { AoCode } from "@/domain/types";
+import type { AoCode, LearningDemand } from "@/domain/types";
 import { defineQuestions, type PartSpec, type QuestionSpec } from "./authoring";
 
 type ExpansionPart = Omit<PartSpec, "specPointIds" | "learningClaims" | "aos"> & {
   claim: string;
   aos?: AoCode[];
 };
+
+/**
+ * The extension questions are structured evidence sets rather than four
+ * unlabelled prompts. These plans are deliberately topic-specific: the same
+ * part position means a different cognitive operation in each option, and the
+ * part metadata lets the depth audit see that distinction.
+ */
+const physicsExtensionDemands: Record<string, readonly LearningDemand[]> = {
+  capacitance: ["recall", "calculation", "application", "transfer"],
+  "alternating-currents": ["calculation", "explanation", "transfer", "synoptic"],
+  "medical-physics": ["explanation", "application", "explanation", "synoptic"],
+  "sports-physics": ["explanation", "application", "transfer", "application"],
+  "energy-environment": ["recall", "explanation", "application", "synoptic"],
+  "practical-investigations": ["application", "explanation", "calculation", "synoptic"],
+  "orbits-universe": ["calculation", "explanation", "application", "synoptic"],
+  "electromagnetic-induction": ["recall", "application", "explanation", "calculation"],
+};
+
+const physicsExtensionMoves: Record<string, readonly string[]> = {
+  capacitance: ["define a charge–potential relation", "keep SI prefixes through an energy calculation", "combine series and parallel constraints", "predict an unseen time-constant observation"],
+  "alternating-currents": ["convert peak and rms values", "link reactance to frequency and phase", "reason from a fixed-power constraint", "connect resonance to impedance and bandwidth"],
+  "medical-physics": ["trace attenuation to image contrast", "use a round-trip timing model", "link spin alignment to detected signal", "balance diagnostic information against dose"],
+  "sports-physics": ["separate model assumptions from equations", "take moments about a joint", "use impulse over a changed contact time", "design a controlled drag measurement"],
+  "energy-environment": ["separate three rate and efficiency definitions", "trace infrared energy through the atmosphere", "distinguish energy capacity from power rating", "combine life-cycle evidence with uncertainty"],
+  "practical-investigations": ["define variables and controls", "separate random from systematic effects", "linearise a measured relationship", "justify a conclusion against uncertainty"],
+  "orbits-universe": ["equate gravitational and centripetal force", "apply orbital conditions in context", "interpret a redshift trend", "evaluate scatter and calibration limits"],
+  "electromagnetic-induction": ["state a rate-of-change law", "apply a field-direction convention", "explain a time-varying output", "combine a transformer ratio with loss analysis"],
+};
+
+function physicsExtensionLearning(topic: string, index: number) {
+  const demands = physicsExtensionDemands[topic];
+  const moves = physicsExtensionMoves[topic];
+  if (!demands || !moves) return undefined;
+  const demand = demands[index]!;
+  return {
+    familyId: `physics-extension:${topic}:core`,
+    contextId: `physics-extension:${topic}:core-context`,
+    demand,
+    reasoningMoves: [moves[index]!],
+  } satisfies PartSpec["learning"];
+}
 
 function expansionQuestion(
   subjectId: string,
@@ -32,6 +73,8 @@ function expansionQuestion(
       aos: part.aos ?? ["AO2"],
       specPointIds: [`${subjectId}.${topic}.sp-${String(index + 1).padStart(2, "0")}`],
       learningClaims: [part.claim],
+      ...(subjectId === physics ? { capabilityIds: [`phys.${topic}.sp-${String(index + 1).padStart(2, "0")}`] } : {}),
+      ...(subjectId === physics ? { learning: physicsExtensionLearning(topic, index) } : {}),
     })),
   };
 }

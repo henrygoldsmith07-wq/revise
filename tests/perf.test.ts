@@ -69,10 +69,10 @@ describe("performance budgets", () => {
     let total = 0;
     const walk = (dir: string) => {
       for (const e of rs2(dir, { withFileTypes: true })) {
-        // `next dev` writes an unconditional compile cache under .next/dev that
-        // scales with how often the dev server ran, not with what ships — the
-        // budget is about production build bloat, so it is excluded.
-        if (dir === nextDir && e.name === "dev") continue;
+        // Next dev and Turbopack both write compile caches under .next that
+        // scale with local build history, not with what ships. The budget is
+        // about the production artifact, so those directories are excluded.
+        if (dir === nextDir && (e.name === "dev" || e.name === "cache")) continue;
         const p = j3(dir, e.name);
         // Server `.js.map` files are debug artifacts `next build` emits for the
         // server graph (none exist under static/). They are never downloaded by

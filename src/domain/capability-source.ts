@@ -30,6 +30,8 @@ export interface CapabilitySourceInput {
   attempts: Attempt[];
   /** Question bank, for per-attempt capability attribution (kind/AO-aware). */
   questions?: Question[];
+  /** Optional trust gate for Physics content; drafts remain practice-only. */
+  trustedQuestion?: (question: Question) => boolean;
   /** Explanations written this session feed the explanation capability. */
   explanations?: Array<{ topicId: Id; score: number }>;
 }
@@ -57,6 +59,7 @@ export function transferEvidenceFromAttempts(attempts: Attempt[]): Array<{ topic
  */
 export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCapabilityMap {
   const profiles: TopicCapabilityMap = {};
+  const trustedQuestion = input.trustedQuestion ?? (() => true);
 
   const profileFor = (topicId: Id): CapabilityProfile => (profiles[topicId] ??= emptyProfile());
 
@@ -100,6 +103,8 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
   for (const attempt of input.attempts) {
     if (attempt.max <= 0 || attempt.mode === "recall") continue;
     const question = questionsById.get(attempt.questionId);
+    if (question && !trustedQuestion(question)) continue;
+    if (!question && attempt.subjectId === "wjec-alevel-physics" && input.questions) continue;
     if (question?.kind !== "extended") continue;
     const score = Math.max(0, Math.min(1, attempt.awarded / attempt.max));
     const source: EvidenceSource = hintEvidenceSource(attempt.hintTier ?? null);
@@ -121,7 +126,11 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
     }]).explanation;
   }
 
-  for (const { topicId, score } of transferEvidenceFromAttempts(input.attempts)) {
+  const trustedAttempts = input.attempts.filter((attempt) => {
+    const question = questionsById.get(attempt.questionId);
+    return question ? trustedQuestion(question) : !(attempt.subjectId === "wjec-alevel-physics" && input.questions);
+  });
+  for (const { topicId, score } of transferEvidenceFromAttempts(trustedAttempts)) {
     const profile = profileFor(topicId);
     profile.transfer = recordAttemptObservations(profile, [{
       capability: "transfer",

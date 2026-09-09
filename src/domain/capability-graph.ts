@@ -1,4 +1,4 @@
-import { independentAttempt, questionFamily, trustworthyAttempt } from "./learning-evidence";
+import { independentAttempt, partFamily, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Question } from "./types";
 
 export interface CapabilityNode {
@@ -8,6 +8,8 @@ export interface CapabilityNode {
   label: string;
   specPointIds: string[];
   prerequisites: string[];
+  /** Why each prerequisite blocks this skill; required for curated cross-topic edges. */
+  prerequisiteRationales?: Record<string, string>;
   explanation: string;
 }
 
@@ -43,6 +45,27 @@ export function validateCapabilityGraph(nodes: readonly CapabilityNode[]): strin
   return errors;
 }
 
+/**
+ * Check the explanatory metadata for cross-topic prerequisites. A graph can be
+ * acyclic and still be pedagogically opaque; requiring a rationale makes every
+ * cross-topic edge auditable by a subject expert without burdening legacy
+ * within-topic nodes.
+ */
+export function validatePrerequisiteRationales(nodes: readonly CapabilityNode[], subjectId?: string): string[] {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const errors: string[] = [];
+  for (const node of nodes) {
+    if (subjectId && node.subjectId !== subjectId) continue;
+    for (const prerequisiteId of node.prerequisites) {
+      const prerequisite = byId.get(prerequisiteId);
+      if (!prerequisite || prerequisite.topicId === node.topicId) continue;
+      const rationale = node.prerequisiteRationales?.[prerequisiteId];
+      if (!rationale?.trim()) errors.push(`Missing prerequisite rationale ${node.id} <- ${prerequisiteId}`);
+    }
+  }
+  return errors;
+}
+
 /** Part-level evidence only. A combined part cannot locate its smallest failed skill. */
 export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions: readonly Question[], attempts: readonly Attempt[]): Map<string, SkillEvidence> {
   const byQuestion = new Map(questions.map((q) => [q.id, q]));
@@ -67,8 +90,12 @@ export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions:
       const max = marks.reduce((sum, p) => sum + p.max, 0);
       lostMarks += max - awarded;
       if (independentAttempt(attempt)) {
-        // Keep the first independent encounter with each family: memorised retries cannot inflate it.
-        if (!families.has(questionFamily(question))) families.set(questionFamily(question), { awarded, max });
+        // Keep the first independent encounter with each part family:
+        // memorised retries cannot inflate transfer coverage on mixed questions.
+        const familyIds = [...new Set(parts.map((part) => partFamily(question, part)))];
+        for (const familyId of familyIds) {
+          if (!families.has(familyId)) families.set(familyId, { awarded, max });
+        }
       } else if (awarded === max) supportedSuccesses++;
     }
     const recent = [...families.values()].slice(-6);

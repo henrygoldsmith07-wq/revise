@@ -145,6 +145,16 @@ export interface BaselineAssessment {
   assessmentVersion: string;
 }
 
+/** Held-out assessment taken after a genuine delay; this is the durable endpoint. */
+export interface DelayedAssessmentEvidence {
+  percent: number;
+  maxMarks: number;
+  takenAt: IsoInstant;
+  assessmentVersion: string;
+  heldOutFamilies: boolean;
+  humanMarked: boolean;
+}
+
 export interface FinalAssessment {
   anonId: string;
   subjectId: Id;
@@ -160,11 +170,13 @@ export interface FinalAssessment {
   delayedDays?: number;
   /** Total observed revision time, including teaching and retrieval, before the final assessment. */
   revisionMinutes?: number;
+  /** Required for a Physics primary outcome; a delayed unseen form, not a same-day retry. */
+  delayedAssessment?: DelayedAssessmentEvidence;
 }
 
 /**
  * Primary outcome per participant:
- *   (finalPercent − baselinePercent) / revisionHours
+ *   (delayedPercent − baselinePercent) / revisionHours for Physics
  * Only computed when BOTH assessments exist and are on the same scale.
  */
 export interface ParticipantPrimaryOutcome {
@@ -461,13 +473,22 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
       ![baseline.percent, final.percent].every((score) => Number.isFinite(score) && score >= 0 && score <= 100) ||
       !Number.isFinite(Date.parse(baseline.takenAt)) || !Number.isFinite(Date.parse(final.takenAt)) ||
       Date.parse(baseline.takenAt) > w.assignedAt || Date.parse(final.takenAt) <= w.assignedAt) continue;
-    if (final.subjectId === "wjec-alevel-physics" &&
-      (!final.heldOutFamilies || !final.humanMarked || (final.delayedDays ?? 0) < 7 ||
-        !Number.isFinite(final.revisionMinutes) || (final.revisionMinutes ?? 0) <= 0)) continue;
+    let endpointPercent = final.percent;
+    if (final.subjectId === "wjec-alevel-physics") {
+      const delayed = final.delayedAssessment;
+      if (!final.heldOutFamilies || !final.humanMarked || (final.delayedDays ?? 0) < 7 ||
+        !Number.isFinite(final.revisionMinutes) || (final.revisionMinutes ?? 0) <= 0 ||
+        !delayed || !delayed.heldOutFamilies || !delayed.humanMarked ||
+        delayed.assessmentVersion !== baseline.assessmentVersion || delayed.maxMarks !== baseline.maxMarks ||
+        !Number.isFinite(delayed.percent) || delayed.percent < 0 || delayed.percent > 100 ||
+        !Number.isFinite(Date.parse(delayed.takenAt)) || Date.parse(delayed.takenAt) <= Date.parse(final.takenAt) ||
+        Date.parse(delayed.takenAt) - Date.parse(final.takenAt) < 7 * 86_400_000) continue;
+      endpointPercent = delayed.percent;
+    }
 
     const attemptHours = input.attempts
       .filter((a) => a.anonId === anonId && new Date(a.createdAt).getTime() >= w.assignedAt &&
-        Date.parse(a.createdAt) <= Date.parse(final.takenAt) && Number.isFinite(a.elapsedMs) && a.elapsedMs > 0)
+      Date.parse(a.createdAt) <= Date.parse(final.takenAt) && Number.isFinite(a.elapsedMs) && a.elapsedMs > 0)
       .reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
     const hours = final.revisionMinutes !== undefined ? final.revisionMinutes / 60 : attemptHours;
     if (!Number.isFinite(hours) || hours < 0.25) continue;
@@ -476,10 +497,10 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     primaryOutcomes.push({
       anonId, arm: w.arm,
       baselinePercent: baseline.percent,
-      finalPercent: final.percent,
-      gainPercent: round(final.percent - baseline.percent),
+      finalPercent: endpointPercent,
+      gainPercent: round(endpointPercent - baseline.percent),
       revisionHours: Math.round(hours * 100) / 100,
-      marksGainedPerHour: round((final.percent - baseline.percent) * baseline.maxMarks / 100 / hours),
+      marksGainedPerHour: round((endpointPercent - baseline.percent) * baseline.maxMarks / 100 / hours),
       assessmentVersion: final.assessmentVersion ?? "unknown",
     });
   }

@@ -96,6 +96,26 @@ export interface LicensedSource {
   accessedAt?: IsoDate;
 }
 
+/**
+ * Provenance for an extracted exam question. A paper id alone is not enough:
+ * the source must be traceable to an immutable board document and explicitly
+ * checked before it can contribute trusted paper evidence.
+ */
+export interface PaperQuestionProvenance {
+  board: string;
+  specification: string;
+  specificationVersion?: string;
+  paperId: Id;
+  questionNumber: string;
+  sourceUrl: string;
+  /** Digest/manifest id for the source file or licensed archive snapshot. */
+  sourceDigest: string;
+  status: "pending" | "verified" | "rejected";
+  verifiedBy?: Id;
+  verifiedAt?: IsoInstant;
+  notes?: string;
+}
+
 export interface SpecPoint {
   /** Stable internal ID, e.g. "wjec-alevel-physics.kinematics-dynamics.sp-1". Never changes when text is clarified. */
   id: Id;
@@ -303,6 +323,21 @@ export interface ReviewLog {
 
 export type QuestionKind = "mcq" | "short" | "structured" | "calculation" | "extended";
 
+/**
+ * Part-level learning metadata. A structured question can contain several
+ * demands, so putting the demand only on Question.learning loses the evidence
+ * needed to audit coverage and to diagnose a single capability. The family,
+ * context and reasoning moves are authored facts; they are never inferred from
+ * a topic name or from the student's score.
+ */
+export interface LearningPartMetadata {
+  familyId: Id;
+  contextId: Id;
+  demand: LearningDemand;
+  /** Distinct cognitive operations required by this part. */
+  reasoningMoves: string[];
+}
+
 export interface QuestionPart {
   id: Id;
   label: string;
@@ -319,6 +354,8 @@ export interface QuestionPart {
   learningClaims?: string[];
   /** Explicit, reviewed skill mapping; never inferred from a whole-topic score. */
   capabilityIds?: Id[];
+  /** Demand and family for this part when a structured question mixes skills. */
+  learning?: LearningPartMetadata;
   /** Optional explicit one-rule-per-mark calculation rubric. */
   calculationRules?: CalculationMarkRule[];
 }
@@ -342,6 +379,8 @@ export interface LearningQuestionMetadata {
   contextId: Id;
   demand: LearningDemand;
   expectedMinutes: number;
+  /** Optional authored operations used to detect cosmetic reskins. */
+  reasoningMoves?: string[];
 }
 
 export type MistakeRepairStage = "detected" | "diagnosed" | "taught" | "guided-success" | "independent-success" | "transfer" | "delayed-retention" | "resolved";
@@ -419,7 +458,8 @@ export type QuestionValidationIssueCode =
   | "missing-reviewer"
   | "missing-last-checked"
   | "stale-provenance"
-  | "missing-licence";
+  | "missing-licence"
+  | "missing-paper-provenance";
 
 export interface QuestionValidationIssue {
   code: QuestionValidationIssueCode;
@@ -492,6 +532,8 @@ export interface Question {
   /** Set when extracted from an uploaded paper. */
   paperId?: Id;
   paperQuestionNumber?: string;
+  /** Authenticated provenance required for trusted WJEC past-paper evidence. */
+  paperProvenance?: PaperQuestionProvenance;
   createdAt: IsoInstant;
   learning?: LearningQuestionMetadata;
 }
@@ -613,7 +655,8 @@ export type WorkingErrorKind =
   | "arithmetic-slip"
   | "incorrect-rearrangement"
   | "substitution-error"
-  | "method-error";
+  | "method-error"
+  | "contradictory-working";
 
 export interface AttemptWorkingEvidence {
   partId: Id;
@@ -673,7 +716,7 @@ export interface InterventionOutcomeRecord {
   plannedMinutes: number;
   actualMinutes: number;
   support: InterventionSupport;
-  immediate: { awarded: number; max: number; independent: boolean; attemptId: Id; at: IsoInstant; result?: InterventionObservationResult };
+  immediate: { awarded: number; max: number; independent: boolean; attemptId: Id; at: IsoInstant; result?: InterventionObservationResult; /** True only when the Physics question itself is trusted content. */ trusted?: boolean };
   transfer?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant; familyId?: Id; trusted?: boolean };
   delayedRetention?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant; familyId?: Id; trusted?: boolean };
   createdAt: IsoInstant;

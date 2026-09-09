@@ -1,5 +1,5 @@
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
-import { isTransferQuestion, questionCapabilities, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
 import { humanVerifiedPhysicsQuestion, trustedAssessmentContent } from "./physics-content-review";
@@ -29,11 +29,13 @@ export function selectLearningAction(input: {
   interventionOutcomes?: readonly InterventionOutcomeRecord[];
 }): LearningAction | undefined {
   const { topicId, nodes, questions, attempts, now } = input;
-  const evidence = deriveSkillEvidence(nodes, questions, attempts);
-  const baselineEvidence = deriveSkillEvidence(nodes, questions.filter(trustedAssessmentContent), attempts);
+  const trustedQuestions = questions.filter(trustedAssessmentContent);
+  const evidence = deriveSkillEvidence(nodes, trustedQuestions, attempts);
+  const baselineEvidence = evidence;
   const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
   const candidates: LearningAction[] = [];
-  const eligible = questions.filter((q) => q.topicIds.includes(topicId) && q.learning &&
+  const hasLearningMetadata = (q: Question) => Boolean(q.learning || q.parts.some((part) => partLearningMetadata(q, part)));
+  const eligible = questions.filter((q) => q.topicIds.includes(topicId) && hasLearningMetadata(q) &&
     !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? ""));
   const add = (kind: LearningAction["kind"], capabilityId: string, pool: Question[], reason: string, mistake?: Mistake) => {
     const trustedPool = (kind === "transfer" || kind === "retention")
@@ -45,7 +47,7 @@ export function selectLearningAction(input: {
       if (minutes > (input.remainingMinutes ?? Infinity)) continue;
       const lost = mistake?.marksLost ?? evidence.get(capabilityId)?.lostMarks ?? 1;
       const gap = 1 - (evidence.get(capabilityId)?.accuracy ?? 0.35);
-      const effect = effectivenessFor(kind, capabilityId, calibrations);
+      const effect = effectivenessFor(kind, capabilityId, calibrations, question.subjectId);
       const trust = humanVerifiedPhysicsQuestion(question) ? "human-verified" as const : "needs-human-review" as const;
       candidates.push({ kind, question, capabilityId, priorState: evidence.get(capabilityId)?.state ?? "unknown", ...(mistake ? { mistakeId: mistake.id } : {}),
         topicId: nodes.find((node) => node.id === capabilityId)?.topicId ?? question.topicIds[0] ?? topicId,
@@ -67,7 +69,7 @@ export function selectLearningAction(input: {
     if (stage === "transfer" && mistake.repair?.dueAt && Date.parse(mistake.repair.dueAt) > now.getTime()) continue;
     const root = smallestUnprovenCapability([capabilityId], nodes, evidence);
     if (root && root.id !== capabilityId && ["weak", "unknown"].includes(evidence.get(root.id)?.state ?? "unknown")) {
-      const probes = questions.filter((q) => q.subjectId === root.subjectId && q.learning &&
+      const probes = questions.filter((q) => q.subjectId === root.subjectId && hasLearningMetadata(q) &&
         !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? "") &&
         questionCapabilities(q).includes(root.id) && unseenQuestion(q, attempts, questions));
       add("diagnose", root.id, probes, `Check ${root.label.toLowerCase()} first; the upstream cause is still a hypothesis.`, mistake);
@@ -79,14 +81,14 @@ export function selectLearningAction(input: {
       const source = relevant.filter((q) => q.id === mistake.questionId);
       add("guided", capabilityId, source, `Repair ${target.label.toLowerCase()}, then complete one guided attempt.`, mistake);
     } else if (stage === "guided-success") {
-      add("independent", capabilityId, fresh.filter((q) => ["application", "calculation"].includes(q.learning!.demand)),
+      add("independent", capabilityId, fresh.filter((q) => questionDemands(q).some((demand) => ["application", "calculation"].includes(demand))),
         `The guided answer held. Test ${target.label.toLowerCase()} on a fresh question without help.`, mistake);
     } else if (stage === "independent-success") {
       const source = questions.find((q) => q.id === mistake.questionId);
       add("transfer", capabilityId, fresh.filter((q) => source && isTransferQuestion(q, source)),
         "Independent success held. Apply the same skill in an unfamiliar context.", mistake);
     } else if (stage === "transfer") {
-      add("retention", capabilityId, fresh.filter((q) => ["application", "calculation", "transfer", "synoptic"].includes(q.learning!.demand)),
+      add("retention", capabilityId, fresh.filter((q) => questionDemands(q).some((demand) => ["application", "calculation", "transfer", "synoptic"].includes(demand))),
         "The delayed check is due. Retrieve and apply the skill without help to test whether the repair lasted.", mistake);
     }
   }

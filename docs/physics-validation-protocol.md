@@ -12,6 +12,15 @@ A Physics subject expert must solve each item, check physical assumptions and da
 
 Approve all six checks only after this work. Approvals become stale on question, solution, scheme, family, or mapping changes. Marking should additionally be checked on anonymised real responses independently labelled by two qualified markers, with disagreements adjudicated. Include incorrect methods leading to coincidentally correct answers, equivalent algebra, significant figures, contradictory working and valid error carried forward. Unrecognised handwritten or algebraic working needs marker review.
 
+The Physics marking benchmark (`evaluatePhysicsAnswerCorpus`) compares each row
+with the exact live prompt, ordered mark points, mark allocation and
+specification version. A missing or changed snapshot is reported as a mapping
+failure and is not scored. Rows marked as internal or synthetic remain useful
+regression fixtures, but they cannot make calibration ready; that requires at
+least twenty complete external gold rows with no missing mappings. A transfer
+chain also records whether its immediate Physics item was trusted, so a draft
+cannot seed trusted transfer or delayed-retention evidence.
+
 Do not release Physics as deeply validated while approved per-capability demand coverage remains incomplete. Draft questions may support practice; they cannot establish trusted transfer or resolve a delayed repair.
 
 ## Prospective four-arm comparison

@@ -32,6 +32,7 @@ import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-dept
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
+import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -60,6 +61,7 @@ export const seedQuestions: Question[] = [
   ...physicsQuestions,
   ...physicsExtraQuestions,
   ...wjecAlevelExpansionQuestions,
+  ...wjecPhysicsQualityExpansionQuestions,
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,
@@ -88,6 +90,7 @@ export { ocrAuthoredQuestions };
 export { extendedResponseQuestions };
 export { wjecAlevelExpansionQuestions };
 export { wjecPhysicsDeepQuestions };
+export { wjecPhysicsQualityExpansionQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);
