@@ -1,4 +1,4 @@
-import type { Attempt, LearningDemand, Question, QuestionPart } from "./types";
+import type { Attempt, LearningDemand, PaperMarkingReview, Question, QuestionPart } from "./types";
 import { trustedAssessmentContent, verifiedPhysicsPaperProvenance } from "./physics-content-review";
 
 function normaliseAnswer(text: string): string {
@@ -41,6 +41,49 @@ export function trustworthyAttempt(attempt: Attempt): boolean {
 
 export function independentAttempt(attempt: Attempt): boolean {
   return trustworthyAttempt(attempt) && !attempt.hintTier && !attempt.repairTeachingSeen && !attempt.copiedAnswer && attempt.mode !== "recall";
+}
+
+/**
+ * Fingerprint the exact response and marks a human reviewer saw. This is an
+ * optional forward-compatible field on persisted attempts: older reviewed
+ * rows can still be trusted, while a supplied fingerprint invalidates the
+ * attestation if the response or awarded marks are edited later.
+ */
+export function paperMarkingFingerprint(attempt: Pick<Attempt, "id" | "questionId" | "answers" | "marked" | "awarded" | "max">): string {
+  const text = JSON.stringify([attempt.id, attempt.questionId, attempt.answers, attempt.marked, attempt.awarded, attempt.max]);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return `paper-mark-v1:${(hash >>> 0).toString(16)}`;
+}
+
+/** A paper response is trusted only after a named human has reviewed its mark. */
+export function humanReviewedPaperAttempt(attempt: Attempt): boolean {
+  if (attempt.mode !== "paper") return false;
+  const review: PaperMarkingReview | undefined = attempt.paperMarking;
+  if (!review || !["human-reviewed", "adjudicated"].includes(review.status) ||
+    !review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) return false;
+  const markerCount = review.markerCount;
+  if (review.status === "adjudicated" && (typeof markerCount !== "number" || !Number.isInteger(markerCount) || markerCount < 2)) return false;
+  if (review.status === "human-reviewed" && markerCount !== undefined &&
+    (typeof markerCount !== "number" || !Number.isInteger(markerCount) || markerCount < 1)) return false;
+  return !review.markingFingerprint || review.markingFingerprint === paperMarkingFingerprint(attempt);
+}
+
+/**
+ * Shared gate for answer evidence. A question must be the same subject as
+ * the attempt, the content must be trusted, and Physics paper attempts must
+ * additionally pass the authenticated provenance + human-marking check. This
+ * keeps planners and analytics from inventing their own weaker trust rules.
+ */
+export function trustedAssessmentAttempt(
+  attempt: Attempt,
+  question: Question | undefined,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+): boolean {
+  if (!question || !trustworthyAttempt(attempt) || question.subjectId !== attempt.subjectId || !trustedAssessmentContent(question)) return false;
+  return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+    authenticPaperEvidence(attempt, question, history, questions);
 }
 
 export function questionFamily(question: Question): string {
@@ -110,10 +153,10 @@ export function authenticPaperEvidence(attempt: Attempt, question: Question | un
   const provenance = question?.paperProvenance;
   if (!question || question.source !== "past-paper" || !trustedAssessmentContent(question) ||
     !verifiedPhysicsPaperProvenance(question) || !provenance ||
-    !independentAttempt(attempt) || attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId ||
+    !independentAttempt(attempt) || !humanReviewedPaperAttempt(attempt) || attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId ||
     attempt.subjectId !== question.subjectId || attempt.paperId !== question.paperId ||
     attempt.paperId !== provenance.paperId ||
-    (attempt.paperSpecId !== undefined && attempt.paperSpecId !== provenance.specification) ||
+    (attempt.paperSpecId !== undefined && !attempt.paperSpecId.trim()) ||
     attempt.max !== question.totalMarks ||
     !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
   return unseenQuestion(question, history.filter((row) => row.userId === attempt.userId &&

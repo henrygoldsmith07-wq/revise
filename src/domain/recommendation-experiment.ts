@@ -25,6 +25,14 @@ import type { Id, IsoDate, IsoInstant } from "./types";
 export const EXPERIMENT_ARMS = ["revise", "baseline-mastery", "baseline-overdue", "control"] as const;
 export type ExperimentArm = (typeof EXPERIMENT_ARMS)[number];
 
+/** Human-readable preregistration labels for the four policy arms. */
+export const EXPERIMENT_ARM_LABELS: Record<ExperimentArm, string> = {
+  revise: "adaptive Revise",
+  "baseline-mastery": "weakest-topic-first",
+  "baseline-overdue": "due-review-first",
+  control: "student-selected revision",
+};
+
 export interface ExperimentAssignment {
   anonId: string;
   arm: ExperimentArm;
@@ -82,6 +90,9 @@ export function policyTaskFor(
 
 export interface AttemptLike {
   anonId: string;
+  /** Optional trust metadata; required for Physics descriptive outcomes. */
+  subjectId?: Id;
+  trusted?: boolean;
   topicIds: Id[];
   questionId: Id;
   awarded: number;
@@ -143,6 +154,8 @@ export interface BaselineAssessment {
   takenAt: IsoInstant;
   /** Frozen assessment form/version for comparability across arms. */
   assessmentVersion: string;
+  /** Optional attestation that the baseline was independently human marked. */
+  humanMarked?: boolean;
 }
 
 /** Held-out assessment taken after a genuine delay; this is the durable endpoint. */
@@ -272,16 +285,26 @@ function armOutcome(
   const participants = new Set<string>();
   for (const [anon, w] of windows) if (w.arm === arm) participants.add(anon);
 
-  // Post-assignment attempts for this arm only.
+  // Post-assignment attempts for this arm only.  Invalid scores or unmeasured
+  // time are discarded before any throughput, transfer or unseen exposure
+  // metric is calculated.  Physics additionally needs an explicit trust
+  // attestation from the content/marking gate.
+  const validAttempt = (a: AttemptLike): boolean =>
+    typeof a.anonId === "string" && typeof a.questionId === "string" && Array.isArray(a.topicIds) &&
+    Number.isFinite(a.awarded) && Number.isFinite(a.max) && a.max > 0 && a.awarded >= 0 && a.awarded <= a.max &&
+    Number.isFinite(a.elapsedMs) && a.elapsedMs > 0 && Number.isFinite(Date.parse(a.createdAt));
+  const eligibleAttempt = (a: AttemptLike): boolean =>
+    validAttempt(a) && (a.subjectId === "wjec-alevel-physics" ? a.trusted === true : a.trusted !== false);
   const mine = attempts.filter((a) => {
     const w = windows.get(a.anonId);
-    return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt;
+    return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt && eligibleAttempt(a);
   });
   const myEvents = events.filter((e) => windows.get(e.anonId)?.arm === arm);
   // Only reviews AFTER assignment — pre-experiment FSRS history is baseline.
   const myReviews = reviews.filter((r) => {
     const w = windows.get(r.anonId);
-    return w?.arm === arm && new Date(r.reviewedAt).getTime() >= w.assignedAt;
+    return w?.arm === arm && Number.isFinite(Date.parse(r.reviewedAt)) && typeof r.cardId === "string" &&
+      typeof r.grade === "string" && new Date(r.reviewedAt).getTime() >= w.assignedAt;
   });
 
   const hours = mine.reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
@@ -306,6 +329,7 @@ function armOutcome(
   // Per-participant unseen exposure: a question is unseen if THIS participant never attempted it before THEIR assignment.
   const seenByParticipant = new Map<string, Set<Id>>();
   for (const a of attempts) {
+    if (!validAttempt(a)) continue;
     const w = windows.get(a.anonId);
     if (!w || new Date(a.createdAt).getTime() >= w.assignedAt) continue;
     const set = seenByParticipant.get(a.anonId) ?? new Set<Id>();
@@ -467,18 +491,26 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     const final = input.finalAssessments.find((f) => f.anonId === anonId);
     if (!baseline) { missingBaselineN++; continue; }
     if (!final) { missingFinalN++; continue; }
-    if (!final.matchesBaselineVersion || final.assessmentVersion !== baseline.assessmentVersion ||
+    if (final.matchesBaselineVersion !== true || typeof baseline.assessmentVersion !== "string" || !baseline.assessmentVersion.trim() ||
+      typeof final.assessmentVersion !== "string" || !final.assessmentVersion.trim() ||
+      final.assessmentVersion !== baseline.assessmentVersion ||
       final.subjectId !== baseline.subjectId || final.maxMarks !== baseline.maxMarks ||
-      !Number.isFinite(final.maxMarks) || final.maxMarks <= 0 ||
+      !Number.isInteger(baseline.maxMarks) || baseline.maxMarks <= 0 ||
+      !Number.isInteger(final.maxMarks) || final.maxMarks <= 0 ||
       ![baseline.percent, final.percent].every((score) => Number.isFinite(score) && score >= 0 && score <= 100) ||
       !Number.isFinite(Date.parse(baseline.takenAt)) || !Number.isFinite(Date.parse(final.takenAt)) ||
       Date.parse(baseline.takenAt) > w.assignedAt || Date.parse(final.takenAt) <= w.assignedAt) continue;
+    // A Physics baseline is part of the durable marks endpoint.  Missing
+    // attestation is as unsafe as an explicit rejection: a self/auto-marked
+    // baseline can make later gain per hour look larger than it is.
+    if (baseline.subjectId === "wjec-alevel-physics" && baseline.humanMarked !== true) continue;
     let endpointPercent = final.percent;
     if (final.subjectId === "wjec-alevel-physics") {
       const delayed = final.delayedAssessment;
-      if (!final.heldOutFamilies || !final.humanMarked || (final.delayedDays ?? 0) < 7 ||
+      if (final.heldOutFamilies !== true || final.humanMarked !== true || !Number.isFinite(final.delayedDays) || (final.delayedDays ?? 0) < 7 ||
         !Number.isFinite(final.revisionMinutes) || (final.revisionMinutes ?? 0) <= 0 ||
-        !delayed || !delayed.heldOutFamilies || !delayed.humanMarked ||
+        !delayed || delayed.heldOutFamilies !== true || delayed.humanMarked !== true ||
+        typeof delayed.assessmentVersion !== "string" || !delayed.assessmentVersion.trim() ||
         delayed.assessmentVersion !== baseline.assessmentVersion || delayed.maxMarks !== baseline.maxMarks ||
         !Number.isFinite(delayed.percent) || delayed.percent < 0 || delayed.percent > 100 ||
         !Number.isFinite(Date.parse(delayed.takenAt)) || Date.parse(delayed.takenAt) <= Date.parse(final.takenAt) ||

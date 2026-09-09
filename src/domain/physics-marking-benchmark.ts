@@ -1,4 +1,4 @@
-import type { AnswerCorpusRecord, AnswerCorpusProvenance, AnswerCorpusReviewStatus } from "./answer-corpus";
+import type { AnswerCorpusRecord, AnswerCorpusProvenance, AnswerCorpusReviewStatus, MarkerMetadata } from "./answer-corpus";
 import { markPart } from "./marking";
 import { firstIncorrectStep } from "./working-analysis";
 import type { MarkedPart, Question, QuestionPart } from "./types";
@@ -40,10 +40,33 @@ export interface PhysicsMarkingBenchmarkReport {
   firstIncorrectStepCoverage: number;
   humanMarkerPairs: number;
   humanMarkerExactAgreementRate: number;
+  humanMarkerWithinOneAgreementRate: number;
+  humanMarkerMeanAbsoluteDifference: number;
+  qualifiedHumanMarkerPairs: number;
+  adjudicatedRecords: number;
+  caseCoverage: Record<PhysicsBenchmarkCaseTag, number>;
+  caseCoverageComplete: boolean;
   /** True only when the supplied corpus is external, gold-labelled and usable. */
   usableForCalibration: boolean;
   note: string;
 }
+
+/**
+ * Cases that must be represented before a Physics marking corpus can drive a
+ * release calibration. They are deliberately tagged by the annotator rather
+ * than inferred from Revise's own diagnosis.
+ */
+export const REQUIRED_PHYSICS_BENCHMARK_CASES = [
+  "method-marks",
+  "equivalent-algebra",
+  "significant-figures",
+  "units",
+  "error-carried-forward",
+  "contradictory",
+  "first-incorrect-step",
+  "borderline-explanation",
+] as const;
+export type PhysicsBenchmarkCaseTag = (typeof REQUIRED_PHYSICS_BENCHMARK_CASES)[number];
 
 function round(value: number, places = 3): number {
   const factor = 10 ** places;
@@ -57,8 +80,8 @@ function consensus(record: AnswerCorpusRecord): number | null {
 }
 
 function goldLabel(record: AnswerCorpusRecord): boolean {
-  return ["adjudicated", "verified"].includes(record.reviewStatus) &&
-    (record.adjudicatedMark != null || (record.humanMark1 != null && record.humanMark1 === record.humanMark2));
+  return record.reviewStatus === "adjudicated" &&
+    record.adjudicatedMark != null && record.humanMark1 != null && record.humanMark2 != null;
 }
 
 function externalLabel(record: AnswerCorpusRecord): boolean {
@@ -90,6 +113,23 @@ function matchesBankSnapshot(record: AnswerCorpusRecord, question: Question, par
 
 function validHumanMark(mark: number | null, maximumMarks: number): boolean {
   return mark == null || (Number.isInteger(mark) && mark >= 0 && mark <= maximumMarks);
+}
+
+function qualifiedMarker(meta: MarkerMetadata | null | undefined): boolean {
+  return Boolean(meta?.markerId?.trim() && /examiner|teacher|senior/i.test(meta.role ?? "") && /wjec/i.test(meta.boardFamiliarity ?? ""));
+}
+
+function qualifiedDoubleMark(record: AnswerCorpusRecord, maximumMarks: number): boolean {
+  if (record.reviewStatus !== "adjudicated") return false;
+  const markerIds = [record.marker1Meta?.markerId, record.marker2Meta?.markerId, record.adjudicatorMeta?.markerId]
+    .map((id) => id?.trim()).filter((id): id is string => Boolean(id));
+  return markerIds.length === 3 && new Set(markerIds).size === 3 &&
+    Number.isInteger(record.humanMark1) && Number.isInteger(record.humanMark2) &&
+    Number.isInteger(record.adjudicatedMark) &&
+    validHumanMark(record.humanMark1, maximumMarks) && validHumanMark(record.humanMark2, maximumMarks) &&
+    validHumanMark(record.adjudicatedMark, maximumMarks) &&
+    qualifiedMarker(record.marker1Meta) && qualifiedMarker(record.marker2Meta) && qualifiedMarker(record.adjudicatorMeta) &&
+    record.marker1Meta?.independentlyMarked === true && record.marker2Meta?.independentlyMarked === true;
 }
 
 function markedByRevise(part: QuestionPart, answer: string): MarkedPart {
@@ -164,8 +204,30 @@ export function evaluatePhysicsAnswerCorpus(input: {
   const versions = [...new Set(input.records.filter((record) => record.subject === "wjec-alevel-physics").map((record) => record.benchmarkVersion))];
   const pairs = comparisons.filter((row) => row.marker1Mark != null && row.marker2Mark != null);
   const pairExact = pairs.filter((row) => row.marker1Mark === row.marker2Mark).length;
+  const pairWithinOne = pairs.filter((row) => Math.abs((row.marker1Mark ?? 0) - (row.marker2Mark ?? 0)) <= 1).length;
+  const pairMeanAbsoluteDifference = pairs.length
+    ? pairs.reduce((sum, row) => sum + Math.abs((row.marker1Mark ?? 0) - (row.marker2Mark ?? 0)), 0) / pairs.length
+    : 0;
+  const byId = new Map(input.records.map((record) => [record.id, record]));
+  const qualifiedPairs = comparisons.filter((row) => {
+    const record = byId.get(row.recordId);
+    return record ? qualifiedDoubleMark(record, row.maximumMarks) : false;
+  });
+  const caseCoverage = Object.fromEntries(REQUIRED_PHYSICS_BENCHMARK_CASES.map((tag) => [tag, 0])) as Record<PhysicsBenchmarkCaseTag, number>;
+  for (const row of qualifiedPairs) {
+    const record = byId.get(row.recordId);
+    for (const tag of REQUIRED_PHYSICS_BENCHMARK_CASES) {
+      if (record?.questionTypeTags.includes(tag)) caseCoverage[tag]++;
+    }
+  }
+  const adjudicatedRecords = comparisons.filter((row) => {
+    const record = byId.get(row.recordId);
+    return record?.reviewStatus === "adjudicated" && record.adjudicatedMark != null;
+  }).length;
+  const caseCoverageComplete = REQUIRED_PHYSICS_BENCHMARK_CASES.every((tag) => caseCoverage[tag] > 0);
   const provenance = input.provenance ?? "external-human";
-  const usable = provenance === "external-human" && externalGold && comparisons.length >= 20 && missingQuestionIds.length === 0 && missingPartRecordIds.length === 0;
+  const usable = provenance === "external-human" && externalGold && comparisons.length >= 20 && qualifiedPairs.length >= 20 &&
+    adjudicatedRecords >= 20 && caseCoverageComplete && missingQuestionIds.length === 0 && missingPartRecordIds.length === 0;
   return {
     subjectId: "wjec-alevel-physics",
     benchmarkVersion: versions.length === 1 ? versions[0]! : versions.length ? "mixed" : null,
@@ -184,11 +246,17 @@ export function evaluatePhysicsAnswerCorpus(input: {
     firstIncorrectStepCoverage: n ? round(firstStepRows / n) : 0,
     humanMarkerPairs: pairs.length,
     humanMarkerExactAgreementRate: pairs.length ? round(pairExact / pairs.length) : 0,
+    humanMarkerWithinOneAgreementRate: pairs.length ? round(pairWithinOne / pairs.length) : 0,
+    humanMarkerMeanAbsoluteDifference: round(pairMeanAbsoluteDifference),
+    qualifiedHumanMarkerPairs: qualifiedPairs.length,
+    adjudicatedRecords,
+    caseCoverage,
+    caseCoverageComplete,
     usableForCalibration: usable,
     note: usable
-      ? "External, gold-labelled Physics rows are eligible for marking calibration; preserve this benchmark version when recalculating metrics."
+      ? "External Physics rows have two qualified independent markers, adjudication and every required edge case; preserve this benchmark version when recalculating metrics."
       : provenance === "internal-regression"
         ? "Internal regression only: synthetic rows must never be presented as examiner validation."
-        : "Not calibration-ready: require at least 20 complete external rows with verified/adjudicated human labels and no missing bank mappings.",
+        : "Not calibration-ready: require at least 20 complete external rows, qualified double marking with adjudication, every required Physics edge case and no missing bank mappings.",
   };
 }

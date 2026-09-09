@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { wjecPhysicsDeepQuestions as bank } from "@/content/questions/wjec-physics-deep";
 import { physicsContentFingerprint, applyHumanVerification, humanVerifiedPhysicsQuestion, buildPhysicsReviewQueue, verifiedPhysicsPaperProvenance } from "@/domain/physics-content-review";
-import { authenticPaperEvidence, isTransferQuestion } from "@/domain/learning-evidence";
+import { authenticPaperEvidence, humanReviewedPaperAttempt, isTransferQuestion, paperMarkingFingerprint } from "@/domain/learning-evidence";
 import { analyseExperiment, type AnalyseExperimentInput } from "@/domain/recommendation-experiment";
+import { paperRunScores } from "@/domain/exam-outlook";
 import { buildPredictionOutcomePairs } from "@/domain/learning-controls";
 import { attachTransferOutcome, attachDelayedRetentionOutcome, createInterventionOutcome, calibratedGain, calibrateInterventions } from "@/domain/intervention-calibration";
 import { markCalculationWorking, contradictoryWorkingStep } from "@/domain/calculation-rubric";
@@ -44,6 +45,7 @@ describe("Physics content trust boundaries", () => {
   });
   it("does not attach unreviewed, supported, uncertain, replayed or other-user transfer", () => {
     const row = initial();
+    expect(createInterventionOutcome({ userId: "learner", subjectId: source.subjectId, context, question: approve(source), attempt: { ...attempt(approve(source), "self-marked", 1), markedBy: "self" } }).immediate.trusted).toBe(false);
     const reviewed = approve(transfer);
     const a = attempt(reviewed, "transfer", 2);
     const evidence = { question: reviewed, questions: [source, reviewed], history: [attempt(source, "initial", 1)] };
@@ -81,6 +83,29 @@ describe("Physics content trust boundaries", () => {
     expect(calibrateInterventions([complete]).get("guided:phys.circuit.divider")?.reliable).toBe(false);
     expect(calibratedGain({ ...complete, priorAccuracy: 0.9 })).toBeLessThan(0);
   });
+  it("keeps later sessions with a reused chain label in calibration", () => {
+    const reviewed = approve(transfer);
+    const trustedSource = approve(source);
+    const transferAttempt = attempt(reviewed, "transfer-1", 2);
+    const first = attachTransferOutcome(initial(trustedSource), transferAttempt, {
+      question: reviewed, questions: [trustedSource, reviewed], history: [],
+    });
+    const third = approve({ ...transfer, id: "test-only-third-session", learning: {
+      ...transfer.learning!, familyId: "test-only-third-session-family", contextId: "test-only-third-session-context",
+    } });
+    const retentionAttempt = { ...attempt(third, "retention-1", 10), awarded: 0,
+      marked: third.parts.map((part) => ({ partId: part.id, awarded: 0, max: part.marks, creditedPoints: [], missedPoints: part.markScheme, comment: "" })) };
+    const firstComplete = attachDelayedRetentionOutcome(first, retentionAttempt, {
+      question: third, questions: [trustedSource, reviewed, third], history: [transferAttempt],
+    });
+    const second = { ...firstComplete, id: "second-session", chainId: "repair", createdAt: "2026-02-01T00:00:00Z", updatedAt: "2026-02-01T00:00:00Z",
+      immediate: { ...firstComplete.immediate, at: "2026-02-01T00:00:00Z", attemptId: "initial-2" },
+      transfer: { ...firstComplete.transfer!, at: "2026-02-01T00:01:00Z", attemptId: "transfer-2", questionId: "transfer-2", familyId: "transfer-2" },
+      delayedRetention: { ...firstComplete.delayedRetention!, at: "2026-02-09T00:01:00Z", attemptId: "retention-2", questionId: "retention-2", familyId: "retention-2" },
+    };
+    const calibration = calibrateInterventions([firstComplete, second]).get("guided:phys.circuit.divider");
+    expect(calibration?.sampleSize).toBe(2);
+  });
   it("attributes the immediate result to the target part instead of total marks", () => {
     const unrelated = { ...source.parts[0]!, id: "unrelated-part", marks: 9, capabilityIds: ["another-capability"] };
     const mixed = { ...source, parts: [source.parts[0]!, unrelated], totalMarks: source.totalMarks + 9 };
@@ -95,6 +120,33 @@ describe("Physics content trust boundaries", () => {
 });
 
 describe("authentic Physics papers and prospective outcomes", () => {
+  it("does not turn a selectively trusted subset into a whole-paper score", () => {
+    const paperId = "paper-complete-check";
+    const makePaperQuestion = (question: Question, number: string) => approve({
+      ...question,
+      id: `${question.id}-${number}`,
+      source: "past-paper",
+      paperId,
+      paperQuestionNumber: number,
+      paperProvenance: {
+        board: "WJEC", specification: "A200QS", paperId, questionNumber: number,
+        sourceUrl: "https://www.wjec.co.uk/test-only/paper.pdf", sourceDigest: "sha256:test-only",
+        status: "verified", verifiedBy: "test-only", verifiedAt: "2026-09-08T00:00:00Z",
+      },
+    });
+    const q1 = makePaperQuestion(source, "1");
+    const q2 = makePaperQuestion(transfer, "2");
+    const paperAttempt = (question: Question, id: string): Attempt => {
+      const base = { ...attempt(question, id, 2), mode: "paper" as const, paperId, paperRunId: "complete-run",
+        paperMarking: { status: "adjudicated" as const, reviewerId: "test-marker", reviewedAt: "2026-09-08T00:00:00Z", markerCount: 2 } };
+      return { ...base, paperMarking: { ...base.paperMarking, markingFingerprint: paperMarkingFingerprint(base) } };
+    };
+    const one = paperAttempt(q1, "paper-q1");
+    expect(paperRunScores([one], [q1, q2])).toEqual([]);
+    const two = paperAttempt(q2, "paper-q2");
+    expect(paperRunScores([one, two], [q1, q2])).toHaveLength(1);
+  });
+
   it("requires reviewed first-exposure paper evidence and excludes mixed-trust sittings", () => {
     const paperQuestion = approve({ ...transfer, source: "past-paper", paperId: "original-paper", paperQuestionNumber: "3(a)", paperProvenance: {
       board: "WJEC", specification: "A200QS", paperId: "original-paper", questionNumber: "3(a)",
@@ -102,7 +154,14 @@ describe("authentic Physics papers and prospective outcomes", () => {
       status: "verified", verifiedBy: "test-only", verifiedAt: "2026-09-08T00:00:00Z",
     } });
     expect(verifiedPhysicsPaperProvenance(paperQuestion)).toBe(true);
-    const response = { ...attempt(paperQuestion, "paper", 2), mode: "paper" as const, paperRunId: "sitting", paperId: "original-paper" };
+    const response = { ...attempt(paperQuestion, "paper", 2), mode: "paper" as const, paperRunId: "sitting", paperId: "original-paper", paperSpecId: "wjec-alevel-physics.u3",
+      paperMarking: { status: "adjudicated" as const, reviewerId: "test-marker", reviewedAt: "2026-09-08T00:00:00Z", markerCount: 2 } };
+    expect(humanReviewedPaperAttempt({ ...response, paperMarking: { status: "unreviewed" } })).toBe(false);
+    const fingerprinted = { ...response, paperMarking: { ...response.paperMarking, markingFingerprint: paperMarkingFingerprint(response) } };
+    expect(humanReviewedPaperAttempt(fingerprinted)).toBe(true);
+    expect(humanReviewedPaperAttempt({ ...fingerprinted, awarded: response.awarded - 1,
+      marked: response.marked.map((part) => ({ ...part, awarded: Math.max(0, part.awarded - 1) })) })).toBe(false);
+    expect(humanReviewedPaperAttempt({ ...response, paperMarking: { ...response.paperMarking, markingFingerprint: "paper-mark-v1:stale" } })).toBe(false);
     expect(authenticPaperEvidence(response, paperQuestion, [], [paperQuestion])).toBe(true);
     expect(authenticPaperEvidence(response, transfer, [], [transfer])).toBe(false);
     expect(humanVerifiedPhysicsQuestion({ ...paperQuestion, paperProvenance: undefined })).toBe(false);
@@ -115,7 +174,7 @@ describe("authentic Physics papers and prospective outcomes", () => {
       assignments: [{ anonId: "test-learner", arm: "revise", assignedAt: "2026-01-02T00:00:00Z", version: 1 }],
       events: [], attempts: [], reviews: [], masteryByTopic: new Map(),
       baselineAssessments: [{ anonId: "test-learner", subjectId: source.subjectId, percent: 50, maxMarks: 80,
-        takenAt: "2026-01-01T00:00:00Z", assessmentVersion: "matched-forms-v1" }],
+        takenAt: "2026-01-01T00:00:00Z", assessmentVersion: "matched-forms-v1", humanMarked: true }],
       finalAssessments: [{ anonId: "test-learner", subjectId: source.subjectId, percent: 75, maxMarks: 80,
         takenAt: "2026-01-12T00:00:00Z", assessmentVersion: "matched-forms-v1", matchesBaselineVersion: true,
         heldOutFamilies: true, humanMarked: true, delayedDays: 7, revisionMinutes: 60,
@@ -124,6 +183,8 @@ describe("authentic Physics papers and prospective outcomes", () => {
     const report = analyseExperiment(input);
     expect(report.primaryOutcomes[0]?.marksGainedPerHour).toBe(20);
     expect(report.gates.efficacyClaimReady).toBe(false);
+    expect(analyseExperiment({ ...input, baselineAssessments: [{ ...input.baselineAssessments[0]!, humanMarked: false }] }).primaryOutcomes).toEqual([]);
+    expect(analyseExperiment({ ...input, baselineAssessments: [{ ...input.baselineAssessments[0]!, humanMarked: undefined }] }).primaryOutcomes).toEqual([]);
     for (const change of [{ humanMarked: false }, { heldOutFamilies: false }, { delayedDays: 0 },
       { revisionMinutes: NaN }, { assessmentVersion: "different" }, { subjectId: "different" }, { maxMarks: 100 }]) {
       expect(analyseExperiment({ ...input, finalAssessments: [{ ...input.finalAssessments[0]!, ...change }] }).primaryOutcomes).toEqual([]);

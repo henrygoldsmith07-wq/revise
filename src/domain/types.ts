@@ -606,6 +606,26 @@ export interface FarTransferAttemptLink {
   outcome?: FarTransferOutcome;
 }
 
+/** Human marking attestation for a paper response.
+ *
+ * Paper provenance and paper marking are separate trust dimensions: an
+ * authenticated WJEC PDF does not make an automatically marked response a
+ * gold outcome. The reviewer/date fields make that distinction explicit in
+ * persisted attempts; adjudicated rows additionally record that two markers
+ * were involved.
+ */
+export type PaperMarkingReviewStatus = "unreviewed" | "human-reviewed" | "adjudicated";
+
+export interface PaperMarkingReview {
+  status: PaperMarkingReviewStatus;
+  reviewerId?: Id;
+  reviewedAt?: IsoInstant;
+  /** Number of qualified human markers whose marks contributed to this row. */
+  markerCount?: number;
+  /** Optional fingerprint of the exact answer/marking reviewed. */
+  markingFingerprint?: string;
+}
+
 export interface Attempt {
   id: Id;
   userId: Id;
@@ -643,6 +663,8 @@ export interface Attempt {
   paperId?: Id;
   paperSpecId?: Id;
   paperRunId?: Id;
+  /** Explicit human-marking gate for authenticated paper evidence. */
+  paperMarking?: PaperMarkingReview;
   /** Links a targeted practice attempt back to the open mistake it is testing. */
   retestMistakeId?: Id;
   createdAt: IsoInstant;

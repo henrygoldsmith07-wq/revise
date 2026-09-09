@@ -1,4 +1,5 @@
 import { hintEvidenceMultiplier } from "./hint-tiers";
+import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Id, IsoInstant, Question, Topic } from "./types";
 
 export type ApplicationEvidence = "unmeasured" | "emerging" | "reliable";
@@ -48,15 +49,17 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
   const trustedQuestion = input.trustedQuestion ?? (() => true);
 
   for (const attempt of input.attempts) {
-    if (attempt.mode === "recall" || attempt.max <= 0 || attempt.markEscalation?.status === "pending") continue;
+    if (!trustworthyAttempt(attempt) || attempt.mode === "recall" || attempt.max <= 0 || attempt.markEscalation?.status === "pending") continue;
     const topicIds = [...new Set(attempt.topicIds)].filter((topicId) => topicById.has(topicId));
     if (!topicIds.length) continue;
     const share = 1 / topicIds.length;
     const question = questionById.get(attempt.questionId);
-    if (question && !trustedQuestion(question)) continue;
+    if (question && (!trustedQuestion(question) || !trustedAssessmentAttempt(attempt, question, input.attempts, input.questions))) continue;
     // A Physics attempt without a bank row cannot be authenticated against a
     // reviewed question, so it must not silently become application mastery.
     if (!question && attempt.subjectId === "wjec-alevel-physics") continue;
+    if (question?.subjectId === "wjec-alevel-physics" && attempt.mode === "paper" &&
+      !authenticPaperEvidence(attempt, question, input.attempts, input.questions)) continue;
     // Hint-assisted marks count at the hint tier's evidence weight, so
     // hint-gaming cannot inflate application mastery.
     const credit = hintEvidenceMultiplier(attempt.hintTier ?? null);

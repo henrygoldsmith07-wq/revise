@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { wjecPhysicsQualityExpansionQuestions } from "@/content/questions/wjec-physics-quality-expansion";
-import { evaluatePhysicsAnswerCorpus } from "@/domain/physics-marking-benchmark";
+import { evaluatePhysicsAnswerCorpus, REQUIRED_PHYSICS_BENCHMARK_CASES } from "@/domain/physics-marking-benchmark";
 import type { AnswerCorpusRecord } from "@/domain/answer-corpus";
 
 const question = wjecPhysicsQualityExpansionQuestions[0]!;
@@ -20,7 +20,7 @@ function record(id: string, overrides: Partial<AnswerCorpusRecord> = {}): Answer
     maximumMarks: part.marks,
     commandWord: "explain",
     difficulty: question.difficulty,
-    questionTypeTags: ["2-4-mark", "misconception"],
+    questionTypeTags: ["2-4-mark", "misconception", ...REQUIRED_PHYSICS_BENCHMARK_CASES],
     studentAnswer: part.modelAnswer,
     humanMark1: part.marks,
     humanMark2: part.marks,
@@ -31,6 +31,9 @@ function record(id: string, overrides: Partial<AnswerCorpusRecord> = {}): Answer
     reviewStatus: "adjudicated",
     provenance: "Test-only anonymised marker row",
     benchmarkVersion: "test-v1",
+    marker1Meta: { markerId: "marker-1", role: "teacher", boardFamiliarity: "WJEC", independentlyMarked: true },
+    marker2Meta: { markerId: "marker-2", role: "examiner", boardFamiliarity: "WJEC", independentlyMarked: true },
+    adjudicatorMeta: { markerId: "adjudicator", role: "senior-examiner", boardFamiliarity: "WJEC" },
     createdAt: "2026-09-08T00:00:00Z",
     ...overrides,
   };
@@ -57,12 +60,35 @@ describe("Physics human-marker benchmark", () => {
     expect(report.usableForCalibration).toBe(true);
     expect(report.humanMarkerPairs).toBe(20);
     expect(report.humanMarkerExactAgreementRate).toBeLessThan(1);
+    expect(report.qualifiedHumanMarkerPairs).toBe(20);
+    expect(report.adjudicatedRecords).toBe(20);
+    expect(report.caseCoverageComplete).toBe(true);
   });
 
   it("reports missing bank mappings instead of silently scoring a row", () => {
     const report = evaluatePhysicsAnswerCorpus({ records: [record("missing", { questionId: "deleted-question" })], questions: [question] });
     expect(report.evaluatedRecords).toBe(0);
     expect(report.missingQuestionIds).toEqual(["deleted-question"]);
+    expect(report.usableForCalibration).toBe(false);
+  });
+
+  it("keeps calibration closed when a marker or required edge-case label is missing", () => {
+    const rows = Array.from({ length: 20 }, (_, index) => record(`row-${index}`, {
+      questionTypeTags: REQUIRED_PHYSICS_BENCHMARK_CASES.filter((tag) => tag !== "borderline-explanation"),
+    }));
+    rows[0] = record("row-0", { marker2Meta: null });
+    const report = evaluatePhysicsAnswerCorpus({ records: rows, questions: [question] });
+    expect(report.qualifiedHumanMarkerPairs).toBe(19);
+    expect(report.caseCoverageComplete).toBe(false);
+    expect(report.usableForCalibration).toBe(false);
+  });
+
+  it("requires an explicit independent first-pass attestation", () => {
+    const report = evaluatePhysicsAnswerCorpus({ records: [record("not-independent", {
+      marker1Meta: { markerId: "marker-1", role: "teacher", boardFamiliarity: "WJEC" },
+    })], questions: [question] });
+    expect(report.humanMarkerPairs).toBe(1);
+    expect(report.qualifiedHumanMarkerPairs).toBe(0);
     expect(report.usableForCalibration).toBe(false);
   });
 

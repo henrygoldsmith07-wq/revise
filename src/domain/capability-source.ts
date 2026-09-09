@@ -22,7 +22,7 @@ import {
   type TopicCapabilityMap,
 } from "./capability-mastery";
 import type { Attempt, Id, Question } from "./types";
-import { independentAttempt } from "./learning-evidence";
+import { authenticPaperEvidence, independentAttempt, trustworthyAttempt } from "./learning-evidence";
 
 export interface CapabilitySourceInput {
   recallMastery: RecallMasteryRow[];
@@ -101,10 +101,13 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
   // double-count the same attempts). Hint support downgrades the source.
   const questionsById = new Map((input.questions ?? []).map((q) => [q.id, q] as const));
   for (const attempt of input.attempts) {
-    if (attempt.max <= 0 || attempt.mode === "recall") continue;
+    if (!trustworthyAttempt(attempt) || attempt.max <= 0 || attempt.mode === "recall") continue;
     const question = questionsById.get(attempt.questionId);
     if (question && !trustedQuestion(question)) continue;
     if (!question && attempt.subjectId === "wjec-alevel-physics" && input.questions) continue;
+    if (question && question.subjectId !== attempt.subjectId) continue;
+    if (question?.subjectId === "wjec-alevel-physics" && attempt.mode === "paper" &&
+      !authenticPaperEvidence(attempt, question, input.attempts, input.questions ?? [])) continue;
     if (question?.kind !== "extended") continue;
     const score = Math.max(0, Math.min(1, attempt.awarded / attempt.max));
     const source: EvidenceSource = hintEvidenceSource(attempt.hintTier ?? null);
@@ -127,8 +130,13 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
   }
 
   const trustedAttempts = input.attempts.filter((attempt) => {
+    if (!trustworthyAttempt(attempt)) return false;
     const question = questionsById.get(attempt.questionId);
-    return question ? trustedQuestion(question) : !(attempt.subjectId === "wjec-alevel-physics" && input.questions);
+    if (question && question.subjectId !== attempt.subjectId) return false;
+    if (!question) return !(attempt.subjectId === "wjec-alevel-physics" && input.questions);
+    if (!trustedQuestion(question)) return false;
+    return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+      authenticPaperEvidence(attempt, question, input.attempts, input.questions ?? []);
   });
   for (const { topicId, score } of transferEvidenceFromAttempts(trustedAttempts)) {
     const profile = profileFor(topicId);

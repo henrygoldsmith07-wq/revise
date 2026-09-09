@@ -25,6 +25,8 @@
 // Pure domain: no React, no storage; `now` is passed in.
 // ---------------------------------------------------------------------------
 
+import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, Id, IsoInstant, Mistake, Paper, Question, Topic, TopicMastery } from "./types";
 
 /** Losses older than this count as history, not as "what is wrong now". */
@@ -197,6 +199,21 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
   const questionById = new Map(input.questions.map((q) => [q.id, q] as const));
   const topicById = new Map(input.topics.map((t) => [t.id, t] as const));
   const masteryById = new Map(input.mastery.map((m) => [m.topicId, m] as const));
+  const attemptById = new Map(input.attempts.map((attempt) => [attempt.id, attempt] as const));
+
+  const trustedPhysicsAttempt = (attempt: Attempt): boolean => {
+    const question = questionById.get(attempt.questionId);
+    if (!question || !trustworthyAttempt(attempt) || !trustedAssessmentContent(question)) return false;
+    if (question.subjectId === "wjec-alevel-physics" && attempt.mode === "paper") {
+      return authenticPaperEvidence(attempt, question, input.attempts, input.questions);
+    }
+    return true;
+  };
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (input.subjectId !== "wjec-alevel-physics") return true;
+    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
+    return Boolean(attempt && trustedPhysicsAttempt(attempt));
+  };
 
   const subjectPapers = input.papers.filter(
     (p) => p.subjectId === input.subjectId && p.questionIds.length > 0,
@@ -250,6 +267,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
     const lossTopics = new Set<Id>();
     for (const mistake of input.mistakes) {
       if (mistake.subjectId !== input.subjectId) continue;
+      if (!trustedMistake(mistake)) continue;
       if (!marksByTopic.has(mistake.topicId)) continue;
       if (!inWindow(mistake.createdAt)) continue;
       recentLossMarks += mistake.marksLost;
@@ -257,12 +275,34 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
     }
 
     // Recorded runs of this paper: attempts carrying the paper's id.
-    const paperAttempts = input.attempts.filter((a) => a.paperId === paper.id);
-    const runTimes = new Set(paperAttempts.map((a) => a.paperRunId).filter((r): r is string => Boolean(r)));
-    const runs = runTimes.size;
-    let lastRunAt: string | null = null;
+    // A Physics question carries the authenticated source-paper identity;
+    // locally generated Paper rows may have a different UI id. Match either
+    // identity, but only count a Physics run after its response is human
+    // reviewed, so an auto-marked sitting cannot distort exposure or recency.
+    const paperIds = new Set<Id>([paper.id, ...resolved.map((question) => question.paperId).filter((id): id is Id => Boolean(id))]);
+    const paperAttempts = input.attempts.filter((attempt) => paperIds.has(attempt.paperId ?? "") &&
+      (input.subjectId !== "wjec-alevel-physics" || trustedPhysicsAttempt(attempt)));
+    const attemptsByRun = new Map<string, Attempt[]>();
     for (const attempt of paperAttempts) {
-      if (lastRunAt == null || attempt.createdAt > lastRunAt) lastRunAt = attempt.createdAt;
+      const runKey = attempt.paperRunId ?? attempt.createdAt.slice(0, 10);
+      const rows = attemptsByRun.get(runKey) ?? [];
+      rows.push(attempt);
+      attemptsByRun.set(runKey, rows);
+    }
+    const completeRuns = [...attemptsByRun.values()].filter((rows) => {
+      if (input.subjectId !== "wjec-alevel-physics") return true;
+      const present = new Set(rows.map((attempt) => attempt.questionId));
+      // A partially answered or selectively trusted Physics sitting cannot
+      // count as past-paper exposure.  It is still retained in storage for
+      // the learner's feedback, but it must not steer paper selection.
+      return rows.length === resolved.length && present.size === resolved.length && resolved.every((question) => present.has(question.id));
+    });
+    const runs = completeRuns.length;
+    let lastRunAt: string | null = null;
+    for (const rows of completeRuns) {
+      for (const attempt of rows) {
+        if (lastRunAt == null || attempt.createdAt > lastRunAt) lastRunAt = attempt.createdAt;
+      }
     }
 
     // Predicted %: only over marks that sit on measured topics.
@@ -302,6 +342,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
   const negativeTopics = new Map<Id, { lossMarks: number; openMistakes: number }>();
   for (const mistake of input.mistakes) {
     if (mistake.subjectId !== input.subjectId) continue;
+    if (!trustedMistake(mistake)) continue;
     if (!topicById.has(mistake.topicId)) continue;
     const entry = negativeTopics.get(mistake.topicId) ?? { lossMarks: 0, openMistakes: 0 };
     if (inWindow(mistake.createdAt)) entry.lossMarks += mistake.marksLost;
@@ -316,8 +357,9 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
     if (mastery?.weak) return true;
     if (mastery && mastery.attempts > 0 && mastery.retention < 0.7) return true;
     // Low recent accuracy on the topic's questions also counts as weak.
-    const recent = input.attempts.filter(
-      (a) => a.topicIds.includes(topicId) && a.subjectId === input.subjectId && inWindow(a.createdAt),
+    const recent = input.attempts.filter((a) =>
+      a.topicIds.includes(topicId) && a.subjectId === input.subjectId && inWindow(a.createdAt) &&
+      (input.subjectId !== "wjec-alevel-physics" || trustedPhysicsAttempt(a)),
     );
     if (recent.length >= 2 && (accuracyOf(recent) ?? 1) < SELECT_LOW_ACCURACY) return true;
     return false;

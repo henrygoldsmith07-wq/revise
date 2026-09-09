@@ -18,7 +18,9 @@
 // ---------------------------------------------------------------------------
 
 import type { GradePrediction } from "./grades";
-import type { Attempt, Id, IsoInstant } from "./types";
+import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent, verifiedPhysicsPaperProvenance } from "./physics-content-review";
+import type { Attempt, Id, IsoInstant, Question } from "./types";
 
 /** Marked answers needed before a subject may show a score band. */
 export const MIN_OUTLOOK_ATTEMPTS = 3;
@@ -74,9 +76,28 @@ export interface PaperRunScore {
   questionCount: number;
 }
 
-/** Collapse paper-mode attempts into real sittings, newest first. */
-export function paperRunScores(attempts: Attempt[]): PaperRunScore[] {
-  const paperAttempts = attempts.filter((a) => a.mode === "paper" && a.max > 0);
+/** Collapse authenticated paper-mode attempts into real sittings, newest first. */
+export function paperRunScores(attempts: Attempt[], questions?: readonly Question[]): PaperRunScore[] {
+  const questionList = questions ?? [];
+  const questionById = new Map(questionList.map((question) => [question.id, question] as const));
+  // For authenticated Physics papers, a score is a whole-sitting outcome.
+  // Infer the expected question set from the immutable paper identity carried
+  // by each trusted question; a run that only contains a convenient subset
+  // must stay out of readiness and calibration evidence.
+  const expectedPhysicsQuestionsByPaper = new Map<Id, Set<Id>>();
+  for (const question of questionList) {
+    if (question.subjectId !== "wjec-alevel-physics" || question.source !== "past-paper" ||
+      !question.paperId || !verifiedPhysicsPaperProvenance(question) || !trustedAssessmentContent(question)) continue;
+    const ids = expectedPhysicsQuestionsByPaper.get(question.paperId) ?? new Set<Id>();
+    ids.add(question.id);
+    expectedPhysicsQuestionsByPaper.set(question.paperId, ids);
+  }
+  const paperAttempts = attempts.filter((a) => {
+    if (a.mode !== "paper" || a.max <= 0 || !trustworthyAttempt(a)) return false;
+    if (a.subjectId !== "wjec-alevel-physics") return true;
+    const question = questionById.get(a.questionId);
+    return Boolean(question && authenticPaperEvidence(a, question, attempts, questions ?? []));
+  });
   const byRun = new Map<string, Attempt[]>();
   for (const attempt of paperAttempts) {
     const key = attempt.paperRunId ?? attempt.createdAt.slice(0, 10);
@@ -86,6 +107,16 @@ export function paperRunScores(attempts: Attempt[]): PaperRunScore[] {
   }
   const out: PaperRunScore[] = [];
   for (const [runKey, list] of byRun) {
+    const first = list[0]!;
+    if (first.subjectId === "wjec-alevel-physics") {
+      const expected = first.paperId ? expectedPhysicsQuestionsByPaper.get(first.paperId) : undefined;
+      const present = new Set(list.map((attempt) => attempt.questionId));
+      // No known manifest or an incomplete manifest is not evidence of a
+      // complete paper.  This deliberately sacrifices a partial score rather
+      // than letting selective human-reviewed rows look like a paper result.
+      if (!expected || expected.size === 0 || list.length !== expected.size || present.size !== expected.size ||
+        [...expected].some((questionId) => !present.has(questionId))) continue;
+    }
     const awarded = list.reduce((a, x) => a + x.awarded, 0);
     const max = list.reduce((a, x) => a + x.max, 0);
     if (max <= 0) continue;
@@ -104,9 +135,16 @@ export function paperRunScores(attempts: Attempt[]): PaperRunScore[] {
 }
 
 /** One row per predicted subject, with measured evidence counted. */
-export function outlookRows(predictions: GradePrediction[], attempts: Attempt[]): ExamOutlookRow[] {
+export function outlookRows(predictions: GradePrediction[], attempts: Attempt[], questions: readonly Question[] = []): ExamOutlookRow[] {
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const evidenceAttempts = attempts.filter((attempt) => {
+    const question = questionById.get(attempt.questionId);
+    if (attempt.subjectId !== "wjec-alevel-physics") return attempt.max > 0 && trustworthyAttempt(attempt);
+    if (!question || !trustedAssessmentContent(question) || attempt.max <= 0) return false;
+    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+  });
   return predictions.map((prediction) => {
-    const marked = attempts.filter((a) => a.subjectId === prediction.subjectId && a.max > 0).length;
+    const marked = evidenceAttempts.filter((a) => a.subjectId === prediction.subjectId).length;
     const band = percentBand(prediction);
     return {
       subjectId: prediction.subjectId,

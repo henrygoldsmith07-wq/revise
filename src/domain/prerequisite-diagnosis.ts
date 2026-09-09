@@ -25,7 +25,9 @@
 // ---------------------------------------------------------------------------
 
 import { prerequisiteEdges, rootPrerequisitePaths, type PrerequisiteEdge } from "./prerequisites";
-import type { Attempt, Card, Id, IsoInstant, Mistake, Topic, TopicMastery } from "./types";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
+import type { Attempt, Card, Id, IsoInstant, Mistake, Question, Topic, TopicMastery } from "./types";
 
 /** How far back a "recent" miss goes. Same convention as the weak-topic exam. */
 export const DIAG_WINDOW_DAYS = 7;
@@ -72,6 +74,13 @@ export interface DiagnosisInput {
   mistakes: Mistake[];
   mastery: TopicMastery[];
   cards: Card[];
+  /** Question bank used to exclude draft or unauthenticated Physics evidence. */
+  questions?: Question[];
+  /**
+   * For Physics this must contain only capability edges with a current
+   * subject-expert approval.  When omitted, no Physics prerequisite edge is
+   * assumed.
+   */
   edges?: PrerequisiteEdge[];
   now?: Date;
 }
@@ -83,12 +92,45 @@ export interface TopicSignalInput {
   mistakes: Mistake[];
   mastery: TopicMastery[];
   cards: Card[];
+  questions?: Question[];
   now: Date;
+}
+
+const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
+
+/**
+ * Filter diagnosis inputs through the same evidence boundary as mastery and
+ * repair. Physics drafts remain usable for practice, but cannot make a topic
+ * look weak/secure or trigger an upstream diagnosis.
+ */
+function trustedDiagnosisEvidence(
+  attempts: Attempt[],
+  mistakes: Mistake[],
+  questions: Question[] | undefined,
+): { attempts: Attempt[]; mistakes: Mistake[] } {
+  const questionById = new Map((questions ?? []).map((question) => [question.id, question] as const));
+  const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
+  const trustedAttempt = (attempt: Attempt): boolean => {
+    if (!trustworthyAttempt(attempt)) return false;
+    if (attempt.subjectId !== PHYSICS_SUBJECT_ID) return true;
+    const question = questionById.get(attempt.questionId);
+    return Boolean(question && trustedAssessmentAttempt(attempt, question, attempts, questions ?? []));
+  };
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (mistake.subjectId !== PHYSICS_SUBJECT_ID) return true;
+    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    return Boolean(attempt && question && trustedAssessmentContent(question) && trustedAttempt(attempt));
+  };
+  return { attempts: attempts.filter(trustedAttempt), mistakes: mistakes.filter(trustedMistake) };
 }
 
 /** Measured state of one topic. Pure over its inputs. */
 export function signalForTopic(input: TopicSignalInput): TopicSignal {
-  const { topicId, attempts, mistakes, mastery, cards, now } = input;
+  const { topicId, mastery, cards, now } = input;
+  const evidence = trustedDiagnosisEvidence(input.attempts, input.mistakes, input.questions);
+  const attempts = evidence.attempts;
+  const mistakes = evidence.mistakes;
   const cutoffMs = now.getTime() - DIAG_WINDOW_DAYS * 86_400_000;
   const afterCutoff = (at: IsoInstant) => new Date(at).getTime() >= cutoffMs;
 
@@ -233,18 +275,23 @@ export function bestUpstreamCause(
  * upstream signals, and a verdict — or a non-failing diagnosis (no verdict).
  */
 export function diagnosePrerequisiteWeakness(input: DiagnosisInput): PrerequisiteDiagnosis {
-  const edges = input.edges ?? prerequisiteEdges();
   const now = input.now ?? new Date();
   const { topicId, topics, attempts, mistakes, mastery, cards } = input;
+  const topic = topics.find((candidate) => candidate.id === topicId);
+  // Physics capability edges are hypotheses until a subject expert signs the
+  // exact fingerprint. Callers may supply the approved projection; absent it,
+  // do not fall back to the older curriculum-order graph.
+  const edges = input.edges ?? (topic?.subjectId === PHYSICS_SUBJECT_ID ? [] : prerequisiteEdges());
+  const evidence = trustedDiagnosisEvidence(attempts, mistakes, input.questions);
 
-  const signal = signalForTopic({ topicId, topics, attempts, mistakes, mastery, cards, now });
+  const signal = signalForTopic({ topicId, topics, attempts: evidence.attempts, mistakes: evidence.mistakes, mastery, cards, questions: input.questions, now });
   const failing = signal.recentMisses >= DIAG_MIN_RECENT_MISSES || signal.unresolvedMistakes > 0;
 
   const upstreamIds = prerequisiteAncestors(topicId, edges).filter((id) =>
     topics.some((t) => t.id === id),
   );
   const prerequisites = upstreamIds.map((id) =>
-    signalForTopic({ topicId: id, topics, attempts, mistakes, mastery, cards, now }),
+    signalForTopic({ topicId: id, topics, attempts: evidence.attempts, mistakes: evidence.mistakes, mastery, cards, questions: input.questions, now }),
   );
 
   if (!failing) {

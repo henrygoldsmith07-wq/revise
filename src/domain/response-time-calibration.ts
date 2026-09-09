@@ -1,3 +1,4 @@
+import { trustedAssessmentAttempt } from "./learning-evidence";
 import type { Attempt, Id, Paper, Question, Subject } from "./types";
 
 /** The existing mistake classifier uses the same exam-time baseline. */
@@ -70,6 +71,8 @@ export interface ResponseTimeCalibrationInput {
   questions: Question[];
   papers: Paper[];
   subjects: Subject[];
+  /** Physics drafts and unauthenticated paper marks are excluded from pace evidence. */
+  trustedQuestion?: (question: Question) => boolean;
 }
 
 function median(values: number[]): number | null {
@@ -187,13 +190,15 @@ export function buildResponseTimeCalibration(input: ResponseTimeCalibrationInput
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
   const papersById = new Map(input.papers.map((paper) => [paper.id, paper] as const));
   const subjectsById = new Map(input.subjects.map((subject) => [subject.id, subject] as const));
+  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => question.subjectId !== "wjec-alevel-physics");
   const observations: ResponseTimeObservation[] = [];
 
   for (const attempt of input.attempts) {
     const question = questionsById.get(attempt.questionId);
     const marks = Number(attempt.max);
     const elapsedMs = Number(attempt.elapsedMs);
-    if (!question || !Number.isFinite(marks) || marks <= 0 || !Number.isFinite(elapsedMs) || elapsedMs <= 0) continue;
+    if (!question || !trustedQuestion(question) || !trustedAssessmentAttempt(attempt, question, input.attempts, input.questions) ||
+      !Number.isFinite(marks) || marks <= 0 || !Number.isFinite(elapsedMs) || elapsedMs <= 0) continue;
     const seconds = elapsedMs / 1000;
     const secondsPerMark = seconds / marks;
     const targetSecondsPerMark = targetFor(question, subjectsById.get(attempt.subjectId), papersById);

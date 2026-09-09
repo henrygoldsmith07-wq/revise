@@ -8,11 +8,12 @@ if (!destination) throw new Error("Usage: node scripts/export-physics-review.mjs
 const bundle = await build({
   stdin: { contents: `
     export { seedQuestions as questions } from "./src/content";
-    export { physicsContentFingerprint, REQUIRED_HUMAN_CHECKS } from "./src/domain/physics-content-review";
+    export { physicsContentFingerprint, humanVerifiedPhysicsQuestion, REQUIRED_HUMAN_CHECKS } from "./src/domain/physics-content-review";
     export { wjecCapabilities as capabilities } from "./src/content/capabilities";
+    export { capabilityEdgeFingerprint } from "./src/domain/capability-graph";
     export { wjecPhysics as curriculum } from "./src/domain/curriculum/wjec-physics";
     export { markPart } from "./src/domain/marking";
-    export { auditPhysicsAssessmentQuality } from "./src/domain/physics-assessment-quality";
+    export { auditPhysicsAssessmentQuality, physicsQualityQueue } from "./src/domain/physics-assessment-quality";
   `, resolveDir: process.cwd(), loader: "ts" },
   bundle: true, platform: "node", format: "esm", write: false,
 });
@@ -21,8 +22,24 @@ const qualityAudit = data.auditPhysicsAssessmentQuality({
   topics: data.curriculum.topics,
   questions: data.questions,
   nodes: data.capabilities,
-  trustedQuestion: () => false,
+  // Read the existing attestation state.  The packet creates pending review
+  // rows for display, but must not hide a valid approval or manufacture one.
+  trustedQuestion: data.humanVerifiedPhysicsQuestion,
 });
+const qualityQueue = data.physicsQualityQueue(qualityAudit);
+const physicsNodes = data.capabilities.filter((node) => node.subjectId === "wjec-alevel-physics");
+const prerequisiteReviews = physicsNodes.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
+  const prerequisite = physicsNodes.find((candidate) => candidate.id === prerequisiteId) ?? data.capabilities.find((candidate) => candidate.id === prerequisiteId);
+  return {
+    targetId: node.id,
+    targetLabel: node.label,
+    prerequisiteId,
+    prerequisiteLabel: prerequisite?.label ?? null,
+    rationale: node.prerequisiteRationales?.[prerequisiteId] ?? null,
+    edgeFingerprint: data.capabilityEdgeFingerprint(node, prerequisite ?? prerequisiteId),
+    review: node.prerequisiteReviews?.[prerequisiteId] ?? { status: "unreviewed" },
+  };
+}));
 const rows = data.questions.filter((question) => question.subjectId === "wjec-alevel-physics").map((question) => ({
   question,
   fingerprint: data.physicsContentFingerprint(question),
@@ -53,7 +70,8 @@ const lines = [
   "# Physics content review packet",
   "",
   `${rows.length} Physics questions from the live bank. This export creates **no human approvals**. No efficacy results are claimed.`,
-  `Quality gate: ${qualityAudit.completeStatements}/${qualityAudit.statements} specification statements meet the two-family/two-context demand check; ${qualityAudit.unreviewedQuestions} questions remain unreviewed. Release-ready: **${qualityAudit.releaseReady ? "yes" : "no"}**.`,
+  `Quality gate: ${qualityAudit.completeStatements}/${qualityAudit.statements} specification statements meet the two-family/two-context demand check; ${qualityAudit.unreviewedQuestions} questions remain unreviewed. Authoring/review queue: ${qualityQueue.length} items. Release-ready: **${qualityAudit.releaseReady ? "yes" : "no"}**.`,
+  `Prerequisite gate: ${prerequisiteReviews.filter((row) => row.review.status === "approved").length}/${prerequisiteReviews.length} dependency edges have an approval; every edge remains a diagnosis hypothesis until a subject expert signs the exact fingerprint.`,
   "",
   "Review the prompt, mark scheme, worked solution, internal specification mapping, capability mapping and exam realism separately. Solve before reading the key. Record accepted alternatives, rejected misconceptions and uncertain marking. Use examiner-labelled student answers to validate partial credit.",
   "",
@@ -82,9 +100,11 @@ const out = resolve(destination);
 await mkdir(out, { recursive: true });
 await writeFile(resolve(out, "physics-review-packet.json"), JSON.stringify(rows, null, 2));
 await writeFile(resolve(out, "physics-review-packet.md"), lines.join("\n"));
-await writeFile(resolve(out, "physics-capability-graph.json"), JSON.stringify(data.capabilities.filter((node) => node.subjectId === "wjec-alevel-physics"), null, 2));
+await writeFile(resolve(out, "physics-capability-graph.json"), JSON.stringify(physicsNodes, null, 2));
+await writeFile(resolve(out, "physics-prerequisite-review.json"), JSON.stringify(prerequisiteReviews, null, 2));
 await writeFile(resolve(out, "physics-quality-audit.json"), JSON.stringify(qualityAudit, null, 2));
+await writeFile(resolve(out, "physics-quality-queue.json"), JSON.stringify(qualityQueue, null, 2));
 console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((row) => row.question.id.startsWith("cnt:question:physics-quality-")).length, approvalsCreated: 0,
   modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
-  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions,
+  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length,
   output: out }));

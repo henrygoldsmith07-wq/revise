@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { wjecPhysicsQualityExpansionQuestions } from "@/content/questions/wjec-physics-quality-expansion";
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 import { wjecPhysicsCapabilities } from "@/content/capabilities";
-import { auditPhysicsAssessmentQuality } from "@/domain/physics-assessment-quality";
+import { auditPhysicsAssessmentQuality, physicsQualityQueue } from "@/domain/physics-assessment-quality";
 import { physicsContentFingerprint, humanVerifiedPhysicsQuestion } from "@/domain/physics-content-review";
 
 describe("Physics quality expansion", () => {
@@ -45,5 +45,45 @@ describe("Physics quality expansion", () => {
       learning: { ...part.learning!, reasoningMoves: ["different reasoning operation"] },
     } : part) };
     expect(physicsContentFingerprint(changed)).not.toBe(physicsContentFingerprint(question));
+  });
+
+  it("puts missing statement and capability links in the authoring queue", () => {
+    const original = wjecPhysicsQualityExpansionQuestions[0]!;
+    const part = original.parts[0]!;
+    const malformed = { ...original, parts: [{ ...part, specPointIds: [], capabilityIds: [] }] };
+    const audit = auditPhysicsAssessmentQuality({
+      topics: wjecPhysics.topics,
+      questions: [malformed],
+      nodes: wjecPhysicsCapabilities,
+      trustedQuestion: () => false,
+    });
+    expect(audit.issues.some((issue) => issue.kind === "missing-spec-point")).toBe(true);
+    expect(audit.issues.some((issue) => issue.kind === "missing-capability")).toBe(true);
+    const queue = physicsQualityQueue(audit);
+    expect(queue.find((item) => item.questionId === original.id && item.issueKind === "missing-spec-point")).toMatchObject({ reason: "missing-mapping", questionId: original.id, partId: part.id,
+      topicId: original.topicIds[0], specPointId: "mapping-required" });
+    expect(queue.some((item) => item.reason === "missing-review" && item.questionId === original.id)).toBe(true);
+  });
+
+  it("keeps marking and reskin defects actionable instead of hiding them in demand counts", () => {
+    const original = wjecPhysicsQualityExpansionQuestions[0]!;
+    const part = original.parts[0]!;
+    const malformed = {
+      ...original,
+      parts: [
+        { ...part, markScheme: part.markScheme.slice(0, -1), learning: { ...part.learning!, reasoningMoves: [] } },
+        ...original.parts.slice(1),
+      ],
+    };
+    const audit = auditPhysicsAssessmentQuality({
+      topics: wjecPhysics.topics,
+      questions: [malformed, { ...original, id: `${original.id}-reskin`, parts: original.parts.map((row) => ({ ...row })) }],
+      nodes: wjecPhysicsCapabilities,
+      trustedQuestion: () => false,
+    });
+    const queue = physicsQualityQueue(audit);
+    expect(queue.some((item) => item.reason === "content-quality" && item.issueKind === "incomplete-mark-scheme" && item.questionId === original.id)).toBe(true);
+    expect(queue.some((item) => item.reason === "content-quality" && item.issueKind === "missing-reasoning-move" && item.questionId === original.id)).toBe(true);
+    expect(queue.some((item) => item.reason === "content-quality" && item.issueKind === "cosmetic-reskin" && item.questionId === `${original.id}-reskin`)).toBe(true);
   });
 });

@@ -35,6 +35,8 @@
 
 import { classifyMistake, type MistakeClass } from "./mistake-classification";
 import { quickSessionQuestionLimit } from "./quick-session";
+import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
 /** Fraction of a class's lost marks attributed to missing knowledge (rest = answering). */
@@ -158,6 +160,18 @@ export interface TopicTechniqueReport {
   report: KnowledgeAnsweringReport;
 }
 
+function physicsMistakeHasTrustedContext(
+  mistake: Mistake,
+  questions: readonly Question[] | undefined,
+  attempts: readonly Attempt[] | undefined,
+): boolean {
+  if (mistake.subjectId !== "wjec-alevel-physics") return true;
+  const question = questions?.find((row) => row.id === mistake.questionId);
+  const attempt = attempts?.find((row) => row.id === mistake.attemptId);
+  if (!question || !attempt || !trustedAssessmentContent(question) || !trustworthyAttempt(attempt)) return false;
+  return attempt.mode !== "paper" || authenticPaperEvidence(attempt, question, attempts ?? [], questions ?? []);
+}
+
 /**
  * Knowledge-vs-answering split aggregated per topic within one subject.
  * Returns one report per topic that has at least one loss, sorted by total
@@ -169,6 +183,7 @@ export function knowledgeVsAnsweringByTopic(
   const byTopic = new Map<Id, Mistake[]>();
   for (const m of input.mistakes) {
     if (m.subjectId !== input.subjectId) continue;
+    if (!physicsMistakeHasTrustedContext(m, input.questions, input.attempts)) continue;
     const list = byTopic.get(m.topicId) ?? [];
     list.push(m);
     byTopic.set(m.topicId, list);
@@ -215,11 +230,12 @@ export function timedSessionRecommendation(
 
 export function knowledgeVsAnswering(input: KnowledgeAnsweringInput): KnowledgeAnsweringReport {
   const { subjectId, mistakes } = input;
+  const questionsById = input.questions ? new Map(input.questions.map((q) => [q.id, q] as const)) : undefined;
+  const attemptsById = input.attempts ? new Map(input.attempts.map((a) => [a.id, a] as const)) : undefined;
   const rows = mistakes.filter(
-    (m) => m.subjectId === subjectId && (input.topicId == null || m.topicId === input.topicId),
+    (m) => m.subjectId === subjectId && (input.topicId == null || m.topicId === input.topicId) &&
+      physicsMistakeHasTrustedContext(m, input.questions, input.attempts),
   );
-  const questions = input.questions ? new Map(input.questions.map((q) => [q.id, q] as const)) : undefined;
-  const attempts = input.attempts ? new Map(input.attempts.map((a) => [a.id, a] as const)) : undefined;
 
   let knowledgeMarks = 0;
   let answeringMarks = 0;
@@ -228,7 +244,7 @@ export function knowledgeVsAnswering(input: KnowledgeAnsweringInput): KnowledgeA
   const byClass = new Map<MistakeClass, { marksLost: number; losses: number }>();
 
   for (const mistake of rows) {
-    const { question, part, attempt } = lookupContext(mistake, questions, attempts);
+    const { question, part, attempt } = lookupContext(mistake, questionsById, attemptsById);
     const result = classifyMistake({ mistake, question, part, attempt });
     const evidenceWeight = CONFIDENCE_WEIGHT[result.confidence];
     if (result.confidence !== "low") classifiedFromAnswers += 1;

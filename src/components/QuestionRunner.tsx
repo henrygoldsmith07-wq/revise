@@ -259,6 +259,7 @@ export function QuestionRunner({
       ...(paperId ? { paperId } : {}),
       ...(paperSpecId ? { paperSpecId } : {}),
       ...(paperRunId ? { paperRunId } : {}),
+      ...(mode === "paper" ? { paperMarking: { status: "unreviewed" as const } } : {}),
       ...(retestMistake ? { retestMistakeId: retestMistake.id } : {}),
       createdAt,
     };
@@ -267,12 +268,17 @@ export function QuestionRunner({
     const remediation = planRemediation(question, submittedAnswers, marked, topic, misconceptionsForTopic(question.topicIds[0] ?? ""));
 
     const farTransferLink = farTransfer
-      ? completeDelayedFarTransfer(farTransfer, attempt)
+      ? completeDelayedFarTransfer(farTransfer, attempt, {
+          question,
+          questions: store.questions,
+          history: store.attempts,
+        })
       : scheduleDelayedFarTransfer({
           attempt,
           question,
           questions: store.questions,
           attemptedQuestionIds: store.attempts.map((existing) => existing.questionId),
+          history: store.attempts,
         });
     const persistedAttempt = farTransferLink ? { ...attempt, farTransfer: farTransferLink } : attempt;
 

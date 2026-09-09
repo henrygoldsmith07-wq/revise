@@ -27,9 +27,20 @@ export interface PhysicsCapabilityCoverage {
   complete: boolean;
 }
 
+/** Coverage at the smallest diagnosed skill, rather than only the statement. */
+export interface PhysicsCapabilityDemandCoverage {
+  topicId: Id;
+  specPointId: Id;
+  capabilityId: Id;
+  demands: PhysicsDemandCoverage[];
+  complete: boolean;
+}
+
 export type PhysicsQualityIssueKind =
   | "missing-part-learning"
   | "missing-reasoning-move"
+  | "missing-spec-point"
+  | "missing-capability"
   | "multi-capability-part"
   | "unknown-spec-point"
   | "unknown-capability"
@@ -40,6 +51,10 @@ export type PhysicsQualityIssueKind =
 export interface PhysicsQualityIssue {
   questionId: Id;
   partId?: Id;
+  /** Context retained so the authoring queue can point to the exact gap. */
+  topicId?: Id;
+  specPointId?: Id;
+  capabilityId?: Id;
   kind: PhysicsQualityIssueKind;
   detail: string;
 }
@@ -51,9 +66,22 @@ export interface PhysicsAssessmentQualityAudit {
   approvedQuestions: number;
   unreviewedQuestions: number;
   capabilityCoverage: PhysicsCapabilityCoverage[];
+  capabilityCoverageByCapability: PhysicsCapabilityDemandCoverage[];
   issues: PhysicsQualityIssue[];
   /** True only when coverage, variation, mappings and human review all pass. */
   releaseReady: boolean;
+}
+
+/** One actionable authoring/review item, ordered by the smallest missing unit. */
+export interface PhysicsQualityQueueItem {
+  topicId: Id;
+  specPointId: Id;
+  capabilityId: Id | null;
+  missingDemands: LearningDemand[];
+  reason: "missing-demand" | "missing-mapping" | "missing-review" | "content-quality";
+  issueKind?: PhysicsQualityIssueKind;
+  questionId?: Id;
+  partId?: Id;
 }
 
 const STOP_WORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "is", "of", "on", "or", "the", "to", "with"]);
@@ -90,6 +118,23 @@ function partDemand(question: Question, part: QuestionPart): LearningDemand | un
   return partLearningMetadata(question, part)?.demand;
 }
 
+function demandCoverage(mappedQuestions: Array<{ question: Question; part: QuestionPart }>): PhysicsDemandCoverage[] {
+  return PHYSICS_ASSESSMENT_DEMANDS.map((demand): PhysicsDemandCoverage => {
+    const rows = mappedQuestions.filter(({ question, part }) => partDemand(question, part) === demand);
+    const families = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.familyId).filter((id): id is string => Boolean(id)));
+    const contexts = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)));
+    const reasoningMoves = unique(rows.flatMap(({ question, part }) => partLearningMetadata(question, part)?.reasoningMoves ?? []));
+    const signatures = unique(rows.map(({ part }) => promptSignature(part.prompt)).filter(Boolean));
+    return { demand, families, contexts, reasoningMoves, questionCount: rows.length,
+      complete: families.length >= MIN_PHYSICS_FAMILIES,
+      // A second family/context is only useful when it asks for a different
+      // reasoning operation. Prompt wording and number changes alone are not
+      // enough to establish transfer-ready coverage.
+      distinct: signatures.length >= MIN_PHYSICS_FAMILIES && contexts.length >= MIN_PHYSICS_FAMILIES &&
+        reasoningMoves.length >= MIN_PHYSICS_FAMILIES };
+  });
+}
+
 /**
  * Audits the content inventory at the smallest authored unit: one part mapped
  * to one specification statement. A family id alone is not enough; the audit
@@ -113,38 +158,57 @@ export function auditPhysicsAssessmentQuality(input: {
   const issues: PhysicsQualityIssue[] = [];
   const promptByDemand = new Map<string, Map<string, Id>>();
 
+  const addIssue = (question: Question, part: QuestionPart | undefined, kind: PhysicsQualityIssueKind, detail: string): void => {
+    const specPointIds = part?.specPointIds ?? [];
+    const capabilityIds = part?.capabilityIds ?? [];
+    issues.push({
+      questionId: question.id,
+      ...(part ? { partId: part.id } : {}),
+      ...(question.topicIds[0] ? { topicId: question.topicIds[0] } : {}),
+      ...(specPointIds.length === 1 ? { specPointId: specPointIds[0] } : {}),
+      ...(capabilityIds.length === 1 ? { capabilityId: capabilityIds[0] } : {}),
+      kind,
+      detail,
+    });
+  };
+
   for (const question of physicsQuestions) {
     if (!trustedQuestion(question)) {
-      issues.push({ questionId: question.id, kind: "unreviewed", detail: "Question has no current six-check human approval." });
+      addIssue(question, undefined, "unreviewed", "Question has no current six-check human approval.");
     }
     for (const part of question.parts) {
       const specPointIds = part.specPointIds ?? [];
+      if (specPointIds.length === 0) {
+        addIssue(question, part, "missing-spec-point", "Map this part to exactly one WJEC specification statement.");
+      }
       if (specPointIds.length > 1) {
-        issues.push({ questionId: question.id, partId: part.id, kind: "multi-capability-part",
-          detail: "A part maps to multiple specification points; it cannot isolate the blocking capability." });
+        addIssue(question, part, "multi-capability-part", "A part maps to multiple specification points; it cannot isolate the blocking capability.");
       }
       for (const specPointId of specPointIds) {
         if (!pointIds.has(specPointId)) {
-          issues.push({ questionId: question.id, partId: part.id, kind: "unknown-spec-point", detail: specPointId });
+          addIssue(question, part, "unknown-spec-point", specPointId);
         }
       }
       const meta = partLearningMetadata(question, part);
       if (!meta) {
-        issues.push({ questionId: question.id, partId: part.id, kind: "missing-part-learning",
-          detail: "Add demand, family, context and authored reasoning moves." });
+        addIssue(question, part, "missing-part-learning", "Add demand, family, context and authored reasoning moves.");
       } else if (!meta.reasoningMoves.length) {
-        issues.push({ questionId: question.id, partId: part.id, kind: "missing-reasoning-move", detail: "No reasoning move is recorded." });
+        addIssue(question, part, "missing-reasoning-move", "No reasoning move is recorded.");
       }
       if (part.markScheme.length !== part.marks) {
-        issues.push({ questionId: question.id, partId: part.id, kind: "incomplete-mark-scheme",
-          detail: `${part.markScheme.length} mark points for ${part.marks} marks.` });
+        addIssue(question, part, "incomplete-mark-scheme", `${part.markScheme.length} mark points for ${part.marks} marks.`);
       }
-      for (const capabilityId of part.capabilityIds ?? []) {
+      const capabilityIds = part.capabilityIds ?? [];
+      if (capabilityIds.length === 0) {
+        addIssue(question, part, "missing-capability", "Map this part to one smallest useful capability.");
+      } else if (capabilityIds.length > 1) {
+        addIssue(question, part, "multi-capability-part", "A part maps to multiple capabilities; split it so a miss can identify the blocking skill.");
+      }
+      for (const capabilityId of capabilityIds) {
         const node = nodeById.get(capabilityId);
-        if (!node) issues.push({ questionId: question.id, partId: part.id, kind: "unknown-capability", detail: capabilityId });
+        if (!node) addIssue(question, part, "unknown-capability", capabilityId);
         else if (specPointIds.length === 1 && !node.specPointIds.includes(specPointIds[0]!)) {
-          issues.push({ questionId: question.id, partId: part.id, kind: "unknown-capability",
-            detail: `${capabilityId} does not map to ${specPointIds[0]}.` });
+          addIssue(question, part, "unknown-capability", `${capabilityId} does not map to ${specPointIds[0]}.`);
         }
       }
       if (meta && specPointIds.length === 1) {
@@ -153,8 +217,7 @@ export function auditPhysicsAssessmentQuality(input: {
         const signature = promptSignature(part.prompt);
         const previous = signatures.get(signature);
         if (previous && previous !== question.id) {
-          issues.push({ questionId: question.id, partId: part.id, kind: "cosmetic-reskin",
-            detail: `Shares the value-stripped prompt signature with ${previous}.` });
+          addIssue(question, part, "cosmetic-reskin", `Shares the value-stripped prompt signature with ${previous}.`);
         } else if (signature) {
           signatures.set(signature, question.id);
           promptByDemand.set(key, signatures);
@@ -167,18 +230,26 @@ export function auditPhysicsAssessmentQuality(input: {
     const mappedQuestions = physicsQuestions.flatMap((question) => questionPartsForPoint(question, point.id)
       .map((part) => ({ question, part })));
     const capabilityIds = unique(mappedQuestions.flatMap(({ part }) => part.capabilityIds ?? []));
-    const demands = PHYSICS_ASSESSMENT_DEMANDS.map((demand): PhysicsDemandCoverage => {
-      const rows = mappedQuestions.filter(({ question, part }) => partDemand(question, part) === demand);
-      const families = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.familyId).filter((id): id is string => Boolean(id)));
-      const contexts = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)));
-      const reasoningMoves = unique(rows.flatMap(({ question, part }) => partLearningMetadata(question, part)?.reasoningMoves ?? []));
-      const signatures = unique(rows.map(({ part }) => promptSignature(part.prompt)).filter(Boolean));
-      return { demand, families, contexts, reasoningMoves, questionCount: rows.length,
-        complete: families.length >= MIN_PHYSICS_FAMILIES,
-        distinct: signatures.length >= MIN_PHYSICS_FAMILIES && contexts.length >= MIN_PHYSICS_FAMILIES };
-    });
+    const demands = demandCoverage(mappedQuestions);
     return { topicId: topic.id, specPointId: point.id, capabilityIds, demands,
       complete: demands.every((demand) => demand.complete && demand.distinct) };
+  });
+  const capabilityCoverageByCapability = points.flatMap(({ topic, point }): PhysicsCapabilityDemandCoverage[] => {
+    const mappedQuestions = physicsQuestions.flatMap((question) => questionPartsForPoint(question, point.id)
+      .map((part) => ({ question, part })));
+    // Include every graph capability attached to the statement even when no
+    // question has been authored yet; otherwise an empty skill disappears
+    // from the authoring queue and can be mistaken for complete coverage.
+    const capabilityIds = unique([
+      ...physicsNodes.filter((node) => node.specPointIds.includes(point.id)).map((node) => node.id),
+      ...mappedQuestions.flatMap(({ part }) => part.capabilityIds ?? []),
+    ]);
+    return capabilityIds.map((capabilityId) => {
+      const rows = mappedQuestions.filter(({ part }) => part.capabilityIds?.length === 1 && part.capabilityIds[0] === capabilityId);
+      const demands = demandCoverage(rows);
+      return { topicId: topic.id, specPointId: point.id, capabilityId, demands,
+        complete: demands.every((demand) => demand.complete && demand.distinct) };
+    });
   });
   const completeStatements = capabilityCoverage.filter((row) => row.complete).length;
   const approvedQuestions = physicsQuestions.filter(trustedQuestion).length;
@@ -189,12 +260,106 @@ export function auditPhysicsAssessmentQuality(input: {
     approvedQuestions,
     unreviewedQuestions: physicsQuestions.length - approvedQuestions,
     capabilityCoverage,
+    capabilityCoverageByCapability,
     issues,
-    releaseReady: points.length > 0 && completeStatements === points.length && approvedQuestions === physicsQuestions.length && issues.length === 0,
+    // Statement-level depth is necessary but insufficient: a second graph
+    // capability attached to the same statement must also have its own
+    // demand coverage, otherwise a broad question could hide an unmeasured
+    // blocking skill.
+    releaseReady: points.length > 0 && completeStatements === points.length &&
+      capabilityCoverage.every((row) => row.capabilityIds.length > 0) &&
+      capabilityCoverageByCapability.length > 0 && capabilityCoverageByCapability.every((row) => row.complete) &&
+      approvedQuestions === physicsQuestions.length && issues.length === 0,
   };
 }
 
 /** A compact queue for the next authoring/review pass. */
 export function physicsQualityGaps(audit: PhysicsAssessmentQualityAudit): PhysicsCapabilityCoverage[] {
   return audit.capabilityCoverage.filter((row) => !row.complete);
+}
+
+/**
+ * Flatten the audit into a deterministic authoring queue. Mapping failures are
+ * surfaced before demand gaps, and demand gaps are attached to the smallest
+ * capability whenever the graph already identifies one.
+ */
+export function physicsQualityQueue(audit: PhysicsAssessmentQualityAudit): PhysicsQualityQueueItem[] {
+  const queue: PhysicsQualityQueueItem[] = [];
+  for (const row of audit.capabilityCoverageByCapability) {
+    const missingDemands = row.demands
+      .filter((demand) => !demand.complete || !demand.distinct)
+      .map((demand) => demand.demand);
+    if (missingDemands.length) queue.push({
+      topicId: row.topicId,
+      specPointId: row.specPointId,
+      capabilityId: row.capabilityId,
+      missingDemands,
+      reason: "missing-demand",
+    });
+  }
+  const seen = new Set(queue.map((row) => `${row.specPointId}:${row.capabilityId ?? "none"}`));
+  for (const row of audit.capabilityCoverage.filter((coverage) => coverage.capabilityIds.length === 0)) {
+    const key = `${row.specPointId}:none`;
+    if (seen.has(key)) continue;
+    queue.push({ topicId: row.topicId, specPointId: row.specPointId, capabilityId: null, missingDemands: [], reason: "missing-mapping" });
+    seen.add(key);
+  }
+  for (const issue of audit.issues) {
+    if (!["missing-spec-point", "missing-capability", "unknown-spec-point", "unknown-capability", "multi-capability-part"].includes(issue.kind)) continue;
+    // The issue already names the question/part. Keep that identity in the
+    // queue even when its statement link is itself the thing being repaired.
+    const key = `${issue.questionId}:${issue.partId ?? "part"}:${issue.kind}`;
+    if (seen.has(key)) continue;
+    queue.push({
+      topicId: issue.topicId ?? "wjec-alevel-physics",
+      specPointId: issue.specPointId ?? "mapping-required",
+      capabilityId: null,
+      missingDemands: [],
+      reason: "missing-mapping",
+      issueKind: issue.kind,
+      questionId: issue.questionId,
+      ...(issue.partId ? { partId: issue.partId } : {}),
+    });
+    seen.add(key);
+  }
+  for (const issue of audit.issues.filter((row) => [
+    "missing-part-learning", "missing-reasoning-move", "incomplete-mark-scheme", "cosmetic-reskin",
+  ].includes(row.kind))) {
+    const key = `${issue.questionId}:${issue.partId ?? "part"}:${issue.kind}`;
+    if (seen.has(key)) continue;
+    queue.push({
+      topicId: issue.topicId ?? "wjec-alevel-physics",
+      specPointId: issue.specPointId ?? "content-review-required",
+      capabilityId: issue.capabilityId ?? null,
+      missingDemands: [],
+      reason: "content-quality",
+      issueKind: issue.kind,
+      questionId: issue.questionId,
+      ...(issue.partId ? { partId: issue.partId } : {}),
+    });
+    seen.add(key);
+  }
+  for (const issue of audit.issues.filter((row) => row.kind === "unreviewed")) {
+    const key = `${issue.questionId}:review`;
+    if (seen.has(key)) continue;
+    queue.push({
+      topicId: issue.topicId ?? "wjec-alevel-physics",
+      specPointId: issue.specPointId ?? "review-required",
+      capabilityId: issue.capabilityId ?? null,
+      missingDemands: [],
+      reason: "missing-review",
+      issueKind: issue.kind,
+      questionId: issue.questionId,
+    });
+    seen.add(key);
+  }
+  const priority: Record<PhysicsQualityQueueItem["reason"], number> = {
+    "missing-mapping": 0,
+    "missing-review": 1,
+    "content-quality": 2,
+    "missing-demand": 3,
+  };
+  return queue.sort((a, b) => priority[a.reason] - priority[b.reason] || a.topicId.localeCompare(b.topicId) ||
+    a.specPointId.localeCompare(b.specPointId) || (a.capabilityId ?? "").localeCompare(b.capabilityId ?? "") ||
+    (a.questionId ?? "").localeCompare(b.questionId ?? "") || (a.partId ?? "").localeCompare(b.partId ?? ""));
 }

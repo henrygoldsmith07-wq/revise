@@ -1,5 +1,5 @@
 import type { Attempt, Id, Mistake, Paper, Question } from "./types";
-import { trustworthyAttempt } from "./learning-evidence";
+import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
 
 export interface PaperWeaknessTopic {
   topicId: Id;
@@ -122,11 +122,17 @@ export function analysePaperWeakness(input: {
   const questionIds = new Set(input.paper.questionIds);
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
   const relevantAttempts = input.attempts.filter(
-    (attempt) =>
-      attempt.mode === "paper" &&
-      attempt.subjectId === input.paper.subjectId && trustworthyAttempt(attempt) &&
-      questionIds.has(attempt.questionId) &&
-      (!input.paperRunId || attempt.paperRunId === input.paperRunId),
+    (attempt) => {
+      if (attempt.mode !== "paper" || attempt.subjectId !== input.paper.subjectId || !trustworthyAttempt(attempt) ||
+        !questionIds.has(attempt.questionId) || (input.paperRunId && attempt.paperRunId !== input.paperRunId)) return false;
+      const question = questionsById.get(attempt.questionId);
+      // Physics paper weakness is high-value diagnostic evidence only after
+      // the source, sitting and human marking have all been authenticated.
+      if (input.paper.subjectId === "wjec-alevel-physics") {
+        return Boolean(question && authenticPaperEvidence(attempt, question, input.attempts, input.questions));
+      }
+      return true;
+    },
   );
   const attemptsById = new Map(relevantAttempts.map((attempt) => [attempt.id, attempt] as const));
   const capabilities = new Map<Id, { capabilityId: Id; marksLost: number; marksAvailable: number }>();

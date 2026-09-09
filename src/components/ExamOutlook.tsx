@@ -17,9 +17,11 @@ import { useStore } from "@/state/store";
 
 export function ExamOutlook() {
   const store = useStore();
-  const { predictions, attempts, examDates, settings } = store;
+  const { predictions, attempts, questions, examDates, settings } = store;
 
-  const rows = outlookRows(predictions, attempts).filter((r) => settings.subjectIds.includes(r.subjectId));
+  // The original two-argument outlookRows(predictions, attempts) contract is
+  // retained; the question index supplies the Physics trust gate.
+  const rows = outlookRows(predictions, attempts, questions).filter((r) => settings.subjectIds.includes(r.subjectId));
   const claimable = rows.filter((r) => r.attempts >= MIN_OUTLOOK_ATTEMPTS);
   const attempted = rows.reduce((sum, r) => sum + r.attempts, 0);
 

@@ -31,6 +31,8 @@
 // ---------------------------------------------------------------------------
 
 import type { Attempt, Card, Id, IsoDate, Mistake } from "./types";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import type { Question } from "./types";
 
 /** A 25-minute self-testing block clears roughly this many review cards. */
 export const REVIEW_CAP = 18;
@@ -79,6 +81,7 @@ export function buildSubjectEvidence(
   mistakes: Mistake[],
   attempts: Attempt[],
   today: IsoDate,
+  questions: Question[] = [],
 ): Map<Id, SubjectEvidence> {
   const out = new Map<Id, SubjectEvidence>();
   const bump = (subjectId: Id, patch: Partial<SubjectEvidence>) => {
@@ -93,6 +96,18 @@ export function buildSubjectEvidence(
   };
 
   const weekAgo = new Date(new Date(`${today}T00:00:00Z`).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const trustedAttempt = (attempt: Attempt): boolean => {
+    const question = questionById.get(attempt.questionId);
+    if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
+    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+  };
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    const attempt = mistake.attemptId ? attempts.find((row) => row.id === mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    return Boolean(attempt && question && trustedAttempt(attempt));
+  };
 
   for (const card of cards) {
     if (!isDue(card, today)) continue;
@@ -101,11 +116,11 @@ export function buildSubjectEvidence(
       bump(card.subjectId, { overdueCards: (out.get(card.subjectId)?.overdueCards ?? 0) + 1 });
     }
   }
-  for (const mistake of mistakes) {
+  for (const mistake of mistakes.filter(trustedMistake)) {
     if (mistake.resolved) continue;
     bump(mistake.subjectId, { openMistakes: (out.get(mistake.subjectId)?.openMistakes ?? 0) + 1 });
   }
-  for (const attempt of attempts) {
+  for (const attempt of attempts.filter(trustedAttempt)) {
     if (attempt.createdAt.slice(0, 10) < weekAgo) continue;
     const lost = Math.max(0, attempt.max - attempt.awarded);
     if (lost <= 0) continue;

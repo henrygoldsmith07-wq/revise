@@ -149,6 +149,10 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
             markedBy: source === "ai" ? "ai" : "rubric",
             elapsedMs: elapsedByQuestion[question.id] ?? 0,
             mode: "paper",
+            paperId: question.paperId ?? paper.id,
+            paperSpecId,
+            paperRunId,
+            paperMarking: { status: "unreviewed" as const },
             createdAt: new Date().toISOString(),
           };
 

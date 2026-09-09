@@ -1,4 +1,5 @@
 import type { Attempt, Id, Mistake, Question } from "./types";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 
 /** The minimum question count before calculation performance is called reliable. */
 export const CALCULATION_MASTERY_MIN_ATTEMPTS = 5;
@@ -104,11 +105,16 @@ export function calculateCalculationMastery(input: {
   questions: Question[];
   attempts: Attempt[];
   mistakes: Mistake[];
+  /** Physics drafts may be practised, but never count toward this benchmark. */
+  trustedQuestion?: (question: Question) => boolean;
 }): CalculationMasteryReport {
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
+  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => question.subjectId !== "wjec-alevel-physics");
   const calculationAttempts = input.attempts
     .map((attempt) => ({ attempt, question: questionsById.get(attempt.questionId) }))
     .filter((row): row is { attempt: Attempt; question: Question } => row.question?.kind === "calculation")
+    .filter(({ attempt, question }) => trustworthyAttempt(attempt) && trustedQuestion(question) &&
+      trustedAssessmentAttempt(attempt, question, input.attempts, input.questions))
     .filter(({ attempt, question }) => (attempt.max > 0 ? attempt.max : question.totalMarks) > 0)
     .sort((a, b) => a.attempt.createdAt.localeCompare(b.attempt.createdAt) || a.attempt.id.localeCompare(b.attempt.id));
 
@@ -159,6 +165,12 @@ export function calculateCalculationMastery(input: {
       (mistake.questionId != null && calculationQuestionIds.has(mistake.questionId)) ||
       (mistake.attemptId != null && calculationAttemptIds.has(mistake.attemptId));
     if (!belongsToCalculation) continue;
+    if (mistake.subjectId === "wjec-alevel-physics") {
+      const question = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
+      const attempt = mistake.attemptId ? input.attempts.find((row) => row.id === mistake.attemptId) : undefined;
+      if (!question || !attempt || !trustedQuestion(question) ||
+        !trustedAssessmentAttempt(attempt, question, input.attempts, input.questions)) continue;
+    }
     const key = errorKey(mistake);
     const current = errors.get(key) ?? { marksLost: 0, occurrences: 0 };
     current.marksLost += Math.max(0, mistake.marksLost);

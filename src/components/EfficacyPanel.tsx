@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useStore } from "@/state/store";
 import { analyseExperiment, type ExperimentAnalysis } from "@/domain/recommendation-experiment";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
 import { computeEfficacyEvidence, formatEfficacyEffect } from "@/domain/efficacy-evidence";
 import { Panel, SectionHeading } from "./ui";
 
@@ -23,15 +24,23 @@ export function EfficacyPanel() {
     if (!arm) return null;
     const userId = store.userId;
     const assignments = [{ anonId: userId, arm: arm.arm, assignedAt: arm.assignedAt ?? new Date().toISOString(), version: 1 as const }];
-    const attempts = store.attempts.map((a) => ({
+    const attempts = store.attempts.map((a) => {
+      const question = store.questions.find((candidate) => candidate.id === a.questionId);
+      const trusted = question
+        ? trustedAssessmentAttempt(a, question, store.attempts, store.questions)
+        : a.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(a);
+      return {
       anonId: a.userId,
+      subjectId: a.subjectId,
+      trusted,
       topicIds: a.topicIds,
       questionId: a.questionId,
       awarded: a.awarded,
       max: a.max,
       elapsedMs: a.elapsedMs ?? 0,
       createdAt: a.createdAt,
-    }));
+      };
+    });
     const reviews = store.reviewLogs.map((r) => ({
       anonId: r.userId,
       cardId: r.cardId,
@@ -40,7 +49,7 @@ export function EfficacyPanel() {
     }));
     const masteryByTopic = new Map(store.mastery.map((m) => [m.topicId, m.mastery]));
     return analyseExperiment({ assignments, events: [], attempts, reviews, masteryByTopic, baselineAssessments: [], finalAssessments: [] });
-  }, [store.experimentArm, store.attempts, store.reviewLogs, store.mastery, store.userId]);
+  }, [store.experimentArm, store.attempts, store.questions, store.reviewLogs, store.mastery, store.userId]);
 
   if (!store.experimentArm) return null;
 

@@ -6,8 +6,9 @@ import { auditLearningDepth } from "@/domain/learning-depth";
 import { applyHumanVerification, buildPhysicsReviewQueue, physicsContentReadiness, humanVerifiedPhysicsQuestion, physicsContentFingerprint } from "@/domain/physics-content-review";
 import { answerLooksCopied, independentAttempt } from "@/domain/learning-evidence";
 import { calibrateInterventions, durableOutcomeScore, effectivenessFor, interventionFamilyKey } from "@/domain/intervention-calibration";
-import { deriveSkillEvidence, smallestUnprovenCapability, validateCapabilityGraph } from "@/domain/capability-graph";
+import { capabilityEdgeFingerprint, deriveSkillEvidence, smallestUnprovenCapability, validateCapabilityGraph, validatePrerequisiteReviews } from "@/domain/capability-graph";
 import type { Attempt, InterventionOutcomeRecord } from "@/domain/types";
+import type { SkillEvidence } from "@/domain/capability-graph";
 
 const physicsQuestions = wjecPhysicsDeepQuestions;
 
@@ -78,6 +79,25 @@ describe("Physics-first coverage and evidence", () => {
     const readiness = physicsContentReadiness({ topics: wjecPhysics.topics, questions: physicsQuestions, nodes: wjecCapabilities });
     expect(readiness.ready).toBe(false);
     expect(readiness.gaps.length).toBeGreaterThan(0);
+    expect(readiness.prerequisiteReviewGaps.length).toBeGreaterThan(0);
+  });
+
+  it("keeps unreviewed prerequisite edges out of root-cause diagnosis and invalidates stale edge attestations", () => {
+    const target = wjecPhysicsCapabilities.find((node) => node.prerequisites.length === 1 && wjecCapabilities.some((candidate) => candidate.id === node.prerequisites[0]))!;
+    const prerequisite = wjecCapabilities.find((node) => node.id === target.prerequisites[0])!;
+    const targetSecure = { capabilityId: target.id, state: "secure" as const, independentFamilies: 3, accuracy: 0.9, supportedSuccesses: 0, lostMarks: 0 };
+    const prerequisiteWeak = { capabilityId: prerequisite.id, state: "weak" as const, independentFamilies: 1, accuracy: 0.2, supportedSuccesses: 0, lostMarks: 2 };
+    const evidence = new Map<string, SkillEvidence>([[target.id, targetSecure], [prerequisite.id, prerequisiteWeak]]);
+    expect(smallestUnprovenCapability([target.id], [target, prerequisite], evidence, { trustedOnly: true })).toBeUndefined();
+    const reviewed = { ...target, prerequisiteReviews: { [prerequisite.id]: {
+      status: "approved" as const, reviewerId: "physics-expert", reviewedAt: "2026-09-08T00:00:00Z",
+      edgeFingerprint: capabilityEdgeFingerprint(target, prerequisite),
+    } } };
+    expect(validatePrerequisiteReviews([reviewed, prerequisite], "wjec-alevel-physics")).toEqual([]);
+    expect(smallestUnprovenCapability([target.id], [reviewed, prerequisite], evidence, { trustedOnly: true })?.id).toBe(prerequisite.id);
+    expect(validatePrerequisiteReviews([{ ...reviewed, label: `${reviewed.label} edited` }, prerequisite], "wjec-alevel-physics")).toEqual([
+      `Stale prerequisite review ${target.id} <- ${prerequisite.id}`,
+    ]);
   });
 
   it("provides explicit working for each calculation draft", () => {

@@ -666,7 +666,7 @@ function PaperSession({
         key={current.id}
         question={current}
         mode="paper"
-        paperId={paper.id}
+        paperId={current.paperId ?? paper.id}
         paperSpecId={paper.paperSpecId}
         paperRunId={paperRunId}
         draft={questionDrafts[current.id]}

@@ -1,4 +1,5 @@
-import { independentAttempt, partFamily, trustworthyAttempt } from "./learning-evidence";
+import { authenticPaperEvidence, independentAttempt, partFamily, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, Question } from "./types";
 
 export interface CapabilityNode {
@@ -10,7 +11,38 @@ export interface CapabilityNode {
   prerequisites: string[];
   /** Why each prerequisite blocks this skill; required for curated cross-topic edges. */
   prerequisiteRationales?: Record<string, string>;
+  /**
+   * Subject-expert attestation for each dependency. Missing metadata is
+   * deliberately treated as unreviewed for Physics so a plausible edge
+   * cannot silently become a diagnosis rule before review.
+   */
+  prerequisiteReviews?: Record<string, CapabilityDependencyReview>;
   explanation: string;
+}
+
+export type CapabilityDependencyReviewStatus = "unreviewed" | "approved" | "rejected";
+
+export interface CapabilityDependencyReview {
+  status: CapabilityDependencyReviewStatus;
+  reviewerId?: string;
+  reviewedAt?: string;
+  /** Fingerprint of the target/prerequisite/rationale reviewed by the expert. */
+  edgeFingerprint?: string;
+}
+
+/** Fingerprint the exact dependency and rationale an expert reviewed. */
+export function capabilityEdgeFingerprint(node: CapabilityNode, prerequisite: CapabilityNode | string): string {
+  const prerequisiteNode = typeof prerequisite === "string" ? null : prerequisite;
+  const prerequisiteId = typeof prerequisite === "string" ? prerequisite : prerequisite.id;
+  const text = JSON.stringify([
+    node.id, node.subjectId, node.topicId, node.label, node.specPointIds, node.prerequisites, node.explanation,
+    prerequisiteId, prerequisiteNode?.subjectId ?? null, prerequisiteNode?.topicId ?? null,
+    prerequisiteNode?.label ?? null, prerequisiteNode?.specPointIds ?? null,
+    node.prerequisiteRationales?.[prerequisiteId] ?? null,
+  ]);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return `capability-edge-v1:${(hash >>> 0).toString(16)}`;
 }
 
 export interface SkillEvidence {
@@ -66,6 +98,44 @@ export function validatePrerequisiteRationales(nodes: readonly CapabilityNode[],
   return errors;
 }
 
+/**
+ * Review gate for dependency assumptions. Physics edges are hypotheses until
+ * a named subject expert approves the exact edge and rationale; rejected or
+ * stale/malformed attestations stay out of diagnosis. Other subjects retain
+ * the legacy behaviour until their own graph is brought under this gate.
+ */
+export function validatePrerequisiteReviews(nodes: readonly CapabilityNode[], subjectId?: string): string[] {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const errors: string[] = [];
+  for (const node of nodes) {
+    if (subjectId && node.subjectId !== subjectId) continue;
+    if (!subjectId && node.subjectId !== "wjec-alevel-physics") continue;
+    for (const prerequisiteId of node.prerequisites) {
+      const prerequisite = byId.get(prerequisiteId);
+      if (!prerequisite) continue;
+      const review = node.prerequisiteReviews?.[prerequisiteId];
+      if (review?.status !== "approved") {
+        errors.push(`Unreviewed prerequisite ${node.id} <- ${prerequisiteId}`);
+        continue;
+      }
+      if (!review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) {
+        errors.push(`Invalid prerequisite review ${node.id} <- ${prerequisiteId}`);
+        continue;
+      }
+      if (!review.edgeFingerprint) errors.push(`Missing prerequisite fingerprint ${node.id} <- ${prerequisiteId}`);
+      else if (review.edgeFingerprint !== capabilityEdgeFingerprint(node, prerequisite)) errors.push(`Stale prerequisite review ${node.id} <- ${prerequisiteId}`);
+    }
+  }
+  return errors;
+}
+
+function trustedPrerequisiteEdge(node: CapabilityNode, prerequisiteId: string, trustedOnly: boolean, byId: ReadonlyMap<string, CapabilityNode>): boolean {
+  if (!trustedOnly || node.subjectId !== "wjec-alevel-physics") return true;
+  const review = node.prerequisiteReviews?.[prerequisiteId];
+  return review?.status === "approved" && Boolean(review.reviewerId?.trim() && review.reviewedAt && Number.isFinite(Date.parse(review.reviewedAt))) &&
+    Boolean(review.edgeFingerprint && review.edgeFingerprint === capabilityEdgeFingerprint(node, byId.get(prerequisiteId) ?? prerequisiteId));
+}
+
 /** Part-level evidence only. A combined part cannot locate its smallest failed skill. */
 export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions: readonly Question[], attempts: readonly Attempt[]): Map<string, SkillEvidence> {
   const byQuestion = new Map(questions.map((q) => [q.id, q]));
@@ -80,6 +150,12 @@ export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions:
       seenAttempts.add(attempt.id);
       const question = byQuestion.get(attempt.questionId);
       if (!question || question.subjectId !== node.subjectId) continue;
+      // Draft Physics questions remain useful for practice, but their marks
+      // cannot establish capability mastery. Paper attempts additionally need
+      // authenticated provenance and a human marking attestation.
+      if (!trustedAssessmentContent(question)) continue;
+      if (question.subjectId === "wjec-alevel-physics" && attempt.mode === "paper" &&
+        !authenticPaperEvidence(attempt, question, attempts, questions)) continue;
       const parts = question.parts.filter((p) => p.capabilityIds?.length === 1 && p.capabilityIds[0] === node.id);
       const marks = parts.flatMap((part) => {
         const marked = attempt.marked.find((m) => m.partId === part.id && m.max === part.marks && m.awarded >= 0 && m.awarded <= m.max);
@@ -110,7 +186,12 @@ export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions:
 }
 
 /** Weak upstream skills win; unknown foundations receive a probe, not a diagnosis. */
-export function smallestUnprovenCapability(targetIds: readonly string[], nodes: readonly CapabilityNode[], evidence: ReadonlyMap<string, SkillEvidence>): CapabilityNode | undefined {
+export function smallestUnprovenCapability(
+  targetIds: readonly string[],
+  nodes: readonly CapabilityNode[],
+  evidence: ReadonlyMap<string, SkillEvidence>,
+  options: { trustedOnly?: boolean } = {},
+): CapabilityNode | undefined {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const seen = new Set<string>();
   const ordered: CapabilityNode[] = [];
@@ -119,7 +200,9 @@ export function smallestUnprovenCapability(targetIds: readonly string[], nodes: 
     seen.add(id);
     const node = byId.get(id);
     if (!node) return;
-    node.prerequisites.forEach(visit);
+    node.prerequisites.forEach((prerequisiteId) => {
+      if (trustedPrerequisiteEdge(node, prerequisiteId, options.trustedOnly === true, byId)) visit(prerequisiteId);
+    });
     ordered.push(node);
   };
   targetIds.forEach(visit);

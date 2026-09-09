@@ -3,6 +3,7 @@ import { untouchedTopics, weakTopics } from "./mastery";
 import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
 import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
 import { paperOutcomeGainMultiplier } from "./paper-outcome";
+import { trustedAssessmentAttempt } from "./learning-evidence";
 import type {
   ActivityKind,
   Card,
@@ -16,6 +17,8 @@ import type {
   RecommendationFactors,
   Topic,
   TopicMastery,
+  Attempt,
+  Question,
 } from "./types";
 import type { PaperOutcomeRecord } from "./paper-outcome";
 
@@ -48,6 +51,9 @@ export interface RecommendInput {
   mastery: TopicMastery[];
   cards: Card[];
   mistakes: Mistake[];
+  /** Optional bank/history lookups used to exclude untrusted Physics losses. */
+  questions?: Question[];
+  attempts?: Attempt[];
   exams: ExamDate[];
   plan: PlannedSession[];
   sessionLengthMinutes: number;
@@ -326,7 +332,14 @@ export function recommend(input: RecommendInput): Recommendation[] {
   }
 
   // --- 2. Unrepaired mistakes. Direct marks you have already dropped.
-  const openMistakes = input.mistakes.filter((m) => !m.resolved);
+  const questionById = new Map((input.questions ?? []).map((question) => [question.id, question] as const));
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    const attempt = mistake.attemptId ? input.attempts?.find((row) => row.id === mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    return Boolean(attempt && question && trustedAssessmentAttempt(attempt, question, input.attempts ?? [], input.questions ?? []));
+  };
+  const openMistakes = input.mistakes.filter((m) => !m.resolved && trustedMistake(m));
   const mistakesBySubject = new Map<Id, Mistake[]>();
   for (const m of openMistakes) {
     if (!input.subjectIds.includes(m.subjectId)) continue;

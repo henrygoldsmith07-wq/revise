@@ -26,6 +26,8 @@
 
 import { classifyTopic, type TopicStatusInfo } from "./topic-status";
 import { MIN_OUTLOOK_ATTEMPTS, outlookRows, paperRunScores, type ExamOutlookRow, type PaperRunScore } from "./exam-outlook";
+import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
 import type { GradePrediction } from "./grades";
 import type {
   AoCode,
@@ -207,17 +209,35 @@ export function buildTopicGraph(
   const { questions, cards, attempts, mistakes, mastery } = input;
 
   const topicQuestions = questions.filter((q) => q.topicIds.includes(topic.id));
-  const topicQuestionIds = new Set(topicQuestions.map((q) => q.id));
+  const trustedTopicQuestions = topicQuestions.filter(trustedAssessmentContent);
+  const topicQuestionIds = new Set(trustedTopicQuestions.map((q) => q.id));
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const trustedAttemptForQuestion = (attempt: Attempt): boolean => {
+    if (!trustworthyAttempt(attempt)) return false;
+    const question = questionById.get(attempt.questionId);
+    // Legacy non-Physics graph fixtures may predate a question bank row. Keep
+    // their marked evidence usable; Physics needs a reviewed question to
+    // establish a trusted capability signal.
+    if (!question) return topic.subjectId !== "wjec-alevel-physics";
+    if (!trustedAssessmentContent(question)) return false;
+    return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+      authenticPaperEvidence(attempt, question, attempts, questions);
+  };
   const topicCards = cards.filter((c) => c.topicId === topic.id);
-  const topicAttempts = attempts.filter((a) => topicQuestionIds.has(a.questionId));
-  const topicMistakes = mistakes.filter((m) => m.topicId === topic.id);
+  const topicAttempts = attempts.filter((a) => topicQuestionIds.has(a.questionId) && trustedAttemptForQuestion(a));
+  const topicMistakes = mistakes.filter((m) => {
+    if (m.topicId !== topic.id) return false;
+    if (topic.subjectId !== "wjec-alevel-physics") return true;
+    const attempt = m.attemptId ? attempts.find((row) => row.id === m.attemptId) : undefined;
+    return Boolean(attempt && trustedAttemptForQuestion(attempt));
+  });
 
   const masteryRow = mastery.find((m) => m.topicId === topic.id);
 
   // Every spec statement of this topic is a concept node; evidence attaches
   // through the specPointIds links on questions and cards.
   const concepts: ConceptNode[] = (topic.specPoints ?? []).map((point) => {
-    const linkedQuestions = topicQuestions.filter((q) => q.specPointIds?.includes(point.id));
+    const linkedQuestions = trustedTopicQuestions.filter((q) => q.specPointIds?.includes(point.id));
     const linkedIds = new Set(linkedQuestions.map((q) => q.id));
     const linkedAttempts = topicAttempts.filter((a) => linkedIds.has(a.questionId));
     const linkedMistakes = topicMistakes.filter((m) => m.questionId != null && linkedIds.has(m.questionId));
@@ -238,7 +258,9 @@ export function buildTopicGraph(
       text: point.text,
       aos: point.aos,
       status: (!evidenced ? "untouched" : shaky ? "shaky" : "covered") as ConceptStatus,
-      questionCount: linkedQuestions.length,
+      // Keep the inventory count visible to editors, while attempted/accuracy
+      // only use trusted questions and marked responses.
+      questionCount: topicQuestions.filter((q) => q.specPointIds?.includes(point.id)).length,
       attemptedCount: new Set(linkedAttempts.map((a) => a.questionId)).size,
       accuracy,
       cardCount: linkedCards.length,
@@ -322,6 +344,15 @@ export function buildTopicGraph(
  */
 export function buildSubjectGraph(input: GraphInput, now: Date = new Date()): SubjectGraph {
   const { subject, units, topics, attempts, mistakes, mastery, predictions, examDates, targetGrades } = input;
+  const questionById = new Map(input.questions.map((question) => [question.id, question] as const));
+  const trustedSubjectAttempt = (attempt: Attempt): boolean => {
+    if (attempt.subjectId !== subject.id || !trustworthyAttempt(attempt)) return false;
+    const question = questionById.get(attempt.questionId);
+    if (!question) return subject.id !== "wjec-alevel-physics";
+    if (!trustedAssessmentContent(question)) return false;
+    return subject.id !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+      authenticPaperEvidence(attempt, question, attempts, input.questions);
+  };
 
   const byUnit = units
     .map((unit) => {
@@ -338,18 +369,23 @@ export function buildSubjectGraph(input: GraphInput, now: Date = new Date()): Su
     .filter((e) => e.subjectId === subject.id && e.date >= today)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))[0];
 
-  const outlookRow = outlookRows(predictions, attempts).find((row) => row.subjectId === subject.id);
+  const outlookRow = outlookRows(predictions, attempts, input.questions).find((row) => row.subjectId === subject.id);
   // Real paper sittings for this subject: the exam node must reflect what
   // actually happened under the clock, not only what the model predicts.
-  const subjectPaperAttempts = attempts.filter((a) => a.subjectId === subject.id && a.mode === "paper" && a.max > 0);
-  const subjectRuns = paperRunScores(subjectPaperAttempts);
+  const subjectPaperAttempts = attempts.filter((a) => a.mode === "paper" && a.max > 0 && trustedSubjectAttempt(a));
+  const subjectRuns = paperRunScores(subjectPaperAttempts, input.questions);
   const paperRunAverage = subjectRuns.length
     ? Math.round(subjectRuns.reduce((a, r) => a + r.percent, 0) / subjectRuns.length)
     : null;
 
   const topicGraphs = byUnit.flatMap((u) => u.topics);
-  const allSubjectAttempts = attempts.filter((a) => a.subjectId === subject.id);
-  const subjectMistakes = mistakes.filter((m) => m.subjectId === subject.id);
+  const allSubjectAttempts = attempts.filter(trustedSubjectAttempt);
+  const subjectMistakes = mistakes.filter((m) => {
+    if (m.subjectId !== subject.id) return false;
+    if (subject.id !== "wjec-alevel-physics") return true;
+    const attempt = m.attemptId ? attempts.find((row) => row.id === m.attemptId) : undefined;
+    return Boolean(attempt && trustedSubjectAttempt(attempt));
+  });
   const subjectCards = input.cards.filter((c) => c.subjectId === subject.id);
   const subjectTopicIds = new Set(topics.map((t) => t.id));
 

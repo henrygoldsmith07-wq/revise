@@ -14,6 +14,7 @@ import {
 import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
 import { computeApplicationMastery } from "@/domain/application-mastery";
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
@@ -25,6 +26,7 @@ import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFinge
 import { daysToExam, recommend } from "@/domain/recommender";
 import { buildAdaptiveSession } from "@/domain/adaptive-session";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
+import { reviewedPhysicsTopicEdges } from "@/content/capabilities";
 import {
   knowledgeVsAnswering,
   knowledgeVsAnsweringByTopic,
@@ -34,6 +36,7 @@ import {
   buildPaperOutcomeRecord,
   closePaperOutcome,
   paperOutcomeGainMultiplier,
+  type PaperOutcomeReview,
   type PaperOutcomeRecord,
 } from "@/domain/paper-outcome";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
@@ -69,7 +72,7 @@ import type {
 } from "@/domain/learning-controls";
 import { questionExposureReport } from "@/domain/question-exposure";
 import type { QuestionExposureReport } from "@/domain/question-exposure";
-import { rootPrerequisiteRemediation as buildRootPrerequisiteRemediation } from "@/domain/prerequisites";
+import { prerequisiteEdges, rootPrerequisiteRemediation as buildRootPrerequisiteRemediation } from "@/domain/prerequisites";
 import type { RootPrerequisiteRemediation } from "@/domain/prerequisites";
 import { validateFsrs } from "@/domain/fsrs-tuning";
 import type { FsrsValidation } from "@/domain/fsrs-tuning";
@@ -228,7 +231,7 @@ interface StoreValue extends Snapshot {
   paperOutcomeGains: Map<Id, number>;
   recordGradeActual(subjectId: Id, percent: number, kind: "mock" | "paper" | "final"): Promise<void>;
   beginPaperOutcome(input: { subjectId: Id; paperId: Id; paperRunId?: Id; predictedMarks: number; totalMarks: number }): Promise<void>;
-  closePaperOutcome(paperRunId: Id, actualMarks: number): Promise<void>;
+  closePaperOutcome(paperRunId: Id, actualMarks: number, markingReview?: PaperOutcomeReview): Promise<void>;
   /** Immediate → transfer → delayed-retention intervention evidence. */
   interventionOutcomes: InterventionOutcomeRecord[];
   interventionCalibrations: Map<string, InterventionCalibration>;
@@ -267,6 +270,13 @@ function currentActiveMinutes(): number {
   if (sessionStartedAt == null) return 0;
   const elapsed = (Date.now() - sessionStartedAt) / 60_000;
   return elapsed > SESSION_IDLE_RESET_MS / 60_000 ? 0 : elapsed;
+}
+
+/** Shared evidence gate for store-level summaries and readiness signals. */
+function trustedSnapshotAttempt(attempt: Attempt, questions: readonly Question[], history: readonly Attempt[]): boolean {
+  const question = questions.find((row) => row.id === attempt.questionId);
+  if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
+  return trustedAssessmentAttempt(attempt, question, history, questions);
 }
 
 /**
@@ -677,6 +687,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const masteryUncertainty = useMemo(() => {
     if (!snapshot) return [];
 
+    const trustedAttempts = snapshot.attempts.filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
+    const trustedAttemptIds = new Set(trustedAttempts.map((attempt) => attempt.id));
+    const trustedQuestions = new Set(snapshot.questions.filter(trustedAssessmentContent).map((question) => question.id));
+    const trustedMistakes = snapshot.mistakes.filter((mistake) => mistake.subjectId !== "wjec-alevel-physics" ||
+      Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId) && mistake.questionId && trustedQuestions.has(mistake.questionId)));
+
     const cardsByTopic = new Map<Id, Card[]>();
     for (const card of snapshot.cards) {
       const rows = cardsByTopic.get(card.topicId) ?? [];
@@ -685,7 +701,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     }
 
     const attemptsByTopic = new Map<Id, Attempt[]>();
-    for (const attempt of snapshot.attempts) {
+    for (const attempt of trustedAttempts) {
       for (const topicId of attempt.topicIds) {
         const rows = attemptsByTopic.get(topicId) ?? [];
         rows.push(attempt);
@@ -694,7 +710,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     }
 
     const mistakesByTopic = new Map<Id, Mistake[]>();
-    for (const mistake of snapshot.mistakes) {
+    for (const mistake of trustedMistakes) {
       const rows = mistakesByTopic.get(mistake.topicId) ?? [];
       rows.push(mistake);
       mistakesByTopic.set(mistake.topicId, rows);
@@ -737,12 +753,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const attemptsByQuestion = useMemo(() => {
     const map = new Map<Id, Attempt[]>();
     for (const attempt of snapshot?.attempts ?? []) {
+      if (snapshot && !trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts)) continue;
       const rows = map.get(attempt.questionId) ?? [];
       rows.push(attempt);
       map.set(attempt.questionId, rows);
     }
     return map;
-  }, [snapshot?.attempts]);
+  }, [snapshot]);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -800,6 +817,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       questions: snapshot.questions,
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
+      trustedQuestion: trustedAssessmentContent,
     });
   }, [snapshot]);
   const sparseEvidenceConfidence = useMemo(() => {
@@ -810,6 +828,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       cards: snapshot.cards,
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
+      questions: snapshot.questions,
     });
   }, [snapshot, topics, mastery]);
   const predictionOutcome = useMemo(() => {
@@ -830,12 +849,31 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return new Map(assessment.expectedMarksPerHour.map((r) => [r.topicId, r.value] as const));
   }, [assessment]);
   const rootPrerequisiteRemediation = useMemo(
-    () => buildRootPrerequisiteRemediation({ topics, mastery, marksPerHour }),
+    () => buildRootPrerequisiteRemediation({
+      topics,
+      mastery,
+      marksPerHour,
+      // The legacy topic graph remains useful for reference subjects, but
+      // Physics must wait for the exact capability-edge attestation.
+      edges: [
+        ...prerequisiteEdges().filter((edge) => !edge.topicId.startsWith("wjec-alevel-physics.")),
+        ...reviewedPhysicsTopicEdges(),
+      ],
+    }),
     [topics, mastery, marksPerHour],
   );
 
   const recurringMisconceptions = useMemo(
-    () => (snapshot ? tallyMisconceptions(snapshot.mistakes, seedMisconceptions) : []),
+    () => {
+      if (!snapshot) return [];
+      const trustedAttemptIds = new Set(snapshot.attempts
+        .filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts))
+        .map((attempt) => attempt.id));
+      const trustedQuestions = new Set(snapshot.questions.filter(trustedAssessmentContent).map((question) => question.id));
+      const mistakes = snapshot.mistakes.filter((mistake) => mistake.subjectId !== "wjec-alevel-physics" ||
+        Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId) && mistake.questionId && trustedQuestions.has(mistake.questionId)));
+      return tallyMisconceptions(mistakes, seedMisconceptions);
+    },
     [snapshot],
   );
 
@@ -870,7 +908,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
         subjectIds: snapshot.settings.subjectIds,
         targetGrades: snapshot.settings.targetGrades,
-        evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso()),
+        evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
         existing: snapshot.plannedSessions,
         previous,
       });
@@ -893,6 +931,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     for (const a of snapshot.attempts.filter((x) => x.mode === "paper")) {
       const q = snapshot.questions.find((qq) => qq.id === a.questionId);
       const subjectId = a.subjectId;
+      if (!trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)) continue;
       // predicted marks for this attempt: sum of topic mastery averaged across its topics
       const qMastery = q ? q.topicIds.reduce((s, id) => s + (masteryMap.get(id) ?? 0.4), 0) / Math.max(1, q.topicIds.length) : 0.4;
       const predicted = a.max * (0.35 + qMastery * 0.6);
@@ -916,6 +955,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         questions: snapshot?.questions ?? [],
         papers: snapshot?.papers ?? [],
         subjects: allSubjects().filter((subject) => subjectIds.includes(subject.id)),
+        trustedQuestion: trustedAssessmentContent,
       }),
     [snapshot, subjectIds],
   );
@@ -974,6 +1014,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       mastery,
       cards: snapshot.cards,
       mistakes: snapshot.mistakes,
+      questions: snapshot.questions,
+      attempts: snapshot.attempts,
       exams: snapshot.examDates,
       plan: snapshot.plannedSessions,
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
@@ -1037,7 +1079,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return subjectIds
       .map((id) => getSubject(id))
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
-      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates));
+      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates, undefined, snapshot.questions));
   }, [snapshot, mastery, subjectIds]);
 
   const farTransferRetests = useMemo(
@@ -1068,7 +1110,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         const recallReviews = recallRows.reduce((sum, row) => sum + row.reviews, 0);
         const retained = recallRows.filter((row) => row.cardsTotal > 0);
         const retentionAverage = retained.length ? retained.reduce((sum, row) => sum + row.currentRetention, 0) / retained.length : null;
-        const timed = snapshot.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0);
+        const timed = snapshot.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0 &&
+          trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
         const available = timed.reduce((sum, attempt) => sum + attempt.max, 0);
         const awarded = timed.reduce((sum, attempt) => sum + Math.max(0, Math.min(attempt.max, attempt.awarded)), 0);
         const pace = responseTimeCalibration.rows.find((row) => row.subjectId === subject.id);
@@ -1131,7 +1174,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       for (const p of predictions) {
         const weekKey = `${p.subjectId}:${week}`;
         if (existing.some((r) => r.id === `gp-${weekKey}`)) continue;
-        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId && a.max > 0).length;
+        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId &&
+          trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)).length;
         const record: GradePredictionRecord = {
           id: `gp-${weekKey}`,
           anonId: userId,
@@ -1297,11 +1341,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   // marks once marking completes. The (predicted, actual) pair then feeds
   // paperOutcomeGainMultiplier on the next recommend() pass.
   const closePaperOutcomeRecord = useCallback<StoreValue["closePaperOutcome"]>(
-    async (paperRunId, actualMarks) => {
+    async (paperRunId, actualMarks, markingReview) => {
       const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
       const target = log.find((o) => o.paperRunId === paperRunId);
       if (!target) return; // no frozen prediction (untimed path or legacy run) — nothing to learn
-      const next = [...log.filter((o) => o.id !== target.id), closePaperOutcome(target, actualMarks)].slice(-200);
+      const next = [...log.filter((o) => o.id !== target.id), closePaperOutcome(target, actualMarks, markingReview)].slice(-200);
       await writeReviseMeta("paperOutcomes", next);
       setPaperOutcomeLog(next);
     },
@@ -1386,7 +1430,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
             row.chainId === context.chainId && row.activity && row.activity !== "question" &&
             row.createdAt > priorQuestionAt && row.createdAt <= attempt.createdAt);
           const outcome = createInterventionOutcome({ userId: attempt.userId, subjectId: attempt.subjectId, context, attempt, question,
-            actualMinutes: attempt.elapsedMs / 60_000 + supportObservations.reduce((sum, row) => sum + row.actualMinutes, 0) });
+            actualMinutes: attempt.elapsedMs / 60_000 + supportObservations.reduce((sum, row) => sum + row.actualMinutes, 0),
+            questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [] });
           // Planned durations remain visible but cannot enter empirical gain.
           outcome.timeMeasured = outcome.timeMeasured === true && supportObservations.every((row) => row.timeMeasured === true);
           next = [...current, outcome];
@@ -1484,7 +1529,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       subjectIds: snapshot.settings.subjectIds,
       subjects,
       targetGrades: snapshot.settings.targetGrades,
-      evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso()),
+      evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
       existing: snapshot.plannedSessions,
     });
     const changelog = summarizePlanChange({

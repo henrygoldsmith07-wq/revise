@@ -1,4 +1,4 @@
-import { independentAttempt, isTransferQuestion, questionFamilies, partLearningMetadata, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
+import { independentAttempt, isTransferQuestion, questionFamilies, partLearningMetadata, trustedAssessmentAttempt, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Card, Mistake, MistakeRepairStage, MistakeRepairState, Question, ReviewLog } from "./types";
 import { trustedAssessmentContent } from "./physics-content-review";
 
@@ -36,6 +36,13 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
   if (!targetParts.length || attempt.questionId !== question.id || attempt.userId !== mistake.userId ||
     attempt.subjectId !== mistake.subjectId || attempt.id === mistake.attemptId ||
     Date.parse(attempt.createdAt) <= Date.parse(mistake.createdAt) || !trustworthyAttempt(attempt)) return mistake;
+  const source = questions.find((q) => q.id === mistake.questionId);
+  // A draft Physics item may be answered for practice, but it must never move
+  // a repair chain through a trusted success rung. Require both the captured
+  // source and the retest item to retain their human content approval.
+  if (mistake.subjectId === "wjec-alevel-physics" &&
+    (!source || !trustedAssessmentContent(source) || !trustedAssessmentContent(question) ||
+      !trustedAssessmentAttempt(attempt, question, history, questions))) return mistake;
   // Older rows may contain a partial repair object from an interrupted
   // migration. Treat that as legacy state rather than letting a malformed
   // evidence array crash the learner's next submission.
@@ -59,7 +66,6 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
     (question.id !== mistake.questionId || !mistake.point || marked.some((p) => p.creditedPoints.includes(mistake.point!)));
   const previous = history.filter((a) => a.userId === attempt.userId && a.id !== attempt.id && a.createdAt <= attempt.createdAt);
   // Persisted repair evidence preserves family exposure even if the caller only has a partial history.
-  const source = questions.find((q) => q.id === mistake.questionId);
   const knownQuestionIds = new Set([mistake.questionId, ...(old?.evidence.map((e) => e.questionId) ?? [])]);
   const knownFamilies = new Set(questions
     .filter((candidate) => knownQuestionIds.has(candidate.id))

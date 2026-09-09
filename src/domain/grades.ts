@@ -1,5 +1,6 @@
 import { daysToExam } from "./recommender";
-import type { Attempt, ExamDate, Id, IsoDate, Subject, TopicMastery } from "./types";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import type { Attempt, ExamDate, Id, IsoDate, Question, Subject, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
 // Grade prediction. Two signals, blended by how much evidence exists behind
@@ -73,9 +74,16 @@ export function predictGrade(
   attempts: Attempt[],
   exams: ExamDate[] = [],
   today: IsoDate = new Date().toISOString().slice(0, 10),
+  questions: Question[] = [],
 ): GradePrediction {
   const rows = mastery.filter((m) => m.subjectId === subject.id);
-  const subjectAttempts = attempts.filter((a) => a.subjectId === subject.id);
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const subjectAttempts = attempts.filter((attempt) => {
+    if (attempt.subjectId !== subject.id) return false;
+    const question = questionById.get(attempt.questionId);
+    if (!question) return subject.id !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
+    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+  });
 
   const coverage = rows.length ? rows.reduce((a, m) => a + m.mastery, 0) / rows.length : 0;
   const marksMax = subjectAttempts.reduce((a, x) => a + x.max, 0);

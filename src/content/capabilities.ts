@@ -1,5 +1,6 @@
-import { validateCapabilityGraph, validatePrerequisiteRationales, type CapabilityNode } from "@/domain/capability-graph";
+import { capabilityEdgeFingerprint, validateCapabilityGraph, validatePrerequisiteRationales, validatePrerequisiteReviews, type CapabilityNode } from "@/domain/capability-graph";
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
+import type { PrerequisiteEdge } from "@/domain/prerequisites";
 
 const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 
@@ -181,6 +182,33 @@ export const wjecCapabilities: CapabilityNode[] = [
   // their own flagship content reaches the same depth as Physics.
 ];
 
+/**
+ * Convert only subject-expert-approved Physics capability edges into the
+ * topic-level edges used by the legacy prerequisite surfaces.  The topic
+ * graph is intentionally empty for an unreviewed edge: a plausible
+ * curriculum ordering must not steer a root-cause diagnosis.
+ */
+export function reviewedPhysicsTopicEdges(): PrerequisiteEdge[] {
+  const byId = new Map(wjecCapabilities.map((node) => [node.id, node] as const));
+  const seen = new Set<string>();
+  const edges: PrerequisiteEdge[] = [];
+  for (const node of wjecCapabilities) {
+    if (node.subjectId !== PHYSICS_SUBJECT_ID) continue;
+    for (const prerequisiteId of node.prerequisites) {
+      const prerequisite = byId.get(prerequisiteId);
+      const review = node.prerequisiteReviews?.[prerequisiteId];
+      if (!prerequisite || prerequisite.subjectId !== PHYSICS_SUBJECT_ID || node.topicId === prerequisite.topicId ||
+        review?.status !== "approved" || !review.reviewerId?.trim() || !review.reviewedAt ||
+        !Number.isFinite(Date.parse(review.reviewedAt)) || review.edgeFingerprint !== capabilityEdgeFingerprint(node, prerequisite)) continue;
+      const key = `${node.topicId}<-${prerequisite.topicId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({ topicId: node.topicId, prerequisiteId: prerequisite.topicId, reason: node.prerequisiteRationales?.[prerequisiteId] });
+    }
+  }
+  return edges.sort((a, b) => a.topicId.localeCompare(b.topicId) || a.prerequisiteId.localeCompare(b.prerequisiteId));
+}
+
 /** Fail content validation early if an author introduces a dangling edge or cycle. */
 export const wjecCapabilityGraphErrors = validateCapabilityGraph(wjecCapabilities);
 if (wjecCapabilityGraphErrors.length) {
@@ -191,3 +219,6 @@ export const wjecPhysicsPrerequisiteErrors = validatePrerequisiteRationales(wjec
 if (wjecPhysicsPrerequisiteErrors.length) {
   throw new Error(`Missing WJEC Physics prerequisite rationales: ${wjecPhysicsPrerequisiteErrors.join("; ")}`);
 }
+
+/** Subject-expert review backlog; these edges remain hypotheses until signed off. */
+export const wjecPhysicsPrerequisiteReviewGaps = validatePrerequisiteReviews(wjecCapabilities, PHYSICS_SUBJECT_ID);

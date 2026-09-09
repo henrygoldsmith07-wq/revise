@@ -27,6 +27,19 @@
 
 import type { Id, IsoInstant } from "./types";
 
+/** Marking attestation for the outcome used to calibrate paper recommendations. */
+export type PaperOutcomeReviewStatus = "unreviewed" | "human-reviewed" | "adjudicated";
+
+export interface PaperOutcomeReview {
+  status: PaperOutcomeReviewStatus;
+  reviewerId?: Id;
+  reviewedAt?: IsoInstant;
+  /** Adjudicated outcomes must record that two qualified markers were involved. */
+  markerCount?: number;
+  /** Optional external manifest/digest for the reviewed marking packet. */
+  markingFingerprint?: string;
+}
+
 /** A sat paper with the prediction frozen at sit time. */
 export interface PaperOutcomeRecord {
   id: Id;
@@ -41,6 +54,8 @@ export interface PaperOutcomeRecord {
   /** Marks actually awarded once marking completed. */
   actualMarks: number;
   satAt: IsoInstant;
+  /** Physics outcomes remain provisional until a named human attests the mark. */
+  markingReview?: PaperOutcomeReview;
 }
 
 /** Fewer recorded outcomes than this → the loop stays neutral. */
@@ -89,6 +104,7 @@ export function buildPaperOutcomeRecord(input: {
     totalMarks: Math.max(1, input.totalMarks),
     actualMarks: 0, // filled in by closePaperOutcome once marking completes
     satAt: input.satAt,
+    ...(input.subjectId === "wjec-alevel-physics" ? { markingReview: { status: "unreviewed" as const } } : {}),
   };
 }
 
@@ -99,8 +115,26 @@ export function buildPaperOutcomeRecord(input: {
 export function closePaperOutcome(
   record: PaperOutcomeRecord,
   actualMarks: number,
+  markingReview?: PaperOutcomeReview,
 ): PaperOutcomeRecord {
-  return { ...record, actualMarks: Math.max(0, Math.min(record.totalMarks, actualMarks)) };
+  return {
+    ...record,
+    actualMarks: Math.max(0, Math.min(record.totalMarks, actualMarks)),
+    ...(markingReview ? { markingReview } : {}),
+  };
+}
+
+/** A Physics outcome can calibrate recommendations only after human review. */
+export function trustedPaperOutcome(record: PaperOutcomeRecord): boolean {
+  if (!Number.isFinite(record.predictedMarks) || !Number.isFinite(record.actualMarks) ||
+    !Number.isFinite(record.totalMarks) || record.totalMarks <= 0 ||
+    !Number.isInteger(record.actualMarks) || record.actualMarks < 0 || record.actualMarks > record.totalMarks) return false;
+  if (record.subjectId !== "wjec-alevel-physics") return true;
+  const review = record.markingReview;
+  if (!review || !["human-reviewed", "adjudicated"].includes(review.status) ||
+    !review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) return false;
+  if (review.status === "adjudicated" && (!Number.isInteger(review.markerCount) || (review.markerCount ?? 0) < 2)) return false;
+  return true;
 }
 
 /** Per-subject prediction drift over the recorded outcomes (newest first). */
@@ -109,6 +143,7 @@ export function subjectPredictionDrift(
 ): Map<Id, SubjectPredictionDrift> {
   const bySubject = new Map<Id, PaperOutcomeRecord[]>();
   for (const o of outcomes) {
+    if (!trustedPaperOutcome(o)) continue;
     if (o.actualMarks <= 0 && o.predictedMarks <= 0) continue;
     const list = bySubject.get(o.subjectId) ?? [];
     list.push(o);

@@ -26,7 +26,7 @@ import { deriveCapabilityProfiles } from "./capability-source";
 import { readinessStopFor } from "./adaptive-stop";
 import { wjecCapabilities } from "@/content/capabilities";
 import { selectLearningAction, type LearningAction } from "./learning-action";
-import { isTransferQuestion } from "./learning-evidence";
+import { isTransferQuestion, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { trustedAssessmentContent } from "./physics-content-review";
 import type { HintTier } from "./hints";
 import type { ApplicationMasteryRow } from "./application-mastery";
@@ -195,6 +195,53 @@ export interface AdaptiveSessionInput {
   interventionOutcomes?: InterventionOutcomeRecord[];
 }
 
+const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
+
+/**
+ * Evidence used to rank a topic must meet the same trust bar as the mastery
+ * engines. Draft Physics answers remain available in the question pool for
+ * practice, but a draft/poorly marked answer cannot make a topic look better
+ * or worse, and a paper answer also needs authenticated provenance and human
+ * marking. Keeping this predicate here prevents the session optimiser from
+ * accidentally bypassing the lower-level evidence gates.
+ */
+function trustedAdaptiveAttempt(
+  attempt: Attempt,
+  questionById: ReadonlyMap<Id, Question>,
+  allAttempts: readonly Attempt[],
+  questions: readonly Question[],
+): boolean {
+  const question = questionById.get(attempt.questionId);
+  if (!question) return attempt.subjectId !== PHYSICS_SUBJECT_ID && trustworthyAttempt(attempt);
+  return trustedAssessmentAttempt(attempt, question, allAttempts, questions);
+}
+
+function trustedAdaptiveMistake(
+  mistake: Mistake,
+  questionById: ReadonlyMap<Id, Question>,
+  attemptById: ReadonlyMap<Id, Attempt>,
+  allAttempts: readonly Attempt[],
+  questions: readonly Question[],
+): boolean {
+  if (mistake.subjectId !== PHYSICS_SUBJECT_ID) return true;
+  const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
+  const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+  if (!attempt || !question || !trustedAdaptiveAttempt(attempt, questionById, allAttempts, questions)) return false;
+  return true;
+}
+
+function trustedAdaptiveEvidence(input: {
+  attempts: readonly Attempt[];
+  mistakes: readonly Mistake[];
+  questions: readonly Question[];
+}): { attempts: Attempt[]; mistakes: Mistake[] } {
+  const questionById = new Map(input.questions.map((question) => [question.id, question] as const));
+  const attemptById = new Map(input.attempts.map((attempt) => [attempt.id, attempt] as const));
+  const attempts = input.attempts.filter((attempt) => trustedAdaptiveAttempt(attempt, questionById, input.attempts, input.questions));
+  const mistakes = input.mistakes.filter((mistake) => trustedAdaptiveMistake(mistake, questionById, attemptById, input.attempts, input.questions));
+  return { attempts, mistakes };
+}
+
 /**
  * Score one topic. The exported shape makes the optimisation auditable and
  * easy to regression-test without mounting the app.
@@ -215,12 +262,13 @@ export function scoreAdaptiveTopic(input: {
   const today = todayIso(now);
   const topic = input.topic;
   const profile = input.profile ?? emptyProfile();
+  const trusted = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: input.mistakes, questions: input.questions });
   return scoreTopic(topic, {
     cards: input.cards,
     reviewLogs: input.reviewLogs,
     questions: input.questions,
-    attempts: input.attempts,
-    mistakes: input.mistakes,
+    attempts: trusted.attempts,
+    mistakes: trusted.mistakes,
     mastery: input.mastery,
     exams: input.exams,
     profile,
@@ -261,15 +309,16 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
       questionsByTopic.set(topicId, list);
     }
   }
+  const trustedEvidence = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: input.mistakes, questions: input.questions });
   const attemptsByTopic = new Map<Id, Attempt[]>();
-  for (const attempt of input.attempts) {
+  for (const attempt of trustedEvidence.attempts) {
     for (const topicId of attempt.topicIds) {
       const list = attemptsByTopic.get(topicId) ?? [];
       list.push(attempt);
       attemptsByTopic.set(topicId, list);
     }
   }
-  const mistakesByTopic = groupBy(input.mistakes.filter((mistake) => !mistake.resolved), (mistake) => mistake.topicId);
+  const mistakesByTopic = groupBy(trustedEvidence.mistakes.filter((mistake) => !mistake.resolved), (mistake) => mistake.topicId);
   const masteryByTopic = new Map(input.mastery.map((row) => [row.topicId, row] as const));
 
   const candidates = topics.map((topic) =>
@@ -300,7 +349,9 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   if (!topic) return null;
   const questions = questionsByTopic.get(topic.id) ?? [];
   const mistakes = mistakesByTopic.get(topic.id) ?? [];
-  const attempts = attemptsByTopic.get(topic.id) ?? [];
+  // Keep all exposure history when avoiding a repeated question, while the
+  // evidence passed to scoring and action selection remains trust-filtered.
+  const attempts = input.attempts.filter((attempt) => attempt.topicIds.includes(topic.id));
   const profile = profiles[topic.id] ?? emptyProfile();
   const stop = readinessStopFor(input.readiness ?? [], topic.subjectId);
   const steps = buildSteps({ topic, selected, cards: cardsByTopic.get(topic.id) ?? [], questions, attempts, mistakes, profile, targetMinutes, stopTopicDone: stop.stop });
@@ -920,6 +971,7 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
     const remaining = Math.max(0, plan.targetMinutes - spent);
     const count = completed.filter((r) => QUESTION_STEP_KINDS.has(r.kind)).length;
     const scheduled = completed.some((r) => r.kind === "delayed-retrieval" && r.result === "scheduled");
+    const trusted = trustedAdaptiveEvidence({ attempts, mistakes, questions });
     const action = count < ADAPTIVE_MAX_QUESTION_ATTEMPTS && !scheduled ? selectLearningAction({
       topicId: plan.topicId, nodes: wjecCapabilities, questions, attempts, mistakes,
       now: input.now ?? new Date(), remainingMinutes: remaining, interventionOutcomes: input.interventionOutcomes,
@@ -928,7 +980,9 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
       done: false, stopped: false, reason: action.reason };
     const delayed = plan.steps.find((s) => s.kind === "delayed-retrieval");
     const delayedStep = !scheduled && delayed && remaining > 0 ? { ...delayed, minutes: Math.min(1, remaining) } : undefined;
-    const waiting = mistakes.find((m) => !m.resolved && m.repair?.stage === "transfer" && m.repair.dueAt);
+    // Draft/auto-marked Physics mistakes may remain in storage for practice,
+    // but they cannot make the session claim that transfer has been shown.
+    const waiting = trusted.mistakes.find((m) => !m.resolved && m.repair?.stage === "transfer" && m.repair.dueAt);
     const reason = count >= ADAPTIVE_MAX_QUESTION_ATTEMPTS ? DONE_REASON_CAPPED : waiting?.repair?.dueAt
       ? `Transfer is demonstrated. The repair stays open until an independent check after ${waiting.repair.dueAt.slice(0, 10)}.`
       : "No further fresh mapped check fits this session. Remaining skills stay unproven; more targeted content or a later check is needed.";

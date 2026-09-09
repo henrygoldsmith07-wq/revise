@@ -7,7 +7,7 @@ import type {
   IsoDate,
   Question,
 } from "./types";
-import { independentAttempt, isTransferQuestion, questionFamily } from "./learning-evidence";
+import { independentAttempt, isTransferQuestion, questionFamily, trustedAssessmentAttempt } from "./learning-evidence";
 
 export const DELAYED_FAR_TRANSFER_DELAY_DAYS = 7;
 export const FAR_TRANSFER_SOURCE_THRESHOLD = 0.8;
@@ -28,6 +28,8 @@ export interface ScheduleDelayedFarTransferInput {
   questions: readonly Question[];
   attemptedQuestionIds?: readonly Id[];
   delayDays?: number;
+  /** Full history is required when a Physics source is a paper response. */
+  history?: readonly Attempt[];
 }
 
 export interface DelayedFarTransferRetest extends FarTransferAttemptLink {
@@ -163,6 +165,9 @@ function eligibleSource(attempt: Attempt): boolean {
 
 export function scheduleDelayedFarTransfer(input: ScheduleDelayedFarTransferInput): FarTransferAttemptLink | undefined {
   if (!eligibleSource(input.attempt)) return undefined;
+  const history = input.history ?? [input.attempt];
+  if (input.question.subjectId === "wjec-alevel-physics" &&
+    !trustedAssessmentAttempt(input.attempt, input.question, history, input.questions)) return undefined;
 
   const delayDays = validDelayDays(input.delayDays);
   const scheduledFor = scheduledDate(input.attempt.createdAt, delayDays);
@@ -206,10 +211,15 @@ export function scoreFarTransferRetest(retestAttempt: Attempt): FarTransferOutco
 export function completeDelayedFarTransfer(
   retest: DelayedFarTransferRetest,
   attempt: Attempt,
+  context?: { question?: Question; questions?: readonly Question[]; history?: readonly Attempt[] },
 ): FarTransferAttemptLink | undefined {
   if (!independentAttempt(attempt) || attempt.questionId !== retest.candidateQuestionId ||
     attempt.userId !== retest.userId || attempt.subjectId !== retest.subjectId ||
     Date.parse(attempt.createdAt) < Date.parse(`${retest.scheduledFor}T00:00:00Z`)) return undefined;
+  if (attempt.subjectId === "wjec-alevel-physics") {
+    const question = context?.question;
+    if (!question || !context?.questions || !trustedAssessmentAttempt(attempt, question, context.history ?? [attempt], context.questions)) return undefined;
+  }
   return {
     retestId: retest.retestId,
     role: "retest",
@@ -252,6 +262,8 @@ export function delayedFarTransferRetests(input: {
     if (sourceAttempt.farTransfer?.role === "retest") continue;
     const sourceQuestion = input.questions.find((question) => question.id === sourceAttempt.questionId);
     if (!sourceQuestion) continue;
+    if (sourceAttempt.subjectId === "wjec-alevel-physics" &&
+      !trustedAssessmentAttempt(sourceAttempt, sourceQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions)) continue;
 
     const stored = sourceAttempt.farTransfer?.role === "source" ? sourceAttempt.farTransfer : undefined;
     const link = stored ?? scheduleDelayedFarTransfer({
@@ -259,13 +271,16 @@ export function delayedFarTransferRetests(input: {
       question: sourceQuestion,
       questions: input.questions,
       attemptedQuestionIds: (attemptsByUser.get(sourceAttempt.userId) ?? []).map((attempt) => attempt.questionId),
+      history: attemptsByUser.get(sourceAttempt.userId) ?? [],
     });
     if (!link) continue;
 
     const candidate = completedByRetestId.get(link.retestId);
+    const candidateQuestion = input.questions.find((question) => question.id === candidate?.questionId);
     const completed = candidate && candidate.userId === sourceAttempt.userId && candidate.subjectId === sourceAttempt.subjectId &&
       candidate.questionId === link.candidateQuestionId && independentAttempt(candidate) &&
-      candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && candidate.createdAt.slice(0, 10) >= link.scheduledFor ? candidate : undefined;
+      candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && candidate.createdAt.slice(0, 10) >= link.scheduledFor &&
+      (candidate.subjectId !== "wjec-alevel-physics" || Boolean(candidateQuestion && trustedAssessmentAttempt(candidate, candidateQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions))) ? candidate : undefined;
     records.set(link.retestId, {
       ...link,
       userId: sourceAttempt.userId,

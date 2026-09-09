@@ -1,4 +1,5 @@
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -75,8 +76,9 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
   const trustedQuestion = input.trustedQuestion ?? (() => true);
   for (const attempt of input.attempts) {
     const question = questionById.get(attempt.questionId);
-    if (question && !trustedQuestion(question)) continue;
-    if (!question && attempt.subjectId === "wjec-alevel-physics" && input.questions) continue;
+    if (question) {
+      if (!trustedQuestion(question) || !trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? [])) continue;
+    } else if (attempt.subjectId === "wjec-alevel-physics" || !trustworthyAttempt(attempt)) continue;
     for (const topicId of attempt.topicIds) {
       const list = attemptsByTopic.get(topicId) ?? [];
       list.push(attempt);
@@ -84,8 +86,16 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     }
   }
   const logsByTopic = groupBy(input.reviewLogs, (l) => l.topicId);
+  const trustedMistakes = input.mistakes.filter((mistake) => {
+    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    const question = mistake.questionId ? questionById.get(mistake.questionId) : undefined;
+    // A mistake on an unreviewed Physics item is useful feedback to the
+    // learner, but it cannot lower or otherwise establish trusted mastery.
+    const attempt = mistake.attemptId ? input.attempts.find((row) => row.id === mistake.attemptId) : undefined;
+    return Boolean(question && attempt && trustedQuestion(question) && trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? []));
+  });
   const openMistakes = groupBy(
-    input.mistakes.filter((m) => !m.resolved),
+    trustedMistakes.filter((m) => !m.resolved),
     (m) => m.topicId,
   );
 

@@ -45,7 +45,16 @@ export type QuestionTypeTag =
   | "contradictory"
   | "irrelevant-but-correct"
   | "misconception"
-  | "different-ability";
+  | "different-ability"
+  // Physics marking benchmark labels. These are explicit case types rather
+  // than inferred from the mark, so coverage gaps remain visible to editors.
+  | "method-marks"
+  | "equivalent-algebra"
+  | "significant-figures"
+  | "units"
+  | "error-carried-forward"
+  | "first-incorrect-step"
+  | "borderline-explanation";
 
 export type AbilityLevel = "foundation" | "intermediate" | "higher" | "mixed";
 
@@ -61,6 +70,13 @@ export interface MarkerMetadata {
   experienceYears?: number;
   /** board familiarity, e.g. "AQA", "WJEC" */
   boardFamiliarity?: string;
+  /**
+   * Explicit attestation that this marker worked independently before seeing
+   * the other marker's award.  A distinct marker id alone cannot establish
+   * independent marking, so Physics calibration requires this flag on both
+   * first-pass markers.
+   */
+  independentlyMarked?: boolean;
   markedAt?: IsoInstant;
 }
 
@@ -217,9 +233,19 @@ export function validateAnswerCorpusRecord(record: unknown, index: number): { re
     if (v !== null && v !== undefined && typeof v === "object") {
       const mm = v as Record<string, unknown>;
       if (mm.markerId !== undefined && typeof mm.markerId !== "string") issues.push(`Record ${rowNum}: ${metaField}.markerId must be string`);
+      if (mm.independentlyMarked !== undefined && typeof mm.independentlyMarked !== "boolean") issues.push(`Record ${rowNum}: ${metaField}.independentlyMarked must be boolean`);
     } else if (v !== null && v !== undefined && typeof v !== "object") {
       issues.push(`Record ${rowNum}: ${metaField} must be object or null`);
     }
+  }
+
+  // Keep imported rows usable for exploratory marking work, but make the
+  // missing independence attestation visible before a Physics row reaches
+  // the stricter benchmark calibration gate.
+  if (r.subject === "wjec-alevel-physics" && r.reviewStatus === "adjudicated" &&
+    (!((r.marker1Meta as Record<string, unknown> | null | undefined)?.independentlyMarked === true) ||
+      !((r.marker2Meta as Record<string, unknown> | null | undefined)?.independentlyMarked === true))) {
+    warnings.push(`Record ${rowNum}: Physics adjudication lacks independent first-pass marker attestations`);
   }
 
   // Cross-field warnings

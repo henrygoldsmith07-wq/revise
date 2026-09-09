@@ -1,5 +1,5 @@
 import type { Attempt, InterventionActivity, InterventionAttemptContext, InterventionKind, InterventionObservationResult, InterventionOutcomeRecord, IsoInstant, Question } from "./types";
-import { independentAttempt, isTransferQuestion, partFamily, questionCapabilities, unseenQuestion } from "./learning-evidence";
+import { authenticPaperEvidence, independentAttempt, isTransferQuestion, partFamily, questionCapabilities, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import { PHYSICS_SUBJECT_ID, trustedAssessmentContent } from "./physics-content-review";
 
 export const INTERVENTION_PRIORS: Record<InterventionKind, number> = {
@@ -84,8 +84,12 @@ export function calibrateInterventions(
   }>();
   const seen = new Set<string>();
   for (const outcome of outcomes) {
-    // Replayed rows and the same chain cannot inflate sample size.
-    const identity = `${outcome.userId}:${outcome.chainId ?? outcome.id}`;
+    // Replayed rows and the same chain cannot inflate sample size. A chain
+    // label is intentionally reusable across sessions (the same capability
+    // can need repair again), so include the immutable creation instant in
+    // the identity. This collapses an exported/replayed copy of one chain
+    // while retaining a later chain with the same capability label.
+    const identity = `${outcome.userId}:${outcome.chainId ?? outcome.id}:${outcome.createdAt}`;
     if (seen.has(identity) || calibratedGain(outcome) == null) continue;
     seen.add(identity);
     // Capability ids are subject-scoped; never borrow effects across subjects.
@@ -182,10 +186,15 @@ export function createInterventionOutcome(input: {
   attempt: Attempt;
   actualMinutes?: number;
   question?: Question;
+  /** Needed to authenticate a Physics paper response before it can enter a chain. */
+  questions?: readonly Question[];
+  history?: readonly Attempt[];
 }): InterventionOutcomeRecord {
   const { context, attempt } = input;
   const score = capabilityScore(attempt, input.question, context.capabilityId);
-  const immediateTrusted = Boolean(input.question && input.question.subjectId === input.subjectId && trustedAssessmentContent(input.question));
+  const immediateTrusted = Boolean(trustworthyAttempt(attempt) && input.question && input.question.subjectId === input.subjectId && trustedAssessmentContent(input.question) &&
+    (input.subjectId !== PHYSICS_SUBJECT_ID || attempt.mode !== "paper" ||
+      (input.questions && authenticPaperEvidence(attempt, input.question, input.history ?? [attempt], input.questions))));
   return {
     // The context identifies the planned rung; the attempt identifies this
     // concrete observation. Reusing a step slot across two sessions must not
@@ -288,6 +297,8 @@ function validFollowUp(outcome: InterventionOutcomeRecord, attempt: Attempt, evi
     attempt.questionId === outcome.immediateQuestionId ||
     familyForCapability(evidence.question, outcome.capabilityId) === outcome.immediateFamilyId ||
     !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
+  if (outcome.subjectId === PHYSICS_SUBJECT_ID && attempt.mode === "paper" &&
+    !authenticPaperEvidence(attempt, evidence.question, evidence.history, evidence.questions)) return false;
   const prior = evidence.history.filter((row) => row.userId === attempt.userId && row.id !== attempt.id &&
     Date.parse(row.createdAt) <= Date.parse(attempt.createdAt));
   return unseenQuestion(evidence.question, prior, evidence.questions);

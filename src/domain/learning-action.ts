@@ -1,5 +1,5 @@
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
-import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
 import { humanVerifiedPhysicsQuestion, trustedAssessmentContent } from "./physics-content-review";
@@ -32,6 +32,15 @@ export function selectLearningAction(input: {
   const trustedQuestions = questions.filter(trustedAssessmentContent);
   const evidence = deriveSkillEvidence(nodes, trustedQuestions, attempts);
   const baselineEvidence = evidence;
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    if (!attempt || !question) return false;
+    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+  };
   const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
   const candidates: LearningAction[] = [];
   const hasLearningMetadata = (q: Question) => Boolean(q.learning || q.parts.some((part) => partLearningMetadata(q, part)));
@@ -59,7 +68,7 @@ export function selectLearningAction(input: {
         contentTrust: trust });
     }
   };
-  const open = input.mistakes.filter((m) => !m.resolved && m.topicId === topicId);
+  const open = input.mistakes.filter((m) => !m.resolved && m.topicId === topicId && trustedMistake(m));
   for (const mistake of open) {
     const capabilityId = mistake.capabilityIds?.length === 1 ? mistake.capabilityIds[0]! : undefined;
     if (!capabilityId) continue;
@@ -67,7 +76,10 @@ export function selectLearningAction(input: {
     if (!target) continue;
     const stage = mistake.repair?.stage ?? "diagnosed";
     if (stage === "transfer" && mistake.repair?.dueAt && Date.parse(mistake.repair.dueAt) > now.getTime()) continue;
-    const root = smallestUnprovenCapability([capabilityId], nodes, evidence);
+    // Physics prerequisite links are hypotheses until a subject expert has
+    // reviewed the exact edge; do not steer a learner using an unreviewed
+    // dependency merely because it appears earlier in the curriculum.
+    const root = smallestUnprovenCapability([capabilityId], nodes, evidence, { trustedOnly: true });
     if (root && root.id !== capabilityId && ["weak", "unknown"].includes(evidence.get(root.id)?.state ?? "unknown")) {
       const probes = questions.filter((q) => q.subjectId === root.subjectId && hasLearningMetadata(q) &&
         !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? "") &&
