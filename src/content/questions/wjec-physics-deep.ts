@@ -1,365 +1,235 @@
-import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
-import { physicsCapabilityIdForSpecPoint } from "@/content/capabilities";
-import type { LearningDemand, QuestionPart, Topic } from "@/domain/types";
-import { defineQuestions, type QuestionSpec } from "./authoring";
+import type { LearningDemand } from "@/domain/types";
+import { defineQuestion, type PartSpec } from "./authoring";
+
+const SUBJECT = "wjec-alevel-physics";
+const sp = (topic: string, point: number) => `${SUBJECT}.${topic}.sp-${String(point).padStart(2, "0")}`;
 
 /**
- * Physics depth pack.
- *
- * The curriculum is the source of truth: every WJEC statement receives two
- * different contexts for each of the seven learning demands. The pack is
- * intentionally marked unverified until a reviewer has checked the stem,
- * mark scheme, worked solution and capability mapping. That honest state is
- * consumed by the review queue rather than silently treating generated text as
- * examiner content.
+ * Replacement for the retired 1,512-row template inventory. These are original
+ * AI-drafted questions, NOT WJEC questions or human-approved content. Each item
+ * supplies the actual observations/data needed to solve it. New ids prevent
+ * an old attempt being reinterpreted against a different question.
+ * Mapping is to internal curriculum claims; exact board references need review.
  */
-const SUBJECT_ID = "wjec-alevel-physics";
-const SPEC_VERSION = "2024-1.0";
-
-type Formula = {
-  key: string;
-  label: string;
-  left: number;
-  right: number;
-  operator: "*" | "/" | "+" | "-";
-  expected: number;
-  unit: string;
-  equation: string;
-  leftLabel: string;
-  leftUnit: string;
-  rightLabel: string;
-  rightUnit: string;
-  keywords: string[];
-};
-
-/**
- * Calculation items are deliberately tied to the claim vocabulary. A single
- * topic-wide formula made a question about, for example, Hooke's law ask for
- * stress, which is a content error hidden by otherwise valid markup. Each
- * topic therefore has a small catalogue of relationships and each variant
- * changes the data, so the two questions are genuinely different attempts.
- */
-const FORMULAS: Record<string, Formula[]> = {
-  "kinematics-dynamics": [
-    { key: "speed", label: "speed", left: 18, right: 3, operator: "/", expected: 6, unit: "m s^-1", equation: "v = s / t", leftLabel: "distance s", leftUnit: "m", rightLabel: "time t", rightUnit: "s", keywords: ["speed", "velocity", "displacement", "average", "instantaneous"] },
-    { key: "acceleration", label: "acceleration", left: 12, right: 4, operator: "/", expected: 3, unit: "m s^-2", equation: "a = delta-v / delta-t", leftLabel: "change in velocity delta-v", leftUnit: "m s^-1", rightLabel: "time interval delta-t", rightUnit: "s", keywords: ["acceleration", "constant-acceleration", "projectile"] },
-    { key: "force", label: "resultant force", left: 6, right: 2, operator: "*", expected: 12, unit: "N", equation: "F = m a", leftLabel: "mass m", leftUnit: "kg", rightLabel: "acceleration a", rightUnit: "m s^-2", keywords: ["force", "newton", "drag", "inclined", "terminal"] },
-    { key: "impulse", label: "impulse", left: 24, right: 0.25, operator: "*", expected: 6, unit: "N s", equation: "impulse = F delta-t", leftLabel: "average force F", leftUnit: "N", rightLabel: "contact time delta-t", rightUnit: "s", keywords: ["impulse", "force-time", "momentum-time", "area"] },
-  ],
-  "energy-power": [
-    { key: "work", label: "work done", left: 45, right: 0.8, operator: "*", expected: 36, unit: "J", equation: "W = F s", leftLabel: "force F resolved along motion", leftUnit: "N", rightLabel: "displacement s", rightUnit: "m", keywords: ["work", "force", "displacement", "area"] },
-    { key: "kinetic-energy", label: "kinetic energy", left: 2, right: 25, operator: "*", expected: 50, unit: "J", equation: "E_k = 0.5 m v^2", leftLabel: "half the mass 0.5m", leftUnit: "kg", rightLabel: "speed squared v^2", rightUnit: "m^2 s^-2", keywords: ["kinetic", "mechanical energy", "energy"] },
-    { key: "gravitational-potential", label: "gravitational potential energy", left: 20, right: 3, operator: "*", expected: 60, unit: "J", equation: "delta-E_p = m g h", leftLabel: "m g product", leftUnit: "N", rightLabel: "height change h", rightUnit: "m", keywords: ["gravitational", "potential", "m g h", "energy"] },
-    { key: "power", label: "power", left: 600, right: 12, operator: "/", expected: 50, unit: "W", equation: "P = E / t", leftLabel: "energy E", leftUnit: "J", rightLabel: "time t", rightUnit: "s", keywords: ["power"] },
-    { key: "efficiency", label: "efficiency", left: 720, right: 900, operator: "/", expected: 0.8, unit: "1", equation: "efficiency = useful / input", leftLabel: "useful output energy", leftUnit: "J", rightLabel: "total input energy", rightUnit: "J", keywords: ["efficiency", "transfer", "non-conservative"] },
-  ],
-  materials: [
-    { key: "stress", label: "stress", left: 120, right: 0.0004, operator: "/", expected: 300000, unit: "Pa", equation: "stress = F / A", leftLabel: "force F", leftUnit: "N", rightLabel: "cross-sectional area A", rightUnit: "m^2", keywords: ["stress", "young modulus", "elastic material"] },
-    { key: "strain", label: "strain", left: 0.003, right: 1.5, operator: "/", expected: 0.002, unit: "1", equation: "strain = delta-l / l", leftLabel: "extension delta-l", leftUnit: "m", rightLabel: "original length l", rightUnit: "m", keywords: ["strain", "young modulus"] },
-    { key: "spring-constant", label: "spring constant", left: 12, right: 0.03, operator: "/", expected: 400, unit: "N m^-1", equation: "k = F / x", leftLabel: "force F", leftUnit: "N", rightLabel: "extension x", rightUnit: "m", keywords: ["hooke", "spring constant", "force-extension"] },
-    { key: "strain-energy", label: "elastic strain energy", left: 60, right: 0.008, operator: "*", expected: 0.48, unit: "J", equation: "E = 0.5 F x", leftLabel: "half the force 0.5F", leftUnit: "N", rightLabel: "extension x", rightUnit: "m", keywords: ["energy", "force-extension", "strain energy", "energy density"] },
-  ],
-  waves: [
-    { key: "wavelength", label: "wavelength", left: 340, right: 500, operator: "/", expected: 0.68, unit: "m", equation: "lambda = v / f", leftLabel: "wave speed v", leftUnit: "m s^-1", rightLabel: "frequency f", rightUnit: "Hz", keywords: ["wave equation", "wavelength", "frequency", "refraction"] },
-    { key: "frequency", label: "frequency", left: 12, right: 0.8, operator: "/", expected: 15, unit: "Hz", equation: "f = v / lambda", leftLabel: "wave speed v", leftUnit: "m s^-1", rightLabel: "wavelength lambda", rightUnit: "m", keywords: ["frequency", "refraction"] },
-    { key: "grating-spacing", label: "wavelength", left: 2, right: 400000, operator: "/", expected: 5e-6, unit: "m", equation: "lambda = d / n", leftLabel: "grating spacing d", leftUnit: "m", rightLabel: "order n", rightUnit: "1", keywords: ["grating", "interference", "path difference"] },
-    { key: "critical-angle", label: "sine of critical angle", left: 1, right: 1.5, operator: "/", expected: 2 / 3, unit: "1", equation: "sin C = 1 / n", leftLabel: "unit numerator", leftUnit: "1", rightLabel: "refractive index n", rightUnit: "1", keywords: ["critical", "total internal", "angle", "sin C"] },
-    { key: "node-spacing", label: "node spacing", left: 0.8, right: 2, operator: "/", expected: 0.4, unit: "m", equation: "node spacing = lambda / 2", leftLabel: "wavelength lambda", leftUnit: "m", rightLabel: "half-wavelength factor", rightUnit: "1", keywords: ["stationary", "node", "antinode", "spacing"] },
-  ],
-  quantum: [
-    { key: "photon-energy", label: "photon energy", left: 6.63e-34, right: 5e14, operator: "*", expected: 3.315e-19, unit: "J", equation: "E = h f", leftLabel: "Planck constant h", leftUnit: "J s", rightLabel: "frequency f", rightUnit: "Hz", keywords: ["photon", "photoelectric", "energy relation", "intensity"] },
-    { key: "de-broglie", label: "de Broglie wavelength", left: 6.63e-34, right: 4e-24, operator: "/", expected: 1.6575e-10, unit: "m", equation: "lambda = h / p", leftLabel: "Planck constant h", leftUnit: "J s", rightLabel: "momentum p", rightUnit: "kg m s^-1", keywords: ["de broglie", "diffraction", "wave-particle"] },
-    { key: "photoelectric-energy", label: "maximum kinetic energy", left: 5e-19, right: 3.2e-19, operator: "-", expected: 1.8e-19, unit: "J", equation: "KEmax = h f - phi", leftLabel: "photon energy h f", leftUnit: "J", rightLabel: "work function phi", rightUnit: "J", keywords: ["photoelectric", "threshold"] },
-    { key: "electron-volt", label: "energy in electronvolts", left: 3.2e-19, right: 1.6e-19, operator: "/", expected: 2, unit: "eV", equation: "E_eV = E_J / (1.6e-19 J eV^-1)", leftLabel: "energy E", leftUnit: "J", rightLabel: "joule per eV conversion constant", rightUnit: "J eV^-1", keywords: ["electron volt", "conversion", "energy level", "transition"] },
-  ],
-  "electric-circuits": [
-    { key: "current", label: "current", left: 12, right: 6, operator: "/", expected: 2, unit: "A", equation: "I = V / R", leftLabel: "potential difference V", leftUnit: "V", rightLabel: "resistance R", rightUnit: "ohm", keywords: ["current", "relations", "ohmic", "resistance"] },
-    { key: "power", label: "power", left: 12, right: 2, operator: "*", expected: 24, unit: "W", equation: "P = V I", leftLabel: "potential difference V", leftUnit: "V", rightLabel: "current I", rightUnit: "A", keywords: ["power", "efficiency"] },
-    { key: "charge", label: "charge", left: 0.002, right: 30, operator: "*", expected: 0.06, unit: "C", equation: "Q = I t", leftLabel: "current I", leftUnit: "A", rightLabel: "time t", rightUnit: "s", keywords: ["charge", "potentiometer", "emf"] },
-    { key: "fractional-uncertainty", label: "fractional uncertainty", left: 0.2, right: 10, operator: "/", expected: 0.02, unit: "1", equation: "fractional uncertainty = absolute / measured", leftLabel: "absolute uncertainty", leftUnit: "V", rightLabel: "measured value", rightUnit: "V", keywords: ["uncertainty", "error", "measurement"] },
-  ],
-  momentum: [
-    { key: "impulse", label: "impulse", left: 20, right: 0.3, operator: "*", expected: 6, unit: "N s", equation: "impulse = F t", leftLabel: "average force F", leftUnit: "N", rightLabel: "contact time t", rightUnit: "s", keywords: ["impulse", "force-time", "average force"] },
-    { key: "momentum-change", label: "change in momentum", left: 0.06, right: 35, operator: "*", expected: 2.1, unit: "kg m s^-1", equation: "delta-p = m delta-v", leftLabel: "mass m", leftUnit: "kg", rightLabel: "change in velocity delta-v", rightUnit: "m s^-1", keywords: ["momentum", "collision", "explosion"] },
-    { key: "average-force", label: "average force", left: 2.1, right: 0.01, operator: "/", expected: 210, unit: "N", equation: "F = delta-p / delta-t", leftLabel: "change in momentum delta-p", leftUnit: "N s", rightLabel: "collision time delta-t", rightUnit: "s", keywords: ["newton", "average force", "uncertainties"] },
-    { key: "kinetic-energy", label: "kinetic energy", left: 2, right: 25, operator: "*", expected: 50, unit: "J", equation: "E_k = 0.5 m v^2", leftLabel: "half the mass 0.5m", leftUnit: "kg", rightLabel: "speed squared v^2", rightUnit: "m^2 s^-2", keywords: ["elastic", "inelastic", "kinetic energy"] },
-  ],
-  "circular-shm": [
-    { key: "linear-speed", label: "linear speed", left: 4, right: 0.5, operator: "*", expected: 2, unit: "m s^-1", equation: "v = omega r", leftLabel: "angular speed omega", leftUnit: "rad s^-1", rightLabel: "radius r", rightUnit: "m", keywords: ["angular", "linear", "omega"] },
-    { key: "centripetal-force", label: "centripetal force", left: 2, right: 9, operator: "*", expected: 18, unit: "N", equation: "F = m a", leftLabel: "mass m", leftUnit: "kg", rightLabel: "centripetal acceleration a", rightUnit: "m s^-2", keywords: ["centripetal", "circular"] },
-    { key: "centripetal-acceleration", label: "centripetal acceleration", left: 16, right: 4, operator: "/", expected: 4, unit: "m s^-2", equation: "a = v^2 / r", leftLabel: "speed squared v^2", leftUnit: "m^2 s^-2", rightLabel: "radius r", rightUnit: "m", keywords: ["acceleration", "simple harmonic", "shm"] },
-    { key: "period", label: "period", left: 6.28, right: 4, operator: "/", expected: 1.57, unit: "s", equation: "T = 2 pi / omega", leftLabel: "2 pi factor", leftUnit: "1", rightLabel: "angular frequency omega", rightUnit: "rad s^-1", keywords: ["period", "pendulum", "mass-spring"] },
-    { key: "shm-energy", label: "simple harmonic energy", left: 2, right: 0.25, operator: "*", expected: 0.5, unit: "J", equation: "E = 0.5 k A^2", leftLabel: "half the spring constant 0.5k", leftUnit: "N m^-1", rightLabel: "amplitude squared A^2", rightUnit: "m^2", keywords: ["energy", "kinetic", "potential", "interchange", "shm"] },
-    { key: "resonance-frequency", label: "frequency", left: 4, right: 6.28, operator: "/", expected: 0.6369426752, unit: "Hz", equation: "f = omega / (2 pi)", leftLabel: "angular frequency omega", leftUnit: "rad s^-1", rightLabel: "2 pi factor", rightUnit: "1", keywords: ["damping", "resonance", "frequency-response"] },
-  ],
-  fields: [
-    { key: "field-strength", label: "field strength", left: 18, right: 3, operator: "/", expected: 6, unit: "N kg^-1", equation: "g = F / m", leftLabel: "force F", leftUnit: "N", rightLabel: "mass m", rightUnit: "kg", keywords: ["field strength", "gravitation", "potential"] },
-    { key: "magnetic-force", label: "magnetic force", left: 1.2, right: 0.3, operator: "*", expected: 0.36, unit: "N", equation: "F = B I l", leftLabel: "B I product", leftUnit: "T A", rightLabel: "conductor length l", rightUnit: "m", keywords: ["magnetic", "conductor", "charge"] },
-    { key: "induced-emf", label: "induced emf", left: 0.12, right: 0.04, operator: "/", expected: 3, unit: "V", equation: "emf = delta-flux / delta-t", leftLabel: "change in flux linkage", leftUnit: "Wb", rightLabel: "time interval", rightUnit: "s", keywords: ["induction", "faraday", "lenz"] },
-    { key: "inverse-square", label: "field strength", left: 18, right: 9, operator: "/", expected: 2, unit: "N kg^-1", equation: "g is proportional to 1 / r^2", leftLabel: "reference field strength", leftUnit: "N kg^-1", rightLabel: "distance-squared factor", rightUnit: "1", keywords: ["inverse-square", "orbital", "gravity"] },
-  ],
-  thermal: [
-    { key: "heating", label: "energy transferred as heat", left: 120, right: 10, operator: "*", expected: 1200, unit: "J", equation: "Q = m c delta-T", leftLabel: "m c product", leftUnit: "J K^-1", rightLabel: "temperature change delta-T", rightUnit: "K", keywords: ["internal energy", "specific heat", "temperature", "heating"] },
-    { key: "pressure", label: "pressure", left: 2, right: 0.01, operator: "/", expected: 200, unit: "Pa", equation: "p = F / A", leftLabel: "force F", leftUnit: "N", rightLabel: "area A", rightUnit: "m^2", keywords: ["pressure", "molecular", "momentum"] },
-    { key: "molecular-energy", label: "mean molecular kinetic energy", left: 1.5, right: 300, operator: "*", expected: 450, unit: "J", equation: "E = 3/2 k T", leftLabel: "3/2 k", leftUnit: "J K^-1", rightLabel: "temperature T", rightUnit: "K", keywords: ["kinetic", "gas", "temperature"] },
-  ],
-  nuclear: [
-    { key: "decay-constant", label: "decay constant", left: 0.693, right: 12, operator: "/", expected: 0.05775, unit: "s^-1", equation: "lambda = ln 2 / t_half", leftLabel: "ln 2", leftUnit: "1", rightLabel: "half-life t_half", rightUnit: "s", keywords: ["decay", "half-life", "activity"] },
-    { key: "mass-energy", label: "mass-energy release", left: 1e-6, right: 9e16, operator: "*", expected: 9e10, unit: "J", equation: "delta-E = delta-m c^2", leftLabel: "mass defect delta-m", leftUnit: "kg", rightLabel: "speed of light squared c^2", rightUnit: "m^2 s^-2", keywords: ["mass-energy", "binding", "fission", "fusion"] },
-    { key: "radius-scale", label: "nuclear radius", left: 1.2, right: 3, operator: "*", expected: 3.6, unit: "fm", equation: "r = r_0 A^(1/3)", leftLabel: "nuclear radius constant r_0", leftUnit: "fm", rightLabel: "A^(1/3) factor", rightUnit: "1", keywords: ["radius", "nucleon"] },
-  ],
-  capacitance: [
-    { key: "charge", label: "charge", left: 0.002, right: 12, operator: "*", expected: 0.024, unit: "C", equation: "Q = C V", leftLabel: "capacitance C", leftUnit: "F", rightLabel: "potential difference V", rightUnit: "V", keywords: ["charge", "capacitance"] },
-    { key: "capacitor-energy", label: "energy stored", left: 0.012, right: 144, operator: "*", expected: 1.728, unit: "J", equation: "E = 0.5 C V^2", leftLabel: "half the capacitance 0.5C", leftUnit: "F", rightLabel: "voltage squared V^2", rightUnit: "V^2", keywords: ["energy", "stored"] },
-    { key: "time-constant", label: "time constant", left: 4700, right: 0.001, operator: "*", expected: 4.7, unit: "s", equation: "tau = R C", leftLabel: "resistance R", leftUnit: "ohm", rightLabel: "capacitance C", rightUnit: "F", keywords: ["time", "charge", "discharge"] },
-  ],
-  "alternating-currents": [
-    { key: "peak-voltage", label: "peak voltage", left: 230, right: 1.414, operator: "*", expected: 325.22, unit: "V", equation: "V_peak = V_rms sqrt 2", leftLabel: "rms voltage V_rms", leftUnit: "V", rightLabel: "square-root-of-two factor", rightUnit: "1", keywords: ["peak", "rms", "voltage"] },
-    { key: "rms-current", label: "rms current", left: 4.2, right: 0.707, operator: "*", expected: 2.9694, unit: "A", equation: "I_rms = I_peak / sqrt 2", leftLabel: "peak current I_peak", leftUnit: "A", rightLabel: "one-over-square-root-two factor", rightUnit: "1", keywords: ["current", "rms"] },
-  ],
-  "medical-physics": [
-    { key: "dose", label: "absorbed dose", left: 0.006, right: 2, operator: "/", expected: 0.003, unit: "Gy", equation: "dose = energy / mass", leftLabel: "absorbed energy", leftUnit: "J", rightLabel: "irradiated mass", rightUnit: "kg", keywords: ["dose", "radiation", "energy"] },
-    { key: "magnification", label: "image magnification", left: 12, right: 3, operator: "/", expected: 4, unit: "1", equation: "magnification = image / object", leftLabel: "image length", leftUnit: "mm", rightLabel: "object length", rightUnit: "mm", keywords: ["image", "magnification", "ultrasound"] },
-  ],
-  "sports-physics": [
-    { key: "kinetic-energy", label: "kinetic energy", left: 2, right: 25, operator: "*", expected: 50, unit: "J", equation: "E_k = 0.5 m v^2", leftLabel: "half the mass 0.5m", leftUnit: "kg", rightLabel: "speed squared v^2", rightUnit: "m^2 s^-2", keywords: ["kinetic", "energy", "speed"] },
-    { key: "power", label: "average power", left: 720, right: 12, operator: "/", expected: 60, unit: "W", equation: "P = W / t", leftLabel: "work done W", leftUnit: "J", rightLabel: "time t", rightUnit: "s", keywords: ["power", "work", "performance"] },
-  ],
-  "energy-environment": [
-    { key: "efficiency", label: "efficiency", left: 720, right: 900, operator: "/", expected: 0.8, unit: "1", equation: "efficiency = useful / input", leftLabel: "useful energy", leftUnit: "J", rightLabel: "input energy", rightUnit: "J", keywords: ["efficiency", "energy"] },
-    { key: "energy-intensity", label: "energy per unit mass", left: 1200, right: 30, operator: "/", expected: 40, unit: "J kg^-1", equation: "specific energy = E / m", leftLabel: "energy E", leftUnit: "J", rightLabel: "mass m", rightUnit: "kg", keywords: ["environment", "mass", "energy"] },
-  ],
-  "practical-investigations": [
-    { key: "gradient", label: "graph gradient", left: 8, right: 2, operator: "/", expected: 4, unit: "N m^-1", equation: "gradient = delta-y / delta-x", leftLabel: "change in y delta-y", leftUnit: "N", rightLabel: "change in x delta-x", rightUnit: "m", keywords: ["gradient", "graph", "relationship"] },
-    { key: "percentage-uncertainty", label: "fractional uncertainty", left: 0.2, right: 10, operator: "/", expected: 0.02, unit: "1", equation: "fractional uncertainty = absolute / measured", leftLabel: "absolute uncertainty", leftUnit: "V", rightLabel: "measured value", rightUnit: "V", keywords: ["uncertainty", "error", "measurement"] },
-  ],
-  "orbits-universe": [
-    { key: "orbital-speed", label: "orbital speed", left: 3.6e7, right: 6e6, operator: "/", expected: 6, unit: "m s^-1", equation: "v = circumference / period", leftLabel: "orbital circumference", leftUnit: "m", rightLabel: "orbital period", rightUnit: "s", keywords: ["orbit", "speed", "period"] },
-    { key: "orbital-field", label: "gravitational field strength", left: 18, right: 3, operator: "/", expected: 6, unit: "N kg^-1", equation: "g = F / m", leftLabel: "gravitational force", leftUnit: "N", rightLabel: "satellite mass", rightUnit: "kg", keywords: ["field", "gravity", "inverse-square"] },
-  ],
-  "electromagnetic-induction": [
-    { key: "induced-emf", label: "induced emf", left: 0.12, right: 0.04, operator: "/", expected: 3, unit: "V", equation: "emf = delta-flux / delta-t", leftLabel: "change in flux linkage", leftUnit: "Wb", rightLabel: "time interval", rightUnit: "s", keywords: ["emf", "faraday", "flux", "induction"] },
-    { key: "flux", label: "magnetic flux", left: 0.6, right: 0.02, operator: "*", expected: 0.012, unit: "Wb", equation: "flux = B A", leftLabel: "magnetic flux density B", leftUnit: "T", rightLabel: "area A", rightUnit: "m^2", keywords: ["flux", "magnetic"] },
-  ],
-};
-
-const DEMANDS: readonly LearningDemand[] = ["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"];
-const DIFFICULTY: Record<LearningDemand, 1 | 2 | 3 | 4 | 5> = {
-  recall: 1, explanation: 2, application: 3, misconception: 3, calculation: 3, transfer: 4, synoptic: 5,
-};
-const MARKS: Record<LearningDemand, number> = {
-  recall: 1, explanation: 2, application: 2, misconception: 2, calculation: 4, transfer: 3, synoptic: 4,
-};
-
-function topicSlug(topicId: string): string {
-  return topicId.slice(`${SUBJECT_ID}.`.length);
+function item(slug: string, topic: string, point: number, demand: LearningDemand,
+  prompt: string, scheme: string[], answer: string, capability?: string,
+  extraParts: PartSpec[] = []) {
+  const specId = sp(topic, point);
+  const parts: PartSpec[] = [{
+    prompt, marks: scheme.length, scheme, answer,
+    aos: demand === "recall" ? ["AO1"] : ["transfer", "synoptic"].includes(demand) ? ["AO2", "AO3"] : ["AO2"],
+    specPointIds: [specId],
+    capabilityIds: [capability ?? `phys.${topic}.sp-${String(point).padStart(2, "0")}`],
+  }, ...extraParts];
+  return defineQuestion({
+    slug: `physics-quality-${slug}`, subjectId: SUBJECT,
+    topics: [...new Set([topic, ...extraParts.flatMap((part) => (part.specPointIds ?? []).map((id) => id.split(".").at(-2)!))])],
+    kind: extraParts.length ? "structured" : demand === "calculation" ? "calculation" : "short",
+    stem: extraParts.length ? "Answer each part. Show your reasoning and numerical working." : prompt,
+    parts, difficulty: ["transfer", "synoptic"].includes(demand) ? 4 : demand === "recall" ? 1 : 3,
+    source: "generated", verification: "unverified", reviewer: null, lastChecked: null,
+    learning: { demand, familyId: `physics-quality:${slug}`, contextId: slug,
+      expectedMinutes: Math.max(1, parts.reduce((sum, part) => sum + part.marks, 0) * 1.5) },
+  });
 }
 
-function calculate(left: number, right: number, operator: Formula["operator"]): number {
-  switch (operator) {
-    case "*": return left * right;
-    case "/": return left / right;
-    case "+": return left + right;
-    case "-": return left - right;
-  }
-}
+export const wjecPhysicsDeepQuestions = [
+  item("acceleration-definition", "kinematics-dynamics", 5, "recall",
+    "Define acceleration. State its SI unit.",
+    ["Rate of change of velocity.", "m s^-2."],
+    "Acceleration is the rate of change of velocity with time. Its SI unit is m s^-2."),
+  item("parachute-opening", "kinematics-dynamics", 7, "explanation",
+    "A skydiver falls at constant speed before opening a parachute. Immediately after it opens, air resistance is greater than weight. Explain the direction of acceleration and how a new terminal speed is reached.",
+    ["The resultant force and acceleration are upward.", "As downward speed decreases, air resistance decreases.", "At the new terminal speed air resistance equals weight, so acceleration is zero."],
+    "The resultant force and acceleration are upward, opposing the downward velocity. As downward speed decreases, air resistance decreases. At the new terminal speed air resistance equals weight, so acceleration is zero.", "phys.drag"),
+  item("lift-force-probe", "kinematics-dynamics", 4, "application",
+    "A lift of mass 600 kg accelerates upward at 0.80 m s^-2. Take g = 9.81 m s^-2. Calculate the cable tension. Neglect other forces.",
+    ["T - mg = ma.", "T = 600(9.81 + 0.80) = 6366 N."],
+    "Choose upward as positive. T - mg = ma. Hence T = 600(9.81 + 0.80) = 6366 N, approximately 6.4 kN.", "phys.acceleration"),
+  item("book-third-law", "kinematics-dynamics", 4, "misconception",
+    "A student says the weight of a stationary book and the upward force from a table are a Newton's third-law pair because they are equal and opposite. Explain the error and identify the third-law partner of the table's force on the book.",
+    ["Third-law forces act on different bodies; both named forces act on the book.", "The partner is the downward contact force exerted by the book on the table."],
+    "Third-law forces act on different bodies; both named forces act on the book. The partner of the table's force is the downward contact force exerted by the book on the table.", "phys.third-law"),
+  item("signed-motion-area", "kinematics-dynamics", 2, "calculation",
+    "A trolley has velocity +4.0 m s^-1 for 3.0 s and then -2.0 m s^-1 for 2.0 s. Ignore the short reversal interval. Calculate its displacement and total distance travelled.",
+    ["Displacement is signed area: 4.0 x 3.0 - 2.0 x 2.0.", "Displacement = +8.0 m.", "Distance = 12.0 + 4.0 = 16.0 m."],
+    "Displacement is signed area: 4.0 x 3.0 - 2.0 x 2.0 = +8.0 m. Distance adds the magnitudes: 12.0 + 4.0 = 16.0 m."),
+  item("asteroid-sample-brake", "kinematics-dynamics", 4, "transfer",
+    "A sample capsule of mass 0.40 kg moves at +6.0 m s^-1 beside an asteroid. A thruster exerts a constant force of -0.80 N for 2.0 s. Other forces are negligible. Determine the final velocity and explain whether the capsule reverses direction.",
+    ["a = -0.80 / 0.40 = -2.0 m s^-2.", "v = 6.0 + (-2.0 x 2.0) = +2.0 m s^-1.", "The capsule has not reversed because the final velocity remains positive."],
+    "a = -0.80 / 0.40 = -2.0 m s^-2. v = 6.0 + (-2.0 x 2.0) = +2.0 m s^-1. The capsule has not reversed because the final velocity remains positive.", "phys.acceleration"),
+  item("runaway-trolley", "energy-power", 6, "synoptic",
+    "A 20 kg trolley starts from rest and descends through a vertical height of 1.5 m. It then crosses 4.0 m of rough horizontal track with a constant resisting force of 30 N. Neglect resistance on the slope. Take g = 9.81 m s^-2. Calculate its speed after the rough track and explain why conserving kinetic plus gravitational potential energy throughout would give the wrong answer.",
+    ["Initial gravitational energy = mgh = 294.3 J.", "Work against resistance = 30 x 4.0 = 120 J.", "Final kinetic energy = 174.3 J.", "Speed = sqrt(2 x 174.3 / 20) = 4.17 m s^-1.", "Friction transfers mechanical energy to internal energy."],
+    "Initial gravitational energy = mgh = 294.3 J. Work against resistance = 30 x 4.0 = 120 J. Final kinetic energy = 174.3 J. Speed = sqrt(2 x 174.3 / 20) = 4.17 m s^-1. Friction transfers mechanical energy to internal energy; mechanical energy alone is not conserved."),
 
-function formulaFor(slug: string, claim: string, variant: number): Formula | undefined {
-  const options = FORMULAS[slug] ?? [];
-  if (!options.length) return undefined;
-  const normalised = claim.toLowerCase();
-  // Prefer the relationship whose claim vocabulary overlaps most strongly.
-  // A first-match rule let a generic word such as "energy" select work for a
-  // gravitational-energy statement. Longer, more specific tokens win while
-  // declaration order remains the deterministic tie-break.
-  const selected = options
-    .map((formula, index) => ({
-      formula,
-      index,
-      score: formula.key.split("-").reduce((sum, token) => sum + (normalised.includes(token) ? token.length * 2 : 0), 0) +
-        formula.keywords.reduce((sum, keyword) => sum + (normalised.includes(keyword) ? keyword.replace(/[^a-z0-9]/gi, "").length : 0), 0),
-    }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)[0]!.formula;
-  if (variant === 0) return selected;
-  // Change the measured quantity while preserving the relationship. This
-  // keeps the paired contexts genuinely different without changing a physical
-  // constant such as h, c² or √2. Most relationships vary the right-hand
-  // measurement; for formulae whose right operand is a named constant, vary
-  // the measured left-hand quantity instead.
-  const rightIsConstant = /planck|speed of light|square-root|one-over|ln 2|conversion|half-wavelength|2 pi/i.test(selected.rightLabel);
-  const left = rightIsConstant ? selected.left * 1.25 : selected.left;
-  const right = rightIsConstant ? selected.right : selected.right * 1.25;
-  return { ...selected, left, right, expected: calculate(left, right, selected.operator) };
-}
+  item("young-modulus-definition", "materials", 1, "recall",
+    "Define tensile stress and tensile strain. Use them to define Young modulus in the proportional region.",
+    ["Stress is tensile force divided by original cross-sectional area.", "Strain is extension divided by original length.", "Young modulus is stress divided by strain in the proportional region."],
+    "Stress is tensile force divided by original cross-sectional area. Strain is extension divided by original length. Young modulus is stress divided by strain in the proportional region."),
+  item("wire-diameter-effect", "materials", 1, "explanation",
+    "Two wires have the same material and original length. Wire B has twice the diameter of wire A. Explain why B extends one quarter as much under the same small tensile load.",
+    ["Cross-sectional area is proportional to diameter squared, so B has four times the area.", "At equal force B has one quarter of the stress.", "Equal Young modulus gives one quarter of the strain and hence extension."],
+    "Cross-sectional area is proportional to diameter squared, so B has four times the area. At equal force B has one quarter of the stress. Equal Young modulus gives one quarter of the strain and hence extension."),
+  item("spring-zero-offset", "materials", 2, "application",
+    "A spring has length 120 mm with no load and 156 mm with a 9.0 N load, within its proportional limit. Calculate its spring constant. State why using 156 mm as the extension is incorrect.",
+    ["Extension = 156 - 120 = 36 mm = 0.036 m.", "k = 9.0 / 0.036 = 250 N m^-1.", "Extension is the change in length, not the loaded length."],
+    "Extension = 156 - 120 = 36 mm = 0.036 m. k = 9.0 / 0.036 = 250 N m^-1. Extension is the change in length, not the loaded length."),
+  item("elastic-nonlinear", "materials", 3, "misconception",
+    "A polymer returns to its original length after unloading, but its loading force-extension graph is curved. A student says it cannot be elastic because it does not obey Hooke's law. Evaluate this claim.",
+    ["Elastic behaviour means returning to the original dimensions on unloading.", "Hooke's law additionally requires force proportional to extension.", "A material can be elastic without obeying Hooke's law."],
+    "Elastic behaviour means returning to the original dimensions on unloading. Hooke's law additionally requires force proportional to extension. A material can be elastic without obeying Hooke's law."),
+  item("nonlinear-spring-work", "materials", 4, "calculation",
+    "A force-extension graph consists of straight segments joining (0 mm, 0 N), (20 mm, 8.0 N), and (50 mm, 14 N). Calculate the work done stretching from 0 to 50 mm.",
+    ["Work is area under the force-extension graph.", "First triangle = 0.5 x 8.0 x 0.020 = 0.080 J.", "Trapezium = 0.5 x (8.0 + 14) x 0.030 = 0.330 J.", "Total work = 0.410 J."],
+    "Work is area under the force-extension graph. First triangle = 0.5 x 8.0 x 0.020 = 0.080 J. Trapezium = 0.5 x (8.0 + 14) x 0.030 = 0.330 J. Total work = 0.410 J."),
+  item("tendon-energy", "materials", 4, "transfer",
+    "A simplified tendon model has a straight loading graph from (extension 0, force 0) to (extension 0.012 m, force 180 N). On unloading, 25% of the input energy is dissipated. Calculate the energy returned to the runner. Explain why force times maximum extension overestimates the input energy.",
+    ["Input energy = 0.5 x 180 x 0.012 = 1.08 J.", "Returned energy = 0.75 x 1.08 = 0.81 J.", "The force increases from zero, so its mean is half its maximum."],
+    "Input energy = 0.5 x 180 x 0.012 = 1.08 J. Returned energy = 0.75 x 1.08 = 0.81 J. The force increases from zero, so its mean is half its maximum."),
+  item("spring-launch", "materials", 4, "synoptic",
+    "A horizontal spring of constant 400 N m^-1 is compressed by 0.050 m. It launches a 0.20 kg cart. During launch, 0.10 J is dissipated. Calculate the cart's speed as the spring returns to its natural length.",
+    ["Stored energy = 0.5 x 400 x 0.050^2 = 0.50 J.", "Kinetic energy = 0.50 - 0.10 = 0.40 J.", "v = sqrt(2 x 0.40 / 0.20) = 2.0 m s^-1."],
+    "Stored energy = 0.5 x 400 x 0.050^2 = 0.50 J. Kinetic energy = 0.50 - 0.10 = 0.40 J. v = sqrt(2 x 0.40 / 0.20) = 2.0 m s^-1."),
 
-function calculationContext(topicTitle: string, claim: string, formula: Formula, variant: number): string {
-  const direction = variant === 0 ? "A measurement" : "A second, independent measurement";
-  return `${direction} in ${topicTitle.toLowerCase()} gives ${formula.leftLabel} = ${formula.left} ${formula.leftUnit} and ${formula.rightLabel} = ${formula.right} ${formula.rightUnit}. For the capability “${claim}”, show the equation ${formula.equation}, substitution, result, unit and sensible significant figures.`;
-}
+  item("coherence-meaning", "waves", 7, "recall",
+    "State the two requirements for two sources to be coherent.",
+    ["The sources have the same frequency.", "They maintain a constant phase difference."],
+    "The sources have the same frequency and maintain a constant phase difference."),
+  item("refraction-frequency", "waves", 1, "explanation",
+    "Light passes from air into glass where its speed is lower. Explain what happens to its frequency and wavelength.",
+    ["Frequency is unchanged because it is fixed by the source.", "From v = f lambda, lower speed at fixed frequency means shorter wavelength."],
+    "Frequency is unchanged because it is fixed by the source. From v = f lambda, lower speed at fixed frequency means shorter wavelength."),
+  item("string-third-harmonic", "waves", 3, "application",
+    "A string fixed at both ends has length 0.90 m. A stationary pattern has three equal loops. Wave speed is 120 m s^-1. Calculate its frequency.",
+    ["Each loop spans half a wavelength, so lambda = 2 x 0.90 / 3 = 0.60 m.", "f = 120 / 0.60 = 200 Hz."],
+    "Each loop spans half a wavelength, so lambda = 2 x 0.90 / 3 = 0.60 m. f = 120 / 0.60 = 200 Hz."),
+  item("tir-direction", "waves", 4, "misconception",
+    "A ray travels from air into glass at an incidence angle of 70 degrees. Glass has critical angle 42 degrees at a glass-air boundary. A student predicts total internal reflection because 70 exceeds 42. Explain why this prediction is wrong.",
+    ["Total internal reflection requires travel from higher to lower refractive index.", "This ray travels from air into glass, so the critical-angle condition does not apply."],
+    "Total internal reflection requires travel from higher to lower refractive index. This ray travels from air into glass, so the critical-angle condition does not apply."),
+  item("grating-wavelength", "waves", 2, "calculation",
+    "A diffraction grating has 600 lines per mm. A first-order maximum is observed at 18.0 degrees to the normal. Calculate the wavelength. Use sin(18.0 degrees) = 0.3090.",
+    ["d = 1 / (600 x 1000) = 1.667e-6 m.", "n lambda = d sin(theta), with n = 1.", "lambda = 5.15e-7 m."],
+    "d = 1 / (600 x 1000) = 1.667e-6 m. Using n lambda = d sin(theta), with n = 1, lambda = 5.15e-7 m."),
+  item("noise-cancellation-seat", "waves", 7, "transfer",
+    "Two in-phase loudspeakers emit sound of wavelength 0.80 m. At one seat their path lengths are 3.2 m and 4.4 m. Assume equal amplitudes at the seat. Predict the sound intensity there relative to either speaker alone, and explain why moving the seat can change it.",
+    ["Path difference = 1.2 m = 1.5 wavelengths.", "An odd number of half wavelengths gives destructive interference, ideally zero intensity for equal amplitudes.", "Moving the seat changes path difference and therefore phase difference."],
+    "Path difference = 1.2 m = 1.5 wavelengths. An odd number of half wavelengths gives destructive interference, ideally zero intensity for equal amplitudes. Moving the seat changes path difference and therefore phase difference."),
+  item("grating-photon", "waves", 2, "synoptic",
+    "A grating spacing of 2.00e-6 m gives a first-order maximum with sin(theta) = 0.250. Determine the wavelength.",
+    ["lambda = d sin(theta) = 5.00e-7 m."],
+    "For first order, lambda = d sin(theta) = 5.00e-7 m.", undefined, [{
+      prompt: "Using your wavelength from part (a), determine the photon energy. Use h = 6.63e-34 J s and c = 3.00e8 m s^-1. Show the relationship used.",
+      marks: 2, scheme: ["E = hc / lambda.", "E = 3.98e-19 J; allow correct follow-through from part (a)."],
+      answer: "E = hc / lambda = 6.63e-34 x 3.00e8 / 5.00e-7 = 3.98e-19 J.",
+      specPointIds: [sp("quantum", 1)], capabilityIds: ["phys.quantum.sp-01"], aos: ["AO2"],
+    }]),
 
-const COMMAND_WORDS = /^(state|define|describe|explain|calculate|use|apply|analyse|analyze|identify|relate|distinguish|interpret|evaluate|derive|recall)\s+/i;
+  item("work-function", "quantum", 1, "recall",
+    "Define the work function of a metal.",
+    ["The minimum energy needed to remove an electron from the metal surface."],
+    "The work function is the minimum energy needed to remove an electron from the metal surface."),
+  item("threshold-darkness", "quantum", 2, "explanation",
+    "Monochromatic light below a metal's threshold frequency produces no photoelectrons. Explain why increasing its intensity does not cause emission in the single-photon model.",
+    ["Photon energy hf is less than the work function.", "One electron absorbs energy from one photon in this model.", "Increasing intensity increases photon number, not individual photon energy."],
+    "Photon energy hf is less than the work function. One electron absorbs energy from one photon in this model. Increasing intensity increases photon number, not individual photon energy."),
+  item("stopping-potential-change", "quantum", 1, "application",
+    "The incident photon energy increases from 4.0 eV to 5.5 eV for a metal with work function 2.0 eV. Determine the change in stopping potential.",
+    ["Maximum kinetic energies are 2.0 eV and 3.5 eV.", "Stopping potential increases by 1.5 V."],
+    "Maximum kinetic energies are 2.0 eV and 3.5 eV. Since eVs equals maximum kinetic energy, stopping potential increases by 1.5 V."),
+  item("brighter-photoelectric", "quantum", 3, "misconception",
+    "Light above threshold shines on a metal. Its frequency is fixed while intensity doubles. A student says the fastest emitted electrons have twice the kinetic energy. Correct this claim and predict the saturation current.",
+    ["Maximum kinetic energy is unchanged because photon energy and work function are unchanged.", "Twice as many photons arrive each second, so saturation current doubles if collection and efficiency are unchanged."],
+    "Maximum kinetic energy is unchanged because photon energy and work function are unchanged. Twice as many photons arrive each second, so saturation current doubles if collection and efficiency are unchanged."),
+  item("photoelectron-energy", "quantum", 1, "calculation",
+    "Light of frequency 8.00e14 Hz falls on a metal of work function 3.20e-19 J. Calculate the maximum photoelectron kinetic energy. Use h = 6.63e-34 J s.",
+    ["Photon energy hf = 5.304e-19 J.", "Maximum kinetic energy = hf - work function.", "Maximum kinetic energy = 2.10e-19 J."],
+    "Photon energy hf = 5.304e-19 J. Maximum kinetic energy = hf - work function = 5.304e-19 - 3.20e-19 = 2.10e-19 J."),
+  item("uv-surface-sensor", "quantum", 2, "transfer",
+    "A vacuum sensor must emit electrons when illuminated at 300 nm but remain inactive at 500 nm. Candidate coatings have work functions 2.0 eV, 3.0 eV and 4.5 eV. Choose a coating and justify it. Use hc = 1240 eV nm and the single-photon model.",
+    ["Photon energies are 1240/300 = 4.13 eV and 1240/500 = 2.48 eV.", "Choose the 3.0 eV coating.", "Its work function is below 4.13 eV but above 2.48 eV."],
+    "Photon energies are 1240/300 = 4.13 eV and 1240/500 = 2.48 eV. Choose the 3.0 eV coating. Its work function is below 4.13 eV but above 2.48 eV."),
+  item("electron-diffraction-voltage", "quantum", 5, "synoptic",
+    "Non-relativistic electrons accelerated from rest through voltage V produce a diffraction pattern. The voltage is increased to 4V. Use energy and momentum relationships to predict the factor by which their de Broglie wavelength changes.",
+    ["Kinetic energy eV = p^2/(2m).", "Quadrupling V doubles momentum p.", "lambda = h/p, so wavelength halves."],
+    "Kinetic energy eV = p^2/(2m). Quadrupling V doubles momentum p. Since lambda = h/p, wavelength halves."),
 
-function targetPhrase(claim: string): string {
-  return claim.replace(COMMAND_WORDS, "").replace(/[.]$/, "");
-}
+  item("emf-definition", "electric-circuits", 1, "recall",
+    "Define the electromotive force of a source in terms of energy and charge.",
+    ["Energy supplied by the source per unit charge passing through it."],
+    "Electromotive force is the energy supplied by the source per unit charge passing through it.", "phys.circuit.emf"),
+  item("lamp-non-ohmic", "electric-circuits", 5, "explanation",
+    "As voltage across a filament lamp rises, current increases less than proportionally. Explain this behaviour in terms of the metal filament.",
+    ["The filament temperature rises.", "Greater lattice vibration increases electron scattering.", "Resistance rises, so current is not proportional to voltage."],
+    "The filament temperature rises. Greater lattice vibration increases electron scattering. Resistance rises, so current is not proportional to voltage."),
+  item("loaded-divider", "electric-circuits", 2, "application",
+    "Two 2.0 kilohm resistors are in series across an ideal 12 V supply. A 2.0 kilohm load is connected in parallel with the lower resistor. Calculate the voltage across the load.",
+    ["The parallel resistance is 1.0 kilohm.", "Total series resistance is 3.0 kilohm.", "Load voltage = 12 x 1/3 = 4.0 V."],
+    "The parallel resistance is 1.0 kilohm. Total series resistance is 3.0 kilohm. Load voltage = 12 x 1/3 = 4.0 V.", "phys.circuit.divider"),
+  item("current-used-up", "electric-circuits", 1, "misconception",
+    "Two unequal resistors are connected in series to a cell. A student says less current leaves the larger resistor because it uses more current. Explain the error.",
+    ["Steady current is the same at every point in a series circuit by charge conservation.", "Resistors transfer energy from charges; they do not consume charge."],
+    "Steady current is the same at every point in a series circuit by charge conservation. Resistors transfer energy from charges; they do not consume charge.", "phys.circuit.charge"),
+  item("cell-internal-resistance", "electric-circuits", 2, "calculation",
+    "A cell has emf 1.50 V and terminal voltage 1.20 V when delivering 0.60 A. Calculate its internal resistance.",
+    ["Lost voltage = 1.50 - 1.20 = 0.30 V.", "r = 0.30 / 0.60 = 0.50 ohm."],
+    "Lost voltage = 1.50 - 1.20 = 0.30 V. r = 0.30 / 0.60 = 0.50 ohm.", "phys.circuit.internal"),
+  item("cold-room-alarm", "electric-circuits", 2, "transfer",
+    "An ideal 6.0 V supply feeds a series combination of a 4.0 kilohm resistor and a thermistor. An alarm measures voltage across the fixed resistor and triggers below 2.0 V. Thermistor resistance is 2.0 kilohm when warm and 10 kilohm when cold. Predict whether cooling triggers the alarm. Assume the alarm draws negligible current.",
+    ["Warm voltage = 6 x 4/(4+2) = 4.0 V.", "Cold voltage = 6 x 4/(4+10) = 1.71 V.", "Cooling triggers the alarm because the cold voltage is below 2.0 V."],
+    "Warm voltage = 6 x 4/(4+2) = 4.0 V. Cold voltage = 6 x 4/(4+10) = 1.71 V. Cooling triggers the alarm because the cold voltage is below 2.0 V.", "phys.circuit.divider"),
+  item("heater-water", "electric-circuits", 4, "synoptic",
+    "A 12 V supply drives a 6.0 ohm immersion heater for 300 s. The heater warms 0.20 kg of water, with 70% of electrical energy reaching the water. Use c = 4200 J kg^-1 K^-1. Calculate the temperature rise.",
+    ["Power = V^2/R = 24 W.", "Energy reaching water = 0.70 x 24 x 300 = 5040 J.", "Temperature rise = 5040/(0.20 x 4200) = 6.0 K."],
+    "Power = V^2/R = 24 W. Energy reaching water = 0.70 x 24 x 300 = 5040 J. Temperature rise = 5040/(0.20 x 4200) = 6.0 K."),
 
-function contextFor(topicTitle: string, demand: LearningDemand, variant: number, claim: string): string {
-  const target = targetPhrase(claim).toLowerCase();
-  const contexts = variant === 0
-    ? {
-        recall: `In a one-minute retrieval check on ${topicTitle.toLowerCase()}, state the definition, relationship or condition needed for ${target}.`,
-        explanation: `A student is revising ${topicTitle.toLowerCase()}. Explain the physical reasoning behind ${target} and connect it to an observation.`,
-        application: `A laboratory technician encounters a new apparatus involving ${topicTitle.toLowerCase()}. Apply the idea of ${target} to predict the outcome.`,
-        misconception: `A student makes a claim about ${target} in ${topicTitle.toLowerCase()} that may be wrong. Diagnose the claim and replace it with the correct Physics.`,
-        calculation: `A measurement in a ${topicTitle.toLowerCase()} experiment is recorded below. Show a complete calculation using the relevant specification relationship.`,
-        transfer: `A design engineer uses an unfamiliar material or instrument involving ${topicTitle.toLowerCase()}. Transfer the idea of ${target} to this new context and justify the result.`,
-        synoptic: `A multi-stage investigation links ${target} to another area of ${topicTitle.toLowerCase()}. Combine the ideas and reach a justified conclusion.`,
-      }[demand]
-    : {
-        recall: `Without looking at notes, give a second concise statement that a WJEC examiner could credit for ${target}.`,
-        explanation: `Explain how changing one variable in a ${topicTitle.toLowerCase()} scenario changes the measured quantity when ${target} is used.`,
-        application: `A field scientist collects a fresh observation related to ${topicTitle.toLowerCase()}. Use ${target} to interpret the observation and state its implication.`,
-        misconception: `Two answers about ${target} look plausible. Identify the tempting error, then explain which answer the evidence supports and why.`,
-        calculation: `A second data set is collected for ${topicTitle.toLowerCase()}. Set out the equation, substitution, numerical result, unit and sensible precision.`,
-        transfer: `A context from electronics, medicine or sport now uses the same ${target} capability. Work through the unfamiliar transfer and explain what stays invariant.`,
-        synoptic: `A past-paper style problem combines ${target} with energy, fields, waves or data analysis. Select the links needed and defend your conclusion.`,
-      }[demand];
-  return contexts;
-}
-
-function contentTokens(text: string): Set<string> {
-  return new Set(text.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((token) => token.length > 3));
-}
-
-function groundedPoint(topic: Topic, claim: string): string {
-  const claimTokens = contentTokens(claim);
-  const candidate = topic.keyPoints
-    .map((point) => ({ point, score: [...contentTokens(point)].filter((token) => claimTokens.has(token)).length }))
-    .sort((a, b) => b.score - a.score || a.point.localeCompare(b.point))[0];
-  return candidate?.point ?? claim;
-}
-
-function answerFor(claim: string, demand: LearningDemand, topic: Topic, variant: number): string {
-  const topicTitle = topic.title;
-  const grounded = groundedPoint(topic, claim);
-  const tail = variant === 0 ? "Use the named quantities and the direction or condition stated in the question." : "State the condition, relationship and consequence explicitly.";
-  switch (demand) {
-    case "recall": return `The required statement is: ${grounded} ${tail}`;
-    case "explanation": return `The relevant physical reason is that ${grounded.toLowerCase()}. This connects the capability to the observed change in ${topicTitle.toLowerCase()}. The observation supports this under the stated conditions; it is a causal explanation rather than a definition. A quantitative observation, direction and assumptions should be stated so another marker can reproduce the reasoning.`;
-    case "application": return `Apply the statement to the apparatus: ${grounded.toLowerCase()}. This connects the capability to the measured outcome, which follows the stated relationship. The measured change is observable and the prediction is testable with the apparatus. State the units, direction and assumptions so the physical prediction can be checked.`;
-    case "misconception": return `The proposed interpretation is incomplete. The tempting error is ${topic.commonErrors[variant % Math.max(1, topic.commonErrors.length)] ?? "a reversed relationship"}. The correct interpretation is that ${grounded.toLowerCase()}. This rejects the misconception and justifies the correction. State the units, direction and assumptions so the correction can be checked.`;
-    case "calculation": return `Use the stated relationship for ${topicTitle.toLowerCase()}, show substitution and report the result with a unit and appropriate significant figures.`;
-    case "transfer": return `The same capability transfers because ${grounded.toLowerCase()}. This connects the capability to an unfamiliar context and justifies why the governing relationship applies even though the surface details change. The invariant is the physical model, while the new apparatus supplies different observations. State the units, direction and assumptions so the transfer can be checked.`;
-    case "synoptic": return `Link the ideas by using ${grounded.toLowerCase()} together with the relevant energy, field, wave or data principle. This links the capability to a second Physics principle, uses both relationships and defends the conclusion. The combined argument must remain dimensionally and physically consistent. State the units, direction and assumptions so the synthesis can be checked.`;
-  }
-}
-
-function calculationAnswer(formula: Formula): string {
-  const rendered = formula.expected.toPrecision(2);
-  return [
-    `method = ${formula.left} ${formula.operator} ${formula.right} = ${formula.expected}`,
-    `value = ${formula.expected}`,
-    `unit = ${rendered} ${formula.unit}`,
-    `precision = ${rendered}`,
-  ].join("\n");
-}
-
-function schemeFor(claim: string, demand: LearningDemand, topic: Topic, formula?: Formula): string[] {
-  if (demand === "calculation" && formula) {
-    return [
-      `selects ${formula.equation}`,
-      "substitutes the measured values with consistent units",
-      `obtains ${formula.expected}`,
-      `gives ${formula.unit} to appropriate significant figures`,
-    ];
-  }
-  const marks = MARKS[demand];
-  const grounded = groundedPoint(topic, claim);
-  if (marks === 1) return [`states that ${grounded.toLowerCase()}`];
-  const second = demand === "misconception"
-    ? "rejects the tempting misconception and justifies the correction"
-    : demand === "application"
-      ? "connects the capability to the measured outcome"
-      : demand === "explanation"
-        ? "connects the capability to the observed change"
-        : demand === "transfer"
-          ? "connects the capability to an unfamiliar context"
-          : demand === "synoptic"
-            ? "links the capability to a second Physics principle"
-            : "links the statement to the stated observation or conclusion";
-  const later = demand === "transfer"
-    ? ["justifies why the governing relationship applies"]
-    : demand === "synoptic"
-      ? ["uses both relationships", "defends the conclusion"]
-      : [];
-  return [`identifies that ${grounded.toLowerCase()}`, second, ...later].slice(0, marks);
-}
-
-function calculationRules(formula: Formula): NonNullable<QuestionPart["calculationRules"]> {
-  return [
-    { kind: "method", label: "method", expected: formula.expected, method: { operator: formula.operator, operands: [formula.left, formula.right] } },
-    { kind: "accuracy", label: "value", expected: formula.expected },
-    { kind: "unit", label: "unit", expected: formula.expected, unitAliases: [formula.unit] },
-    { kind: "precision", label: "precision", expected: formula.expected, significantFigures: 2 },
-  ];
-}
-
-function makeSpecs(): QuestionSpec[] {
-  const specs: QuestionSpec[] = [];
-  for (const topic of wjecPhysics.topics) {
-    const slug = topicSlug(topic.id);
-    for (const point of topic.specPoints ?? []) {
-      const capabilityId = physicsCapabilityIdForSpecPoint(point.id);
-      const claim = point.text.replace(/[.]$/, "");
-      for (const demand of DEMANDS) {
-        for (let variant = 0; variant < 2; variant++) {
-          const formula = demand === "calculation" ? formulaFor(slug, claim, variant) : undefined;
-          const marks = MARKS[demand];
-          const prompt = formula
-            ? calculationContext(topic.title, claim, formula, variant)
-            : contextFor(topic.title, demand, variant, claim);
-          const answer = formula ? calculationAnswer(formula) : answerFor(claim, demand, topic, variant);
-          const scheme = schemeFor(claim, demand, topic, formula);
-          const calculation = formula ? calculationRules(formula) : undefined;
-          specs.push({
-            slug: `wjec-physics-depth-${slug}-${point.id.split(".").at(-1)}-${demand}-${variant}`,
-            subjectId: SUBJECT_ID,
-            topics: [slug],
-            kind: demand === "calculation" ? "calculation" : marks > 2 ? "structured" : "short",
-            stem: prompt,
-            difficulty: DIFFICULTY[demand],
-            calculator: demand === "calculation",
-            parts: [{
-              prompt,
-              marks,
-              scheme,
-              answer,
-              aos: point.aos,
-              specPointIds: [point.id],
-              capabilityIds: [capabilityId],
-              ...(calculation ? { calculationRules: calculation } : {}),
-            }],
-            source: "generated",
-            // A generated depth question is useful for coverage immediately,
-            // but never masquerades as checked examiner content.
-            verification: "unverified",
-            reviewer: null,
-            lastChecked: null,
-            specVersion: SPEC_VERSION,
-            specPointIds: [point.id],
-            learning: {
-              familyId: `physics-depth:${point.id}:${demand}:${variant}`,
-              contextId: `physics-context:${slug}:${point.id.split(".").at(-1)}:${demand}:${variant}`,
-              demand,
-              expectedMinutes: demand === "recall" ? 1 : demand === "calculation" ? 5 : demand === "synoptic" ? 6 : 3,
-            },
-          });
-        }
-      }
-    }
-  }
-  return specs;
-}
-
-/** Complete per-statement × demand inventory, ready for moderation. */
-export const wjecPhysicsDeepQuestions = defineQuestions(makeSpecs());
+  item("magnetic-no-work", "fields", 5, "explanation",
+    "An electron enters a uniform magnetic field with its velocity perpendicular to the field. Explain why its speed stays constant although it accelerates. Neglect other forces and radiation.",
+    ["Magnetic force is perpendicular to velocity.", "The force does no work, so kinetic energy and speed remain constant.", "Velocity direction changes, giving centripetal acceleration."],
+    "Magnetic force is perpendicular to velocity. The force does no work, so kinetic energy and speed remain constant. Velocity direction changes, giving centripetal acceleration."),
+  item("orbit-height-trap", "fields", 4, "misconception",
+    "A satellite orbits at a height equal to Earth's radius R above the surface. A student predicts its gravitational field strength is the surface value g because its height is R. Determine the correct field strength and explain.",
+    ["Distance from Earth's centre is 2R.", "Inverse-square dependence gives field strength g/4."],
+    "Distance from Earth's centre is 2R. Inverse-square dependence gives field strength g/4."),
+  item("coil-flux-rate", "fields", 8, "calculation",
+    "A 200-turn coil has flux per turn decreasing uniformly from 3.0e-4 Wb to 1.0e-4 Wb in 0.050 s. Calculate the magnitude of induced emf. State how the induced current's field relates to this change.",
+    ["Change in flux linkage = 200 x 2.0e-4 = 0.040 Wb turns.", "Emf magnitude = 0.040 / 0.050 = 0.80 V.", "The induced field opposes the decrease in flux."],
+    "Change in flux linkage = 200 x 2.0e-4 = 0.040 Wb turns. Emf magnitude = 0.040 / 0.050 = 0.80 V. The induced field opposes the decrease in flux."),
+  item("mass-spectrometer-ratio", "fields", 6, "transfer",
+    "Two positive ion species enter the same uniform magnetic field at the same speed, perpendicular to it. Species A has mass m and charge e. Species B has mass 4m and charge 2e. Determine the ratio of their path radii rB/rA.",
+    ["Equating qvB = mv^2/r gives r = mv/(qB).", "At fixed speed and field, radius is proportional to m/q.", "rB/rA = 4/2 = 2."],
+    "Equating qvB = mv^2/r gives r = mv/(qB). At fixed speed and field, radius is proportional to m/q. rB/rA = 4/2 = 2."),
+  item("gas-temperature-trap", "thermal", 3, "misconception",
+    "A sealed rigid flask of ideal gas is heated from 20 degrees C to 40 degrees C. A student says the pressure doubles. Calculate the actual pressure ratio and explain the error.",
+    ["At fixed amount and volume, pressure is proportional to absolute temperature.", "Temperatures are 293 K and 313 K.", "Pressure ratio = 313/293 = 1.068, not 2."],
+    "At fixed amount and volume, pressure is proportional to absolute temperature. Temperatures are 293 K and 313 K. Pressure ratio = 313/293 = 1.068, not 2."),
+  item("molecular-energy", "thermal", 5, "calculation",
+    "Calculate the mean translational kinetic energy of one ideal-gas molecule at 300 K. Use k = 1.38e-23 J K^-1.",
+    ["Mean kinetic energy = 3kT/2.", "Mean kinetic energy = 6.21e-21 J."],
+    "Mean kinetic energy = 3kT/2 = 1.5 x 1.38e-23 x 300 = 6.21e-21 J."),
+  item("background-decay", "nuclear", 3, "calculation",
+    "A detector measures 820 counts per minute initially and 220 counts per minute after 12 minutes. Background is constant at 20 counts per minute. Estimate the half-life; ignore counting uncertainty for this calculation.",
+    ["Background-corrected rates are 800 and 200 counts per minute.", "The source rate falls by a factor of four, corresponding to two half-lives.", "Half-life = 12/2 = 6 minutes."],
+    "Background-corrected rates are 800 and 200 counts per minute. The source rate falls by a factor of four, corresponding to two half-lives. Half-life = 12/2 = 6 minutes."),
+  item("decay-randomness", "nuclear", 3, "explanation",
+    "A sample has a half-life of one hour. Explain why this does not mean that each nucleus decays exactly one hour after it was formed.",
+    ["Decay of an individual nucleus is random with constant probability per unit time.", "Half-life describes the expected halving of a large undecayed population."],
+    "Decay of an individual nucleus is random with constant probability per unit time. Half-life describes the expected halving of a large undecayed population."),
+  item("rebound-impulse", "momentum", 4, "calculation",
+    "A 0.060 kg ball approaches a wall at +20 m s^-1 and rebounds at -15 m s^-1. Contact lasts 0.010 s. Calculate the average force on the ball, including its direction.",
+    ["Change in velocity = -15 - 20 = -35 m s^-1.", "Change in momentum = 0.060 x (-35) = -2.1 kg m s^-1.", "Average force = -2.1 / 0.010 = -210 N, away from the wall."],
+    "Change in velocity = -15 - 20 = -35 m s^-1. Change in momentum = 0.060 x (-35) = -2.1 kg m s^-1. Average force = -2.1 / 0.010 = -210 N, away from the wall."),
+  item("airbag-force", "momentum", 4, "transfer",
+    "Two restraint designs stop the same test dummy from the same speed without rebound. Design B doubles the stopping time. Explain the effect on impulse and average force. Can you deduce the peak force from this information?",
+    ["The momentum change and impulse are the same.", "Doubling time halves the average force.", "Peak force cannot be determined without the force-time profile."],
+    "The momentum change and impulse are the same. Doubling time halves the average force. Peak force cannot be determined without the force-time profile."),
+  item("shm-sign", "circular-shm", 3, "misconception",
+    "An oscillator has acceleration a = +16x, with SI units. A student identifies SHM because acceleration is proportional to displacement. Explain why this is insufficient.",
+    ["SHM requires acceleration directed towards equilibrium, opposite to displacement.", "The positive coefficient gives acceleration away from equilibrium, so this is not SHM."],
+    "SHM requires acceleration directed towards equilibrium, opposite to displacement. The positive coefficient gives acceleration away from equilibrium, so this is not SHM."),
+  item("shm-period-from-gradient", "circular-shm", 4, "calculation",
+    "An acceleration-displacement graph for an oscillator is a straight line through the origin with gradient -25 s^-2. Calculate its period.",
+    ["The gradient is -omega^2, so omega = 5.0 rad s^-1.", "T = 2 pi / 5.0 = 1.26 s."],
+    "The gradient is -omega^2, so omega = 5.0 rad s^-1. T = 2 pi / 5.0 = 1.26 s."),
+];

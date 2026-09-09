@@ -1311,6 +1311,7 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
 }
 
 function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, seq: number): AdaptiveSessionStep {
+  const questionTopicId = action.topicId ?? topicId;
   const kind: AdaptiveStepKind = action.kind === "guided" ? "misconception-repair" :
     action.kind === "transfer" ? "transfer" : "independent-application";
   const intervention: InterventionAttemptContext = {
@@ -1318,8 +1319,9 @@ function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, 
     ...(action.mistakeId ? { chainId: action.mistakeId } : { chainId: `${topicId}:${action.capabilityId}` }),
     kind: action.kind,
     capabilityId: action.capabilityId,
-    topicId,
+    topicId: questionTopicId,
     priorState: action.priorState,
+    ...(action.priorAccuracy !== undefined ? { priorAccuracy: action.priorAccuracy } : {}),
     plannedMinutes: action.minutes,
     support: action.teaching ? "scaffold" : "none",
     activity: "question",
@@ -1328,11 +1330,11 @@ function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, 
     id: `${topicId}:skill:${seq}:${action.question.id}`, kind,
     label: action.kind === "diagnose" ? "Check the smallest gap" : action.kind === "retention" ? "Check what stayed with you" : STEP_LABELS[kind],
     description: action.reason, why: action.reason, minutes: action.minutes,
-    topicId, subjectId, questionIds: [action.question.id], cardIds: [],
+    topicId: questionTopicId, subjectId, questionIds: [action.question.id], cardIds: [],
     mistakeIds: action.mistakeId && action.kind !== "diagnose" ? [action.mistakeId] : [],
     capabilityId: action.capabilityId, teaching: action.teaching,
     intervention,
-    href: practiceHref(topicId, action.question.id, kind),
+    href: practiceHref(questionTopicId, action.question.id, kind),
     params: { support: action.teaching ? "supported" : "independent", hintBudget: action.teaching ? 3 : 0 },
   };
 }

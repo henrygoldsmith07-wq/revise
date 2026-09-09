@@ -1360,13 +1360,25 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           (context.kind === "transfer" ? !row.transfer : context.kind === "retention" ? Boolean(row.transfer) && !row.delayedRetention : false));
         let next: InterventionOutcomeRecord[];
         if (related && context.kind === "transfer") {
-          const updated = attachTransferOutcome(related, attempt);
+          const updated = attachTransferOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [] });
           next = [...current.filter((row) => row.id !== related.id), updated];
         } else if (related && context.kind === "retention") {
-          const updated = attachDelayedRetentionOutcome(related, attempt);
+          const lastLearningAt = current.filter((row) => row.capabilityId === context.capabilityId && row.updatedAt < attempt.createdAt)
+            .map((row) => row.updatedAt).sort().at(-1);
+          const updated = attachDelayedRetentionOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [], lastLearningAt });
           next = [...current.filter((row) => row.id !== related.id), updated];
         } else {
-          next = [...current, createInterventionOutcome({ userId: attempt.userId, subjectId: attempt.subjectId, context, attempt })];
+          const priorQuestionAt = current.filter((row) => row.capabilityId === context.capabilityId &&
+            row.chainId === context.chainId && (row.activity ?? "question") === "question" && row.createdAt < attempt.createdAt)
+            .map((row) => row.createdAt).sort().at(-1) ?? "";
+          const supportObservations = current.filter((row) => row.capabilityId === context.capabilityId &&
+            row.chainId === context.chainId && row.activity && row.activity !== "question" &&
+            row.createdAt > priorQuestionAt && row.createdAt <= attempt.createdAt);
+          const outcome = createInterventionOutcome({ userId: attempt.userId, subjectId: attempt.subjectId, context, attempt, question,
+            actualMinutes: attempt.elapsedMs / 60_000 + supportObservations.reduce((sum, row) => sum + row.actualMinutes, 0) });
+          // Planned durations remain visible but cannot enter empirical gain.
+          outcome.timeMeasured = outcome.timeMeasured === true && supportObservations.every((row) => row.timeMeasured === true);
+          next = [...current, outcome];
         }
         const nextAll = [...all.filter((row) => row.userId !== attempt.userId), ...next].slice(-2000);
         await writeReviseMeta("interventionOutcomes", nextAll);

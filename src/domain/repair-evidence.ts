@@ -1,5 +1,6 @@
 import { independentAttempt, isTransferQuestion, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Card, Mistake, MistakeRepairStage, MistakeRepairState, Question, ReviewLog } from "./types";
+import { trustedAssessmentContent } from "./physics-content-review";
 
 export const REPAIR_RETENTION_DELAY_MS = 7 * 86_400_000;
 
@@ -76,7 +77,7 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
     record("transfer");
     repair.dueAt = new Date(Date.parse(attempt.createdAt) + REPAIR_RETENTION_DELAY_MS).toISOString();
   } else if (priorStage === "transfer") {
-    if (independent && repair.dueAt && Date.parse(attempt.createdAt) >= Date.parse(repair.dueAt) &&
+    if (independent && trustedAssessmentContent(question) && repair.dueAt && Date.parse(attempt.createdAt) >= Date.parse(repair.dueAt) &&
       question.learning && ["application", "calculation", "transfer", "synoptic"].includes(question.learning.demand)) {
       record("delayed-retention");
       record("resolved");

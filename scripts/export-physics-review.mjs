@@ -1,0 +1,68 @@
+import { build } from "esbuild";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+// No approvals are created here. The output is a review packet, not a review.
+const destination = process.argv[2];
+if (!destination) throw new Error("Usage: node scripts/export-physics-review.mjs <output-directory>");
+const bundle = await build({
+  stdin: { contents: `
+    export { seedQuestions as questions } from "./src/content";
+    export { physicsContentFingerprint, REQUIRED_HUMAN_CHECKS } from "./src/domain/physics-content-review";
+    export { wjecCapabilities as capabilities } from "./src/content/capabilities";
+    export { wjecPhysics as curriculum } from "./src/domain/curriculum/wjec-physics";
+    export { markPart } from "./src/domain/marking";
+  `, resolveDir: process.cwd(), loader: "ts" },
+  bundle: true, platform: "node", format: "esm", write: false,
+});
+const data = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+const rows = data.questions.filter((question) => question.subjectId === "wjec-alevel-physics").map((question) => ({
+  question,
+  fingerprint: data.physicsContentFingerprint(question),
+  review: {
+    status: "pending",
+    contentFingerprint: data.physicsContentFingerprint(question),
+    checks: Object.fromEntries(data.REQUIRED_HUMAN_CHECKS.map((check) => [check, false])),
+    notes: "Pending review of this version. Inherited checked/verified labels are not a new human attestation.",
+  },
+  automaticMarking: question.parts.map((part) => {
+    const marked = data.markPart(part, part.modelAnswer);
+    return { partId: part.id, modelAnswerAwarded: marked.awarded, available: part.marks,
+      missedPoints: marked.missedPoints,
+      note: "Self-consistency check only; this cannot establish marking validity." };
+  }),
+}));
+const lines = [
+  "# Physics content review packet",
+  "",
+  `${rows.length} Physics questions from the complete live bank, including the 47 replacement AI drafts. This export creates **no human approvals**. No efficacy results are claimed.`,
+  "",
+  "Review the prompt, mark scheme, worked solution, internal specification mapping, capability mapping and exam realism separately. Solve before reading the key. Record accepted alternatives, rejected misconceptions and uncertain marking. Use examiner-labelled student answers to validate partial credit.",
+  "",
+  "The fingerprint identifies the exact content reviewed. If content changes, review again. Do not copy the test-only reviewer identities from automated tests into production.",
+  "",
+  "Board reference: [WJEC Physics specification, version 3 October 2023](https://www.wjec.co.uk/media/gxbjl243/wjec-gce-physics-spec-from-2015-e-22-09-22.pdf). Internal claim IDs and references require checking against this document; they are not an assertion of official coverage.",
+  "",
+];
+for (const row of rows) {
+  lines.push(`## ${row.question.id}`, "", `Source: ${row.question.source ?? "unspecified"}. Demand: ${row.question.learning?.demand ?? "unclassified"}. Fingerprint: ${row.fingerprint}.`, "");
+  for (const part of row.question.parts) {
+    const automatic = row.automaticMarking.find((result) => result.partId === part.id);
+    lines.push(part.prompt, "", `Marks: ${part.marks}`, "", ...part.markScheme.map((point) => `- ${point}`),
+      "", "**Worked solution**", "", part.modelAnswer, "",
+      `Automatic model-answer check: ${automatic.modelAnswerAwarded}/${automatic.available}. ${automatic.modelAnswerAwarded === automatic.available ? "Consistency only; still needs human review." : "MARKING DISAGREEMENT: investigate before using as trusted evidence."}`,
+      "",
+      `Internal claims: ${part.specPointIds?.join(", ") || "MAPPING REQUIRED"}`,
+      `Capabilities: ${part.capabilityIds?.join(", ") || "MAPPING REQUIRED"}`, "");
+  }
+  lines.push("Review: [ ] Question [ ] Marking [ ] Solution [ ] Specification [ ] Capability [ ] Exam realism", "",
+    "Reviewer / date / decision / corrections: ____________________", "");
+}
+const out = resolve(destination);
+await mkdir(out, { recursive: true });
+await writeFile(resolve(out, "physics-review-packet.json"), JSON.stringify(rows, null, 2));
+await writeFile(resolve(out, "physics-review-packet.md"), lines.join("\n"));
+await writeFile(resolve(out, "physics-capability-graph.json"), JSON.stringify(data.capabilities.filter((node) => node.subjectId === "wjec-alevel-physics"), null, 2));
+console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((row) => row.question.id.startsWith("cnt:question:physics-quality-")).length, approvalsCreated: 0,
+  modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
+  output: out }));

@@ -1,4 +1,5 @@
 import type { QuestionTrace } from "./knowledge-tracing";
+import { authenticPaperEvidence } from "./learning-evidence";
 import { masteryIntervals } from "./mastery-uncertainty";
 import type { Attempt, Card, Id, Mistake, Question, Topic, TopicMastery } from "./types";
 import type { MasteryInterval } from "./mastery-uncertainty";
@@ -153,7 +154,7 @@ export function buildPredictionOutcomePairs(input: { attempts: Attempt[]; questi
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
   const grouped = new Map<string, Attempt[]>();
   for (const attempt of input.attempts.filter((row) => row.mode === "paper")) {
-    const key = `${attempt.subjectId}:${groupKey(attempt)}`;
+    const key = `${attempt.userId}:${attempt.subjectId}:${groupKey(attempt)}`;
     const rows = grouped.get(key) ?? [];
     rows.push(attempt);
     grouped.set(key, rows);
@@ -166,6 +167,10 @@ export function buildPredictionOutcomePairs(input: { attempts: Attempt[]; questi
   const pairs: PredictionOutcomePair[] = [];
 
   for (const group of groups) {
+    // A partial trusted subset is not a whole paper. Keep practice evidence
+    // elsewhere, but exclude the entire Physics sitting from calibration.
+    if (group[0]?.subjectId === "wjec-alevel-physics" && group.some((attempt) =>
+      !authenticPaperEvidence(attempt, questionsById.get(attempt.questionId), input.attempts, input.questions))) continue;
     let predictedMarks = 0;
     let actualMarks = 0;
     let marksAvailable = 0;

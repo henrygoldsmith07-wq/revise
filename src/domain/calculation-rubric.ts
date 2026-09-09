@@ -12,16 +12,17 @@ function numberOf(expression: string): number | null {
   const number = value ? value.n / value.d : 0;
   return Number.isFinite(number) ? number : null;
 }
-const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(1e-12, Math.abs(b) * 0.005);
+// An absolute 1e-12 floor incorrectly awarded zero for photon-scale energies.
+const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(Number.MIN_VALUE, Math.abs(b) * 0.005);
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const SCALAR = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?";
+const SCALAR = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
 const NUMERIC_EXPRESSION = new RegExp(`^(${SCALAR}(?:\\s*[+*/-]\\s*${SCALAR})*)\\s*(.*)$`);
 
 interface Line { text: string; expression: string; raw: string; value: number; unit: string }
 function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
   const aliases = [rule.label, ...(rule.aliases ?? [])].map((s) => escaped(normalise(s)));
-  const lines = normalise(answer).split(/[\n;]/).map((s) => s.trim());
-  const matching = lines.filter((line) => new RegExp(`^(?:${aliases.join("|")})\\s*=`).test(line));
+  const lines = answer.replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/").split(/[\n;]/).map((s) => s.trim());
+  const matching = lines.filter((line) => new RegExp(`^(?:${aliases.join("|")})\\s*=`, "i").test(line));
   // Multiple conflicting versions need review; never cherry-pick the correct one.
   if (matching.length !== 1) return undefined;
   const text = matching[0]!;
@@ -36,7 +37,35 @@ function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
   const raw = final[1]!.trim();
   const parsed = numberOf(raw) ?? Number(raw);
   if (!Number.isFinite(parsed)) return undefined;
-  return { text, expression: segments.length >= 2 ? segments[0]! : "", raw, value: parsed, unit: final[2]!.trim() };
+  return { text, expression: segments.length >= 2 ? normalise(segments[0]!) : "", raw, value: parsed, unit: final[2]!.trim() };
+}
+
+function unitKey(unit: string): string {
+  // SI symbol case matters: m is metre, M is the mega prefix; Pa is not pA.
+  return unit.replace(/⁻/g, "-").replace(/²/g, "2").replace(/³/g, "3").replace(/[\s^]/g, "");
+}
+
+/** Locate explicit contradictions without guessing at unrecognised algebra. */
+export function contradictoryWorkingStep(answer: string): number | null {
+  const seen = new Map<string, number>();
+  const lines = normalise(answer).split(/[\n;]/).map((line) => line.trim()).filter(Boolean);
+  for (const [index, line] of lines.entries()) {
+    const [label, ...segments] = line.split("=").map((segment) => segment.trim());
+    if (!label || !segments.length) continue;
+    const final = segments.at(-1)?.match(NUMERIC_EXPRESSION);
+    if (!final) continue;
+    const value = numberOf(final[1]!) ?? Number(final[1]);
+    if (!Number.isFinite(value)) continue;
+    const prior = seen.get(label);
+    if (prior !== undefined && !close(prior, value)) return index;
+    seen.set(label, value);
+    // An explicitly evaluated expression that disagrees with its result.
+    for (const expression of segments.slice(0, -1)) {
+      const computed = numberOf(expression);
+      if (computed !== null && !close(computed, value)) return index;
+    }
+  }
+  return null;
 }
 
 /** Conservative supported grammar. Unrecognised working is queued for review, not a confident zero. */
@@ -76,18 +105,20 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
         awarded = followsMethod;
         reason = awarded ? "Correct calculation method is shown, independently of the arithmetic result." : "The required calculation method is not demonstrated.";
       } else if (rule.kind === "accuracy") {
-        awarded = close(line.value, rule.expected);
+        const evaluated = line.expression ? numberOf(line.expression) : null;
+        awarded = close(line.value, rule.expected) && (evaluated === null || close(evaluated, line.value));
         reason = awarded ? "The numerical result is correct." : `Check this result; the expected value is ${rule.expected}.`;
       } else if (rule.kind === "follow-through") {
         awarded = followsMethod && computed !== null && close(line.value, computed);
         reason = awarded ? close(line.value, rule.expected) ? "The method and result are correct." : "Method mark earned using your earlier value (error carried forward)." : "The result does not follow from the shown calculation.";
       } else if (rule.kind === "unit") {
-        awarded = (rule.unitAliases ?? []).some((unit) => normalise(unit).replace(/[\s^]/g, "") === line.unit.replace(/[\s^]/g, ""));
+        awarded = (rule.unitAliases ?? []).some((unit) => unitKey(unit) === unitKey(line.unit));
         reason = awarded ? "The final unit is correct." : "The final unit is missing or incorrect.";
       } else {
         const mantissa = line.raw.split(/e/i)[0]!.replace(/^[+-]/, "");
         const digits = mantissa.replace(".", "").replace(/^0+/, "");
-        awarded = digits.length === rule.significantFigures;
+        // Fractions/arithmetic do not explicitly declare significant figures.
+        awarded = new RegExp(`^${SCALAR}$`).test(line.raw) && digits.length === rule.significantFigures;
         reason = awarded ? "The final value uses the requested significant figures." : `Report the final value to ${rule.significantFigures} significant figures.`;
       }
     }

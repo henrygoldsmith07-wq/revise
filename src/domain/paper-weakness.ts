@@ -1,4 +1,5 @@
 import type { Attempt, Id, Mistake, Paper, Question } from "./types";
+import { trustworthyAttempt } from "./learning-evidence";
 
 export interface PaperWeaknessTopic {
   topicId: Id;
@@ -33,6 +34,8 @@ export interface PaperWeaknessRecommendation {
 }
 
 export interface PaperWeaknessAnalysis {
+  /** Only singly mapped, marked parts can locate a blocking capability. */
+  capabilities: Array<{ capabilityId: Id; marksLost: number; marksAvailable: number }>;
   paperId: Id;
   title: string;
   subjectId: Id;
@@ -121,10 +124,26 @@ export function analysePaperWeakness(input: {
   const relevantAttempts = input.attempts.filter(
     (attempt) =>
       attempt.mode === "paper" &&
+      attempt.subjectId === input.paper.subjectId && trustworthyAttempt(attempt) &&
       questionIds.has(attempt.questionId) &&
       (!input.paperRunId || attempt.paperRunId === input.paperRunId),
   );
   const attemptsById = new Map(relevantAttempts.map((attempt) => [attempt.id, attempt] as const));
+  const capabilities = new Map<Id, { capabilityId: Id; marksLost: number; marksAvailable: number }>();
+  for (const attempt of attemptsById.values()) {
+    const question = questionsById.get(attempt.questionId);
+    for (const part of question?.parts ?? []) {
+      if (part.capabilityIds?.length !== 1) continue;
+      const marked = attempt.marked.find((row) => row.partId === part.id && row.max === part.marks &&
+        row.awarded >= 0 && row.awarded <= row.max);
+      if (!marked) continue;
+      const capabilityId = part.capabilityIds[0]!;
+      const row = capabilities.get(capabilityId) ?? { capabilityId, marksLost: 0, marksAvailable: 0 };
+      row.marksLost += marked.max - marked.awarded;
+      row.marksAvailable += marked.max;
+      capabilities.set(capabilityId, row);
+    }
+  }
   const topics = new Map<Id, TopicAccumulator>();
   const questions = new Map<Id, QuestionAccumulator>();
 
@@ -222,6 +241,7 @@ export function analysePaperWeakness(input: {
 
   return {
     paperId: input.paper.id,
+    capabilities: [...capabilities.values()].sort((a, b) => b.marksLost - a.marksLost),
     title: input.paper.title,
     subjectId: input.paper.subjectId,
     attempts: relevantAttempts.length,

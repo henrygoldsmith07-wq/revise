@@ -74,11 +74,15 @@ export interface HumanVerificationRecord {
   status: "pending" | "approved" | "changes-requested";
   reviewerId?: Id;
   reviewedAt?: IsoInstant;
+  /** Fingerprint of the exact question, scheme, solution and mappings reviewed. */
+  contentFingerprint?: string;
   checks: {
     question: boolean;
     marking: boolean;
     workedSolution: boolean;
     capabilityMapping: boolean;
+    specificationMapping?: boolean;
+    examRealism?: boolean;
   };
   notes?: string;
 }
@@ -640,6 +644,7 @@ export interface InterventionAttemptContext {
   capabilityId: Id;
   topicId: Id;
   priorState: InterventionPriorState;
+  priorAccuracy?: number;
   plannedMinutes: number;
   support: InterventionSupport;
   /** Question attempts, card retrievals and teaching gates share one event path. */
@@ -659,12 +664,18 @@ export interface InterventionOutcomeRecord {
   capabilityId: Id;
   kind: InterventionKind;
   priorState: InterventionPriorState;
+  /** Measured pre-intervention independent accuracy; absence prevents gain calibration. */
+  priorAccuracy?: number;
+  evidenceVersion?: 2;
+  immediateQuestionId?: Id;
+  immediateFamilyId?: Id;
+  timeMeasured?: boolean;
   plannedMinutes: number;
   actualMinutes: number;
   support: InterventionSupport;
   immediate: { awarded: number; max: number; independent: boolean; attemptId: Id; at: IsoInstant; result?: InterventionObservationResult };
-  transfer?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant };
-  delayedRetention?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant };
+  transfer?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant; familyId?: Id; trusted?: boolean };
+  delayedRetention?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant; familyId?: Id; trusted?: boolean };
   createdAt: IsoInstant;
   updatedAt: IsoInstant;
 }

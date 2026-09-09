@@ -2,14 +2,16 @@ import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } 
 import { isTransferQuestion, questionCapabilities, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
-import { humanVerifiedPhysicsQuestion } from "./physics-content-review";
+import { humanVerifiedPhysicsQuestion, trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, InterventionOutcomeRecord, Mistake, Question, InterventionPriorState } from "./types";
 
 export interface LearningAction {
   kind: "diagnose" | "guided" | "independent" | "transfer" | "retention";
   question: Question;
   capabilityId: string;
+  topicId?: string;
   priorState: InterventionPriorState;
+  priorAccuracy?: number;
   mistakeId?: string;
   teaching: boolean;
   minutes: number;
@@ -28,15 +30,16 @@ export function selectLearningAction(input: {
 }): LearningAction | undefined {
   const { topicId, nodes, questions, attempts, now } = input;
   const evidence = deriveSkillEvidence(nodes, questions, attempts);
+  const baselineEvidence = deriveSkillEvidence(nodes, questions.filter(trustedAssessmentContent), attempts);
   const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
   const candidates: LearningAction[] = [];
   const eligible = questions.filter((q) => q.topicIds.includes(topicId) && q.learning &&
     !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? ""));
   const add = (kind: LearningAction["kind"], capabilityId: string, pool: Question[], reason: string, mistake?: Mistake) => {
     const trustedPool = (kind === "transfer" || kind === "retention")
-      ? pool.filter(humanVerifiedPhysicsQuestion)
-      : [];
-    const selectedPool = trustedPool.length ? trustedPool : pool;
+      ? pool.filter(trustedAssessmentContent)
+      : pool;
+    const selectedPool = trustedPool;
     for (const question of selectedPool) {
       const minutes = Math.max(0.5, question.learning?.expectedMinutes ?? question.totalMarks * 0.75);
       if (minutes > (input.remainingMinutes ?? Infinity)) continue;
@@ -45,6 +48,8 @@ export function selectLearningAction(input: {
       const effect = effectivenessFor(kind, capabilityId, calibrations);
       const trust = humanVerifiedPhysicsQuestion(question) ? "human-verified" as const : "needs-human-review" as const;
       candidates.push({ kind, question, capabilityId, priorState: evidence.get(capabilityId)?.state ?? "unknown", ...(mistake ? { mistakeId: mistake.id } : {}),
+        topicId: nodes.find((node) => node.id === capabilityId)?.topicId ?? question.topicIds[0] ?? topicId,
+        ...(baselineEvidence.get(capabilityId)?.accuracy != null ? { priorAccuracy: baselineEvidence.get(capabilityId)!.accuracy! } : {}),
         teaching: kind === "guided", minutes, reason,
         expectedGainPerMinute: effect.gainPerMinute * Math.min(5, Math.max(1, lost)) * (0.4 + gap),
         calibrated: effect.calibrated,
@@ -62,7 +67,9 @@ export function selectLearningAction(input: {
     if (stage === "transfer" && mistake.repair?.dueAt && Date.parse(mistake.repair.dueAt) > now.getTime()) continue;
     const root = smallestUnprovenCapability([capabilityId], nodes, evidence);
     if (root && root.id !== capabilityId && ["weak", "unknown"].includes(evidence.get(root.id)?.state ?? "unknown")) {
-      const probes = eligible.filter((q) => questionCapabilities(q).includes(root.id) && unseenQuestion(q, attempts, questions));
+      const probes = questions.filter((q) => q.subjectId === root.subjectId && q.learning &&
+        !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? "") &&
+        questionCapabilities(q).includes(root.id) && unseenQuestion(q, attempts, questions));
       add("diagnose", root.id, probes, `Check ${root.label.toLowerCase()} first; the upstream cause is still a hypothesis.`, mistake);
       if (probes.length) continue;
     }

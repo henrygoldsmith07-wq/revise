@@ -1,4 +1,5 @@
 import type { Attempt, Question } from "./types";
+import { trustedAssessmentContent } from "./physics-content-review";
 
 function normaliseAnswer(text: string): string {
   return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
@@ -52,6 +53,7 @@ export function questionCapabilities(question: Question): string[] {
 
 /** Transfer is an authored demand and a different context, never a difficulty label. */
 export function isTransferQuestion(question: Question, source?: Question): boolean {
+  if (!trustedAssessmentContent(question)) return false;
   const meta = question.learning;
   if (!meta || !["transfer", "synoptic"].includes(meta.demand)) return false;
   if (!source) return true;
@@ -65,4 +67,16 @@ export function unseenQuestion(question: Question, history: readonly Attempt[], 
   const byId = new Map(questions.map((q) => [q.id, q]));
   return !history.some((a) => a.questionId === question.id ||
     (byId.has(a.questionId) && questionFamily(byId.get(a.questionId)!) === questionFamily(question)));
+}
+
+/** A paper-mode flag alone cannot authenticate an unseen exam performance. */
+export function authenticPaperEvidence(attempt: Attempt, question: Question | undefined,
+  history: readonly Attempt[], questions: readonly Question[]): boolean {
+  if (!question || question.source !== "past-paper" || !trustedAssessmentContent(question) ||
+    !question.paperId || !question.paperQuestionNumber?.trim() ||
+    !independentAttempt(attempt) || attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId ||
+    attempt.subjectId !== question.subjectId || attempt.max !== question.totalMarks ||
+    !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
+  return unseenQuestion(question, history.filter((row) => row.userId === attempt.userId &&
+    row.id !== attempt.id && row.createdAt <= attempt.createdAt), questions);
 }

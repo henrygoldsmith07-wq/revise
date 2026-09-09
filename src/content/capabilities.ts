@@ -23,21 +23,65 @@ export function physicsCapabilityIdsForSpecPoints(specPointIds: readonly string[
 }
 
 /**
- * One diagnosable node per WJEC Physics specification statement. The ordered
- * edge inside a topic is deliberately conservative: a later statement can be
- * attempted only after the preceding statement has evidence, while topics do
- * not form a giant cross-topic chain. This gives the tutor a useful smallest
- * upstream probe without turning an unknown in one topic into a prerequisite
- * for the whole course.
+ * Conceptual dependencies, never curriculum order. An absent edge means no
+ * blocking prerequisite has been established here; it does not assert that a
+ * skill has no prerequisites. These links still await subject-expert review.
  */
+export const physicsPrerequisites: Record<string, string[]> = {
+  "kinematics-dynamics.sp-02": ["phys.kinematics-dynamics.sp-05"],
+  "kinematics-dynamics.sp-03": ["phys.kinematics-dynamics.sp-05"],
+  "kinematics-dynamics.sp-04": ["phys.resultant"],
+  "kinematics-dynamics.sp-06": ["phys.kinematics-dynamics.sp-01", "phys.kinematics-dynamics.sp-03"],
+  "kinematics-dynamics.sp-07": ["phys.acceleration"],
+  "kinematics-dynamics.sp-08": ["phys.momentum.sp-01"],
+  "energy-power.sp-01": ["phys.kinematics-dynamics.sp-01"],
+  "energy-power.sp-02": ["phys.energy-power.sp-01"],
+  "energy-power.sp-03": ["phys.energy-power.sp-01"],
+  "energy-power.sp-04": ["phys.energy-power.sp-01"],
+  "energy-power.sp-05": ["phys.energy-power.sp-02", "phys.materials.sp-04"],
+  "energy-power.sp-06": ["phys.energy-power.sp-02"],
+  "materials.sp-04": ["phys.materials.sp-02", "phys.energy-power.sp-04"],
+  "materials.sp-05": ["phys.materials.sp-03"],
+  "materials.sp-06": ["phys.materials.sp-01", "phys.materials.sp-04"],
+  "waves.sp-02": ["phys.waves.sp-07"],
+  "waves.sp-03": ["phys.waves.sp-07", "phys.waves.sp-01"],
+  "waves.sp-04": ["phys.waves.sp-06"],
+  "quantum.sp-02": ["phys.quantum.sp-01"],
+  "quantum.sp-03": ["phys.quantum.sp-01"],
+  "quantum.sp-04": ["phys.momentum.sp-01", "phys.waves.sp-08"],
+  "quantum.sp-05": ["phys.quantum.sp-04"],
+  "quantum.sp-07": ["phys.quantum.sp-01", "phys.quantum.sp-06"],
+  "electric-circuits.sp-02": ["phys.circuit.ohm"],
+  "electric-circuits.sp-04": ["phys.circuit.ohm", "phys.circuit.emf"],
+  "electric-circuits.sp-05": ["phys.circuit.ohm"],
+  "electric-circuits.sp-06": ["phys.circuit.emf", "phys.circuit.divider"],
+  "momentum.sp-02": ["phys.momentum.sp-01"],
+  "momentum.sp-03": ["phys.momentum.sp-02", "phys.energy-power.sp-02"],
+  "momentum.sp-04": ["phys.momentum.sp-01", "phys.kinematics-dynamics.sp-05"],
+  "momentum.sp-05": ["phys.momentum.sp-02", "phys.kinematics-dynamics.sp-01"],
+  "momentum.sp-06": ["phys.momentum.sp-02"],
+  "circular-shm.sp-02": ["phys.circular-shm.sp-01", "phys.acceleration"],
+  "circular-shm.sp-03": ["phys.acceleration"],
+  "circular-shm.sp-04": ["phys.circular-shm.sp-03"],
+  "circular-shm.sp-05": ["phys.circular-shm.sp-03", "phys.materials.sp-02"],
+  "circular-shm.sp-06": ["phys.circular-shm.sp-03", "phys.energy-power.sp-02"],
+  "circular-shm.sp-07": ["phys.circular-shm.sp-04", "phys.energy-power.sp-06"],
+  "fields.sp-03": ["phys.energy-power.sp-01", "phys.fields.sp-02"],
+  "fields.sp-04": ["phys.fields.sp-01", "phys.fields.sp-02", "phys.circular-shm.sp-02"],
+  "fields.sp-06": ["phys.fields.sp-05", "phys.circular-shm.sp-02"],
+  "fields.sp-08": ["phys.fields.sp-07"],
+  "thermal.sp-04": ["phys.momentum.sp-04"],
+  "thermal.sp-05": ["phys.thermal.sp-03", "phys.energy-power.sp-02"],
+  "thermal.sp-06": ["phys.thermal.sp-01", "phys.thermal.sp-02"],
+  "nuclear.sp-05": ["phys.nuclear.sp-04"],
+  "nuclear.sp-07": ["phys.nuclear.sp-06"],
+};
+
 export const wjecPhysicsCapabilities: CapabilityNode[] = wjecPhysics.topics.flatMap((topic) => {
   const points = topic.specPoints ?? [];
-  return points.map((point, index) => {
+  return points.map((point) => {
     const id = physicsCapabilityIdForSpecPoint(point.id);
-    const previous = points[index - 1];
-    const prerequisites = previous && index > 0
-      ? [physicsCapabilityIdForSpecPoint(previous.id)]
-      : [];
+    const prerequisites = physicsPrerequisites[id.replace(/^phys\./, "")] ?? [];
     return {
       id,
       subjectId: PHYSICS_SUBJECT_ID,
@@ -50,8 +94,26 @@ export const wjecPhysicsCapabilities: CapabilityNode[] = wjecPhysics.topics.flat
   });
 });
 
+const physicsCircuitCapabilities: CapabilityNode[] = [
+  { id: "phys.circuit.charge", label: "Conserve charge at junctions and in series", point: 1, prerequisites: [],
+    explanation: "In steady state charge does not accumulate. Current into a junction equals current out. A resistor transfers energy, not charge." },
+  { id: "phys.circuit.emf", label: "Distinguish emf from terminal potential difference", point: 1, prerequisites: [],
+    explanation: "Emf is energy supplied per coulomb by a source; terminal potential difference is energy transferred per coulomb to the external circuit." },
+  { id: "phys.circuit.ohm", label: "Relate current, voltage and resistance", point: 2, prerequisites: ["phys.circuit.charge", "phys.circuit.emf"],
+    explanation: "For a component R = V/I at its operating point. Ohm's law additionally requires constant resistance under unchanged physical conditions." },
+  { id: "phys.circuit.divider", label: "Analyse a loaded potential divider", point: 2, prerequisites: ["phys.circuit.ohm"],
+    explanation: "Combine the load with the parallel resistor first. Then use Vout = Vin Rlower/(Rupper + Rlower). A load changes the resistance ratio." },
+  { id: "phys.circuit.internal", label: "Find lost volts and internal resistance", point: 2, prerequisites: ["phys.circuit.emf", "phys.circuit.ohm"],
+    explanation: "For a delivering cell, emf = terminal voltage + Ir. Divide lost volts by current to find internal resistance; include internal resistance in total circuit resistance." },
+].map(({ point, ...node }) => ({ ...node, subjectId: PHYSICS_SUBJECT_ID,
+  topicId: `${PHYSICS_SUBJECT_ID}.electric-circuits`,
+  specPointIds: [`${PHYSICS_SUBJECT_ID}.electric-circuits.sp-${String(point).padStart(2, "0")}`] }));
+
 /** Initial reviewed-in-code skill chains. Exact board-reference verification is still editorial work. */
 const legacyWjecCapabilities: CapabilityNode[] = [
+  { id: "phys.third-law", subjectId: PHYSICS_SUBJECT_ID, topicId: "wjec-alevel-physics.kinematics-dynamics",
+    label: "Identify an interaction pair on different bodies", specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-04"], prerequisites: [],
+    explanation: "Identify who exerts each force and who receives it. The interaction pair has equal magnitude, opposite direction, the same force type and different receiving bodies. Balanced forces on one body are not an interaction pair." },
   { id: "bio.active-site", subjectId: "wjec-alevel-biology", topicId: "wjec-alevel-biology.enzymes", label: "Link active-site shape to specificity", specPointIds: ["wjec-alevel-biology.enzymes.sp-01"], prerequisites: [],
     explanation: "The active site's shape and chemical properties are complementary to the substrate. Binding forms an enzyme–substrate complex; enzyme specificity depends on this interaction." },
   { id: "bio.saturation", subjectId: "wjec-alevel-biology", topicId: "wjec-alevel-biology.enzymes", label: "Explain enzyme saturation", specPointIds: ["wjec-alevel-biology.enzymes.sp-03"], prerequisites: ["bio.active-site"],
@@ -82,6 +144,7 @@ const legacyWjecCapabilities: CapabilityNode[] = [
 export const wjecCapabilities: CapabilityNode[] = [
   ...legacyWjecCapabilities,
   ...wjecPhysicsCapabilities,
+  ...physicsCircuitCapabilities,
   // Chemistry, Biology and Maths nodes above remain intentionally small until
   // their own flagship content reaches the same depth as Physics.
 ];

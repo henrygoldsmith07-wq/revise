@@ -260,7 +260,9 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
   return {
     cards: scoped<Card>("cards"),
     reviewLogs: reviewLogs.filter((row) => row.userId === userId),
-    questions: scoped<Question>("questions"),
+    // Retired template rows stay on disk for export/history recovery, but can
+    // no longer be selected or contribute to live learning evidence.
+    questions: scoped<Question>("questions").filter((question) => !question.id.startsWith("cnt:question:wjec-physics-depth-")),
     attempts: attempts.filter((row) => row.userId === userId),
     mistakes: scoped<Mistake>("mistakes"),
     papers: scoped<Paper>("papers"),

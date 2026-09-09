@@ -23,11 +23,14 @@ const humanVerificationSchema = z.object({
   status: z.enum(["pending", "approved", "changes-requested"]),
   reviewerId: id.optional(),
   reviewedAt: isoInstant.optional(),
+  contentFingerprint: nonEmpty.optional(),
   checks: z.object({
     question: z.boolean(),
     marking: z.boolean(),
     workedSolution: z.boolean(),
     capabilityMapping: z.boolean(),
+    specificationMapping: z.boolean().optional(),
+    examRealism: z.boolean().optional(),
   }),
   notes: z.string().optional(),
 }).passthrough();

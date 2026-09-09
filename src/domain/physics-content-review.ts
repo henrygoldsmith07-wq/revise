@@ -3,7 +3,18 @@ import type { CapabilityNode } from "./capability-graph";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
-export const REQUIRED_HUMAN_CHECKS = ["question", "marking", "workedSolution", "capabilityMapping"] as const;
+export const REQUIRED_HUMAN_CHECKS = ["question", "marking", "workedSolution", "capabilityMapping", "specificationMapping", "examRealism"] as const;
+
+/** Change detector, not a signature: reviewer identity still needs human attestation. */
+export function physicsContentFingerprint(question: Question): string {
+  const text = JSON.stringify([question.id, question.subjectId, question.topicIds,
+    question.specPointIds, question.stem, question.parts, question.totalMarks,
+    question.learning, question.options, question.correctIndex, question.calculatorAllowed,
+    question.source, question.origin, question.licensedSource, question.paperId, question.paperQuestionNumber, question.specVersion]);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return `physics-review-v1:${(hash >>> 0).toString(16)}`;
+}
 
 export type PhysicsReviewQueueRow = {
   questionId: Id;
@@ -15,20 +26,26 @@ export type PhysicsReviewQueueRow = {
 
 function completeChecks(record: HumanVerificationRecord | undefined): boolean {
   return record?.status === "approved" && Boolean(record.reviewerId && record.reviewedAt && Number.isFinite(Date.parse(record.reviewedAt))) &&
-    REQUIRED_HUMAN_CHECKS.every((check) => record.checks[check]);
+    REQUIRED_HUMAN_CHECKS.every((check) => record.checks?.[check] === true);
 }
 
 /** A question is trusted only when every component has an approved check. */
 export function humanVerifiedPhysicsQuestion(question: Question): boolean {
-  return question.subjectId === PHYSICS_SUBJECT_ID && question.verification === "verified" && completeChecks(question.humanVerification);
+  return question.subjectId === PHYSICS_SUBJECT_ID && question.verification === "verified" && completeChecks(question.humanVerification) &&
+    question.humanVerification?.contentFingerprint === physicsContentFingerprint(question) &&
+    !["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "");
+}
+
+export function trustedAssessmentContent(question: Question): boolean {
+  return question.subjectId !== PHYSICS_SUBJECT_ID || humanVerifiedPhysicsQuestion(question);
 }
 
 /** Questions requiring editorial review before they can provide trusted transfer evidence. */
 export function buildPhysicsReviewQueue(questions: readonly Question[]): PhysicsReviewQueueRow[] {
   return questions
-    .filter((question) => question.subjectId === PHYSICS_SUBJECT_ID && Boolean(question.learning))
+    .filter((question) => question.subjectId === PHYSICS_SUBJECT_ID)
     .flatMap((question) => {
-      if (completeChecks(question.humanVerification)) return [];
+      if (humanVerifiedPhysicsQuestion(question)) return [];
       const checks = question.humanVerification?.checks;
       const missingChecks = REQUIRED_HUMAN_CHECKS.filter((check) => !checks?.[check]);
       const status: PhysicsReviewQueueRow["status"] = question.humanVerification?.status ?? "unreviewed";
@@ -44,11 +61,12 @@ export function buildPhysicsReviewQueue(questions: readonly Question[]): Physics
 
 /** Apply an immutable review decision; incomplete approvals remain untrusted. */
 export function applyHumanVerification(question: Question, record: HumanVerificationRecord): Question {
-  const approved = completeChecks(record);
+  const approved = completeChecks(record) && record.contentFingerprint === physicsContentFingerprint(question);
   return {
     ...question,
-    humanVerification: { ...record, status: approved ? "approved" : record.status },
-    ...(approved ? { verification: "verified" as const, reviewer: record.reviewerId ?? question.reviewer ?? null, lastChecked: record.reviewedAt?.slice(0, 10) ?? question.lastChecked ?? null } : {}),
+    humanVerification: { ...record, status: approved ? "approved" : record.status === "approved" ? "pending" : record.status },
+    ...(approved ? { verification: "verified" as const, reviewer: record.reviewerId ?? question.reviewer ?? null, lastChecked: record.reviewedAt?.slice(0, 10) ?? question.lastChecked ?? null } :
+      { verification: "unverified" as const, reviewer: null, lastChecked: null }),
   };
 }
 
@@ -70,7 +88,8 @@ export function physicsContentReadiness(input: {
 }): PhysicsContentReadiness {
   const topics = input.topics.filter((topic) => topic.subjectId === PHYSICS_SUBJECT_ID);
   const questions = input.questions.filter((question) => question.subjectId === PHYSICS_SUBJECT_ID);
-  const audit = auditLearningDepth(topics, questions, input.nodes);
+  // Release depth must be counted from approved content, not the draft inventory.
+  const audit = auditLearningDepth(topics, questions.filter(humanVerifiedPhysicsQuestion), input.nodes);
   const reviewQueue = buildPhysicsReviewQueue(questions);
   const trustedQuestionCount = questions.filter(humanVerifiedPhysicsQuestion).length;
   const gaps = audit.rows.filter((row) => row.gaps.length).map((row) => ({ topicId: row.topicId, specPointId: row.specPointId, demands: row.gaps }));

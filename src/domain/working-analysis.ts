@@ -13,6 +13,7 @@ import { isNumericPoint, numericEquivalent, perPointThreshold, pointCoverage } f
 import { findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
 import { diagnoseWorking } from "./step-diagnosis";
+import { contradictoryWorkingStep } from "./calculation-rubric";
 import type { AttemptWorkingEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 export interface StudentStep {
@@ -32,6 +33,7 @@ export interface FirstIncorrect {
     | "content-mismatch"
     | "missing-expected-step"
     | "unrecognised-step"
+    | "contradictory-working"
     | "working-runs-out";
 }
 
@@ -257,6 +259,7 @@ export function validateWorkedSolutions(questions: readonly Question[]): WorkedS
 export function firstIncorrectStep(part: QuestionPart, answer: string): WorkingAnalysis {
   const modelSteps = modelStepsForPart(part);
   const steps = splitSteps(answer).map((text, index) => ({ index, text }));
+  const contradiction = contradictoryWorkingStep(answer);
 
   if (!steps.length) {
     return {
@@ -284,7 +287,12 @@ export function firstIncorrectStep(part: QuestionPart, answer: string): WorkingA
   // the same polynomial — so order is what disambiguates them.)
   for (const step of steps) {
     if (nextModel >= modelSteps.length) {
-      // Working continues past the model — treat as extra, not an error.
+      if (contradiction !== null) return {
+        modelSteps, steps, consistentWithModel: false,
+        firstIncorrect: { stepIndex: contradiction, studentStep: steps[contradiction]?.text ?? answer,
+          expected: "Keep numerical statements consistent; identify any corrected or abandoned working.",
+          similarity: 0, reason: "contradictory-working" },
+      };
       continue;
     }
     const forward = stepSimilarity(step.text, modelSteps[nextModel]!);
@@ -399,6 +407,8 @@ export function analyseAttemptWorking(
     const methodMarksAwarded = count("method");
     const accuracyMarksAwarded = count("accuracy");
     const followThroughMarksAwarded = count("follow-through");
+    const carriedForward = evidence.some((point) => point.status === "credited" &&
+      /error carried forward/i.test(point.explanation));
     return [{
       partId: part.id,
       firstIncorrectStep: firstIncorrectIndex,
@@ -407,7 +417,7 @@ export function analyseAttemptWorking(
       methodMarksAwarded,
       accuracyMarksAwarded,
       followThroughMarksAwarded,
-      ...(followThroughMarksAwarded > 0 && accuracyMarksAwarded === 0 ? { errorCarriedForward: true } : {}),
+      ...(carriedForward ? { errorCarriedForward: true } : {}),
       unitMarksAwarded: count("unit"),
       precisionMarksAwarded: count("precision"),
     }];
