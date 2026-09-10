@@ -22,6 +22,8 @@ const calculationRuleSchema = z.object({
 const humanVerificationSchema = z.object({
   status: z.enum(["pending", "approved", "changes-requested"]),
   reviewerId: id.optional(),
+  reviewerRole: z.enum(["examiner", "teacher", "subject-expert"]).optional(),
+  reviewerQualification: nonEmpty.optional(),
   reviewedAt: isoInstant.optional(),
   contentFingerprint: nonEmpty.optional(),
   checks: z.object({
@@ -40,6 +42,9 @@ const paperProvenanceSchema = z.object({
   specification: nonEmpty,
   specificationVersion: nonEmpty.optional(),
   paperId: id,
+  sittingId: id.optional(),
+  year: z.number().int().min(2015).max(2100).optional(),
+  series: nonEmpty.optional(),
   questionNumber: nonEmpty,
   sourceUrl: z.string().url(),
   sourceDigest: nonEmpty,

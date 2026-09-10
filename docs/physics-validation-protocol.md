@@ -2,6 +2,8 @@
 
 Status: implementation and AI draft content only. No human verification or student trial has been completed by this change.
 
+The operational hand-off is documented in [`docs/physics-evidence-intake.md`](./physics-evidence-intake.md). Run `node scripts/create-physics-evidence-intake.mjs <directory>` to create a blank evidence drop, then `node scripts/validate-physics-evidence.mjs <directory> --strict` to check a returned drop. These commands report missing real evidence; they do not create approvals or claim efficacy.
+
 ## Editorial release
 
 The 1,512 generic Physics template questions have been removed from the live bank. Existing stored rows remain recoverable on disk, but are excluded from the loaded question inventory. Replacement questions have new IDs. Old attempts are never rewritten as attempts on the new content.

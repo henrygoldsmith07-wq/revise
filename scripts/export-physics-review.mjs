@@ -13,7 +13,7 @@ const bundle = await build({
     export { capabilityEdgeFingerprint } from "./src/domain/capability-graph";
     export { wjecPhysics as curriculum } from "./src/domain/curriculum/wjec-physics";
     export { markPart } from "./src/domain/marking";
-    export { auditPhysicsAssessmentQuality, physicsQualityQueue } from "./src/domain/physics-assessment-quality";
+    export { auditPhysicsAssessmentQuality, physicsQualityQueue, physicsAuthoringBriefs } from "./src/domain/physics-assessment-quality";
   `, resolveDir: process.cwd(), loader: "ts" },
   bundle: true, platform: "node", format: "esm", write: false,
 });
@@ -27,6 +27,7 @@ const qualityAudit = data.auditPhysicsAssessmentQuality({
   trustedQuestion: data.humanVerifiedPhysicsQuestion,
 });
 const qualityQueue = data.physicsQualityQueue(qualityAudit);
+const authoringBriefs = data.physicsAuthoringBriefs(qualityAudit);
 const physicsNodes = data.capabilities.filter((node) => node.subjectId === "wjec-alevel-physics");
 const prerequisiteReviews = physicsNodes.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
   const prerequisite = physicsNodes.find((candidate) => candidate.id === prerequisiteId) ?? data.capabilities.find((candidate) => candidate.id === prerequisiteId);
@@ -94,7 +95,7 @@ for (const row of rows) {
       `Demand: ${metadata?.demand ?? "MAPPING REQUIRED"}; family: ${metadata?.familyId ?? "MAPPING REQUIRED"}; context: ${metadata?.contextId ?? "MAPPING REQUIRED"}; reasoning: ${metadata?.reasoningMoves.join("; ") || "MAPPING REQUIRED"}`, "");
   }
   lines.push("Review: [ ] Question [ ] Marking [ ] Solution [ ] Specification [ ] Capability [ ] Exam realism", "",
-    "Reviewer / date / decision / corrections: ____________________", "");
+    "Reviewer ID / role / qualification / date / decision / corrections: ____________________", "");
 }
 const out = resolve(destination);
 await mkdir(out, { recursive: true });
@@ -104,7 +105,8 @@ await writeFile(resolve(out, "physics-capability-graph.json"), JSON.stringify(ph
 await writeFile(resolve(out, "physics-prerequisite-review.json"), JSON.stringify(prerequisiteReviews, null, 2));
 await writeFile(resolve(out, "physics-quality-audit.json"), JSON.stringify(qualityAudit, null, 2));
 await writeFile(resolve(out, "physics-quality-queue.json"), JSON.stringify(qualityQueue, null, 2));
+await writeFile(resolve(out, "physics-authoring-briefs.json"), JSON.stringify(authoringBriefs, null, 2));
 console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((row) => row.question.id.startsWith("cnt:question:physics-quality-")).length, approvalsCreated: 0,
   modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
-  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length,
+  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length,
   output: out }));

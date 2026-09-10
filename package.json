@@ -13,6 +13,8 @@
     "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm run curriculum:freshness -- --fail-on-stale && npm test -- --run && npm run build && npm run perf:budget",
     "perf:budget": "node scripts/check-client-performance.mjs --require-build",
     "curriculum:freshness": "node scripts/check-curriculum-freshness.mjs",
+    "physics:evidence:init": "node scripts/create-physics-evidence-intake.mjs",
+    "physics:evidence:check": "node scripts/validate-physics-evidence.mjs",
     "prebuild": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",
     "predev": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",
     "postinstall": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",

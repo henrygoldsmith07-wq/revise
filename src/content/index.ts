@@ -33,6 +33,7 @@ import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion"
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
+import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -62,6 +63,7 @@ export const seedQuestions: Question[] = [
   ...physicsExtraQuestions,
   ...wjecAlevelExpansionQuestions,
   ...wjecPhysicsQualityExpansionQuestions,
+  ...physicsCapacitorEnergyQuestions,
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,

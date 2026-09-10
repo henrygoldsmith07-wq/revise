@@ -1,0 +1,51 @@
+{
+  "formatVersion": 1,
+  "catalogueUrl": "https://www.wjec.co.uk/qualifications/physics-asa-level/",
+  "catalogueEndpoint": "https://www.wjec.co.uk/umbraco/surface/TabSurface/GetpastpapersTab?qualificationId=36869&cultureId=en-GB",
+  "retrievedAt": "2026-09-10",
+  "notes": "Downloaded from the official WJEC catalogue. Checksums identify the acquired bytes; source acquisition is not qualified human approval. PDFs are retained in the local review pack, not redistributed in the repository.",
+  "papers": [
+    {
+      "paperId": "wjec-physics-1420U30-1-2024-summer",
+      "sittingId": "wjec-1420U30-1-2024-06-06-am",
+      "board": "WJEC",
+      "subjectId": "wjec-alevel-physics",
+      "qualificationLevel": "alevel",
+      "specification": "1420QS",
+      "specificationVersion": "WJEC Physics v3 October 2023",
+      "year": 2024,
+      "series": "Summer",
+      "durationMinutes": 135,
+      "maximumMarks": 100,
+      "sourceUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U30-1.pdf",
+      "sourceDigest": "aace63f3358462281f74a19a0db19812457f22a61cbe99fae0097eb9b777484c",
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U30-1-ms.pdf",
+      "markSchemeDigest": "a56c77d1737a211fa8bd35d7e4afe17343d7d144aa9a7c6fa7cfb8000b626901",
+      "dataBookletUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U30-1A.pdf",
+      "dataBookletDigest": "b834404db24a158c32d3fa014b310ac6f0e13c3d842a23369e3e52e9a365e1ed",
+      "status": "pending",
+      "notes": "Cover inspected: Unit 3 Oscillations and Nuclei, 6 June 2024 morning, 24 pages. Mark scheme: 17 pages; data booklet: 7 pages. Requires a named human provenance review and part-level mapping/marking review before trusted diagnosis. First exposure and observed time must be captured for each learner's sitting."
+    },
+    {
+      "paperId": "wjec-physics-1420U40-1-2024-summer",
+      "sittingId": "wjec-1420U40-1-2024-06-13-am",
+      "board": "WJEC",
+      "subjectId": "wjec-alevel-physics",
+      "qualificationLevel": "alevel",
+      "specification": "1420QS",
+      "specificationVersion": "WJEC Physics v3 October 2023",
+      "year": 2024,
+      "series": "Summer",
+      "durationMinutes": 120,
+      "maximumMarks": 100,
+      "sourceUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U40-1.pdf",
+      "sourceDigest": "7c8cf6ef4344405c874ec7831102cd72d1113df8b808d534793a6b2bcbc51d0a",
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U40-1-ms.pdf",
+      "markSchemeDigest": "3bd12473c3daf27c36da19c4a57dc9f77edd20d60689858a23562e8a5622e547",
+      "dataBookletUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U40-1A.pdf",
+      "dataBookletDigest": "eecda74a0d0b7289c5e48ece5d95ce5607cad3dbc45893d4fac42dd2db12758d",
+      "status": "pending",
+      "notes": "Cover inspected: Unit 4 Fields and Options, 13 June 2024 morning, 36 pages. Mark scheme: 24 pages; data booklet: 7 pages. Section A is 80 marks; exactly one 20-mark option is attempted. Do not total all four options. Requires human provenance and part-level review before trusted diagnosis."
+    }
+  ]
+}

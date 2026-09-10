@@ -25,6 +25,9 @@ export type CapabilityDependencyReviewStatus = "unreviewed" | "approved" | "reje
 export interface CapabilityDependencyReview {
   status: CapabilityDependencyReviewStatus;
   reviewerId?: string;
+  /** Optional qualification metadata retained for the external review audit. */
+  reviewerRole?: "examiner" | "teacher" | "subject-expert";
+  reviewerQualification?: string;
   reviewedAt?: string;
   /** Fingerprint of the target/prerequisite/rationale reviewed by the expert. */
   edgeFingerprint?: string;

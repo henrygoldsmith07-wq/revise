@@ -84,6 +84,28 @@ export interface PhysicsQualityQueueItem {
   partId?: Id;
 }
 
+/**
+ * A concrete brief for an author, derived from the audit rather than from a
+ * generic prompt template. It tells the author which families, contexts and
+ * reasoning operations already exist so a new item can add real diversity.
+ */
+export interface PhysicsAuthoringBrief {
+  topicId: Id;
+  specPointId: Id;
+  capabilityId: Id;
+  missingDemands: LearningDemand[];
+  demandRequirements: Array<{
+    demand: LearningDemand;
+    existingFamilies: string[];
+    existingContexts: string[];
+    existingReasoningMoves: string[];
+    requiredFamilies: number;
+    requiredContexts: number;
+    requiredReasoningMoves: number;
+  }>;
+  rejectIf: string[];
+}
+
 const STOP_WORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "is", "of", "on", "or", "the", "to", "with"]);
 
 /** Remove values and punctuation so a number-swapped reskin is visible. */
@@ -276,6 +298,40 @@ export function auditPhysicsAssessmentQuality(input: {
 /** A compact queue for the next authoring/review pass. */
 export function physicsQualityGaps(audit: PhysicsAssessmentQualityAudit): PhysicsCapabilityCoverage[] {
   return audit.capabilityCoverage.filter((row) => !row.complete);
+}
+
+/**
+ * Turn the capability audit into briefs that a human author can act on. A
+ * brief is intentionally silent on wording or numbers: the new question must
+ * introduce a different context and reasoning operation, not fill a template.
+ */
+export function physicsAuthoringBriefs(audit: PhysicsAssessmentQualityAudit): PhysicsAuthoringBrief[] {
+  return audit.capabilityCoverageByCapability
+    .filter((row) => !row.complete)
+    .map((row) => {
+      const incomplete = row.demands.filter((demand) => !demand.complete || !demand.distinct);
+      return {
+        topicId: row.topicId,
+        specPointId: row.specPointId,
+        capabilityId: row.capabilityId,
+        missingDemands: incomplete.map((demand) => demand.demand),
+        demandRequirements: incomplete.map((demand) => ({
+          demand: demand.demand,
+          existingFamilies: demand.families,
+          existingContexts: demand.contexts,
+          existingReasoningMoves: demand.reasoningMoves,
+          requiredFamilies: MIN_PHYSICS_FAMILIES,
+          requiredContexts: MIN_PHYSICS_FAMILIES,
+          requiredReasoningMoves: MIN_PHYSICS_FAMILIES,
+        })),
+        rejectIf: [
+          "only the numbers, names or surface wording change",
+          "the part maps to multiple specification points or capabilities",
+          "the mark scheme has fewer independently awardable points than marks",
+          "the reviewer cannot verify the physical assumptions against WJEC",
+        ],
+      };
+    });
 }
 
 /**

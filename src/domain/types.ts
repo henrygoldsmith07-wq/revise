@@ -73,6 +73,10 @@ export type ContentSource = "authored" | "licensed" | "generated" | "past-paper"
 export interface HumanVerificationRecord {
   status: "pending" | "approved" | "changes-requested";
   reviewerId?: Id;
+  /** Role of the qualified Physics reviewer who made the decision. */
+  reviewerRole?: "examiner" | "teacher" | "subject-expert";
+  /** Free-text qualification evidence, e.g. "WJEC A-level Physics examiner". */
+  reviewerQualification?: string;
   reviewedAt?: IsoInstant;
   /** Fingerprint of the exact question, scheme, solution and mappings reviewed. */
   contentFingerprint?: string;
@@ -106,6 +110,10 @@ export interface PaperQuestionProvenance {
   specification: string;
   specificationVersion?: string;
   paperId: Id;
+  /** Immutable sitting identity; different series must never be merged. */
+  sittingId?: Id;
+  year?: number;
+  series?: string;
   questionNumber: string;
   sourceUrl: string;
   /** Digest/manifest id for the source file or licensed archive snapshot. */
@@ -922,6 +930,13 @@ export interface Paper {
   title: string;
   year?: number;
   series?: string;
+  /** Source manifest fields retained at paper level for audit/export. */
+  sittingId?: Id;
+  sourceUrl?: string;
+  sourceDigest?: string;
+  provenanceStatus?: "pending" | "verified" | "rejected";
+  provenanceVerifiedBy?: Id;
+  provenanceVerifiedAt?: IsoInstant;
   paperSpecId?: Id;
   /** Extracted plain text, kept so questions can be re-extracted later. */
   sourceText?: string;
