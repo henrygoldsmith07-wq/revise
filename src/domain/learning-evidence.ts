@@ -112,6 +112,12 @@ export function questionFamilies(question: Question): string[] {
   return [...new Set(question.parts.map((part) => partFamily(question, part)).filter(Boolean))];
 }
 
+/** All authored contexts represented by a question, including mixed structured parts. */
+export function questionContexts(question: Question): string[] {
+  if (question.learning?.contextId) return [question.learning.contextId];
+  return [...new Set(question.parts.map((part) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)))];
+}
+
 /** Demands represented by a question, used by the planner when parts are mixed. */
 export function questionDemands(question: Question): LearningDemand[] {
   return [...new Set(question.parts.map((part) => partLearningMetadata(question, part)?.demand ?? question.learning?.demand).filter((demand): demand is LearningDemand => Boolean(demand)))];

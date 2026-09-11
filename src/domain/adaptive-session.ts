@@ -27,7 +27,8 @@ import { deriveCapabilityProfiles } from "./capability-source";
 import { readinessStopFor } from "./adaptive-stop";
 import { wjecCapabilities } from "@/content/capabilities";
 import { selectLearningAction, type LearningAction } from "./learning-action";
-import { isTransferQuestion, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { isTransferQuestion, questionContexts, questionFamilies, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { questionExposureReport } from "./question-exposure";
 import { trustedAssessmentContent } from "./physics-content-review";
 import type { HintTier } from "./hints";
 import type { ApplicationMasteryRow } from "./application-mastery";
@@ -526,19 +527,73 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
   const mistakeIds = selected.evidence.openMistakeIds.slice(0, 3);
   const usedQuestions = new Set<Id>();
   const attemptedIds = new Set(attempts.map((attempt) => attempt.questionId));
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  // Family-aware freshness: a reskinned same-family question the student has
+  // already met is familiar evidence, even under a new question id. Attempted
+  // families are derived from the full attempt history (not just trusted
+  // attempts) because familiarity does not depend on marking quality.
+  const attemptedFamilies = new Set<string>();
+  for (const attempt of attempts) {
+    const prior = questionById.get(attempt.questionId);
+    if (prior) for (const family of questionFamilies(prior)) attemptedFamilies.add(family);
+  }
+  // Overpractised questions (secure, repeatedly answered) are kept as a last
+  // resort so the session does not burn minutes re-proving what is secure.
+  const exposureByQuestion = new Map(questionExposureReport({ questions, attempts }).rows.map((row) => [row.questionId, row.status] as const));
+  const isFreshFamily = (question: Question): boolean =>
+    !questionFamilies(question).some((family) => attemptedFamilies.has(family));
   const orderedQuestions = questions.slice().sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id));
+  const rankByFreshness = (question: Question): number =>
+    (isFreshFamily(question) ? 0 : 1) * 10 + (exposureByQuestion.get(question.id) === "overpractised" ? 1 : 0);
   const pickQuestion = (predicate: (question: Question) => boolean): Question | undefined => {
-    const found = orderedQuestions.find(
+    const candidates = orderedQuestions.filter(
       (question) => !usedQuestions.has(question.id) && !attemptedIds.has(question.id) && predicate(question),
-    ) ?? orderedQuestions.find((question) => !usedQuestions.has(question.id) && predicate(question));
-    if (found) usedQuestions.add(found.id);
+    );
+    const fresh = candidates.filter(isFreshFamily);
+    const pool = fresh.length ? fresh : candidates;
+    const found = pool.slice().sort((a, b) =>
+      rankByFreshness(a) - rankByFreshness(b) || a.difficulty - b.difficulty || a.id.localeCompare(b.id))[0] ??
+      orderedQuestions.find((question) => !usedQuestions.has(question.id) && predicate(question));
+    if (found) {
+      usedQuestions.add(found.id);
+      for (const family of questionFamilies(found)) attemptedFamilies.add(family);
+    }
     return found;
   };
   const supported = pickQuestion((question) => question.difficulty <= 2);
   const independent = pickQuestion((question) => question.difficulty >= 3 && question.difficulty <= 4);
-  const transfer = pickQuestion(
-    (question) => isTransferQuestion(question) && !attemptedIds.has(question.id),
-  );
+  // Transfer must be a genuinely new family in a new context: the same idea
+  // met in the supported/independent rungs does not test transfer, and a
+  // reskinned familiar family would let memorised working pass as transfer
+  // evidence. Fall back to any unseen transfer question only when no fresh
+  // family exists, and never to an already-attempted one.
+  const practisedFamilies = new Set<string>([
+    ...(supported ? questionFamilies(supported) : []),
+    ...(independent ? questionFamilies(independent) : []),
+  ]);
+  const practisedContexts = new Set<string>([
+    ...(supported ? questionContexts(supported) : []),
+    ...(independent ? questionContexts(independent) : []),
+  ]);
+  const transferCandidates = (freshOnly: boolean): Question | undefined => {
+    const pool = orderedQuestions.filter((question) => {
+      if (usedQuestions.has(question.id) || attemptedIds.has(question.id)) return false;
+      if (!isTransferQuestion(question)) return false;
+      if (!freshOnly) return true;
+      const families = questionFamilies(question);
+      const contexts = questionContexts(question);
+      return !families.some((family) => practisedFamilies.has(family) || !isFreshFamily(question)) &&
+        !contexts.some((context) => practisedContexts.has(context));
+    });
+    const found = pool.slice().sort((a, b) =>
+      rankByFreshness(a) - rankByFreshness(b) || a.difficulty - b.difficulty || a.id.localeCompare(b.id))[0];
+    if (found) {
+      usedQuestions.add(found.id);
+      for (const family of questionFamilies(found)) attemptedFamilies.add(family);
+    }
+    return found;
+  };
+  const transfer = transferCandidates(true) ?? transferCandidates(false);
 
   const focusEvidence = profile[selected.evidence.focus];
   const needsExplanation =
@@ -570,8 +625,14 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       support,
       activity,
     });
-  const capabilityForQuestion = (question: Question): Id =>
-    question.parts.flatMap((part) => part.capabilityIds ?? [])[0] ?? focusCapabilityId;
+  const capabilityForQuestion = (question: Question): Id => {
+    // Only a question whose parts all isolate the same single capability can
+    // carry that capability's intervention chain. A mixed structured question
+    // cannot locate its smallest failed skill, so it stays on the focus
+    // capability rather than misattributing the attempt.
+    const ids = [...new Set(question.parts.flatMap((part) => part.capabilityIds ?? []))];
+    return ids.length === 1 ? ids[0]! : focusCapabilityId;
+  };
 
   if (dueCardIds.length) {
     const count = dueCardIds.length;
@@ -1018,10 +1079,26 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
       .map((card) => card.id),
   );
 
-  // Question pools: fresh = never attempted anywhere; retryable = missed here.
+  // Question pools: fresh = never attempted anywhere, with unseen families
+  // preferred so a reskinned familiar question cannot stand in for new
+  // learning; retryable = missed here. Familiarity is family-based, not
+  // id-based, because a renamed variant is still familiar evidence.
   const ordered = [...questions].sort(
     (a, b) => difficultyNumber(a) - difficultyNumber(b) || a.id.localeCompare(b.id),
   );
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const attemptedFamilies = new Set<string>();
+  for (const attempt of attempts) {
+    const prior = questionById.get(attempt.questionId);
+    if (prior) for (const family of questionFamilies(prior)) attemptedFamilies.add(family);
+  }
+  for (const record of completed) {
+    if (!record.itemId) continue;
+    const prior = questionById.get(record.itemId);
+    if (prior) for (const family of questionFamilies(prior)) attemptedFamilies.add(family);
+  }
+  const isFreshFamily = (question: Question): boolean =>
+    !questionFamilies(question).some((family) => attemptedFamilies.has(family));
   const usedThisRun = new Set(
     completed
       .map((record) => record.itemId)
@@ -1042,7 +1119,10 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
     prefer: "fresh" | "retry" | "any" = "fresh",
   ): Question | undefined => {
     if (prefer !== "retry") {
-      const fromFresh = fresh.find((question) => inBand(question, band)) ?? (prefer === "any" ? fresh[0] : undefined);
+      const inBandFresh = fresh.filter((question) => inBand(question, band));
+      const freshFamily = inBandFresh.find(isFreshFamily);
+      if (freshFamily) return freshFamily;
+      const fromFresh = inBandFresh[0] ?? (prefer === "any" ? fresh.find(isFreshFamily) ?? fresh[0] : undefined);
       if (fromFresh) return fromFresh;
     }
     if (band === "transfer") return undefined;

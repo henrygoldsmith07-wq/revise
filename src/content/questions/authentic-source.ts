@@ -447,10 +447,10 @@ const physics: SourceItem[] = [
   {
     slug: "tidal-generator-report",
     topic: "energy-power",
-    stem: "Source extract: A tidal-generator report says a turbine receives 45 kJ of kinetic energy every 20 s and delivers 14 kJ of electrical energy in that time.",
+    stem: "Source extract: A tidal-generator report says a turbine receives 45 kJ of kinetic energy every 20 s. The generator stage converts 70% of the turbine's mechanical output to electricity, and the turbine itself converts 45% of the incoming kinetic energy to mechanical output.",
     kind: "calculation",
-    difficulty: 2,
-    parts: [part("Calculate the useful power and efficiency.", 3, ["Useful power = 14 000/20 = 700 W", "Efficiency = useful output/input", "Efficiency = 14/45 × 100 ≈ 31.1%"], "The useful power is 700 W. The efficiency is (14/45) × 100 ≈ 31.1%.", "apply energy, power and efficiency to an original renewable-energy report")],
+    difficulty: 3,
+    parts: [part("Calculate the overall efficiency from incoming kinetic energy to delivered electricity, and the electrical energy delivered every 20 s.", 3, ["Overall efficiency is the product of stage efficiencies: 0.45 × 0.70 = 0.315", "Electrical energy = 0.315 × 45 = 14.2 kJ per 20 s", "Each stage dissipates energy, so chained efficiencies multiply rather than add"], "The overall efficiency is 0.45 × 0.70 = 31.5%. Every 20 s the generator delivers 0.315 × 45 = 14.2 kJ of electrical energy; the rest is dissipated at the two stages.", "chain stage efficiencies in an original renewable-energy report")],
   },
   {
     slug: "bridge-materials-report",
@@ -489,26 +489,26 @@ const physics: SourceItem[] = [
   {
     slug: "crash-test-report",
     topic: "momentum",
-    stem: "Source extract: A crash-test report says an occupant's momentum changes by 1200 kg m s⁻¹. A restraint increases the stopping time from 0.12 s to 0.48 s.",
+    stem: "Source extract: A crash-test report says an occupant's momentum changes by 1200 kg m s⁻¹. Safety rules require the average restraint force to stay below 3000 N.",
     kind: "calculation",
-    difficulty: 2,
-    parts: [part("Compare the average force with and without the restraint.", 3, ["Force = change in momentum/time", "Without restraint: 1200/0.12 = 10 000 N", "With restraint: 1200/0.48 = 2500 N, one quarter as large"], "Without the restraint the average force is 10 000 N. With it, the force is 2500 N, so the longer stopping time reduces the force to one quarter.", "apply impulse and momentum to an original safety report")],
+    difficulty: 3,
+    parts: [part("Calculate the minimum stopping time the restraint must provide, and compare it with an unrestrained 0.12 s impact.", 3, ["Minimum time t = Δp/F = 1200/3000 = 0.40 s", "The restraint must extend the impact to at least 0.40 s", "That is more than three times the unrestrained 0.12 s duration"], "The impulse relation gives t = Δp/F = 1200/3000 = 0.40 s. The restraint must stretch the impact to at least 0.40 s — over three times the unrestrained 0.12 s — to keep the average force within the limit.", "invert the impulse relation to find a required stopping time")],
   },
   {
     slug: "centrifuge-log",
     topic: "circular-shm",
-    stem: "Source extract: A centrifuge log records a rotor radius of 0.20 m and a rotation frequency of 5.0 Hz.",
+    stem: "Source extract: A centrifuge log records a rotor radius of 0.20 m. A sample must experience 200 m s⁻² at the rotor edge.",
     kind: "calculation",
-    difficulty: 2,
-    parts: [part("Calculate the centripetal acceleration at the rotor edge.", 3, ["Angular speed ω = 2πf = 10π rad s⁻¹", "a = ω²r", "a = (10π)² × 0.20 ≈ 197 m s⁻²"], "The angular speed is 10π rad s⁻¹. The centripetal acceleration is (10π)² × 0.20 ≈ 197 m s⁻² towards the centre.", "apply circular-motion equations to an original equipment log")],
+    difficulty: 3,
+    parts: [part("Calculate the rotation frequency required to produce this acceleration.", 3, ["a = ω²r gives ω = √(a/r) = √(200/0.20) = 31.6 rad s⁻¹", "f = ω/2π = 31.6/6.28 = 5.03 Hz", "The rotor must turn at about 5.0 Hz"], "Rearranging a = ω²r gives ω = √(a/r) = √(200/0.20) = 31.6 rad s⁻¹. The frequency is f = ω/2π = 31.6/6.28 ≈ 5.0 Hz.", "rearrange the circular-acceleration relation to solve for frequency")],
   },
   {
     slug: "planetary-mission-report",
     topic: "fields",
-    stem: "Source extract: A planetary-mission report says a probe's gravitational potential changes from −4.0 × 10⁷ to −2.5 × 10⁷ J kg⁻¹ as it moves away from a planet.",
+    stem: "Source extract: A planetary-mission report tracks a probe climbing from twice to four times the planet's radius, measured from the planet's centre.",
     kind: "calculation",
-    difficulty: 2,
-    parts: [part("Calculate the change in gravitational potential energy per kilogram and interpret its sign.", 2, ["ΔV = (−2.5 × 10⁷) − (−4.0 × 10⁷) = +1.5 × 10⁷ J kg⁻¹", "A positive change means work is done against the gravitational field"], "The change is +1.5 × 10⁷ J kg⁻¹. The positive value shows that the probe gains gravitational potential energy as it moves away.", "interpret gravitational potential from an original spaceflight report")],
+    difficulty: 3,
+    parts: [part("By what factor does the gravitational field strength change, and what does this imply for the probe's weight?", 3, ["Field strength follows an inverse-square law: g ∝ 1/r²", "Doubling r divides g by four", "The probe's weight falls to one quarter of its value at 2R"], "Gravitational field strength obeys g = GM/r². Moving from 2R to 4R doubles the distance, so the field strength — and hence the probe's weight — falls by a factor of four.", "apply an inverse-square scaling to a changed orbital radius")],
   },
   {
     slug: "thermal-storage-log",
@@ -520,10 +520,10 @@ const physics: SourceItem[] = [
   {
     slug: "radiotherapy-record",
     topic: "nuclear",
-    stem: "Source extract: A radiotherapy record gives a tracer half-life of 8.0 hours and an initial activity of 480 MBq. Treatment imaging occurs 24 hours later.",
+    stem: "Source extract: A radiotherapy record gives a tracer half-life of 8.0 hours and an initial activity of 480 MBq. Imaging requires at least 60 MBq.",
     kind: "calculation",
-    difficulty: 2,
-    parts: [part("Calculate the activity during imaging and explain why the half-life is selected carefully.", 3, ["24 hours is three half-lives", "Activity = 480 × (1/2)³ = 60 MBq", "The half-life must be long enough for imaging but short enough to limit exposure"], "After three half-lives the activity is 480/8 = 60 MBq. The half-life must allow the tracer to remain detectable while limiting the time that the patient is exposed to radiation.", "apply radioactive decay and risk-benefit reasoning to an original medical record")],
+    difficulty: 3,
+    parts: [part("Calculate how long after injection the tracer remains usable for imaging, and explain why a short half-life limits patient exposure.", 3, ["480/60 = 8 = 2³, so three half-lives elapse before the activity falls below the threshold", "Time = 3 × 8.0 = 24 h", "After that the tracer is no longer useful, and a short half-life means significant activity persists only briefly"], "The activity halves every 8.0 h: 480 → 240 → 120 → 60 MBq. Three half-lives (24 h) pass before it drops below the 60 MBq imaging threshold. Because the half-life is short, the patient carries significant activity only for about a day.", "invert a halving sequence to find a usable imaging window")],
   },
 ];
 

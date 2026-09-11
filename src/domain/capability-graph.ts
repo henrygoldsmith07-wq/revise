@@ -132,6 +132,35 @@ export function validatePrerequisiteReviews(nodes: readonly CapabilityNode[], su
   return errors;
 }
 
+/**
+ * Find prerequisite edges that are already implied by a longer path
+ * (`A -> B -> C` makes a direct `A -> C` an unnecessary blocker). These are
+ * review findings rather than validation errors: removing them keeps the graph
+ * acyclic but is a human editorial call about how tightly the ladder is drawn.
+ */
+export function redundantPrerequisiteEdges(nodes: readonly CapabilityNode[], subjectId?: string): string[] {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const reachable = (fromId: string, avoid: string): Set<string> => {
+    const seen = new Set<string>();
+    const stack = (byId.get(fromId)?.prerequisites ?? []).filter((id) => id !== avoid);
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      for (const nextId of byId.get(id)?.prerequisites ?? []) if (!seen.has(nextId)) stack.push(nextId);
+    }
+    return seen;
+  };
+  const findings: string[] = [];
+  for (const node of nodes) {
+    if (subjectId && node.subjectId !== subjectId) continue;
+    for (const prerequisiteId of node.prerequisites) {
+      if (reachable(node.id, prerequisiteId).has(prerequisiteId)) findings.push(`${node.id} <- ${prerequisiteId}`);
+    }
+  }
+  return findings;
+}
+
 function trustedPrerequisiteEdge(node: CapabilityNode, prerequisiteId: string, trustedOnly: boolean, byId: ReadonlyMap<string, CapabilityNode>): boolean {
   if (!trustedOnly || !requiresWjecContentReview(node.subjectId)) return true;
   const review = node.prerequisiteReviews?.[prerequisiteId];

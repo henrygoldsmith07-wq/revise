@@ -122,5 +122,14 @@ export function selectLearningAction(input: {
   return candidates.sort((a, b) =>
     b.expectedGainPerMinute - a.expectedGainPerMinute ||
     Number(b.kind === "retention") - Number(a.kind === "retention") ||
+    // Between equal-value actions, take the smallest intervention likely to
+    // produce the durable gain: a check before teaching before independent
+    // practice before transfer before a delayed retention re-test.
+    INTERVENTION_SMALLNESS[a.kind] - INTERVENTION_SMALLNESS[b.kind] ||
     a.question.id.localeCompare(b.question.id))[0];
 }
+
+/** Rough cost of each intervention; smaller is cheaper in learner minutes. */
+const INTERVENTION_SMALLNESS: Record<LearningAction["kind"], number> = {
+  diagnose: 0, guided: 1, independent: 2, transfer: 3, retention: 4,
+};

@@ -297,9 +297,13 @@ function parseFactor(st: ParseState): Polynomial {
   if (t && t.t === "op" && t.v === "^") {
     next(st);
     const exp = parseAtom(st);
-    // Exponent must be a constant.
-    if (exp.size !== 1 || !exp.has(0)) throw new ParseError("variable exponent");
-    const n = fracToNum(exp.get(0)!);
+    // Exponent must be a constant. A zero exponent parses to an empty
+    // polynomial (no non-zero terms), so check for stray variables instead of
+    // demanding a present constant — that is what made `10^0` (valid standard
+    // form) unparseable and sent correct answers to review.
+    if ([...exp.keys()].some((degree) => degree !== 0)) throw new ParseError("variable exponent");
+    const zero = exp.get(0);
+    const n = zero ? fracToNum(zero) : 0;
     const raised = polyPow(base, n);
     if (!raised) throw new ParseError("unsupported power");
     return raised;

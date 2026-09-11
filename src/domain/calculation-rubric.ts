@@ -2,11 +2,18 @@ import { parseExpression } from "./maths-equivalence";
 import type { CalculationMarkRule, MarkedPart, QuestionPart } from "./types";
 
 function normalise(text: string): string {
-  return text.replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/")
+  return expandSuperscripts(text).replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/")
     .replace(/⁻/g, "-").replace(/²/g, "2").replace(/³/g, "3").toLowerCase();
 }
+const SUPERSCRIPT_DIGITS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "ˣ": "x" };
+function expandSuperscripts(text: string): string {
+  // A superscript run after a base (`10³`, `m²`, `(a+b)⁻¹`) is a power, so a
+  // caret is inserted; a bare superscript digit elsewhere just becomes a digit.
+  const withCaret = text.replace(/([0-9a-zA-Z)\]])([⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+)/g, "$1^$2");
+  return withCaret.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻ˣ]/g, (ch) => SUPERSCRIPT_DIGITS[ch] ?? ch);
+}
 function numberOf(expression: string): number | null {
-  const poly = parseExpression(expression);
+  const poly = parseExpression(expandSuperscripts(expression));
   if (!poly || [...poly.keys()].some((key) => key !== 0)) return null;
   const value = poly.get(0);
   const number = value ? value.n / value.d : 0;
@@ -16,12 +23,17 @@ function numberOf(expression: string): number | null {
 const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(Number.MIN_VALUE, Math.abs(b) * 0.005);
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const SCALAR = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
-const NUMERIC_EXPRESSION = new RegExp(`^(${SCALAR}(?:\\s*[+*/-]\\s*${SCALAR})*)\\s*(.*)$`);
+// A standard-form power (`10^3`, `10³`) is part of the number, not a unit.
+// The polynomial evaluator handles constant exponents, so accept them in the
+// final-answer grammar; students write `1.04 × 10³` far more often than `1040`
+// in A-level physics working.
+const POWER = "(?:\\s*\\^\\s*[+-]?\\d+)?";
+const NUMERIC_EXPRESSION = new RegExp(`^(${SCALAR}${POWER}(?:\\s*[+*/-]\\s*${SCALAR}${POWER})*)\\s*(.*)$`);
 
 interface Line { text: string; expression: string; raw: string; value: number; unit: string }
 function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
   const aliases = [rule.label, ...(rule.aliases ?? [])].map((s) => escaped(normalise(s)));
-  const lines = answer.replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/").split(/[\n;]/).map((s) => s.trim());
+  const lines = expandSuperscripts(answer).replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/").split(/[\n;]/).map((s) => s.trim());
   const matching = lines.filter((line) => new RegExp(`^(?:${aliases.join("|")})\\s*=`, "i").test(line));
   // Multiple conflicting versions need review; never cherry-pick the correct one.
   if (matching.length !== 1) return undefined;
@@ -211,10 +223,14 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
         awarded = (rule.unitAliases ?? []).some((unit) => unitKey(unit) === unitKey(line.unit));
         reason = awarded ? "The final unit is correct." : "The final unit is missing or incorrect.";
       } else {
-        const mantissa = line.raw.split(/e/i)[0]!.replace(/^[+-]/, "");
+        // Significant figures may be declared as a bare number or in
+        // standard form (`1.04 × 10³` carries its three figures in the
+        // mantissa; the power of ten carries none).
+        const standardForm = expandSuperscripts(line.raw).match(/^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*(?:\*?\s*10\s*\^\s*[+-]?\d+)?\s*$/);
+        const mantissa = (standardForm?.[1] ?? line.raw).split(/e/i)[0]!.replace(/^[+-]/, "");
         const digits = mantissa.replace(".", "").replace(/^0+/, "");
         // Fractions/arithmetic do not explicitly declare significant figures.
-        awarded = new RegExp(`^${SCALAR}$`).test(line.raw) && digits.length === rule.significantFigures;
+        awarded = standardForm !== null && new RegExp(`^${SCALAR}$`).test(standardForm[1]!) && digits.length === rule.significantFigures;
         reason = awarded ? "The final value uses the requested significant figures." : `Report the final value to ${rule.significantFigures} significant figures.`;
       }
     }

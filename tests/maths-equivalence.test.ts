@@ -24,6 +24,11 @@ describe("parseExpression", () => {
     expect(norm(parseExpression("2x·3")!)).toEqual(norm(parseExpression("6x")!));
   });
 
+  it("evaluates a zero exponent (standard form mantissa) rather than rejecting it", () => {
+    expect(norm(parseExpression("10^0")!)).toEqual(norm(parseExpression("1")!));
+    expect(norm(parseExpression("2.77 + 10^0")!)).toEqual(norm(parseExpression("3.77")!));
+  });
+
   it("handles rational coefficients exactly", () => {
     expect(norm(parseExpression("0.5x^2")!)).toEqual(norm(parseExpression("x^2/2")!));
     expect(norm(parseExpression("1/2 x + 0.25")!)).toEqual(norm(parseExpression("0.5x + 1/4")!));

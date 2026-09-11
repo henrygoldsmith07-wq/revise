@@ -86,8 +86,8 @@ export const PHYSICS_PART_LEARNING: Record<string, PhysicsPartLearningSpec> = {
     demand: "explanation", familyId: "physics-authentic:resonance-damping", contextId: "physics-authentic:resonance-damping:curve-comparison",
     reasoningMoves: ["compare resonance curves through peak height and bandwidth"] },
   "cnt:question:authentic-expansion-wjec-alevel-physics-physics-orbital-speed:0": {
-    demand: "explanation", familyId: "physics-authentic:orbital-derivation", contextId: "physics-authentic:orbital-derivation:force-equality",
-    reasoningMoves: ["derive orbital speed by equating gravitational and centripetal force"] },
+    demand: "calculation", familyId: "physics-authentic:orbital-derivation", contextId: "physics-authentic:orbital-derivation:force-equality",
+    reasoningMoves: ["add the altitude to the planetary radius before applying circular-orbit relations"] },
   "cnt:question:authentic-expansion-wjec-alevel-physics-physics-induced-emf:0": {
     demand: "calculation", familyId: "physics-authentic:induced-emf", contextId: "physics-authentic:induced-emf:flux-linkage-change",
     reasoningMoves: ["divide a total flux-linkage change by the time taken"] },
@@ -198,7 +198,7 @@ export const PHYSICS_PART_LEARNING: Record<string, PhysicsPartLearningSpec> = {
   // --- authentic-source physics (11 items, 12 parts) ---
   "cnt:question:authentic-source-wjec-alevel-physics-tidal-generator-report:0": {
     demand: "calculation", familyId: "physics-source:tidal-generator", contextId: "physics-source:tidal-generator:efficiency",
-    reasoningMoves: ["form a useful-to-input energy ratio over a common interval"] },
+    reasoningMoves: ["multiply chained stage efficiencies before applying them to an energy input"] },
   "cnt:question:authentic-source-wjec-alevel-physics-cyclist-field-note:0": {
     demand: "explanation", familyId: "physics-source:cyclist-motion", contextId: "physics-source:cyclist-motion:resistive-forces",
     reasoningMoves: ["account for speed-dependent resistance when explaining steady speed"] },
@@ -219,19 +219,19 @@ export const PHYSICS_PART_LEARNING: Record<string, PhysicsPartLearningSpec> = {
     reasoningMoves: ["track a divider ratio as one resistance changes"] },
   "cnt:question:authentic-source-wjec-alevel-physics-crash-test-report:0": {
     demand: "calculation", familyId: "physics-source:crash-test", contextId: "physics-source:crash-test:restraint-force",
-    reasoningMoves: ["divide a fixed momentum change by two stopping times"] },
+    reasoningMoves: ["invert the impulse relation to find a required stopping time"] },
   "cnt:question:authentic-source-wjec-alevel-physics-centrifuge-log:0": {
     demand: "calculation", familyId: "physics-source:centrifuge", contextId: "physics-source:centrifuge:rim-acceleration",
-    reasoningMoves: ["convert a rotation frequency to angular speed before a = ω²r"] },
+    reasoningMoves: ["rearrange the circular-acceleration relation to solve for frequency"] },
   "cnt:question:authentic-source-wjec-alevel-physics-planetary-mission-report:0": {
     demand: "calculation", familyId: "physics-source:planetary-mission", contextId: "physics-source:planetary-mission:potential-change",
-    reasoningMoves: ["subtract signed potentials and interpret the sign of the change"] },
+    reasoningMoves: ["apply an inverse-square scaling to a changed orbital radius"] },
   "cnt:question:authentic-source-wjec-alevel-physics-thermal-storage-log:0": {
     demand: "explanation", familyId: "physics-source:thermal-storage", contextId: "physics-source:thermal-storage:design-features",
     reasoningMoves: ["map each design feature to the transfer mechanism it suppresses"] },
   "cnt:question:authentic-source-wjec-alevel-physics-radiotherapy-record:0": {
     demand: "calculation", familyId: "physics-source:radiotherapy", contextId: "physics-source:radiotherapy:imaging-activity",
-    reasoningMoves: ["scale activity across elapsed half-lives against an exposure trade-off"] },
+    reasoningMoves: ["invert a halving sequence to find a usable imaging window"] },
 
   // --- extended-responses physics (2 questions, 3 parts) ---
   "cnt:question:extended-response-wjec-alevel-physics-induced-emf-direction:0": {
@@ -280,7 +280,7 @@ export const PHYSICS_PART_LEARNING: Record<string, PhysicsPartLearningSpec> = {
     reasoningMoves: ["multiply a decay constant by a nucleus count to obtain activity"] },
   "cnt:question:phys-kinematics-projectile:0": {
     demand: "calculation", familyId: "physics-core:cliff-projectile", contextId: "physics-core:cliff-projectile:flight-time",
-    reasoningMoves: ["solve the vertical equation of motion for time"] },
+    reasoningMoves: ["solve the vertical equation of motion, then invert a drop-height ratio into duration and range scaling"] },
   "cnt:question:phys-kinematics-projectile:1": {
     demand: "calculation", familyId: "physics-core:cliff-projectile", contextId: "physics-core:cliff-projectile:range",
     reasoningMoves: ["apply constant horizontal velocity over the flight time"] },

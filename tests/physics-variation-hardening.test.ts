@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { auditPhysicsAssessmentQuality, isTemplatedReasoningMove, promptOverload, physicsQualityQueue } from "@/domain/physics-assessment-quality";
+import { auditPhysicsAssessmentQuality, isTemplatedReasoningMove, physicsQualityQueue, promptOverload } from "@/domain/physics-assessment-quality";
 import { conflictingWorkingLabel, markCalculationWorking } from "@/domain/calculation-rubric";
+import { redundantPrerequisiteEdges, validateCapabilityGraph } from "@/domain/capability-graph";
+import { questionContexts, questionFamilies } from "@/domain/learning-evidence";
 import { PHYSICS_PART_LEARNING } from "@/content/questions/physics-part-learning";
 import { physicsCoverageQuestions } from "@/content/questions/physics-coverage";
 import { seedQuestionsForSubject } from "@/content";
@@ -147,6 +149,25 @@ describe("equivalent-algebra method marking", () => {
     expect(marked?.evidence?.every((point) => point.status === "unreported")).toBe(true);
     expect(marked?.comment).toContain("provisional");
   });
+
+  it("reads standard-form answers with powers of ten", () => {
+    const standardPart: QuestionPart = { ...tensionPart(), marks: 1,
+      markScheme: ["T = 6.366 × 10³ N"], modelAnswer: "T = 6.366 × 10³ N",
+      calculationRules: [{ kind: "accuracy", label: "T", expected: 6366 }] };
+    expect(markCalculationWorking(standardPart, "T = 6.366 × 10³ N")?.awarded).toBe(1);
+    expect(markCalculationWorking(standardPart, "T = 6.366e3 N")?.awarded).toBe(1);
+    expect(markCalculationWorking(standardPart, "T = 6.366 × 10² N")?.awarded).toBe(0);
+  });
+
+  it("credits significant figures declared in standard form", () => {
+    const precisionPart: QuestionPart = { ...tensionPart(), marks: 1,
+      markScheme: ["v to 3 s.f."], modelAnswer: "v = 2.77",
+      calculationRules: [{ kind: "precision", label: "v", expected: 2.77, significantFigures: 3 }] };
+    expect(markCalculationWorking(precisionPart, "v = 2.77")?.awarded).toBe(1);
+    expect(markCalculationWorking(precisionPart, "v = 2.77 × 10⁰")?.awarded).toBe(1);
+    expect(markCalculationWorking(precisionPart, "v = 2.8")?.awarded).toBe(0);
+    expect(markCalculationWorking(precisionPart, "v = 11/4")?.awarded).toBe(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -223,5 +244,41 @@ describe("physics quality queue after enrichment", () => {
     expect(queue.some((item) => item.reason === "missing-review")).toBe(true);
     expect(queue.some((item) => item.reason === "missing-demand")).toBe(true);
     expect(audit.releaseReady).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prerequisite-graph coherence: no cycles, no transitively redundant blockers.
+// ---------------------------------------------------------------------------
+
+describe("prerequisite graph coherence", () => {
+  it("the shipped Physics graph has no cycles and no redundant (implied) edges", () => {
+    expect(validateCapabilityGraph(wjecCapabilities)).toEqual([]);
+    expect(redundantPrerequisiteEdges(wjecCapabilities, SUBJECT)).toEqual([]);
+  });
+
+  it("flags a direct edge that is already implied by a longer path", () => {
+    const nodes = [
+      { id: "x", subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: "X", specPointIds: [`${SUBJECT}.t.sp-01`], prerequisites: ["y", "z"] },
+      { id: "y", subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: "Y", specPointIds: [`${SUBJECT}.t.sp-02`], prerequisites: ["z"] },
+      { id: "z", subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: "Z", specPointIds: [`${SUBJECT}.t.sp-03`], prerequisites: [] },
+    ];
+    // x reaches z through y, so the direct x <- z edge is an unnecessary blocker.
+    expect(redundantPrerequisiteEdges(nodes)).toEqual(["x <- z"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Family/context isolation for transfer freshness.
+// ---------------------------------------------------------------------------
+
+describe("question context isolation", () => {
+  it("reads part-level contexts when a structured question mixes skills", () => {
+    const q: Question = { ...questionWith([
+      partWith({ prompt: "p one", learning: { familyId: "fa", contextId: "ctx-one", demand: "calculation", reasoningMoves: ["one"] } }),
+      partWith({ prompt: "p two", learning: { familyId: "fb", contextId: "ctx-two", demand: "explanation", reasoningMoves: ["two"] } }),
+    ], "q-ctx") };
+    expect(new Set(questionContexts(q))).toEqual(new Set(["ctx-one", "ctx-two"]));
+    expect(new Set(questionFamilies(q))).toEqual(new Set(["fa", "fb"]));
   });
 });

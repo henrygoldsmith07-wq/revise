@@ -234,12 +234,12 @@ export const physicsQuestions = defineQuestions([
     aos: ["AO2"],
     parts: [
       {
-        prompt: "Calculate the time to hit the sea.",
+        prompt: "Find how long the ball takes to reach the sea. A second ball is thrown identically from a cliff four times as high; state how its duration and range compare with the first.",
         marks: 3,
-        scheme: ["Uses s = ut + 1/2 at^2 vertically", "Substitutes 45 = 0 + 4.905 t^2", "t = 3.03 s"],
+        scheme: ["Uses s = ut + 1/2 at^2 vertically", "Substitutes 45 = 0 + 4.905 t^2", "t = 3.03 s; duration scales as the square root of height, so 2 × 3.03 = 6.06 s, and range scales with duration, so 2 × 24 = 48 m"],
         specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-01"],
         learningClaims: ["resolve projectile motion and calculate time of flight"],
-        answer: "Vertically, s = ut + ½at² with u = 0, so 45 = 4.905 t² giving t = √(9.17) = 3.03 s.",
+        answer: "Vertically, s = ut + ½at² with u = 0, so 45 = 4.905 t² giving t = √(9.17) = 3.03 s. Duration scales as √h, so a cliff four times as high doubles the duration to 6.06 s; with the same horizontal speed the range doubles to 48 m.",
       },
       {
         prompt: "Calculate the horizontal distance from the cliff at impact.",

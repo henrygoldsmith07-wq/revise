@@ -515,3 +515,97 @@ Success signals:
   carried out in a fresh `revise/` clone inside the shared Forq workspace
   because the conversation's checkout pointed at a different repository; all
   changes above are confined to that clone and are uncommitted.
+
+## Improvement state: Physics content trust and shallow-variation hardening
+
+### Goal and observable outcome
+
+Push WJEC A-level Physics toward the north-star (durable unseen exam marks per
+hour) by removing every *deterministically fixable* defect the Physics quality
+queue reported, without touching the human-review or efficacy gates that must
+stay honest. Concretely: no curated question should reach the learner unmapped
+or carrying placeholder reasoning; the audit must reject number-swaps,
+wording-only rewordings and identical reasoning paths; Physics calculation
+marking must recognise standard-form answers and prefer escalation over a
+confident wrong mark on contradictory working; and the prerequisite ladder must
+not carry transitively redundant blockers.
+
+### Baseline evidence
+
+- Physics quality queue: 625 items — 118 `missing-capability`, 118
+  `missing-part-learning`, 30 statement-level `missing-mapping`, 9
+  `incomplete-mark-scheme`, 10 `missing-reasoning-move`, 115
+  `missing-demand`, 224 `unreviewed`.
+- The evidence-intake reported 78 model-answer marking disagreements (the mark
+  scheme and the deterministic rubric disagreed on the authored answer).
+- The curated expansion packs (`unfamiliar-context`, `data-expansion`,
+  `authentic-source`, `evidence-expansion`, `extended-responses`,
+  `flagship-physics-depth`) had real, distinct content but no part-level
+  `learning`/`capabilityIds`, so the audit could not see their coverage.
+- `wjec-physics-deep.ts` and `flagship-physics-depth.ts` used templated
+  reasoning moves ("${demand} reasoning …"), which the distinctness check must
+  reject.
+- The shared coverage generator produced 24 Physics items from one template
+  prompt ("Use the … evidence to explain the first examinable requirement") —
+  the textbook shallow variation.
+
+### Decisions
+
+- Keep the six-check human attestation and the double-marked benchmark as
+  external gates; never fabricate approvals or demand coverage in code.
+- Author part-level metadata in one explicit, question-id-keyed module
+  (`physics-part-learning.ts`) applied to the seed bank at assembly time, so the
+  curated packs stay readable and every mapping is auditable in one place.
+- Replace the 24 template Physics coverage questions with authored per-topic
+  items carrying distinct family/context/reasoning; keep the generator for the
+  other three flagships so their per-topic counts are unchanged.
+- Harden the audit: reject templated reasoning moves, count only authored
+  reasoning toward distinctness, and add a value-stripped near-duplicate
+  `surface-rewording` check that also requires a shared reasoning operation so
+  legitimate same-skill practice in a new context is not flagged.
+- Fix the shared maths parser rather than special-case the rubric: a standard
+  form `m × 10^0` was unparseable (zero exponent rejected), mis-earning a
+  review; then accept standard-form answers and significant figures in standard
+  form in the calculation rubric.
+- Escalate (unreported/provisional) on same-label contradictory working instead
+  of cherry-picking; keep an internal arithmetic slip eligible for the
+  follow-through mark.
+- Add a `redundantPrerequisiteEdges` detector; it found three transitively
+  implied blockers (emf reachable via ohm); remove the direct duplicates.
+
+### Delivered scope
+
+- 118 `missing-capability`, 118 `missing-part-learning`, 30 `missing-mapping`,
+  10 `missing-reasoning-move` and 9 `incomplete-mark-scheme` cleared;
+  templated moves eliminated.
+- Quality queue 625 → 355 items with zero deterministic defects; the remainder
+  is 240 honest human-review rows and 115 real demand gaps for human authoring.
+- Model-answer marking disagreements 78 → 0.
+- 24 authored Physics coverage items replace the shared template; 16 previously
+  unmapped specification statements gain an authored item; the shared coverage
+  generator is excluded for Physics only.
+- Prerequisite graph: three redundant blockers removed; the detector is wired
+  into the review export and asserted to return none on the shipped graph.
+- Smaller-intervention tie-break added to `selectLearningAction`.
+
+### Status
+
+- [x] curated-pack metadata enrichment + templated-move elimination
+- [x] shallow-variation audit hardening (templated moves, near-duplicate
+  prompts, shared-reasoning-path distinctness)
+- [x] calculation-marking expansion (standard form, contradiction escalation)
+- [x] authored Physics coverage + zero-family statement items; template removed
+- [x] prerequisite redundant-edge audit and cleanup
+- [x] full lint, regular and strict TypeScript, test suite, build and perf budget
+
+### Verification log
+
+2026-09-11: lint (0 warnings), `tsc --noEmit`, `tsc --noEmit -p
+tsconfig.strict.json`, curriculum validation and freshness, **182 test files /
+1,526 tests passed** (2 skipped), production build (static pages generated) and
+the client performance budget all passed. Physics quality queue re-exported:
+625 → 355 items, 0 model-answer marking disagreements, 0 redundant prerequisite
+edges, 0 `missing-capability` / `missing-part-learning` /
+`incomplete-mark-scheme` issues. No human approvals fabricated
+(`approvalsCreated: 0`); `releaseReady` correctly remains false until the
+six-check attestation and double-marked benchmark are supplied by people.

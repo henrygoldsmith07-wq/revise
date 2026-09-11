@@ -11,6 +11,7 @@ const bundle = await build({
     export { physicsContentFingerprint, humanVerifiedPhysicsQuestion, REQUIRED_HUMAN_CHECKS } from "./src/domain/physics-content-review";
     export { wjecCapabilities as capabilities } from "./src/content/capabilities";
     export { capabilityEdgeFingerprint } from "./src/domain/capability-graph";
+    export { redundantPrerequisiteEdges } from "./src/domain/capability-graph";
     export { wjecPhysics as curriculum } from "./src/domain/curriculum/wjec-physics";
     export { markPart } from "./src/domain/marking";
     export { auditPhysicsAssessmentQuality, physicsQualityQueue, physicsAuthoringBriefs } from "./src/domain/physics-assessment-quality";
@@ -41,6 +42,7 @@ const prerequisiteReviews = physicsNodes.flatMap((node) => node.prerequisites.ma
     review: node.prerequisiteReviews?.[prerequisiteId] ?? { status: "unreviewed" },
   };
 }));
+const redundantEdges = data.redundantPrerequisiteEdges(data.capabilities, "wjec-alevel-physics");
 const rows = data.questions.filter((question) => question.subjectId === "wjec-alevel-physics").map((question) => ({
   question,
   fingerprint: data.physicsContentFingerprint(question),
@@ -72,7 +74,7 @@ const lines = [
   "",
   `${rows.length} Physics questions from the live bank. This export creates **no human approvals**. No efficacy results are claimed.`,
   `Quality gate: ${qualityAudit.completeStatements}/${qualityAudit.statements} specification statements meet the two-family/two-context demand check; ${qualityAudit.unreviewedQuestions} questions remain unreviewed. Authoring/review queue: ${qualityQueue.length} items. Release-ready: **${qualityAudit.releaseReady ? "yes" : "no"}**.`,
-  `Prerequisite gate: ${prerequisiteReviews.filter((row) => row.review.status === "approved").length}/${prerequisiteReviews.length} dependency edges have an approval; every edge remains a diagnosis hypothesis until a subject expert signs the exact fingerprint.`,
+  `Prerequisite gate: ${prerequisiteReviews.filter((row) => row.review.status === "approved").length}/${prerequisiteReviews.length} dependency edges have an approval; ${redundantEdges.length} edge${redundantEdges.length === 1 ? " is" : "s are"} transitively redundant; every edge remains a diagnosis hypothesis until a subject expert signs the exact fingerprint.`,
   "",
   "Review the prompt, mark scheme, worked solution, internal specification mapping, capability mapping and exam realism separately. Solve before reading the key. Record accepted alternatives, rejected misconceptions and uncertain marking. Use examiner-labelled student answers to validate partial credit.",
   "",
@@ -103,10 +105,11 @@ await writeFile(resolve(out, "physics-review-packet.json"), JSON.stringify(rows,
 await writeFile(resolve(out, "physics-review-packet.md"), lines.join("\n"));
 await writeFile(resolve(out, "physics-capability-graph.json"), JSON.stringify(physicsNodes, null, 2));
 await writeFile(resolve(out, "physics-prerequisite-review.json"), JSON.stringify(prerequisiteReviews, null, 2));
+await writeFile(resolve(out, "physics-prerequisite-audit.json"), JSON.stringify({ redundantEdges }, null, 2));
 await writeFile(resolve(out, "physics-quality-audit.json"), JSON.stringify(qualityAudit, null, 2));
 await writeFile(resolve(out, "physics-quality-queue.json"), JSON.stringify(qualityQueue, null, 2));
 await writeFile(resolve(out, "physics-authoring-briefs.json"), JSON.stringify(authoringBriefs, null, 2));
 console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((row) => row.question.id.startsWith("cnt:question:physics-quality-")).length, approvalsCreated: 0,
   modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
-  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length,
+  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length, redundantPrerequisiteEdges: redundantEdges.length,
   output: out }));
