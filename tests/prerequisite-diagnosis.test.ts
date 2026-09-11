@@ -11,20 +11,22 @@ import {
 import type { Attempt, Card, Mistake, Topic, TopicMastery } from "../src/domain/types";
 
 // ---------------------------------------------------------------------------
-// Fixtures: a WJEC A-level Biology set where Photosynthesis depends on Enzymes
+// Generic diagnosis mechanics use reference-subject fixtures. The WJEC
+// evidence gate is tested separately in wjec-subject-quality.
+// An AQA A-level Biology set where Photosynthesis depends on Enzymes
 // and membrane transport (the real curated chain), plus a two-step Chemistry
 // chain (acids-bases ← equilibria ← moles) for depth selection.
 // ---------------------------------------------------------------------------
 
 const NOW = new Date("2026-05-10T12:00:00Z");
 
-const PHOTO = "wjec-alevel-biology.photosynthesis";
-const ENZYMES = "wjec-alevel-biology.enzymes";
-const MEMBRANES = "wjec-alevel-biology.membranes-transport";
+const PHOTO = "aqa-alevel-biology.photosynthesis";
+const ENZYMES = "aqa-alevel-biology.enzymes";
+const MEMBRANES = "aqa-alevel-biology.membranes-transport";
 
-const ACIDS = "wjec-alevel-chemistry.acids-bases";
-const EQUILIBRIA = "wjec-alevel-chemistry.equilibria";
-const MOLES = "wjec-alevel-chemistry.moles";
+const ACIDS = "aqa-alevel-chemistry.acids-bases";
+const EQUILIBRIA = "aqa-alevel-chemistry.equilibria";
+const MOLES = "aqa-alevel-chemistry.moles";
 
 function topic(id: string, title: string): Topic {
   const subjectId = id.slice(0, id.lastIndexOf("."));

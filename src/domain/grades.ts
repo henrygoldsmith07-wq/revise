@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { daysToExam } from "./recommender";
 import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, ExamDate, Id, IsoDate, Question, Subject, TopicMastery } from "./types";
@@ -81,7 +82,7 @@ export function predictGrade(
   const subjectAttempts = attempts.filter((attempt) => {
     if (attempt.subjectId !== subject.id) return false;
     const question = questionById.get(attempt.questionId);
-    if (!question) return subject.id !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
+    if (!question) return !requiresWjecContentReview(subject.id) && trustworthyAttempt(attempt);
     return trustedAssessmentAttempt(attempt, question, attempts, questions);
   });
 

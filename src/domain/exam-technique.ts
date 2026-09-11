@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Knowledge vs answering — exam-technique modelling.
 //
@@ -165,7 +166,7 @@ function physicsMistakeHasTrustedContext(
   questions: readonly Question[] | undefined,
   attempts: readonly Attempt[] | undefined,
 ): boolean {
-  if (mistake.subjectId !== "wjec-alevel-physics") return true;
+  if (!requiresWjecContentReview(mistake.subjectId)) return true;
   const question = questions?.find((row) => row.id === mistake.questionId);
   const attempt = attempts?.find((row) => row.id === mistake.attemptId);
   if (!question || !attempt || !trustedAssessmentContent(question) || !trustworthyAttempt(attempt)) return false;

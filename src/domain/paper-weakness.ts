@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type { Attempt, Id, Mistake, Paper, Question } from "./types";
 import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
 
@@ -128,7 +129,7 @@ export function analysePaperWeakness(input: {
       const question = questionsById.get(attempt.questionId);
       // Physics paper weakness is high-value diagnostic evidence only after
       // the source, sitting and human marking have all been authenticated.
-      if (input.paper.subjectId === "wjec-alevel-physics") {
+      if (requiresWjecContentReview(input.paper.subjectId)) {
         return Boolean(question && authenticPaperEvidence(attempt, question, input.attempts, input.questions));
       }
       return true;

@@ -2,6 +2,9 @@ import { capabilityEdgeFingerprint, validateCapabilityGraph, validatePrerequisit
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 import type { PrerequisiteEdge } from "@/domain/prerequisites";
 
+import { wjecSubjectCapabilities } from "./wjec-subject-capabilities";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
+
 const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 
 /**
@@ -167,7 +170,7 @@ const legacyWjecCapabilities: CapabilityNode[] = [
     explanation: "Drag opposes motion and usually increases with speed. As a falling object speeds up, upward drag increases and downward acceleration decreases. At terminal velocity drag balances weight: acceleration is zero while velocity remains non-zero." },
   { id: "math.power", subjectId: "wjec-alevel-maths", topicId: "wjec-alevel-maths.differentiation", label: "Differentiate a power correctly", specPointIds: ["wjec-alevel-maths.differentiation.sp-01"], prerequisites: [],
     explanation: "For x raised to n, multiply by n and reduce the power by one: d(x^n)/dx = n x^(n−1). Differentiate each term separately; a constant differentiates to zero." },
-  { id: "math.stationary", subjectId: "wjec-alevel-maths", topicId: "wjec-alevel-maths.differentiation", label: "Find and classify stationary points", specPointIds: ["wjec-alevel-maths.differentiation.sp-04"], prerequisites: ["math.power"],
+  { id: "math.stationary", subjectId: "wjec-alevel-maths", topicId: "wjec-alevel-maths.differentiation", label: "Find and classify stationary points", specPointIds: ["wjec-alevel-maths.differentiation.sp-03"], prerequisites: ["math.power"],
     explanation: "Solve f′(x) = 0. A positive f″ at the point gives a local minimum and a negative f″ a local maximum. If f″ is zero, check the derivative's sign on both sides." },
   { id: "math.optimisation", subjectId: "wjec-alevel-maths", topicId: "wjec-alevel-maths.differentiation", label: "Optimise a model within its domain", specPointIds: ["wjec-alevel-maths.differentiation.sp-04"], prerequisites: ["math.stationary"],
     explanation: "Use the constraint to write the objective in one variable. State its feasible domain. Differentiate, solve for stationary points, then compare valid candidates with endpoints and justify the optimum in context." },
@@ -178,8 +181,7 @@ export const wjecCapabilities: CapabilityNode[] = [
   ...legacyWjecCapabilities,
   ...wjecPhysicsCapabilities,
   ...physicsCircuitCapabilities,
-  // Chemistry, Biology and Maths nodes above remain intentionally small until
-  // their own flagship content reaches the same depth as Physics.
+  ...wjecSubjectCapabilities,
 ];
 
 /**
@@ -189,15 +191,19 @@ export const wjecCapabilities: CapabilityNode[] = [
  * curriculum ordering must not steer a root-cause diagnosis.
  */
 export function reviewedPhysicsTopicEdges(): PrerequisiteEdge[] {
+  return reviewedWjecTopicEdges(PHYSICS_SUBJECT_ID);
+}
+
+export function reviewedWjecTopicEdges(subjectId?: string): PrerequisiteEdge[] {
   const byId = new Map(wjecCapabilities.map((node) => [node.id, node] as const));
   const seen = new Set<string>();
   const edges: PrerequisiteEdge[] = [];
   for (const node of wjecCapabilities) {
-    if (node.subjectId !== PHYSICS_SUBJECT_ID) continue;
+    if (!requiresWjecContentReview(node.subjectId) || (subjectId && node.subjectId !== subjectId)) continue;
     for (const prerequisiteId of node.prerequisites) {
       const prerequisite = byId.get(prerequisiteId);
       const review = node.prerequisiteReviews?.[prerequisiteId];
-      if (!prerequisite || prerequisite.subjectId !== PHYSICS_SUBJECT_ID || node.topicId === prerequisite.topicId ||
+      if (!prerequisite || prerequisite.subjectId !== node.subjectId || node.topicId === prerequisite.topicId ||
         review?.status !== "approved" || !review.reviewerId?.trim() || !review.reviewedAt ||
         !Number.isFinite(Date.parse(review.reviewedAt)) || review.edgeFingerprint !== capabilityEdgeFingerprint(node, prerequisite)) continue;
       const key = `${node.topicId}<-${prerequisite.topicId}`;

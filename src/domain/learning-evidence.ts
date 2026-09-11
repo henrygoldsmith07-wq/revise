@@ -1,5 +1,5 @@
 import type { Attempt, LearningDemand, PaperMarkingReview, Question, QuestionPart } from "./types";
-import { trustedAssessmentContent, verifiedPhysicsPaperProvenance } from "./physics-content-review";
+import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
 
 function normaliseAnswer(text: string): string {
   return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
@@ -82,7 +82,7 @@ export function trustedAssessmentAttempt(
   questions: readonly Question[],
 ): boolean {
   if (!question || !trustworthyAttempt(attempt) || question.subjectId !== attempt.subjectId || !trustedAssessmentContent(question)) return false;
-  return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+  return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
     authenticPaperEvidence(attempt, question, history, questions);
 }
 
@@ -152,7 +152,7 @@ export function authenticPaperEvidence(attempt: Attempt, question: Question | un
   history: readonly Attempt[], questions: readonly Question[]): boolean {
   const provenance = question?.paperProvenance;
   if (!question || question.source !== "past-paper" || !trustedAssessmentContent(question) ||
-    !verifiedPhysicsPaperProvenance(question) || !provenance ||
+    !verifiedWjecPaperProvenance(question) || !provenance ||
     !independentAttempt(attempt) || !humanReviewedPaperAttempt(attempt) || attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId ||
     attempt.subjectId !== question.subjectId || attempt.paperId !== question.paperId ||
     attempt.paperId !== provenance.paperId ||

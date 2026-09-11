@@ -1,5 +1,5 @@
 import { authenticPaperEvidence, independentAttempt, partFamily, trustworthyAttempt } from "./learning-evidence";
-import { trustedAssessmentContent } from "./physics-content-review";
+import { requiresWjecContentReview, trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, Question } from "./types";
 
 export interface CapabilityNode {
@@ -133,7 +133,7 @@ export function validatePrerequisiteReviews(nodes: readonly CapabilityNode[], su
 }
 
 function trustedPrerequisiteEdge(node: CapabilityNode, prerequisiteId: string, trustedOnly: boolean, byId: ReadonlyMap<string, CapabilityNode>): boolean {
-  if (!trustedOnly || node.subjectId !== "wjec-alevel-physics") return true;
+  if (!trustedOnly || !requiresWjecContentReview(node.subjectId)) return true;
   const review = node.prerequisiteReviews?.[prerequisiteId];
   return review?.status === "approved" && Boolean(review.reviewerId?.trim() && review.reviewedAt && Number.isFinite(Date.parse(review.reviewedAt))) &&
     Boolean(review.edgeFingerprint && review.edgeFingerprint === capabilityEdgeFingerprint(node, byId.get(prerequisiteId) ?? prerequisiteId));
@@ -157,7 +157,7 @@ export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions:
       // cannot establish capability mastery. Paper attempts additionally need
       // authenticated provenance and a human marking attestation.
       if (!trustedAssessmentContent(question)) continue;
-      if (question.subjectId === "wjec-alevel-physics" && attempt.mode === "paper" &&
+      if (requiresWjecContentReview(question.subjectId) && attempt.mode === "paper" &&
         !authenticPaperEvidence(attempt, question, attempts, questions)) continue;
       const parts = question.parts.filter((p) => p.capabilityIds?.length === 1 && p.capabilityIds[0] === node.id);
       const marks = parts.flatMap((part) => {

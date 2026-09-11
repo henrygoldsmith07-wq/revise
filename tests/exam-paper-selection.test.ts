@@ -9,7 +9,9 @@ import {
 import type { Attempt, Mistake, Paper, Question, Topic, TopicMastery } from "../src/domain/types";
 
 const NOW = new Date("2026-06-01T12:00:00Z");
-const SUBJECT = "wjec-alevel-biology";
+// Synthetic ranking fixtures exercise scoring mechanics; WJEC evidence gates
+// are covered separately with fingerprinted content in wjec-subject-quality.
+const SUBJECT = "aqa-alevel-biology";
 
 const TOPICS: Topic[] = ["photo", "enzymes", "transport"].map((slug, i) => ({
   id: `${SUBJECT}.${slug}`,

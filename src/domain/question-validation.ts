@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type {
   Id,
   IsoDate,
@@ -150,7 +151,7 @@ export function validateQuestion(
   if (question.source === "licensed" && !question.licensedSource?.citation?.trim()) {
     addIssue(issues, "missing-licence", `${question.id}: licensed questions need a citation`);
   }
-  if (question.subjectId === "wjec-alevel-physics" && question.source === "past-paper") {
+  if (requiresWjecContentReview(question.subjectId) && question.source === "past-paper") {
     const paper = question.paperProvenance;
     const validPaper = Boolean(paper && paper.status === "verified" && paper.board.toLowerCase() === "wjec" &&
       paper.paperId === question.paperId && paper.questionNumber === question.paperQuestionNumber &&

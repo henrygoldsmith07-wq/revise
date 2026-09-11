@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type {
   Attempt,
   FarTransferAttemptLink,
@@ -166,7 +167,7 @@ function eligibleSource(attempt: Attempt): boolean {
 export function scheduleDelayedFarTransfer(input: ScheduleDelayedFarTransferInput): FarTransferAttemptLink | undefined {
   if (!eligibleSource(input.attempt)) return undefined;
   const history = input.history ?? [input.attempt];
-  if (input.question.subjectId === "wjec-alevel-physics" &&
+  if (requiresWjecContentReview(input.question.subjectId) &&
     !trustedAssessmentAttempt(input.attempt, input.question, history, input.questions)) return undefined;
 
   const delayDays = validDelayDays(input.delayDays);
@@ -216,7 +217,7 @@ export function completeDelayedFarTransfer(
   if (!independentAttempt(attempt) || attempt.questionId !== retest.candidateQuestionId ||
     attempt.userId !== retest.userId || attempt.subjectId !== retest.subjectId ||
     Date.parse(attempt.createdAt) < Date.parse(`${retest.scheduledFor}T00:00:00Z`)) return undefined;
-  if (attempt.subjectId === "wjec-alevel-physics") {
+  if (requiresWjecContentReview(attempt.subjectId)) {
     const question = context?.question;
     if (!question || !context?.questions || !trustedAssessmentAttempt(attempt, question, context.history ?? [attempt], context.questions)) return undefined;
   }
@@ -262,7 +263,7 @@ export function delayedFarTransferRetests(input: {
     if (sourceAttempt.farTransfer?.role === "retest") continue;
     const sourceQuestion = input.questions.find((question) => question.id === sourceAttempt.questionId);
     if (!sourceQuestion) continue;
-    if (sourceAttempt.subjectId === "wjec-alevel-physics" &&
+    if (requiresWjecContentReview(sourceAttempt.subjectId) &&
       !trustedAssessmentAttempt(sourceAttempt, sourceQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions)) continue;
 
     const stored = sourceAttempt.farTransfer?.role === "source" ? sourceAttempt.farTransfer : undefined;
@@ -280,7 +281,7 @@ export function delayedFarTransferRetests(input: {
     const completed = candidate && candidate.userId === sourceAttempt.userId && candidate.subjectId === sourceAttempt.subjectId &&
       candidate.questionId === link.candidateQuestionId && independentAttempt(candidate) &&
       candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && candidate.createdAt.slice(0, 10) >= link.scheduledFor &&
-      (candidate.subjectId !== "wjec-alevel-physics" || Boolean(candidateQuestion && trustedAssessmentAttempt(candidate, candidateQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions))) ? candidate : undefined;
+      (!requiresWjecContentReview(candidate.subjectId) || Boolean(candidateQuestion && trustedAssessmentAttempt(candidate, candidateQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions))) ? candidate : undefined;
     records.set(link.retestId, {
       ...link,
       userId: sourceAttempt.userId,

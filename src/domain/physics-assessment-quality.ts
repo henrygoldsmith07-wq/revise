@@ -164,15 +164,18 @@ function demandCoverage(mappedQuestions: Array<{ question: Question; part: Quest
  * masquerade as transfer practice.
  */
 export function auditPhysicsAssessmentQuality(input: {
+  /** Defaults to Physics; reuse the existing audit for other WJEC subjects. */
+  subjectId?: Id;
   topics: readonly Topic[];
   questions: readonly Question[];
   nodes: readonly CapabilityNode[];
   /** Trust predicate is injected to keep this audit independent of the review store. */
   trustedQuestion?: (question: Question) => boolean;
 }): PhysicsAssessmentQualityAudit {
-  const physicsTopics = input.topics.filter((topic) => topic.subjectId === "wjec-alevel-physics");
-  const physicsQuestions = input.questions.filter((question) => question.subjectId === "wjec-alevel-physics");
-  const physicsNodes = input.nodes.filter((node) => node.subjectId === "wjec-alevel-physics");
+  const subjectId = input.subjectId ?? "wjec-alevel-physics";
+  const physicsTopics = input.topics.filter((topic) => topic.subjectId === subjectId);
+  const physicsQuestions = input.questions.filter((question) => question.subjectId === subjectId);
+  const physicsNodes = input.nodes.filter((node) => node.subjectId === subjectId);
   const points = physicsTopics.flatMap((topic) => (topic.specPoints ?? []).map((point) => ({ topic, point })));
   const pointIds = new Set(points.map(({ point }) => point.id));
   const nodeById = new Map(physicsNodes.map((node) => [node.id, node]));

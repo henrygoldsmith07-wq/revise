@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Prerequisite-weakness diagnosis.
 //
@@ -96,7 +97,6 @@ export interface TopicSignalInput {
   now: Date;
 }
 
-const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 
 /**
  * Filter diagnosis inputs through the same evidence boundary as mastery and
@@ -112,12 +112,12 @@ function trustedDiagnosisEvidence(
   const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
   const trustedAttempt = (attempt: Attempt): boolean => {
     if (!trustworthyAttempt(attempt)) return false;
-    if (attempt.subjectId !== PHYSICS_SUBJECT_ID) return true;
+    if (!requiresWjecContentReview(attempt.subjectId)) return true;
     const question = questionById.get(attempt.questionId);
     return Boolean(question && trustedAssessmentAttempt(attempt, question, attempts, questions ?? []));
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (mistake.subjectId !== PHYSICS_SUBJECT_ID) return true;
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
     const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
     const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
     return Boolean(attempt && question && trustedAssessmentContent(question) && trustedAttempt(attempt));
@@ -281,7 +281,7 @@ export function diagnosePrerequisiteWeakness(input: DiagnosisInput): Prerequisit
   // Physics capability edges are hypotheses until a subject expert signs the
   // exact fingerprint. Callers may supply the approved projection; absent it,
   // do not fall back to the older curriculum-order graph.
-  const edges = input.edges ?? (topic?.subjectId === PHYSICS_SUBJECT_ID ? [] : prerequisiteEdges());
+  const edges = input.edges ?? (requiresWjecContentReview(topic?.subjectId) ? [] : prerequisiteEdges());
   const evidence = trustedDiagnosisEvidence(attempts, mistakes, input.questions);
 
   const signal = signalForTopic({ topicId, topics, attempts: evidence.attempts, mistakes: evidence.mistakes, mastery, cards, questions: input.questions, now });

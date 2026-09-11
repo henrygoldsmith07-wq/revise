@@ -5,6 +5,10 @@ import { validatePrerequisiteReviews } from "./capability-graph";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
+export const REVIEWED_WJEC_SUBJECT_IDS = [PHYSICS_SUBJECT_ID, "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry"] as const;
+export function requiresWjecContentReview(subjectId: string | undefined): boolean {
+  return REVIEWED_WJEC_SUBJECT_IDS.some((id) => id === subjectId);
+}
 export const REQUIRED_HUMAN_CHECKS = ["question", "marking", "workedSolution", "capabilityMapping", "specificationMapping", "examRealism"] as const;
 
 /** Change detector, not a signature: reviewer identity still needs human attestation. */
@@ -34,14 +38,19 @@ function completeChecks(record: HumanVerificationRecord | undefined): boolean {
 
 /** A question is trusted only when every component has an approved check. */
 export function humanVerifiedPhysicsQuestion(question: Question): boolean {
-  return question.subjectId === PHYSICS_SUBJECT_ID && question.verification === "verified" && completeChecks(question.humanVerification) &&
+  return question.subjectId === PHYSICS_SUBJECT_ID && humanVerifiedWjecQuestion(question);
+}
+
+/** Same six-check and edit-invalidation contract for all four WJEC flagships. */
+export function humanVerifiedWjecQuestion(question: Question): boolean {
+  return requiresWjecContentReview(question.subjectId) && question.verification === "verified" && completeChecks(question.humanVerification) &&
     question.humanVerification?.contentFingerprint === physicsContentFingerprint(question) &&
-    (question.source !== "past-paper" || verifiedPhysicsPaperProvenance(question)) &&
+    (question.source !== "past-paper" || verifiedWjecPaperProvenance(question)) &&
     !["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "");
 }
 
 export function trustedAssessmentContent(question: Question): boolean {
-  return question.subjectId !== PHYSICS_SUBJECT_ID || humanVerifiedPhysicsQuestion(question);
+  return !requiresWjecContentReview(question.subjectId) || humanVerifiedWjecQuestion(question);
 }
 
 /**
@@ -50,8 +59,12 @@ export function trustedAssessmentContent(question: Question): boolean {
  * approval: provenance and marking quality are two independent gates.
  */
 export function verifiedPhysicsPaperProvenance(question: Question): boolean {
+  return question.subjectId === PHYSICS_SUBJECT_ID && verifiedWjecPaperProvenance(question);
+}
+
+export function verifiedWjecPaperProvenance(question: Question): boolean {
   const provenance = question.paperProvenance;
-  return question.subjectId === PHYSICS_SUBJECT_ID && question.source === "past-paper" &&
+  return requiresWjecContentReview(question.subjectId) && question.source === "past-paper" &&
     Boolean(question.paperId && question.paperQuestionNumber?.trim() && provenance &&
       provenance.status === "verified" && provenance.board.toLowerCase() === "wjec" &&
       provenance.paperId === question.paperId && provenance.questionNumber === question.paperQuestionNumber &&
@@ -61,11 +74,11 @@ export function verifiedPhysicsPaperProvenance(question: Question): boolean {
 }
 
 /** Questions requiring editorial review before they can provide trusted transfer evidence. */
-export function buildPhysicsReviewQueue(questions: readonly Question[]): PhysicsReviewQueueRow[] {
+export function buildPhysicsReviewQueue(questions: readonly Question[], subjectId: Id = PHYSICS_SUBJECT_ID): PhysicsReviewQueueRow[] {
   return questions
-    .filter((question) => question.subjectId === PHYSICS_SUBJECT_ID)
+    .filter((question) => question.subjectId === subjectId)
     .flatMap((question) => {
-      if (humanVerifiedPhysicsQuestion(question)) return [];
+      if (humanVerifiedWjecQuestion(question)) return [];
       const checks = question.humanVerification?.checks;
       const missingChecks = REQUIRED_HUMAN_CHECKS.filter((check) => !checks?.[check]);
       const status: PhysicsReviewQueueRow["status"] = question.humanVerification?.status ?? "unreviewed";

@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // The prospective recommendation experiment — the instrument behind Revise's
 // central claim: "what should I revise next?" beats self-directed revision.
@@ -294,7 +295,7 @@ function armOutcome(
     Number.isFinite(a.awarded) && Number.isFinite(a.max) && a.max > 0 && a.awarded >= 0 && a.awarded <= a.max &&
     Number.isFinite(a.elapsedMs) && a.elapsedMs > 0 && Number.isFinite(Date.parse(a.createdAt));
   const eligibleAttempt = (a: AttemptLike): boolean =>
-    validAttempt(a) && (a.subjectId === "wjec-alevel-physics" ? a.trusted === true : a.trusted !== false);
+    validAttempt(a) && (requiresWjecContentReview(a.subjectId) ? a.trusted === true : a.trusted !== false);
   const mine = attempts.filter((a) => {
     const w = windows.get(a.anonId);
     return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt && eligibleAttempt(a);
@@ -503,9 +504,9 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     // A Physics baseline is part of the durable marks endpoint.  Missing
     // attestation is as unsafe as an explicit rejection: a self/auto-marked
     // baseline can make later gain per hour look larger than it is.
-    if (baseline.subjectId === "wjec-alevel-physics" && baseline.humanMarked !== true) continue;
+    if (requiresWjecContentReview(baseline.subjectId) && baseline.humanMarked !== true) continue;
     let endpointPercent = final.percent;
-    if (final.subjectId === "wjec-alevel-physics") {
+    if (requiresWjecContentReview(final.subjectId)) {
       const delayed = final.delayedAssessment;
       if (final.heldOutFamilies !== true || final.humanMarked !== true || !Number.isFinite(final.delayedDays) || (final.delayedDays ?? 0) < 7 ||
         !Number.isFinite(final.revisionMinutes) || (final.revisionMinutes ?? 0) <= 0 ||

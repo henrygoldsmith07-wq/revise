@@ -1,6 +1,7 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type { Attempt, InterventionActivity, InterventionAttemptContext, InterventionKind, InterventionObservationResult, InterventionOutcomeRecord, IsoInstant, Question } from "./types";
 import { authenticPaperEvidence, independentAttempt, isTransferQuestion, partFamily, questionCapabilities, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
-import { PHYSICS_SUBJECT_ID, trustedAssessmentContent } from "./physics-content-review";
+import { trustedAssessmentContent } from "./physics-content-review";
 
 export const INTERVENTION_PRIORS: Record<InterventionKind, number> = {
   diagnose: 0.015,
@@ -47,7 +48,7 @@ export function durableOutcomeScore(outcome: InterventionOutcomeRecord): number 
     !outcome.transfer?.trusted || !outcome.delayedRetention?.trusted ||
     !outcome.immediateFamilyId || !outcome.transfer.familyId || !outcome.delayedRetention.familyId ||
     new Set([outcome.immediateFamilyId, outcome.transfer.familyId, outcome.delayedRetention.familyId]).size !== 3 ||
-    (outcome.subjectId === PHYSICS_SUBJECT_ID && outcome.immediate.trusted !== true) ||
+    (requiresWjecContentReview(outcome.subjectId) && outcome.immediate.trusted !== true) ||
     Date.parse(outcome.transfer.at) <= Date.parse(outcome.immediate.at) ||
     Date.parse(outcome.delayedRetention.at) - Date.parse(outcome.transfer.at) < RETENTION_DELAY) return null;
   const immediate = validScore(outcome.immediate);
@@ -193,7 +194,7 @@ export function createInterventionOutcome(input: {
   const { context, attempt } = input;
   const score = capabilityScore(attempt, input.question, context.capabilityId);
   const immediateTrusted = Boolean(trustworthyAttempt(attempt) && input.question && input.question.subjectId === input.subjectId && trustedAssessmentContent(input.question) &&
-    (input.subjectId !== PHYSICS_SUBJECT_ID || attempt.mode !== "paper" ||
+    (!requiresWjecContentReview(input.subjectId) || attempt.mode !== "paper" ||
       (input.questions && authenticPaperEvidence(attempt, input.question, input.history ?? [attempt], input.questions))));
   return {
     // The context identifies the planned rung; the attempt identifies this
@@ -223,7 +224,7 @@ export function createInterventionOutcome(input: {
       attemptId: attempt.id,
       at: attempt.createdAt,
       result: (score?.max ?? attempt.max) > 0 && (score?.awarded ?? attempt.awarded) / (score?.max ?? attempt.max) >= 0.7 ? "passed" : "missed",
-      ...(input.subjectId === PHYSICS_SUBJECT_ID ? { trusted: immediateTrusted } : {}),
+      ...(requiresWjecContentReview(input.subjectId) ? { trusted: immediateTrusted } : {}),
     },
     createdAt: attempt.createdAt,
     updatedAt: attempt.createdAt,
@@ -289,7 +290,7 @@ export interface OutcomeEvidenceContext {
 
 function validFollowUp(outcome: InterventionOutcomeRecord, attempt: Attempt, evidence?: OutcomeEvidenceContext): evidence is OutcomeEvidenceContext {
   if (!evidence || !independentFor(attempt) || attempt.userId !== outcome.userId || attempt.subjectId !== outcome.subjectId ||
-    (outcome.subjectId === PHYSICS_SUBJECT_ID && outcome.immediate.trusted !== true) ||
+    (requiresWjecContentReview(outcome.subjectId) && outcome.immediate.trusted !== true) ||
     attempt.questionId !== evidence.question.id || !trustedAssessmentContent(evidence.question) ||
     !questionCapabilities(evidence.question).includes(outcome.capabilityId) ||
     !capabilityScore(attempt, evidence.question, outcome.capabilityId) ||
@@ -297,7 +298,7 @@ function validFollowUp(outcome: InterventionOutcomeRecord, attempt: Attempt, evi
     attempt.questionId === outcome.immediateQuestionId ||
     familyForCapability(evidence.question, outcome.capabilityId) === outcome.immediateFamilyId ||
     !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
-  if (outcome.subjectId === PHYSICS_SUBJECT_ID && attempt.mode === "paper" &&
+  if (requiresWjecContentReview(outcome.subjectId) && attempt.mode === "paper" &&
     !authenticPaperEvidence(attempt, evidence.question, evidence.history, evidence.questions)) return false;
   const prior = evidence.history.filter((row) => row.userId === attempt.userId && row.id !== attempt.id &&
     Date.parse(row.createdAt) <= Date.parse(attempt.createdAt));

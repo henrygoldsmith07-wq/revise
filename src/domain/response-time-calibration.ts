@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { trustedAssessmentAttempt } from "./learning-evidence";
 import type { Attempt, Id, Paper, Question, Subject } from "./types";
 
@@ -190,7 +191,7 @@ export function buildResponseTimeCalibration(input: ResponseTimeCalibrationInput
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
   const papersById = new Map(input.papers.map((paper) => [paper.id, paper] as const));
   const subjectsById = new Map(input.subjects.map((subject) => [subject.id, subject] as const));
-  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => question.subjectId !== "wjec-alevel-physics");
+  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => !requiresWjecContentReview(question.subjectId));
   const observations: ResponseTimeObservation[] = [];
 
   for (const attempt of input.attempts) {

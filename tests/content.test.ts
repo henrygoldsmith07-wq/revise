@@ -172,7 +172,9 @@ describe("seed question bank", () => {
 });
 
 describe("grade prediction", () => {
-  const subject = allSubjects()[0];
+  // Generic prediction mechanics use a reference subject. WJEC evidence now
+  // requires reviewed question fixtures, covered in wjec-subject-quality.
+  const subject = allSubjects().find((s) => s.id === "aqa-alevel-biology")!;
   const mastery = (value: number): TopicMastery[] =>
     topicsFor(subject.id).map((t) => ({
       topicId: t.id,

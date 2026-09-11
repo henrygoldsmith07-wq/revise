@@ -18,7 +18,8 @@ import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner"
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { parseQuickSessionMinutes, type QuickSessionMinutes } from "@/domain/quick-session";
 import { buildWeakTopicExam } from "@/domain/weak-topic-exam";
-import { reviewedPhysicsTopicEdges } from "@/content/capabilities";
+import { reviewedWjecTopicEdges } from "@/content/capabilities";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
 import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
 import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionMode";
@@ -134,7 +135,7 @@ function Practice() {
       mastery: store.mastery,
       cards: store.cards,
       questions: store.questions,
-      ...(topic.subjectId === "wjec-alevel-physics" ? { edges: reviewedPhysicsTopicEdges() } : {}),
+      ...(requiresWjecContentReview(topic.subjectId) ? { edges: reviewedWjecTopicEdges(topic.subjectId) } : {}),
       now: new Date(),
     });
   }, [

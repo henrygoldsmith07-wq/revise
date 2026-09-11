@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Intelligent exam-paper selection — which paper to sit next.
 //
@@ -204,13 +205,13 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
   const trustedPhysicsAttempt = (attempt: Attempt): boolean => {
     const question = questionById.get(attempt.questionId);
     if (!question || !trustworthyAttempt(attempt) || !trustedAssessmentContent(question)) return false;
-    if (question.subjectId === "wjec-alevel-physics" && attempt.mode === "paper") {
+    if (requiresWjecContentReview(question.subjectId) && attempt.mode === "paper") {
       return authenticPaperEvidence(attempt, question, input.attempts, input.questions);
     }
     return true;
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (input.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(input.subjectId)) return true;
     const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
     return Boolean(attempt && trustedPhysicsAttempt(attempt));
   };
@@ -281,7 +282,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
     // reviewed, so an auto-marked sitting cannot distort exposure or recency.
     const paperIds = new Set<Id>([paper.id, ...resolved.map((question) => question.paperId).filter((id): id is Id => Boolean(id))]);
     const paperAttempts = input.attempts.filter((attempt) => paperIds.has(attempt.paperId ?? "") &&
-      (input.subjectId !== "wjec-alevel-physics" || trustedPhysicsAttempt(attempt)));
+      (!requiresWjecContentReview(input.subjectId) || trustedPhysicsAttempt(attempt)));
     const attemptsByRun = new Map<string, Attempt[]>();
     for (const attempt of paperAttempts) {
       const runKey = attempt.paperRunId ?? attempt.createdAt.slice(0, 10);
@@ -290,7 +291,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
       attemptsByRun.set(runKey, rows);
     }
     const completeRuns = [...attemptsByRun.values()].filter((rows) => {
-      if (input.subjectId !== "wjec-alevel-physics") return true;
+      if (!requiresWjecContentReview(input.subjectId)) return true;
       const present = new Set(rows.map((attempt) => attempt.questionId));
       // A partially answered or selectively trusted Physics sitting cannot
       // count as past-paper exposure.  It is still retained in storage for
@@ -359,7 +360,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
     // Low recent accuracy on the topic's questions also counts as weak.
     const recent = input.attempts.filter((a) =>
       a.topicIds.includes(topicId) && a.subjectId === input.subjectId && inWindow(a.createdAt) &&
-      (input.subjectId !== "wjec-alevel-physics" || trustedPhysicsAttempt(a)),
+      (!requiresWjecContentReview(input.subjectId) || trustedPhysicsAttempt(a)),
     );
     if (recent.length >= 2 && (accuracyOf(recent) ?? 1) < SELECT_LOW_ACCURACY) return true;
     return false;

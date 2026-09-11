@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { wjecCapabilities } from "@/content/capabilities";
-import { wjecRepairDepthQuestions as bank } from "@/content/questions/wjec-repair-depth";
+import { wjecRepairDepthQuestions as rawBank } from "@/content/questions/wjec-repair-depth";
 import { contentQuestionSchema } from "@/content/schema";
 import { allTopics } from "@/domain/curriculum";
 import { deriveSkillEvidence, smallestUnprovenCapability, validateCapabilityGraph } from "@/domain/capability-graph";
@@ -12,7 +12,18 @@ import { selectLearningAction } from "@/domain/learning-action";
 import { auditLearningDepth } from "@/domain/learning-depth";
 import { buildAdaptiveSession, replanAdaptiveSession } from "@/domain/adaptive-session";
 import { markPart } from "@/domain/marking";
+import { applyHumanVerification, physicsContentFingerprint } from "@/domain/physics-content-review";
 import type { Attempt, Question } from "@/domain/types";
+
+// The trust gate now covers all four WJEC flagships, so the repair bank must
+// carry test-only human approvals before it can move repair evidence. No
+// production content is approved by these fixtures.
+const approve = (question: Question): Question => applyHumanVerification(question, {
+  status: "approved", reviewerId: "test-only", reviewedAt: "2026-09-08T00:00:00Z",
+  contentFingerprint: physicsContentFingerprint(question),
+  checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
+});
+const bank: Question[] = rawBank.map(approve);
 
 const START = Date.parse("2026-09-08T09:00:00Z");
 const q = (slug: string) => bank.find((item) => item.id === `cnt:question:repair-depth-${slug}`)!;
@@ -192,8 +203,9 @@ describe("WJEC content depth and trust", () => {
   it("has forty individually authored mapped questions and no invented external verification", () => {
     expect(bank).toHaveLength(40);
     const ids = new Set(allTopics().flatMap((t) => t.specPoints?.map((p) => p.id) ?? []));
-    for (const item of bank) {
+    for (const item of rawBank) {
       expect(contentQuestionSchema.safeParse(item).success, item.id).toBe(true);
+      // No production content ships verified; the approvals above are test-only.
       expect(item.verification).toBe("unverified");
       for (const p of item.parts) {
         expect(p.learningClaims).toHaveLength(p.markScheme.length);
@@ -201,7 +213,7 @@ describe("WJEC content depth and trust", () => {
       }
     }
   });
-  it.each(bank)("accepts the complete authored answer for $id", (item) => {
+  it.each(rawBank)("accepts the complete authored answer for $id", (item) => {
     for (const p of item.parts) expect(markPart(p, p.modelAnswer).awarded).toBe(p.marks);
   });
   it("reports real remaining specification and demand gaps", () => {
@@ -209,6 +221,8 @@ describe("WJEC content depth and trust", () => {
     expect(report.statements).toBeGreaterThan(200);
     expect(report.statementsWithFullDepth).toBe(0);
     expect(report.rows.some((r) => r.capabilityIds.length && r.families.transfer >= 2)).toBe(true);
-    expect(report.rows.some((r) => !r.capabilityIds.length && r.gaps.length === 7)).toBe(true);
+    // Every statement now maps to a capability, so the honest gap signal is a
+    // statement with no authored question family for any demand.
+    expect(report.rows.some((r) => r.gaps.length === 7)).toBe(true);
   });
 });

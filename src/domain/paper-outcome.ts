@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Paper-outcome feedback loop — the sat-paper half of prediction honesty.
 //
@@ -104,7 +105,7 @@ export function buildPaperOutcomeRecord(input: {
     totalMarks: Math.max(1, input.totalMarks),
     actualMarks: 0, // filled in by closePaperOutcome once marking completes
     satAt: input.satAt,
-    ...(input.subjectId === "wjec-alevel-physics" ? { markingReview: { status: "unreviewed" as const } } : {}),
+    ...(requiresWjecContentReview(input.subjectId) ? { markingReview: { status: "unreviewed" as const } } : {}),
   };
 }
 
@@ -129,7 +130,7 @@ export function trustedPaperOutcome(record: PaperOutcomeRecord): boolean {
   if (!Number.isFinite(record.predictedMarks) || !Number.isFinite(record.actualMarks) ||
     !Number.isFinite(record.totalMarks) || record.totalMarks <= 0 ||
     !Number.isInteger(record.actualMarks) || record.actualMarks < 0 || record.actualMarks > record.totalMarks) return false;
-  if (record.subjectId !== "wjec-alevel-physics") return true;
+  if (!requiresWjecContentReview(record.subjectId)) return true;
   const review = record.markingReview;
   if (!review || !["human-reviewed", "adjudicated"].includes(review.status) ||
     !review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) return false;

@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Capability source — derives capability evidence from records Revise already
 // keeps. No new capture, no new store tables: the tutor reads the evidence
@@ -104,9 +105,9 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
     if (!trustworthyAttempt(attempt) || attempt.max <= 0 || attempt.mode === "recall") continue;
     const question = questionsById.get(attempt.questionId);
     if (question && !trustedQuestion(question)) continue;
-    if (!question && attempt.subjectId === "wjec-alevel-physics" && input.questions) continue;
+    if (!question && requiresWjecContentReview(attempt.subjectId) && input.questions) continue;
     if (question && question.subjectId !== attempt.subjectId) continue;
-    if (question?.subjectId === "wjec-alevel-physics" && attempt.mode === "paper" &&
+    if (requiresWjecContentReview(question?.subjectId) && attempt.mode === "paper" &&
       !authenticPaperEvidence(attempt, question, input.attempts, input.questions ?? [])) continue;
     if (question?.kind !== "extended") continue;
     const score = Math.max(0, Math.min(1, attempt.awarded / attempt.max));
@@ -133,9 +134,9 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
     if (!trustworthyAttempt(attempt)) return false;
     const question = questionsById.get(attempt.questionId);
     if (question && question.subjectId !== attempt.subjectId) return false;
-    if (!question) return !(attempt.subjectId === "wjec-alevel-physics" && input.questions);
+    if (!question) return !(requiresWjecContentReview(attempt.subjectId) && input.questions);
     if (!trustedQuestion(question)) return false;
-    return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+    return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
       authenticPaperEvidence(attempt, question, input.attempts, input.questions ?? []);
   });
   for (const { topicId, score } of transferEvidenceFromAttempts(trustedAttempts)) {

@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Exam outlook — "based on your current evidence, most likely to score X–Y".
 //
@@ -19,7 +20,7 @@
 
 import type { GradePrediction } from "./grades";
 import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
-import { trustedAssessmentContent, verifiedPhysicsPaperProvenance } from "./physics-content-review";
+import { trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
 import type { Attempt, Id, IsoInstant, Question } from "./types";
 
 /** Marked answers needed before a subject may show a score band. */
@@ -86,15 +87,15 @@ export function paperRunScores(attempts: Attempt[], questions?: readonly Questio
   // must stay out of readiness and calibration evidence.
   const expectedPhysicsQuestionsByPaper = new Map<Id, Set<Id>>();
   for (const question of questionList) {
-    if (question.subjectId !== "wjec-alevel-physics" || question.source !== "past-paper" ||
-      !question.paperId || !verifiedPhysicsPaperProvenance(question) || !trustedAssessmentContent(question)) continue;
+    if (!requiresWjecContentReview(question.subjectId) || question.source !== "past-paper" ||
+      !question.paperId || !verifiedWjecPaperProvenance(question) || !trustedAssessmentContent(question)) continue;
     const ids = expectedPhysicsQuestionsByPaper.get(question.paperId) ?? new Set<Id>();
     ids.add(question.id);
     expectedPhysicsQuestionsByPaper.set(question.paperId, ids);
   }
   const paperAttempts = attempts.filter((a) => {
     if (a.mode !== "paper" || a.max <= 0 || !trustworthyAttempt(a)) return false;
-    if (a.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(a.subjectId)) return true;
     const question = questionById.get(a.questionId);
     return Boolean(question && authenticPaperEvidence(a, question, attempts, questions ?? []));
   });
@@ -108,7 +109,7 @@ export function paperRunScores(attempts: Attempt[], questions?: readonly Questio
   const out: PaperRunScore[] = [];
   for (const [runKey, list] of byRun) {
     const first = list[0]!;
-    if (first.subjectId === "wjec-alevel-physics") {
+    if (requiresWjecContentReview(first.subjectId)) {
       const expected = first.paperId ? expectedPhysicsQuestionsByPaper.get(first.paperId) : undefined;
       const present = new Set(list.map((attempt) => attempt.questionId));
       // No known manifest or an incomplete manifest is not evidence of a
@@ -139,7 +140,7 @@ export function outlookRows(predictions: GradePrediction[], attempts: Attempt[],
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
   const evidenceAttempts = attempts.filter((attempt) => {
     const question = questionById.get(attempt.questionId);
-    if (attempt.subjectId !== "wjec-alevel-physics") return attempt.max > 0 && trustworthyAttempt(attempt);
+    if (!requiresWjecContentReview(attempt.subjectId)) return attempt.max > 0 && trustworthyAttempt(attempt);
     if (!question || !trustedAssessmentContent(question) || attempt.max <= 0) return false;
     return trustedAssessmentAttempt(attempt, question, attempts, questions);
   });

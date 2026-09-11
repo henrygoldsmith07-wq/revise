@@ -27,7 +27,7 @@ import {
 import {
   applyHumanVerification,
   buildPhysicsReviewQueue,
-  humanVerifiedPhysicsQuestion,
+  humanVerifiedWjecQuestion,
   physicsContentFingerprint,
   REQUIRED_HUMAN_CHECKS,
   type PhysicsReviewQueueRow,
@@ -200,9 +200,9 @@ export interface PhysicsReviewImportResult {
 }
 
 /** Build the exact packet a reviewer should fill; no approval is created. */
-export function buildPhysicsReviewPacketTemplate(questions: readonly Question[]): PhysicsReviewPacketTemplateRow[] {
+export function buildPhysicsReviewPacketTemplate(questions: readonly Question[], subjectId: Id = "wjec-alevel-physics"): PhysicsReviewPacketTemplateRow[] {
   return questions
-    .filter((question) => question.subjectId === "wjec-alevel-physics")
+    .filter((question) => question.subjectId === subjectId)
     .map((question) => {
       const fingerprint = physicsContentFingerprint(question);
       return {
@@ -221,11 +221,11 @@ export function buildPhysicsReviewPacketTemplate(questions: readonly Question[])
 }
 
 /** Import completed packet rows against the current live bank. */
-export function importPhysicsReviewPacket(raw: string, questions: readonly Question[]): PhysicsReviewImportResult {
+export function importPhysicsReviewPacket(raw: string, questions: readonly Question[], subjectId: Id = "wjec-alevel-physics"): PhysicsReviewImportResult {
   const parsed = jsonRows(raw, "rows");
   const errors = [...parsed.errors];
   const warnings: string[] = [];
-  const byId = new Map(questions.filter((question) => question.subjectId === "wjec-alevel-physics").map((question) => [question.id, question]));
+  const byId = new Map(questions.filter((question) => question.subjectId === subjectId).map((question) => [question.id, question]));
   const seen = new Set<Id>();
   const updated = new Map<Id, Question>();
   const approvedQuestionIds: Id[] = [];
@@ -267,7 +267,7 @@ export function importPhysicsReviewPacket(raw: string, questions: readonly Quest
     if (!result.review) continue;
     const next = applyHumanVerification(current, result.review);
     if (result.review.status === "approved") {
-      if (!humanVerifiedPhysicsQuestion(next)) {
+      if (!humanVerifiedWjecQuestion(next)) {
         errors.push(`${prefix}: approval failed the trusted Physics predicate after application`);
         continue;
       }
@@ -287,7 +287,7 @@ export function importPhysicsReviewPacket(raw: string, questions: readonly Quest
     missingQuestionIds,
     errors,
     warnings,
-    reviewQueue: buildPhysicsReviewQueue(merged),
+    reviewQueue: buildPhysicsReviewQueue(merged, subjectId),
   };
 }
 
@@ -314,8 +314,8 @@ export interface PhysicsPrerequisiteImportResult {
   warnings: string[];
 }
 
-export function buildPhysicsPrerequisiteReviewTemplate(nodes: readonly CapabilityNode[]): PhysicsPrerequisiteReviewTemplateRow[] {
-  const physics = nodes.filter((node) => node.subjectId === "wjec-alevel-physics");
+export function buildPhysicsPrerequisiteReviewTemplate(nodes: readonly CapabilityNode[], subjectId: Id = "wjec-alevel-physics"): PhysicsPrerequisiteReviewTemplateRow[] {
+  const physics = nodes.filter((node) => node.subjectId === subjectId);
   const byId = new Map(physics.map((node) => [node.id, node]));
   return physics.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
     const prerequisite = byId.get(prerequisiteId) ?? nodes.find((candidate) => candidate.id === prerequisiteId);
@@ -361,12 +361,12 @@ function dependencyReview(value: unknown, prefix: string, expectedFingerprint: s
   };
 }
 
-export function importPhysicsPrerequisiteReviews(raw: string, nodes: readonly CapabilityNode[]): PhysicsPrerequisiteImportResult {
+export function importPhysicsPrerequisiteReviews(raw: string, nodes: readonly CapabilityNode[], subjectId: Id = "wjec-alevel-physics"): PhysicsPrerequisiteImportResult {
   const parsed = jsonRows(raw, "rows");
   const errors = [...parsed.errors];
   const warnings: string[] = [];
   const byId = new Map(nodes.map((node) => [node.id, node]));
-  const expectedRows = buildPhysicsPrerequisiteReviewTemplate(nodes);
+  const expectedRows = buildPhysicsPrerequisiteReviewTemplate(nodes, subjectId);
   const expected = new Map(expectedRows.map((row) => [`${row.targetId}:${row.prerequisiteId}`, row]));
   const seen = new Set<string>();
   const reviews = new Map<string, CapabilityDependencyReview>();
@@ -386,7 +386,7 @@ export function importPhysicsPrerequisiteReviews(raw: string, nodes: readonly Ca
     seen.add(key);
     const target = byId.get(rawRow.targetId);
     const prerequisite = byId.get(rawRow.prerequisiteId);
-    if (!target || !prerequisite || target.subjectId !== "wjec-alevel-physics" || prerequisite.subjectId !== "wjec-alevel-physics") {
+    if (!target || !prerequisite || target.subjectId !== subjectId || prerequisite.subjectId !== subjectId) {
       errors.push(`${prefix}: unknown or non-Physics edge ${key}`);
       continue;
     }
@@ -414,7 +414,7 @@ export function importPhysicsPrerequisiteReviews(raw: string, nodes: readonly Ca
   const missingEdges = [...expected.keys()].filter((key) => !seen.has(key));
   if (missingEdges.length) warnings.push(`${missingEdges.length} prerequisite edges were not present in the review file`);
   const updatedNodes = nodes.map((node) => {
-    if (node.subjectId !== "wjec-alevel-physics" || !node.prerequisites.length) return node;
+    if (node.subjectId !== subjectId || !node.prerequisites.length) return node;
     const nextReviews = { ...(node.prerequisiteReviews ?? {}) };
     for (const prerequisiteId of node.prerequisites) {
       const review = reviews.get(`${node.id}:${prerequisiteId}`);

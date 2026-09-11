@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // Assessment depth — the five assessment-specific slices that make revision feel
 // like exam prep rather than flashcard completion.
 // Pure functions: no React, no I/O.
@@ -88,12 +89,12 @@ export function buildAssessmentInsight(input: {
     if (!trustworthyAttempt(attempt)) return false;
     const question = input.questionsById.get(attempt.questionId);
     if (!question || !trustedAssessmentContent(question)) return false;
-    return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+    return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
       authenticPaperEvidence(attempt, question, input.attempts, questions);
   });
   const trustedAttemptIds = new Set(trustedAttempts.map((attempt) => attempt.id));
   const trustedMistakes = input.mistakes.filter((mistake) => {
-    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
     return Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId));
   });
   const byCommand = Object.fromEntries(COMMAND_WORDS.map((c) => [c, 0])) as Record<CommandWord, number>;

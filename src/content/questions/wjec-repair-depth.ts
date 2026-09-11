@@ -67,7 +67,7 @@ const items: Item[] = [
   { slug: "chem-ratio-transfer", skill: "chem.stoichiometry", demand: "transfer", difficulty: 4, context: "water-hardness-complexation",
     stem: "An unfamiliar reagent L reacts with calcium ions in a 1:1 mole ratio. A 50.0 cm³ water sample requires 12.5 cm³ of 0.0100 mol dm⁻³ L. Only calcium reacts with L under these conditions.", prompt: "Calculate the calcium-ion concentration in mol dm⁻³. Explain which feature of the reaction replaces the acid–alkali mole ratio in a titration.",
     scheme: ["n(L) = 0.0100 × 0.0125 = 0.000125 mol", "The 1:1 calcium:L ratio gives n(Ca²⁺) = 0.000125 mol", "c(Ca²⁺) = 0.000125 / 0.0500 = 0.00250 mol dm⁻³"] },
-  { slug: "chem-ratio-synoptic", skill: "chem.stoichiometry", demand: "synoptic", difficulty: 5, context: "antacid-back-titration",
+  { slug: "chem-ratio-synoptic", skill: "chem.stoichiometry", demand: "synoptic", difficulty: 5, context: "antacid-back-titration", family: "chemistry:back-titration",
     stem: "An antacid sample containing CaCO₃ and inert filler is treated with 50.0 cm³ of 0.200 mol dm⁻³ HCl. After reaction, the remaining acid requires 20.0 cm³ of 0.100 mol dm⁻³ NaOH. CaCO₃ + 2HCl → CaCl₂ + H₂O + CO₂; HCl + NaOH → NaCl + H₂O. M(CaCO₃) = 100.0 g mol⁻¹.", prompt: "Calculate the mass of calcium carbonate in the sample.",
     scheme: ["Initial n(HCl) = 0.200 × 0.0500 = 0.0100 mol", "Remaining n(HCl) = 0.100 × 0.0200 = 0.00200 mol", "Reacted n(HCl) = 0.0100 − 0.00200 = 0.00800 mol", "n(CaCO₃) = 0.00800 / 2 = 0.00400 mol", "Mass = 0.00400 × 100.0 = 0.400 g"] },
   { slug: "chem-ratio-retention", skill: "chem.stoichiometry", demand: "transfer", difficulty: 4, context: "peroxide-assay",

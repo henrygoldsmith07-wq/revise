@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
 import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
@@ -334,7 +335,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
   // --- 2. Unrepaired mistakes. Direct marks you have already dropped.
   const questionById = new Map((input.questions ?? []).map((question) => [question.id, question] as const));
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
     const attempt = mistake.attemptId ? input.attempts?.find((row) => row.id === mistake.attemptId) : undefined;
     const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
     return Boolean(attempt && question && trustedAssessmentAttempt(attempt, question, input.attempts ?? [], input.questions ?? []));

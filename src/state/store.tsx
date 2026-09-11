@@ -26,7 +26,8 @@ import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFinge
 import { daysToExam, recommend } from "@/domain/recommender";
 import { buildAdaptiveSession } from "@/domain/adaptive-session";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
-import { reviewedPhysicsTopicEdges } from "@/content/capabilities";
+import { reviewedWjecTopicEdges } from "@/content/capabilities";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import {
   knowledgeVsAnswering,
   knowledgeVsAnsweringByTopic,
@@ -854,10 +855,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       mastery,
       marksPerHour,
       // The legacy topic graph remains useful for reference subjects, but
-      // Physics must wait for the exact capability-edge attestation.
+      // All four WJEC flagships require the exact capability-edge attestation.
       edges: [
-        ...prerequisiteEdges().filter((edge) => !edge.topicId.startsWith("wjec-alevel-physics.")),
-        ...reviewedPhysicsTopicEdges(),
+        ...prerequisiteEdges().filter((edge) => !requiresWjecContentReview(edge.topicId.split(".")[0])),
+        ...reviewedWjecTopicEdges(),
       ],
     }),
     [topics, mastery, marksPerHour],

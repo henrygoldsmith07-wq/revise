@@ -19,7 +19,8 @@ import { diagnosePrerequisiteWeakness } from "@/domain/prerequisite-diagnosis";
 import { buryCard } from "@/domain/scheduling";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
 import { createInterventionObservation } from "@/domain/intervention-calibration";
-import { reviewedPhysicsTopicEdges, wjecCapabilities } from "@/content/capabilities";
+import { reviewedWjecTopicEdges, wjecCapabilities } from "@/content/capabilities";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { useStore } from "@/state/store";
@@ -862,7 +863,7 @@ function replanWithCurrentEvidence(
       mastery: store.mastery,
       cards: store.cards,
       questions: store.questions,
-      ...(plan.subjectId === "wjec-alevel-physics" ? { edges: reviewedPhysicsTopicEdges() } : {}),
+      ...(requiresWjecContentReview(plan.subjectId) ? { edges: reviewedWjecTopicEdges(plan.subjectId) } : {}),
     });
     const verdict = diagnosis.verdict;
     if (verdict && verdict.kind !== "topic-itself") {

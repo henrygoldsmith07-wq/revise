@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type { Attempt, Id, Mistake, Question } from "./types";
 import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 
@@ -109,7 +110,7 @@ export function calculateCalculationMastery(input: {
   trustedQuestion?: (question: Question) => boolean;
 }): CalculationMasteryReport {
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
-  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => question.subjectId !== "wjec-alevel-physics");
+  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => !requiresWjecContentReview(question.subjectId));
   const calculationAttempts = input.attempts
     .map((attempt) => ({ attempt, question: questionsById.get(attempt.questionId) }))
     .filter((row): row is { attempt: Attempt; question: Question } => row.question?.kind === "calculation")
@@ -165,7 +166,7 @@ export function calculateCalculationMastery(input: {
       (mistake.questionId != null && calculationQuestionIds.has(mistake.questionId)) ||
       (mistake.attemptId != null && calculationAttemptIds.has(mistake.attemptId));
     if (!belongsToCalculation) continue;
-    if (mistake.subjectId === "wjec-alevel-physics") {
+    if (requiresWjecContentReview(mistake.subjectId)) {
       const question = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
       const attempt = mistake.attemptId ? input.attempts.find((row) => row.id === mistake.attemptId) : undefined;
       if (!question || !attempt || !trustedQuestion(question) ||

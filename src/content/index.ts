@@ -34,6 +34,9 @@ import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
 import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
+import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
+import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
+import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -64,6 +67,9 @@ export const seedQuestions: Question[] = [
   ...wjecAlevelExpansionQuestions,
   ...wjecPhysicsQualityExpansionQuestions,
   ...physicsCapacitorEnergyQuestions,
+  ...wjecMathsQualityQuestions,
+  ...wjecBiologyQualityQuestions,
+  ...wjecChemistryQualityQuestions,
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,

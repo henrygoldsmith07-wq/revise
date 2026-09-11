@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Cross-subject allocation — when Biology, French and Maths all want the same
 // 90 minutes, who gets the blocks?
@@ -99,11 +100,11 @@ export function buildSubjectEvidence(
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
   const trustedAttempt = (attempt: Attempt): boolean => {
     const question = questionById.get(attempt.questionId);
-    if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
+    if (!question) return !requiresWjecContentReview(attempt.subjectId) && trustworthyAttempt(attempt);
     return trustedAssessmentAttempt(attempt, question, attempts, questions);
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
     const attempt = mistake.attemptId ? attempts.find((row) => row.id === mistake.attemptId) : undefined;
     const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
     return Boolean(attempt && question && trustedAttempt(attempt));

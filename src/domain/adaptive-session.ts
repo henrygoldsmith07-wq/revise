@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // One adaptive learning session.
 //
@@ -195,7 +196,6 @@ export interface AdaptiveSessionInput {
   interventionOutcomes?: InterventionOutcomeRecord[];
 }
 
-const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 
 /**
  * Evidence used to rank a topic must meet the same trust bar as the mastery
@@ -212,7 +212,7 @@ function trustedAdaptiveAttempt(
   questions: readonly Question[],
 ): boolean {
   const question = questionById.get(attempt.questionId);
-  if (!question) return attempt.subjectId !== PHYSICS_SUBJECT_ID && trustworthyAttempt(attempt);
+  if (!question) return !requiresWjecContentReview(attempt.subjectId) && trustworthyAttempt(attempt);
   return trustedAssessmentAttempt(attempt, question, allAttempts, questions);
 }
 
@@ -223,7 +223,7 @@ function trustedAdaptiveMistake(
   allAttempts: readonly Attempt[],
   questions: readonly Question[],
 ): boolean {
-  if (mistake.subjectId !== PHYSICS_SUBJECT_ID) return true;
+  if (!requiresWjecContentReview(mistake.subjectId)) return true;
   const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
   const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
   if (!attempt || !question || !trustedAdaptiveAttempt(attempt, questionById, allAttempts, questions)) return false;

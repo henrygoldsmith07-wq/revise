@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Knowledge graph — the spec-to-exam chain, derived from real evidence.
 //
@@ -218,16 +219,16 @@ export function buildTopicGraph(
     // Legacy non-Physics graph fixtures may predate a question bank row. Keep
     // their marked evidence usable; Physics needs a reviewed question to
     // establish a trusted capability signal.
-    if (!question) return topic.subjectId !== "wjec-alevel-physics";
+    if (!question) return !requiresWjecContentReview(topic.subjectId);
     if (!trustedAssessmentContent(question)) return false;
-    return question.subjectId !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+    return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
       authenticPaperEvidence(attempt, question, attempts, questions);
   };
   const topicCards = cards.filter((c) => c.topicId === topic.id);
   const topicAttempts = attempts.filter((a) => topicQuestionIds.has(a.questionId) && trustedAttemptForQuestion(a));
   const topicMistakes = mistakes.filter((m) => {
     if (m.topicId !== topic.id) return false;
-    if (topic.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(topic.subjectId)) return true;
     const attempt = m.attemptId ? attempts.find((row) => row.id === m.attemptId) : undefined;
     return Boolean(attempt && trustedAttemptForQuestion(attempt));
   });
@@ -348,9 +349,9 @@ export function buildSubjectGraph(input: GraphInput, now: Date = new Date()): Su
   const trustedSubjectAttempt = (attempt: Attempt): boolean => {
     if (attempt.subjectId !== subject.id || !trustworthyAttempt(attempt)) return false;
     const question = questionById.get(attempt.questionId);
-    if (!question) return subject.id !== "wjec-alevel-physics";
+    if (!question) return !requiresWjecContentReview(subject.id);
     if (!trustedAssessmentContent(question)) return false;
-    return subject.id !== "wjec-alevel-physics" || attempt.mode !== "paper" ||
+    return !requiresWjecContentReview(subject.id) || attempt.mode !== "paper" ||
       authenticPaperEvidence(attempt, question, attempts, input.questions);
   };
 
@@ -382,7 +383,7 @@ export function buildSubjectGraph(input: GraphInput, now: Date = new Date()): Su
   const allSubjectAttempts = attempts.filter(trustedSubjectAttempt);
   const subjectMistakes = mistakes.filter((m) => {
     if (m.subjectId !== subject.id) return false;
-    if (subject.id !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(subject.id)) return true;
     const attempt = m.attemptId ? attempts.find((row) => row.id === m.attemptId) : undefined;
     return Boolean(attempt && trustedSubjectAttempt(attempt));
   });

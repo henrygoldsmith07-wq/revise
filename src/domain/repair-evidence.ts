@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { independentAttempt, isTransferQuestion, questionFamilies, partLearningMetadata, trustedAssessmentAttempt, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Card, Mistake, MistakeRepairStage, MistakeRepairState, Question, ReviewLog } from "./types";
 import { trustedAssessmentContent } from "./physics-content-review";
@@ -40,7 +41,7 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
   // A draft Physics item may be answered for practice, but it must never move
   // a repair chain through a trusted success rung. Require both the captured
   // source and the retest item to retain their human content approval.
-  if (mistake.subjectId === "wjec-alevel-physics" &&
+  if (requiresWjecContentReview(mistake.subjectId) &&
     (!source || !trustedAssessmentContent(source) || !trustedAssessmentContent(question) ||
       !trustedAssessmentAttempt(attempt, question, history, questions))) return mistake;
   // Older rows may contain a partial repair object from an interrupted

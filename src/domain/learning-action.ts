@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
 import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
@@ -35,7 +36,7 @@ export function selectLearningAction(input: {
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
   const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
     const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
     const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
     if (!attempt || !question) return false;

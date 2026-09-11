@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type { QuestionTrace } from "./knowledge-tracing";
 import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { masteryIntervals } from "./mastery-uncertainty";
@@ -46,11 +47,11 @@ export function sparseEvidenceConfidence(input: {
   const attemptById = new Map(input.attempts.map((attempt) => [attempt.id, attempt] as const));
   const trustedAttempt = (attempt: Attempt): boolean => {
     const question = questionById.get(attempt.questionId);
-    if (!question) return attempt.subjectId !== "wjec-alevel-physics";
+    if (!question) return !requiresWjecContentReview(attempt.subjectId);
     return trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? []);
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (mistake.subjectId !== "wjec-alevel-physics") return true;
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
     const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
     const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
     return Boolean(attempt && question && trustedAttempt(attempt));
@@ -184,7 +185,7 @@ export function buildPredictionOutcomePairs(input: { attempts: Attempt[]; questi
   for (const group of groups) {
     // A partial trusted subset is not a whole paper. Keep practice evidence
     // elsewhere, but exclude the entire Physics sitting from calibration.
-    if (group[0]?.subjectId === "wjec-alevel-physics" && group.some((attempt) =>
+    if (requiresWjecContentReview(group[0]?.subjectId) && group.some((attempt) =>
       !authenticPaperEvidence(attempt, questionsById.get(attempt.questionId), input.attempts, input.questions))) continue;
     let predictedMarks = 0;
     let actualMarks = 0;
