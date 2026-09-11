@@ -39,6 +39,7 @@ export interface PhysicsCapabilityDemandCoverage {
 export type PhysicsQualityIssueKind =
   | "missing-part-learning"
   | "missing-reasoning-move"
+  | "templated-reasoning-move"
   | "missing-spec-point"
   | "missing-capability"
   | "multi-capability-part"
@@ -46,6 +47,7 @@ export type PhysicsQualityIssueKind =
   | "unknown-capability"
   | "incomplete-mark-scheme"
   | "cosmetic-reskin"
+  | "surface-rewording"
   | "unreviewed";
 
 export interface PhysicsQualityIssue {
@@ -119,6 +121,84 @@ export function promptSignature(text: string): string {
     .join(" ");
 }
 
+/**
+ * Value-stripped prompt containment: the fraction of the smaller prompt's
+ * content words (and character trigrams) that also appear in the other.
+ * Rewordings ("calculate" → "determine", "acting" → "acts", a name swap)
+ * keep this near 1 because almost every content word survives; genuinely
+ * different questions share little. Used together with the reasoning-move
+ * check to reject wording-only variants from counting as distinct families.
+ */
+export function promptOverload(left: string, right: string): number {
+  const tokens = (text: string): Set<string> =>
+    new Set(promptSignature(text).split(" ").filter(Boolean));
+  const a = tokens(left);
+  const b = tokens(right);
+  let tokenScore = 0;
+  if (a.size && b.size) {
+    let shared = 0;
+    for (const token of a) if (b.has(token)) shared++;
+    tokenScore = shared / Math.min(a.size, b.size);
+  }
+  const trigrams = (text: string): Set<string> => {
+    const squashed = promptSignature(text).replace(/[^a-z0-9#]/g, "");
+    const grams = new Set<string>();
+    for (let i = 0; i + 3 <= squashed.length; i++) grams.add(squashed.slice(i, i + 3));
+    return grams;
+  };
+  const ta = trigrams(left);
+  const tb = trigrams(right);
+  let trigramScore = 0;
+  if (ta.size && tb.size) {
+    let shared = 0;
+    for (const gram of ta) if (tb.has(gram)) shared++;
+    trigramScore = shared / Math.min(ta.size, tb.size);
+  }
+  return Math.max(tokenScore, trigramScore);
+}
+
+/** Authoring constants that a real reasoning move can never collapse to. */
+const TEMPLATED_MOVE_PREFIXES = [
+  "recall reasoning",
+  "explanation reasoning",
+  "application reasoning",
+  "misconception reasoning",
+  "calculation reasoning",
+  "transfer reasoning",
+  "synoptic reasoning",
+];
+
+/**
+ * A reasoning move must name the physical/cognitive operation, not the demand
+ * category. `${demand} reasoning ...` strings are generated filler and defeat
+ * the distinctness check, so they are rejected before coverage counting.
+ */
+export function isTemplatedReasoningMove(move: string): boolean {
+  const text = move.trim().toLowerCase();
+  if (text.length < 12) return true;
+  return TEMPLATED_MOVE_PREFIXES.some((prefix) => text.startsWith(prefix));
+}
+
+/** Distinctness floor for reasoning-move text itself (0–1 containment). */
+const MOVE_OVERLAP_LIMIT = 0.55;
+/**
+ * Wording-only rewording threshold (0–1 containment). Two prompts sharing at
+ * least this fraction of the smaller one's content words ask the same thing
+ * in different words. The flag additionally requires the same reasoning
+ * operation, so the wording bar can sit lower than a standalone duplicate
+ * detector: wording overlap alone never flags.
+ */
+const REWORDING_CONTAINMENT_LIMIT = 0.6;
+/**
+ * Shared-operation threshold (0–1 containment over reasoning-move text).
+ * Short calculation prompts on a narrow statement always share vocabulary
+ * ("calculate the internal resistance"), so wording overlap alone cannot
+ * distinguish a reskin from legitimate same-skill practice in a new context.
+ * A rewording also repeats the same reasoning operation, so both signals are
+ * required before a part is flagged.
+ */
+const SHARED_OPERATION_LIMIT = 0.5;
+
 function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
@@ -140,20 +220,43 @@ function partDemand(question: Question, part: QuestionPart): LearningDemand | un
   return partLearningMetadata(question, part)?.demand;
 }
 
+/** Authored reasoning moves only; templated filler never counts toward distinctness. */
+function authoredReasoningMoves(question: Question, part: QuestionPart): string[] {
+  return (partLearningMetadata(question, part)?.reasoningMoves ?? [])
+    .filter((move) => !isTemplatedReasoningMove(move));
+}
+
+/**
+ * Count reasoning moves as distinct only when their text genuinely differs.
+ * Two "families" whose moves are near-identical strings follow the same
+ * solution path, so they cannot establish distinct coverage.
+ */
+function distinctAuthoredMoves(parts: Array<{ question: Question; part: QuestionPart }>): string[] {
+  const moves: string[] = [];
+  for (const { question, part } of parts) {
+    for (const move of authoredReasoningMoves(question, part)) {
+      const duplicate = moves.some((existing) => promptOverload(existing, move) >= MOVE_OVERLAP_LIMIT);
+      if (!duplicate) moves.push(move);
+    }
+  }
+  return moves;
+}
+
 function demandCoverage(mappedQuestions: Array<{ question: Question; part: QuestionPart }>): PhysicsDemandCoverage[] {
   return PHYSICS_ASSESSMENT_DEMANDS.map((demand): PhysicsDemandCoverage => {
     const rows = mappedQuestions.filter(({ question, part }) => partDemand(question, part) === demand);
     const families = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.familyId).filter((id): id is string => Boolean(id)));
     const contexts = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)));
-    const reasoningMoves = unique(rows.flatMap(({ question, part }) => partLearningMetadata(question, part)?.reasoningMoves ?? []));
+    const authoredMoves = distinctAuthoredMoves(rows);
     const signatures = unique(rows.map(({ part }) => promptSignature(part.prompt)).filter(Boolean));
-    return { demand, families, contexts, reasoningMoves, questionCount: rows.length,
+    return { demand, families, contexts, reasoningMoves: authoredMoves, questionCount: rows.length,
       complete: families.length >= MIN_PHYSICS_FAMILIES,
       // A second family/context is only useful when it asks for a different
       // reasoning operation. Prompt wording and number changes alone are not
-      // enough to establish transfer-ready coverage.
+      // enough to establish transfer-ready coverage, and templated moves
+      // (`${demand} reasoning ...`) are excluded before counting.
       distinct: signatures.length >= MIN_PHYSICS_FAMILIES && contexts.length >= MIN_PHYSICS_FAMILIES &&
-        reasoningMoves.length >= MIN_PHYSICS_FAMILIES };
+        authoredMoves.length >= MIN_PHYSICS_FAMILIES };
   });
 }
 
@@ -164,7 +267,7 @@ function demandCoverage(mappedQuestions: Array<{ question: Question; part: Quest
  * masquerade as transfer practice.
  */
 export function auditPhysicsAssessmentQuality(input: {
-  /** Defaults to Physics; reuse the existing audit for other WJEC subjects. */
+  /** Defaults to Physics for existing callers; the same audit serves the other WJEC flagships. */
   subjectId?: Id;
   topics: readonly Topic[];
   questions: readonly Question[];
@@ -182,6 +285,10 @@ export function auditPhysicsAssessmentQuality(input: {
   const trustedQuestion = input.trustedQuestion ?? (() => false);
   const issues: PhysicsQualityIssue[] = [];
   const promptByDemand = new Map<string, Map<string, Id>>();
+  /** Per statement+demand cell: every stored prompt keyed by question:part id. */
+  const promptTextByDemand = new Map<string, Map<string, string>>();
+  /** Per statement+demand cell: authored reasoning moves keyed by question:part id. */
+  const promptMovesByDemand = new Map<string, Map<string, string[]>>();
 
   const addIssue = (question: Question, part: QuestionPart | undefined, kind: PhysicsQualityIssueKind, detail: string): void => {
     const specPointIds = part?.specPointIds ?? [];
@@ -219,6 +326,8 @@ export function auditPhysicsAssessmentQuality(input: {
         addIssue(question, part, "missing-part-learning", "Add demand, family, context and authored reasoning moves.");
       } else if (!meta.reasoningMoves.length) {
         addIssue(question, part, "missing-reasoning-move", "No reasoning move is recorded.");
+      } else if (meta.reasoningMoves.every((move) => isTemplatedReasoningMove(move))) {
+        addIssue(question, part, "templated-reasoning-move", "Reasoning move restates the demand category; author the actual cognitive operation.");
       }
       if (part.markScheme.length !== part.marks) {
         addIssue(question, part, "incomplete-mark-scheme", `${part.markScheme.length} mark points for ${part.marks} marks.`);
@@ -238,14 +347,44 @@ export function auditPhysicsAssessmentQuality(input: {
       }
       if (meta && specPointIds.length === 1) {
         const key = `${specPointIds[0]}:${meta.demand}`;
-        const signatures = promptByDemand.get(key) ?? new Map<string, Id>();
+        const seen = promptByDemand.get(key) ?? new Map<string, Id>();
+        const texts = promptTextByDemand.get(key) ?? new Map<string, string>();
         const signature = promptSignature(part.prompt);
-        const previous = signatures.get(signature);
+        // Exact value-stripped signature match with a *different* question:
+        // a number-swapped reskin.
+        const previous = seen.get(signature);
         if (previous && previous !== question.id) {
           addIssue(question, part, "cosmetic-reskin", `Shares the value-stripped prompt signature with ${previous}.`);
-        } else if (signature) {
-          signatures.set(signature, question.id);
-          promptByDemand.set(key, signatures);
+        }
+        if (signature) {
+          // Wording-only changes keep a high content-word overlap. A part
+          // whose prompt is a near-copy of any part from another question in
+          // the same statement+demand cell cannot be a distinct family, so it
+          // is surfaced as a queue item. Parts of the same structured question
+          // are one authored item and never counted against each other.
+          // Because short calculation prompts on a narrow statement share
+          // vocabulary legitimately, the flag additionally requires the same
+          // reasoning operation: wording overlap without a shared operation
+          // is same-skill practice in a new context, which is allowed.
+          const ownMoves = authoredReasoningMoves(question, part);
+          for (const [priorKey, priorPrompt] of texts) {
+            if (priorKey.startsWith(`${question.id}:`)) continue;
+            if (promptOverload(priorPrompt, part.prompt) < REWORDING_CONTAINMENT_LIMIT) continue;
+            const priorEntry = promptMovesByDemand.get(key)?.get(priorKey);
+            const sharedOperation = priorEntry !== undefined && ownMoves.length > 0 &&
+              ownMoves.some((move) => priorEntry.some((prior) => promptOverload(prior, move) >= SHARED_OPERATION_LIMIT));
+            if (sharedOperation) {
+              addIssue(question, part, "surface-rewording", `Wording and reasoning operation of an existing ${meta.demand} part in the same statement; a rewording is not a distinct family.`);
+              break;
+            }
+          }
+          seen.set(signature, question.id);
+          promptByDemand.set(key, seen);
+          texts.set(`${question.id}:${part.id}`, part.prompt);
+          promptTextByDemand.set(key, texts);
+          const movesByPart = promptMovesByDemand.get(key) ?? new Map<string, string[]>();
+          movesByPart.set(`${question.id}:${part.id}`, ownMoves);
+          promptMovesByDemand.set(key, movesByPart);
         }
       }
     }
@@ -329,6 +468,7 @@ export function physicsAuthoringBriefs(audit: PhysicsAssessmentQualityAudit): Ph
         })),
         rejectIf: [
           "only the numbers, names or surface wording change",
+          "the reasoning move restates the demand category instead of the cognitive operation",
           "the part maps to multiple specification points or capabilities",
           "the mark scheme has fewer independently awardable points than marks",
           "the reviewer cannot verify the physical assumptions against WJEC",
@@ -382,7 +522,8 @@ export function physicsQualityQueue(audit: PhysicsAssessmentQualityAudit): Physi
     seen.add(key);
   }
   for (const issue of audit.issues.filter((row) => [
-    "missing-part-learning", "missing-reasoning-move", "incomplete-mark-scheme", "cosmetic-reskin",
+    "missing-part-learning", "missing-reasoning-move", "templated-reasoning-move", "incomplete-mark-scheme",
+    "cosmetic-reskin", "surface-rewording",
   ].includes(row.kind))) {
     const key = `${issue.questionId}:${issue.partId ?? "part"}:${issue.kind}`;
     if (seen.has(key)) continue;

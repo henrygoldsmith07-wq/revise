@@ -8,11 +8,12 @@ import {
   signalForTopic,
   type DiagnosisInput,
 } from "../src/domain/prerequisite-diagnosis";
-import type { Attempt, Card, Mistake, Topic, TopicMastery } from "../src/domain/types";
+import { applyHumanVerification, physicsContentFingerprint } from "../src/domain/physics-content-review";
+import type { Attempt, Card, Mistake, Question, Topic, TopicMastery } from "../src/domain/types";
 
 // ---------------------------------------------------------------------------
-// Generic diagnosis mechanics use reference-subject fixtures. The WJEC
-// evidence gate is tested separately in wjec-subject-quality.
+// Reference-subject fixtures exercise diagnosis mechanics without the WJEC
+// review gate. Its fail-closed behaviour is covered in wjec-subject-quality.
 // An AQA A-level Biology set where Photosynthesis depends on Enzymes
 // and membrane transport (the real curated chain), plus a two-step Chemistry
 // chain (acids-bases ← equilibria ← moles) for depth selection.
@@ -89,6 +90,48 @@ function attempt(id: string, topicId: string, awarded: number, max = 10, created
   };
 }
 
+// The trust gate covers all four WJEC flagships, so every attempt fixture
+// needs an approved question behind it. Test-only approvals; nothing in the
+// production bank is verified here.
+function approvedQuestion(topicId: string, questionId: string): Question {
+  const base: Question = {
+    id: questionId,
+    subjectId: topicId.slice(0, topicId.lastIndexOf(".")),
+    topicIds: [topicId],
+    kind: "short",
+    stem: "Test-only approved question.",
+    options: undefined,
+    correctIndex: undefined,
+    parts: [{ id: `${questionId}:0`, label: "", prompt: "Test-only.", marks: 1, markScheme: ["ok"], modelAnswer: "ok" }],
+    totalMarks: 1,
+    calculatorAllowed: true,
+    difficulty: 1,
+    origin: "seed",
+    source: "authored",
+    licensedSource: null,
+    verification: "unverified",
+    reviewer: null,
+    lastChecked: null,
+    createdAt: daysAgo(3),
+  };
+  return applyHumanVerification(base, {
+    status: "approved", reviewerId: "test-only", reviewedAt: daysAgo(3),
+    contentFingerprint: physicsContentFingerprint(base),
+    checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
+  });
+}
+
+/** Approved questions for every attempt id used by a diagnosis input. */
+function questionsFor(attempts: readonly Attempt[], mistakes: readonly Mistake[]): Question[] {
+  const ids = new Set<string>();
+  for (const attempt of attempts) ids.add(attempt.questionId);
+  for (const mistake of mistakes) if (mistake.questionId) ids.add(mistake.questionId);
+  return [...ids].flatMap((questionId) => {
+    const owner = attempts.find((a) => a.questionId === questionId);
+    return owner ? [approvedQuestion(owner.topicIds[0]!, questionId)] : [];
+  });
+}
+
 function card(topicId: string, studied: boolean): Card {
   const base = createCard(
     {
@@ -123,7 +166,7 @@ function masteryRow(topicId: string, overrides: Partial<TopicMastery> = {}): Top
 }
 
 function input(overrides: Partial<DiagnosisInput> = {}): DiagnosisInput {
-  return {
+  const base: DiagnosisInput = {
     topicId: PHOTO,
     topics,
     attempts: [],
@@ -133,6 +176,7 @@ function input(overrides: Partial<DiagnosisInput> = {}): DiagnosisInput {
     now: NOW,
     ...overrides,
   };
+  return { ...base, questions: questionsFor(base.attempts, base.mistakes), ...overrides.questions ? { questions: [...base.questions ?? [], ...(overrides.questions ?? [])] } : {} };
 }
 
 /** Two unresolved recent misses on the target: repeated failure. */

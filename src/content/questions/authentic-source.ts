@@ -458,7 +458,7 @@ const physics: SourceItem[] = [
     stem: "Source extract: A bridge-materials report gives a stress of 1.5 × 10⁸ Pa and strain of 7.5 × 10⁻⁴ for a new alloy.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Calculate the Young modulus and explain what a larger value indicates.", 2, ["E = stress/strain", "E = (1.5 × 10⁸)/(7.5 × 10⁻⁴) = 2.0 × 10¹¹ Pa", "A larger Young modulus means less strain for a given stress"], "The Young modulus is 2.0 × 10¹¹ Pa. A larger value indicates a stiffer material, which undergoes less strain for the same stress.", "interpret stress-strain data from an original materials report")],
+    parts: [part("Calculate the Young modulus and explain what a larger value indicates.", 2, ["E = stress/strain = (1.5 × 10⁸)/(7.5 × 10⁻⁴) = 2.0 × 10¹¹ Pa", "A larger Young modulus means less strain for a given stress"], "The Young modulus is 2.0 × 10¹¹ Pa. A larger value indicates a stiffer material, which undergoes less strain for the same stress.", "interpret stress-strain data from an original materials report")],
   },
   {
     slug: "sonar-log",
@@ -508,7 +508,7 @@ const physics: SourceItem[] = [
     stem: "Source extract: A planetary-mission report says a probe's gravitational potential changes from −4.0 × 10⁷ to −2.5 × 10⁷ J kg⁻¹ as it moves away from a planet.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Calculate the change in gravitational potential energy per kilogram and interpret its sign.", 2, ["ΔV = final − initial", "ΔV = (−2.5 × 10⁷) − (−4.0 × 10⁷) = +1.5 × 10⁷ J kg⁻¹", "A positive change means work is done against the gravitational field"], "The change is +1.5 × 10⁷ J kg⁻¹. The positive value shows that the probe gains gravitational potential energy as it moves away.", "interpret gravitational potential from an original spaceflight report")],
+    parts: [part("Calculate the change in gravitational potential energy per kilogram and interpret its sign.", 2, ["ΔV = (−2.5 × 10⁷) − (−4.0 × 10⁷) = +1.5 × 10⁷ J kg⁻¹", "A positive change means work is done against the gravitational field"], "The change is +1.5 × 10⁷ J kg⁻¹. The positive value shows that the probe gains gravitational potential energy as it moves away.", "interpret gravitational potential from an original spaceflight report")],
   },
   {
     slug: "thermal-storage-log",

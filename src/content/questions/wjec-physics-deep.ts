@@ -11,9 +11,13 @@ const sp = (topic: string, point: number) => `${SUBJECT}.${topic}.sp-${String(po
  * an old attempt being reinterpreted against a different question.
  * Mapping is to internal curriculum claims; exact board references need review.
  */
+interface DeepMove {
+  move: string;
+}
+
 function item(slug: string, topic: string, point: number, demand: LearningDemand,
   prompt: string, scheme: string[], answer: string, capability?: string,
-  extraParts: PartSpec[] = []) {
+  extraParts: PartSpec[] = [], moves: DeepMove[] = []) {
   const specId = sp(topic, point);
   const parts: PartSpec[] = [{
     prompt, marks: scheme.length, scheme, answer,
@@ -22,13 +26,16 @@ function item(slug: string, topic: string, point: number, demand: LearningDemand
     capabilityIds: [capability ?? `phys.${topic}.sp-${String(point).padStart(2, "0")}`],
   }, ...extraParts];
   const familyId = `physics-quality:${slug}`;
+  const defaultMove = AUTHORED_MOVES[slug];
+  const moveFor = (index: number): string =>
+    moves[index]?.move ?? (index === 0 ? defaultMove : `${AUTHORED_MOVES[slug] ?? "solve the stated physical problem"} (follow-on part)`);
   const annotatedParts = parts.map((part, index) => ({
     ...part,
     learning: part.learning ?? {
       familyId,
       contextId: `${slug}:context-${index + 1}`,
       demand,
-      reasoningMoves: [`${demand} reasoning in the stated physical context`],
+      reasoningMoves: [moveFor(index)],
     },
   }));
   return defineQuestion({
@@ -42,6 +49,61 @@ function item(slug: string, topic: string, point: number, demand: LearningDemand
       expectedMinutes: Math.max(1, parts.reduce((sum, part) => sum + part.marks, 0) * 1.5) },
   });
 }
+
+/**
+ * Authored reasoning move per item: the named cognitive operation the part
+ * actually requires. Never the demand category — that would be filler and the
+ * quality audit rejects it.
+ */
+const AUTHORED_MOVES: Record<string, string> = {
+  "acceleration-definition": "state a rate-of-change definition and its derived SI unit",
+  "parachute-opening": "rebalance drag against weight while tracking the sign of acceleration through a speed change",
+  "lift-force-probe": "apply Newton's second law with consistent sign convention before substituting",
+  "book-third-law": "separate forces on one body from interaction pairs across two bodies",
+  "signed-motion-area": "compute signed area for displacement and sum magnitudes for distance on a split-velocity graph",
+  "asteroid-sample-brake": "chain force to acceleration to velocity and test the sign before concluding on direction",
+  "runaway-trolley": "track mechanical energy across a dissipative segment and justify which store gains the loss",
+  "young-modulus-definition": "chain stress, strain and modulus definitions in the proportional region",
+  "wire-diameter-effect": "scale a squared-geometry quantity before applying a material law",
+  "spring-zero-offset": "convert loaded length to extension before applying Hooke's law",
+  "elastic-nonlinear": "separate elasticity (recovery) from proportionality (Hooke's law)",
+  "nonlinear-spring-work": "integrate a piecewise-linear force-extension graph as triangle plus trapezium",
+  "tendon-energy": "account for dissipated fraction of stored strain energy on unloading",
+  "spring-launch": "transfer stored elastic energy to kinetic energy minus a stated dissipation",
+  "coherence-meaning": "state the two-source conditions that keep phase difference fixed",
+  "refraction-frequency": "hold the source-fixed quantity constant while speed changes",
+  "string-third-harmonic": "count loops as half-wavelengths before applying v = fλ",
+  "tir-direction": "check the direction of travel across the boundary before applying the critical-angle condition",
+  "grating-wavelength": "invert the grating equation for line density and bound the visible order",
+  "noise-cancellation-seat": "convert path difference into a phase relationship and predict interference",
+  "grating-photon": "chain a wave-optics result into a photon-energy calculation",
+  "work-function": "state the minimum escape energy for a surface electron",
+  "threshold-darkness": "apply one-photon-one-electron energy accounting under fixed frequency",
+  "stopping-potential-change": "convert maximum kinetic energy changes into stopping-potential differences",
+  "brighter-photoelectric": "separate photon energy from photon rate when intensity changes",
+  "photoelectron-energy": "apply the photoelectric energy balance with consistent units",
+  "uv-surface-sensor": "bracket a threshold between two photon energies to select a coating",
+  "electron-diffraction-voltage": "chain energy to momentum to wavelength through a parameter change",
+  "emf-definition": "define emf as energy supplied per unit charge by the source",
+  "lamp-non-ohmic": "link temperature-dependent scattering to a changing resistance",
+  "loaded-divider": "combine parallel resistances before applying the divider ratio",
+  "current-used-up": "apply charge conservation to steady series current",
+  "cell-internal-resistance": "read emf and internal resistance from a V-I line's intercept and gradient",
+  "cold-room-alarm": "predict the sensor direction from the divider ratio change",
+  "heater-water": "chain electrical power to thermal energy with a stated efficiency",
+  "magnetic-no-work": "use the force-velocity angle to decide work done on kinetic energy",
+  "orbit-height-trap": "measure field distance from the centre before applying an inverse-square law",
+  "coil-flux-rate": "scale per-turn flux change by turns before dividing by time",
+  "mass-spectrometer-ratio": "form a path-radius proportionality in m/q at fixed speed and field",
+  "gas-temperature-trap": "convert Celsius to absolute temperature before ratio reasoning",
+  "molecular-energy": "invert the mean-energy relation for temperature and scale to a mole",
+  "background-decay": "count elapsed half-lives from a decay factor and extrapolate one more",
+  "decay-randomness": "distinguish per-nucleus randomness from population halving",
+  "rebound-impulse": "reverse one velocity sign before computing momentum change",
+  "airbag-force": "separate impulse (fixed) from average force (time-dependent) and name the missing information",
+  "shm-sign": "check the direction of acceleration relative to displacement, not only proportionality",
+  "shm-period-from-gradient": "read ω² from a gradient and invert to a period",
+};
 
 export const wjecPhysicsDeepQuestions = [
   item("acceleration-definition", "kinematics-dynamics", 5, "recall",
@@ -119,9 +181,9 @@ export const wjecPhysicsDeepQuestions = [
     ["Total internal reflection requires travel from higher to lower refractive index.", "This ray travels from air into glass, so the critical-angle condition does not apply."],
     "Total internal reflection requires travel from higher to lower refractive index. This ray travels from air into glass, so the critical-angle condition does not apply."),
   item("grating-wavelength", "waves", 2, "calculation",
-    "A diffraction grating has 600 lines per mm. A first-order maximum is observed at 18.0 degrees to the normal. Calculate the wavelength. Use sin(18.0 degrees) = 0.3090.",
-    ["d = 1 / (600 x 1000) = 1.667e-6 m.", "n lambda = d sin(theta), with n = 1.", "lambda = 5.15e-7 m."],
-    "d = 1 / (600 x 1000) = 1.667e-6 m. Using n lambda = d sin(theta), with n = 1, lambda = 5.15e-7 m."),
+    "Light of wavelength 520 nm falls on a grating. The second-order maximum appears at 25.5 degrees. Use sin(25.5 degrees) = 0.431. Calculate the number of lines per mm of the grating, and state the highest order visible.",
+    ["d = n lambda / sin(theta) = 2 x 520e-9 / 0.431 = 2.41e-6 m.", "Lines per mm = 1/(d x 1000) = 414 lines per mm.", "Highest order: n_max = floor(d/lambda) = floor(4.64) = 4; check sin(theta) stays within 1: n = 4 gives sin(theta) = 4 x 520e-9/2.41e-6 = 0.863, visible."],
+    "d = nλ/sinθ = 2 × 520×10⁻⁹/0.431 = 2.41×10⁻⁶ m, giving 1/(2.41×10⁻³ mm) ≈ 414 lines per mm. The highest visible order satisfies d/λ = 4.64, so n = 4 is the highest complete order (sinθ = 0.863 < 1)."),
   item("noise-cancellation-seat", "waves", 7, "transfer",
     "Two in-phase loudspeakers emit sound of wavelength 0.80 m. At one seat their path lengths are 3.2 m and 4.4 m. Assume equal amplitudes at the seat. Predict the sound intensity there relative to either speaker alone, and explain why moving the seat can change it.",
     ["Path difference = 1.2 m = 1.5 wavelengths.", "An odd number of half wavelengths gives destructive interference, ideally zero intensity for equal amplitudes.", "Moving the seat changes path difference and therefore phase difference."],
@@ -182,9 +244,9 @@ export const wjecPhysicsDeepQuestions = [
     ["Steady current is the same at every point in a series circuit by charge conservation.", "Resistors transfer energy from charges; they do not consume charge."],
     "Steady current is the same at every point in a series circuit by charge conservation. Resistors transfer energy from charges; they do not consume charge.", "phys.circuit.charge"),
   item("cell-internal-resistance", "electric-circuits", 2, "calculation",
-    "A cell has emf 1.50 V and terminal voltage 1.20 V when delivering 0.60 A. Calculate its internal resistance.",
-    ["Lost voltage = 1.50 - 1.20 = 0.30 V.", "r = 0.30 / 0.60 = 0.50 ohm."],
-    "Lost voltage = 1.50 - 1.20 = 0.30 V. r = 0.30 / 0.60 = 0.50 ohm.", "phys.circuit.internal"),
+    "A student plots terminal voltage V against current I for a cell and gets a straight line from (0 A, 1.50 V) to (0.60 A, 1.20 V). Using the line's gradient and intercept, determine the cell's emf and internal resistance.",
+    ["The intercept at I = 0 is the emf: 1.50 V.", "The gradient magnitude equals r: (1.50 - 1.20)/0.60 = 0.50 ohm."],
+    "Using V = emf - Ir, the intercept at I = 0 gives emf = 1.50 V. The gradient is (1.20 - 1.50)/(0.60 - 0) = -0.50 V A^-1. Hence r = -gradient = 0.50 ohm.", "phys.circuit.internal"),
   item("cold-room-alarm", "electric-circuits", 2, "transfer",
     "An ideal 6.0 V supply feeds a series combination of a 4.0 kilohm resistor and a thermistor. An alarm measures voltage across the fixed resistor and triggers below 2.0 V. Thermistor resistance is 2.0 kilohm when warm and 10 kilohm when cold. Predict whether cooling triggers the alarm. Assume the alarm draws negligible current.",
     ["Warm voltage = 6 x 4/(4+2) = 4.0 V.", "Cold voltage = 6 x 4/(4+10) = 1.71 V.", "Cooling triggers the alarm because the cold voltage is below 2.0 V."],
@@ -215,13 +277,13 @@ export const wjecPhysicsDeepQuestions = [
     ["At fixed amount and volume, pressure is proportional to absolute temperature.", "Temperatures are 293 K and 313 K.", "Pressure ratio = 313/293 = 1.068, not 2."],
     "At fixed amount and volume, pressure is proportional to absolute temperature. Temperatures are 293 K and 313 K. Pressure ratio = 313/293 = 1.068, not 2."),
   item("molecular-energy", "thermal", 5, "calculation",
-    "Calculate the mean translational kinetic energy of one ideal-gas molecule at 300 K. Use k = 1.38e-23 J K^-1.",
-    ["Mean kinetic energy = 3kT/2.", "Mean kinetic energy = 6.21e-21 J."],
-    "Mean kinetic energy = 3kT/2 = 1.5 x 1.38e-23 x 300 = 6.21e-21 J."),
+    "The mean translational kinetic energy of a nitrogen molecule is 6.21e-21 J. Using k = 1.38e-23 J K^-1, find the gas temperature, then determine the total translational kinetic energy of one mole at this temperature (N_A = 6.02e23).",
+    ["Rearranging 3kT/2 gives T = 2E/(3k) = 2 x 6.21e-21/(3 x 1.38e-23) = 300 K.", "Total per mole = N_A x 6.21e-21 = 3.74e3 J."],
+    "T = 2E/(3k) = 2 × 6.21×10⁻²¹ / (3 × 1.38×10⁻²³) = 300 K. One mole holds N_A × 6.21×10⁻²¹ = 6.02×10²³ × 6.21×10⁻²¹ ≈ 3.74×10³ J of translational kinetic energy."),
   item("background-decay", "nuclear", 3, "calculation",
-    "A detector measures 820 counts per minute initially and 220 counts per minute after 12 minutes. Background is constant at 20 counts per minute. Estimate the half-life; ignore counting uncertainty for this calculation.",
-    ["Background-corrected rates are 800 and 200 counts per minute.", "The source rate falls by a factor of four, corresponding to two half-lives.", "Half-life = 12/2 = 6 minutes."],
-    "Background-corrected rates are 800 and 200 counts per minute. The source rate falls by a factor of four, corresponding to two half-lives. Half-life = 12/2 = 6 minutes."),
+    "A source's background-corrected count rate is 1600 counts per minute at t = 0. The corrected rate has fallen to 100 counts per minute after 24 minutes. Determine the half-life and the corrected rate at t = 30 minutes.",
+    ["The rate falls by a factor of 16 = 2^4, so four half-lives elapse in 24 minutes.", "Half-life = 24/4 = 6 minutes.", "At 30 minutes (five half-lives) the corrected rate is 1600/2^5 = 50 counts per minute."],
+    "1600 → 100 is a factor of 16 = 2⁴, so four half-lives pass in 24 minutes: t½ = 6 minutes. At t = 30 minutes, five half-lives have passed and the corrected rate is 1600/2⁵ = 50 counts per minute."),
   item("decay-randomness", "nuclear", 3, "explanation",
     "A sample has a half-life of one hour. Explain why this does not mean that each nucleus decays exactly one hour after it was formed.",
     ["Decay of an individual nucleus is random with constant probability per unit time.", "Half-life describes the expected halving of a large undecayed population."],

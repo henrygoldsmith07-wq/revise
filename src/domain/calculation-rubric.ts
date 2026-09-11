@@ -42,7 +42,9 @@ function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
 
 function unitKey(unit: string): string {
   // SI symbol case matters: m is metre, M is the mega prefix; Pa is not pA.
-  return unit.replace(/⁻/g, "-").replace(/²/g, "2").replace(/³/g, "3").replace(/[\s^]/g, "");
+  // Trailing sentence punctuation from prose working must not break the match.
+  return unit.replace(/⁻/g, "-").replace(/²/g, "2").replace(/³/g, "3")
+    .replace(/[\s^]/g, "").replace(/[.,;:!]+$/, "");
 }
 
 /** Locate explicit contradictions without guessing at unrecognised algebra. */
@@ -68,11 +70,92 @@ export function contradictoryWorkingStep(answer: string): number | null {
   return null;
 }
 
+/**
+ * Detect an explicitly contradictory line pair anywhere in the answer, even
+ * when the conflicting labels are only two tokens long or the conflict spans
+ * lines an author did not anticipate. Escalation prefers this signal to any
+ * confident mark: the working cannot be interpreted reliably when it states
+ * two different values for the same labelled quantity.
+ */
+export function hasContradictoryWorking(answer: string): boolean {
+  return contradictoryWorkingStep(answer) !== null;
+}
+
+/**
+ * Detect two *separate lines* assigning different values to the same label.
+ * This is a contradiction in the student's working: no confident mark may be
+ * awarded from it (cherry-picking risk), so callers escalate instead. An
+ * expression that disagrees with its own result on one line is an arithmetic
+ * slip, not a contradiction — the follow-through rule credits the method
+ * while the accuracy mark stays lost, exactly as an examiner would.
+ */
+export function conflictingWorkingLabel(answer: string): string | null {
+  const seen = new Map<string, number>();
+  const lines = normalise(answer).split(/[\n;]/).map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    const [label, ...segments] = line.split("=").map((segment) => segment.trim());
+    if (!label || !segments.length) continue;
+    const final = segments.at(-1)?.match(NUMERIC_EXPRESSION);
+    if (!final) continue;
+    const value = numberOf(final[1]!) ?? Number(final[1]);
+    if (!Number.isFinite(value)) continue;
+    const prior = seen.get(label);
+    if (prior !== undefined && !close(prior, value)) return label;
+    seen.set(label, value);
+  }
+  return null;
+}
+
+/** Evaluate complete arithmetic terms, never digit substrings or numbers
+ * mentioned elsewhere in the answer. Unrecognised factorisations stay provisional.
+ */
+function expressionReferencesOperand(expression: string, operandValue: number): boolean {
+  const stripped = expression.replace(/\s+/g, "");
+  const terms = stripped.split(/(?<![eE])(?=[+-])/).filter(Boolean);
+  return [stripped, ...terms].slice(0, 12).some((fragment) => {
+    const value = numberOf(fragment);
+    return value !== null && close(value, operandValue);
+  });
+}
+
+/** Recognise numeric rearrangements only when the method's operand values
+ * are demonstrated in the submitted expression itself.
+ */
+function equivalentMethodShown(
+  expression: string,
+  method: { operator: "+" | "-" | "*" | "/"; operands: [number | string, number | string] },
+  operandValues: readonly number[],
+): boolean {
+  const [left, right] = operandValues;
+  if (left === undefined || right === undefined) return false;
+  const authored = applyOperator(method.operator, left, right);
+  const value = numberOf(expression);
+  return authored !== null && value !== null && close(value, authored) &&
+    operandValues.every((operand) => expressionReferencesOperand(expression, operand));
+}
+
+function applyOperator(operator: "+" | "-" | "*" | "/", left: number, right: number): number | null {
+  switch (operator) {
+    case "+": return left + right;
+    case "-": return left - right;
+    case "*": return left * right;
+    case "/": return right === 0 ? null : left / right;
+    default: return null;
+  }
+}
+
 /** Conservative supported grammar. Unrecognised working is queued for review, not a confident zero. */
 export function markCalculationWorking(part: QuestionPart, answer: string): MarkedPart | undefined {
   const rules = part.calculationRules;
   if (!rules || rules.length !== part.marks || rules.length !== part.markScheme.length) return undefined;
   const lines = new Map(rules.map((rule) => [rule.label, readLine(rule, answer)]));
+  // A same-label conflict across lines is a contradiction: no rule may award a
+  // confident mark from it (readLine already refuses those lines; the flag
+  // here also marks any other rule's line unrecognised, because the student's
+  // working as a whole cannot be interpreted reliably). An expression that
+  // merely disagrees with its own result is an arithmetic slip: the
+  // follow-through rule credits the method while the accuracy mark stays lost.
+  const contradiction = conflictingWorkingLabel(answer) !== null ? 1 : null;
   const results = rules.map((rule, index) => {
     const line = lines.get(rule.label);
     let awarded = false;
@@ -99,8 +182,21 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
         const reversed = ["+", "*"].includes(method.operator) && close(a, right) && close(b, left);
         followsMethod = binary[2] === method.operator && (ordered || reversed);
       }
+      // Equivalent algebra: a rearranged but correct method line the direct
+      // binary match missed. Containment (in equivalentMethodShown) keeps a
+      // coincidental numeric match from earning the mark.
+      if (!followsMethod && left !== undefined && right !== undefined) {
+        followsMethod = equivalentMethodShown(expression, method, [left, right]);
+        if (followsMethod) methodRecognised = true;
+      }
     }
-    if (line) {
+    // A contradiction anywhere in the answer makes the rule's own reading
+    // provisional; never award a confident mark from cherry-picked lines.
+    if (contradiction !== null && line) {
+      methodRecognised = false;
+      awarded = false;
+      reason = "The working contains two different values for the same quantity; this mark needs a marker review.";
+    } else if (line) {
       if (rule.kind === "method") {
         awarded = followsMethod;
         reason = awarded ? "Correct calculation method is shown, independently of the arithmetic result." : "The required calculation method is not demonstrated.";
@@ -122,10 +218,10 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
         reason = awarded ? "The final value uses the requested significant figures." : `Report the final value to ${rule.significantFigures} significant figures.`;
       }
     }
-    const recognised = Boolean(line) && (!["method", "follow-through"].includes(rule.kind) || methodRecognised);
+    const recognised = contradiction === null && Boolean(line) && (!["method", "follow-through"].includes(rule.kind) || methodRecognised);
     return { point: part.markScheme[index]!, status: awarded ? "credited" as const : recognised ? "missed" as const : "unreported" as const,
       evidence: line?.text ?? null, evidenceStrength: recognised ? "strong" as const : "none" as const,
-      confidence: recognised ? 1 : 0, explanation: recognised ? reason : "This working needs a marker review; the method could not be interpreted reliably." };
+      confidence: recognised ? 1 : 0, explanation: recognised ? reason : contradiction !== null && line ? reason : "This working needs a marker review; the method could not be interpreted reliably." };
   });
   const credited = results.filter((r) => r.status === "credited");
   return { partId: part.id, awarded: credited.length, max: part.marks,

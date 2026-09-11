@@ -150,6 +150,8 @@ export const physicsQuestions = defineQuestions([
           "It is inelastic",
           "Kinetic energy after (6.08 J) is less than before (10.8 J), so kinetic energy is not conserved",
         ],
+        specPointIds: ["wjec-alevel-physics.momentum.sp-01"],
+        learningClaims: ["distinguish elastic from inelastic collisions by comparing kinetic energy before and after"],
         answer:
           "It is inelastic. Kinetic energy before = ½(0.150)(12.0)² = 10.8 J; after = ½(0.150)(9.00)² = 6.08 J. Kinetic energy is not conserved, although momentum is conserved for the ball–wall–Earth system.",
       },

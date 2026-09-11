@@ -1,7 +1,6 @@
 import { capabilityEdgeFingerprint, validateCapabilityGraph, validatePrerequisiteRationales, validatePrerequisiteReviews, type CapabilityNode } from "@/domain/capability-graph";
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 import type { PrerequisiteEdge } from "@/domain/prerequisites";
-
 import { wjecSubjectCapabilities } from "./wjec-subject-capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 
@@ -79,6 +78,20 @@ export const physicsPrerequisites: Record<string, string[]> = {
   "thermal.sp-06": ["phys.thermal.sp-01", "phys.thermal.sp-02"],
   "nuclear.sp-05": ["phys.nuclear.sp-04"],
   "nuclear.sp-07": ["phys.nuclear.sp-06"],
+  // --- extension-topic dependencies (capacitance, AC, induction, options) ---
+  "capacitance.sp-02": ["phys.circuit.emf"],
+  "capacitance.sp-03": ["phys.capacitance.sp-01"],
+  "alternating-currents.sp-02": ["phys.alternating-currents.sp-01", "phys.circuit.ohm"],
+  "electromagnetic-induction.sp-02": ["phys.electromagnetic-induction.sp-01", "phys.circuit.emf"],
+  "electromagnetic-induction.sp-03": ["phys.electromagnetic-induction.sp-01", "phys.energy-power.sp-02"],
+  "orbits-universe.sp-01": ["phys.fields.sp-04"],
+  "orbits-universe.sp-02": ["phys.fields.sp-04"],
+  "medical-physics.sp-02": ["phys.waves.sp-01"],
+  "sports-physics.sp-01": ["phys.kinematics-dynamics.sp-06"],
+  "sports-physics.sp-02": ["phys.kinematics-dynamics.sp-04"],
+  "energy-environment.sp-02": ["phys.energy-power.sp-03"],
+  "practical-investigations.sp-02": ["phys.practical-investigations.sp-01"],
+  "practical-investigations.sp-03": ["phys.practical-investigations.sp-01"],
 };
 
 /** Subject-expert rationale for each cross-topic edge in the initial Physics graph. */
@@ -103,6 +116,19 @@ const physicsPrerequisiteRationales: Record<string, string> = {
   "quantum.sp-04|phys.momentum.sp-01": "The de Broglie relation uses momentum, so the learner must distinguish a particle's momentum from its kinetic-energy value.",
   "quantum.sp-04|phys.waves.sp-08": "Electron diffraction is interpreted through the same wavelength and interference ideas used for wave diffraction.",
   "quantum.sp-07|phys.quantum.sp-01": "Electron-volt conversions and transitions depend on the photon-energy relation established for a single quantum.",
+  "capacitance.sp-02|phys.circuit.emf": "Stored-energy and charge calculations use the potential difference across a component, which is defined by the source-energy-per-charge concept.",
+  "capacitance.sp-03|phys.capacitance.sp-01": "Combining capacitors uses the capacitance definition with charge and potential-difference constraints for series and parallel connections.",
+  "alternating-currents.sp-02|phys.circuit.ohm": "Reactance and impedance calculations extend the resistance relation to time-varying currents and voltages.",
+  "electromagnetic-induction.sp-02|phys.circuit.emf": "An induced emf is an energy-per-charge quantity driving a current, so the circuit emf concept must be in place before quantitative induction work.",
+  "electromagnetic-induction.sp-03|phys.energy-power.sp-02": "Transformer and generator power transfer is analysed with the power relations and conservation of energy established for mechanical systems.",
+  "orbits-universe.sp-01|phys.fields.sp-04": "Orbital speed and period derivations apply the inverse-square field law to circular motion, which the fields treatment introduces.",
+  "orbits-universe.sp-02|phys.fields.sp-04": "Cosmological and orbital reasoning extends the field-strength and potential relations to astronomical distances.",
+  "medical-physics.sp-02|phys.waves.sp-01": "Ultrasound depth and resolution calculations are applications of the wave equation in a diagnostic context.",
+  "sports-physics.sp-01|phys.kinematics-dynamics.sp-06": "Modelling a launch or leap requires resolving motion into independent projectile components.",
+  "sports-physics.sp-02|phys.kinematics-dynamics.sp-04": "Joint and moment analyses apply Newton's laws to the forces acting on a body.",
+  "energy-environment.sp-02|phys.energy-power.sp-03": "Comparing generation resources chains the efficiency and power definitions into a systems-level energy budget.",
+  "practical-investigations.sp-02|phys.practical-investigations.sp-01": "Uncertainty propagation and repeat analysis presuppose the variable and control definitions from investigation planning.",
+  "practical-investigations.sp-03|phys.practical-investigations.sp-01": "Linearisation and graph analysis presuppose the planned measurement of the declared variables.",
 };
 
 function rationaleForPhysicsEdge(targetKey: string, prerequisiteId: string): string | undefined {

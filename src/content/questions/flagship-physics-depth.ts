@@ -51,6 +51,27 @@ const FLAGSHIP_DEMANDS: Record<string, readonly LearningDemand[]> = {
   "depth-kinematics-projectile": ["calculation", "transfer"],
 };
 
+/** Authored reasoning move per part of the first depth pass (index-aligned with FLAGSHIP_DEMANDS rows). */
+const FLAGSHIP_MOVES: Record<string, readonly string[]> = {
+  "depth-energy-fx-graph": ["integrate a piecewise force-extension graph by splitting it into triangle and rectangle", "name the energy store that receives dissipated work"],
+  "depth-energy-gpe-epelastic": ["equate gravitational loss to elastic gain at a turning point", "carry the elastic result into a speed calculation"],
+  "depth-materials-strain-energy-density": ["divide strain energy by volume to obtain density", "rearrange the density relation to solve for a material property"],
+  "depth-unfamiliar-materials-climbing-rope": ["apply energy conservation in an unfamiliar loading scenario", "rearrange a proportionality to answer a design question"],
+  "depth-momentum-impulse-average-force": ["convert a force-time graph area into impulse and force", "apply the impulse-momentum relation to a rebound"],
+  "depth-misconception-momentum-ke": ["separate momentum conservation from kinetic-energy conservation"],
+  "depth-unfamiliar-quantum-electron-diffraction": ["transfer wavelength interference reasoning to matter waves", "carry a wavelength result into an energy calculation"],
+  "depth-synoptic-quantum-transitions-efficiency": ["chain photon energy into atomic transitions", "compare delivered energy to photon energy for an efficiency bound"],
+  "depth-waves-grating": ["convert line density to spacing before applying the grating equation", "apply interference conditions in an unfamiliar geometry"],
+  "depth-unfamiliar-waves-fibre": ["apply refraction conditions to a guided-wave context", "carry a geometric result into a timing calculation"],
+  "depth-circuits-internal-r": ["account for internal resistance when computing terminal behaviour", "explain terminal p.d. via energy dissipation inside the cell"],
+  "depth-circular-banked": ["resolve along and normal to an incline before applying circular conditions", "apply the circular motion condition to a real surface"],
+  "depth-fields-orbit": ["equate gravitational and centripetal force for a circular orbit", "explain orbital dependence through the equated-force model"],
+  "depth-unfamiliar-fields-mass-spec": ["apply the magnetic-radius relation in an unfamiliar instrument", "carry a velocity result through the selector geometry"],
+  "depth-thermal-latent": ["separate sensible heating from latent heating during a state change", "apply the heating model to an unfamiliar substance"],
+  "depth-nuclear-half-life": ["chain the exponential decay law to activity", "explain activity through per-nucleus probability"],
+  "depth-kinematics-projectile": ["resolve projectile motion into independent components", "transfer component reasoning to an unfamiliar launch"],
+};
+
 function build(item: ItemSpec): Question {
   const prefix = `wjec-alevel-physics.${item.topic}`;
   return defineQuestion({
@@ -78,7 +99,7 @@ function build(item: ItemSpec): Question {
         familyId: `physics-flagship:${item.slug}`,
         contextId: `physics-flagship:${item.slug}:part-${index + 1}`,
         demand: FLAGSHIP_DEMANDS[item.slug]![index]!,
-        reasoningMoves: [`${FLAGSHIP_DEMANDS[item.slug]![index]!} reasoning with the authored data`],
+        reasoningMoves: [FLAGSHIP_MOVES[item.slug]?.[index] ?? "reason through the authored data in the stated physical context"],
       } : undefined,
     })),
   });
@@ -294,7 +315,7 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
         point: "sp-05",
         claim: "calculate de Broglie wavelength and interpret electron diffraction evidence",
         aos: ["AO2"],
-        scheme: ["λ = h/p", "= 6.63e-34 / 4.0e-24", "= 1.66e-10 ≈ 1.7 × 10⁻¹⁰ m"],
+        scheme: ["λ = h/p", "λ = 6.63e-34 / 4.0e-24 = 1.7e-10 m"],
         answer: "λ = h/p = 6.63 × 10⁻³⁴ ÷ 4.0 × 10⁻²⁴ ≈ 1.7 × 10⁻¹⁰ m - comparable to atomic spacings, which is why crystals diffract electrons.",
       },
     ],
@@ -328,7 +349,8 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
         scheme: [
           "Electrical energy per electron = eV = 1.60e-19 × 1.9 = 3.04e-19 J",
           "Photon needs 3.21e-19 J > 3.04e-19 J, so one 1.9 V electron cannot supply it at face value",
-          "Maximum efficiency = photon energy ÷ electrical energy = 3.21/3.04 ≈ 106% → impossible above 100%, therefore the stated wavelength/voltage pair is inconsistent; with V = 2.0 V efficiency would be ≈ 84%",
+          "An efficiency above 100% is impossible, so the stated wavelength/voltage pair is inconsistent",
+          "With V = 2.0 V the ceiling would be 3.21/3.20 ≈ 84% (or 100% × photon energy ÷ electrical energy once numbers are consistent)",
         ],
         answer:
           "Each electron delivers Ve = 1.60 × 10⁻¹⁹ × 1.9 = 3.04 × 10⁻¹⁹ J, but a 620 nm photon requires 3.21 × 10⁻¹⁹ J. One electron alone cannot emit that photon - the pair (λ, V) is inconsistent because the implied efficiency exceeds 100%. At V = 2.0 V the ceiling would be 3.21/3.20 ≈ 84%.",
@@ -404,22 +426,23 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
   build({
     slug: "depth-circuits-internal-r",
     topic: "electric-circuits",
-    stem: "A cell of emf 1.52 V and internal resistance r is connected to a 6.8 Ω resistor. A high-resistance voltmeter across the cell terminals reads 1.40 V.",
-    difficulty: 3,
+    stem: "A cell is connected first to a 6.8 Ω resistor, then to a 2.2 Ω resistor. A high-resistance voltmeter across the cell terminals reads 1.40 V in the first case and 0.88 V in the second.",
+    difficulty: 4,
     parts: [
       {
-        prompt: "(a) Calculate the current in the circuit and the internal resistance.",
-        marks: 3,
+        prompt: "(a) Using the two terminal-voltage measurements, determine the cell's emf and internal resistance.",
+        marks: 4,
         point: "sp-02",
         claim: "apply the relations for electric circuits to solve numerical problems",
         aos: ["AO2"],
         scheme: [
-          "I = V/R = 1.40 / 6.8 = 0.206 A",
-          "ε = I(R + r) or lost volts = Ir = 0.12 V",
-          "r = 0.12 / 0.206 = 0.58 Ω",
+          "Two unknowns require two equations: ε = V₁ + I₁r and ε = V₂ + I₂r",
+          "I₁ = 1.40/6.8 = 0.206 A and I₂ = 0.88/2.2 = 0.40 A",
+          "Subtracting gives r = (1.40 − 0.88)/(0.40 − 0.206) = 2.68 Ω",
+          "ε = 1.40 + 0.206 × 2.68 = 1.95 V (accept 1.9–2.0 V)",
         ],
         answer:
-          "Terminal p.d. is 1.40 V across 6.8 Ω, so I = 1.40/6.8 = 0.206 A. Lost volts Ir = 1.52 − 1.40 = 0.12 V, hence r = 0.12/0.206 = 0.58 Ω.",
+          "Write ε = V + Ir for each load. I₁ = 1.40/6.8 = 0.206 A and I₂ = 0.88/2.2 = 0.40 A. Subtracting eliminates ε: 1.40 − 0.88 = r(0.40 − 0.206), so r = 0.52/0.194 = 2.68 Ω. Then ε = 1.40 + 0.206 × 2.68 = 1.95 V.",
       },
       {
         prompt: "(b) The 6.8 Ω resistor is replaced by a 2.2 Ω resistor. Explain, without further calculation, what happens to the terminal p.d.",
@@ -525,7 +548,7 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
         point: "sp-06",
         claim: "apply F = BIl sinθ and F = BQv to determine trajectories",
         aos: ["AO2"],
-        scheme: ["r = mv/Bq", "= 3.2e-26 × 1.58e5 / (0.40 × 1.60e-19)", "= 0.079 m"],
+        scheme: ["r = mv/Bq = 3.2e-26 × 1.58e5 / (0.40 × 1.60e-19)", "r = 0.079 m"],
         answer: "Magnetic force provides centripetal force: r = mv/Bq = (3.2×10⁻²⁶ × 1.58×10⁵) / (0.40 × 1.60×10⁻¹⁹) = 7.9 × 10⁻² m.",
       },
     ],
@@ -608,7 +631,8 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
         claim: "resolve motion in two dimensions including projectile motion with constant acceleration",
         aos: ["AO2"],
         scheme: [
-          "s = ½gt² → 45 = 0.5 × 9.81 × t² → t = 3.03 s",
+          "Resolve vertically: s = ½gt² → 45 = 0.5 × 9.81 × t²",
+          "t = √(2s/g) = 3.03 s",
           "x = u t = 12 × 3.03 = 36 m",
         ],
         answer:

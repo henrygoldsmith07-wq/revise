@@ -22,14 +22,20 @@ type CoverageFamily = {
  * member of each family too; otherwise topic-level practice silently falls
  * behind the curriculum. These are short authored coverage prompts, while the
  * deeper four-part questions live in wjec-alevel-expansion.ts.
+ *
+ * Physics is excluded: its extension topics are covered by authored
+ * per-statement items in physics-coverage.ts, because a single shared prompt
+ * template ("Use the … evidence to explain the first examinable requirement")
+ * is a shallow variation the Physics quality audit rejects as a reskin.
  */
 export function wjecAlevelCoverageQuestions(family: CoverageFamily): Question[] {
   const topics = WJEC_ALEVEL_SUBJECTS.flatMap((subjectId) =>
     topicsFor(subjectId).filter((topic) =>
-      topic.unitId.includes(".unit") ||
-      topic.unitId.includes("extension") ||
-      topic.unitId.includes("modelling-mechanics") ||
-      topic.unitId.includes("probability-context"),
+      topic.subjectId !== "wjec-alevel-physics" &&
+      (topic.unitId.includes(".unit") ||
+        topic.unitId.includes("extension") ||
+        topic.unitId.includes("modelling-mechanics") ||
+        topic.unitId.includes("probability-context")),
     ),
   );
 

@@ -1,5 +1,6 @@
 import type { Id, Misconception, Question } from "@/domain/types";
 import { honestQuestion } from "@/domain/curriculum/honesty";
+import { enrichCuratedPhysicsLearning } from "./questions/physics-part-learning";
 import { biologyQuestions } from "./questions/biology";
 import { biologyAqaQuestions } from "./questions/biology-aqa";
 import { biologyAqaExtraQuestions } from "./questions/biology-aqa-extra";
@@ -29,11 +30,14 @@ import { ocrAuthoredQuestions } from "./questions/ocr-authored";
 import { extendedResponseQuestions } from "./questions/extended-responses";
 import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
 import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
+import { physicsCoverageQuestions } from "./questions/physics-coverage";
+import { physicsStatementCoverageQuestions } from "./questions/physics-statement-coverage";
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
 import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
+import { physicsCapacitorRcQuestions } from "./questions/physics-capacitor-rc";
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
@@ -45,7 +49,7 @@ export { CONTENT_SCHEMAS, contentCardSchema, contentQuestionPartSchema, contentQ
 
 /** The authored question bank. Uploaded and AI-generated questions live in
  *  IndexedDB alongside these and are treated identically everywhere else. */
-export const seedQuestions: Question[] = [
+const BASE_SEED_QUESTIONS: Question[] = [
   ...flagshipPhysicsDepthQuestions,
   ...evidenceExpansionQuestions,
   ...authenticExpansionQuestions,
@@ -66,7 +70,10 @@ export const seedQuestions: Question[] = [
   ...physicsExtraQuestions,
   ...wjecAlevelExpansionQuestions,
   ...wjecPhysicsQualityExpansionQuestions,
+  ...physicsCoverageQuestions,
+  ...physicsStatementCoverageQuestions,
   ...physicsCapacitorEnergyQuestions,
+  ...physicsCapacitorRcQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
@@ -88,6 +95,8 @@ export const seedQuestions: Question[] = [
   ...wjecPhysicsDeepQuestions,
 ].map(honestQuestion);
 
+export const seedQuestions: Question[] = enrichCuratedPhysicsLearning(BASE_SEED_QUESTIONS);
+
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
 export { gcseExpansionQuestions };
 export { edexcelExpansionQuestions };
@@ -99,6 +108,7 @@ export { extendedResponseQuestions };
 export { wjecAlevelExpansionQuestions };
 export { wjecPhysicsDeepQuestions };
 export { wjecPhysicsQualityExpansionQuestions };
+export { physicsCoverageQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

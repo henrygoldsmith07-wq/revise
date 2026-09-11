@@ -5,7 +5,7 @@ import { defineQuestion } from "./authoring";
 type Item = {
   slug: string; skill: string; demand: LearningDemand; difficulty: Question["difficulty"];
   context: string; stem: string; prompt: string; scheme: string[];
-  answer?: string; family?: string;
+  answer?: string; family?: string; move?: string;
   rules?: Question["parts"][number]["calculationRules"];
 };
 
@@ -145,6 +145,50 @@ const items: Item[] = [
     scheme: ["C′(v) = 2v − 54/v² = 0 gives v³ = 27 so v = 3", "C(3) = 27", "C(1) = 55 and C(6) = 45 are larger", "C″(v) = 2 + 108/v³ > 0 throughout the domain so v = 3 is the global minimum"] },
 ];
 
+/** Authored reasoning move per repair item — the cognitive operation, never the demand label. */
+const REPAIR_MOVES: Record<string, string> = {
+  "phys-resultant-probe": "add opposing forces with signs before stating the direction",
+  "phys-acceleration-probe": "divide a resultant force by mass to find acceleration",
+  "phys-drag-recall": "state the force balance that defines terminal velocity",
+  "phys-drag-explain": "track a speed-dependent drag against a fixed weight",
+  "phys-drag-misconception": "separate zero acceleration from zero velocity",
+  "phys-drag-calculation": "compute the resultant before applying Newton's second law",
+  "phys-drag-application": "follow the force balance through a sudden drag change to a new terminal speed",
+  "phys-drag-transfer": "transfer the drag-balance model to an upward motion with two fixed forces",
+  "phys-drag-synoptic": "close a quadratic drag balance and reason about the parameter power",
+  "phys-drag-retention": "apply the drag-balance model to a horizontally driven vehicle",
+  "bio-site-probe": "relate active-site shape to substrate complementarity",
+  "bio-saturation-probe": "explain a plateau through occupied active sites",
+  "bio-inhibitor-recall": "state where a competitive inhibitor binds and how substrate displaces it",
+  "bio-inhibitor-explain": "separate low-concentration rate effects from maximum-rate effects",
+  "bio-inhibitor-misconception": "identify the missing measurement that distinguishes inhibition models",
+  "bio-inhibitor-data": "compute a percentage rate change and match it to the inhibition model",
+  "bio-inhibitor-application": "restore rate by shifting a competitive equilibrium",
+  "bio-inhibitor-transfer": "infer the inhibition model from an unrecoverable maximum rate",
+  "bio-inhibitor-synoptic": "control a confounding variable before attributing a rate change",
+  "bio-inhibitor-retention": "use reversibility and maximum-rate recovery to classify inhibition",
+  "chem-volume-probe": "convert a solution volume between cubic units",
+  "chem-amount-probe": "multiply concentration by converted volume to obtain an amount",
+  "chem-ratio-recall": "read a balanced-equation ratio before scaling an amount",
+  "chem-ratio-explain": "link a stoichiometric ratio to a concentration comparison",
+  "chem-ratio-misconception": "apply the equation ratio the student omitted",
+  "chem-ratio-calculation": "scale a titrated amount through the balanced equation",
+  "chem-ratio-application": "chain a titration result to a quality-control concentration",
+  "chem-ratio-transfer": "replace an acid-alkali ratio with an unfamiliar 1:1 reagent ratio",
+  "chem-ratio-synoptic": "close a back-titration mass balance across two reactions",
+  "chem-ratio-retention": "apply an unfamiliar stoichiometric ratio to an assay",
+  "math-power-probe": "differentiate each term of a polynomial",
+  "math-stationary-probe": "solve a zero derivative and classify with the second derivative",
+  "math-opt-recall": "list the candidates a closed-interval maximum needs",
+  "math-opt-explain": "reject a stationary point outside the feasible domain",
+  "math-opt-misconception": "distinguish a stationary point from a global extremum",
+  "math-opt-calculation": "build a one-variable objective and justify its maximum",
+  "math-opt-application": "maximise a bounded quadratic against endpoint values",
+  "math-opt-transfer": "compare interior stationary points with endpoints for a cubic model",
+  "math-opt-synoptic": "form a box-volume model and optimise within its domain",
+  "math-opt-retention": "minimise an unfamiliar cost model on a closed interval",
+};
+
 export const wjecRepairDepthQuestions: Question[] = items.map((item) => {
   const node = wjecCapabilities.find((n) => n.id === item.skill)!;
   return defineQuestion({
@@ -159,6 +203,8 @@ export const wjecRepairDepthQuestions: Question[] = items.map((item) => {
       answer: item.answer ?? item.scheme.join(". ") + ".",
       aos: item.demand === "recall" ? ["AO1"] : ["AO2", ...(item.difficulty >= 4 ? ["AO3" as const] : [])],
       specPointIds: node.specPointIds, learningClaims: item.scheme, capabilityIds: [node.id],
+      learning: { familyId: item.family ?? item.slug, contextId: item.context, demand: item.demand,
+        reasoningMoves: [item.move ?? REPAIR_MOVES[item.slug] ?? "reason through the stated evidence before substituting"] },
       ...(item.rules ? { calculationRules: item.rules } : {}) }],
     // The explicit working rubric carries method/ECF evidence separately from prose similarity.
   });

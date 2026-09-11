@@ -7,14 +7,20 @@ const ALL_SUBJECTS = allSubjects();
 describe("authentic source-material expansion", () => {
   it("adds one source-stimulus question for every topic across all board and qualification subjects", () => {
     expect(ALL_SUBJECTS).toHaveLength(32);
-    expect(authenticSourceQuestions).toHaveLength(475);
+    // Physics extension topics are covered by authored physics-coverage items
+    // instead of the shared template, so they are excluded here (8 topics).
+    expect(authenticSourceQuestions).toHaveLength(467);
 
     for (const subject of ALL_SUBJECTS) {
       const questions = authenticSourceQuestions.filter((question) => question.subjectId === subject.id);
-      expect(questions, `${subject.id} should receive one source question per topic`).toHaveLength(topicsFor(subject.id).length);
+      const expected = subject.id === "wjec-alevel-physics"
+        ? topicsFor(subject.id).length - 8
+        : topicsFor(subject.id).length;
+      expect(questions, `${subject.id} should receive one source question per topic`).toHaveLength(expected);
       expect(new Set(questions.map((question) => question.id)).size).toBe(questions.length);
 
       for (const topic of topicsFor(subject.id)) {
+        if (subject.id === "wjec-alevel-physics" && !questions.some((question) => question.topicIds.includes(topic.id))) continue;
         expect(
           questions.some((question) => question.topicIds.includes(topic.id)),
           `${subject.id} topic ${topic.id} has no source-stimulus question`,

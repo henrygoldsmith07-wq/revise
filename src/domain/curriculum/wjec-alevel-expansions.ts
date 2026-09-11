@@ -605,7 +605,7 @@ export const wjecPhysicsExpansion: UnitSpec[] = [
       topic({
         slug: "capacitance",
         title: "Capacitance and RC circuits",
-        specRef: "Unit 4.6",
+        specRef: "Unit 4.1",
         difficulty: 4,
         summary:
           "Charge storage, energy in a capacitor and the exponential charge/discharge of an RC circuit, including how to read the time constant from data.",
@@ -613,7 +613,7 @@ export const wjecPhysicsExpansion: UnitSpec[] = [
           "Capacitance is charge stored per unit potential difference, C = Q/V; a larger plate area or smaller separation increases capacitance for a parallel-plate capacitor.",
           "The stored energy is E = ½QV = ½CV² = Q²/(2C), so raising voltage has a squared effect on energy.",
           "In a series circuit capacitors share charge and reciprocal capacitances add; in parallel they share potential difference and capacitances add.",
-          "During charging or discharging, Q, V and I change exponentially with time constant τ = RC; after one τ, charging reaches about 63% and discharging falls to about 37%.",
+          "With constant R and C, capacitor charge and voltage rise towards their final values during charging, reaching about 63% after τ = RC; charging current falls to about 37%. During discharge, charge, voltage and current magnitude all fall to about 37% after τ.",
         ],
         commonErrors: [
           "Using the resistor-current equation alone and forgetting that capacitor current changes during the transient.",
@@ -621,10 +621,10 @@ export const wjecPhysicsExpansion: UnitSpec[] = [
           "Calling τ the time to reach the final value; it is the characteristic scale, not an instant finish.",
         ],
         specPoints: [
-          point("Unit 4.6(a)", "define capacitance and explain factors affecting a parallel-plate capacitor", ["AO1", "AO2"]),
-          point("Unit 4.6(b)", "calculate energy stored in a capacitor", ["AO2"]),
-          point("Unit 4.6(c)", "calculate equivalent capacitance in series and parallel combinations", ["AO2"]),
-          point("Unit 4.6(d)", "interpret charging and discharging curves using the time constant RC", ["AO2", "AO3"]),
+          point("Unit 4.1(a), (c)-(e)", "define capacitance and explain factors affecting a parallel-plate capacitor", ["AO1", "AO2"]),
+          point("Unit 4.1(b), (g)", "calculate energy stored in a capacitor", ["AO2"]),
+          point("Unit 4.1(h)", "calculate equivalent capacitance in series and parallel combinations", ["AO2"]),
+          point("Unit 4.1(i)-(j)", "interpret charging and discharging curves using the time constant RC", ["AO2", "AO3"]),
         ],
         aos: ["AO1", "AO2", "AO3"],
       }),
