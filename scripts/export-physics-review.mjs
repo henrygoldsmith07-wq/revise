@@ -15,6 +15,7 @@ const bundle = await build({
     export { wjecPhysics as curriculum } from "./src/domain/curriculum/wjec-physics";
     export { markPart } from "./src/domain/marking";
     export { auditPhysicsAssessmentQuality, physicsQualityQueue, physicsAuthoringBriefs } from "./src/domain/physics-assessment-quality";
+    export { auditCapabilityGranularity } from "./src/domain/capability-granularity";
   `, resolveDir: process.cwd(), loader: "ts" },
   bundle: true, platform: "node", format: "esm", write: false,
 });
@@ -29,6 +30,7 @@ const qualityAudit = data.auditPhysicsAssessmentQuality({
 });
 const qualityQueue = data.physicsQualityQueue(qualityAudit);
 const authoringBriefs = data.physicsAuthoringBriefs(qualityAudit);
+const granularityFindings = data.auditCapabilityGranularity(data.capabilities, data.questions.filter((question) => question.subjectId === "wjec-alevel-physics"));
 const physicsNodes = data.capabilities.filter((node) => node.subjectId === "wjec-alevel-physics");
 const prerequisiteReviews = physicsNodes.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
   const prerequisite = physicsNodes.find((candidate) => candidate.id === prerequisiteId) ?? data.capabilities.find((candidate) => candidate.id === prerequisiteId);
@@ -109,7 +111,8 @@ await writeFile(resolve(out, "physics-prerequisite-audit.json"), JSON.stringify(
 await writeFile(resolve(out, "physics-quality-audit.json"), JSON.stringify(qualityAudit, null, 2));
 await writeFile(resolve(out, "physics-quality-queue.json"), JSON.stringify(qualityQueue, null, 2));
 await writeFile(resolve(out, "physics-authoring-briefs.json"), JSON.stringify(authoringBriefs, null, 2));
+await writeFile(resolve(out, "physics-capability-granularity.json"), JSON.stringify(granularityFindings, null, 2));
 console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((row) => row.question.id.startsWith("cnt:question:physics-quality-")).length, approvalsCreated: 0,
   modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
-  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length, redundantPrerequisiteEdges: redundantEdges.length,
+  statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length, redundantPrerequisiteEdges: redundantEdges.length, overbroadCapabilities: granularityFindings.length,
   output: out }));

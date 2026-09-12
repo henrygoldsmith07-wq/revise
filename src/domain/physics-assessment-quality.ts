@@ -1,5 +1,7 @@
 import type { CapabilityNode } from "./capability-graph";
 import type { Id, LearningDemand, Question, QuestionPart, Topic } from "./types";
+import { solutionPathOf } from "./reasoning-signature";
+import { textOverload } from "./text-similarity";
 
 /** The seven demands that make a Physics item useful beyond simple recall. */
 export const PHYSICS_ASSESSMENT_DEMANDS: readonly LearningDemand[] = [
@@ -249,6 +251,11 @@ function demandCoverage(mappedQuestions: Array<{ question: Question; part: Quest
     const contexts = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)));
     const authoredMoves = distinctAuthoredMoves(rows);
     const signatures = unique(rows.map(({ part }) => promptSignature(part.prompt)).filter(Boolean));
+    // Two families that re-run the identical solution path (same calculation
+    // method, or the same ordered operations for a written part) are not two
+    // distinct ways of examining the skill, even when their authored move text
+    // differs. Count only genuinely different reasoning paths.
+    const solutionPaths = distinctSolutionPaths(rows);
     return { demand, families, contexts, reasoningMoves: authoredMoves, questionCount: rows.length,
       complete: families.length >= MIN_PHYSICS_FAMILIES,
       // A second family/context is only useful when it asks for a different
@@ -256,8 +263,20 @@ function demandCoverage(mappedQuestions: Array<{ question: Question; part: Quest
       // enough to establish transfer-ready coverage, and templated moves
       // (`${demand} reasoning ...`) are excluded before counting.
       distinct: signatures.length >= MIN_PHYSICS_FAMILIES && contexts.length >= MIN_PHYSICS_FAMILIES &&
-        authoredMoves.length >= MIN_PHYSICS_FAMILIES };
+        authoredMoves.length >= MIN_PHYSICS_FAMILIES && solutionPaths >= MIN_PHYSICS_FAMILIES };
   });
+}
+
+/** Number of genuinely different solution paths among a demand's parts. */
+function distinctSolutionPaths(rows: Array<{ question: Question; part: QuestionPart }>): number {
+  const paths: string[] = [];
+  for (const { part } of rows) {
+    const path = solutionPathOf(part);
+    if (!path.length) continue;
+    const key = path.join("|");
+    if (!paths.some((existing) => textOverload(existing, key) >= MOVE_OVERLAP_LIMIT)) paths.push(key);
+  }
+  return paths.length;
 }
 
 /**

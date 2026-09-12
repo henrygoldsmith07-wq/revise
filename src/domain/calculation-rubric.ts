@@ -30,14 +30,41 @@ const SCALAR = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?";
 const POWER = "(?:\\s*\\^\\s*[+-]?\\d+)?";
 const NUMERIC_EXPRESSION = new RegExp(`^(${SCALAR}${POWER}(?:\\s*[+*/-]\\s*${SCALAR}${POWER})*)\\s*(.*)$`);
 
+/**
+ * Split submitted working into steps. Students chain a derivation with newlines,
+ * semicolons, arrows (`→`, `=>`) or the words "so"/"then"; a single line such as
+ * `F = ma → F = 2 × 3 = 6` is really three steps and must be read as such, or a
+ * correct long derivation is thrown to review for a formatting reason.
+ */
+function splitWorkingLines(text: string): string[] {
+  return expandSuperscripts(text)
+    .replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/")
+    .split(/\n|;|=>|→|⟶|\b(?:then|so)\b/i)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 interface Line { text: string; expression: string; raw: string; value: number; unit: string }
 function readLine(rule: CalculationMarkRule, answer: string): Line | undefined {
   const aliases = [rule.label, ...(rule.aliases ?? [])].map((s) => escaped(normalise(s)));
-  const lines = expandSuperscripts(answer).replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/").split(/[\n;]/).map((s) => s.trim());
+  const lines = splitWorkingLines(answer);
   const matching = lines.filter((line) => new RegExp(`^(?:${aliases.join("|")})\\s*=`, "i").test(line));
-  // Multiple conflicting versions need review; never cherry-pick the correct one.
-  if (matching.length !== 1) return undefined;
-  const text = matching[0]!;
+  if (!matching.length) return undefined;
+  // A label may legitimately be restated with the same value (a check, or a
+  // unit added on a second line). Only genuinely conflicting restatements are
+  // ambiguous; those are escalated by `conflictingWorkingLabel`, so here we
+  // accept the first line whose final value parses and is consistent.
+  const parsedLines = matching
+    .map((text) => parseLine(text))
+    .filter((line): line is Line => line !== undefined);
+  if (!parsedLines.length) return undefined;
+  const first = parsedLines[0]!;
+  if (parsedLines.some((line) => !close(line.value, first.value))) return undefined;
+  return first;
+}
+
+/** Parse one `label = expr = value unit` step; undefined when the value is unreadable. */
+function parseLine(text: string): Line | undefined {
   const segments = text.split("=").slice(1).map((s) => s.trim());
   // Accept a small, explicit arithmetic grammar on the final line as well as
   // a bare number. Students commonly leave an equivalent fraction such as
@@ -62,10 +89,11 @@ function unitKey(unit: string): string {
 /** Locate explicit contradictions without guessing at unrecognised algebra. */
 export function contradictoryWorkingStep(answer: string): number | null {
   const seen = new Map<string, number>();
-  const lines = normalise(answer).split(/[\n;]/).map((line) => line.trim()).filter(Boolean);
+  const lines = splitWorkingLines(answer);
   for (const [index, line] of lines.entries()) {
-    const [label, ...segments] = line.split("=").map((segment) => segment.trim());
-    if (!label || !segments.length) continue;
+    const [rawLabel, ...segments] = line.split("=").map((segment) => segment.trim());
+    if (!rawLabel || !segments.length) continue;
+    const label = rawLabel.toLowerCase();
     const final = segments.at(-1)?.match(NUMERIC_EXPRESSION);
     if (!final) continue;
     const value = numberOf(final[1]!) ?? Number(final[1]);
@@ -103,10 +131,11 @@ export function hasContradictoryWorking(answer: string): boolean {
  */
 export function conflictingWorkingLabel(answer: string): string | null {
   const seen = new Map<string, number>();
-  const lines = normalise(answer).split(/[\n;]/).map((line) => line.trim()).filter(Boolean);
+  const lines = splitWorkingLines(answer);
   for (const line of lines) {
-    const [label, ...segments] = line.split("=").map((segment) => segment.trim());
-    if (!label || !segments.length) continue;
+    const [rawLabel, ...segments] = line.split("=").map((segment) => segment.trim());
+    if (!rawLabel || !segments.length) continue;
+    const label = rawLabel.toLowerCase();
     const final = segments.at(-1)?.match(NUMERIC_EXPRESSION);
     if (!final) continue;
     const value = numberOf(final[1]!) ?? Number(final[1]);

@@ -32,6 +32,7 @@ import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
 import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
 import { physicsCoverageQuestions } from "./questions/physics-coverage";
 import { physicsStatementCoverageQuestions } from "./questions/physics-statement-coverage";
+import { physicsReasoningDepthQuestions } from "./questions/physics-reasoning-depth";
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
@@ -72,6 +73,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...wjecPhysicsQualityExpansionQuestions,
   ...physicsCoverageQuestions,
   ...physicsStatementCoverageQuestions,
+  ...physicsReasoningDepthQuestions,
   ...physicsCapacitorEnergyQuestions,
   ...physicsCapacitorRcQuestions,
   ...wjecMathsQualityQuestions,
@@ -109,6 +111,7 @@ export { wjecAlevelExpansionQuestions };
 export { wjecPhysicsDeepQuestions };
 export { wjecPhysicsQualityExpansionQuestions };
 export { physicsCoverageQuestions };
+export { physicsReasoningDepthQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

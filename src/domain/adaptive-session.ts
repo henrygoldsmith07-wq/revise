@@ -27,8 +27,9 @@ import { deriveCapabilityProfiles } from "./capability-source";
 import { readinessStopFor } from "./adaptive-stop";
 import { wjecCapabilities } from "@/content/capabilities";
 import { selectLearningAction, type LearningAction } from "./learning-action";
-import { isTransferQuestion, questionContexts, questionFamilies, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { isTransferQuestion, questionContexts, questionFamilies, reasoningNoveltyFor, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { questionExposureReport } from "./question-exposure";
+import { capabilityCombination, combinationKey, isSynopticQuestion, synopticLearningValue } from "./synoptic-coverage";
 import { trustedAssessmentContent } from "./physics-content-review";
 import type { HintTier } from "./hints";
 import type { ApplicationMasteryRow } from "./application-mastery";
@@ -543,8 +544,21 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
   const isFreshFamily = (question: Question): boolean =>
     !questionFamilies(question).some((family) => attemptedFamilies.has(family));
   const orderedQuestions = questions.slice().sort((a, b) => a.difficulty - b.difficulty || a.id.localeCompare(b.id));
+  // Reasoning novelty (0–1, 1 = no solution-path overlap with anything already
+  // attempted) is memoised per question; familiarity does not depend on marking
+  // quality, so the full attempt history is used, matching the family logic.
+  const noveltyCache = new Map<Id, number>();
+  const reasoningNovelty = (question: Question): number => {
+    const cached = noveltyCache.get(question.id);
+    if (cached !== undefined) return cached;
+    const value = reasoningNoveltyFor(question, attempts, questions);
+    noveltyCache.set(question.id, value);
+    return value;
+  };
   const rankByFreshness = (question: Question): number =>
-    (isFreshFamily(question) ? 0 : 1) * 10 + (exposureByQuestion.get(question.id) === "overpractised" ? 1 : 0);
+    (isFreshFamily(question) ? 0 : 1) * 100 +
+    Math.round((1 - reasoningNovelty(question)) * 90) +
+    (exposureByQuestion.get(question.id) === "overpractised" ? 1 : 0);
   const pickQuestion = (predicate: (question: Question) => boolean): Question | undefined => {
     const candidates = orderedQuestions.filter(
       (question) => !usedQuestions.has(question.id) && !attemptedIds.has(question.id) && predicate(question),
@@ -575,6 +589,19 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
     ...(supported ? questionContexts(supported) : []),
     ...(independent ? questionContexts(independent) : []),
   ]);
+  // Encountered capability combinations, so a transfer step can prefer a
+  // genuinely new pairing over a repeat of one already sat.
+  const encounteredCombinations = new Set<string>();
+  for (const attempt of attempts) {
+    const prior = questionById.get(attempt.questionId);
+    const combination = prior ? capabilityCombination(prior) : null;
+    if (combination) encounteredCombinations.add(combinationKey(combination));
+  }
+  const practisedQuestions = questions.filter((question) => attemptedIds.has(question.id));
+  const synopticTransferBonus = (question: Question): number =>
+    isSynopticQuestion(question)
+      ? synopticLearningValue(question, practisedQuestions, encounteredCombinations)
+      : 0;
   const transferCandidates = (freshOnly: boolean): Question | undefined => {
     const pool = orderedQuestions.filter((question) => {
       if (usedQuestions.has(question.id) || attemptedIds.has(question.id)) return false;
@@ -586,7 +613,12 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
         !contexts.some((context) => practisedContexts.has(context));
     });
     const found = pool.slice().sort((a, b) =>
-      rankByFreshness(a) - rankByFreshness(b) || a.difficulty - b.difficulty || a.id.localeCompare(b.id))[0];
+      rankByFreshness(a) - rankByFreshness(b) ||
+      // A question that combines previously-separate capabilities through
+      // genuinely new reasoning is the higher-value transfer; a fresh costume
+      // over one capability adds complexity without moving the needle.
+      synopticTransferBonus(b) - synopticTransferBonus(a) ||
+      a.difficulty - b.difficulty || a.id.localeCompare(b.id))[0];
     if (found) {
       usedQuestions.add(found.id);
       for (const family of questionFamilies(found)) attemptedFamilies.add(family);

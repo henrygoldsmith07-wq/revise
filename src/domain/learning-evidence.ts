@@ -1,5 +1,6 @@
-import type { Attempt, LearningDemand, PaperMarkingReview, Question, QuestionPart } from "./types";
+import type { Attempt, Id, LearningDemand, PaperMarkingReview, Question, QuestionPart } from "./types";
 import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
+import { isReasoningTransfer, reasoningNovelty } from "./reasoning-signature";
 
 function normaliseAnswer(text: string): string {
   return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
@@ -140,9 +141,42 @@ export function isTransferQuestion(question: Question, source?: Question): boole
   const sourceMetas = source.parts.map((part) => partLearningMetadata(source, part)).filter(Boolean);
   const sourceFamilies = new Set(sourceMetas.map((meta) => meta!.familyId));
   const sourceContexts = new Set(sourceMetas.map((meta) => meta!.contextId));
+  const sharedCapability = questionCapabilities(question).some((id) => questionCapabilities(source).includes(id));
+  // A different wrapper is not enough: the candidate must still exercise the
+  // shared capability through a genuinely different solution path. New props or
+  // extra algebra that re-run the *same* operations are unfamiliarity without
+  // transfer value, and a number-swapped reskin repeats the same reasoning.
+  const reasoningNovel = sharedCapability && isReasoningTransfer(source, question, transferTargetCapability(question, source));
   return question.subjectId === source.subjectId &&
     metas.some((meta) => !sourceFamilies.has(meta!.familyId) && !sourceContexts.has(meta!.contextId)) &&
-    questionCapabilities(question).some((id) => questionCapabilities(source).includes(id));
+    sharedCapability && reasoningNovel;
+}
+
+/** The capability a transfer item is meant to move: the one shared with the source. */
+function transferTargetCapability(question: Question, source: Question): string {
+  const shared = questionCapabilities(question).find((id) => questionCapabilities(source).includes(id));
+  return shared ?? questionCapabilities(question)[0] ?? "";
+}
+
+/**
+ * Reasoning-aware freshness for selection. A question is unseen in the family
+ * sense but may repeat solution paths already drilled; this prefers candidates
+ * whose reasoning overlaps least with what the learner has attempted. Returns
+ * 0–1 novelty (1 = no reasoning shared with any practised item).
+ */
+export function reasoningNoveltyFor(
+  question: Question,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+): number {
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const practised = new Map<Id, Question>();
+  for (const attempt of history) {
+    const prior = byId.get(attempt.questionId);
+    if (prior && prior.subjectId === question.subjectId) practised.set(prior.id, prior);
+  }
+  if (!practised.size) return 1;
+  return reasoningNovelty(question, [...practised.values()]);
 }
 
 /** A renamed or renumbered variant is still familiar evidence. */

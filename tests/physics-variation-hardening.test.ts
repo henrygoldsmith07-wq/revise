@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { auditPhysicsAssessmentQuality, isTemplatedReasoningMove, physicsQualityQueue, promptOverload } from "@/domain/physics-assessment-quality";
 import { conflictingWorkingLabel, markCalculationWorking } from "@/domain/calculation-rubric";
-import { redundantPrerequisiteEdges, validateCapabilityGraph } from "@/domain/capability-graph";
+import { redundantPrerequisiteEdges, validateCapabilityGraph, type CapabilityNode } from "@/domain/capability-graph";
 import { questionContexts, questionFamilies } from "@/domain/learning-evidence";
 import { PHYSICS_PART_LEARNING } from "@/content/questions/physics-part-learning";
 import { physicsCoverageQuestions } from "@/content/questions/physics-coverage";
@@ -258,11 +258,11 @@ describe("prerequisite graph coherence", () => {
   });
 
   it("flags a direct edge that is already implied by a longer path", () => {
-    const nodes = [
-      { id: "x", subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: "X", specPointIds: [`${SUBJECT}.t.sp-01`], prerequisites: ["y", "z"] },
-      { id: "y", subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: "Y", specPointIds: [`${SUBJECT}.t.sp-02`], prerequisites: ["z"] },
-      { id: "z", subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: "Z", specPointIds: [`${SUBJECT}.t.sp-03`], prerequisites: [] },
-    ];
+    const node = (id: string, prerequisites: string[]): CapabilityNode => ({
+      id, subjectId: SUBJECT, topicId: `${SUBJECT}.t`, label: id.toUpperCase(),
+      specPointIds: [`${SUBJECT}.t.sp-01`], prerequisites, explanation: `Demonstrate ${id}.`,
+    });
+    const nodes = [node("x", ["y", "z"]), node("y", ["z"]), node("z", [])];
     // x reaches z through y, so the direct x <- z edge is an unnecessary blocker.
     expect(redundantPrerequisiteEdges(nodes)).toEqual(["x <- z"]);
   });

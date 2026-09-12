@@ -19,6 +19,8 @@ export interface LearningAction {
   reason: string;
   /** An explicit policy prior, not a measured causal effect or calibrated prediction. */
   expectedGainPerMinute: number;
+  /** Total durable marks the action is expected to recover over `minutes`. */
+  expectedDurableGain: number;
   calibrated: boolean;
   calibrationSampleSize: number;
   contentTrust: "human-verified" | "needs-human-review";
@@ -59,11 +61,19 @@ export function selectLearningAction(input: {
       const gap = 1 - (evidence.get(capabilityId)?.accuracy ?? 0.35);
       const effect = effectivenessFor(kind, capabilityId, calibrations, question.subjectId);
       const trust = humanVerifiedPhysicsQuestion(question) ? "human-verified" as const : "needs-human-review" as const;
+      // Rank by durable gain PER LEARNER MINUTE, the north-star metric. A
+      // capability where many marks are at stake has more headroom, but the
+      // influence is bounded (square root) so a five-mark loss does not
+      // linearly outrank a cheaper, equally-efficient action. Total expected
+      // gain is surfaced separately and used only for the session budget.
+      const recoverable = Math.sqrt(Math.min(5, Math.max(1, lost)));
+      const expectedGainPerMinute = effect.gainPerMinute * (0.4 + gap) * recoverable;
       candidates.push({ kind, question, capabilityId, priorState: evidence.get(capabilityId)?.state ?? "unknown", ...(mistake ? { mistakeId: mistake.id } : {}),
         topicId: nodes.find((node) => node.id === capabilityId)?.topicId ?? question.topicIds[0] ?? topicId,
         ...(baselineEvidence.get(capabilityId)?.accuracy != null ? { priorAccuracy: baselineEvidence.get(capabilityId)!.accuracy! } : {}),
         teaching: kind === "guided", minutes, reason,
-        expectedGainPerMinute: effect.gainPerMinute * Math.min(5, Math.max(1, lost)) * (0.4 + gap),
+        expectedGainPerMinute,
+        expectedDurableGain: expectedGainPerMinute * minutes,
         calibrated: effect.calibrated,
         calibrationSampleSize: effect.sampleSize,
         contentTrust: trust });
