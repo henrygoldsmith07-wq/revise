@@ -40,6 +40,10 @@ import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-q
 import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
 import { physicsCapacitorRcQuestions } from "./questions/physics-capacitor-rc";
 import { physicsMotionGraphQuestions } from "./questions/physics-motion-graphs";
+import { physicsDepth50MechanicsQuestions } from "./questions/physics-depth-50-mechanics";
+import { physicsDepth50CircuitsFieldsQuestions } from "./questions/physics-depth-50-circuits-fields";
+import { physicsDepth50AppliedQuestions } from "./questions/physics-depth-50-applied";
+import { physicsDepth50OrbitsQuestions } from "./questions/physics-depth-50-orbits";
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
@@ -78,6 +82,10 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...physicsCapacitorEnergyQuestions,
   ...physicsCapacitorRcQuestions,
   ...physicsMotionGraphQuestions,
+  ...physicsDepth50MechanicsQuestions,
+  ...physicsDepth50CircuitsFieldsQuestions,
+  ...physicsDepth50AppliedQuestions,
+  ...physicsDepth50OrbitsQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
