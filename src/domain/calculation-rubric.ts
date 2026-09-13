@@ -2,8 +2,7 @@ import { parseExpression } from "./maths-equivalence";
 import type { CalculationMarkRule, MarkedPart, QuestionPart } from "./types";
 
 function normalise(text: string): string {
-  return expandSuperscripts(text).replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/")
-    .replace(/⁻/g, "-").replace(/²/g, "2").replace(/³/g, "3").toLowerCase();
+  return expandSuperscripts(text).replace(/[−–]/g, "-").replace(/×/g, "*").replace(/÷/g, "/").toLowerCase();
 }
 const SUPERSCRIPT_DIGITS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "ˣ": "x" };
 function expandSuperscripts(text: string): string {
@@ -206,6 +205,7 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
     let followsMethod = false;
     let computed: number | null = null;
     let methodRecognised = false;
+    let accuracyRecognised = true;
     if (line?.expression && method) {
       const left = operand(method.operands[0]);
       const right = operand(method.operands[1]);
@@ -242,8 +242,13 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
         awarded = followsMethod;
         reason = awarded ? "Correct calculation method is shown, independently of the arithmetic result." : "The required calculation method is not demonstrated.";
       } else if (rule.kind === "accuracy") {
-        const evaluated = line.expression ? numberOf(line.expression) : null;
-        awarded = close(line.value, rule.expected) && (evaluated === null || close(evaluated, line.value));
+        let expression = line.expression;
+        for (const [label, earlier] of lines) {
+          if (earlier && label !== rule.label) expression = expression.replace(new RegExp(`\\b${escaped(normalise(label))}\\b`, "g"), String(earlier.value));
+        }
+        const evaluated = expression ? numberOf(expression) : null;
+        accuracyRecognised = !expression || evaluated !== null;
+        awarded = accuracyRecognised && close(line.value, rule.expected) && (evaluated === null || close(evaluated, line.value));
         reason = awarded ? "The numerical result is correct." : `Check this result; the expected value is ${rule.expected}.`;
       } else if (rule.kind === "follow-through") {
         awarded = followsMethod && computed !== null && close(line.value, computed);
@@ -263,7 +268,7 @@ export function markCalculationWorking(part: QuestionPart, answer: string): Mark
         reason = awarded ? "The final value uses the requested significant figures." : `Report the final value to ${rule.significantFigures} significant figures.`;
       }
     }
-    const recognised = contradiction === null && Boolean(line) && (!["method", "follow-through"].includes(rule.kind) || methodRecognised);
+    const recognised = contradiction === null && Boolean(line) && accuracyRecognised && (!["method", "follow-through"].includes(rule.kind) || methodRecognised);
     return { point: part.markScheme[index]!, status: awarded ? "credited" as const : recognised ? "missed" as const : "unreported" as const,
       evidence: line?.text ?? null, evidenceStrength: recognised ? "strong" as const : "none" as const,
       confidence: recognised ? 1 : 0, explanation: recognised ? reason : contradiction !== null && line ? reason : "This working needs a marker review; the method could not be interpreted reliably." };

@@ -527,7 +527,8 @@ function canonicalAuthoredAnswer(text: string): string[] {
       const raw = match[0] ?? "";
       if (/^[a-z]+$/i.test(raw)) {
         const word = stem(raw.toLowerCase());
-        if (word && !STOP_WORDS.has(word)) tokens.push("w:" + word);
+        // Negation and comparison change the claim even when other words match.
+        if (word && (!STOP_WORDS.has(word) || ["not", "no", "less", "more", "without", "never"].includes(word))) tokens.push("w:" + word);
         continue;
       }
       const numeric = extractNumbersCached(raw.replace(/\s+/g, "")).find((hit) => hit.value != null)?.value;
@@ -573,6 +574,61 @@ function authoredAnswerEquivalent(part: QuestionPart, answer: string): boolean {
       return true;
     });
   });
+}
+
+/** A stated numerical result must match the result, not an input in the working.
+ * Restrict the guard to explicit SI results in Physics schemes. Method-only and
+ * authored follow-through points still use their separate evidence paths.
+ */
+function physicsResultMatches(point: string, answer: string): boolean | undefined {
+  if (/follow.through|alternatively|accept an? equivalent/i.test(point)) return undefined;
+  // Most Physics rubric points are explanatory prose. Skip the numeric regex
+  // pipeline unless the point actually states an explicit equality result.
+  if (!/=\s*[+-]?(?:\d|\.)/.test(point)) return undefined;
+  const value = "([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:(?:[eE][+-]?\\d+)|(?:\\s*[x×*]\\s*10\\s*\\^?\\s*[+-]?\\d+))?)";
+  const units = "([kmunpµμM]?)(J|V|F|C|N|W|Pa|Hz|ohm|s|m|kg)";
+  // This guard handles simple units only. Never truncate a compound unit
+  // (m/s, m s^-1, J kg^-1) into a different physical quantity.
+  const unitEnd = "(?![a-zA-Zµμ]|\\s*(?:[/·^]|[a-zA-Z]+\\s*\\^))(?=\\b|[.;,)]|$)";
+  const expand = (s: string) => s.replace(/[−–]/g, "-").replace(/[⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, r => "^" + [...r].map(c => ({ "⁻": "-", "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9" }[c] ?? c)).join(""));
+  const expected = [...expand(point).matchAll(new RegExp("=\\s*" + value + "\\s*" + units + unitEnd, "g"))].at(-1);
+  if (!expected) return undefined;
+  const read = (raw: string) => {
+    const scientific = raw.match(/^([+-]?[\d.]+)\s*[x×*]\s*10\s*\^?\s*([+-]?\d+)$/);
+    return scientific ? Number(scientific[1]) * 10 ** Number(scientific[2]) : Number(raw);
+  };
+  const scales: Record<string, number> = { "": 1, k: 1e3, M: 1e6, m: 1e-3, u: 1e-6, µ: 1e-6, μ: 1e-6, n: 1e-9, p: 1e-12 };
+  const target = read(expected[1]!) * scales[expected[2]!]!;
+  if (!Number.isFinite(target)) return undefined;
+  return [...expand(answer).matchAll(new RegExp(value + "\\s*" + units + unitEnd, "g"))].some(hit => {
+    const actual = read(hit[1]!) * scales[hit[2]!]!;
+    return hit[3] === expected[3] && Number.isFinite(actual) &&
+      (Math.abs(actual - target) <= Math.max(Number.MIN_VALUE, Math.abs(target) * 0.015) ||
+        /two significant figures/i.test(point) && sameToTwoSigFigs(actual, target));
+  });
+}
+
+/** Catch an otherwise identical assertion with its explicit negation reversed.
+ * Clause-local comparison avoids vetoing an unrelated correct sentence simply
+ * because another sentence in the answer contains "not".
+ */
+function explicitNegationConflict(point: string, answer: string): boolean {
+  const negative = /\b(?:not|never)\b/i;
+  if (!negative.test(point) && !negative.test(answer)) return false;
+  // This check only distinguishes a reversed polarity in an otherwise
+  // identical clause. Token multisets are sufficient here and avoid invoking
+  // the more expensive authored-answer canonicaliser for every Physics mark.
+  const withoutNegation = (text: string) => text
+    .toLowerCase()
+    .replace(/\b(?:not|never)\b/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .sort()
+    .join("|");
+  const expected = withoutNegation(point);
+  return answerFragments(answer).some(fragment => negative.test(point) !== negative.test(fragment) &&
+    withoutNegation(fragment) === expected);
 }
 
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
@@ -634,6 +690,14 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     }
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
     if (ok && sym !== "equivalent" && polarityConflict(point, trimmed)) ok = false;
+    if (part.capabilityIds?.some(id => id.startsWith("phys."))) {
+      if (explicitNegationConflict(point, trimmed)) ok = false;
+      const resultMatches = physicsResultMatches(point, trimmed);
+      if (resultMatches === false) ok = false;
+      const selected = point.match(/^Only ([A-D]) is suitable\.?$/);
+      if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(trimmed) &&
+        !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(trimmed);
+    }
     (ok ? credited : missed).push(point);
   }
 
@@ -646,6 +710,9 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // keywords it happens to contain.
   if (trimmed.split(/\s+/).length < 3 && part.marks > 1) awarded = Math.min(awarded, 1);
 
+  // Physics uses recorded support exposure to judge independence. Correct
+  // reasoning cannot lose an exam mark merely for using the rubric's wording.
+  // Preserve the legacy vocabulary heuristic for other subjects here.
   // Anti-regurgitation: when almost every content word in the answer comes
   // from the scheme's own vocabulary, the response recites rather than
   // engages — an examiner caps it below full marks. Genuine answers
@@ -655,7 +722,8 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // carries almost no independent wording.
   const stripEdges = (t: string) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
   const contentTokens = [...tokenise(trimmed)].map(stripEdges).filter((t) => t && !STOP_WORDS.has(t));
-  if (contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
+  if (!part.capabilityIds?.some(id => id.startsWith("phys.")) &&
+    contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
     const schemeVocabulary = new Set(
       part.markScheme.flatMap((p) => [...tokenise(p)]).map(stripEdges).filter((t) => t && !STOP_WORDS.has(t)),
     );

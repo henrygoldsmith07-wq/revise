@@ -183,11 +183,12 @@ describe("recency and exposure", () => {
     const [fresh, repeat] = result.candidates;
     expect(fresh!.paperId).toBe("p-fresh");
     expect(fresh!.factors.recency.detail).toBe("never sat");
-    expect(fresh!.factors.exposure.detail).toBe("no recorded runs");
+    // Both papers contain the same previously practised question.
+    expect(fresh!.factors.exposure.detail).toBe("never sat; 100% of families already practised");
     expect(fresh!.runs).toBe(0);
     expect(repeat!.runs).toBe(2);
     expect(repeat!.factors.recency.detail).toBe("last sat 1 day ago");
-    expect(repeat!.factors.exposure.detail).toBe("2 runs so far");
+    expect(repeat!.factors.exposure.detail).toBe("2 runs so far; 100% of families already practised");
     expect(fresh!.daysSinceLastRun).toBeNull();
   });
 });

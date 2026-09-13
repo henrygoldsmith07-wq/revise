@@ -129,5 +129,9 @@ describe("performance budget", () => {
     // gates; 250ms/case absorbs CI contention while still catching algorithmic blowups (a stray O(n^2) scan would blow far past this).
     const budget = process.env.CI ? 400 : 250;
     expect(elapsedMs / sampled.totalCases).toBeLessThan(budget);
-  }, 60_000);
+  // The Physics bank now carries more authored solution steps and its
+  // deterministic 21-category sample can exceed one minute on a shared
+  // Windows worker. Keep the performance assertion unchanged; give the
+  // harness enough wall-clock time to report it instead of timing out first.
+  }, 120_000);
 });

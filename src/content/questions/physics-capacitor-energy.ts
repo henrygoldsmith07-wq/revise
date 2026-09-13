@@ -45,7 +45,7 @@ export const physicsCapacitorEnergyQuestions: Question[] = [
   energyItem("choose-pulse-bank", "application", "voltage-limit", "pulse-driver",
     "combine a required energy with the rated voltage constraint",
     "A pulse driver needs at least 0.40 J stored energy. Available capacitors are A: 2200 μF rated at 16 V, and B: 1000 μF rated at 35 V. A supply can be set to any voltage up to 30 V. Which single capacitor can meet the requirement without exceeding its rating? Justify quantitatively.",
-    ["A stores at most 0.2816 J at its 16 V rating; alternatively, storing 0.40 J requires 19.1 V, above its rating.", "B stores 0.45 J at the 30 V supply limit; alternatively, 0.40 J requires 28.3 V, within both limits.", "Only B meets 0.40 J while remaining within both limits, justified by the preceding energy or required-voltage comparison."],
+    ["A stores at most 0.2816 J at its 16 V rating; alternatively, storing 0.40 J requires 19.1 V, above its rating.", "B stores 0.45 J at the 30 V supply limit; alternatively, 0.40 J requires 28.3 V, within both limits.", "Only B is suitable."],
     "The voltage limit matters as well as capacitance. A stores at most 0.2816 J at 16 V. B stores 0.45 J at the supply limit of 30 V, below its 35 V rating. Only B can store at least 0.40 J."),
   energyItem("usable-voltage-window", "application", "energy-window", "backup-logger",
     "subtract residual energy at the cutoff instead of spending the full initial store",

@@ -204,6 +204,14 @@ const legacyWjecCapabilities: CapabilityNode[] = [
 
 /** All WJEC nodes, including the original stable ids kept for old attempts. */
 export const wjecCapabilities: CapabilityNode[] = [
+  { id: "phys.motion.graph-gradient", subjectId: PHYSICS_SUBJECT_ID,
+    topicId: "wjec-alevel-physics.kinematics-dynamics", label: "Interpret local slopes and their signs in motion graphs",
+    specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-02"], prerequisites: [],
+    explanation: "Use the axis meanings and scales. A displacement-time tangent gives instantaneous velocity; a velocity-time slope gives acceleration. Position, velocity and acceleration signs are distinct." },
+  { id: "phys.motion.graph-area", subjectId: PHYSICS_SUBJECT_ID,
+    topicId: "wjec-alevel-physics.kinematics-dynamics", label: "Integrate signed motion-graph areas and apply initial conditions",
+    specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-02"], prerequisites: [],
+    explanation: "Velocity-time signed area gives displacement; absolute areas give distance. Acceleration-time signed area gives a velocity change, to which initial velocity must be added. Keep each interval's axis scale and sign." },
   ...legacyWjecCapabilities,
   ...wjecPhysicsCapabilities,
   ...physicsCircuitCapabilities,

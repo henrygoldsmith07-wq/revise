@@ -1,6 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import type { Attempt, InterventionActivity, InterventionAttemptContext, InterventionKind, InterventionObservationResult, InterventionOutcomeRecord, IsoInstant, Question } from "./types";
-import { authenticPaperEvidence, independentAttempt, isTransferQuestion, partFamily, questionCapabilities, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
+import { authenticPaperEvidence, independentAttempt, isTransferQuestion, partFamily, questionCapabilities, questionFreshness, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import { trustedAssessmentContent } from "./physics-content-review";
 
 export const INTERVENTION_PRIORS: Record<InterventionKind, number> = {
@@ -302,6 +302,15 @@ function validFollowUp(outcome: InterventionOutcomeRecord, attempt: Attempt, evi
     !authenticPaperEvidence(attempt, evidence.question, evidence.history, evidence.questions)) return false;
   const prior = evidence.history.filter((row) => row.userId === attempt.userId && row.id !== attempt.id &&
     Date.parse(row.createdAt) <= Date.parse(attempt.createdAt));
+  if (outcome.subjectId === "wjec-alevel-physics") {
+    const chainIds = [outcome.immediateQuestionId, outcome.transfer?.questionId].filter(Boolean);
+    const chain = evidence.questions.filter(q => chainIds.includes(q.id));
+    // The immutable chain also protects callers with only partial attempt history.
+    if (chain.length !== new Set(chainIds).size) return false;
+    const exposed = evidence.questions.filter(q => chainIds.includes(q.id) || prior.some(a => a.questionId === q.id));
+    const fresh = questionFreshness(evidence.question, exposed);
+    if (!fresh.newReasoning || !fresh.newContext) return false;
+  }
   return unseenQuestion(evidence.question, prior, evidence.questions);
 }
 

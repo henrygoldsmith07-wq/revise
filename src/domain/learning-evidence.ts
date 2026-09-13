@@ -115,8 +115,42 @@ export function questionFamilies(question: Question): string[] {
 
 /** All authored contexts represented by a question, including mixed structured parts. */
 export function questionContexts(question: Question): string[] {
-  if (question.learning?.contextId) return [question.learning.contextId];
-  return [...new Set(question.parts.map((part) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)))];
+  return [...new Set([question.learning?.contextId, ...question.parts.map((part) => partLearningMetadata(question, part)?.contextId)].filter((id): id is string => Boolean(id)))];
+}
+
+/** Exposure is retained even for supported or unreviewed attempts: seeing a
+ * solution makes its reasoning familiar without establishing mastery.
+ */
+export function questionReasoningMoves(question: Question): string[] {
+  return [...new Set([...(question.learning?.reasoningMoves ?? []),
+    ...question.parts.flatMap(part => partLearningMetadata(question, part)?.reasoningMoves ?? [])]
+    .map(move => move.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()).filter(Boolean))];
+}
+
+export function questionFreshness(question: Question, previous: readonly Question[]) {
+  const sameSubject = previous.filter(prior => prior.subjectId === question.subjectId);
+  const families = new Set(sameSubject.flatMap(questionFamilies));
+  const contexts = new Set(sameSubject.flatMap(questionContexts));
+  const capabilities = questionCapabilities(question);
+  const specPoints = (q: Question) => [...(q.specPointIds ?? []), ...q.parts.flatMap(p => p.specPointIds ?? [])];
+  const targetPoints = new Set(specPoints(question));
+  // Preserve exposure when an editorial split replaces a broad capability id.
+  const priorMoves = sameSubject.filter(prior => questionCapabilities(prior).some(id => capabilities.includes(id)) ||
+    specPoints(prior).some(id => targetPoints.has(id)))
+    .flatMap(questionReasoningMoves);
+  const moves = questionReasoningMoves(question);
+  const similar = (a: string, b: string) => {
+    if (a === b) return true;
+    const tokens = (s: string) => new Set(s.split(" ").filter(w => w.length > 2 && !["the", "and", "with", "from", "then", "using"].includes(w)));
+    const left = tokens(a), right = tokens(b);
+    return left.size > 0 && right.size > 0 &&
+      [...left].filter(word => right.has(word)).length / Math.max(left.size, right.size) >= 0.8;
+  };
+  return {
+    newFamily: questionFamilies(question).every(family => !families.has(family)),
+    newContext: questionContexts(question).length > 0 && questionContexts(question).every(context => !contexts.has(context)),
+    newReasoning: moves.length > 0 && moves.some(move => !priorMoves.some(prior => similar(move, prior))),
+  };
 }
 
 /** Demands represented by a question, used by the planner when parts are mixed. */
@@ -147,7 +181,8 @@ export function isTransferQuestion(question: Question, source?: Question): boole
   // extra algebra that re-run the *same* operations are unfamiliarity without
   // transfer value, and a number-swapped reskin repeats the same reasoning.
   const reasoningNovel = sharedCapability && isReasoningTransfer(source, question, transferTargetCapability(question, source));
-  return question.subjectId === source.subjectId &&
+  const reasoningFresh = question.subjectId !== "wjec-alevel-physics" || questionFreshness(question, [source]).newReasoning;
+  return reasoningFresh && question.subjectId === source.subjectId &&
     metas.some((meta) => !sourceFamilies.has(meta!.familyId) && !sourceContexts.has(meta!.contextId)) &&
     sharedCapability && reasoningNovel;
 }
@@ -183,8 +218,11 @@ export function reasoningNoveltyFor(
 export function unseenQuestion(question: Question, history: readonly Attempt[], questions: readonly Question[]): boolean {
   const byId = new Map(questions.map((q) => [q.id, q]));
   const families = new Set(questionFamilies(question));
+  const previous = history.flatMap(a => byId.has(a.questionId) ? [byId.get(a.questionId)!] : []);
   return !history.some((a) => a.questionId === question.id ||
-    (byId.has(a.questionId) && questionFamilies(byId.get(a.questionId)!).some((family) => families.has(family))));
+    (byId.has(a.questionId) && questionFamilies(byId.get(a.questionId)!).some((family) => families.has(family)))) &&
+    (question.subjectId !== "wjec-alevel-physics" || !questionReasoningMoves(question).length ||
+      questionFreshness(question, previous).newReasoning);
 }
 
 /** A paper-mode flag alone cannot authenticate an unseen exam performance. */

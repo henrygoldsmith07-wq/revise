@@ -27,6 +27,15 @@ function attempt(question: Question, id: string, day: number): Attempt {
 }
 const source = bank.find((q) => q.id.endsWith("loaded-divider"))!;
 const transfer = bank.find((q) => q.id.endsWith("cold-room-alarm"))!;
+function retentionQuestion(id: string): Question {
+  const learning = { ...transfer.learning!, familyId: "test-only-inverse-divider",
+    contextId: "test-only-resistor-identification", reasoningMoves: ["infer unknown resistance from a measured voltage ratio"] };
+  const prompt = "An unloaded divider has a 9.0 V supply and a 3.0 kohm upper resistor. The voltage across the unknown lower resistor is 6.0 V. Find the lower resistance.";
+  return approve({ ...transfer, id, stem: prompt, learning, totalMarks: 3,
+    parts: [{ ...transfer.parts[0]!, prompt, marks: 3, learning,
+      markScheme: ["Upper voltage = 3.0 V.", "Current = 1.0 mA.", "Lower resistance = 6.0 kohm."],
+      modelAnswer: "The upper resistor has 9.0 - 6.0 = 3.0 V across it. Current = 3.0/3000 = 0.001 A. The lower resistance is 6.0/0.001 = 6000 ohm." }] });
+}
 const context = { id: "step", chainId: "repair", capabilityId: "phys.circuit.divider", topicId: source.topicIds[0]!,
   kind: "guided" as const, priorState: "weak" as const, priorAccuracy: 0.25, plannedMinutes: 3, support: "scaffold" as const };
 const initial = (question: Question = source) => createInterventionOutcome({ userId: "learner", subjectId: question.subjectId, context, question, attempt: attempt(question, "initial", 1) });
@@ -66,8 +75,7 @@ describe("Physics content trust boundaries", () => {
     const a = attempt(reviewed, "transfer", 2);
     const trustedSource = approve(source);
     const row = attachTransferOutcome(initial(trustedSource), a, { question: reviewed, questions: [trustedSource, reviewed], history: [] });
-    const retention = approve({ ...transfer, id: "test-only-retention",
-      learning: { ...transfer.learning!, familyId: "test-only-third-family", contextId: "test-only-new-context" } });
+    const retention = retentionQuestion("test-only-retention");
     const later = { ...attempt(retention, "retention", 10), awarded: 0,
       marked: retention.parts.map((part) => ({ partId: part.id, awarded: 0, max: part.marks,
         creditedPoints: [], missedPoints: part.markScheme, comment: "" })) };
@@ -90,9 +98,7 @@ describe("Physics content trust boundaries", () => {
     const first = attachTransferOutcome(initial(trustedSource), transferAttempt, {
       question: reviewed, questions: [trustedSource, reviewed], history: [],
     });
-    const third = approve({ ...transfer, id: "test-only-third-session", learning: {
-      ...transfer.learning!, familyId: "test-only-third-session-family", contextId: "test-only-third-session-context",
-    } });
+    const third = retentionQuestion("test-only-third-session");
     const retentionAttempt = { ...attempt(third, "retention-1", 10), awarded: 0,
       marked: third.parts.map((part) => ({ partId: part.id, awarded: 0, max: part.marks, creditedPoints: [], missedPoints: part.markScheme, comment: "" })) };
     const firstComplete = attachDelayedRetentionOutcome(first, retentionAttempt, {
@@ -105,6 +111,19 @@ describe("Physics content trust boundaries", () => {
     };
     const calibration = calibrateInterventions([firstComplete, second]).get("guided:phys.circuit.divider");
     expect(calibration?.sampleSize).toBe(2);
+  });
+  it("rejects retention obtained by relabelling the transfer question even with partial history", () => {
+    const reviewed = approve(transfer), trustedSource = approve(source);
+    const a = attempt(reviewed, "transfer-clone-test", 2);
+    const row = attachTransferOutcome(initial(trustedSource), a, {
+      question: reviewed, questions: [trustedSource, reviewed], history: [],
+    });
+    expect(row.transfer).toBeDefined();
+    const clone = approve({ ...transfer, id: "cosmetic-clone",
+      learning: { ...transfer.learning!, familyId: "new-label", contextId: "new-label" } });
+    expect(attachDelayedRetentionOutcome(row, attempt(clone, "clone-retention", 10), {
+      question: clone, questions: [trustedSource, reviewed, clone], history: [],
+    })).toBe(row);
   });
   it("attributes the immediate result to the target part instead of total marks", () => {
     const unrelated = { ...source.parts[0]!, id: "unrelated-part", marks: 9, capabilityIds: ["another-capability"] };

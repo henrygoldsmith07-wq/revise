@@ -1,6 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
-import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
 import { humanVerifiedPhysicsQuestion, trustedAssessmentContent } from "./physics-content-review";
@@ -37,6 +37,13 @@ export function selectLearningAction(input: {
   const baselineEvidence = evidence;
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
   const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
+  const exposedQuestions = attempts.flatMap(attempt => questionById.has(attempt.questionId) ? [questionById.get(attempt.questionId)!] : []);
+  const freshness = new Map<Question, ReturnType<typeof questionFreshness>>();
+  const freshReasoning = (question: Question) => {
+    let result = freshness.get(question);
+    if (!result) { result = questionFreshness(question, exposedQuestions); freshness.set(question, result); }
+    return result;
+  };
   const trustedMistake = (mistake: Mistake): boolean => {
     if (!requiresWjecContentReview(mistake.subjectId)) return true;
     const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
@@ -86,7 +93,8 @@ export function selectLearningAction(input: {
     const target = nodes.find((n) => n.id === capabilityId);
     if (!target) continue;
     const stage = mistake.repair?.stage ?? "diagnosed";
-    if (stage === "transfer" && mistake.repair?.dueAt && Date.parse(mistake.repair.dueAt) > now.getTime()) continue;
+    if (stage === "transfer" && (!mistake.repair?.dueAt || !Number.isFinite(Date.parse(mistake.repair.dueAt)) ||
+      Date.parse(mistake.repair.dueAt) > now.getTime())) continue;
     // Physics prerequisite links are hypotheses until a subject expert has
     // reviewed the exact edge; do not steer a learner using an unreviewed
     // dependency merely because it appears earlier in the curriculum.
@@ -111,7 +119,8 @@ export function selectLearningAction(input: {
       add("transfer", capabilityId, fresh.filter((q) => source && isTransferQuestion(q, source)),
         "Independent success held. Apply the same skill in an unfamiliar context.", mistake);
     } else if (stage === "transfer") {
-      add("retention", capabilityId, fresh.filter((q) => questionDemands(q).some((demand) => ["application", "calculation", "transfer", "synoptic"].includes(demand))),
+      add("retention", capabilityId, fresh.filter((q) => freshReasoning(q).newContext &&
+        questionDemands(q).some((demand) => ["application", "calculation", "transfer", "synoptic"].includes(demand))),
         "The delayed check is due. Retrieve and apply the skill without help to test whether the repair lasted.", mistake);
     }
   }
@@ -131,6 +140,7 @@ export function selectLearningAction(input: {
   }
   return candidates.sort((a, b) =>
     b.expectedGainPerMinute - a.expectedGainPerMinute ||
+    Number(freshReasoning(b.question).newReasoning) - Number(freshReasoning(a.question).newReasoning) ||
     Number(b.kind === "retention") - Number(a.kind === "retention") ||
     // Between equal-value actions, take the smallest intervention likely to
     // produce the durable gain: a check before teaching before independent

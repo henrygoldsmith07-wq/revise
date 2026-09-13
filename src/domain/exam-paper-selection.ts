@@ -26,7 +26,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // Pure domain: no React, no storage; `now` is passed in.
 // ---------------------------------------------------------------------------
 
-import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { authenticPaperEvidence, questionFamilies, trustworthyAttempt } from "./learning-evidence";
 import { trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, Id, IsoInstant, Mistake, Paper, Question, Topic, TopicMastery } from "./types";
 
@@ -246,6 +246,8 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
     predictedPercent: number | null;
     measuredShare: number;
     measuredMarks: number;
+    /** Share of the paper's question families already met in any attempt (0–1). */
+    seenFamilyShare: number;
   }
 
   const signals: PaperSignals[] = paperPayloads.map(({ paper, resolved }) => {
@@ -306,6 +308,21 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
       }
     }
 
+    // First-exposure integrity: a sitting only measures exam readiness when
+    // its questions are unfamiliar. Families already met in practice (any
+    // mode, any marking quality — familiarity is not a marking judgement)
+    // make the paper a rehearsal, not a measurement.
+    const seenFamilies = new Set<string>();
+    for (const attempt of input.attempts) {
+      const prior = questionById.get(attempt.questionId);
+      if (!prior) continue;
+      for (const family of questionFamilies(prior)) seenFamilies.add(family);
+    }
+    const paperFamilies = new Set<string>();
+    for (const question of resolved) for (const family of questionFamilies(question)) paperFamilies.add(family);
+    const seenPaperFamilies = [...paperFamilies].filter((family) => seenFamilies.has(family)).length;
+    const seenFamilyShare = paperFamilies.size ? seenPaperFamilies / paperFamilies.size : 0;
+
     // Predicted %: only over marks that sit on measured topics.
     let measuredMarks = 0;
     let expectedMarks = 0;
@@ -335,6 +352,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
       predictedPercent,
       measuredShare,
       measuredMarks,
+      seenFamilyShare,
     };
   });
 
@@ -403,11 +421,17 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
         ? "sat today"
         : `last sat ${daysSince} ${daysSince === 1 ? "day" : "days"} ago`;
 
-    // exposure — fewer recorded runs preferred; saturation at 3.
-    const exposureScore = s.runs === 0 ? 1 : clamp01(1 - s.runs / EXPOSURE_SATURATION_RUNS);
-    const exposureDetail = s.runs === 0
-      ? "no recorded runs"
-      : `${s.runs} ${s.runs === 1 ? "run" : "runs"} so far`;
+    // exposure — fewer recorded runs preferred; saturation at 3. A paper
+    // whose families were already practised is a rehearsal, not a first
+    // exposure: blend run count with unseen-family share so a never-sat
+    // paper of familiar questions does not outrank a truly fresh sitting.
+    const runScore = s.runs === 0 ? 1 : clamp01(1 - s.runs / EXPOSURE_SATURATION_RUNS);
+    const exposureScore = clamp01(runScore * 0.6 + (1 - s.seenFamilyShare) * 0.4);
+    const exposureDetail = s.runs === 0 && s.seenFamilyShare === 0
+      ? "never sat; all families unseen"
+      : s.runs === 0
+        ? `never sat; ${Math.round(s.seenFamilyShare * 100)}% of families already practised`
+        : `${s.runs} ${s.runs === 1 ? "run" : "runs"} so far${s.seenFamilyShare > 0 ? `; ${Math.round(s.seenFamilyShare * 100)}% of families already practised` : ""}`;
 
     // gain — predicted mark gain: real recent losses the paper can recover.
     const gainScore = cohortMaxLossShare > 0 ? clamp01((s.recentLossMarks / s.totalMarks) / cohortMaxLossShare) : 0;

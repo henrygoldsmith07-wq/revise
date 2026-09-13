@@ -1,5 +1,5 @@
 import { requiresWjecContentReview } from "./physics-content-review";
-import { independentAttempt, isTransferQuestion, questionFamilies, partLearningMetadata, trustedAssessmentAttempt, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
+import { independentAttempt, isTransferQuestion, questionFamilies, questionFreshness, partLearningMetadata, trustedAssessmentAttempt, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Card, Mistake, MistakeRepairStage, MistakeRepairState, Question, ReviewLog } from "./types";
 import { trustedAssessmentContent } from "./physics-content-review";
 
@@ -36,14 +36,23 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
   const targetParts = repairTargetParts(mistake, question);
   if (!targetParts.length || attempt.questionId !== question.id || attempt.userId !== mistake.userId ||
     attempt.subjectId !== mistake.subjectId || attempt.id === mistake.attemptId ||
-    Date.parse(attempt.createdAt) <= Date.parse(mistake.createdAt) || !trustworthyAttempt(attempt)) return mistake;
+    !Number.isFinite(Date.parse(attempt.createdAt)) ||
+    Date.parse(attempt.createdAt) <= Date.parse(mistake.createdAt)) return mistake;
   const source = questions.find((q) => q.id === mistake.questionId);
   // A draft Physics item may be answered for practice, but it must never move
   // a repair chain through a trusted success rung. Require both the captured
   // source and the retest item to retain their human content approval.
-  if (requiresWjecContentReview(mistake.subjectId) &&
+  if (!trustworthyAttempt(attempt) || (requiresWjecContentReview(mistake.subjectId) &&
     (!source || !trustedAssessmentContent(source) || !trustedAssessmentContent(question) ||
-      !trustedAssessmentAttempt(attempt, question, history, questions))) return mistake;
+      !trustedAssessmentAttempt(attempt, question, history, questions)))) {
+    // Draft practice still exposes the skill. It cannot earn a repair rung,
+    // but it must restart the unpractised retention interval.
+    if (mistake.repair?.stage === "transfer" && Number.isFinite(Date.parse(attempt.createdAt))) {
+      const dueAt = new Date(Date.parse(attempt.createdAt) + REPAIR_RETENTION_DELAY_MS).toISOString();
+      if (!mistake.repair.dueAt || dueAt > mistake.repair.dueAt) return { ...mistake, repair: { ...mistake.repair, dueAt } };
+    }
+    return mistake;
+  }
   // Older rows may contain a partial repair object from an interrupted
   // migration. Treat that as legacy state rather than letting a malformed
   // evidence array crash the learner's next submission.
@@ -72,7 +81,8 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
     .filter((candidate) => knownQuestionIds.has(candidate.id))
     .flatMap((candidate) => questionFamilies(candidate)));
   const fresh = !knownQuestionIds.has(question.id) && unseenQuestion(question, previous, questions) &&
-    !questionFamilies(question).some((family) => knownFamilies.has(family));
+    !questionFamilies(question).some((family) => knownFamilies.has(family)) &&
+    (question.subjectId !== "wjec-alevel-physics" || questionFreshness(question, questions.filter(q => knownQuestionIds.has(q.id))).newReasoning);
   const independent = independentAttempt(attempt) && fresh;
   const targetDemands = targetParts
     .map((id) => question.parts.find((part) => part.id === id))
@@ -92,7 +102,8 @@ export function advanceMistakeRepair(mistake: Mistake, question: Question, attem
     repair.dueAt = new Date(Date.parse(attempt.createdAt) + REPAIR_RETENTION_DELAY_MS).toISOString();
   } else if (priorStage === "transfer") {
     if (independent && trustedAssessmentContent(question) && repair.dueAt && Date.parse(attempt.createdAt) >= Date.parse(repair.dueAt) &&
-      independentDemand) {
+      independentDemand && questionFreshness(question, questions.filter(q => knownQuestionIds.has(q.id) ||
+        previous.some(a => a.questionId === q.id))).newContext) {
       record("delayed-retention");
       record("resolved");
       delete repair.dueAt;

@@ -39,6 +39,7 @@ import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
 import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
 import { physicsCapacitorRcQuestions } from "./questions/physics-capacitor-rc";
+import { physicsMotionGraphQuestions } from "./questions/physics-motion-graphs";
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
@@ -76,6 +77,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...physicsReasoningDepthQuestions,
   ...physicsCapacitorEnergyQuestions,
   ...physicsCapacitorRcQuestions,
+  ...physicsMotionGraphQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,

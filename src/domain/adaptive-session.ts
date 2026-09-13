@@ -358,7 +358,10 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   const stop = readinessStopFor(input.readiness ?? [], topic.subjectId);
   const steps = buildSteps({ topic, selected, cards: cardsByTopic.get(topic.id) ?? [], questions, attempts, mistakes, profile, targetMinutes, stopTopicDone: stop.stop });
   const mapped = questions.some((q) => q.parts.some((p) => p.capabilityIds?.some((id) => wjecCapabilities.some((n) => n.id === id))));
-  const action = mapped ? selectLearningAction({ topicId: topic.id, nodes: wjecCapabilities, questions, attempts, mistakes, now, remainingMinutes: targetMinutes, interventionOutcomes: input.interventionOutcomes }) : undefined;
+  const action = mapped ? selectLearningAction({ topicId: topic.id, nodes: wjecCapabilities,
+    questions: input.questions.filter(q => q.subjectId === topic.subjectId),
+    attempts: input.attempts.filter(a => a.subjectId === topic.subjectId),
+    mistakes, now, remainingMinutes: targetMinutes, interventionOutcomes: input.interventionOutcomes }) : undefined;
   if (mapped) {
     const retrieval = steps.filter((s) => s.kind === "overdue-retrieval" || s.kind === "delayed-retrieval");
     const delayed = retrieval.find((s) => s.kind === "delayed-retrieval");
@@ -579,8 +582,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
   // Transfer must be a genuinely new family in a new context: the same idea
   // met in the supported/independent rungs does not test transfer, and a
   // reskinned familiar family would let memorised working pass as transfer
-  // evidence. Fall back to any unseen transfer question only when no fresh
-  // family exists, and never to an already-attempted one.
+  // evidence. If no fresh family exists, do not label rehearsal as transfer.
   const practisedFamilies = new Set<string>([
     ...(supported ? questionFamilies(supported) : []),
     ...(independent ? questionFamilies(independent) : []),
@@ -602,11 +604,10 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
     isSynopticQuestion(question)
       ? synopticLearningValue(question, practisedQuestions, encounteredCombinations)
       : 0;
-  const transferCandidates = (freshOnly: boolean): Question | undefined => {
+  const transferCandidates = (): Question | undefined => {
     const pool = orderedQuestions.filter((question) => {
       if (usedQuestions.has(question.id) || attemptedIds.has(question.id)) return false;
       if (!isTransferQuestion(question)) return false;
-      if (!freshOnly) return true;
       const families = questionFamilies(question);
       const contexts = questionContexts(question);
       return !families.some((family) => practisedFamilies.has(family) || !isFreshFamily(question)) &&
@@ -625,7 +626,7 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
     }
     return found;
   };
-  const transfer = transferCandidates(true) ?? transferCandidates(false);
+  const transfer = transferCandidates();
 
   const focusEvidence = profile[selected.evidence.focus];
   const needsExplanation =
