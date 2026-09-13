@@ -16,6 +16,7 @@ const bundle = await build({
     export { markPart } from "./src/domain/marking";
     export { auditPhysicsAssessmentQuality, physicsQualityQueue, physicsAuthoringBriefs } from "./src/domain/physics-assessment-quality";
     export { auditCapabilityGranularity } from "./src/domain/capability-granularity";
+    export { auditPhysicsBank } from "./src/domain/physics-bank-audit";
   `, resolveDir: process.cwd(), loader: "ts" },
   bundle: true, platform: "node", format: "esm", write: false,
 });
@@ -31,6 +32,7 @@ const qualityAudit = data.auditPhysicsAssessmentQuality({
 const qualityQueue = data.physicsQualityQueue(qualityAudit);
 const authoringBriefs = data.physicsAuthoringBriefs(qualityAudit);
 const granularityFindings = data.auditCapabilityGranularity(data.capabilities, data.questions.filter((question) => question.subjectId === "wjec-alevel-physics"));
+const bankAudit = data.auditPhysicsBank(data.questions);
 const physicsNodes = data.capabilities.filter((node) => node.subjectId === "wjec-alevel-physics");
 const prerequisiteReviews = physicsNodes.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
   const prerequisite = physicsNodes.find((candidate) => candidate.id === prerequisiteId) ?? data.capabilities.find((candidate) => candidate.id === prerequisiteId);
@@ -77,6 +79,7 @@ const lines = [
   `${rows.length} Physics questions from the live bank. This export creates **no human approvals**. No efficacy results are claimed.`,
   `Quality gate: ${qualityAudit.completeStatements}/${qualityAudit.statements} specification statements meet the two-family/two-context demand check; ${qualityAudit.unreviewedQuestions} questions remain unreviewed. Authoring/review queue: ${qualityQueue.length} items. Release-ready: **${qualityAudit.releaseReady ? "yes" : "no"}**.`,
   `Prerequisite gate: ${prerequisiteReviews.filter((row) => row.review.status === "approved").length}/${prerequisiteReviews.length} dependency edges have an approval; ${redundantEdges.length} edge${redundantEdges.length === 1 ? " is" : "s are"} transitively redundant; every edge remains a diagnosis hypothesis until a subject expert signs the exact fingerprint.`,
+  `Bank audit: ${bankAudit.errors} hard consistency error${bankAudit.errors === 1 ? "" : "s"}, ${bankAudit.warnings} warning${bankAudit.warnings === 1 ? "" : "s"}; ${bankAudit.duplicatePairs} duplicate-reasoning pair${bankAudit.duplicatePairs === 1 ? "" : "s"}, ${bankAudit.difficultyMismatches} difficulty mismatch${bankAudit.difficultyMismatches === 1 ? "" : "es"}, ${bankAudit.transferWarnings} transfer-novelty warning${bankAudit.transferWarnings === 1 ? "" : "s"}. Precomputed ${bankAudit.profileCount} profiles and ${bankAudit.estimatedComparisons} within-capability comparisons in ${bankAudit.elapsedMs.toFixed(1)} ms.`,
   "",
   "Review the prompt, mark scheme, worked solution, internal specification mapping, capability mapping and exam realism separately. Solve before reading the key. Record accepted alternatives, rejected misconceptions and uncertain marking. Use examiner-labelled student answers to validate partial credit.",
   "",
@@ -112,7 +115,9 @@ await writeFile(resolve(out, "physics-quality-audit.json"), JSON.stringify(quali
 await writeFile(resolve(out, "physics-quality-queue.json"), JSON.stringify(qualityQueue, null, 2));
 await writeFile(resolve(out, "physics-authoring-briefs.json"), JSON.stringify(authoringBriefs, null, 2));
 await writeFile(resolve(out, "physics-capability-granularity.json"), JSON.stringify(granularityFindings, null, 2));
+await writeFile(resolve(out, "physics-bank-audit.json"), JSON.stringify(bankAudit, null, 2));
 console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((row) => row.question.id.startsWith("cnt:question:physics-quality-")).length, approvalsCreated: 0,
   modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
   statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length, redundantPrerequisiteEdges: redundantEdges.length, overbroadCapabilities: granularityFindings.length,
+  bankConsistencyErrors: bankAudit.consistencyErrors, bankErrors: bankAudit.errors, bankWarnings: bankAudit.warnings, bankDuplicatePairs: bankAudit.duplicatePairs, bankDifficultyMismatches: bankAudit.difficultyMismatches, bankTransferWarnings: bankAudit.transferWarnings, bankElapsedMs: bankAudit.elapsedMs,
   output: out }));

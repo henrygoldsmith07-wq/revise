@@ -44,6 +44,11 @@ import { physicsDepth50MechanicsQuestions } from "./questions/physics-depth-50-m
 import { physicsDepth50CircuitsFieldsQuestions } from "./questions/physics-depth-50-circuits-fields";
 import { physicsDepth50AppliedQuestions } from "./questions/physics-depth-50-applied";
 import { physicsDepth50OrbitsQuestions } from "./questions/physics-depth-50-orbits";
+import { physicsDepthNearCompleteCoreQuestions } from "./questions/physics-depth-near-complete-core";
+import { physicsDepthNearCompleteMaterialsQuestions } from "./questions/physics-depth-near-complete-materials";
+import { physicsDepthNearCompleteWavesQuestions } from "./questions/physics-depth-near-complete-waves";
+import { physicsDepthNearCompleteQuantumQuestions } from "./questions/physics-depth-near-complete-quantum";
+import { physicsDepthNearCompleteGapQuestions } from "./questions/physics-depth-near-complete-gaps";
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
@@ -86,6 +91,11 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...physicsDepth50CircuitsFieldsQuestions,
   ...physicsDepth50AppliedQuestions,
   ...physicsDepth50OrbitsQuestions,
+  ...physicsDepthNearCompleteCoreQuestions,
+  ...physicsDepthNearCompleteMaterialsQuestions,
+  ...physicsDepthNearCompleteWavesQuestions,
+  ...physicsDepthNearCompleteQuantumQuestions,
+  ...physicsDepthNearCompleteGapQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
@@ -122,6 +132,7 @@ export { wjecPhysicsDeepQuestions };
 export { wjecPhysicsQualityExpansionQuestions };
 export { physicsCoverageQuestions };
 export { physicsReasoningDepthQuestions };
+export { physicsDepthNearCompleteCoreQuestions, physicsDepthNearCompleteMaterialsQuestions, physicsDepthNearCompleteWavesQuestions, physicsDepthNearCompleteQuantumQuestions, physicsDepthNearCompleteGapQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);
