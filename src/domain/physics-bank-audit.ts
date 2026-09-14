@@ -10,7 +10,7 @@
 import type { LearningDemand, Question, QuestionPart } from "./types";
 import { reasoningProfileOf, reasoningSimilarity, type ReasoningProfile } from "./reasoning-signature";
 import { contentTokens, promptSignature, textOverload } from "./text-similarity";
-import { auditPhysicsPartNumerics, type PhysicsDimensionalCoverage, type PhysicsNumericalIssueKind, type PhysicsSchemeAnswerCoverage } from "./physics-numerical-audit";
+import { auditPhysicsPartNumerics, type PhysicsClaimCoverage, type PhysicsDimensionalCoverage, type PhysicsNumericalIssueKind, type PhysicsNumericalReviewPriority, type PhysicsNumericalClaimRole, type PhysicsSchemeAnswerCoverage, type PhysicsSymbolicDimensionalCoverage } from "./physics-numerical-audit";
 
 export type PhysicsBankIssueKind =
   | "definition-conflict"
@@ -34,6 +34,18 @@ export interface PhysicsBankIssue {
   questionId: string;
   partId: string;
   peerId?: string;
+  detail: string;
+}
+
+export interface PhysicsNumericalReviewItem {
+  priority: PhysicsNumericalReviewPriority;
+  rank: number;
+  questionId: string;
+  partId: string;
+  claimId?: string;
+  source: "prompt" | "scheme" | "answer" | "scheme-answer";
+  role?: PhysicsNumericalClaimRole;
+  status: "error" | "unresolved" | "parsed";
   detail: string;
 }
 
@@ -76,6 +88,13 @@ export interface PhysicsBankAudit {
   claimsParsed: number;
   claimsVerified: number;
   claimsUnresolved: number;
+  derivedClaimsDetected: number;
+  derivedClaimsParsed: number;
+  derivedClaimsVerified: number;
+  derivedClaimsUnresolved: number;
+  derivedClaimErrors: number;
+  derivedCoveragePercent: number | null;
+  derivedCoverage: PhysicsClaimCoverage;
   numericalCoverage: {
     detected: number;
     parsed: number;
@@ -100,6 +119,10 @@ export interface PhysicsBankAudit {
   schemeAnswerErrors: number;
   schemeAnswerCandidates: number;
   schemeAnswerUnresolved: number;
+  schemeAnswerMatchedQuantities: number;
+  schemeAnswerUnmatchedSchemeQuantities: number;
+  schemeAnswerUnmatchedAnswerQuantities: number;
+  schemeAnswerAmbiguousPairings: number;
   schemeAnswerCoveragePercent: number | null;
   schemeAnswerCoverage: PhysicsSchemeAnswerCoverage;
   physicsRuleChecks: number;
@@ -107,6 +130,15 @@ export interface PhysicsBankAudit {
   physicsRuleVerified: number;
   physicsRuleErrors: number;
   physicsRuleUnresolved: number;
+  plausibilityChecks: number;
+  plausibilityWarnings: number;
+  symbolicDimensionalChecks: number;
+  symbolicDimensionalVerified: number;
+  symbolicDimensionalErrors: number;
+  symbolicDimensionalUnresolved: number;
+  symbolicDimensionalCoverage: PhysicsSymbolicDimensionalCoverage;
+  numericalReviewQueue: PhysicsNumericalReviewItem[];
+  numericalReviewQueueCounts: Record<PhysicsNumericalReviewPriority, number>;
   manualReviewRequired: number;
   confidence: {
     structural: "checked" | "issues";
@@ -135,6 +167,23 @@ const DIFFICULTY_TARGET: Record<LearningDemand, number> = {
 };
 const DUPLICATE_THRESHOLD = 0.72;
 const TRANSFER_THRESHOLD = 0.72;
+const REVIEW_PRIORITY_RANK: Record<PhysicsNumericalReviewPriority, number> = {
+  "derived-final": 1,
+  "derived-intermediate": 2,
+  "physics-law": 3,
+  "dimensional-uncertainty": 4,
+  "supplied-data-sanity": 5,
+};
+
+function emptyReviewQueueCounts(): Record<PhysicsNumericalReviewPriority, number> {
+  return {
+    "derived-final": 0,
+    "derived-intermediate": 0,
+    "physics-law": 0,
+    "dimensional-uncertainty": 0,
+    "supplied-data-sanity": 0,
+  };
+}
 
 function now(): number {
   return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
@@ -440,6 +489,11 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
   let numericalClaimsVerified = 0;
   let numericalClaimsUnresolved = 0;
   let numericalClaimErrors = 0;
+  let derivedClaimsDetected = 0;
+  let derivedClaimsParsed = 0;
+  let derivedClaimsVerified = 0;
+  let derivedClaimsUnresolved = 0;
+  let derivedClaimErrors = 0;
   let numericalChecks = 0;
   let numericalVerified = 0;
   let numericalErrors = 0;
@@ -454,11 +508,23 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
   let schemeAnswerErrors = 0;
   let schemeAnswerCandidates = 0;
   let schemeAnswerUnresolved = 0;
+  let schemeAnswerMatchedQuantities = 0;
+  let schemeAnswerUnmatchedSchemeQuantities = 0;
+  let schemeAnswerUnmatchedAnswerQuantities = 0;
+  let schemeAnswerAmbiguousPairings = 0;
   let physicsRuleChecks = 0;
   let physicsRuleDetected = 0;
   let physicsRuleVerified = 0;
   let physicsRuleErrors = 0;
   let physicsRuleUnresolved = 0;
+  let plausibilityChecks = 0;
+  let plausibilityWarnings = 0;
+  let symbolicDimensionalChecks = 0;
+  let symbolicDimensionalVerified = 0;
+  let symbolicDimensionalErrors = 0;
+  let symbolicDimensionalUnresolved = 0;
+  const numericalReviewQueue: PhysicsNumericalReviewItem[] = [];
+  const numericalReviewQueueCounts = emptyReviewQueueCounts();
   for (const entry of index.entries) {
     auditExplicitConsistency(entry, issues);
     const numeric = addNumericalIssues(entry, issues);
@@ -467,6 +533,11 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
     numericalClaimsVerified += numeric.claimsVerified;
     numericalClaimsUnresolved += numeric.claimsUnresolved;
     numericalClaimErrors += numeric.claimErrors;
+    derivedClaimsDetected += numeric.derivedClaimsDetected;
+    derivedClaimsParsed += numeric.derivedClaimsParsed;
+    derivedClaimsVerified += numeric.derivedClaimsVerified;
+    derivedClaimsUnresolved += numeric.derivedClaimsUnresolved;
+    derivedClaimErrors += numeric.derivedClaimErrors;
     numericalChecks += numeric.arithmeticChecks;
     numericalVerified += numeric.arithmeticVerified;
     numericalErrors += numeric.arithmeticErrors;
@@ -481,11 +552,78 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
     schemeAnswerErrors += numeric.schemeAnswerErrors;
     schemeAnswerCandidates += numeric.schemeAnswerCoverage.candidateClaims;
     schemeAnswerUnresolved += numeric.schemeAnswerCoverage.unresolved;
+    schemeAnswerMatchedQuantities += numeric.schemeAnswerCoverage.matchedQuantities;
+    schemeAnswerUnmatchedSchemeQuantities += numeric.schemeAnswerCoverage.unmatchedSchemeQuantities;
+    schemeAnswerUnmatchedAnswerQuantities += numeric.schemeAnswerCoverage.unmatchedAnswerQuantities;
+    schemeAnswerAmbiguousPairings += numeric.schemeAnswerCoverage.ambiguousPairings;
     physicsRuleChecks += numeric.physicsRuleChecks;
     physicsRuleDetected += numeric.physicsRuleDetected;
     physicsRuleVerified += numeric.physicsRuleVerified;
     physicsRuleErrors += numeric.physicsRuleErrors;
     physicsRuleUnresolved += numeric.physicsRuleUnresolved;
+    plausibilityChecks += numeric.plausibilityChecks;
+    plausibilityWarnings += numeric.plausibilityWarnings;
+    symbolicDimensionalChecks += numeric.symbolicDimensionalChecks;
+    symbolicDimensionalVerified += numeric.symbolicDimensionalVerified;
+    symbolicDimensionalErrors += numeric.symbolicDimensionalErrors;
+    symbolicDimensionalUnresolved += numeric.symbolicDimensionalUnresolved;
+
+    for (const claim of numeric.claims) {
+      if (claim.status === "verified") continue;
+      const item: PhysicsNumericalReviewItem = {
+        priority: claim.reviewPriority,
+        rank: REVIEW_PRIORITY_RANK[claim.reviewPriority],
+        questionId: entry.question.id,
+        partId: entry.part.id,
+        claimId: claim.id,
+        source: claim.source,
+        role: claim.role,
+        status: claim.status === "parsed" ? "parsed" : claim.status,
+        detail: `${claim.role}: ${claim.text}`,
+      };
+      numericalReviewQueue.push(item);
+      numericalReviewQueueCounts[item.priority]++;
+    }
+    for (const rule of numeric.physicsRules) {
+      if (rule.status === "verified") continue;
+      const item: PhysicsNumericalReviewItem = {
+        priority: "physics-law",
+        rank: REVIEW_PRIORITY_RANK["physics-law"],
+        questionId: entry.question.id,
+        partId: entry.part.id,
+        source: rule.source,
+        status: rule.status,
+        detail: `${rule.id}: ${rule.detail}`,
+      };
+      numericalReviewQueue.push(item);
+      numericalReviewQueueCounts[item.priority]++;
+    }
+    if (numeric.dimensionalCoverage.unresolved > 0 && !numeric.claims.some((claim) => claim.status !== "verified" && claim.reviewPriority === "dimensional-uncertainty")) {
+      const item: PhysicsNumericalReviewItem = {
+        priority: "dimensional-uncertainty",
+        rank: REVIEW_PRIORITY_RANK["dimensional-uncertainty"],
+        questionId: entry.question.id,
+        partId: entry.part.id,
+        source: "scheme",
+        status: "unresolved",
+        detail: `${numeric.dimensionalCoverage.unresolved} unit-bearing claim${numeric.dimensionalCoverage.unresolved === 1 ? " remains" : "s remain"} without a safe dimensional check.`,
+      };
+      numericalReviewQueue.push(item);
+      numericalReviewQueueCounts[item.priority]++;
+    }
+    for (const issue of numeric.issues.filter((issue) => issue.kind === "plausibility-warning")) {
+      const item: PhysicsNumericalReviewItem = {
+        priority: "supplied-data-sanity",
+        rank: REVIEW_PRIORITY_RANK["supplied-data-sanity"],
+        questionId: entry.question.id,
+        partId: entry.part.id,
+        source: issue.source,
+        status: "unresolved",
+        detail: issue.detail,
+      };
+      numericalReviewQueue.push(item);
+      numericalReviewQueueCounts[item.priority]++;
+    }
   }
   auditGlobalConventions(index, issues);
   let estimatedComparisons = 0;
@@ -500,6 +638,7 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
   const errors = issues.filter((issue) => issue.severity === "error").length;
   const warnings = issues.length - errors;
   const manualReviewRequired = new Set(issues.filter((issue) => issue.kind === "unresolved-numerical").map((issue) => `${issue.questionId}:${issue.partId}`)).size;
+  numericalReviewQueue.sort((left, right) => left.rank - right.rank || left.questionId.localeCompare(right.questionId) || left.partId.localeCompare(right.partId) || (left.claimId ?? "").localeCompare(right.claimId ?? ""));
   const structuralKinds: PhysicsBankIssueKind[] = [
     "definition-conflict", "notation-conflict", "sign-convention-conflict", "constant-conflict",
     "assumption-conflict", "terminology-conflict", "model-conflict", "rounding-conflict",
@@ -529,6 +668,20 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
     claimsParsed: numericalClaimsParsed,
     claimsVerified: numericalClaimsVerified,
     claimsUnresolved: numericalClaimsUnresolved,
+    derivedClaimsDetected,
+    derivedClaimsParsed,
+    derivedClaimsVerified,
+    derivedClaimsUnresolved,
+    derivedClaimErrors,
+    derivedCoveragePercent: derivedClaimsDetected ? (derivedClaimsVerified / derivedClaimsDetected) * 100 : null,
+    derivedCoverage: {
+      detected: derivedClaimsDetected,
+      parsed: derivedClaimsParsed,
+      verified: derivedClaimsVerified,
+      unresolved: derivedClaimsUnresolved,
+      errors: derivedClaimErrors,
+      coveragePercent: derivedClaimsDetected ? (derivedClaimsVerified / derivedClaimsDetected) * 100 : null,
+    },
     numericalCoverage: {
       detected: numericalClaimsDetected,
       parsed: numericalClaimsParsed,
@@ -560,6 +713,10 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
     schemeAnswerErrors,
     schemeAnswerCandidates,
     schemeAnswerUnresolved,
+    schemeAnswerMatchedQuantities,
+    schemeAnswerUnmatchedSchemeQuantities,
+    schemeAnswerUnmatchedAnswerQuantities,
+    schemeAnswerAmbiguousPairings,
     schemeAnswerCoveragePercent: schemeAnswerCandidates ? (schemeAnswerChecks / schemeAnswerCandidates) * 100 : null,
     schemeAnswerCoverage: {
       candidateClaims: schemeAnswerCandidates,
@@ -567,6 +724,10 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
       verified: schemeAnswerVerified,
       unresolved: schemeAnswerUnresolved,
       errors: schemeAnswerErrors,
+      matchedQuantities: schemeAnswerMatchedQuantities,
+      unmatchedSchemeQuantities: schemeAnswerUnmatchedSchemeQuantities,
+      unmatchedAnswerQuantities: schemeAnswerUnmatchedAnswerQuantities,
+      ambiguousPairings: schemeAnswerAmbiguousPairings,
       coveragePercent: schemeAnswerCandidates ? (schemeAnswerChecks / schemeAnswerCandidates) * 100 : null,
     },
     physicsRuleChecks,
@@ -574,6 +735,22 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
     physicsRuleVerified,
     physicsRuleErrors,
     physicsRuleUnresolved,
+    plausibilityChecks,
+    plausibilityWarnings,
+    symbolicDimensionalChecks,
+    symbolicDimensionalVerified,
+    symbolicDimensionalErrors,
+    symbolicDimensionalUnresolved,
+    symbolicDimensionalCoverage: {
+      candidates: symbolicDimensionalChecks + symbolicDimensionalUnresolved,
+      checks: symbolicDimensionalChecks,
+      verified: symbolicDimensionalVerified,
+      unresolved: symbolicDimensionalUnresolved,
+      errors: symbolicDimensionalErrors,
+      coveragePercent: (symbolicDimensionalChecks + symbolicDimensionalUnresolved) ? (symbolicDimensionalChecks / (symbolicDimensionalChecks + symbolicDimensionalUnresolved)) * 100 : null,
+    },
+    numericalReviewQueue,
+    numericalReviewQueueCounts,
     manualReviewRequired,
     confidence: {
       structural: issues.some((issue) => issue.severity === "error" && structuralKinds.includes(issue.kind)) ? "issues" : "checked",
