@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { seedQuestionsForSubject } from "@/content";
 import { defineQuestion } from "@/content/questions/authoring";
 import { auditPhysicsBank } from "@/domain/physics-bank-audit";
-import { parsePhysicsNumericExpression } from "@/domain/physics-numerical-audit";
+import { auditPhysicsPartNumerics, parsePhysicsNumericExpression } from "@/domain/physics-numerical-audit";
 import type { LearningDemand, Question } from "@/domain/types";
 
 function fixture(
@@ -249,5 +249,126 @@ describe("Physics bank-wide audit", () => {
     expect(report.issues.some((issue) => issue.detail.includes("0.50"))).toBe(true);
     expect(report.issues.some((issue) => issue.detail.includes("+4.0 N"))).toBe(true);
     expect(report.issues.some((issue) => issue.kind === "rounding-conflict")).toBe(true);
+  });
+
+  it("counts every numeric claim independently and retains equation provenance", () => {
+    const part = fixture("audit-claim-level", "calculation", "claim-level", "Calculate the speed.", {
+      parts: [{
+        prompt: "Calculate the speed.", marks: 2,
+        scheme: ["v = 6.0 / 3.0 = 2.0 m s^-1; the measured time is 0.50 s"],
+        answer: "v = 2.0 m s^-1. The measured time is 0.50 s.",
+        specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "claim-level", contextId: "claim-level:context", demand: "calculation", reasoningMoves: ["separate a checked equation from an additional reported value"] },
+      }],
+    }).parts[0]!;
+    const report = auditPhysicsPartNumerics(part);
+    expect(report.claimsDetected).toBeGreaterThanOrEqual(3);
+    expect(report.claimsParsed).toBeGreaterThanOrEqual(3);
+    expect(report.claimsVerified).toBeGreaterThanOrEqual(1);
+    expect(report.claimsUnresolved).toBeGreaterThan(0);
+    expect(report.provenance.some((row) => row.source === "scheme" && row.sourceValues.length === 2 && row.status === "verified")).toBe(true);
+    expect(report.dimensionalCoverage.claimsDetected).toBeGreaterThan(report.dimensionalCoverage.checks);
+  });
+
+  it("recomputes Physics-law candidates and uses precision-aware tolerances", () => {
+    const good = fixture("audit-law-good", "calculation", "law-good", "Calculate the force.", {
+      parts: [{
+        prompt: "Calculate the force.", marks: 2,
+        scheme: ["F = ma = 2.0 × 3.0 = 6.0 N", "The current calculation uses F = ma."],
+        answer: "F = 6.0 N.", specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "law-good", contextId: "law-good:context", demand: "calculation", reasoningMoves: ["apply F=ma"] },
+      }],
+    }).parts[0]!;
+    const goodAudit = auditPhysicsPartNumerics(good);
+    expect(goodAudit.physicsRuleDetected).toBeGreaterThan(0);
+    expect(goodAudit.physicsRuleVerified).toBeGreaterThan(0);
+    expect(goodAudit.provenance.some((row) => row.rule === "F=ma" && row.status === "verified")).toBe(true);
+
+    const rounded = fixture("audit-precision", "calculation", "precision", "Calculate the current.", {
+      parts: [{
+        prompt: "Calculate the current.", marks: 2,
+        scheme: ["I = 14.1 / 6.0 = 2.36 A"], answer: "I = 2.36 A.",
+        specPointIds: ["wjec-alevel-physics.electric-circuits.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "precision", contextId: "precision:context", demand: "calculation", reasoningMoves: ["retain a guard digit from measured inputs"] },
+      }],
+    }).parts[0]!;
+    expect(auditPhysicsPartNumerics(rounded).arithmeticErrors).toBe(0);
+
+    const bad = fixture("audit-law-bad", "calculation", "law-bad", "Calculate the force.", {
+      parts: [{
+        prompt: "Calculate the force.", marks: 2,
+        scheme: ["F = ma = 2.0 × 3.0 = 7.0 N", "Use F = ma."], answer: "F = 7.0 N.",
+        specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "law-bad", contextId: "law-bad:context", demand: "calculation", reasoningMoves: ["reject an incorrect F=ma result"] },
+      }],
+    }).parts[0]!;
+    const badAudit = auditPhysicsPartNumerics(bad);
+    expect(badAudit.physicsRuleErrors).toBeGreaterThan(0);
+    expect(badAudit.issues.some((issue) => issue.kind === "numeric-arithmetic")).toBe(true);
+  });
+
+  it("validates safe rearrangements across the common Physics law set", () => {
+    const part = fixture("audit-law-set", "calculation", "law-set", "Apply the stated relations.", {
+      parts: [{
+        prompt: "Apply the stated relations.", marks: 8,
+        scheme: [
+          "F = ma = 2.0 × 3.0 = 6.0 N",
+          "I = V / R = 12 / 4.0 = 3.0 A",
+          "P = VI = 12 × 3.0 = 36 W",
+          "pV = nRT; n = pV / RT = 1.0×10⁵ × 0.020 / (8.31 × 300) = 0.802 mol",
+          "Q = mcΔT = 2.0 × 4200 × 5.0 = 42000 J",
+          "λ = h / p = 6.63e-34 / 2.0e-24 = 3.32e-10 m",
+          "E = hf = 6.63e-34 × 5.0e14 = 3.32e-19 J",
+        ],
+        answer: "The safe results are F = 6.0 N, I = 3.0 A, P = 36 W, n = 0.802 mol, Q = 42000 J, λ = 3.32e-10 m and E = 3.32e-19 J.",
+        specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "law-set", contextId: "law-set:context", demand: "calculation", reasoningMoves: ["rearrange and check common Physics relations"] },
+      }],
+    }).parts[0]!;
+    const report = auditPhysicsPartNumerics(part);
+    expect(report.physicsRuleChecks).toBeGreaterThanOrEqual(6);
+    expect(report.physicsRuleVerified).toBe(report.physicsRuleChecks);
+    expect(report.physicsRuleErrors).toBe(0);
+    expect(report.issues.filter((issue) => issue.severity === "error")).toHaveLength(0);
+  });
+
+  it("matches normal prose quantities conservatively across the scheme and answer", () => {
+    const part = fixture("audit-prose-quantity", "calculation", "prose-quantity", "Find the speed.", {
+      parts: [{
+        prompt: "Find the speed.", marks: 2,
+        scheme: ["The speed is 2.0 m s^-1"], answer: "The resulting speed is 2.0 m s^-1.",
+        specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "prose-quantity", contextId: "prose-quantity:context", demand: "calculation", reasoningMoves: ["report a final quantity in prose"] },
+      }],
+    }).parts[0]!;
+    const report = auditPhysicsPartNumerics(part);
+    expect(report.schemeAnswerChecks).toBe(1);
+    expect(report.schemeAnswerVerified).toBe(1);
+    expect(report.schemeAnswerCoverage.coveragePercent).toBe(100);
+  });
+
+  it("matches equivalent dimensions and explicit magnitude wording without hiding sign errors", () => {
+    const part = fixture("audit-equivalent-units", "calculation", "equivalent-units", "Compare the field strength.", {
+      parts: [{
+        prompt: "Compare the field strength.", marks: 2,
+        scheme: ["field strength = 2.0 N C^-1"], answer: "field strength = 2.0 V m^-1.",
+        specPointIds: ["wjec-alevel-physics.electric-fields.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "equivalent-units", contextId: "equivalent-units:context", demand: "calculation", reasoningMoves: ["recognise equivalent SI dimensions"] },
+      }],
+    }).parts[0]!;
+    const equivalent = auditPhysicsPartNumerics(part);
+    expect(equivalent.schemeAnswerChecks).toBe(1);
+    expect(equivalent.schemeAnswerVerified).toBe(1);
+    expect(equivalent.dimensionalErrors).toBe(0);
+
+    const magnitude = fixture("audit-magnitude-sign", "calculation", "magnitude-sign", "Find the internal resistance.", {
+      parts: [{
+        prompt: "Find the internal resistance.", marks: 2,
+        scheme: ["gradient magnitude = 0.50 Ω"], answer: "gradient = -0.50 V A^-1.",
+        specPointIds: ["wjec-alevel-physics.electric-circuits.sp-99"], capabilityIds: ["phys.audit-fixture"],
+        learning: { familyId: "magnitude-sign", contextId: "magnitude-sign:context", demand: "calculation", reasoningMoves: ["interpret the signed V-I gradient as a resistance magnitude"] },
+      }],
+    }).parts[0]!;
+    expect(auditPhysicsPartNumerics(magnitude).schemeAnswerErrors).toBe(0);
   });
 });
