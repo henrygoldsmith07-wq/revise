@@ -49,6 +49,10 @@ import { physicsDepthNearCompleteMaterialsQuestions } from "./questions/physics-
 import { physicsDepthNearCompleteWavesQuestions } from "./questions/physics-depth-near-complete-waves";
 import { physicsDepthNearCompleteQuantumQuestions } from "./questions/physics-depth-near-complete-quantum";
 import { physicsDepthNearCompleteGapQuestions } from "./questions/physics-depth-near-complete-gaps";
+import { physicsDepthCompletionEnergyQuantumQuestions } from "./questions/physics-depth-completion-energy-quantum";
+import { physicsDepthCompletionCircuitsMechanicsQuestions } from "./questions/physics-depth-completion-circuits-mechanics";
+import { physicsDepthCompletionFieldsThermalNuclearQuestions } from "./questions/physics-depth-completion-fields-thermal-nuclear";
+import { physicsDepthCompletionPracticalQuestions } from "./questions/physics-depth-completion-practical";
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
@@ -96,6 +100,10 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...physicsDepthNearCompleteWavesQuestions,
   ...physicsDepthNearCompleteQuantumQuestions,
   ...physicsDepthNearCompleteGapQuestions,
+  ...physicsDepthCompletionEnergyQuantumQuestions,
+  ...physicsDepthCompletionCircuitsMechanicsQuestions,
+  ...physicsDepthCompletionFieldsThermalNuclearQuestions,
+  ...physicsDepthCompletionPracticalQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
@@ -133,6 +141,7 @@ export { wjecPhysicsQualityExpansionQuestions };
 export { physicsCoverageQuestions };
 export { physicsReasoningDepthQuestions };
 export { physicsDepthNearCompleteCoreQuestions, physicsDepthNearCompleteMaterialsQuestions, physicsDepthNearCompleteWavesQuestions, physicsDepthNearCompleteQuantumQuestions, physicsDepthNearCompleteGapQuestions };
+export { physicsDepthCompletionEnergyQuantumQuestions, physicsDepthCompletionCircuitsMechanicsQuestions, physicsDepthCompletionFieldsThermalNuclearQuestions, physicsDepthCompletionPracticalQuestions };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

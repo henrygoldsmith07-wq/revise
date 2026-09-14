@@ -10,6 +10,7 @@
 import type { LearningDemand, Question, QuestionPart } from "./types";
 import { reasoningProfileOf, reasoningSimilarity, type ReasoningProfile } from "./reasoning-signature";
 import { contentTokens, promptSignature, textOverload } from "./text-similarity";
+import { auditPhysicsPartNumerics, type PhysicsNumericalIssueKind } from "./physics-numerical-audit";
 
 export type PhysicsBankIssueKind =
   | "definition-conflict"
@@ -24,7 +25,8 @@ export type PhysicsBankIssueKind =
   | "duplicate-mark-scheme"
   | "duplicate-misconception"
   | "difficulty-mismatch"
-  | "transfer-novelty";
+  | "transfer-novelty"
+  | PhysicsNumericalIssueKind;
 
 export interface PhysicsBankIssue {
   kind: PhysicsBankIssueKind;
@@ -61,6 +63,26 @@ export interface PhysicsBankAudit {
   duplicatePairs: number;
   difficultyMismatches: number;
   transferWarnings: number;
+  /** Structural checks are complete even when numerical content needs review. */
+  structuralChecked: number;
+  numericalChecks: number;
+  numericalVerified: number;
+  numericalErrors: number;
+  numericalUnresolved: number;
+  dimensionalChecks: number;
+  dimensionalVerified: number;
+  dimensionalErrors: number;
+  schemeAnswerChecks: number;
+  schemeAnswerVerified: number;
+  schemeAnswerErrors: number;
+  physicsRuleChecks: number;
+  manualReviewRequired: number;
+  confidence: {
+    structural: "checked" | "issues";
+    numerical: "verified" | "partial" | "unresolved" | "failed";
+    dimensional: "verified" | "partial" | "unresolved" | "failed";
+    unresolvedManual: number;
+  };
   estimatedComparisons: number;
   elapsedMs: number;
   issues: PhysicsBankIssue[];
@@ -363,6 +385,14 @@ function auditGroup(group: PhysicsBankIndexEntry[], issues: PhysicsBankIssue[]):
   return { comparisons, duplicatePairs, transferWarnings };
 }
 
+function addNumericalIssues(entry: PhysicsBankIndexEntry, issues: PhysicsBankIssue[]): ReturnType<typeof auditPhysicsPartNumerics> {
+  const report = auditPhysicsPartNumerics(entry.part);
+  for (const issue of report.issues) {
+    issues.push({ kind: issue.kind, severity: issue.severity, questionId: entry.question.id, partId: entry.part.id, detail: `[${issue.source}] ${issue.detail}` });
+  }
+  return report;
+}
+
 /** Audit a Physics bank in one deterministic, precomputed pass. */
 export function auditPhysicsBank(questions: readonly Question[], options?: { subjectId?: string }): PhysicsBankAudit {
   const started = now();
@@ -370,7 +400,32 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
   const selected = questions.filter((question) => question.subjectId === subjectId);
   const index = buildPhysicsBankIndex(selected, subjectId);
   const issues: PhysicsBankIssue[] = [];
-  for (const entry of index.entries) auditExplicitConsistency(entry, issues);
+  let numericalChecks = 0;
+  let numericalVerified = 0;
+  let numericalErrors = 0;
+  let numericalUnresolved = 0;
+  let dimensionalChecks = 0;
+  let dimensionalVerified = 0;
+  let dimensionalErrors = 0;
+  let schemeAnswerChecks = 0;
+  let schemeAnswerVerified = 0;
+  let schemeAnswerErrors = 0;
+  let physicsRuleChecks = 0;
+  for (const entry of index.entries) {
+    auditExplicitConsistency(entry, issues);
+    const numeric = addNumericalIssues(entry, issues);
+    numericalChecks += numeric.arithmeticChecks;
+    numericalVerified += numeric.arithmeticVerified;
+    numericalErrors += numeric.arithmeticErrors;
+    numericalUnresolved += numeric.unresolved;
+    dimensionalChecks += numeric.dimensionalChecks;
+    dimensionalVerified += numeric.dimensionalVerified;
+    dimensionalErrors += numeric.dimensionalErrors;
+    schemeAnswerChecks += numeric.schemeAnswerChecks;
+    schemeAnswerVerified += numeric.schemeAnswerVerified;
+    schemeAnswerErrors += numeric.schemeAnswerErrors;
+    physicsRuleChecks += numeric.physicsRuleChecks;
+  }
   auditGlobalConventions(index, issues);
   let estimatedComparisons = 0;
   let duplicatePairs = 0;
@@ -383,6 +438,11 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
   }
   const errors = issues.filter((issue) => issue.severity === "error").length;
   const warnings = issues.length - errors;
+  const manualReviewRequired = new Set(issues.filter((issue) => issue.kind === "unresolved-numerical").map((issue) => `${issue.questionId}:${issue.partId}`)).size;
+  const structuralKinds: PhysicsBankIssueKind[] = [
+    "definition-conflict", "notation-conflict", "sign-convention-conflict", "constant-conflict",
+    "assumption-conflict", "terminology-conflict", "model-conflict", "rounding-conflict",
+  ];
   return {
     subjectId,
     questionCount: selected.length,
@@ -397,6 +457,25 @@ export function auditPhysicsBank(questions: readonly Question[], options?: { sub
     duplicatePairs,
     difficultyMismatches: issues.filter((issue) => issue.kind === "difficulty-mismatch").length,
     transferWarnings,
+    structuralChecked: index.entries.length,
+    numericalChecks,
+    numericalVerified,
+    numericalErrors,
+    numericalUnresolved,
+    dimensionalChecks,
+    dimensionalVerified,
+    dimensionalErrors,
+    schemeAnswerChecks,
+    schemeAnswerVerified,
+    schemeAnswerErrors,
+    physicsRuleChecks,
+    manualReviewRequired,
+    confidence: {
+      structural: issues.some((issue) => issue.severity === "error" && structuralKinds.includes(issue.kind)) ? "issues" : "checked",
+      numerical: numericalErrors || schemeAnswerErrors ? "failed" : numericalChecks ? (numericalUnresolved ? "partial" : "verified") : "unresolved",
+      dimensional: dimensionalErrors ? "failed" : dimensionalChecks ? "verified" : "unresolved",
+      unresolvedManual: manualReviewRequired,
+    },
     estimatedComparisons,
     elapsedMs: Math.max(0, now() - started),
     issues,

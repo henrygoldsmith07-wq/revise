@@ -17,6 +17,7 @@ const bundle = await build({
     export { auditPhysicsAssessmentQuality, physicsQualityQueue, physicsAuthoringBriefs } from "./src/domain/physics-assessment-quality";
     export { auditCapabilityGranularity } from "./src/domain/capability-granularity";
     export { auditPhysicsBank } from "./src/domain/physics-bank-audit";
+    export { auditPhysicsPartNumerics } from "./src/domain/physics-numerical-audit";
   `, resolveDir: process.cwd(), loader: "ts" },
   bundle: true, platform: "node", format: "esm", write: false,
 });
@@ -72,6 +73,7 @@ const rows = data.questions.filter((question) => question.subjectId === "wjec-al
       missedPoints: marked.missedPoints,
       note: "Self-consistency check only; this cannot establish marking validity." };
   }),
+  numericalAudit: question.parts.map((part) => ({ partId: part.id, ...data.auditPhysicsPartNumerics(part) })),
 }));
 const lines = [
   "# Physics content review packet",
@@ -79,7 +81,8 @@ const lines = [
   `${rows.length} Physics questions from the live bank. This export creates **no human approvals**. No efficacy results are claimed.`,
   `Quality gate: ${qualityAudit.completeStatements}/${qualityAudit.statements} specification statements meet the two-family/two-context demand check; ${qualityAudit.unreviewedQuestions} questions remain unreviewed. Authoring/review queue: ${qualityQueue.length} items. Release-ready: **${qualityAudit.releaseReady ? "yes" : "no"}**.`,
   `Prerequisite gate: ${prerequisiteReviews.filter((row) => row.review.status === "approved").length}/${prerequisiteReviews.length} dependency edges have an approval; ${redundantEdges.length} edge${redundantEdges.length === 1 ? " is" : "s are"} transitively redundant; every edge remains a diagnosis hypothesis until a subject expert signs the exact fingerprint.`,
-  `Bank audit: ${bankAudit.errors} hard consistency error${bankAudit.errors === 1 ? "" : "s"}, ${bankAudit.warnings} warning${bankAudit.warnings === 1 ? "" : "s"}; ${bankAudit.duplicatePairs} duplicate-reasoning pair${bankAudit.duplicatePairs === 1 ? "" : "s"}, ${bankAudit.difficultyMismatches} difficulty mismatch${bankAudit.difficultyMismatches === 1 ? "" : "es"}, ${bankAudit.transferWarnings} transfer-novelty warning${bankAudit.transferWarnings === 1 ? "" : "s"}. Precomputed ${bankAudit.profileCount} profiles and ${bankAudit.estimatedComparisons} within-capability comparisons in ${bankAudit.elapsedMs.toFixed(1)} ms.`,
+  `Bank audit: ${bankAudit.errors} hard error${bankAudit.errors === 1 ? "" : "s"}, ${bankAudit.warnings} warning${bankAudit.warnings === 1 ? "" : "s"}; ${bankAudit.duplicatePairs} duplicate-reasoning pair${bankAudit.duplicatePairs === 1 ? "" : "s"}, ${bankAudit.difficultyMismatches} difficulty mismatch${bankAudit.difficultyMismatches === 1 ? "" : "es"}, ${bankAudit.transferWarnings} transfer-novelty warning${bankAudit.transferWarnings === 1 ? "" : "s"}. Precomputed ${bankAudit.profileCount} profiles and ${bankAudit.estimatedComparisons} within-capability comparisons in ${bankAudit.elapsedMs.toFixed(1)} ms.`,
+  `Audit confidence: structural **${bankAudit.confidence.structural}** (${bankAudit.structuralChecked} parts); numerical **${bankAudit.confidence.numerical}** (${bankAudit.numericalVerified}/${bankAudit.numericalChecks} equations verified, ${bankAudit.numericalErrors} errors, ${bankAudit.numericalUnresolved} unresolved); dimensional **${bankAudit.confidence.dimensional}** (${bankAudit.dimensionalVerified}/${bankAudit.dimensionalChecks} checks verified, ${bankAudit.dimensionalErrors} errors); scheme↔answer ${bankAudit.schemeAnswerVerified}/${bankAudit.schemeAnswerChecks} direct quantities verified with ${bankAudit.schemeAnswerErrors} mismatches. ${bankAudit.manualReviewRequired} parts require manual numerical review.`,
   "",
   "Review the prompt, mark scheme, worked solution, internal specification mapping, capability mapping and exam realism separately. Solve before reading the key. Record accepted alternatives, rejected misconceptions and uncertain marking. Use examiner-labelled student answers to validate partial credit.",
   "",
@@ -93,9 +96,11 @@ for (const row of rows) {
   for (const part of row.question.parts) {
     const automatic = row.automaticMarking.find((result) => result.partId === part.id);
     const metadata = row.quality.parts.find((entry) => entry.partId === part.id);
+    const numerical = row.numericalAudit.find((result) => result.partId === part.id);
     lines.push(part.prompt, "", `Marks: ${part.marks}`, "", ...part.markScheme.map((point) => `- ${point}`),
       "", "**Worked solution**", "", part.modelAnswer, "",
       `Automatic model-answer check: ${automatic.modelAnswerAwarded}/${automatic.available}. ${automatic.modelAnswerAwarded === automatic.available ? "Consistency only; still needs human review." : "MARKING DISAGREEMENT: investigate before using as trusted evidence."}`,
+      `Deterministic numerical audit: ${numerical?.status ?? "unresolved"}; ${numerical?.arithmeticVerified ?? 0}/${numerical?.arithmeticChecks ?? 0} arithmetic checks, ${numerical?.dimensionalVerified ?? 0}/${numerical?.dimensionalChecks ?? 0} dimensional checks, ${numerical?.schemeAnswerVerified ?? 0}/${numerical?.schemeAnswerChecks ?? 0} scheme↔answer checks. ${numerical?.issues.length ? `Issues: ${numerical.issues.map((issue) => `${issue.kind} (${issue.detail})`).join("; ")}` : "No deterministic issue; still requires human subject review."}`,
       "",
       `Internal claims: ${part.specPointIds?.join(", ") || "MAPPING REQUIRED"}`,
       `Capabilities: ${part.capabilityIds?.join(", ") || "MAPPING REQUIRED"}`,
@@ -120,4 +125,8 @@ console.log(JSON.stringify({ questions: rows.length, replacements: rows.filter((
   modelAnswerMarkingDisagreements: rows.flatMap((row) => row.automaticMarking).filter((row) => row.modelAnswerAwarded !== row.available).length,
   statements: qualityAudit.statements, completeStatements: qualityAudit.completeStatements, unreviewedQuestions: qualityAudit.unreviewedQuestions, qualityQueueItems: qualityQueue.length, authoringBriefs: authoringBriefs.length, redundantPrerequisiteEdges: redundantEdges.length, overbroadCapabilities: granularityFindings.length,
   bankConsistencyErrors: bankAudit.consistencyErrors, bankErrors: bankAudit.errors, bankWarnings: bankAudit.warnings, bankDuplicatePairs: bankAudit.duplicatePairs, bankDifficultyMismatches: bankAudit.difficultyMismatches, bankTransferWarnings: bankAudit.transferWarnings, bankElapsedMs: bankAudit.elapsedMs,
+  numericalChecks: bankAudit.numericalChecks, numericalVerified: bankAudit.numericalVerified, numericalErrors: bankAudit.numericalErrors, numericalUnresolved: bankAudit.numericalUnresolved,
+  dimensionalChecks: bankAudit.dimensionalChecks, dimensionalVerified: bankAudit.dimensionalVerified, dimensionalErrors: bankAudit.dimensionalErrors,
+  schemeAnswerChecks: bankAudit.schemeAnswerChecks, schemeAnswerVerified: bankAudit.schemeAnswerVerified, schemeAnswerErrors: bankAudit.schemeAnswerErrors,
+  physicsRuleChecks: bankAudit.physicsRuleChecks, manualReviewRequired: bankAudit.manualReviewRequired, confidence: bankAudit.confidence,
   output: out }));
