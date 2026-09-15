@@ -344,6 +344,11 @@ export interface LearningPartMetadata {
   demand: LearningDemand;
   /** Distinct cognitive operations required by this part. */
   reasoningMoves: string[];
+  /**
+   * Authoring quality gate. Scaffold cells may guide authors, but cannot
+   * establish deep coverage or trusted learning evidence.
+   */
+  quality?: "substantive" | "scaffold";
 }
 
 export interface QuestionPart {

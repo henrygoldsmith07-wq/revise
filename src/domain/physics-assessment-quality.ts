@@ -215,6 +215,7 @@ function partLearningMetadata(question: Question, part: QuestionPart) {
     contextId: question.learning.contextId,
     demand: question.learning.demand,
     reasoningMoves: question.learning.reasoningMoves ?? [],
+    quality: undefined,
   } : undefined);
 }
 
@@ -244,9 +245,18 @@ function distinctAuthoredMoves(parts: Array<{ question: Question; part: Question
   return moves;
 }
 
-function demandCoverage(mappedQuestions: Array<{ question: Question; part: QuestionPart }>): PhysicsDemandCoverage[] {
+function demandCoverage(
+  mappedQuestions: Array<{ question: Question; part: QuestionPart }>,
+  strictSubstantive = false,
+  substantivePart?: (question: Question, part: QuestionPart) => boolean,
+): PhysicsDemandCoverage[] {
   return PHYSICS_ASSESSMENT_DEMANDS.map((demand): PhysicsDemandCoverage => {
-    const rows = mappedQuestions.filter(({ question, part }) => partDemand(question, part) === demand);
+    const rows = mappedQuestions.filter(({ question, part }) => {
+      if (partDemand(question, part) !== demand) return false;
+      if (!strictSubstantive) return true;
+      return partLearningMetadata(question, part)?.quality === "substantive" &&
+        (substantivePart ? substantivePart(question, part) : true);
+    });
     const families = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.familyId).filter((id): id is string => Boolean(id)));
     const contexts = unique(rows.map(({ question, part }) => partLearningMetadata(question, part)?.contextId).filter((id): id is string => Boolean(id)));
     const authoredMoves = distinctAuthoredMoves(rows);
@@ -300,8 +310,17 @@ export function auditPhysicsAssessmentQuality(input: {
   nodes: readonly CapabilityNode[];
   /** Trust predicate is injected to keep this audit independent of the review store. */
   trustedQuestion?: (question: Question) => boolean;
+  /**
+   * When true, only parts explicitly marked substantive contribute to depth.
+   * Physics keeps the legacy contract by default; the other WJEC subjects use
+   * this gate so scaffold or unclassified cells cannot inflate coverage.
+   */
+  strictSubstantive?: boolean;
+  /** Additional content-quality predicate used by the flagship subject gate. */
+  substantivePart?: (question: Question, part: QuestionPart) => boolean;
 }): PhysicsAssessmentQualityAudit {
   const subjectId = input.subjectId ?? "wjec-alevel-physics";
+  const strictSubstantive = input.strictSubstantive ?? false;
   const physicsTopics = input.topics.filter((topic) => topic.subjectId === subjectId);
   const physicsQuestions = input.questions.filter((question) => question.subjectId === subjectId);
   const physicsNodes = input.nodes.filter((node) => node.subjectId === subjectId);
@@ -420,7 +439,7 @@ export function auditPhysicsAssessmentQuality(input: {
     const mappedQuestions = physicsQuestions.flatMap((question) => questionPartsForPoint(question, point.id)
       .map((part) => ({ question, part })));
     const capabilityIds = unique(mappedQuestions.flatMap(({ part }) => part.capabilityIds ?? []));
-    const demands = demandCoverage(mappedQuestions);
+    const demands = demandCoverage(mappedQuestions, strictSubstantive, input.substantivePart);
     return { topicId: topic.id, specPointId: point.id, capabilityIds, demands,
       complete: demands.every((demand) => demand.complete && demand.distinct) };
   });
@@ -436,7 +455,7 @@ export function auditPhysicsAssessmentQuality(input: {
     ]);
     return capabilityIds.map((capabilityId) => {
       const rows = mappedQuestions.filter(({ part }) => part.capabilityIds?.length === 1 && part.capabilityIds[0] === capabilityId);
-      const demands = demandCoverage(rows);
+      const demands = demandCoverage(rows, strictSubstantive, input.substantivePart);
       return { topicId: topic.id, specPointId: point.id, capabilityId, demands,
         complete: demands.every((demand) => demand.complete && demand.distinct) };
     });

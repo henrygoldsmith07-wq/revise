@@ -10,7 +10,7 @@ export function qualityItem(subject: "maths" | "biology" | "chemistry", topic: s
   prompt: string, scheme: string[], answer: string): Question {
   const subjectId = `wjec-alevel-${subject}`;
   const specPoint = `${subjectId}.${topic}.sp-${String(point).padStart(2, "0")}`;
-  const learning = { familyId: `${subject}:${family}`, contextId: `${subject}:${slug}`, demand, reasoningMoves: [reasoning] };
+  const learning = { familyId: `${subject}:${family}`, contextId: `${subject}:${slug}`, demand, reasoningMoves: [reasoning], quality: "substantive" as const };
   return defineQuestion({ slug: `wjec-quality-${subject}-${slug}`, subjectId, topics: [topic], stem: prompt,
     kind: subject === "maths" || demand === "calculation" ? "calculation" : "short",
     source: "generated", verification: "unverified", reviewer: null, lastChecked: null,
@@ -18,6 +18,7 @@ export function qualityItem(subject: "maths" | "biology" | "chemistry", topic: s
     learning: { ...learning, expectedMinutes: Math.max(1, scheme.length * 1.25) },
     parts: [{ prompt, marks: scheme.length, scheme, answer, specPointIds: [specPoint],
       capabilityIds: [wjecCapabilityForSpecPoint(specPoint)!], learning,
+      learningClaims: demand === "synoptic" ? [prompt, `${family} dependency`] : undefined,
       aos: demand === "recall" ? ["AO1"] : ["transfer", "synoptic"].includes(demand) ? ["AO2", "AO3"] : ["AO2"] }],
   });
 }

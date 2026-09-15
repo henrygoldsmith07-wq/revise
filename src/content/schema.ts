@@ -59,6 +59,7 @@ const learningPartSchema = z.object({
   contextId: id,
   demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
   reasoningMoves: z.array(nonEmpty).min(1).max(8),
+  quality: z.enum(["substantive", "scaffold"]).optional(),
 }).passthrough();
 
 export const contentQuestionPartSchema = z.object({

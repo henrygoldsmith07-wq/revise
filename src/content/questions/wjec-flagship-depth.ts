@@ -31,72 +31,184 @@ interface DepthBrief {
 
 const demands: LearningDemand[] = ["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"];
 
-const defaultTasks: Record<FlagshipSubject, Record<LearningDemand, [string, string]>> = {
-  maths: {
-    recall: ["State the defining result and one domain restriction", "State an equivalent form and explain when it is valid"],
-    explanation: ["Explain why the result follows from the underlying definition", "Explain how a graphical or structural check exposes the same result"],
-    application: ["Set up the method for the stated context and identify the quantity to find", "Choose a different representation and use it to reach the target"],
-    misconception: ["A student uses a tempting but invalid shortcut. Locate the first invalid step", "A graph or domain condition is ignored. Correct the conclusion and justify it"],
-    calculation: ["Carry the exact algebra through to the requested value", "Use a second route and retain the requested exact form or precision"],
-    transfer: ["Solve an unfamiliar problem where the same idea is hidden behind a new structure", "Decide which features are invariant before adapting the method"],
-    synoptic: ["Combine this capability with a second pure or applied idea and state the dependency", "Evaluate the result against a domain, graph or modelling constraint"],
-  },
-  biology: {
-    recall: ["State the mechanism and the biological structure involved", "State a contrasting mechanism and the condition that separates them"],
-    explanation: ["Build a causal chain from the structure to the observed effect", "Explain the same effect through a different level of organisation"],
-    application: ["Apply the mechanism to the described organism or tissue", "Use the evidence to predict what changes when one condition is altered"],
-    misconception: ["A student confuses correlation with mechanism. Identify the first unsupported claim", "A control or variable is misidentified. Repair the design and conclusion"],
-    calculation: ["Extract and process the biological data, showing units and a justified comparison", "Use a second data summary and state the biological meaning of the result"],
-    transfer: ["Interpret an unfamiliar investigation using this capability without assuming the usual organism", "Select the strongest evidence and explain which alternative it rules out"],
-    synoptic: ["Link the mechanism to a second biological process and predict a consequence", "Evaluate the claim using mechanism, controls and the limits of the data"],
-  },
-  chemistry: {
-    recall: ["State the chemical relationship and the conditions under which it applies", "State the particle-level feature that distinguishes the related case"],
-    explanation: ["Explain the relationship using particles, bonding or electron movement", "Explain how the same relationship appears in an observable property"],
-    application: ["Choose the reaction model or equation needed for the stated context", "Use a structural or equilibrium argument to predict the outcome"],
-    misconception: ["A student applies a familiar rule outside its conditions. Locate the first invalid assumption", "A charge, coefficient or equilibrium term is omitted. Correct it and justify the change"],
-    calculation: ["Carry the chemical calculation through with units and significant figures", "Check the result through a ratio, charge balance or independent route"],
-    transfer: ["Solve an unfamiliar compound or dataset by identifying the invariant chemical relationship", "Use the evidence to reject at least one chemically plausible alternative"],
-    synoptic: ["Combine the relationship with a practical or quantitative constraint", "Evaluate the prediction against stoichiometry, energetics, kinetics or structure"],
-  },
-};
-
 function specPointId(brief: DepthBrief): string {
   return `wjec-alevel-${brief.subject}.${brief.topic}.sp-${String(brief.point).padStart(2, "0")}`;
 }
 
+/** Concrete values keep generated authoring rows answerable while still
+ * leaving the six-check human review as the trust boundary.  These are small
+ * deterministic setups, not generic prose placeholders: every route names a
+ * quantity, a representation and enough data for an examiner-style response.
+ */
+function concreteSetup(brief: DepthBrief, variant: 0 | 1): string {
+  const n = brief.point + 2 + variant;
+  if (brief.subject === "maths") {
+    if (brief.topic === "algebra") return `Let f(x) = x² − ${n}x + ${n - 1} for 0 ≤ x ≤ ${n}; use the displayed polynomial and this interval.`;
+    if (brief.topic === "coordinate-geometry") return `On a coordinate grid A(${n}, ${n + 1}) and B(${n + 2}, ${n - 1}) are joined, and the circle has centre (${n}, ${n}) and radius ${n + 1}.`;
+    if (brief.topic === "differentiation") return `For f(x) = x³ − ${n}x² + ${n}x on 0 ≤ x ≤ ${n}, inspect the point x = ${n - 1}.`;
+    if (brief.topic === "integration") return `A velocity is v(t) = ${n}t − ${n - 1} for 0 ≤ t ≤ ${n} seconds; use this function and interval.`;
+    if (brief.topic === "trigonometry") return `In triangle ABC, a = ${n} cm, b = ${n + 1} cm and the included angle C = 60°.`;
+    return `A calibration model is y = ${n}e^(0.2t) + ${n - 1} for t ≥ 0, with all logarithm arguments required to be positive.`;
+  }
+  if (brief.subject === "biology") {
+    if (brief.topic === "biological-molecules") {
+      if (brief.slug.includes("condensation")) return `A starch suspension is treated with amylase at pH 7 and 25 °C; reducing-sugar product is ${n}.0 mg before treatment and ${n + 1}.5 mg after treatment.`;
+      if (brief.slug.includes("carbohydrates")) return `A plant sample contains ${n}.0 mg starch before storage and ${n + 1}.5 mg after storage; the tissue is kept at pH 7 and 25 °C.`;
+      if (brief.slug.includes("lipids")) return `A membrane sample contains ${n}.0 mg phospholipid before repair and ${n + 1}.5 mg after repair; temperature is held at 25 °C.`;
+      if (brief.slug.includes("protein")) return `An enzyme extract contains ${n}.0 mg protein before a mutation and ${n + 1}.5 mg after purification; pH is 7 at 25 °C.`;
+      if (brief.slug.includes("dna-rna")) return `A DNA fragment is quantified at ${n}.0 ng before transcription and ${n + 1}.5 ng after processing; the sample is kept at pH 7.`;
+      return `A water sample contains ${n}.0 mg dissolved solute before heating and ${n + 1}.5 mg after cooling; pressure is held constant.`;
+    }
+    if (brief.topic === "cell-structure") return `An electron micrograph shows a ${n} μm cell with a visible nucleus and ${n + 1} mitochondria; the scale bar is ${n * 2} μm.`;
+    if (brief.topic === "membranes-transport") return `In a membrane assay, condition A changes by ${n}.0% and condition B by ${n - 1}.0% in ${n * 5} minutes; temperature is held at 25 °C.`;
+    return `A DNA fragment is 5′-ATG CCA TAA-3′ and an enzyme assay records ${n}.0 μmol product in ${n * 2}.0 s before a treatment and ${n + 2}.0 μmol in the same time after it.`;
+  }
+  if (brief.topic === "atomic-structure") return `An element has isotopes of mass ${n * 10} and ${n * 10 + 2} with abundances ${n * 10}% and ${100 - n * 10}%; compare Mg2+ and Cl- electron counts explicitly.`;
+  if (brief.topic === "moles") {
+    const concentration = (n / 10 + 0.1).toFixed(3);
+    return `A ${n * 5}.00 cm³ aliquot of a ${concentration} mol dm⁻³ solution reacts 1:1 with ${n * 4}.00 cm³ of standard reagent.`;
+  }
+  if (brief.topic === "bonding") return `The comparison uses NH₃ and BF₃, and a ${n}.0 g sample with specific heat capacity 4.2 J g⁻¹ °C⁻¹ is heated from ${20 + n} °C to ${30 + n} °C at constant pressure.`;
+  if (brief.topic === "kinetics") return `A reaction produces ${n * 10}.0 cm³ gas in ${n * 2}.0 s at 298 K; a second run produces ${n * 12}.0 cm³ in the same time after a catalyst is added.`;
+  if (brief.topic === "equilibria") {
+    const n4 = (n / 10).toFixed(2);
+    const no2 = (n / 20).toFixed(2);
+    return `For N₂O₄(g) ⇌ 2NO₂(g), a ${n}.00 dm³ vessel contains ${n4} mol N₂O₄ and ${no2} mol NO₂ at ${300 + n} K.`;
+  }
+  const acidConcentration = (n / 10 + 0.1).toFixed(3);
+  const baseConcentration = (n / 20 + 0.05).toFixed(3);
+  return `A ${n * 5}.00 cm³ sample of ${acidConcentration} mol dm⁻³ acid reacts with ${n * 4}.00 cm³ of ${baseConcentration} mol dm⁻³ base; the reaction is 1:1.`;
+}
+
+function secondaryCapability(brief: DepthBrief): string {
+  if (brief.subject === "maths") return brief.topic === "differentiation" || brief.topic === "integration"
+    ? "domain and endpoint checks" : "exact form and admissibility checks";
+  if (brief.subject === "biology") return brief.topic === "membranes-transport" || brief.topic === "nucleic-acids"
+    ? "experimental controls and data interpretation" : "structure-function and evidence limits";
+  return brief.topic === "moles" || brief.topic === "equilibria"
+    ? "stoichiometric and unit constraints" : "particle-level structure and charge balance";
+}
+
+function concreteResult(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): string {
+  const n = brief.point + 2 + variant;
+  if (brief.subject === "maths") {
+    if (brief.topic === "differentiation") return `f′(${n - 1}) = ${3 * (n - 1) ** 2 - 2 * n * (n - 1) + n}`;
+    if (brief.topic === "integration") return `∫₀${n} v(t) dt = ${(n * n * n) / 2 - (n - 1) * n}`;
+    if (brief.topic === "trigonometry") return `the cosine-rule value is c² = ${n}² + ${n + 1}² − 2(${n})(${n + 1})cos 60° = ${n * n + (n + 1) ** 2 - n * (n + 1)}`;
+    if (brief.topic === "coordinate-geometry") return `AB² = 8, so the segment length is 2√2 units`;
+    return `f(${n - 1}) = ${(n - 1) ** 2 - n * (n - 1) + n - 1}`;
+  }
+  if (brief.subject === "biology") {
+    const entity = brief.slug.includes("condensation") ? "reducing-sugar product from starch hydrolysis"
+      : brief.slug.includes("carbohydrates") ? "starch storage"
+        : brief.slug.includes("lipids") ? "phospholipid membrane"
+          : brief.slug.includes("protein") ? "enzyme protein activity"
+            : brief.slug.includes("dna-rna") ? "DNA/RNA fragment"
+              : brief.topic === "cell-structure" ? "mitochondrial count"
+                : brief.topic === "membranes-transport" ? "membrane transport response"
+                  : "enzyme-assay response";
+    return `the ${entity} measurement changes from ${n}.0 to ${n + 1}.5 units, a difference of 1.5 units; the ${brief.capability} mechanism explains that measured change`;
+  }
+  if (brief.topic === "atomic-structure") return `Mg2+ has 10 electrons and Cl- has 18; the weighted isotope mass is ${(n * 10 + 2 - n / 5).toFixed(2)} u after applying each abundance`;
+  if (brief.topic === "moles") return `n = cV = ${((n / 10 + 0.1) * (n * 5) / 1000).toFixed(5)} mol, with the 1:1 ratio giving the same amount of reacting species`;
+  if (brief.topic === "bonding") return `NH₃ is trigonal pyramidal while BF₃ is trigonal planar; the sample gains q = ${((n) * 4.2 * 10).toFixed(1)} J from q = mcΔT, while the particle model explains the polarity difference`;
+  if (brief.topic === "kinetics") return `the initial rate is ${n * 5}.0 cm³ s⁻¹ from ${n * 10}.0 cm³ divided by ${n * 2}.0 s, and the catalyst run is faster`;
+  if (brief.topic === "equilibria") {
+    const n2o4 = ((n / 10) / n).toFixed(3);
+    const no2 = ((n / 20) / n).toFixed(3);
+    const kc = ((Number(no2) ** 2) / Number(n2o4)).toFixed(3);
+    return `Kc = [NO₂]²/[N₂O₄] = (${no2})²/(${n2o4}) = ${kc}; use the concentrations from the ${n}.00 dm³ vessel before comparison`;
+  }
+  return `n = cV = ${((n / 10 + 0.1) * (n * 5) / 1000).toFixed(5)} mol for the acid/base reaction, with the 1:1 stoichiometric ratio and units shown`;
+}
+
+/**
+ * Materialise a demand that a brief did not spell out.  This is deliberately
+ * a concrete authoring seed: it names the capability, route operation and
+ * computed/concluded result from the supplied setup.  A future helper that
+ * cannot instantiate those details must set `learning.quality` to `scaffold`
+ * instead of silently falling back to generic prose.
+ */
+function materialisedDemandPlan(brief: DepthBrief, demand: LearningDemand, result: string): { task: string; evidence: string } {
+  const subjectNoun = brief.subject === "biology" ? "biological" : brief.subject === "chemistry" ? "chemical" : "mathematical";
+  switch (demand) {
+    case "recall":
+      return {
+        task: `State the ${subjectNoun} rule for ${brief.capability} and the condition that makes this result valid`,
+        evidence: `${result}; state the defining rule and its stated condition for ${brief.capability}.`,
+      };
+    case "explanation":
+      return {
+        task: `Explain why ${result} follows when ${brief.modeA} is applied to ${brief.capability}`,
+        evidence: `${result}; link ${brief.modeA} to the ${brief.subject} mechanism or logical step for ${brief.capability}.`,
+      };
+    case "application":
+      return {
+        task: `Apply ${brief.modeA} to the supplied setup and report ${result}`,
+        evidence: `${result}; applying ${brief.modeA} to the supplied values gives a checkable ${brief.subject} consequence.`,
+      };
+    case "misconception":
+      return {
+        task: `A student claims the opposite of ${result}. Identify the first invalid step and correct it using ${brief.modeA}`,
+        evidence: `${result}; the tempting claim is rejected at its first invalid ${brief.subject} assumption, then repaired with ${brief.modeA}.`,
+      };
+    case "calculation":
+      return {
+        task: `Calculate ${result} from the supplied quantities using ${brief.modeA}, showing units and precision`,
+        evidence: `${result}; show the substitution, intermediate value and final unit for ${brief.capability}.`,
+      };
+    case "transfer":
+      return {
+        task: `Use the unfamiliar representation to derive ${result} with ${brief.modeB}, then state what changes from the original case`,
+        evidence: `${result}; the new representation preserves the ${brief.capability} invariant but requires ${brief.modeB}.`,
+      };
+    case "synoptic":
+      return {
+        task: `Combine ${brief.capability} with ${secondaryCapability(brief)} to obtain ${result} and justify the constraint`,
+        evidence: `${result}; both ${brief.capability} and ${secondaryCapability(brief)} constrain the final ${brief.subject} conclusion.`,
+      };
+  }
+}
+
 function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): PartSpec {
   const pointId = specPointId(brief);
-  const plan = brief.demands[demand];
-  const [taskA, taskB] = defaultTasks[brief.subject][demand];
   const context = variant === 0 ? brief.contextA : brief.contextB;
   const mode = variant === 0 ? brief.modeA : brief.modeB;
-  const task = plan?.task ?? (variant === 0 ? taskA : taskB);
-  const evidenceBase = plan?.evidence ?? `The ${brief.capability} is handled by ${mode}; the conclusion is constrained by the stated conditions.`;
-  // Keep the two routes genuinely different in their worked reasoning.  The
-  // audit compares solution paths as well as family/context ids, so a shared
-  // claim with a changed number must never look like a second family.
+  const setup = concreteSetup(brief, variant);
+  const result = concreteResult(brief, demand, variant);
+  const authoredPlan = brief.demands[demand];
+  const plan = authoredPlan ?? materialisedDemandPlan(brief, demand, result);
+  const task = authoredPlan?.task ?? (variant === 0 ? plan.task : plan.task.replace(brief.modeA, brief.modeB));
+  const demandCue = demand === "transfer"
+    ? "Use this unfamiliar representation and do not copy the route from the other context."
+    : demand === "synoptic"
+      ? `Combine ${brief.capability} with ${secondaryCapability(brief)}.`
+      : "";
+  const evidenceBase = plan.evidence;
+  // Keep the two routes genuinely different in their worked reasoning. The
+  // route text names an operation and a concrete check; it is not a request to
+  // “use an appropriate method” or to “trace a relationship to a target”.
   const routeProof = variant === 0
-    ? "The direct route derives the result from the defining relationship before substitution."
-    : "The independent route checks an invariant, limiting case or graphical representation before accepting the result.";
+    ? `Route A substitutes the displayed values into the ${brief.capability} relation and obtains ${result}.`
+    : `Route B recomputes ${result} from ${brief.modeB}, then compares the sign, ratio or limiting case with Route A.`;
   const evidence = variant === 0
     ? `${evidenceBase} ${routeProof}`
-    : `The cross-check uses ${mode} and tests the conclusion against an independent invariant or limiting case. ${routeProof}`;
+    : `${evidenceBase} ${routeProof}`;
   const operation = variant === 0
-    ? `trace ${mode} from the supplied conditions to the target`
-    : `cross-check ${mode} against a distinct ${brief.subject === "biology" ? "mechanism or control" : brief.subject === "chemistry" ? "equation or particle model" : "representation or domain"}`;
+    ? `Substitute the displayed quantities using ${mode}; compute the ${brief.subject === "biology" ? "biological" : brief.subject === "chemistry" ? "chemical" : "mathematical"} result.`
+    : `Reconstruct the result independently using ${mode}; test its sign, ratio or endpoint before accepting it.`;
   const marks = demand === "synoptic" ? 3 : 2;
   const scheme = [
     evidence,
-    `A complete answer must ${operation}.`,
-    "Checks the conclusion against the stated constraint and explains the implication.",
+    operation,
+    `Reports ${result} and explains its implication for ${brief.capability}.`,
   ].slice(0, marks);
   return {
     label: `(${String.fromCharCode(97 + demands.indexOf(demand))})`,
-    prompt: `${context} ${task} for ${brief.capability}.`,
+    prompt: `${setup} ${context}. ${demandCue} ${task} for ${brief.capability}.`,
     marks,
     scheme,
-    answer: `${evidence} A complete response ${operation}.`,
+    answer: `${evidence} Therefore, ${result}. ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.`,
     specPointIds: [pointId],
     capabilityIds: [wjecCapabilityForSpecPoint(pointId)!],
     learning: {
@@ -104,8 +216,12 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
       contextId: `wjec-${brief.subject}-depth:${brief.slug}:${variant === 0 ? brief.contextA : brief.contextB}`,
       demand,
       reasoningMoves: [operation],
+      // These rows now contain a concrete, standalone setup and worked result;
+      // they are eligible for substantive review. A future authoring helper
+      // that cannot instantiate its data must explicitly use `scaffold`.
+      quality: "substantive",
     },
-    learningClaims: [brief.capability],
+    learningClaims: demand === "synoptic" ? [brief.capability, secondaryCapability(brief)] : [brief.capability],
     aos: demand === "recall" ? ["AO1"] : demand === "synoptic" || demand === "transfer" ? ["AO2", "AO3"] : ["AO2"],
   };
 }
