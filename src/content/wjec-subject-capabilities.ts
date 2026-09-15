@@ -2,8 +2,11 @@ import type { CapabilityNode } from "@/domain/capability-graph";
 import { wjecMaths } from "@/domain/curriculum/wjec-maths";
 import { wjecBiology } from "@/domain/curriculum/wjec-biology";
 import { wjecChemistry } from "@/domain/curriculum/wjec-chemistry";
+import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 
 export const wjecDepthCurricula = [wjecMaths, wjecBiology, wjecChemistry];
+/** All four WJEC flagships for the internal balanced-depth report. */
+export const wjecFlagshipCurricula = [wjecPhysics, wjecMaths, wjecBiology, wjecChemistry];
 const namespaces: Record<string, string> = { "wjec-alevel-maths": "math", "wjec-alevel-biology": "bio", "wjec-alevel-chemistry": "chem" };
 
 export function wjecCapabilityForSpecPoint(pointId: string): string | undefined {

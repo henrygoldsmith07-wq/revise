@@ -56,6 +56,7 @@ import { physicsDepthCompletionPracticalQuestions } from "./questions/physics-de
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
+import { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts } from "./questions/wjec-flagship-depth";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
@@ -107,6 +108,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
+  ...wjecFlagshipDepthQuestions,
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,
@@ -142,6 +144,7 @@ export { physicsCoverageQuestions };
 export { physicsReasoningDepthQuestions };
 export { physicsDepthNearCompleteCoreQuestions, physicsDepthNearCompleteMaterialsQuestions, physicsDepthNearCompleteWavesQuestions, physicsDepthNearCompleteQuantumQuestions, physicsDepthNearCompleteGapQuestions };
 export { physicsDepthCompletionEnergyQuantumQuestions, physicsDepthCompletionCircuitsMechanicsQuestions, physicsDepthCompletionFieldsThermalNuclearQuestions, physicsDepthCompletionPracticalQuestions };
+export { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

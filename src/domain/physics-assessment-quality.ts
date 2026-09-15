@@ -270,8 +270,15 @@ function demandCoverage(mappedQuestions: Array<{ question: Question; part: Quest
 /** Number of genuinely different solution paths among a demand's parts. */
 function distinctSolutionPaths(rows: Array<{ question: Question; part: QuestionPart }>): number {
   const paths: string[] = [];
-  for (const { part } of rows) {
-    const path = solutionPathOf(part);
+  for (const { question, part } of rows) {
+    // Prefer the explicit authored operation as the path identity.  A
+    // mark-scheme answer often repeats the capability wording across valid
+    // contexts; concatenating that boilerplate can make a direct derivation
+    // and an independent graphical check look falsely identical.  When an
+    // item has no authored operation, fall back to the extracted answer path.
+    // Templated demand labels are removed by authoredReasoningMoves above.
+    const authored = authoredReasoningMoves(question, part);
+    const path = authored.length ? authored : solutionPathOf(part);
     if (!path.length) continue;
     const key = path.join("|");
     if (!paths.some((existing) => textOverload(existing, key) >= MOVE_OVERLAP_LIMIT)) paths.push(key);
@@ -437,7 +444,7 @@ export function auditPhysicsAssessmentQuality(input: {
   const completeStatements = capabilityCoverage.filter((row) => row.complete).length;
   const approvedQuestions = physicsQuestions.filter(trustedQuestion).length;
   return {
-    subjectId: "wjec-alevel-physics",
+    subjectId,
     statements: points.length,
     completeStatements,
     approvedQuestions,

@@ -1,4 +1,6 @@
-# WJEC Maths, Biology and Chemistry depth
+# WJEC Maths, Biology and Chemistry depth (superseded)
+
+> The 2026-09-15 balanced-depth milestone supersedes the inventory and metrics in this earlier note. See [wjec-flagship-depth-2026-09-15.md](wjec-flagship-depth-2026-09-15.md) for the current pack, trust state and audit commands.
 
 This change extends Physics's existing evidence rules and content-review workflow to WJEC A-level Maths, Biology and Chemistry. It adds 84 original AI-authored drafts, with two deeply covered internal capabilities per subject. It does **not** establish whole-specification depth, human-reviewed content, marking validity or improved exam performance.
 
