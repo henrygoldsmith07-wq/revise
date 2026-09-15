@@ -201,6 +201,61 @@ const REWORDING_CONTAINMENT_LIMIT = 0.6;
  */
 const SHARED_OPERATION_LIMIT = 0.5;
 
+/**
+ * Semantic route features used in addition to authored move text.  These
+ * deliberately describe operations, representations and evidence sources;
+ * names, numbers and narrative context are ignored so a cosmetic reskin
+ * cannot establish a second family.
+ */
+const ROUTE_FEATURES: ReadonlyArray<readonly [string, RegExp]> = [
+  ["differentiate", /\b(?:differentiat|derivative|gradient|tangent|normal|rate\s+of\s+change)\w*/i],
+  ["integrate", /\b(?:integrat|antiderivative|area\s+under|displacement)\w*/i],
+  ["substitute", /\b(?:substitut|insert|evaluate\s+at|plug\s+in)\w*/i],
+  ["rearrange", /\b(?:rearrang|isolate|make\s+\w+\s+the\s+subject)\w*/i],
+  ["factor-or-root", /\b(?:factor|root|quadratic|discriminant|synthetic\s+division)\w*/i],
+  ["balance", /\b(?:balance|half[- ]equation|oxidation|reduction|electron\s+transfer|charge\s+balance)\w*/i],
+  ["stoichiometry", /\b(?:stoichiometr|mole\s+ratio|titre|titration|limiting\s+reagent|yield|purity)\w*/i],
+  ["probability", /\b(?:probabil|conditional|bayes|sample\s+space|tree|counting|binomial)\w*/i],
+  ["graph-gradient-area", /\b(?:graph|gradient|slope|tangent|area|interpolat|plot|axis)\w*/i],
+  ["mechanism", /\b(?:mechanism|causal|because|collision|active\s+site|membrane|particle|structure[- ]function)\w*/i],
+  ["compare-or-rank", /\b(?:compar|rank|contrast|difference|higher|lower|trend|classif)\w*/i],
+  ["constraint-domain", /\b(?:domain|range|endpoint|boundary|constraint|admissib|valid|infeasible|limiting\s+case)\w*/i],
+  ["data-or-uncertainty", /\b(?:data|table|measurement|uncertaint|significant\s+figures?|error|standard\s+deviation|control|replicat)\w*/i],
+  ["representation-change", /\b(?:diagram|spectrum|coordinate|vector|sequence|matrix|equation|formula|representation|translation|map)\w*/i],
+  ["unit-conversion", /\b(?:unit|convert|standard\s+form|SI|cm³|dm³|kelvin|pascal)\w*/i],
+  ["prediction", /\b(?:predict|infer|deduce|derive|extrapolat|forecast|suggest)\w*/i],
+  // Finer route markers prevent a transfer item from looking identical to a
+  // direct application merely because both mention the same topic.  They
+  // describe the hidden state, representation or evidence protocol that
+  // actually changes the reasoning path.
+  ["hidden-variable", /\b(?:hidden|latent|prior|posterior|Bayes|source|unobserved|unknown\s+(?:state|parameter))\w*/i],
+  ["weighted-cases", /\b(?:weight(?:ed|ing)?|mixture|case(?:s)?|contribution|enumerat(?:e|ion)|RR|RB|BR|all\s+cases)\b/i],
+  ["reporting-protocol", /\b(?:protocol|operator|reports?|reporting|without\s+showing|selected\s+uniformly|observ(?:e|ation))\b/i],
+  ["conditional-formula", /P\s*\([^)]*\|[^)]*\)|\bconditional\s+probabil(?:ity|istic)\b/i],
+  ["complement-count", /\b(?:at\s+least\s+one|complement|1\s*[-−]\s*|none|exactly\s+one|failure\s+count)\b/i],
+  ["symbolic-equation", /(?:[A-Za-z][A-Za-z0-9′']*\s*=|\b(?:equation|formula|identity|simultaneous)\b)/i],
+  ["physical-constraint", /\b(?:feasible|admissible|domain|boundary|conservation|limiting|units?|significant\s+figures?|error\s+carried)\b/i],
+] as const;
+
+export function semanticRouteFeatures(text: string): string[] {
+  return ROUTE_FEATURES.filter(([, pattern]) => pattern.test(text)).map(([name]) => name);
+}
+
+/** 0 means identical semantic route; 1 means no shared operation/evidence. */
+export function semanticRouteDistance(left: string, right: string): number {
+  const a = new Set(semanticRouteFeatures(left));
+  const b = new Set(semanticRouteFeatures(right));
+  if (!a.size || !b.size) return 1 - textOverload(left, right);
+  let shared = 0;
+  for (const feature of a) if (b.has(feature)) shared++;
+  // Jaccard distance penalises a route that merely adds the same topic words
+  // while introducing no genuinely new operation.  The previous
+  // min-denominator score treated a feature superset as identical, which let
+  // transfer questions with a hidden protocol collapse into direct practice.
+  const union = new Set([...a, ...b]).size;
+  return 1 - shared / Math.max(1, union);
+}
+
 function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
@@ -215,6 +270,8 @@ function partLearningMetadata(question: Question, part: QuestionPart) {
     contextId: question.learning.contextId,
     demand: question.learning.demand,
     reasoningMoves: question.learning.reasoningMoves ?? [],
+    capabilityEvidence: question.learning.capabilityEvidence,
+    provenance: question.learning.provenance,
     quality: undefined,
   } : undefined);
 }
@@ -279,7 +336,7 @@ function demandCoverage(
 
 /** Number of genuinely different solution paths among a demand's parts. */
 function distinctSolutionPaths(rows: Array<{ question: Question; part: QuestionPart }>): number {
-  const paths: string[] = [];
+  const paths: Array<{ path: string; text: string; features: string[] }> = [];
   for (const { question, part } of rows) {
     // Prefer the explicit authored operation as the path identity.  A
     // mark-scheme answer often repeats the capability wording across valid
@@ -291,7 +348,18 @@ function distinctSolutionPaths(rows: Array<{ question: Question; part: QuestionP
     const path = authored.length ? authored : solutionPathOf(part);
     if (!path.length) continue;
     const key = path.join("|");
-    if (!paths.some((existing) => textOverload(existing, key) >= MOVE_OVERLAP_LIMIT)) paths.push(key);
+    const fullText = [part.prompt, ...(part.markScheme ?? []), part.modelAnswer].join("\n");
+    const features = semanticRouteFeatures(fullText);
+    if (!paths.some((existing) => {
+      const textualDuplicate = textOverload(existing.path, key) >= MOVE_OVERLAP_LIMIT;
+      const semanticDuplicate = semanticRouteDistance(existing.text, fullText) < 0.35;
+      // Keep the conservative conjunction for the existing bank: a narrow
+      // subject calculation can legitimately share route features with a
+      // second context. A duplicate requires both high path-text overlap and
+      // semantic-route overlap; genuinely different operations survive even
+      // when they use the same topic vocabulary.
+      return textualDuplicate && semanticDuplicate;
+    })) paths.push({ path: key, text: fullText, features });
   }
   return paths.length;
 }

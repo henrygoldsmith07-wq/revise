@@ -1,15 +1,31 @@
 import type { CapabilityNode } from "./capability-graph";
+import {
+  answerLeakageDetail,
+  hasSynopticAttribution,
+  transferNoveltyClasses,
+  validateCapabilityEvidence,
+  validateProvenance,
+} from "./subject-assessment-semantic";
+export { answerLeakageDetail, classifyNumericalClaims, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
+export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
 import { checkEquationBalance, findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
 import {
   auditPhysicsAssessmentQuality,
   PHYSICS_ASSESSMENT_DEMANDS,
   promptOverload,
+  semanticRouteDistance,
   type PhysicsAssessmentQualityAudit,
   type PhysicsQualityIssueKind,
   type PhysicsQualityIssue,
 } from "./physics-assessment-quality";
-import type { Id, LearningDemand, Question, QuestionPart, Topic } from "./types";
+import type {
+  Id,
+  LearningDemand,
+  Question,
+  QuestionPart,
+  Topic,
+} from "./types";
 
 /**
  * The WJEC flagship subjects share one depth contract.  Physics already uses
@@ -30,6 +46,11 @@ export type SubjectAssessmentIssueKind =
   | "not-self-contained"
   | "solution-substance"
   | "demand-evidence"
+  | "answer-leakage"
+  | "capability-evidence"
+  | "provenance"
+  | "transfer-novelty"
+  | "synoptic-evidence"
   | "maths-equivalence"
   | "maths-domain"
   | "maths-exact-form"
@@ -139,13 +160,6 @@ function hasResultEvidence(text: string): boolean {
   return /[=→⟶]|\b(?:therefore|thus|hence|gives?|giving|equals?|is|are|was|were|increases?|decreases?|changes?|predicts?|conclude|so that|result(?:s|ing)?|because|leads?|causes?|follows?|obtain|obtains|yield|amount|concentration|purity|probability|value|volume|mass|approximately|about|would|could|supports?|requires?|twice|half|outside|infeasible|impossible|rejected|valid|invalid|root|solution|test|suggest|explains?|explain|compare|difference|different|higher|lower)\b/i.test(text);
 }
 
-/**
- * A result/conclusion must contain something a marker can check.  Words such
- * as “the result is correct” are outcome-shaped prose, but they do not show a
- * value, relation or biological/chemical consequence.  Keep this stricter
- * predicate for the substantive gate while the broader predicate above still
- * supports qualitative explanation checks.
- */
 function hasConcreteResultEvidence(text: string, subjectId?: WjecFlagshipSubjectId | Id): boolean {
   if (/(?:->|==>|[→⟶])/.test(text)) return true;
   if (/(?:=|≈|≃|≤|≥|<|>)\s*[+-]?(?:\d|[A-Za-z(])/.test(text)) return true;
@@ -168,16 +182,9 @@ function hasWorkedEvidence(text: string): boolean {
 
 function numericLiterals(text: string): string[] {
   return [...text.matchAll(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[×x]\s*10\s*(?:\^|\*\*)?\s*[+-]?\d+)?/gi)]
-    .map((match) => match[0]!.replace(/\s+/g, "").toLowerCase());
+    .map((match) => match[0]!.replace(/\s+/g, "").replace(/\.$/, "").toLowerCase());
 }
 
-/**
- * Detect completed numerical reasoning without requiring a derived answer to
- * repeat one of the prompt's literal values.  Real solutions commonly turn
- * supplied values into new mole amounts, ratios, percentages or interpolated
- * results, so literal overlap is only one signal.  A bare invented number
- * (“the answer is 42”) remains unresolved and is rejected by the gate.
- */
 function hasCalculationNarrative(text: string): boolean {
   if (!numericLiterals(text).length) return false;
   if (/[=≈≃≤≥→⟶]/.test(text)) return true;
@@ -279,15 +286,6 @@ function hasConcreteApplicationContext(prompt: string, subjectId: WjecFlagshipSu
   return hasSubjectSpecificEvidence(prompt, subjectId);
 }
 
-/**
- * The older generated depth pack is retained as provisional practice content
- * while the subject-specific quality packs are authored. It has concrete
- * numeric setups, but its route prose is intentionally not a human-reviewed
- * correctness signal. Keep it out of trusted/release counts while allowing
- * the structural depth inventory to remain visible during migration. New
- * generated rows do not get this exception unless they carry the explicit
- * `-depth:` family marker used by that migration pack.
- */
 function isGeneratedDepthDraft(question: Question): boolean {
   return question.source === "generated" && question.verification === "unverified" &&
     question.parts.some((part) => part.learning?.familyId?.includes("-depth:"));
@@ -323,12 +321,6 @@ function undefinedVariableReference(prompt: string, subjectId: WjecFlagshipSubje
   return null;
 }
 
-/**
- * Generic wording is acceptable only when the surrounding cell instantiates
- * the thing it refers to.  This keeps the fallback detector strict while
- * allowing an authored prompt such as “use the appropriate method to find
- * f(2)” to retain a harmless editorial phrase.
- */
 function fallbackPhraseIsInstantiated(phrase: RegExp, prompt: string, fullText: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
   const source = phrase.source;
   const target = hasSpecificTarget(prompt);
@@ -405,8 +397,14 @@ function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecFlagship
   return join && answerJoin && hasSubjectSpecificEvidence(answer, subjectId);
 }
 
+/**
+ * Require the two synoptic capabilities to appear in attributable solution
+ * steps.  Naming two topics in a stem is insufficient if the worked answer
+ * uses only one of them; at least two checkable scheme/answer steps must carry
+ * distinct subject operations.
+ */
 interface SubstantiveGateFailure {
-  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence">;
+  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
   detail: string;
 }
 
@@ -421,7 +419,15 @@ export function validateSubstantivePart(
   part: QuestionPart,
 ): SubstantiveGateFailure[] {
   const failures: SubstantiveGateFailure[] = [];
-  const meta = part.learning;
+  const meta = part.learning ?? (question.learning ? {
+    familyId: question.learning.familyId,
+    contextId: question.learning.contextId,
+    demand: question.learning.demand,
+    reasoningMoves: question.learning.reasoningMoves ?? [],
+    capabilityEvidence: question.learning.capabilityEvidence,
+    provenance: question.learning.provenance,
+    quality: undefined,
+  } : undefined);
   const text = partText(part);
   const prompt = part.prompt.trim();
   const answer = part.modelAnswer.trim();
@@ -441,6 +447,19 @@ export function validateSubstantivePart(
   }
   if (!hasCommandWord) {
     failures.push({ kind: "demand-evidence", detail: "A substantive cell needs an explicit subject command such as calculate, explain, compare or define." });
+  }
+
+  // The expected result belongs in the scheme/answer, never in the student
+  // prompt.  This is a hard error because a leaked result can create a false
+  // mastery or transfer signal even when every other structural check passes.
+  const leakage = answerLeakageDetail(prompt, `${part.markScheme.join("\n")}\n${answer}`);
+  if (leakage) failures.push({ kind: "answer-leakage", detail: leakage });
+
+  for (const detail of validateCapabilityEvidence(meta?.capabilityEvidence, part, text)) {
+    failures.push({ kind: "capability-evidence", detail });
+  }
+  for (const detail of validateProvenance(meta?.provenance, prompt, part.markScheme, answer, subjectId)) {
+    failures.push({ kind: detail.includes("answer leakage") ? "answer-leakage" : "provenance", detail });
   }
 
   for (const phrase of GENERIC_FALLBACK_PHRASES) {
@@ -586,15 +605,22 @@ export function validateSubstantivePart(
     }
   } else if (demand === "transfer") {
     if (provisionalDepthDraft) return failures;
-    if (!hasTransferAdaptation(prompt, answer, subjectId)) {
+    const noveltyClasses = transferNoveltyClasses(prompt);
+    if (!hasTransferAdaptation(prompt, answer, subjectId) || noveltyClasses.length === 0) {
       failures.push({ kind: "demand-evidence", detail: "Transfer must use a genuinely new representation or context and reach a conclusion." });
+      if (noveltyClasses.length === 0) {
+        failures.push({ kind: "transfer-novelty", detail: "Transfer prompt changes no observable representation, information structure, hidden state, constraint, data form or concept combination." });
+      }
     }
   } else if (demand === "synoptic") {
     if (provisionalDepthDraft) return failures;
     const claims = part.learningClaims ?? [];
     const distinctClaims = claims.length >= 2 && promptOverload(claims[0]!, claims[1]!) < 0.85;
-    if (!distinctClaims || !hasSynopticJoin(prompt, answer, subjectId)) {
-      failures.push({ kind: "demand-evidence", detail: "Synoptic work must combine two independently meaningful capabilities." });
+    const joined = hasSynopticJoin(prompt, answer, subjectId);
+    const attributed = hasSynopticAttribution(part, subjectId);
+    const explicitSecondary = Boolean(meta?.capabilityEvidence?.secondaryCapability);
+    if (!distinctClaims || !joined || !attributed || !explicitSecondary) {
+      failures.push({ kind: "synoptic-evidence", detail: "Synoptic work must name primary and secondary capabilities and attribute a necessary solution step to each." });
     }
   }
 
@@ -1521,6 +1547,7 @@ function buildRepairQueue(
   };
 
   const priorityForSubjectIssue = (issue: SubjectAssessmentIssue): SubjectRepairPriority => {
+    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "synoptic-evidence") return "missing-authored-demand";
     if (issue.kind === "not-self-contained") return "not-self-contained";
     if (issue.kind === "solution-substance") return "weak-worked-solution";
     if (issue.kind !== "generic-fallback" && issue.kind !== "demand-evidence") return "correctness-warning";
@@ -1657,6 +1684,35 @@ export function auditFlagshipSubject(input: {
       // author repairs and re-reviews it; warnings remain conservative manual
       // review items and do not silently erase otherwise useful coverage.
       if (subjectIssues.slice(issueStart).some((issue) => issue.severity === "error")) {
+        invalidParts.add(`${question.id}:${part.id}`);
+      }
+    }
+  }
+
+  // A transfer item must change the reasoning route as well as its wrapper.
+  // Compare it with the application/calculation routes for the same smallest
+  // capability.  When no baseline route exists the item remains a hypothesis
+  // and the authoring queue will ask for that missing comparison rather than
+  // claiming transfer evidence from a lone question.
+  if (input.subjectId !== "wjec-alevel-physics") {
+    const allParts = subjectQuestions.flatMap((question) => question.parts.map((part) => ({ question, part })));
+    for (const { question, part } of allParts) {
+      if (part.learning?.demand !== "transfer" || isGeneratedDepthDraft(question)) continue;
+      const capability = part.capabilityIds?.length === 1 ? part.capabilityIds[0] : undefined;
+      const specPoint = part.specPointIds?.length === 1 ? part.specPointIds[0] : undefined;
+      if (!capability || !specPoint) continue;
+      const baselines = allParts.filter(({ question: candidateQuestion, part: candidate }) =>
+        candidateQuestion.id !== question.id && candidate.specPointIds?.length === 1 && candidate.specPointIds[0] === specPoint &&
+        candidate.capabilityIds?.length === 1 && candidate.capabilityIds[0] === capability &&
+        (candidate.learning?.demand === "application" || candidate.learning?.demand === "calculation") &&
+        !isGeneratedDepthDraft(candidateQuestion));
+      if (!baselines.length) continue;
+      const transferText = partText(part);
+      const transferClasses = new Set(transferNoveltyClasses(part.prompt));
+      const baselineClasses = new Set(baselines.flatMap(({ part: baseline }) => transferNoveltyClasses(baseline.prompt)));
+      const hasNewClass = [...transferClasses].some((novelty) => !baselineClasses.has(novelty));
+      if (!hasNewClass && baselines.every(({ part: baseline }) => semanticRouteDistance(transferText, partText(baseline)) < 0.35)) {
+        addIssue(subjectIssues, question, part, "transfer-novelty", "error", "Transfer route is semantically the same as the available application/calculation route; add an unfamiliar representation, hidden constraint or genuinely different operation.");
         invalidParts.add(`${question.id}:${part.id}`);
       }
     }

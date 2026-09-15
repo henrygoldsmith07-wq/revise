@@ -1,6 +1,7 @@
 import type { LearningDemand, Question } from "@/domain/types";
 import { defineQuestions, type PartSpec, type QuestionSpec } from "./authoring";
 import { wjecCapabilityForSpecPoint } from "../wjec-subject-capabilities";
+import { capabilityEvidenceFor, provenanceFor } from "./wjec-quality-authoring";
 
 /**
  * Balanced WJEC flagship depth pack.
@@ -134,40 +135,49 @@ function materialisedDemandPlan(brief: DepthBrief, demand: LearningDemand, resul
   switch (demand) {
     case "recall":
       return {
-        task: `State the ${subjectNoun} rule for ${brief.capability} and the condition that makes this result valid`,
+        task: `State the ${subjectNoun} rule for ${brief.capability} and the condition that makes the relation valid`,
         evidence: `${result}; state the defining rule and its stated condition for ${brief.capability}.`,
       };
     case "explanation":
       return {
-        task: `Explain why ${result} follows when ${brief.modeA} is applied to ${brief.capability}`,
+        task: `Explain why the stated outcome follows when ${brief.modeA} is applied to ${brief.capability}`,
         evidence: `${result}; link ${brief.modeA} to the ${brief.subject} mechanism or logical step for ${brief.capability}.`,
       };
     case "application":
       return {
-        task: `Apply ${brief.modeA} to the supplied setup and report ${result}`,
+        task: `Apply ${brief.modeA} to the supplied setup and report the resulting quantity or conclusion`,
         evidence: `${result}; applying ${brief.modeA} to the supplied values gives a checkable ${brief.subject} consequence.`,
       };
     case "misconception":
       return {
-        task: `A student claims the opposite of ${result}. Identify the first invalid step and correct it using ${brief.modeA}`,
+        task: `A student applies the wrong ${subjectNoun} assumption. Identify the first invalid step and correct it using ${brief.modeA}`,
         evidence: `${result}; the tempting claim is rejected at its first invalid ${brief.subject} assumption, then repaired with ${brief.modeA}.`,
       };
     case "calculation":
       return {
-        task: `Calculate ${result} from the supplied quantities using ${brief.modeA}, showing units and precision`,
+        task: `Calculate the derived quantity from the supplied quantities using ${brief.modeA}, showing units and precision`,
         evidence: `${result}; show the substitution, intermediate value and final unit for ${brief.capability}.`,
       };
     case "transfer":
       return {
-        task: `Use the unfamiliar representation to derive ${result} with ${brief.modeB}, then state what changes from the original case`,
+        task: `Use the unfamiliar representation to derive the derived quantity with ${brief.modeB}, then state what changes from the original case`,
         evidence: `${result}; the new representation preserves the ${brief.capability} invariant but requires ${brief.modeB}.`,
       };
     case "synoptic":
       return {
-        task: `Combine ${brief.capability} with ${secondaryCapability(brief)} to obtain ${result} and justify the constraint`,
+        task: `Combine ${brief.capability} with ${secondaryCapability(brief)} to obtain the derived quantity and justify the constraint`,
         evidence: `${result}; both ${brief.capability} and ${secondaryCapability(brief)} constrain the final ${brief.subject} conclusion.`,
       };
   }
+}
+
+/** Remove any accidental answer/conclusion interpolation from a prompt task. */
+function withoutExpectedResult(task: string, result: string): string {
+  const normalise = (value: string): string => value.replace(/[−–—]/g, "-").replace(/\s+/g, " ").trim();
+  const target = normalise(result);
+  if (!target) return task;
+  const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return task.replace(new RegExp(escaped, "gi"), "the derived quantity or conclusion");
 }
 
 function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): PartSpec {
@@ -178,7 +188,7 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   const result = concreteResult(brief, demand, variant);
   const authoredPlan = brief.demands[demand];
   const plan = authoredPlan ?? materialisedDemandPlan(brief, demand, result);
-  const task = authoredPlan?.task ?? (variant === 0 ? plan.task : plan.task.replace(brief.modeA, brief.modeB));
+  const task = withoutExpectedResult(authoredPlan?.task ?? (variant === 0 ? plan.task : plan.task.replace(brief.modeA, brief.modeB)), result);
   const demandCue = demand === "transfer"
     ? "Use this unfamiliar representation and do not copy the route from the other context."
     : demand === "synoptic"
@@ -198,19 +208,27 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
     ? `Substitute the displayed quantities using ${mode}; compute the ${brief.subject === "biology" ? "biological" : brief.subject === "chemistry" ? "chemical" : "mathematical"} result.`
     : `Reconstruct the result independently using ${mode}; test its sign, ratio or endpoint before accepting it.`;
   const marks = demand === "synoptic" ? 3 : 2;
+  const capabilityId = wjecCapabilityForSpecPoint(pointId)!;
   const scheme = [
     evidence,
     operation,
     `Reports ${result} and explains its implication for ${brief.capability}.`,
   ].slice(0, marks);
+  const fullPrompt = `${setup} ${context}. ${demandCue} ${task} for ${brief.capability}.`;
+  const fullAnswer = `${evidence} Therefore, ${result}. ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.`;
+  const baseCapabilityEvidence = capabilityEvidenceFor(brief.subject, brief.topic, capabilityId, fullPrompt, scheme, fullAnswer, operation);
+  const capabilityEvidence = demand === "synoptic"
+    ? { ...baseCapabilityEvidence, secondaryCapability: secondaryCapability(brief) }
+    : baseCapabilityEvidence;
+  const provenance = provenanceFor(fullPrompt, scheme, fullAnswer, operation);
   return {
     label: `(${String.fromCharCode(97 + demands.indexOf(demand))})`,
-    prompt: `${setup} ${context}. ${demandCue} ${task} for ${brief.capability}.`,
+    prompt: fullPrompt,
     marks,
     scheme,
-    answer: `${evidence} Therefore, ${result}. ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.`,
+    answer: fullAnswer,
     specPointIds: [pointId],
-    capabilityIds: [wjecCapabilityForSpecPoint(pointId)!],
+    capabilityIds: [capabilityId],
     learning: {
       familyId: `wjec-${brief.subject}-depth:${brief.slug}:${demand}:${variant === 0 ? "mechanism" : "cross-check"}`,
       contextId: `wjec-${brief.subject}-depth:${brief.slug}:${variant === 0 ? brief.contextA : brief.contextB}`,
@@ -220,6 +238,8 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
       // they are eligible for substantive review. A future authoring helper
       // that cannot instantiate its data must explicitly use `scaffold`.
       quality: "substantive",
+      capabilityEvidence,
+      provenance,
     },
     learningClaims: demand === "synoptic" ? [brief.capability, secondaryCapability(brief)] : [brief.capability],
     aos: demand === "recall" ? ["AO1"] : demand === "synoptic" || demand === "transfer" ? ["AO2", "AO3"] : ["AO2"],

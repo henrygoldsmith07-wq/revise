@@ -60,6 +60,19 @@ const learningPartSchema = z.object({
   demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
   reasoningMoves: z.array(nonEmpty).min(1).max(8),
   quality: z.enum(["substantive", "scaffold"]).optional(),
+  capabilityEvidence: z.object({
+    capabilityId: id,
+    requiredEntities: z.array(nonEmpty).min(1).max(12),
+    requiredOperations: z.array(nonEmpty).min(1).max(8),
+    requiredRelations: z.array(nonEmpty).max(8).optional(),
+    secondaryCapability: nonEmpty.optional(),
+  }).optional(),
+  provenance: z.object({
+    sourceEvidence: z.array(nonEmpty).min(1).max(12),
+    operation: nonEmpty,
+    intermediateResults: z.array(nonEmpty).max(12),
+    finalResult: nonEmpty,
+  }).optional(),
 }).passthrough();
 
 export const contentQuestionPartSchema = z.object({
@@ -98,6 +111,19 @@ export const contentQuestionSchema = z.object({
     demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
     expectedMinutes: z.number().finite().positive().max(120),
     reasoningMoves: z.array(nonEmpty).min(1).max(8).optional(),
+    capabilityEvidence: z.object({
+      capabilityId: id,
+      requiredEntities: z.array(nonEmpty).min(1).max(12),
+      requiredOperations: z.array(nonEmpty).min(1).max(8),
+      requiredRelations: z.array(nonEmpty).max(8).optional(),
+      secondaryCapability: nonEmpty.optional(),
+    }).optional(),
+    provenance: z.object({
+      sourceEvidence: z.array(nonEmpty).min(1).max(12),
+      operation: nonEmpty,
+      intermediateResults: z.array(nonEmpty).max(12),
+      finalResult: nonEmpty,
+    }).optional(),
   }).optional(),
 }).passthrough().superRefine((question, ctx) => {
   const marks = question.parts.reduce((sum, part) => sum + part.marks, 0);

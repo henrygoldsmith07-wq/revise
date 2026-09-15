@@ -10,6 +10,8 @@ import { seedQuestions } from "@/content";
 import { defineQuestion } from "@/content/questions/authoring";
 import { qualityItem } from "@/content/questions/wjec-quality-authoring";
 import { auditFlagshipSubject, buildFlagshipDepthDashboard } from "@/domain/subject-assessment-audit";
+import { classifyNumericalClaims, promptAnswerClaims, transferNoveltyClasses } from "@/domain/subject-assessment-audit";
+import { semanticRouteDistance } from "@/domain/physics-assessment-quality";
 import type { LearningDemand, Question } from "@/domain/types";
 
 const qualityBanks = [wjecMathsQualityQuestions, wjecBiologyQualityQuestions, wjecChemistryQualityQuestions];
@@ -97,6 +99,217 @@ function subjectIssues(question: Question) {
 }
 
 describe("subject-specific correctness checks", () => {
+  it("treats a numeric answer placed in a calculation prompt as a hard leakage error", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "answer-leak-numeric", "calculation",
+      "For f(x) = x², calculate f'(3) = 14 from the supplied information.",
+      "f'(3) = 14.",
+    );
+    expect(subjectIssues(question).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+  });
+
+  it("catches simplified algebraic expressions and prose conclusions leaked into prompts", () => {
+    expect(promptAnswerClaims("Simplify (√2 + 1)^2 to 3 + 2√2.")).toContain("3 + 2√2");
+    const algebra = substantiveFixture(
+      "wjec-alevel-maths", "answer-leak-expression", "calculation",
+      "Simplify (√2 + 1)^2 to 3 + 2√2.",
+      "The simplified expression is 3 + 2√2.",
+    );
+    const biology = substantiveFixture(
+      "wjec-alevel-biology", "answer-leak-conclusion", "explanation",
+      "The effect is increased enzyme activity. Explain why the effect occurs.",
+      "The effect is increased enzyme activity because more active sites form enzyme-substrate complexes.",
+    );
+    expect(subjectIssues(algebra).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+    expect(subjectIssues(biology).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+  });
+
+  it("does not mistake an instructed route such as solve f' = 0 for a leaked result", () => {
+    const prompt = "Calculate f'(3) using solve f' = 0 then compare the stationary values.";
+    expect(promptAnswerClaims(prompt)).toEqual([]);
+    const question = substantiveFixture("wjec-alevel-maths", "answer-leak-route-instruction", "calculation", prompt,
+      "Solve f'(x) = 0, compare the values and report the stationary point.");
+    expect(subjectIssues(question).some((issue) => issue.kind === "answer-leakage")).toBe(false);
+  });
+
+  it("keeps a supplied equation distinct from a leaked result and catches selection leaks", () => {
+    expect(promptAnswerClaims("Calculate y = 2x from the supplied relation.")).toEqual([]);
+    expect(promptAnswerClaims("Select 14 as the concentration.")).toContain("14");
+    const suppliedRelation = substantiveFixture(
+      "wjec-alevel-maths", "answer-leak-supplied-equation", "calculation",
+      "Calculate y = 2x from the supplied relation.",
+      "Using y = 2x and x = 2 gives y = 4.",
+    );
+    const selection = substantiveFixture(
+      "wjec-alevel-chemistry", "answer-leak-selection", "calculation",
+      "Select 0.020 mol dm^-3 as the concentration.",
+      "The concentration is 0.020 mol dm^-3.",
+    );
+    expect(subjectIssues(suppliedRelation).some((issue) => issue.kind === "answer-leakage")).toBe(false);
+    expect(subjectIssues(selection).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+  });
+
+  it("catches a qualitative conclusion embedded in a predictive prompt", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-biology", "answer-leak-prediction", "explanation",
+      "Predict that water moves into the cell. Explain why.",
+      "Water moves into the cell because its water potential is higher outside.",
+    );
+    expect(subjectIssues(question).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+  });
+
+  it("requires concrete capability evidence in the student-facing setup", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "missing-capability-evidence", "calculation",
+      "Use the polynomial equation x² - 5x + 6 = 0 to find its roots.",
+      "The roots are x = 2 and x = 3.",
+    );
+    const part = question.parts[0]!;
+    part.specPointIds = ["wjec-alevel-maths.algebra.sp-01"];
+    part.capabilityIds = ["math.algebra.sp-01"];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.algebra.sp-01",
+        requiredEntities: ["surd"],
+        requiredOperations: ["simplify"],
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && /surd/i.test(issue.detail))).toBe(true);
+  });
+
+  it("rejects provenance that invents a final number without a source-linked route", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "invented-provenance-number", "calculation",
+      "For x = 2, calculate y from the stated relation.",
+      "y = 42.",
+    );
+    const part = question.parts[0]!;
+    part.specPointIds = ["wjec-alevel-maths.algebra.sp-01"];
+    part.capabilityIds = ["math.algebra.sp-01"];
+    part.learning = {
+      ...part.learning!,
+      provenance: {
+        sourceEvidence: ["x = 2"],
+        operation: "calculate",
+        intermediateResults: [],
+        finalResult: "y = 42",
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "provenance" && /42|source-linked/i.test(issue.detail))).toBe(true);
+  });
+
+  it("rejects an inconsistent intermediate even when the final value looks plausible", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "wrong-intermediate", "calculation",
+      "For x = 2, calculate y from y = 2x.",
+      "2 × 2 = 5, so y = 4.",
+    );
+    const part = question.parts[0]!;
+    part.learning = {
+      ...part.learning!,
+      provenance: {
+        sourceEvidence: ["x = 2", "y = 2x"],
+        operation: "calculate",
+        intermediateResults: ["2 × 2 = 5"],
+        finalResult: "y = 4",
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "provenance" && /Arithmetic step is inconsistent/i.test(issue.detail))).toBe(true);
+  });
+
+  it("rejects provenance that changes the Maths function or invents a Chemistry species", () => {
+    const maths = substantiveFixture(
+      "wjec-alevel-maths", "wrong-function", "calculation",
+      "Given f(x) = x², calculate f'(2).",
+      "g'(x) = 2x, so g'(2) = 4.",
+    );
+    const mathsPart = maths.parts[0]!;
+    mathsPart.learning = {
+      ...mathsPart.learning!,
+      provenance: { sourceEvidence: ["f(x) = x²"], operation: "differentiate", intermediateResults: ["g'(x) = 2x"], finalResult: "g'(2) = 4" },
+    };
+    const chemistry = substantiveFixture(
+      "wjec-alevel-chemistry", "wrong-species", "calculation",
+      "For NaOH(aq), calculate the amount from the supplied concentration and volume.",
+      "HCl(aq) provides the reacting amount, so n = 0.020 mol.",
+    );
+    const chemistryPart = chemistry.parts[0]!;
+    chemistryPart.learning = {
+      ...chemistryPart.learning!,
+      provenance: { sourceEvidence: ["NaOH(aq)"], operation: "calculate", intermediateResults: ["n = 0.020 mol"], finalResult: "n = 0.020 mol" },
+    };
+    expect(subjectIssues(maths).some((issue) => issue.kind === "provenance" && /different function/i.test(issue.detail))).toBe(true);
+    expect(subjectIssues(chemistry).some((issue) => issue.kind === "provenance" && /HCl/i.test(issue.detail))).toBe(true);
+  });
+
+  it("classifies supplied and derived numerical claims separately", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "numeric-claim-roles", "calculation",
+      "For x = 2, calculate y = 2x.",
+      "2 × 2 = 4, so y = 4.",
+    );
+    const part = question.parts[0]!;
+    part.learning = {
+      ...part.learning!,
+      provenance: {
+        sourceEvidence: ["x = 2", "y = 2x"],
+        operation: "calculate",
+        intermediateResults: ["2 × 2 = 4"],
+        finalResult: "y = 4",
+      },
+    };
+    const claims = classifyNumericalClaims(part);
+    expect(claims.some((claim) => claim.location === "prompt" && claim.value === "2" && claim.role === "supplied")).toBe(true);
+    expect(claims.some((claim) => claim.location === "answer" && claim.value === "4" && claim.role === "derived-final")).toBe(true);
+  });
+
+  it("does not label a raw graph datum as a verified graph-derived result", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "graph-claim-roles", "calculation",
+      "A graph shows a raw reading of 4.0 at x = 2. Use the tangent to calculate the gradient.",
+      "The tangent gradient is 2.0.",
+    );
+    const part = question.parts[0]!;
+    part.learning = {
+      ...part.learning!,
+      provenance: { sourceEvidence: ["4.0", "x = 2"], operation: "calculate gradient", intermediateResults: [], finalResult: "gradient = 2.0" },
+    };
+    const claims = classifyNumericalClaims(part);
+    expect(claims.some((claim) => claim.location === "prompt" && claim.value === "4.0" && claim.role === "supplied")).toBe(true);
+    expect(claims.some((claim) => claim.location === "answer" && claim.value === "2.0" && claim.role === "graph-derived")).toBe(true);
+  });
+
+  it("requires transfer novelty to change the information structure, not only the label", () => {
+    expect(transferNoveltyClasses("Use an unfamiliar graph representation with a hidden parameter and a fixed integer constraint.")).toEqual(
+      expect.arrayContaining(["representation", "hidden-state", "constraint"]),
+    );
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "transfer-without-novelty", "transfer",
+      "Use a different context and calculate the same value using the same method.",
+      "The different context gives the same value by the same method.",
+    );
+    expect(subjectIssues(question).some((issue) => issue.kind === "transfer-novelty" && issue.severity === "error")).toBe(true);
+  });
+
+  it("keeps semantic route distance sensitive to a genuinely different representation", () => {
+    expect(semanticRouteDistance("substitute the equation and calculate the value", "substitute the equation and calculate the value")).toBe(0);
+    expect(semanticRouteDistance("substitute the equation and calculate the value", "read the graph gradient, infer the hidden parameter and compare the trend")).toBeGreaterThan(0.2);
+  });
+
+  it("requires explicit secondary capability evidence for synoptic work", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "synoptic-without-secondary", "synoptic",
+      "Combine differentiation with the area of a rectangle and determine the optimum.",
+      "Differentiate the area expression, compare the admissible values and report the optimum.",
+    );
+    const part = question.parts[0]!;
+    part.specPointIds = ["wjec-alevel-maths.differentiation.sp-04"];
+    part.capabilityIds = ["math.differentiation.sp-04"];
+    part.learningClaims = ["differentiation", "area"];
+    expect(subjectIssues(question).some((issue) => issue.kind === "synoptic-evidence" && issue.severity === "error")).toBe(true);
+  });
+
   it("labels uninstantiated helper prose as scaffold while allowing an instantiated operation", () => {
     const scaffold = qualityItem(
       "maths", "differentiation", 1, "fallback-helper", "calculation", "fallback", "generic route",

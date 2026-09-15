@@ -349,6 +349,45 @@ export interface LearningPartMetadata {
    * establish deep coverage or trusted learning evidence.
    */
   quality?: "substantive" | "scaffold";
+  /**
+   * Concrete evidence contract for the mapped capability.  These are
+   * authored entities/operations rather than a topic label, so the audit can
+   * tell whether a generated item actually instantiates the intended skill.
+   */
+  capabilityEvidence?: CapabilityEvidenceContract;
+  /**
+   * Claim-level provenance for a worked answer.  The audit uses this to keep
+   * supplied data, intermediate results and the final result distinct and to
+   * reject answers that invent unsupported values.
+   */
+  provenance?: LearningProvenance;
+}
+
+export interface CapabilityEvidenceContract {
+  capabilityId: Id;
+  /** Named entities, representations or quantities that must be present. */
+  requiredEntities: string[];
+  /** Operations/transformations the learner must perform or explain. */
+  requiredOperations: string[];
+  /** Optional relations, constraints or laws that make the evidence checkable. */
+  requiredRelations?: string[];
+  /**
+   * A second capability is required for a synoptic part.  Keeping this as an
+   * authored label (rather than inferring it from the topic name) lets the
+   * audit verify that both strands are explicit and attributable.
+   */
+  secondaryCapability?: string;
+}
+
+export interface LearningProvenance {
+  /** Values, observations, species or representations supplied by the prompt. */
+  sourceEvidence: string[];
+  /** The authored operation/law that turns the sources into the answer. */
+  operation: string;
+  /** Checkable intermediate values or conclusions, in route order. */
+  intermediateResults: string[];
+  /** The final quantity/conclusion the worked answer establishes. */
+  finalResult: string;
 }
 
 export interface QuestionPart {
@@ -394,6 +433,8 @@ export interface LearningQuestionMetadata {
   expectedMinutes: number;
   /** Optional authored operations used to detect cosmetic reskins. */
   reasoningMoves?: string[];
+  capabilityEvidence?: CapabilityEvidenceContract;
+  provenance?: LearningProvenance;
 }
 
 export type MistakeRepairStage = "detected" | "diagnosed" | "taught" | "guided-success" | "independent-success" | "transfer" | "delayed-retention" | "resolved";
