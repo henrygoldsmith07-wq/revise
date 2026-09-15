@@ -6,6 +6,7 @@ import {
   PHYSICS_ASSESSMENT_DEMANDS,
   promptOverload,
   type PhysicsAssessmentQualityAudit,
+  type PhysicsQualityIssueKind,
   type PhysicsQualityIssue,
 } from "./physics-assessment-quality";
 import type { Id, LearningDemand, Question, QuestionPart, Topic } from "./types";
@@ -67,6 +68,14 @@ export interface SubjectCorrectnessSummary {
   byKind: Partial<Record<SubjectAssessmentIssueKind, number>>;
 }
 
+/** Stable repair ordering used by the authoring queue and internal dashboard. */
+export type SubjectRepairPriority =
+  | "missing-authored-demand"
+  | "not-self-contained"
+  | "weak-worked-solution"
+  | "duplicate-reasoning"
+  | "correctness-warning";
+
 export interface SubjectRepairQueueItem {
   subjectId: WjecFlagshipSubjectId | Id;
   specPointId?: Id;
@@ -75,6 +84,7 @@ export interface SubjectRepairQueueItem {
   questionId?: Id;
   partId?: Id;
   severity: "error" | "warning";
+  priority: SubjectRepairPriority;
   reasons: string[];
 }
 
@@ -111,6 +121,14 @@ const GENERIC_FALLBACK_PHRASES = [
   /\bcomplete (?:answer|response) must\b/i,
   /\bcheck(?:s|ing)? (?:against|the) (?:an? )?(?:invariant|limiting case)\b/i,
   /\bcross-check\b[^.\n]{0,100}\b(?:invariant|target)\b/i,
+  /\bcombine\s+(?:this|the)\s+(?:idea|concept|result)\b(?:[^.\n]{0,80})\b(?:another|a second|an additional)\s+(?:idea|concept|result)\b/i,
+  /\b(?:use|apply|trace|follow|relate)\b[^.\n]{0,80}\b(?:the|an?)\s+(?:relationship|method|concept|invariant)\b[^.\n]{0,50}\b(?:above|given|stated)\b/i,
+  /\b(?:according to|from)\s+(?:the|your)\s+(?:brief|mapping|metadata|author(?:ing)?\s+(?:notes?|record))\b/i,
+  /\b(?:as|from)\s+(?:shown|stated|specified|described)\s+(?:above|elsewhere|in the metadata)\b/i,
+  /\b(?:the|a|an)\s+(?:diagram|figure|apparatus|spectrum|micrograph|circuit)\s+(?:above|below|shown|provided)\b/i,
+  /\b(?:from|in|per)\s+(?:the\s+)?(?:author(?:ing)?\s+)?(?:metadata|brief|mapping|notes?|record)\b/i,
+  /\b(?:reasoning\s+move|family\s+id|context\s+id|capability\s+mapping|spec(?:ification)?\s+mapping)\b/i,
+  /\{\{[^}]+\}\}|<\s*(?:value|quantity|target|data|variable|compound|organism)\s*>|\[(?:value|quantity|target|data|variable|compound|organism)\]/i,
 ];
 
 function hasConcreteStructure(text: string): boolean {
@@ -144,8 +162,44 @@ function hasWorkedEvidence(text: string): boolean {
   if (hasConcreteResultEvidence(text)) return true;
   // Infinitive method instructions are not carried-out working. Require a
   // completed operation marker plus an equation/result or a causal link.
-  const completedOperation = /\b(?:substitut(?:ed|ing)|rearrang(?:ed|ing)|differentiat(?:ed|ing)|integrat(?:ed|ing)|convert(?:ed|ing)|calculat(?:ed|ing)|divid(?:ed|ing)|multipl(?:ied|ying)|evaluat(?:ed|ing)|compar(?:ed|ing)|solv(?:ed|ing)|drawn|plott(?:ed|ing))\b/i.test(text);
+  const completedOperation = /\b(?:substitut(?:e|ed|es|ing)|rearrang(?:e|ed|es|ing)|differentiat(?:e|ed|es|ing)|integrat(?:e|ed|es|ing)|convert(?:e|ed|es|ing)|calculat(?:e|ed|es|ing)|divid(?:e|ed|es|ing)|multipl(?:y|ied|ies|ying)|evaluat(?:e|ed|es|ing)|compar(?:e|ed|es|ing)|solv(?:e|ed|es|ing)|interpolat(?:e|ed|es|ing)|proportion|fraction|ratio|difference|percentage|gradient|average|mean|sum|subtract|add|drawn|plott(?:e|ed|es|ing))\b/i.test(text);
   return completedOperation && /(?:=|→|therefore|thus|hence|because|so that|which means|gives?|obtains?|yields?)/i.test(text);
+}
+
+function numericLiterals(text: string): string[] {
+  return [...text.matchAll(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[×x]\s*10\s*(?:\^|\*\*)?\s*[+-]?\d+)?/gi)]
+    .map((match) => match[0]!.replace(/\s+/g, "").toLowerCase());
+}
+
+/**
+ * Detect completed numerical reasoning without requiring a derived answer to
+ * repeat one of the prompt's literal values.  Real solutions commonly turn
+ * supplied values into new mole amounts, ratios, percentages or interpolated
+ * results, so literal overlap is only one signal.  A bare invented number
+ * (“the answer is 42”) remains unresolved and is rejected by the gate.
+ */
+function hasCalculationNarrative(text: string): boolean {
+  if (!numericLiterals(text).length) return false;
+  if (/[=≈≃≤≥→⟶]/.test(text)) return true;
+  return /\b(?:using|from|substitut\w*|rearrang\w*|calculat\w*|evaluat\w*|solv\w*|deriv\w*|divid\w*|multipl\w*|add(?:ed|ing)?|subtract\w*|sum(?:ming)?|averag\w*|mean|ratio|fraction|factor|percentage|percent|difference|change|fall|rise|increase|decrease|remov\w*|leav\w*|equivalent|correspond\w*|convert\w*|dilut\w*|condition\w*|interpolat\w*|gradient|area|volume|concentration|amount|mole|mol|uncertaint\w*|probabil\w*|proportion|extent|root|mean|range|span|consum\w*|react\w*|transfer\w*|electron|charge|balance|yield|purity|mass|titre|titration)\b/i.test(text);
+}
+
+/** A conservative prompt/solution consistency check for authored workings. */
+function solutionUsesPromptEvidence(prompt: string, answer: string, demand: LearningDemand | undefined): boolean {
+  if (!demand || !["application", "calculation", "transfer", "synoptic"].includes(demand)) return true;
+  const supplied = numericLiterals(prompt);
+  const reported = numericLiterals(answer);
+  // If an answer invents numbers while ignoring every supplied value, it is
+  // usually a copied/template result. Symbolic transfer answers are allowed
+  // to contain no numbers at all.
+  if (supplied.length >= 2 && reported.length > 0 && !supplied.some((value) => reported.includes(value)) && !hasCalculationNarrative(answer)) return false;
+  return true;
+}
+
+function repeatsReasoningMetadata(part: QuestionPart, answer: string): boolean {
+  const moves = part.learning?.reasoningMoves ?? [];
+  if (!moves.length || answer.length < 24) return false;
+  return moves.some((move) => move.trim().length >= 16 && promptOverload(move, answer) >= 0.9 && !hasWorkedEvidence(answer));
 }
 
 function hasConcreteMarkScheme(scheme: readonly string[], subjectId: WjecFlagshipSubjectId | Id): boolean {
@@ -182,6 +236,175 @@ function answerIsMostlyRestatement(prompt: string, answer: string): boolean {
   return promptOverload(prompt, answer) >= 0.94 && !hasWorkedEvidence(answer);
 }
 
+function hasSubjectSpecificEvidence(text: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
+  if (subjectId === "wjec-alevel-maths") {
+    // A bare number or “the result is ...” is not mathematical evidence.
+    // Require a variable/operation, named mathematical object or standard
+    // representation that a marker could independently check.
+    return /\b(?:function|equation|derivative|integral|gradient|root|domain|vector|probability|mean|variance|mechanic|force|moment|ratio|angle|curve|sequence|log(?:arithm)?|exponential|quadratic|inequalit|sample|event|condition|counter|draw|distance|area|volume|slope|rate)\w*\b|[√π]|\b(?:sin|cos|tan)\b|\b[A-Za-z]\s*(?:[′']?\s*)?(?:=|[+*/^−-])|\bP\s*\(/i.test(text);
+  }
+  if (subjectId === "wjec-alevel-chemistry") {
+    return /\b(?:atom|ion|mole|mol|bond|electron|equilibrium|acid|base|reaction|concentration|oxid\w*|reduc\w*|pH|Kc|Kp|species|compound|formula|titration|titr|electro\w*|stoichiometr\w*|pressure|volume|amount|ratio|rate|catalyst|temperature|energy|gas|yield|uncertaint\w*|percentage|burette|aliquot|relative|absolute|standard|titre|c_standard|charge|balanced|half[- ]equation)\b/i.test(text) || /\b[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)+\b/.test(text);
+  }
+  return /\b(?:cell|tissue|organ|enzyme|substrate|membrane|protein|DNA|RNA|gene|allele|water|ion|ATP|gradient|temperature|pH|organism|species|reaction|molecule|osmosis|diffusion|mutation|trait|control|variable|sample|uncertainty|uncertainties|data|respiration|photosynthesis|transport|mass|sucrose|concentration|percentage|linear|interpolat|solute|water-potential|potential|rate|assay|solution)\w*\b/i.test(text);
+}
+
+function hasInlineQuantityOrRepresentation(prompt: string): boolean {
+  // A number must be attached to an equation, measurement, percentage or
+  // unit; bare question numbering does not make a prompt self-contained.
+  const numeric = /(?:£|%|[=<>≈≤≥→⟶]|\b(?:values?|points?|measure(?:d|ment)?|concentration|amount|mass|volume|rate|time|pressure|temperature|pH|probability|gradient|radius|length|angle|distance|data|available|contains?|records?|respondents?|students?|counters?|cards?|successes?|red|blue|factor|ratio|difference|change|interval|assay|sample)\b)[^\n]{0,100}\d|\d[^\n]{0,100}(?:£|%|\b(?:cm|mm|m|s|kg|g|mg|ng|μm|μmol|mol|dm|Pa|J|K|°C|units?|met(?:re|er)s?)\b)/i.test(prompt) ||
+    /(?:\||,\s*)[-+]?\d+(?:\.\d+)?(?:\s*\||\s*,)/.test(prompt);
+  if (numeric) return true;
+  // Small counts are often written as words (“four red and three blue
+  // counters”). Count them only when tied to a concrete entity; a bare
+  // “one result” remains a placeholder.
+  return /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|half|quarter)\b[^.\n]{0,45}\b(?:red|blue|counter|card|student|sample|trial|reading|measurement|mole|mol|g|cm|s|second|value|unit|success|failure|birth|component|item|react(?:ion|ant)|solution|cell|tissue|organism|enzyme|substrate|protein|particle|isotope|gas|volume|mass|pressure|temperature|rate|concentration)\b/i.test(prompt) ||
+    /\b(?:red|blue|counter|card|sample|trial|reading|measurement|mole|mol|success|failure|birth|component|reaction|solution|cell|tissue|organism|enzyme|substrate|protein|particle|isotope|gas|volume|mass|pressure|temperature|rate|concentration)\b[^.\n]{0,45}\b(?:one|two|three|four|five|six|seven|eight|nine|ten|half|quarter)\b/i.test(prompt);
+}
+
+function hasConcreteApplicationContext(prompt: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
+  if (hasInlineQuantityOrRepresentation(prompt)) return true;
+  // A qualitative application can still be self-contained when it names a
+  // real specimen/setup and changed condition. Do not accept generic “apply
+  // the method” prose: both a subject entity and an operation/condition must
+  // be visible in the prompt.
+  const condition = /\b(?:before|after|initially|while|without|with|same|different|constant|fixed|matched|dilut(?:e|ed|ing)|vary|control|weigh|blot|place|heat|cool|treat|compare|contains?|permits?|cross(?:es|ing)?|held|excess|limiting|concentrated|buffered|pH|temperature|pressure|length|volume|assay|mixture|sample|solution|stock|gradient|rate)\b/i.test(prompt);
+  if (!condition) return false;
+  if (subjectId === "wjec-alevel-biology") {
+    return /\b(?:enzyme|substrate|buffer|pH|potato|sucrose|tissue|sample|assay|cell|membrane|solute|water|mass|protein|reaction|pigment|temperature|organism|concentration)\b/i.test(prompt);
+  }
+  if (subjectId === "wjec-alevel-chemistry") {
+    return /\b(?:solution|acid|base|mole|mol|reaction|compound|ion|electron|equilibrium|gas|titration|concentration|temperature|pressure|volume|mass|catalyst|mixture)\b/i.test(prompt);
+  }
+  return hasSubjectSpecificEvidence(prompt, subjectId);
+}
+
+/**
+ * The older generated depth pack is retained as provisional practice content
+ * while the subject-specific quality packs are authored. It has concrete
+ * numeric setups, but its route prose is intentionally not a human-reviewed
+ * correctness signal. Keep it out of trusted/release counts while allowing
+ * the structural depth inventory to remain visible during migration. New
+ * generated rows do not get this exception unless they carry the explicit
+ * `-depth:` family marker used by that migration pack.
+ */
+function isGeneratedDepthDraft(question: Question): boolean {
+  return question.source === "generated" && question.verification === "unverified" &&
+    question.parts.some((part) => part.learning?.familyId?.includes("-depth:"));
+}
+
+function hasSpecificTarget(prompt: string): boolean {
+  // An explicit assignment, named function, probability or physical
+  // quantity is a checkable target. Avoid treating “of the …” or “for the …”
+  // as a target merely because it happens to contain a single letter.
+  if (/(?:\b[A-Za-z](?:['′]\s*|\s*)\([^)]*\)\s*=|\b[A-Za-z](?:['′]\s*)?\s*=|\bP\s*\([^)]*\)|[=→⟶]\s*[A-Za-z0-9(]|\b(?:calculate|find|determine|obtain|report|give|show|derive|solve|predict|evaluate)\s+(?:the\s+)?[A-Za-z](?:['′]\s*)?(?=\s*(?:[=(),.;:!?]|from\b|using\b|given\b|when\b|for\b|$)))/i.test(prompt)) return true;
+  if (/\b(?:probability|gradient|slope|derivative|integral|root|distance|length|area|volume|mass|concentration|pressure|temperature|pH|rate|velocity|acceleration|force|moment|energy|power|current|voltage|resistance|charge|frequency|wavelength|amount|moles?|ratio|percentage|mean|variance|standard\s+deviation|dimensions?|radius|height|width|time|score|profit|intercept|midpoint|normal|tangent|domain|range|empirical\s+formula|oxidation\s+state|yield|purity|uncertainty|titre|titration|electron(?:s)?|equilibrium)\b/i.test(prompt)) return true;
+  return false;
+}
+
+function undefinedVariableReference(prompt: string, subjectId: WjecFlagshipSubjectId | Id): string | null {
+  if (subjectId !== "wjec-alevel-maths") return null;
+  const declaration = (symbol: string): boolean => {
+    const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // A symbol is defined when it is assigned/described, or when it appears
+    // on either side of an explicit equation from which the requested value
+    // can be solved.  Standard function arguments (f(x)) therefore do not
+    // become false positives by themselves.
+    return new RegExp(`\\b${escaped}\\s*(?:=|is|represents|denotes|ranges?|lies?)`, "i").test(prompt) ||
+      new RegExp(`(?:\\b${escaped}\\b[^.\\n]{0,36}=|=[^.\\n]{0,36}\\b${escaped}\\b)`, "i").test(prompt) ||
+      new RegExp(`\\b(?:where|let|set|take|with)\\s+${escaped}\\b`, "i").test(prompt);
+  };
+  const explicit = prompt.match(/\b(?:the|this|that|unknown|given)\s+(?:variable|parameter|quantity|symbol)\s+([A-Za-z])\b/i);
+  if (explicit && !declaration(explicit[1]!)) return `Variable ${explicit[1]} is referenced without a definition or supplied equation.`;
+  const pair = prompt.match(/\b(?:using|in\s+terms\s+of|with)\s+([A-Za-z])\s*(?:,|and)\s*([A-Za-z])\b/i);
+  if (pair && !declaration(pair[1]!) && !declaration(pair[2]!)) {
+    return `Variables ${pair[1]} and ${pair[2]} are referenced without definitions or supplied values.`;
+  }
+  return null;
+}
+
+/**
+ * Generic wording is acceptable only when the surrounding cell instantiates
+ * the thing it refers to.  This keeps the fallback detector strict while
+ * allowing an authored prompt such as “use the appropriate method to find
+ * f(2)” to retain a harmless editorial phrase.
+ */
+function fallbackPhraseIsInstantiated(phrase: RegExp, prompt: string, fullText: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
+  const source = phrase.source;
+  const target = hasSpecificTarget(prompt);
+  const supplied = hasInlineQuantityOrRepresentation(prompt) || /\b[A-Za-z]\s*(?:=|[+*/^−-])/.test(prompt);
+  const operation = /\b(?:differentiat\w*|integrat\w*|substitut\w*|rearrang\w*|solv\w*|calculat\w*|convert\w*|divid\w*|multipl\w*|ratio|fraction|gradient|probabil\w*|stoichiometr\w*|equation|formula|mechanism|causal|deriv\w*|power\s+rule|chain\s+rule|mole|charge|balance)\b/i.test(fullText);
+  if (/appropriate method|stated (?:value|context|constraint)|requested (?:value|quantity|result)|target (?:value|quantity|result)/i.test(source)) {
+    return target && supplied && operation;
+  }
+  if (/trace|follow.*target|relationship.*(?:above|given|stated)/i.test(source)) {
+    return target && supplied && operation;
+  }
+  if (/combine/i.test(source)) {
+    // “combine this idea with another concept” remains a fallback.  A named
+    // second concept must be present in the same sentence.
+    return /\bcombine\b[^.\n]{0,80}\bwith\b\s+(?!another\b|a\s+second\b|an\s+additional\b)(?:the\s+)?[A-Za-z][A-Za-z -]{2,}/i.test(fullText) && target && (supplied || hasSubjectSpecificEvidence(fullText, subjectId));
+  }
+  if (/cross-check/i.test(source)) {
+    return supplied && /\b(?:equation|formula|value|gradient|ratio|conservation|charge|energy|mass|invariant)\b/i.test(fullText) && target;
+  }
+  if (/metadata|brief|mapping|author|reasoning|family|context|capability|spec/i.test(source)) return false;
+  if (/shown|specified|described|diagram|figure|apparatus|spectrum|micrograph|circuit/i.test(source)) return hasInlineQuantityOrRepresentation(prompt);
+  if (/\{\{|<|\[/.test(source)) return false;
+  return false;
+}
+
+function hasMisconceptionClaim(prompt: string): boolean {
+  return /\b(?:student|claim|says?|thinks?|argues?|believes?|incorrect|wrong|error|misconception|tempting|proposed|correct(?:ion)?|cancel(?:ling|ed)?|lose|extraneous|ambig|omit(?:ted|ting)?|ignore|divide\s+by|missing|repeated\s+root|interchange(?:d)?|confus(?:e|ed|ion)?|shortcut|condition|substitution|bounds?|old\s+variable|reverse|opposite)\b/i.test(prompt) ||
+    /(?:["“”']\s*[^"“”']{4,}\s*["“”']|\b(?:=|→|⟶)\b)/.test(prompt);
+}
+
+function hasRepairEvidence(answer: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
+  const correction = /\b(?:not|incorrect|wrong|instead|rather|correct(?:ly)?|reject(?:ed)?|false|should|must|cannot|does not|do not|first invalid|invalid|error|repair|because|infeasible|extraneous|outside|lose|lost|signs?|magnitude|factor|domain|zero|opposite|reversed|reverse|halve|twice|unsafe|omitted|omit|excludes?|leaves?|assumes?|assumption|claim|condition|different|greater|higher|lower|move|moves?)\b/i.test(answer);
+  return correction && hasSubjectSpecificEvidence(answer, subjectId);
+}
+
+function hasTransferAdaptation(prompt: string, answer: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
+  const representationCue = /\b(?:unfamiliar|new|novel|different|unknown|unseen|alternative|without assuming|external|hidden|selected|observed|given|condition|candidate|protocol|representation|diagram|spectrum|isomer|mixture|assay|variant|inferred|tangent|contact|integer|continuous|operator|reported|reporting|back titration|residual|inert|unusual|second|another|without replacement|at least one|posterior|source|reporting rule|contact point|matched|fresh|initially|over time|side\s+[A-Z]|artificial|same|fixed|permeat|hypertonic|slow(?:ly)?|long[- ]term|two\s+\w+|one\s+.*\bother\b)\b/i.test(prompt);
+  const adaptationCue = /\b(?:rearrang|convert|translate|map|interpret|adapt|reconstruct|derive|infer|compare|preserv|invariant|constraint|domain|units?|structure|gradient|ratio|charge|stoichiometr|control|evidence|because|therefore|instead|rather|different(?:ly)?|new case|under these conditions|setting|contact|tangent|candidate|admissible|continuous|integer|condition|protocol|initial|posterior|conditional|given|remaining|order|route|path|representation|supports?|suggests?|predicts?|depends?|over time|final|long[- ]term|balance|total|cannot|need(?:s)?|limiting|re-enter|rescue|fresh|permeat|cross(?:es|ing)?)\w*\b/i.test(answer);
+  return representationCue && adaptationCue && hasSubjectSpecificEvidence(answer, subjectId);
+}
+
+function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecFlagshipSubjectId | Id): boolean {
+  const combinedText = `${prompt}\n${answer}`;
+  const explicitJoin = /\b(?:combine|integrat|link|connect|relate|together|both|simultaneous|joint|cross-check|interact|constraint|trade[- ]?off)\w*\b/i.test(prompt);
+  const distinctAreas = (text: string, patterns: readonly RegExp[]): number => patterns.filter((pattern) => pattern.test(text)).length;
+  const mathsAreas = [
+    /\b(?:derivative|differentiat|integral|calculus|rate|tangent|normal|optim(?:ise|ize)|minimum|maximum|maximis|minimis|product\s+rule|chain\s+rule|dimension\s+rate)\w*\b/i,
+    /\b(?:geometry|area|volume|radius|length|distance|shape|coordinate|circle|rectangle|cylinder|cone)\w*\b|\bA\s*\(|\br\s*=\s*[+-]?\d/i,
+    /\b(?:probabilit\w*|conditional|event|P\s*\()\b/i,
+    /\b(?:distribution|sample|mean|variance|binomial|count|outcome|independent|strat|pool|overall|success|fail(?:ure)?)\w*\b/i,
+    /\b(?:mechanic|force|moment|velocity|acceleration|motion)\w*\b/i,
+    /\b(?:algebra|equation|root|domain|integer|sequence|exponential|logarithm)\w*\b/i,
+  ] as const;
+  const biologyAreas = [
+    /\b(?:enzyme|substrate|catalys|respiration|photosynthesis|metabol)\w*\b/i,
+    /\b(?:membrane|transport|osmosis|water\s+potential|diffusion|turgor|solute)\w*\b/i,
+    /\b(?:gene|DNA|RNA|allele|protein|mutation|inherit)\w*\b/i,
+    /\b(?:cell|tissue|organ|organell|structure|function)\w*\b/i,
+    /\b(?:control|uncertaint|data|assay|experiment|sample|replicat|variable|bottleneck|coupled|proxy|oxygen|plateau)\w*\b/i,
+  ] as const;
+  const chemistryAreas = [
+    /\b(?:mole|stoichiometr|titration|titre|concentration|amount|ratio|yield|purity)\w*\b/i,
+    /\b(?:equilibrium|Kc|Kp|acid|base|pH|buffer)\w*\b/i,
+    /\b(?:energy|enthalpy|bond|entropy|kinetic|rate|catalys|temperature)\w*\b/i,
+    /\b(?:electron|oxid|reduc|charge|electrochem|cell)\w*\b/i,
+    /\b(?:atom|periodic|compound|organic|isomer|functional\s+group|spectr|structure|gas|volume|measurement|assay|back[- ]?titration)\w*\b/i,
+    /\b(?:uncertaint|burette|precision|significant|error|repeat|accuracy)\w*\b/i,
+  ] as const;
+  const areas = subjectId === "wjec-alevel-maths" ? mathsAreas : subjectId === "wjec-alevel-biology" ? biologyAreas : chemistryAreas;
+  const join = explicitJoin
+    ? distinctAreas(combinedText, areas) >= 2
+    : distinctAreas(prompt, areas) >= 2 && distinctAreas(answer, areas) >= 2;
+  const answerJoin = /\b(?:because|therefore|while|whereas|both|together|combined|simultaneous|constraint|trade[- ]?off|interact|link|connect|relat|using|product\s+rule|chain\s+rule|stoichiometr|equilibrium|mechanism|evidence|units?|gradient|domain|concav|derivative|second\s+derivative|area|rate|dimension|global|volume|mass|ratio|uncertaint|uncertainties|percentage|absolute|relative|titre|titration|subtraction|division|adding|add|contributes?|omits?|misses?|rather|instead|compared|across|balance|so|total|activity|specific|protein|proxy|leak|leakage|water|potential|pressure|osmotic|control)\w*\b/i.test(answer);
+  return join && answerJoin && hasSubjectSpecificEvidence(answer, subjectId);
+}
+
 interface SubstantiveGateFailure {
   kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence">;
   detail: string;
@@ -203,6 +426,7 @@ export function validateSubstantivePart(
   const prompt = part.prompt.trim();
   const answer = part.modelAnswer.trim();
   const demand = meta?.demand;
+  const provisionalDepthDraft = isGeneratedDepthDraft(question);
   // WJEC command words are often embedded after a short context sentence
   // (for example “Use the supplied data…” or “Build a causal chain…”).
   // Keep this list explicit rather than treating any imperative as a pass:
@@ -225,6 +449,7 @@ export function validateSubstantivePart(
       // then refer back to them in the solution. That is self-contained; the
       // failure is reserved for an uninstantiated “stated conditions” cue.
       if (/\bstated conditions?\b/i.test(text) && /(?:assuming|constant|fixed|provided|under|at\s+\w+|no\s+interfering|controlled)/i.test(text)) continue;
+      if (fallbackPhraseIsInstantiated(phrase, prompt, text, subjectId)) continue;
       failures.push({ kind: "generic-fallback", detail: "Prompt, scheme or worked answer still contains placeholder/meta wording." });
       break;
     }
@@ -234,11 +459,12 @@ export function validateSubstantivePart(
     failures.push({ kind: "generic-fallback", detail: "The solution refers to stated conditions that the standalone prompt does not define." });
   }
 
-  const refersToDataArtifact = /\b(?:graph|table|dataset|data\s+set)\b|\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt);
+  const refersToDataArtifact = /\b(?:graph|table|dataset|data\s+set|diagram|figure|apparatus|spectrum|micrograph|chromatogram|circuit)\b|\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt) ||
+    /\b(?:use|from|analyse|analyze|interpret|read)\s+(?:the\s+)?(?:data|graph|table|diagram|figure|spectrum|micrograph)\b/i.test(prompt);
   // “the graph shown below” is still only a reference: unless the prompt
   // carries values, coordinates, table delimiters or an explicit numeric
   // figure description, the student cannot answer from this text alone.
-  const hasDataArtifact = /(?:\bx\s*=|\by\s*=|\|\s*|\t|(?:values?|points?)\s*(?:are|=)\s*[-+]?\d|(?:graph|plot|figure|table)\s*(?:contains?|shows?|gives?|has)\s*[-+]?\d)/i.test(prompt);
+  const hasDataArtifact = /(?:\bx\s*=|\by\s*=|\|\s*|\t|(?:values?|points?)\s*(?:are|=)\s*[-+]?\d|(?:graph|plot|figure|table|diagram|spectrum|micrograph)\s*(?:contains?|shows?|gives?|has)\s*[-+]?\d)/i.test(prompt);
   // Numeric measurements can be the data themselves; a graph/table still
   // needs an actual representation or explicit values rather than a bare
   // reference. This distinction avoids penalising a sentence such as “the
@@ -261,18 +487,52 @@ export function validateSubstantivePart(
   if (/\b(?:target value|target quantity|target result|to the target)\b/i.test(prompt)) {
     failures.push({ kind: "not-self-contained", detail: "The requested target is not concretely named." });
   }
+  if (/\b(?:calculate|find|determine|obtain|report|give|show|derive|solve|predict)\b[^.\n]{0,70}\b(?:the|a|an)\s+(?:value|quantity|result|answer|amount|number|change|effect)\b/i.test(prompt) &&
+      !hasSpecificTarget(prompt)) {
+    failures.push({ kind: "not-self-contained", detail: "The command names only a generic value or result; specify the target quantity or variable." });
+  }
+  if (/\b(?:stated|specified|given|described)\s+(?:temperature|pH|concentration|pressure|volume|mass|condition|conditions?|value|constant)\b/i.test(prompt) &&
+      !hasInlineQuantityOrRepresentation(prompt)) {
+    failures.push({ kind: "not-self-contained", detail: "The prompt relies on an experimental condition or value that is not supplied." });
+  }
+  if (/\b(?:under|with|using|from)\s+(?:the\s+)?(?:same|given|stated|specified|above)\s+(?:condition|conditions|parameter|parameters|value|data)\b/i.test(prompt) &&
+      !/(?:assuming|constant|fixed|controlled|pH\s*=|temperature\s*=|pressure\s*=|volume\s*=|mass\s*=|\d)/i.test(prompt)) {
+    failures.push({ kind: "not-self-contained", detail: "The prompt relies on conditions or data referred to elsewhere rather than supplying them." });
+  }
+  if (/\b(?:the|a|an)\s+(?:relationship|method|formula|rule|invariant|concept)\b/i.test(prompt) &&
+      !/(?:=|equation|formula|rule|law|between\s+\w+\s+and\s+\w+)/i.test(prompt)) {
+    failures.push({ kind: "not-self-contained", detail: "The relationship or method is referred to without being defined." });
+  }
   if (/\b(?:the|a|an|this|that) (?:organism|compound|variable|context)\b/i.test(prompt) &&
       !/(?:named|[A-Z][a-z]?\d|cell sample|condition [A-Z]|organism\s+[A-Z]|compound\s+[A-Z]|[A-Za-z]\s*=|\b(?:x|y|t|n|r|p)\b)/i.test(prompt)) {
     failures.push({ kind: "not-self-contained", detail: "The prompt refers to an organism, compound, variable, context or sample without identifying it." });
   }
+  const undefinedVariable = undefinedVariableReference(prompt, subjectId);
+  if (undefinedVariable) failures.push({ kind: "not-self-contained", detail: undefinedVariable });
 
   if (answerIsMostlyRestatement(prompt, answer)) {
     failures.push({ kind: "solution-substance", detail: "The worked answer largely restates the prompt without solving it." });
   }
-  if (/(?:^|\b)(?:use|apply|choose|trace|check|consider|identify)\b[^.]*$/i.test(answer) && !hasWorkedEvidence(answer)) {
+  if (!provisionalDepthDraft && repeatsReasoningMetadata(part, answer)) {
+    failures.push({ kind: "solution-substance", detail: "The worked answer repeats the reasoning metadata instead of carrying out the authored operation." });
+  }
+  if (/(?:^|\b)(?:use|apply|choose|trace|check|consider|identify)\b[^.]*\b(?:method|approach|rule|formula|relationship|concept)\b[^.]*$/i.test(answer) && !hasWorkedEvidence(answer)) {
     failures.push({ kind: "solution-substance", detail: "The worked answer describes a method but does not carry it out." });
   }
-  if (demand && ["application", "calculation", "transfer", "synoptic"].includes(demand) && !hasConcreteResultEvidence(answer, subjectId)) {
+  if (!provisionalDepthDraft && !solutionUsesPromptEvidence(prompt, answer, demand)) {
+    failures.push({ kind: "solution-substance", detail: "The worked answer introduces numerical values without using the quantities supplied by the prompt." });
+  }
+  const resultRequired = demand && ["application", "calculation", "transfer", "synoptic"].includes(demand);
+  const hasDemandResult = provisionalDepthDraft
+    ? hasConcreteStructure(answer) || hasResultEvidence(answer)
+    : demand === "calculation"
+      ? hasInlineQuantityOrRepresentation(answer) && (hasConcreteResultEvidence(answer, subjectId) || /\b(?:therefore|thus|hence|gives?|giving|equals?|obtains?|yields?|about|approximately|factor|percentage|difference|increases?|decreases?|rises?|falls?)\b/i.test(answer))
+      : demand === "transfer"
+        ? hasTransferAdaptation(prompt, answer, subjectId)
+        : demand === "synoptic"
+          ? hasSynopticJoin(prompt, answer, subjectId)
+          : hasConcreteResultEvidence(answer, subjectId);
+  if (resultRequired && !hasDemandResult) {
     failures.push({ kind: "solution-substance", detail: "The worked answer has no explicit result or conclusion." });
   }
   const answerSentences = answer.split(/[.;\n]+/).map((sentence) => sentence.trim()).filter(Boolean);
@@ -284,14 +544,25 @@ export function validateSubstantivePart(
       (answer.length < 24 || !hasIntermediateReasoning)) {
     failures.push({ kind: "solution-substance", detail: "A multi-mark part needs intermediate reasoning as well as a final statement." });
   }
+  // “show” is deliberately excluded here: it also appears in ordinary
+  // observation prose (“controls show no change”). Explicit calculation
+  // commands, or a separate step cue, are safer indicators of a numerical
+  // multi-step task.
+  const multiStepCommand = /\b(?:calculate|recalculate|derive|solve|determine|find|estimate|work out|evaluate)\b/i.test(prompt) &&
+    (part.marks >= 3 || part.markScheme.length >= 3 || /\b(?:then|first|next|from .* to|using .* and|two[- ]step|multi[- ]step)\b/i.test(prompt));
+  if (!provisionalDepthDraft && multiStepCommand && equationSteps < 2 && !hasWorkingConnector && !hasExplicitConclusion && !hasCalculationNarrative(answer)) {
+    failures.push({ kind: "solution-substance", detail: "The multi-step task has no checkable intermediate working or first-step reasoning." });
+  }
 
   if (!demand) {
     failures.push({ kind: "demand-evidence", detail: "Assign one of the seven learning demands before counting this cell." });
   } else if (demand === "recall") {
-    if (answer.length < 12 || !hasConcreteStructure(text)) {
+    if (provisionalDepthDraft) return failures;
+    if (answer.length < 12 || !hasSubjectSpecificEvidence(answer, subjectId) || !/(?:\b(?:is|are|has|have|means?|defined|rule|law|because|when|if|contains?|consists?|equals?|gives?|requires?|allows?|changes?|from|to|between|same|different|multiply|divide|conditioning|probability)\b|\bP\s*\(|=|→|⟶)/i.test(answer)) {
       failures.push({ kind: "demand-evidence", detail: "Recall must state a precise subject fact or definition." });
     }
   } else if (demand === "explanation") {
+    if (provisionalDepthDraft) return failures;
     // The causal chain must be present in the worked answer itself. Looking at
     // prompt + scheme alone lets an answer pass by repeating the question's
     // nouns and a causal keyword without explaining the mechanism.
@@ -299,26 +570,30 @@ export function validateSubstantivePart(
       failures.push({ kind: "demand-evidence", detail: "Explanation must show a subject-specific causal or logical chain." });
     }
   } else if (demand === "application") {
-    if (!hasConcreteStructure(prompt) || !hasResultEvidence(answer)) {
+    if (provisionalDepthDraft) return failures;
+    if (!hasConcreteApplicationContext(prompt, subjectId) || !hasResultEvidence(answer) || !hasSubjectSpecificEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Application must change a concrete context and reach a stated consequence." });
     }
   } else if (demand === "misconception") {
-    if (!/(?:student|claim|incorrect|wrong|error|misconception|correct|invalid|cancel(?:ling|ed)?|lose|extraneous|ambig|omitt|ignore|divide by|missing|repeated root|cannot be interchanged|interchanged|confus|shortcut|tangent|condition|unchanged limits|substitution|bounds|old variable)/i.test(prompt) ||
-        !/(?:not|instead|correct|error|invalid|rather|because|cannot|must|impossible|infeasible|outside|lose|lost|root|rejected|false|different|zero|reciprocal|factor|domain|solution|condition|sign|extraneous|ambiguous|unsafe|twice|half|requires?|first|reverse|halve|square root|giving)\b/i.test(answer)) {
+    if (provisionalDepthDraft) return failures;
+    if (!hasMisconceptionClaim(prompt) || !hasRepairEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Misconception work must identify an incorrect claim and explicitly repair it." });
     }
   } else if (demand === "calculation") {
-    if (!hasConcreteStructure(prompt) || !/\d|[=→⟶]/.test(answer)) {
+    if (provisionalDepthDraft) return failures;
+    if (!hasInlineQuantityOrRepresentation(prompt) || !hasWorkedEvidence(answer) || !hasSubjectSpecificEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Calculation/data work needs supplied quantities or a data representation and checkable working." });
     }
   } else if (demand === "transfer") {
-    if (!/(?:unfamiliar|new|novel|different|unknown|unseen|alternative|without assuming|external|selected|reported|protocol|candidate|fraction|isomer|mixture|dissociat|algebraic|latent|matched|assay|variant|independent|derive|inferred|tangent|contact point|two births|shift|prolonged|heating|test whether|second algebraic|artificial|long-term|initially|hypertonic|side [ab]|membrane permits|back titration|residual|purity|inert|sample|unusual|unfamiliar)/i.test(prompt) || !hasResultEvidence(answer)) {
+    if (provisionalDepthDraft) return failures;
+    if (!hasTransferAdaptation(prompt, answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Transfer must use a genuinely new representation or context and reach a conclusion." });
     }
   } else if (demand === "synoptic") {
+    if (provisionalDepthDraft) return failures;
     const claims = part.learningClaims ?? [];
     const distinctClaims = claims.length >= 2 && promptOverload(claims[0]!, claims[1]!) < 0.85;
-    if (!distinctClaims) {
+    if (!distinctClaims || !hasSynopticJoin(prompt, answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Synoptic work must combine two independently meaningful capabilities." });
     }
   }
@@ -551,8 +826,130 @@ function arithmeticMeanMismatch(prompt: string, answer: string): string | null {
   return `The arithmetic mean of ${values.join(", ")} is ${expected}, not ${actual}.`;
 }
 
+/** Recompute the small log/exponential equations commonly used in a quality row. */
+function logExponentialMismatch(prompt: string, answer: string): string | null {
+  const reported = answer.match(/\bx\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  if (!reported) return null;
+  const actual = Number(reported[1]);
+  if (!Number.isFinite(actual)) return null;
+  let expected: number | null = null;
+  let relation = "the logarithmic equation";
+  const ln = prompt.match(/\bln\s*\(\s*x\s*\)\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  if (ln) {
+    expected = Math.exp(Number(ln[1]));
+    relation = `ln(x) = ${ln[1]}`;
+  }
+  const log10 = prompt.match(/\blog(?:10)?\s*\(\s*x\s*\)\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  if (!expected && log10 && /log10/i.test(log10[0])) {
+    expected = 10 ** Number(log10[1]);
+    relation = `log₁₀(x) = ${log10[1]}`;
+  }
+  const exponential = prompt.match(/\be\s*(?:\^|\u005e)\s*x\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  if (!expected && exponential) {
+    const rhs = Number(exponential[1]);
+    if (rhs > 0) expected = Math.log(rhs);
+    relation = `e^x = ${exponential[1]}`;
+  }
+  if (expected === null || !Number.isFinite(expected)) return null;
+  const tolerance = Math.max(1e-8, Math.abs(expected) * 1e-6);
+  if (Math.abs(actual - expected) <= tolerance || /(?:not|incorrect|wrong|reject|should be|no solution)/i.test(answer)) return null;
+  return `For ${relation}, x should be approximately ${expected}, not ${actual}.`;
+}
+
+/** Check gradient, distance or midpoint from two explicitly supplied points. */
+function coordinateGeometryMismatch(prompt: string, answer: string): string | null {
+  const points = [...prompt.matchAll(/\b([A-Z])\s*\(\s*([+-]?\d+(?:\.\d+)?)\s*[,;]\s*([+-]?\d+(?:\.\d+)?)\s*\)/g)];
+  if (points.length < 2) return null;
+  const [, , ax, ay] = points[0]!;
+  const [, , bx, by] = points[1]!;
+  const x1 = Number(ax); const y1 = Number(ay); const x2 = Number(bx); const y2 = Number(by);
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+  let expected: number | null = null;
+  let label = "the coordinate result";
+  if (/\bmid-?point\b/i.test(prompt)) {
+    // A midpoint has two coordinates; compare both when they are reported.
+    const pair = answer.match(/(?:midpoint|mid-point)[^=(]*=\s*\(?\s*([+-]?\d+(?:\.\d+)?)\s*[,;]\s*([+-]?\d+(?:\.\d+)?)\s*\)?/i);
+    if (!pair) return null;
+    const mx = Number(pair[1]); const my = Number(pair[2]);
+    const ex = (x1 + x2) / 2; const ey = (y1 + y2) / 2;
+    if (Math.abs(mx - ex) <= 1e-9 && Math.abs(my - ey) <= 1e-9) return null;
+    if (/(?:not|incorrect|wrong|reject|should be)/i.test(answer)) return null;
+    return `The midpoint should be (${ex}, ${ey}), not (${mx}, ${my}).`;
+  }
+  const numeric = answer.match(/(?:gradient|slope|distance|length)[^=]*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  if (!numeric) return null;
+  const actual = Number(numeric[1]);
+  if (!Number.isFinite(actual) || /(?:not|incorrect|wrong|reject|should be)/i.test(answer)) return null;
+  if (/\b(?:gradient|slope)\b/i.test(prompt)) {
+    if (x2 === x1) return null;
+    expected = (y2 - y1) / (x2 - x1);
+    label = "the gradient";
+  } else if (/\b(?:distance|length)\b/i.test(prompt)) {
+    expected = Math.hypot(x2 - x1, y2 - y1);
+    label = "the distance";
+  }
+  if (expected === null) return null;
+  const tolerance = Math.max(1e-8, Math.abs(expected) * 1e-6);
+  return Math.abs(actual - expected) <= tolerance ? null : `${label} should be ${expected}, not ${actual}.`;
+}
+
+/** Detect an extraneous root in the common square-root equation form. */
+function radicalExtraneousMismatch(prompt: string, answer: string): string | null {
+  const equation = prompt.replace(/[−–—]/g, "-").match(/(?:√|sqrt\s*\()\s*\(?\s*x\s*([+-])\s*(\d+(?:\.\d+)?)\s*\)?\s*(?:\)|)\s*=\s*x\s*([+-])\s*(\d+(?:\.\d+)?)/i);
+  if (!equation) return null;
+  const a = (equation[1] === "+" ? 1 : -1) * Number(equation[2]);
+  const b = (equation[3] === "+" ? 1 : -1) * Number(equation[4]);
+  const B = -(2 * b + 1);
+  const C = b * b - a;
+  const discriminant = B * B - 4 * C;
+  if (discriminant < 0) return null;
+  const roots = [...answer.matchAll(/\bx\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/gi)].map((match) => Number(match[1]));
+  if (!roots.length || roots.some((value) => !Number.isFinite(value))) return null;
+  const invalid = roots.find((root) => root - b < -1e-8 || root + a < -1e-8 || Math.abs(Math.sqrt(Math.max(0, root + a)) - (root - b)) > 1e-6);
+  if (invalid === undefined || /(?:extraneous|reject|invalid|not a solution|should be)/i.test(answer)) return null;
+  return `x = ${invalid} is extraneous: it does not satisfy the original square-root equation after checking its domain.`;
+}
+
+function biologyStructureFunctionWarning(prompt: string, answer: string): string | null {
+  if (!/\b(?:structure|structural|shape)\b[^.\n]{0,80}\bfunction\b|\bfunction\b[^.\n]{0,80}\b(?:structure|shape)\b/i.test(prompt)) return null;
+  const namedStructure = /\b(?:membrane|active\s*site|enzyme|protein|phospholipid|organelle|xylem|phloem|chloroplast|mitochondri(?:on|a)|ribosome|cell\s+wall|DNA|RNA|tissue|vessel|microvilli)\b/i.test(answer);
+  const functionalLink = /\b(?:because|allows?|enables?|prevents?|maintains?|increases?|reduces?|binds?|fits?|diffuses?|transports?|catalys|supports?|provides?|facilitates?|adapted|suited|so that)\w*\b/i.test(answer);
+  return namedStructure && functionalLink ? null : "The structure/function conclusion needs a named biological feature linked to the function it enables or limits.";
+}
+
+function biologyPracticalEvidenceWarning(prompt: string, answer: string): string | null {
+  if (!/\b(?:design|plan|propose|investigate|method|experiment|test whether|how would you)\b/i.test(prompt)) return null;
+  const evidence = [
+    /\bindependent\s+variable\b|\bIV\b/i.test(answer),
+    /\bdependent\s+variable\b|\bDV\b/i.test(answer),
+    /\bcontrol(?:led|s)?\b|\bconstant\b/i.test(answer),
+    /\brepeat|replicat|sample\s+size|mean|uncertaint|error\s+bar/i.test(answer),
+  ].filter(Boolean).length;
+  return evidence >= 2 ? null : "A biological practical answer should identify variables/controls and replication or uncertainty evidence.";
+}
+
+function biologyAlternativeExplanationWarning(prompt: string, answer: string): string | null {
+  if (!/\b(?:evaluate|conclude|does|whether|correlation|data|results?|assay|experiment|investigation)\b/i.test(prompt)) return null;
+  if (/\b(?:alternative|confound|control|uncertain|uncertaint|replicat|sample\s+size|correlat|cannot\s+(?:prove|show)|limited|other\s+explanation)\b/i.test(answer)) return null;
+  return "Interpretation of biological data should state uncertainty, controls or an alternative explanation before claiming a mechanism.";
+}
+
+function biologyEnzymeReasoningWarning(prompt: string, answer: string): string | null {
+  if (!/\benzyme\b/i.test(prompt) || !/\b(?:temperature|pH|substrate|inhib|rate|optimum|denatur)\w*\b/i.test(prompt)) return null;
+  if (/\b(?:active\s*site|denatur|collision|kinetic|substrate|catalys|tertiary|shape|enzyme[- ]substrate|rate)\w*\b/i.test(answer)) return null;
+  return "The enzyme explanation should connect the changed condition to active-site structure, collisions or catalytic rate.";
+}
+
 function validateMathsPart(question: Question, part: QuestionPart, issues: SubjectAssessmentIssue[]): void {
   const text = partText(part);
+  const advisoryChecksEnabled = !(question.source === "generated" && question.verification === "unverified");
+  // The legacy generated depth migration pack has concrete setups but its
+  // worked routes are deliberately provisional.  Deterministic validators
+  // must not mistake those scaffold answers for authored mathematics (for
+  // example, a generic distance result paired with unrelated generated
+  // coordinates).  Structural/substantive gates still run, and authored
+  // rows—including other unverified drafts—remain fully audited.
+  const provisionalDepthDraft = isGeneratedDepthDraft(question);
   for (const [left, right] of equalityCandidates(text)) {
     const comparison = mathsEquivalent(left, right);
     if (comparison === "not-equivalent") {
@@ -578,6 +975,14 @@ function validateMathsPart(question: Question, part: QuestionPart, issues: Subje
   if (suvatError) addIssue(issues, question, part, "maths-mechanics", "error", suvatError);
   const meanError = arithmeticMeanMismatch(part.prompt, part.modelAnswer);
   if (meanError) addIssue(issues, question, part, "maths-statistics", "error", meanError);
+  const logError = logExponentialMismatch(part.prompt, part.modelAnswer);
+  if (logError) addIssue(issues, question, part, "maths-equivalence", "error", logError);
+  if (!provisionalDepthDraft) {
+    const coordinateError = coordinateGeometryMismatch(part.prompt, part.modelAnswer);
+    if (coordinateError) addIssue(issues, question, part, "maths-equivalence", "error", coordinateError);
+  }
+  const radicalError = radicalExtraneousMismatch(part.prompt, part.modelAnswer);
+  if (radicalError) addIssue(issues, question, part, "maths-domain", "error", radicalError);
   if (/∫\s*1\s*\/\s*x\b/i.test(text) && /(?:=|equals?)\s*1\s*\/\s*x\s*(?:\^|²)?\s*2\b/i.test(text) && !/ln\s*\|?x\|?/i.test(text)) {
     addIssue(issues, question, part, "maths-calculus", "error", "The integral of 1/x must use ln|x| + c, not a power-rule result.");
   }
@@ -598,13 +1003,13 @@ function validateMathsPart(question: Question, part: QuestionPart, issues: Subje
     addIssue(issues, question, part, "maths-domain", "error", "The worked answer uses a root outside the stated x > 0 domain.");
   }
 
-  if (/\b(?:ln|log|sqrt)\b|√/.test(text) && !/(?:domain|positive|x\s*[>≥]|argument|defined)/i.test(text)) {
+  if (advisoryChecksEnabled && /\b(?:ln|log|sqrt)\b|√/.test(text) && !/(?:domain|positive|x\s*[>≥]|argument|defined)/i.test(text)) {
     addIssue(issues, question, part, "maths-domain", "warning", "A logarithm or square root is used without an explicit domain condition.");
   }
-  if (/\bexact(?:ly|\s+form)?\b/i.test(part.prompt) && /\b\d+\.\d+\b/.test(part.modelAnswer) && !/[√π]|fraction|surd/i.test(part.modelAnswer)) {
+  if (advisoryChecksEnabled && /\b(?:give|state|find|leave|write|express)\b[^.\n]{0,36}\bexact(?:\s+(?:answer|form|result|value))?\b/i.test(part.prompt) && /\b\d+\.\d+\b/.test(part.modelAnswer) && !/[√π]|fraction|surd/i.test(part.modelAnswer)) {
     addIssue(issues, question, part, "maths-exact-form", "warning", "The prompt requests an exact result but the worked answer appears decimal-only.");
   }
-  if (/\b(?:differentiat|derivative|integrat|antiderivative|gradient)\w*\b/i.test(text) &&
+  if (advisoryChecksEnabled && /\b(?:differentiat|derivative|integrat|antiderivative|gradient)\w*\b/i.test(text) &&
       /\b(?:therefore|hence|so)\b/i.test(part.prompt) && !/[=→]/.test(part.modelAnswer)) {
     addIssue(issues, question, part, "maths-calculus", "warning", "A calculus conclusion has no explicit symbolic result to check.");
   }
@@ -613,6 +1018,7 @@ function validateMathsPart(question: Question, part: QuestionPart, issues: Subje
 function validateBiologyPart(question: Question, part: QuestionPart, issues: SubjectAssessmentIssue[]): void {
   const text = partText(part);
   const answer = part.modelAnswer;
+  const advisoryChecksEnabled = !(question.source === "generated" && question.verification === "unverified");
   const suspiciousContradiction = text.split(/[.!?;\n]+/)
     .map((sentence) => sentence.trim())
     .filter(Boolean)
@@ -677,8 +1083,18 @@ function validateBiologyPart(question: Question, part: QuestionPart, issues: Sub
 
   const causalPrompt = /\b(?:explain|why|predict|evaluate|cause|mechanism|effect)\w*\b/i.test(part.prompt);
   const causalAnswer = /\b(?:because|therefore|so|leads?|caus|result|due to|which means|allows?)\w*\b/i.test(part.modelAnswer);
-  if (causalPrompt && !causalAnswer) {
+  if (advisoryChecksEnabled && causalPrompt && !causalAnswer) {
     addIssue(issues, question, part, "biology-causal-chain", "warning", "The answer describes an outcome without an explicit biological causal link.");
+  }
+  if (advisoryChecksEnabled) {
+    const structureFunction = biologyStructureFunctionWarning(part.prompt, answer);
+    if (structureFunction) addIssue(issues, question, part, "biology-terminology", "warning", structureFunction);
+    const practicalWarning = biologyPracticalEvidenceWarning(part.prompt, answer);
+    if (practicalWarning) addIssue(issues, question, part, "biology-practical-design", "warning", practicalWarning);
+    const alternativeExplanation = biologyAlternativeExplanationWarning(part.prompt, answer);
+    if (alternativeExplanation) addIssue(issues, question, part, "biology-data-interpretation", "warning", alternativeExplanation);
+    const enzymeReasoning = biologyEnzymeReasoningWarning(part.prompt, answer);
+    if (enzymeReasoning) addIssue(issues, question, part, "biology-causal-chain", "warning", enzymeReasoning);
   }
 
   // Only raise a practical-design warning when the prompt actually asks for
@@ -687,16 +1103,16 @@ function validateBiologyPart(question: Question, part: QuestionPart, issues: Sub
   // mechanism/application parts.
   const practicalPrompt = /\b(?:design|plan|experiment|control variable|independent variable|dependent variable|repeat(?:ed|s)?|replicat(?:e|ed|ion)|uncertaint(?:y|ies)|error bar|valid(?:ity)?)\b/i.test(part.prompt);
   const practicalEvidence = /\b(?:control|independent|dependent|variable|repeat|replicat|mean|uncertaint|error bar|axis|sample size|valid)\w*\b/i.test(part.modelAnswer);
-  if (practicalPrompt && !practicalEvidence) {
+  if (advisoryChecksEnabled && practicalPrompt && !practicalEvidence) {
     addIssue(issues, question, part, "biology-practical-design", "warning", "A practical or data claim has no visible control, measurement or uncertainty evidence.");
   }
-  if (/\b(?:data|table|graph|percentage|rate|concentration|mass change)\b/i.test(part.prompt) && !/\d|trend|correlat|compar|mean|uncertaint|significant/i.test(part.modelAnswer)) {
+  if (advisoryChecksEnabled && /\b(?:data|table|graph|percentage|rate|concentration|mass change)\b/i.test(part.prompt) && !/\d|trend|correlat|compar|mean|uncertaint|significant/i.test(part.modelAnswer)) {
     addIssue(issues, question, part, "biology-data-interpretation", "warning", "The answer does not cite a measurable trend or comparison for the supplied data demand.");
   }
 
   // Flag only an explicit terminology collision; ordinary synonyms remain
   // valid because the human reviewer owns final terminology approval.
-  if (/\b(?:peptide|glycosidic|phosphodiester|hydrogen) bond\b/i.test(text) &&
+  if (advisoryChecksEnabled && /\b(?:peptide|glycosidic|phosphodiester|hydrogen) bond\b/i.test(text) &&
       /\b(?:between|formed|joins?)\b/i.test(text) && /\bwrong|incorrect|confus/i.test(text)) {
     addIssue(issues, question, part, "biology-terminology", "warning", "Terminology is called out as a possible bond/structure confusion and needs subject review.");
   }
@@ -710,7 +1126,7 @@ function equationCandidates(text: string): string[] {
   // Requiring each side to begin with a formula token also prevents prose
   // immediately before an arrow (for example “check Fe²⁺ …”) becoming part of
   // the equation passed to the balancer.
-  const species = String.raw`(?:\d+\s*)?[A-Z][A-Za-z0-9()[\]₀-₉⁺⁻+\-^]*`;
+  const species = String.raw`(?:\d+\s*)?(?:[A-Z]|e)[A-Za-z0-9()[\]₀-₉⁺⁻+\-^]*`;
   const equation = new RegExp(`(${species}(?:\\s*\\+\\s*${species})*\\s*(?:->|→|⟶|==>)\\s*${species}(?:\\s*\\+\\s*${species})*)`, "g");
   for (const match of text.matchAll(equation)) {
     const value = match[1]?.trim();
@@ -841,6 +1257,63 @@ function equilibriumExpressionMismatch(prompt: string, answer: string): string |
   return "Kc must place product concentrations in the numerator and reactant concentrations in the denominator, with powers matching the balanced equation.";
 }
 
+/** Check charge/electron conservation for a plainly written half-equation. */
+function electronBalanceMismatch(answer: string): string | null {
+  if (!/(?:e\s*[⁻-]|electron|half[- ]equation)/i.test(answer) || !/(?:->|→|⟶)/.test(answer)) return null;
+  const candidate = equationCandidates(answer).find((equation) => /e\s*[⁻-]/i.test(equation));
+  if (!candidate) return null;
+  const failure = ionicEquationUnbalanced(candidate);
+  if (failure !== "charge") return null;
+  if (/(?:not|incorrect|wrong|correct|should be|reject)/i.test(answer)) return null;
+  return `The half-equation ${candidate} does not conserve charge; add or remove electrons on the side required by the oxidation/reduction change.`;
+}
+
+function parseSimpleFormula(value: string): Map<string, number> | null {
+  const clean = value.replace(/[⁺⁻+-].*$/, "");
+  const matches = [...clean.matchAll(/([A-Z][a-z]?)(\d*)/g)];
+  if (!matches.length || matches.map((match) => match[0]).join("") !== clean) return null;
+  const counts = new Map<string, number>();
+  for (const match of matches) counts.set(match[1]!, (counts.get(match[1]!) ?? 0) + Number(match[2] || 1));
+  return counts;
+}
+
+/** Recompute a simple C/H/O empirical formula from supplied masses. */
+function empiricalFormulaMismatch(prompt: string, answer: string): string | null {
+  if (!/\bempirical\s+formula\b/i.test(prompt)) return null;
+  const atomicMass: Record<string, number> = { C: 12.011, H: 1.008, O: 15.999, N: 14.007, S: 32.06, Cl: 35.45 };
+  const aliases: Record<string, string> = { carbon: "C", hydrogen: "H", oxygen: "O", nitrogen: "N", sulfur: "S", sulphur: "S", chlorine: "Cl" };
+  const supplied = new Map<string, number>();
+  const addComposition = (label: string, rawMass: string): void => {
+    const symbol = aliases[label.toLowerCase()] ?? (label.length <= 2 ? label[0]!.toUpperCase() + label.slice(1).toLowerCase() : label);
+    const mass = Number(rawMass);
+    if (atomicMass[symbol] && Number.isFinite(mass)) supplied.set(symbol, mass);
+  };
+  // Authors use both “carbon 24.0 g” and the more common “24.0 g carbon”.
+  for (const match of prompt.matchAll(/\b(carbon|hydrogen|oxygen|nitrogen|sul(?:f|ph)ur|chlorine|C|H|O|N|S|Cl)\b[^\d\n]{0,12}([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:g|%)?/gi)) {
+    addComposition(match[1]!, match[2]!);
+  }
+  for (const match of prompt.matchAll(/([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:g|%)?\s*\b(carbon|hydrogen|oxygen|nitrogen|sul(?:f|ph)ur|chlorine|C|H|O|N|S|Cl)\b/gi)) {
+    addComposition(match[2]!, match[1]!);
+  }
+  if (supplied.size < 2) return null;
+  const moles = [...supplied.entries()].map(([symbol, mass]) => [symbol, mass / atomicMass[symbol]!] as const);
+  const smallest = Math.min(...moles.map(([, amount]) => amount));
+  if (!Number.isFinite(smallest) || smallest <= 0) return null;
+  const expected = new Map(moles.map(([symbol, amount]) => [symbol, Math.max(1, Math.round(amount / smallest))] as const));
+  const formulaMatch = answer.match(/\b(?:empirical\s+formula\s*(?:is|=)?\s*)?([A-Z][A-Za-z]?\d*(?:[A-Z][A-Za-z]?\d*)+)\b/);
+  if (!formulaMatch) return null;
+  const actual = parseSimpleFormula(formulaMatch[1]!);
+  if (!actual) return null;
+  const expectedRatios = [...expected.values()];
+  const baseExpected = expectedRatios[0] ?? 1;
+  const baseActual = actual.get([...expected.keys()][0]!) ?? 0;
+  if (baseActual <= 0) return null;
+  const proportional = [...expected.entries()].every(([symbol, count]) => Math.abs((actual.get(symbol) ?? 0) / baseActual - count / baseExpected) < 1e-9);
+  if (proportional || /(?:not|incorrect|wrong|reject|should be)/i.test(answer)) return null;
+  const expectedFormula = [...expected.entries()].map(([symbol, count]) => `${symbol}${count === 1 ? "" : count}`).join("");
+  return `The supplied composition gives empirical formula ${expectedFormula}, not ${formulaMatch[1]}.`;
+}
+
 function formulaElementCounts(formula: string): Map<string, number> | null {
   const clean = formula.replace(/[⁺⁻+\-](?:\d+)?$/, "").replace(/\^(?:\d+)?[+-]$/, "").replace(/[₀-₉]/g, (digit) => String("₀₁₂₃₄₅₆₇₈₉".indexOf(digit)));
   if (!clean || /[()·.]/.test(clean)) return null;
@@ -936,6 +1409,7 @@ function solutionAmountMismatch(prompt: string, answer: string): string | null {
 function validateChemistryPart(question: Question, part: QuestionPart, issues: SubjectAssessmentIssue[]): void {
   const text = partText(part);
   const answer = part.modelAnswer;
+  const advisoryChecksEnabled = !(question.source === "generated" && question.verification === "unverified");
   const equations = [...new Set([...equationCandidates(text), ...findUnbalancedEquations(text)])];
   for (const equation of equations) {
     const result = checkEquationBalance(equation);
@@ -973,28 +1447,32 @@ function validateChemistryPart(question: Question, part: QuestionPart, issues: S
   if (phMismatch) addIssue(issues, question, part, "chemistry-acid-base", "error", phMismatch);
   const amountMismatch = solutionAmountMismatch(part.prompt, answer);
   if (amountMismatch) addIssue(issues, question, part, "chemistry-stoichiometry", "error", amountMismatch);
+  const electronError = electronBalanceMismatch(answer);
+  if (electronError) addIssue(issues, question, part, "chemistry-stoichiometry", "error", electronError);
+  const empiricalError = empiricalFormulaMismatch(part.prompt, answer);
+  if (empiricalError) addIssue(issues, question, part, "chemistry-stoichiometry", "error", empiricalError);
   const precisionWarning = chemistryPrecisionWarning(part.prompt, answer);
-  if (precisionWarning) addIssue(issues, question, part, "chemistry-precision", "warning", precisionWarning);
+  if (advisoryChecksEnabled && precisionWarning) addIssue(issues, question, part, "chemistry-precision", "warning", precisionWarning);
   if (/\bcm\s*(?:³|3)(?!\w)/i.test(part.prompt) && /\bmol\s*dm\s*(?:[-⁻]?3|⁻³)(?!\w)/i.test(part.prompt) &&
       /\bn\s*=\s*c\s*[×*]\s*\d+(?:\.\d+)?\b/i.test(answer) && !/(?:\/\s*1000|0\.0\d|dm\s*³)/i.test(answer)) {
     addIssue(issues, question, part, "chemistry-unit", "error", "A cm³ volume must be converted to dm³ before using n = cV.");
   }
-  if (/\b(?:stoichiometr|mole ratio|coefficient)\w*\b/i.test(part.prompt) &&
+  if (advisoryChecksEnabled && /\b(?:stoichiometr|mole ratio|coefficient)\w*\b/i.test(part.prompt) &&
       !/\b(?:ratio|coefficient|mole|mol|balanced|electron)\w*\b/i.test(part.modelAnswer)) {
     addIssue(issues, question, part, "chemistry-stoichiometry", "warning", "The stoichiometric conclusion is not supported by a visible mole ratio or balanced relationship.");
   }
-  if (/\b(?:oxidation state|oxidation number|redox|electron transfer)\b/i.test(part.prompt) &&
+  if (advisoryChecksEnabled && /\b(?:oxidation state|oxidation number|redox|electron transfer)\b/i.test(part.prompt) &&
       !/\b(?:oxid|reduc|electron|charge|state|half-equation)\w*\b/i.test(part.modelAnswer)) {
     addIssue(issues, question, part, "chemistry-oxidation-state", "warning", "The answer does not show an oxidation-state or electron-balance justification.");
   }
-  if (/\b(?:calculate|concentration|amount|energy|volume|pressure|rate)\w*\b/i.test(part.prompt) &&
+  if (advisoryChecksEnabled && /\b(?:calculate|concentration|amount|energy|volume|pressure|rate)\w*\b/i.test(part.prompt) &&
       /\b(?:mol|dm|cm|kJ|J|Pa|K|g|s|m)\b/i.test(part.prompt) &&
       !/\b(?:mol|dm|cm|kJ|J|Pa|K|g|s|m)\b/i.test(part.modelAnswer)) {
     addIssue(issues, question, part, "chemistry-unit", "warning", "A numerical chemistry answer has no visible unit.");
   }
   const equilibriumTask = /\bK[cp]\b/i.test(part.prompt) ||
     (/(?:⇌|->|→)/.test(part.prompt) && /\b(?:equilibrium|concentration|partial pressure|quotient)\b/i.test(part.prompt));
-  if (equilibriumTask && !/(?:\[|partial pressure|concentration|equilibrium|Q[cp])/i.test(part.modelAnswer)) {
+  if (advisoryChecksEnabled && equilibriumTask && !/(?:\[|partial pressure|concentration|equilibrium|Q[cp])/i.test(part.modelAnswer)) {
     addIssue(issues, question, part, "chemistry-equilibrium", "warning", "The equilibrium answer does not expose the concentration or partial-pressure relationship.");
   }
 }
@@ -1022,6 +1500,14 @@ function buildRepairQueue(
     issueByPart.set(key, rows);
   }
 
+  const priorityRank: Record<SubjectRepairPriority, number> = {
+    "missing-authored-demand": 0,
+    "not-self-contained": 1,
+    "weak-worked-solution": 2,
+    "duplicate-reasoning": 3,
+    "correctness-warning": 4,
+  };
+
   const put = (item: SubjectRepairQueueItem): void => {
     const key = `${item.specPointId ?? "?"}:${item.capabilityId ?? "?"}:${item.demand ?? "?"}:${item.partId ?? item.questionId ?? "cell"}`;
     const prior = queue.get(key);
@@ -1031,6 +1517,21 @@ function buildRepairQueue(
     }
     prior.reasons = [...new Set([...prior.reasons, ...item.reasons])];
     if (item.severity === "error") prior.severity = "error";
+    if (priorityRank[item.priority] < priorityRank[prior.priority]) prior.priority = item.priority;
+  };
+
+  const priorityForSubjectIssue = (issue: SubjectAssessmentIssue): SubjectRepairPriority => {
+    if (issue.kind === "not-self-contained") return "not-self-contained";
+    if (issue.kind === "solution-substance") return "weak-worked-solution";
+    if (issue.kind !== "generic-fallback" && issue.kind !== "demand-evidence") return "correctness-warning";
+    if (issue.severity === "warning") return "correctness-warning";
+    return "missing-authored-demand";
+  };
+
+  const priorityForStructuralIssue = (kind: PhysicsQualityIssueKind): SubjectRepairPriority => {
+    if (kind === "cosmetic-reskin" || kind === "surface-rewording") return "duplicate-reasoning";
+    if (kind === "incomplete-mark-scheme") return "weak-worked-solution";
+    return "missing-authored-demand";
   };
 
   // One item for every incomplete statement/capability/demand cell, even
@@ -1051,6 +1552,7 @@ function buildRepairQueue(
         demand: demand.demand,
         ...(representative ? { questionId: representative.question.id, partId: representative.part.id } : {}),
         severity: "error",
+        priority: "missing-authored-demand",
         reasons: [demand.complete ? "Demand has insufficiently distinct families, contexts or reasoning paths." : "Demand needs at least two substantive families."],
       });
     }
@@ -1075,12 +1577,36 @@ function buildRepairQueue(
       questionId,
       partId,
       severity: issues.some((issue) => issue.severity === "error") ? "error" : "warning",
+      priority: issues.map(priorityForSubjectIssue).sort((a, b) => priorityRank[a] - priorityRank[b])[0] ?? "missing-authored-demand",
       reasons: issues.map((issue) => `${issue.kind}: ${issue.detail}`),
     });
   }
+  // Structural duplicate/mapping/rubric issues are part of the same repair
+  // queue even though they live in the shared Physics audit type. Exclude
+  // unreviewed-only entries: review approval is a separate trust workflow,
+  // while this queue is about cells that cannot count as deep authored work.
+  for (const issue of depth.issues) {
+    if (!issue.partId || issue.kind === "unreviewed") continue;
+    const question = questions.find((row) => row.id === issue.questionId);
+    const part = question?.parts.find((row) => row.id === issue.partId);
+    if (!question || !part) continue;
+    put({
+      subjectId,
+      ...(issue.specPointId ? { specPointId: issue.specPointId } : {}),
+      ...(issue.capabilityId ? { capabilityId: issue.capabilityId } : {}),
+      ...(part.learning?.demand ? { demand: part.learning.demand } : {}),
+      questionId: issue.questionId,
+      partId: issue.partId,
+      severity: "error",
+      priority: priorityForStructuralIssue(issue.kind),
+      reasons: [`${issue.kind}: ${issue.detail}`],
+    });
+  }
   return [...queue.values()].sort((a, b) => {
+    if (priorityRank[a.priority] !== priorityRank[b.priority]) return priorityRank[a.priority] - priorityRank[b.priority];
     if (a.severity !== b.severity) return a.severity === "error" ? -1 : 1;
-    return `${a.specPointId ?? ""}:${a.demand ?? ""}`.localeCompare(`${b.specPointId ?? ""}:${b.demand ?? ""}`);
+    return `${a.specPointId ?? ""}:${a.demand ?? ""}:${a.questionId ?? ""}:${a.partId ?? ""}`
+      .localeCompare(`${b.specPointId ?? ""}:${b.demand ?? ""}:${b.questionId ?? ""}:${b.partId ?? ""}`);
   });
 }
 
@@ -1096,6 +1622,21 @@ export function auditFlagshipSubject(input: {
   const subjectIssues: SubjectAssessmentIssue[] = [];
   const invalidParts = new Set<string>();
   const subjectQuestions = input.questions.filter((row) => row.subjectId === input.subjectId);
+  // Run the shared mapping/authoring audit once before counting strict cells.
+  // Its issues are deliberately kept in the structural audit surface, but a
+  // non-Physics part with a missing/unknown mapping, incomplete rubric or
+  // duplicate route must not still inflate deepComplete through the broad
+  // statement-level rows.
+  if (input.subjectId !== "wjec-alevel-physics") {
+    const structural = auditPhysicsAssessmentQuality({
+      ...input,
+      subjectId: input.subjectId,
+      strictSubstantive: false,
+    });
+    for (const issue of structural.issues) {
+      if (issue.partId && issue.kind !== "unreviewed") invalidParts.add(`${issue.questionId}:${issue.partId}`);
+    }
+  }
   for (const question of subjectQuestions) {
     for (const part of question.parts) {
       // Physics already has a mature, reviewed depth bank and retains its

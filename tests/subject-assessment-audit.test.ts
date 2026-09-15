@@ -8,6 +8,7 @@ import { wjecDepthCurricula } from "@/content/wjec-subject-capabilities";
 import { wjecFlagshipCurricula } from "@/content/wjec-subject-capabilities";
 import { seedQuestions } from "@/content";
 import { defineQuestion } from "@/content/questions/authoring";
+import { qualityItem } from "@/content/questions/wjec-quality-authoring";
 import { auditFlagshipSubject, buildFlagshipDepthDashboard } from "@/domain/subject-assessment-audit";
 import type { LearningDemand, Question } from "@/domain/types";
 
@@ -96,6 +97,38 @@ function subjectIssues(question: Question) {
 }
 
 describe("subject-specific correctness checks", () => {
+  it("labels uninstantiated helper prose as scaffold while allowing an instantiated operation", () => {
+    const scaffold = qualityItem(
+      "maths", "differentiation", 1, "fallback-helper", "calculation", "fallback", "generic route",
+      "Calculate the requested value from the stated value using the appropriate method.",
+      ["Use the appropriate method."], "Use the appropriate method.",
+    );
+    expect(scaffold.parts[0]!.learning?.quality).toBe("scaffold");
+
+    const authored = qualityItem(
+      "maths", "differentiation", 1, "instantiated-helper", "calculation", "route", "differentiate a named function",
+      "For f(x) = x², use the appropriate method to calculate f'(2).",
+      ["Differentiate f(x) = x² to obtain f'(x) = 2x.", "Substitute x = 2 to obtain f'(2) = 4."],
+      "Using f'(x) = 2x, substitute x = 2 and obtain f'(2) = 4.",
+    );
+    expect(authored.parts[0]!.learning?.quality).toBe("substantive");
+  });
+
+  it("excludes a mapped cell with missing standalone capability/spec metadata", () => {
+    const question = qualityItem(
+      "maths", "differentiation", 1, "missing-map", "recall", "map", "state the rule",
+      "State the derivative rule for f(x) = x².",
+      ["The derivative is f'(x) = 2x."], "f'(x) = 2x.",
+    );
+    question.parts[0]!.specPointIds = [];
+    question.parts[0]!.capabilityIds = [];
+    const curriculum = wjecDepthCurricula[0]!;
+    const audit = auditFlagshipSubject({ subjectId: curriculum.subject.id, topics: curriculum.topics, questions: [question], nodes: wjecCapabilities });
+    expect(audit.completeStatements).toBe(0);
+    expect(audit.issues.some((issue) => issue.kind === "missing-spec-point")).toBe(true);
+    expect(audit.repairQueue[0]?.priority).toBe("missing-authored-demand");
+  });
+
   it("catches a non-equivalent Maths identity", () => {
     const question = fixture("wjec-alevel-maths", "Check the identity. x + 1 = x + 2.", "x + 1 = x + 2");
     const audit = auditFlagshipSubject({ subjectId: question.subjectId, topics: [], questions: [question], nodes: [] });
@@ -201,6 +234,17 @@ describe("subject-specific correctness checks", () => {
     expect(subjectIssues(question).some((issue) => issue.kind === "not-self-contained")).toBe(true);
   });
 
+  it("flags an explicitly referenced Maths variable with no definition", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths",
+      "undefined-variable",
+      "calculation",
+      "Calculate the variable z using x and y.",
+      "z = 4.",
+    );
+    expect(subjectIssues(question).some((issue) => issue.kind === "not-self-contained" && /variable|definition/i.test(issue.detail))).toBe(true);
+  });
+
   it("rejects a method instruction that never carries out the calculation", () => {
     const question = substantiveFixture(
       "wjec-alevel-maths",
@@ -224,6 +268,9 @@ describe("subject-specific correctness checks", () => {
     ["wrong-independent-product", "calculation", "A and B are independent. Find P(A ∩ B).", "P(A ∩ B) = P(A) + P(B).", "maths-equivalence"],
     ["wrong-suvat", "calculation", "Use v = u + at for u = 2 m s^-1, a = 3 m s^-2 and t = 4 s; calculate v.", "v = 8 m s^-1.", "maths-mechanics"],
     ["wrong-mean", "calculation", "The data values are 2, 4, 6. Calculate the mean.", "mean = 5.", "maths-statistics"],
+    ["wrong-log", "calculation", "Solve ln(x) = 2 for x > 0.", "x = 5.", "maths-equivalence"],
+    ["wrong-coordinate-gradient", "calculation", "Points A(1, 2) and B(4, 8) are given. Calculate the gradient.", "gradient = 1.", "maths-equivalence"],
+    ["wrong-radical-root", "calculation", "Solve √(x + 3) = x - 1.", "x = -2.", "maths-domain"],
   ] as const)("catches adversarial Maths %s", (_slug, demand, prompt, answer, kind) => {
     const question = substantiveFixture("wjec-alevel-maths", _slug, demand, prompt, answer);
     expect(subjectIssues(question).some((issue) => issue.kind === kind && issue.severity === "error")).toBe(true);
@@ -244,6 +291,15 @@ describe("subject-specific correctness checks", () => {
     expect(subjectIssues(question).some((issue) => issue.kind === kind && issue.severity === "error")).toBe(true);
   });
 
+  it("flags a Biology practical answer that omits controls and replication", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-biology", "practical-controls", "application",
+      "Design an experiment to test whether temperature changes enzyme rate.",
+      "Change the temperature and record the rate.",
+    );
+    expect(subjectIssues(question).some((issue) => issue.kind === "biology-practical-design" && issue.severity === "warning")).toBe(true);
+  });
+
   it.each([
     ["ionic-charge", "calculation", "Check Fe2+ + Cl2 -> Fe3+ + Cl-.", "Fe2+ + Cl2 -> Fe3+ + Cl-.", "chemistry-equation-balance"],
     ["ionic-superscript-charge", "calculation", "Check Fe^2+ + OH- -> Fe(OH)2.", "Fe^2+ + OH- -> Fe(OH)2.", "chemistry-equation-balance"],
@@ -257,6 +313,8 @@ describe("subject-specific correctness checks", () => {
     ["acid-base-ph", "calculation", "Given [H+] = 1 × 10^-3 mol dm-3, calculate pH.", "pH = 2.", "chemistry-acid-base"],
     ["volume-unit", "calculation", "Calculate n for 25 cm³ of 0.2 mol dm-3 solution.", "n = c × 25 = 5 mol.", "chemistry-unit"],
     ["titration-amount", "calculation", "A 25 cm³ aliquot of 0.2 mol dm-3 solution is used in a titration. Calculate n.", "n = c × 25/1000 = 0.5 mol.", "chemistry-stoichiometry"],
+    ["electron-half-equation", "calculation", "Check the reduction half-equation Fe3+ + e- -> Fe2+.", "Fe3+ + 2e- -> Fe2+.", "chemistry-stoichiometry"],
+    ["empirical-formula", "calculation", "A compound contains 24.0 g carbon and 4.0 g hydrogen. Find its empirical formula.", "The empirical formula is CH.", "chemistry-stoichiometry"],
   ] as const)("catches adversarial Chemistry %s", (_slug, demand, prompt, answer, kind) => {
     const question = substantiveFixture("wjec-alevel-chemistry", _slug, demand, prompt, answer);
     const issues = subjectIssues(question);
