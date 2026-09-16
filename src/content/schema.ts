@@ -60,6 +60,12 @@ const learningPartSchema = z.object({
   demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
   reasoningMoves: z.array(nonEmpty).min(1).max(8),
   quality: z.enum(["substantive", "scaffold"]).optional(),
+  // Authoring trace is retained for audits but is never part of the prompt
+  // projection shown to a learner.
+  promptTarget: nonEmpty.optional(),
+  expectedResult: nonEmpty.optional(),
+  derivation: z.array(nonEmpty).max(16).optional(),
+  evidenceSources: z.array(nonEmpty).max(16).optional(),
   capabilityEvidence: z.object({
     capabilityId: id,
     requiredEntities: z.array(nonEmpty).min(1).max(12),
@@ -111,6 +117,11 @@ export const contentQuestionSchema = z.object({
     demand: z.enum(["recall", "explanation", "application", "misconception", "calculation", "transfer", "synoptic"]),
     expectedMinutes: z.number().finite().positive().max(120),
     reasoningMoves: z.array(nonEmpty).min(1).max(8).optional(),
+    quality: z.enum(["substantive", "scaffold"]).optional(),
+    promptTarget: nonEmpty.optional(),
+    expectedResult: nonEmpty.optional(),
+    derivation: z.array(nonEmpty).max(16).optional(),
+    evidenceSources: z.array(nonEmpty).max(16).optional(),
     capabilityEvidence: z.object({
       capabilityId: id,
       requiredEntities: z.array(nonEmpty).min(1).max(12),

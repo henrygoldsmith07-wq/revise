@@ -221,6 +221,10 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
     ? { ...baseCapabilityEvidence, secondaryCapability: secondaryCapability(brief) }
     : baseCapabilityEvidence;
   const provenance = provenanceFor(fullPrompt, scheme, fullAnswer, operation);
+  const promptTarget = task.trim();
+  const expectedResult = result.trim();
+  const derivation = [...new Set([operation, ...provenance.intermediateResults])].filter(Boolean).slice(0, 16);
+  const evidenceSources = provenance.sourceEvidence.slice(0, 16);
   return {
     label: `(${String.fromCharCode(97 + demands.indexOf(demand))})`,
     prompt: fullPrompt,
@@ -238,6 +242,10 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
       // they are eligible for substantive review. A future authoring helper
       // that cannot instantiate its data must explicitly use `scaffold`.
       quality: "substantive",
+      promptTarget,
+      expectedResult,
+      derivation,
+      evidenceSources,
       capabilityEvidence,
       provenance,
     },

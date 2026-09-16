@@ -110,6 +110,12 @@ function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+/** Keep the learner-facing target separate from setup/context prose. */
+function promptTargetFor(prompt: string): string {
+  const command = prompt.match(/\b(?:state|define|describe|explain|calculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|solve|simplify|apply|interpret|measure|report|justify|use|check|balance|classify|estimate|select|infer|obtain|test|reject|choose|give|name|list|write|draw|sketch)\b[^.!?\n]*/i)?.[0];
+  return (command ?? prompt).replace(/[.!?]+$/, "").trim();
+}
+
 /**
  * Build an explicit capability contract from the authored item.  The
  * contract is deliberately small and inspectable: it records the concrete
@@ -290,12 +296,20 @@ export function qualityItem(subject: "maths" | "biology" | "chemistry", topic: s
     ? { ...baseCapabilityEvidence, secondaryCapability: family }
     : baseCapabilityEvidence;
   const provenance = provenanceFor(prompt, scheme, answer, reasoning);
+  const promptTarget = promptTargetFor(prompt);
+  const expectedResult = provenance.finalResult;
+  const derivation = uniqueStrings([provenance.operation, ...provenance.intermediateResults]).slice(0, 16);
+  const evidenceSources = provenance.sourceEvidence.slice(0, 16);
   const learning = {
     familyId: `${subject}:${family}`,
     contextId: `${subject}:${slug}`,
     demand,
     reasoningMoves: [reasoning],
     quality: likelyScaffold ? "scaffold" as const : "substantive" as const,
+    promptTarget,
+    expectedResult,
+    derivation,
+    evidenceSources,
     capabilityEvidence,
     provenance,
   };

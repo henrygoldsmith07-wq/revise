@@ -419,15 +419,7 @@ export function validateSubstantivePart(
   part: QuestionPart,
 ): SubstantiveGateFailure[] {
   const failures: SubstantiveGateFailure[] = [];
-  const meta = part.learning ?? (question.learning ? {
-    familyId: question.learning.familyId,
-    contextId: question.learning.contextId,
-    demand: question.learning.demand,
-    reasoningMoves: question.learning.reasoningMoves ?? [],
-    capabilityEvidence: question.learning.capabilityEvidence,
-    provenance: question.learning.provenance,
-    quality: undefined,
-  } : undefined);
+  const meta = part.learning ?? question.learning;
   const text = partText(part);
   const prompt = part.prompt.trim();
   const answer = part.modelAnswer.trim();
@@ -449,16 +441,36 @@ export function validateSubstantivePart(
     failures.push({ kind: "demand-evidence", detail: "A substantive cell needs an explicit subject command such as calculate, explain, compare or define." });
   }
 
-  // The expected result belongs in the scheme/answer, never in the student
-  // prompt.  This is a hard error because a leaked result can create a false
-  // mastery or transfer signal even when every other structural check passes.
-  const leakage = answerLeakageDetail(prompt, `${part.markScheme.join("\n")}\n${answer}`);
+  // Expected results must stay out of learner prompts: leakage is a hard error.
+  const target = meta?.promptTarget?.trim();
+  const workedAnswer = `${part.markScheme.join("\n")}\n${answer}`;
+  const leakage = answerLeakageDetail(prompt, workedAnswer, meta?.expectedResult);
   if (leakage) failures.push({ kind: "answer-leakage", detail: leakage });
+
+  // Generated substantive cells must retain the target/result authoring trace.
+  const requiresAuthoringTrace = question.source === "generated" && meta?.quality === "substantive";
+  if (requiresAuthoringTrace) {
+    const missing: string[] = [];
+    if (!target) missing.push("promptTarget");
+    if (!meta?.expectedResult?.trim()) missing.push("expectedResult");
+    if (!meta?.derivation?.some((step) => step.trim())) missing.push("derivation");
+    if (!meta?.evidenceSources?.some((source) => source.trim())) missing.push("evidenceSources");
+    if (missing.length) failures.push({ kind: "provenance", detail: `Substantive generated content is missing the target/result trace: ${missing.join(", ")}.` });
+    if (target && !prompt.toLowerCase().includes(target.toLowerCase())) {
+      failures.push({ kind: "provenance", detail: "The authored promptTarget is not represented in the rendered prompt." });
+    }
+  }
 
   for (const detail of validateCapabilityEvidence(meta?.capabilityEvidence, part, text)) {
     failures.push({ kind: "capability-evidence", detail });
   }
-  for (const detail of validateProvenance(meta?.provenance, prompt, part.markScheme, answer, subjectId)) {
+  const traceProvenance = meta?.provenance ?? (meta?.expectedResult ? {
+    sourceEvidence: meta.evidenceSources ?? [],
+    operation: meta.derivation?.[0] ?? "derive",
+    intermediateResults: meta.derivation?.slice(1) ?? [],
+    finalResult: meta.expectedResult,
+  } : undefined);
+  for (const detail of validateProvenance(traceProvenance, prompt, part.markScheme, answer, subjectId)) {
     failures.push({ kind: detail.includes("answer leakage") ? "answer-leakage" : "provenance", detail });
   }
 

@@ -79,6 +79,8 @@ function evidenceSegments(text: string): string[] {
   return segments;
 }
 
+const RESULT_QUANTITY = /\b((?:the\s+)?(?:[A-Za-z][A-Za-z0-9′'/-]*\s+){0,3}(?:probability|concentration|amount|mass|volume|force|energy|gradient|derivative|root|ratio|yield|purity|rate|value|answer|result|share|length|area|distance|temperature|pressure|current|charge|frequency|wavelength|momentum|potential|electrons?|q|x|y))\s*(?:is|are|equals?|=|will\s+be|should\s+be|,|:)\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[/:+-]\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+))*(?:\s+[A-Za-zμΩ°][A-Za-z0-9μΩ°⁻¹⁻²³/.-]*)?)(?![A-Za-z])/gi;
+
 /**
  * Extract only values that a prompt explicitly presents as an answer or
  * conclusion.  Source equations (for example f(x)=x²) are deliberately
@@ -130,6 +132,14 @@ export function promptAnswerClaims(prompt: string): string[] {
       claims.push(target);
     }
 
+    // A bare quantity after a command (“find the concentration, 0.25 mol
+    // dm−3”) is still an answer leak even without an equality. Stop at source
+    // cues such as “from” or “using” so supplied data remain legitimate.
+    const quantityClaim = [...targetWindow.matchAll(RESULT_QUANTITY)][0];
+    if (quantityClaim && !/\b(?:using|by|via|through|from|where|given|supplied|stated|with|according\s+to)\b/i.test(targetWindow.slice(0, quantityClaim.index ?? 0))) {
+      claims.push(`${quantityClaim[1]!.trim()} is ${quantityClaim[2]!.trim()}`);
+    }
+
     // Selection instructions can embed a numerical or option answer without
     // an equality (“select 14 as the concentration”, “tick option C”).
     // Restrict this to an explicit selection command so ordinary supplied
@@ -171,27 +181,64 @@ export function promptAnswerClaims(prompt: string): string[] {
   return unique(claims);
 }
 
-/** Return a hard error when the prompt already contains the expected answer. */
-export function answerLeakageDetail(prompt: string, workedAnswer: string): string | null {
-  const compact = (value: string): string => normaliseEvidenceText(value)
+function expectedResultFragments(expectedResult: string): string[] {
+  const normalised = normaliseEvidenceText(expectedResult).replace(/[.!?]+(?=\s|$)/g, "").trim();
+  if (!normalised) return [];
+  const fragments: string[] = [];
+  // Keep the complete authored conclusion when it contains a concrete value
+  // or outcome. This catches prose such as “the concentration is 0.25 mol
+  // dm−3” even when the prompt has no command/equality for the parser to use.
+  if (/(?:\d|\b(?:increase|decrease|rise|fall|move|enter|leave|diffus|react|bind|denatur|higher|lower|positive|negative|zero|same|different|proportional|independent|dependent|favou?r|product|reactant)\w*)/i.test(normalised) &&
+      !/\b(?:conclusion|result)\s+follows\b/i.test(normalised)) {
+    fragments.push(normalised);
+  }
+  // Also expose individual equations so a prompt that embeds only the final
+  // assignment (rather than the whole prose sentence) is still rejected.
+  for (const match of normalised.matchAll(/\b[A-Za-z][A-Za-z0-9′']*(?:\([^)]*\))?\s*(?:=|≈|\bis\b|\bequals?\b)\s*[^,.;\n]+/gi)) {
+    const fragment = match[0]!.trim();
+    if (/\d|[√π]|\b(?:increase|decrease|rise|fall|move|enter|leave|higher|lower|positive|negative|zero|same|different)\w*/i.test(fragment)) fragments.push(fragment);
+  }
+  // Keep a compact quantity assertion as well as the full sentence. This
+  // catches “find the concentration, 0.25 mol dm−3” when the hidden trace
+  // says “the concentration is 0.25 mol dm−3”, while still requiring the
+  // target noun/variable (a supplied domain bound such as x ≤ 12 cannot
+  // satisfy the assertion).
+  for (const match of normalised.matchAll(RESULT_QUANTITY)) {
+    fragments.push(`${match[1]!.trim()} ${match[2]!.trim()}`);
+  }
+  return unique(fragments);
+}
+
+function compactClaim(value: string): string {
+  return normaliseEvidenceText(value)
     .replace(/[.!?]+(?=\s|$)/g, "")
     .replace(/[\s,;:]+/g, "");
-  const normalisedAnswer = compact(workedAnswer);
+}
+
+function claimMatches(text: string, claim: string, options: { allowRhs?: boolean } = {}): boolean {
+  const compactText = compactClaim(text);
+  const compact = compactClaim(claim);
+  if (!compact) return false;
+  if (compactText.includes(compact)) return true;
+  if (options.allowRhs === false) return false;
+  const rhs = claim.split("=").slice(1).join("=").trim();
+  // A full equality may be re-rendered with a different lhs (for example a
+  // prose answer says “the gradient is 2”). Only compare a sufficiently
+  // specific RHS; a lone supplied digit is never enough evidence.
+  return rhs.length >= 2 && /\d|[A-Za-z]{2,}|[√π]/.test(rhs) && compactText.includes(compactClaim(rhs));
+}
+
+/** Return a hard error when the prompt already contains the expected answer. */
+export function answerLeakageDetail(prompt: string, workedAnswer: string, expectedResult?: string): string | null {
   for (const claim of promptAnswerClaims(prompt)) {
-    const normalisedClaim = compact(claim);
-    // A compact exact expression such as `3 + 2√2` is only five characters
-    // after normalisation, so the lower bound must not discard valid algebraic
-    // leaks. Single-word precision cues are still ignored by the target
-    // parser above.
-    if (normalisedClaim.length < 1) continue;
-    if (normalisedAnswer.includes(normalisedClaim)) return `Prompt states the expected result/conclusion (${claim}) before the learner responds.`;
-    const rhs = claim.split("=").slice(1).join("=").trim();
-    // A full equality may be re-rendered with a different lhs (for example a
-    // prose answer says “the gradient is 2”).  Only compare a sufficiently
-    // specific RHS; a lone supplied digit is never enough evidence.
-    if (rhs.length >= 2 && /\d|[A-Za-z]{2,}|[√π]/.test(rhs) && normalisedAnswer.includes(compact(rhs))) {
-      return `Prompt supplies the expected result ${rhs} in advance.`;
-    }
+    if (claimMatches(workedAnswer, claim)) return `Prompt states the expected result/conclusion (${claim}) before the learner responds.`;
+  }
+  for (const claim of expectedResultFragments(expectedResult ?? "")) {
+    // For the hidden expected-result trace, require the complete authored
+    // assertion to be present. Matching only a right-hand-side value would
+    // confuse supplied data such as a domain bound (x ≤ 12) or a prior
+    // probability (1/2) with the learner's derived answer (x = 12).
+    if (claimMatches(prompt, claim, { allowRhs: false })) return `Prompt contains the authored expected result/conclusion (${claim}) before the learner responds.`;
   }
   return null;
 }

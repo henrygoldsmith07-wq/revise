@@ -158,6 +158,48 @@ describe("subject-specific correctness checks", () => {
     expect(subjectIssues(question).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
   });
 
+  it("uses the hidden result trace without confusing supplied values for leaks", () => {
+    const quantityLeakWithoutTrace = substantiveFixture(
+      "wjec-alevel-chemistry", "answer-leak-quantity-no-trace", "calculation",
+      "Find the concentration, 0.25 mol dm^-3.",
+      "The concentration is 0.25 mol dm^-3.",
+    );
+    expect(subjectIssues(quantityLeakWithoutTrace).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+
+    const quantityLeak = substantiveFixture(
+      "wjec-alevel-chemistry", "answer-leak-hidden-quantity", "calculation",
+      "Find the concentration, 0.25 mol dm^-3.",
+      "The concentration is 0.25 mol dm^-3.",
+    );
+    quantityLeak.parts[0]!.learning = {
+      ...quantityLeak.parts[0]!.learning!,
+      expectedResult: "The concentration is 0.25 mol dm^-3.",
+    };
+    expect(subjectIssues(quantityLeak).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+
+    const suppliedBoundary = substantiveFixture(
+      "wjec-alevel-maths", "answer-leak-supplied-boundary", "misconception",
+      "A model is valid for 0 ≤ x ≤ 12. Find the greatest permitted x.",
+      "The boundary gives x = 12.",
+    );
+    suppliedBoundary.parts[0]!.learning = {
+      ...suppliedBoundary.parts[0]!.learning!,
+      expectedResult: "x = 12",
+    };
+    expect(subjectIssues(suppliedBoundary).some((issue) => issue.kind === "answer-leakage")).toBe(false);
+
+    const setupLeak = substantiveFixture(
+      "wjec-alevel-biology", "answer-leak-hidden-setup", "explanation",
+      "The measured result is an increased rate of photosynthesis. Explain the mechanism using the supplied light data.",
+      "The rate increases because light provides more energy for photosynthesis.",
+    );
+    setupLeak.parts[0]!.learning = {
+      ...setupLeak.parts[0]!.learning!,
+      expectedResult: "the result is an increased rate of photosynthesis",
+    };
+    expect(subjectIssues(setupLeak).some((issue) => issue.kind === "answer-leakage" && issue.severity === "error")).toBe(true);
+  });
+
   it("requires concrete capability evidence in the student-facing setup", () => {
     const question = substantiveFixture(
       "wjec-alevel-maths", "missing-capability-evidence", "calculation",

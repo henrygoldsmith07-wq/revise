@@ -350,6 +350,15 @@ export interface LearningPartMetadata {
    */
   quality?: "substantive" | "scaffold";
   /**
+   * Authoring-only target/result split.  `promptTarget` is the task exposed
+   * to a learner; the remaining fields stay with the hidden answer evidence
+   * and must never be interpolated into the prompt.
+   */
+  promptTarget?: string;
+  expectedResult?: string;
+  derivation?: string[];
+  evidenceSources?: string[];
+  /**
    * Concrete evidence contract for the mapped capability.  These are
    * authored entities/operations rather than a topic label, so the audit can
    * tell whether a generated item actually instantiates the intended skill.
@@ -433,6 +442,11 @@ export interface LearningQuestionMetadata {
   expectedMinutes: number;
   /** Optional authored operations used to detect cosmetic reskins. */
   reasoningMoves?: string[];
+  quality?: "substantive" | "scaffold";
+  promptTarget?: string;
+  expectedResult?: string;
+  derivation?: string[];
+  evidenceSources?: string[];
   capabilityEvidence?: CapabilityEvidenceContract;
   provenance?: LearningProvenance;
 }
