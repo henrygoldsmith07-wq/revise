@@ -1,12 +1,14 @@
 import type { CapabilityNode } from "./capability-graph";
 import {
   answerLeakageDetail,
+  capabilityStructureContract,
+  compareTransferStructures,
   hasSynopticAttribution,
   transferNoveltyClasses,
   validateCapabilityEvidence,
   validateProvenance,
 } from "./subject-assessment-semantic";
-export { answerLeakageDetail, classifyNumericalClaims, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
+export { answerLeakageDetail, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
 import { checkEquationBalance, findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
@@ -153,7 +155,7 @@ const GENERIC_FALLBACK_PHRASES = [
 ];
 
 function hasConcreteStructure(text: string): boolean {
-  return /\d|[=→⟶]|\b(?:figure|equation|formula|function|probability|vector|derivative|integral|gradient|root|domain|inequality|organism|cell|tissue|sample|species|compound|reaction|solution|concentration|mass|volume|force|graph|table|dataset|triangle|DNA|RNA|enzyme|protein|membrane|osmosis|water potential|bond|electron|molecule|mole|acid|base|ion|atom|pH|Kc|Kp|ATP)\b/i.test(text);
+  return /\d|[=→⟶<>≤≥√∫]|\b(?:figure|equation|formula|function|probabil(?:ity|ities)|vector|derivative|integral|antiderivative|gradient|root|domain|inequalit(?:y|ies)|surd|quadratic|polynomial|transformation|tangent|normal|trigonometric|triangle|logarithm|exponential|organism|cell|tissue|sample|species|compound|reaction|solution|concentration|mass|volume|force|graph|table|dataset|scale|magnification|resolution|sequence|codon|protein|carbohydrate|lipid|hydrolysis|enzyme|substrate|membrane|osmosis|water potential|solute|organelle|micrograph|fraction|pellet|DNA|RNA|bond|electron|molecule|mole|acid|base|ion|atom|isotope|configuration|spectrum|dipole|lattice|intermolecular|gas|pH|Kc|Kp|ATP)\b/i.test(text);
 }
 
 function hasResultEvidence(text: string): boolean {
@@ -397,22 +399,11 @@ function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecFlagship
   return join && answerJoin && hasSubjectSpecificEvidence(answer, subjectId);
 }
 
-/**
- * Require the two synoptic capabilities to appear in attributable solution
- * steps.  Naming two topics in a stem is insufficient if the worked answer
- * uses only one of them; at least two checkable scheme/answer steps must carry
- * distinct subject operations.
- */
 interface SubstantiveGateFailure {
   kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
   detail: string;
 }
 
-/**
- * Validate the hard substantive gate shared by all non-Physics WJEC packs.
- * The returned failures are deliberately conservative: a cell is excluded
- * from deep coverage until its prompt, evidence and solution are explicit.
- */
 export function validateSubstantivePart(
   subjectId: WjecFlagshipSubjectId | Id,
   question: Question,
@@ -425,14 +416,17 @@ export function validateSubstantivePart(
   const answer = part.modelAnswer.trim();
   const demand = meta?.demand;
   const provisionalDepthDraft = isGeneratedDepthDraft(question);
-  // WJEC command words are often embedded after a short context sentence
-  // (for example “Use the supplied data…” or “Build a causal chain…”).
-  // Keep this list explicit rather than treating any imperative as a pass:
-  // substantive cells still have to satisfy the demand/result gates below.
-  const hasCommandWord = /\b(?:state|define|describe|explain|calculate|recalculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|write|give|classify|suggest|justify|use|deduce|sketch|solve|estimate|outline|apply|process|summari[sz]e|choose|decide|locate|interpret|carry|reconstruct|combine|check|convert|minimi[sz]e|select|repair|test|reject|name|list|construct|formulate|balance|draw|infer|read|plot|measure|obtain|verify|confirm|discuss|assess|analyse|analyze|track|follow|build|relate|separate|map|translate|recover|weight|rank|distinguish|match|move|sum|treat|report|differentiate)\b/i.test(prompt);
+  const hasCommandWord = /\b(?:state|define|describe|explain|calculate|recalculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|write|give|classify|suggest|justify|use|deduce|sketch|solve|estimate|outline|apply|process|summari[sz]e|choose|decide|locate|interpret|carry|reconstruct|combine|check|convert|minimi[sz]e|maximi[sz]e|optimise|optimize|select|repair|test|reject|name|list|construct|formulate|balance|draw|infer|read|plot|measure|obtain|verify|confirm|discuss|assess|analyse|analyze|track|follow|build|relate|separate|map|translate|recover|weight|rank|distinguish|match|move|sum|treat|report|differentiate|simplify|rationalise|rationalize|integrate|factor|substitute|rearrange|prove)\b/i.test(prompt);
 
   if (meta?.quality !== "substantive") {
     failures.push({ kind: "generic-fallback", detail: "Mark this cell substantive only after replacing fallback/scaffold prose with a reviewed, answerable task." });
+  }
+  if (question.source === "generated" && meta?.quality === "substantive") {
+    const capabilityId = part.capabilityIds?.length === 1 ? part.capabilityIds[0] : undefined;
+    const contract = capabilityId ? capabilityStructureContract(subjectId, capabilityId) : undefined;
+    if (!meta.capabilityEvidence?.structuralContract || !contract) {
+      failures.push({ kind: "capability-evidence", detail: "Generated substantive content needs a capability-specific structural contract; unsupported capabilities remain scaffold/incomplete." });
+    }
   }
   if (!hasConcreteMarkScheme(part.markScheme, subjectId)) {
     failures.push({ kind: "generic-fallback", detail: "The mark scheme does not contain concrete, independently awardable subject evidence." });
@@ -441,13 +435,11 @@ export function validateSubstantivePart(
     failures.push({ kind: "demand-evidence", detail: "A substantive cell needs an explicit subject command such as calculate, explain, compare or define." });
   }
 
-  // Expected results must stay out of learner prompts: leakage is a hard error.
   const target = meta?.promptTarget?.trim();
   const workedAnswer = `${part.markScheme.join("\n")}\n${answer}`;
   const leakage = answerLeakageDetail(prompt, workedAnswer, meta?.expectedResult);
   if (leakage) failures.push({ kind: "answer-leakage", detail: leakage });
 
-  // Generated substantive cells must retain the target/result authoring trace.
   const requiresAuthoringTrace = question.source === "generated" && meta?.quality === "substantive";
   if (requiresAuthoringTrace) {
     const missing: string[] = [];
@@ -476,9 +468,6 @@ export function validateSubstantivePart(
 
   for (const phrase of GENERIC_FALLBACK_PHRASES) {
     if (phrase.test(text)) {
-      // A real prompt may explicitly enumerate the operating conditions and
-      // then refer back to them in the solution. That is self-contained; the
-      // failure is reserved for an uninstantiated “stated conditions” cue.
       if (/\bstated conditions?\b/i.test(text) && /(?:assuming|constant|fixed|provided|under|at\s+\w+|no\s+interfering|controlled)/i.test(text)) continue;
       if (fallbackPhraseIsInstantiated(phrase, prompt, text, subjectId)) continue;
       failures.push({ kind: "generic-fallback", detail: "Prompt, scheme or worked answer still contains placeholder/meta wording." });
@@ -490,21 +479,12 @@ export function validateSubstantivePart(
     failures.push({ kind: "generic-fallback", detail: "The solution refers to stated conditions that the standalone prompt does not define." });
   }
 
-  const refersToDataArtifact = /\b(?:graph|table|dataset|data\s+set|diagram|figure|apparatus|spectrum|micrograph|chromatogram|circuit)\b|\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt) ||
+  // Treat apparatus/circuit as data references only when a measurement cue is
+  // attached; a biological apparatus name is not an absent artefact.
+  const refersToDataArtifact = /\b(?:graph|table|dataset|data\s+set|diagram|figure|spectrum|micrograph|chromatogram)\b|\b(?:apparatus|circuit)\b[^.!?]{0,60}\b(?:reading|measure|measurement|voltage|current|resistance|time|data|result|value)\b|\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt) ||
     /\b(?:use|from|analyse|analyze|interpret|read)\s+(?:the\s+)?(?:data|graph|table|diagram|figure|spectrum|micrograph)\b/i.test(prompt);
-  // “the graph shown below” is still only a reference: unless the prompt
-  // carries values, coordinates, table delimiters or an explicit numeric
-  // figure description, the student cannot answer from this text alone.
   const hasDataArtifact = /(?:\bx\s*=|\by\s*=|\|\s*|\t|(?:values?|points?)\s*(?:are|=)\s*[-+]?\d|(?:graph|plot|figure|table|diagram|spectrum|micrograph)\s*(?:contains?|shows?|gives?|has)\s*[-+]?\d)/i.test(prompt);
-  // Numeric measurements can be the data themselves; a graph/table still
-  // needs an actual representation or explicit values rather than a bare
-  // reference. This distinction avoids penalising a sentence such as “the
-  // supplied data change from 4.0 to 5.5 mg”.
   const hasInlineData = /\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt) && /\d/.test(prompt);
-  // A compact equation or measured value can be the representation from
-  // which a graph/table is reconstructed. It counts as supplied evidence,
-  // while a bare “use the graph” sentence (with no values or relation) still
-  // fails the standalone gate.
   const hasInlineNumericData = /\d/.test(prompt) && /(?:=|,|;|%|\b(?:mg|μm|μmol|ng|cm|mm|s|mol|K|°C|units?)\b)/i.test(prompt);
   if (refersToDataArtifact && !hasDataArtifact && !hasInlineData && !hasInlineNumericData) {
     failures.push({ kind: "not-self-contained", detail: "The prompt refers to a graph, table or data set that is not supplied." });
@@ -1720,10 +1700,13 @@ export function auditFlagshipSubject(input: {
         !isGeneratedDepthDraft(candidateQuestion));
       if (!baselines.length) continue;
       const transferText = partText(part);
-      const transferClasses = new Set(transferNoveltyClasses(part.prompt));
-      const baselineClasses = new Set(baselines.flatMap(({ part: baseline }) => transferNoveltyClasses(baseline.prompt)));
-      const hasNewClass = [...transferClasses].some((novelty) => !baselineClasses.has(novelty));
-      if (!hasNewClass && baselines.every(({ part: baseline }) => semanticRouteDistance(transferText, partText(baseline)) < 0.35)) {
+      const structuralComparisons = baselines.map(({ part: baseline }) => compareTransferStructures(
+        input.subjectId,
+        baseline.prompt,
+        part.prompt,
+      ));
+      const hasStructuralChange = structuralComparisons.some((comparison) => comparison.meaningful);
+      if (!hasStructuralChange || baselines.every(({ part: baseline }) => semanticRouteDistance(transferText, partText(baseline)) < 0.35)) {
         addIssue(subjectIssues, question, part, "transfer-novelty", "error", "Transfer route is semantically the same as the available application/calculation route; add an unfamiliar representation, hidden constraint or genuinely different operation.");
         invalidParts.add(`${question.id}:${part.id}`);
       }

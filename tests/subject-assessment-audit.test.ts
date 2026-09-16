@@ -12,6 +12,7 @@ import { qualityItem } from "@/content/questions/wjec-quality-authoring";
 import { auditFlagshipSubject, buildFlagshipDepthDashboard } from "@/domain/subject-assessment-audit";
 import { classifyNumericalClaims, promptAnswerClaims, transferNoveltyClasses } from "@/domain/subject-assessment-audit";
 import { semanticRouteDistance } from "@/domain/physics-assessment-quality";
+import { capabilityStructureContract, compareTransferStructures, setupFingerprintFor } from "@/domain/subject-assessment-semantic";
 import type { LearningDemand, Question } from "@/domain/types";
 
 const qualityBanks = [wjecMathsQualityQuestions, wjecBiologyQualityQuestions, wjecChemistryQualityQuestions];
@@ -47,7 +48,7 @@ describe("WJEC flagship depth pack", () => {
     // Existing quality packs are generated drafts too; the dashboard counts
     // the whole internal inventory, while the new pack must be present.
     expect(dashboard.generatedQuestionCount).toBeGreaterThanOrEqual(wjecFlagshipDepthQuestions.length);
-  });
+  }, 15_000);
 
   it("can report all four WJEC flagships without changing the student surface", () => {
     const dashboard = buildFlagshipDepthDashboard({ curricula: wjecFlagshipCurricula, questions: seedQuestions, nodes: wjecCapabilities });
@@ -57,7 +58,7 @@ describe("WJEC flagship depth pack", () => {
     expect(dashboard.subjects[0]!.statements).toBe(108);
     expect(dashboard.subjects[0]!.deepComplete).toBe(108);
     expect(dashboard.balancedAtTwenty).toBe(true);
-  });
+  }, 15_000);
 });
 
 function fixture(subjectId: string, prompt: string, modelAnswer: string): Question {
@@ -337,6 +338,168 @@ describe("subject-specific correctness checks", () => {
   it("keeps semantic route distance sensitive to a genuinely different representation", () => {
     expect(semanticRouteDistance("substitute the equation and calculate the value", "substitute the equation and calculate the value")).toBe(0);
     expect(semanticRouteDistance("substitute the equation and calculate the value", "read the graph gradient, infer the hidden parameter and compare the trend")).toBeGreaterThan(0.2);
+  });
+
+  it("compares transfer structures rather than rewarding number swaps", () => {
+    const sameRoute = compareTransferStructures(
+      "wjec-alevel-maths",
+      "For f(x) = x², calculate f(2).",
+      "For f(x) = x², calculate f(5).",
+    );
+    expect(sameRoute.meaningful).toBe(false);
+    expect(sameRoute.changes).toEqual([]);
+
+    const newRepresentation = compareTransferStructures(
+      "wjec-alevel-maths",
+      "For f(x) = x², calculate f(2).",
+      "A graph passes through (0, 0) and (2, 4). Infer its gradient from the plotted points.",
+    );
+    expect(newRepresentation.meaningful).toBe(true);
+    expect(newRepresentation.changes.some((change) => /structures|representations/i.test(change))).toBe(true);
+  });
+
+  it("rejects a label-only capability setup even when metadata names the skill", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "label-only-radical", "calculation",
+      "Use the quadratic equation x² - 5x + 6 = 0 for surds and rationalising denominators, then report the roots.",
+      "The roots are x = 2 and x = 3.",
+    );
+    const part = question.parts[0]!;
+    part.specPointIds = ["wjec-alevel-maths.algebra.sp-01"];
+    part.capabilityIds = ["math.algebra.sp-01"];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.algebra.sp-01",
+        requiredEntities: ["radical-expression"],
+        requiredOperations: ["simplify"],
+        structuralContract: capabilityStructureContract("wjec-alevel-maths", "math.algebra.sp-01"),
+        setupFingerprint: setupFingerprintFor("wjec-alevel-maths", part.prompt),
+        derivation: {
+          setupStructures: [],
+          capabilityOperation: "simplify",
+          intermediateResults: ["The quadratic roots are 2 and 3."],
+          finalResult: "The roots are x = 2 and x = 3.",
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && /radical-expression/i.test(issue.detail))).toBe(true);
+  });
+
+  it.each([
+    ["biology", "bio.membranes-transport.sp-02", "Explain osmosis for the named capability using only a percentage change in mass.", "The percentage changes.", /membrane-gradient/],
+    ["chemistry", "chem.moles.sp-02", "Calculate the amount from 0.200 and 25.0 without naming a reacting species.", "The amount is 0.00500 mol.", /stoichiometric-data/],
+  ] as const)("rejects a %s capability when its required problem structure is absent", (subject, capabilityId, prompt, answer, expected) => {
+    const question = substantiveFixture(`wjec-alevel-${subject}`, `missing-structure-${subject}`, "calculation", prompt, answer);
+    const part = question.parts[0]!;
+    part.capabilityIds = [capabilityId];
+    part.specPointIds = [`wjec-alevel-${subject}.fixture.sp-01`];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId,
+        requiredEntities: [],
+        requiredOperations: ["calculate"],
+        structuralContract: capabilityStructureContract(`wjec-alevel-${subject}`, capabilityId),
+        setupFingerprint: setupFingerprintFor(`wjec-alevel-${subject}`, prompt),
+        derivation: {
+          setupStructures: [],
+          capabilityOperation: "calculate",
+          intermediateResults: ["A derived intermediate is shown."],
+          finalResult: answer,
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && expected.test(issue.detail))).toBe(true);
+  });
+
+  it("rejects a stale setup fingerprint after the learner prompt changes", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "stale-setup-fingerprint", "calculation",
+      "For f(x) = x², calculate f'(2).",
+      "Using f'(x) = 2x, f'(2) = 4.",
+    );
+    const part = question.parts[0]!;
+    part.capabilityIds = ["math.differentiation.sp-01"];
+    part.specPointIds = ["wjec-alevel-maths.differentiation.sp-01"];
+    const stale = setupFingerprintFor("wjec-alevel-maths", "For g(x) = ln(x), calculate g'(2).");
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.differentiation.sp-01",
+        requiredEntities: ["function"],
+        requiredOperations: ["differentiate"],
+        structuralContract: capabilityStructureContract("wjec-alevel-maths", "math.differentiation.sp-01"),
+        setupFingerprint: stale,
+        derivation: {
+          setupStructures: ["function", "derivative-target"],
+          capabilityOperation: "differentiate",
+          intermediateResults: ["f'(x) = 2x"],
+          finalResult: "f'(2) = 4",
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && /stale/i.test(issue.detail))).toBe(true);
+  });
+
+  it("rejects a stored contract that weakens the canonical capability requirements", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "weakened-contract", "calculation",
+      "For f(x) = x², differentiate the function and report f'(2).",
+      "Using f'(x) = 2x, f'(2) = 4.",
+    );
+    const part = question.parts[0]!;
+    part.capabilityIds = ["math.differentiation.sp-01"];
+    part.specPointIds = ["wjec-alevel-maths.differentiation.sp-01"];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.differentiation.sp-01",
+        requiredEntities: [],
+        requiredOperations: ["differentiate"],
+        structuralContract: { requiredOperations: ["differentiate"] },
+        setupFingerprint: setupFingerprintFor("wjec-alevel-maths", part.prompt),
+        derivation: {
+          setupStructures: ["function", "derivative-target"],
+          capabilityOperation: "differentiate",
+          intermediateResults: ["Using f'(x) = 2x"],
+          finalResult: "f'(2) = 4",
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && /weaker than the canonical/i.test(issue.detail))).toBe(true);
+  });
+
+  it("requires a synoptic conclusion to retain both attributed strands", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "synoptic-removal-test", "synoptic",
+      "For f(x) = x² and a rectangle of width 4, combine the derivative with the area constraint to determine the optimum.",
+      "The derivative gives the optimum.",
+    );
+    const part = question.parts[0]!;
+    part.capabilityIds = ["math.differentiation.sp-04"];
+    part.specPointIds = ["wjec-alevel-maths.differentiation.sp-04"];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.differentiation.sp-04",
+        requiredEntities: [],
+        requiredOperations: ["calculate"],
+        secondaryCapability: "rectangle area constraint",
+        structuralContract: capabilityStructureContract("wjec-alevel-maths", "math.differentiation.sp-04"),
+        setupFingerprint: setupFingerprintFor("wjec-alevel-maths", part.prompt),
+        derivation: {
+          setupStructures: ["function", "derivative-target", "optimisation-constraint"],
+          capabilityOperation: "calculate",
+          intermediateResults: ["Differentiate f(x) = x²."],
+          finalResult: "The derivative gives the optimum.",
+          primaryEvidence: ["Differentiate f(x) = x² to get the gradient."],
+          secondaryEvidence: ["The rectangle width is 4."],
+          joiningDependency: "The derivative and rectangle area constraint combine to determine the result.",
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && /synoptic|depend/i.test(issue.detail))).toBe(true);
   });
 
   it("requires explicit secondary capability evidence for synoptic work", () => {

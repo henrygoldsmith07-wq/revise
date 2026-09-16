@@ -364,6 +364,10 @@ export interface LearningPartMetadata {
    * tell whether a generated item actually instantiates the intended skill.
    */
   capabilityEvidence?: CapabilityEvidenceContract;
+  /** Machine-readable description of the learner-visible setup.  This is
+   * derived from the rendered prompt and is kept alongside the authored
+   * contract so audits can show exactly which structures were supplied. */
+  setupFingerprint?: CapabilitySetupFingerprint;
   /**
    * Claim-level provenance for a worked answer.  The audit uses this to keep
    * supplied data, intermediate results and the final result distinct and to
@@ -380,12 +384,124 @@ export interface CapabilityEvidenceContract {
   requiredOperations: string[];
   /** Optional relations, constraints or laws that make the evidence checkable. */
   requiredRelations?: string[];
+  /** Structural contract for the supplied problem, independent of labels or
+   * answer-key prose.  A missing required structure is a hard capability
+   * evidence failure for substantive content. */
+  structuralContract?: CapabilityStructureContract;
+  /** Fingerprint of the learner-visible setup used to satisfy the contract. */
+  setupFingerprint?: CapabilitySetupFingerprint;
+  /** The route evidence attributable to this capability. */
+  derivation?: CapabilityDerivationEvidence;
   /**
    * A second capability is required for a synoptic part.  Keeping this as an
    * authored label (rather than inferring it from the topic name) lets the
    * audit verify that both strands are explicit and attributable.
    */
   secondaryCapability?: string;
+  /** Optional stable secondary capability id for structural synoptic checks. */
+  secondaryCapabilityId?: Id;
+  secondaryStructuralContract?: CapabilityStructureContract;
+  /** Explicit join used by structural synoptic validation. */
+  joiningDependency?: string;
+}
+
+/** Observable problem structures used by subject-specific capability
+ * contracts.  These deliberately describe inputs/representations rather
+ * than topic labels so a prompt cannot pass by naming a skill. */
+export type CapabilityStructureKind =
+  | "polynomial"
+  | "quadratic"
+  | "radical-expression"
+  | "factor-theorem-instance"
+  | "simultaneous-equations"
+  | "inequality-domain"
+  | "transformation-graph"
+  | "exponential-function"
+  | "logarithmic-expression"
+  | "coordinate-geometry"
+  | "function"
+  | "derivative-target"
+  | "tangent-normal"
+  | "rate-of-change"
+  | "optimisation-constraint"
+  | "integral"
+  | "definite-integral"
+  | "trigonometric-triangle"
+  | "trigonometric-identity"
+  | "trigonometric-equation"
+  | "probability-events"
+  | "probability-tree"
+  | "conditional-probability"
+  | "vector-components"
+  | "table-dataset"
+  | "graph-dataset"
+  | "membrane-gradient"
+  | "membrane-model"
+  | "enzyme-assay"
+  | "micrograph"
+  | "dna-sequence"
+  | "controlled-experiment"
+  | "biological-molecule"
+  | "cell-ultrastructure"
+  | "chemical-equation"
+  | "stoichiometric-data"
+  | "titration-dataset"
+  | "equilibrium-system"
+  | "mass-spectrum"
+  | "electron-configuration"
+  | "molecular-structure"
+  | "redox-species"
+  | "gas-data"
+  | "bonding-model"
+  | "particle-model"
+  | "numeric-data";
+
+export interface CapabilitySetupFingerprint {
+  /** Canonical subject family, when known. */
+  subject?: "maths" | "biology" | "chemistry" | "physics";
+  structures: CapabilityStructureKind[];
+  /** Representations actually supplied, e.g. equation, graph or table. */
+  representations: string[];
+  /** Learner-visible operations/commands, canonicalised. */
+  operations: string[];
+  /** Equations, ratios, gradients or other explicit relationships. */
+  relationships: string[];
+  /** Expected response form inferred from the target command. */
+  outputTypes: string[];
+}
+
+export interface CapabilityStructureContract {
+  requiredStructures?: CapabilityStructureKind[];
+  /** Alternative structure sets for capabilities whose valid instances have
+   * different representations (for example a rate, tangent or optimisation
+   * item under one differentiation statement). Each group requires one of
+   * its members. */
+  requiredStructureGroups?: CapabilityStructureKind[][];
+  requiredRepresentations?: string[];
+  requiredOperations?: string[];
+  /** Alternative operations accepted for the same structure.  This is useful
+   * when a statement is assessed through a calculation, explanation or
+   * misconception repair while retaining one machine-checkable contract. */
+  requiredOperationGroups?: string[][];
+  requiredRelationships?: string[];
+  expectedOutputTypes?: string[];
+  /** Structures that are tempting substitutes but do not exercise this
+   * capability by themselves (for example a polynomial for a surd task). */
+  invalidSubstituteStructures?: CapabilityStructureKind[];
+  /** If true, at least one contract operation must be present in the setup
+   * and a second operation must be attributable in the derivation. */
+  requireDerivationOperation?: boolean;
+}
+
+export interface CapabilityDerivationEvidence {
+  setupStructures: CapabilityStructureKind[];
+  capabilityOperation: string;
+  intermediateResults: string[];
+  finalResult: string;
+  /** Synoptic routes can expose which worked steps belong to each strand. */
+  primaryEvidence?: string[];
+  secondaryEvidence?: string[];
+  joiningDependency?: string;
 }
 
 export interface LearningProvenance {
@@ -448,6 +564,7 @@ export interface LearningQuestionMetadata {
   derivation?: string[];
   evidenceSources?: string[];
   capabilityEvidence?: CapabilityEvidenceContract;
+  setupFingerprint?: CapabilitySetupFingerprint;
   provenance?: LearningProvenance;
 }
 
