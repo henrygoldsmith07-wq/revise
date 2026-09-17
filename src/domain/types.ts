@@ -338,6 +338,41 @@ export type QuestionKind = "mcq" | "short" | "structured" | "calculation" | "ext
  * context and reasoning moves are authored facts; they are never inferred from
  * a topic name or from the student's score.
  */
+export type ReasoningGraphNodeKind = "evidence" | "operation" | "intermediate" | "constraint" | "conclusion";
+
+export interface ReasoningGraphNode {
+  kind: ReasoningGraphNodeKind;
+  label: string;
+}
+
+export interface ReasoningGraph {
+  nodes: ReasoningGraphNode[];
+}
+
+export interface SetupFingerprint {
+  relationshipTopology: string;
+  knownVsUnknown: string;
+  hiddenState: string;
+  representationType: string;
+  operationSequence: string;
+  suppliedVsInferred: string;
+  constraintType: string;
+  requestedOutput: string;
+}
+
+export interface TransferLink {
+  baselinePartId: Id;
+  baselineSetupFingerprint: SetupFingerprint;
+  transferSetupFingerprint: SetupFingerprint;
+  baselineReasoningGraph: ReasoningGraph;
+  transferReasoningGraph: ReasoningGraph;
+}
+
+export interface SynopticLink {
+  primaryCapabilityId: Id;
+  secondaryCapabilityId: Id;
+}
+
 export interface LearningPartMetadata {
   familyId: Id;
   contextId: Id;
@@ -374,6 +409,25 @@ export interface LearningPartMetadata {
    * reject answers that invent unsupported values.
    */
   provenance?: LearningProvenance;
+  /**
+   * Ordered semantic reasoning graph: evidence → operation → intermediate
+   * state → constraint/check → conclusion. Stable labels, not prose.
+   */
+  reasoningGraph?: ReasoningGraph;
+  /**
+   * Structural transfer linkage. Every substantive transfer cell references
+   * an explicit baseline task from the same capability plus both setup
+   * fingerprints and both reasoning graphs.
+   */
+  transferLink?: TransferLink;
+  /**
+   * Explicit synoptic linkage with real mapped capability ids. Both strands
+   * need independent structural contracts (see primaryContract /
+   * secondaryContract).
+   */
+  synopticLink?: SynopticLink;
+  primaryContract?: CapabilityEvidenceContract;
+  secondaryContract?: CapabilityEvidenceContract;
 }
 
 export interface CapabilityEvidenceContract {
@@ -566,6 +620,11 @@ export interface LearningQuestionMetadata {
   capabilityEvidence?: CapabilityEvidenceContract;
   setupFingerprint?: CapabilitySetupFingerprint;
   provenance?: LearningProvenance;
+  reasoningGraph?: ReasoningGraph;
+  transferLink?: TransferLink;
+  synopticLink?: SynopticLink;
+  primaryContract?: CapabilityEvidenceContract;
+  secondaryContract?: CapabilityEvidenceContract;
 }
 
 export type MistakeRepairStage = "detected" | "diagnosed" | "taught" | "guided-success" | "independent-success" | "transfer" | "delayed-retention" | "resolved";

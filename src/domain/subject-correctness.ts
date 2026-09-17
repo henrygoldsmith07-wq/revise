@@ -16,6 +16,11 @@ import {
   validateCapabilityEvidence,
   validateProvenance,
 } from "./subject-assessment-semantic";
+import {
+  compareTransferStructures as compareTransferReasoningGraphs,
+  isMappedCapabilityId,
+  validateSynopticStructure,
+} from "./reasoning-graph";
 import { promptOverload } from "./physics-assessment-quality";
 import type { Id, LearningDemand, Question, QuestionPart } from "./types";
 import type { SubjectAssessmentIssue, SubjectAssessmentIssueKind, WjecFlagshipSubjectId } from "./subject-assessment-audit";
@@ -186,10 +191,15 @@ function hasConcreteApplicationContext(prompt: string, subjectId: WjecSubjectId)
   const condition = /\b(?:before|after|initially|while|without|with|same|different|constant|fixed|matched|dilut(?:e|ed|ing)|vary|control|weigh|blot|place|heat|cool|treat|compare|contains?|permits?|cross(?:es|ing)?|held|excess|limiting|concentrated|buffered|pH|temperature|pressure|length|volume|assay|mixture|sample|solution|stock|gradient|rate)\b/i.test(prompt);
   if (!condition) return false;
   if (subjectId === "wjec-alevel-biology") {
-    return /\b(?:enzyme|substrate|buffer|pH|potato|sucrose|tissue|sample|assay|cell|membrane|solute|water|mass|protein|reaction|pigment|temperature|organism|concentration)\b/i.test(prompt);
+    // Nucleic-acid specimens (sequences, codons, strands) are concrete setups
+    // too; the earlier list named only cell/membrane vocabulary and so could
+    // never recognise a genetics application context.
+    return /\b(?:enzyme|substrate|buffer|pH|potato|sucrose|tissue|sample|assay|cell|membrane|solute|water|mass|protein|reaction|pigment|temperature|organism|concentration|dna|rna|gene|allele|codon|ribosome|mutation|strand|sequence|base)\b/i.test(prompt);
   }
   if (subjectId === "wjec-alevel-chemistry") {
-    return /\b(?:solution|acid|base|mole|mol|reaction|compound|ion|electron|equilibrium|gas|titration|concentration|temperature|pressure|volume|mass|catalyst|mixture)\b/i.test(prompt);
+    // Bonding/atomic specimens (molecules, lattices, spectra) are concrete
+    // setups too; the earlier list omitted that vocabulary entirely.
+    return /\b(?:solution|acid|base|mole|mol|reaction|compound|ion|electron|equilibrium|gas|titration|concentration|temperature|pressure|volume|mass|catalyst|mixture|molecule|structure|dipole|bond|lattice|spectrum|fragment|isotope|configuration|shell)\b/i.test(prompt);
   }
   return hasSubjectSpecificEvidence(prompt, subjectId);
 }
@@ -312,7 +322,7 @@ function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecSubjectI
  * distinct subject operations.
  */
 export interface SubstantiveGateFailure {
-  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "capability-not-required" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
+  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "capability-not-required" | "provenance" | "transfer-novelty" | "transfer-not-novel" | "duplicate-reasoning-graph" | "secondary-capability-not-required" | "missing-secondary-contract" | "route-superset" | "synoptic-evidence">;
   detail: string;
 }
 
@@ -333,6 +343,11 @@ export function validateSubstantivePart(
   const answer = part.modelAnswer.trim();
   const demand = meta?.demand;
   const provisionalDepthDraft = isGeneratedDepthDraft(question);
+  // Generated flagship transfer cells no longer skip validation through a
+  // provisional draft. Only cells explicitly marked `scaffold` retain the
+  // temporary bypass; a generated `substantive` transfer must pass the exact
+  // same structural novelty gate as authored content.
+  const scaffoldBypass = provisionalDepthDraft && meta?.quality === "scaffold";
   // WJEC command words are often embedded after a short context sentence
   // (for example “Use the supplied data…” or “Build a causal chain…”).
   // Keep this list explicit rather than treating any imperative as a pass:
@@ -463,17 +478,17 @@ export function validateSubstantivePart(
   if (answerIsMostlyRestatement(prompt, answer)) {
     failures.push({ kind: "solution-substance", detail: "The worked answer largely restates the prompt without solving it." });
   }
-  if (!provisionalDepthDraft && repeatsReasoningMetadata(part, answer)) {
+  if (!scaffoldBypass && repeatsReasoningMetadata(part, answer)) {
     failures.push({ kind: "solution-substance", detail: "The worked answer repeats the reasoning metadata instead of carrying out the authored operation." });
   }
   if (/(?:^|\b)(?:use|apply|choose|trace|check|consider|identify)\b[^.]*\b(?:method|approach|rule|formula|relationship|concept)\b[^.]*$/i.test(answer) && !hasWorkedEvidence(answer)) {
     failures.push({ kind: "solution-substance", detail: "The worked answer describes a method but does not carry it out." });
   }
-  if (!provisionalDepthDraft && !solutionUsesPromptEvidence(prompt, answer, demand)) {
+  if (!scaffoldBypass && !solutionUsesPromptEvidence(prompt, answer, demand)) {
     failures.push({ kind: "solution-substance", detail: "The worked answer introduces numerical values without using the quantities supplied by the prompt." });
   }
   const resultRequired = demand && ["application", "calculation", "transfer", "synoptic"].includes(demand);
-  const hasDemandResult = provisionalDepthDraft
+  const hasDemandResult = scaffoldBypass
     ? hasConcreteStructure(answer) || hasResultEvidence(answer)
     : demand === "calculation"
       ? hasInlineQuantityOrRepresentation(answer) && (hasConcreteResultEvidence(answer, subjectId) || /\b(?:therefore|thus|hence|gives?|giving|equals?|obtains?|yields?|about|approximately|factor|percentage|difference|increases?|decreases?|rises?|falls?)\b/i.test(answer))
@@ -500,19 +515,19 @@ export function validateSubstantivePart(
   // multi-step task.
   const multiStepCommand = /\b(?:calculate|recalculate|derive|solve|determine|find|estimate|work out|evaluate)\b/i.test(prompt) &&
     (part.marks >= 3 || part.markScheme.length >= 3 || /\b(?:then|first|next|from .* to|using .* and|two[- ]step|multi[- ]step)\b/i.test(prompt));
-  if (!provisionalDepthDraft && multiStepCommand && equationSteps < 2 && !hasWorkingConnector && !hasExplicitConclusion && !hasCalculationNarrative(answer)) {
+  if (!scaffoldBypass && multiStepCommand && equationSteps < 2 && !hasWorkingConnector && !hasExplicitConclusion && !hasCalculationNarrative(answer)) {
     failures.push({ kind: "solution-substance", detail: "The multi-step task has no checkable intermediate working or first-step reasoning." });
   }
 
   if (!demand) {
     failures.push({ kind: "demand-evidence", detail: "Assign one of the seven learning demands before counting this cell." });
   } else if (demand === "recall") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     if (answer.length < 12 || !hasSubjectSpecificEvidence(answer, subjectId) || !/(?:\b(?:is|are|has|have|means?|defined|rule|law|because|when|if|contains?|consists?|equals?|gives?|requires?|allows?|changes?|from|to|between|same|different|multiply|divide|conditioning|probability)\b|\bP\s*\(|=|→|⟶)/i.test(answer)) {
       failures.push({ kind: "demand-evidence", detail: "Recall must state a precise subject fact or definition." });
     }
   } else if (demand === "explanation") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     // The causal chain must be present in the worked answer itself. Looking at
     // prompt + scheme alone lets an answer pass by repeating the question's
     // nouns and a causal keyword without explaining the mechanism.
@@ -520,22 +535,22 @@ export function validateSubstantivePart(
       failures.push({ kind: "demand-evidence", detail: "Explanation must show a subject-specific causal or logical chain." });
     }
   } else if (demand === "application") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     if (!hasConcreteApplicationContext(prompt, subjectId) || !hasResultEvidence(answer) || !hasSubjectSpecificEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Application must change a concrete context and reach a stated consequence." });
     }
   } else if (demand === "misconception") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     if (!hasMisconceptionClaim(prompt) || !hasRepairEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Misconception work must identify an incorrect claim and explicitly repair it." });
     }
   } else if (demand === "calculation") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     if (!hasInlineQuantityOrRepresentation(prompt) || !hasWorkedEvidence(answer) || !hasSubjectSpecificEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Calculation/data work needs supplied quantities or a data representation and checkable working." });
     }
   } else if (demand === "transfer") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     const noveltyClasses = transferNoveltyClasses(prompt);
     if (!hasTransferAdaptation(prompt, answer, subjectId) || noveltyClasses.length === 0) {
       failures.push({ kind: "demand-evidence", detail: "Transfer must use a genuinely new representation or context and reach a conclusion." });
@@ -543,15 +558,58 @@ export function validateSubstantivePart(
         failures.push({ kind: "transfer-novelty", detail: "Transfer prompt changes no observable representation, information structure, hidden state, constraint, data form or concept combination." });
       }
     }
+    // Layer C — structural transfer: explicit baseline plus fingerprint and
+    // reasoning-graph novelty. Number swaps, renamed contexts, different
+    // nouns and "unfamiliar"/"new representation" contribute nothing because
+    // the fingerprint and graph builders strip them before comparison.
+    // Depth cells carry an explicit stored link; authored quality cells are
+    // validated against their real baselines in the cross-part gate below.
+    if (meta?.quality === "substantive") {
+      const link = meta?.transferLink;
+      const isDepthCell = (meta?.familyId ?? "").includes("-depth:");
+      if (link?.baselinePartId?.trim()) {
+        const comparison = compareTransferReasoningGraphs(
+          link.baselineSetupFingerprint,
+          link.transferSetupFingerprint,
+          link.baselineReasoningGraph,
+          link.transferReasoningGraph,
+        );
+        if (!comparison.isNovel) {
+          failures.push({ kind: "transfer-not-novel", detail: `Transfer has no structural novelty against its baseline (structural: ${comparison.structuralChanges.join(", ") || "none"}; reasoning: ${comparison.reasoningChanges.join(", ") || "none"}) (transfer-not-novel).` });
+        }
+      } else if (isDepthCell) {
+        failures.push({ kind: "transfer-not-novel", detail: "Transfer cell lacks an explicit baselinePartId from the same capability (transfer-not-novel)." });
+      }
+    }
   } else if (demand === "synoptic") {
-    if (provisionalDepthDraft) return failures;
+    if (scaffoldBypass) return failures;
     const claims = part.learningClaims ?? [];
     const distinctClaims = claims.length >= 2 && promptOverload(claims[0]!, claims[1]!) < 0.85;
     const joined = hasSynopticJoin(prompt, answer, subjectId);
     const attributed = hasSynopticAttribution(part, subjectId);
-    const explicitSecondary = Boolean(meta?.capabilityEvidence?.secondaryCapability);
+    const explicitSecondary = Boolean(meta?.capabilityEvidence?.secondaryCapability ?? meta?.capabilityEvidence?.secondaryCapabilityId ?? meta?.synopticLink?.secondaryCapabilityId);
     if (!distinctClaims || !joined || !attributed || !explicitSecondary) {
       failures.push({ kind: "synoptic-evidence", detail: "Synoptic work must name primary and secondary capabilities and attribute a necessary solution step to each." });
+    }
+    // Layer C — synoptic validity with real capability ids and independent
+    // contracts. Depth cells must carry mapped ids; authored quality cells
+    // keep their display label but still need two attributable strands.
+    if (meta?.quality === "substantive") {
+      const isDepthCell = (meta?.familyId ?? "").includes("-depth:");
+      const secondaryId = meta?.synopticLink?.secondaryCapabilityId ?? meta?.capabilityEvidence?.secondaryCapabilityId ?? meta?.capabilityEvidence?.secondaryCapability ?? "";
+      if (isDepthCell && (!secondaryId.trim() || !isMappedCapabilityId(secondaryId.trim()))) {
+        failures.push({ kind: "missing-secondary-contract", detail: `Synoptic secondary skill lacks a mapped capability id (found: ${secondaryId || "none"}) (missing-secondary-contract).` });
+      } else if (isDepthCell) {
+        for (const detail of validateSynopticStructure(part, subjectId)) {
+          if (/missing-secondary-contract/i.test(detail)) {
+            failures.push({ kind: "missing-secondary-contract", detail: `${detail} (missing-secondary-contract).` });
+          } else if (/secondary-capability-not-required|unused|does not depend|removing/i.test(detail)) {
+            failures.push({ kind: "secondary-capability-not-required", detail: `${detail} (secondary-capability-not-required).` });
+          } else {
+            failures.push({ kind: "synoptic-evidence", detail });
+          }
+        }
+      }
     }
   }
 
@@ -833,7 +891,11 @@ function coordinateGeometryMismatch(prompt: string, answer: string): string | nu
     if (/(?:not|incorrect|wrong|reject|should be)/i.test(answer)) return null;
     return `The midpoint should be (${ex}, ${ey}), not (${mx}, ${my}).`;
   }
-  const numeric = answer.match(/(?:gradient|slope|distance|length)[^=]*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
+  // Require the label and its value in the same clause: a gradient word in one
+  // sentence and an unrelated "=" (for example AB² = 8) in the next must not
+  // be misread as a stated gradient. This was a demonstrated false positive
+  // on correct depth content once substantive drafts lost their bypass.
+  const numeric = answer.match(/(?:gradient|slope|distance|length)[^=.;\n]{0,40}=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
   if (!numeric) return null;
   const actual = Number(numeric[1]);
   if (!Number.isFinite(actual) || /(?:not|incorrect|wrong|reject|should be)/i.test(answer)) return null;
@@ -900,13 +962,10 @@ function biologyEnzymeReasoningWarning(prompt: string, answer: string): string |
 export function validateMathsPart(question: Question, part: QuestionPart, issues: SubjectAssessmentIssue[]): void {
   const text = partText(part);
   const advisoryChecksEnabled = !(question.source === "generated" && question.verification === "unverified");
-  // The legacy generated depth migration pack has concrete setups but its
-  // worked routes are deliberately provisional.  Deterministic validators
-  // must not mistake those scaffold answers for authored mathematics (for
-  // example, a generic distance result paired with unrelated generated
-  // coordinates).  Structural/substantive gates still run, and authored
-  // rows—including other unverified drafts—remain fully audited.
-  const provisionalDepthDraft = isGeneratedDepthDraft(question);
+  // Scaffold depth rows keep a provisional bypass so deterministic validators
+  // do not mistake their placeholder answers for authored mathematics.
+  // Generated substantive rows pass the exact same gates as authored content.
+  const provisionalDepthDraft = isGeneratedDepthDraft(question) && part.learning?.quality === "scaffold";
   for (const [left, right] of equalityCandidates(text)) {
     const comparison = mathsEquivalent(left, right);
     if (comparison === "not-equivalent") {
@@ -1349,7 +1408,9 @@ function solutionAmountMismatch(prompt: string, answer: string): string | null {
   if (!concentration || !volume) return null;
   const c = Number(concentration[1]);
   const v = Number(volume[1]);
-  const reportedValues = [...answer.matchAll(/\bn\s*=\s*[^=;\n]*?(?:=\s*)?([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[×x]\s*10\s*(?:\^|\*\*)?\s*[+-]?\d+)?)\s*mol\b/gi)]
+  // Keep the match in one clause: an "n = …" in one sentence and a later
+  // concentration "0.500 mol" must not combine into a false amount claim.
+  const reportedValues = [...answer.matchAll(/\bn\s*=\s*[^=;.\n]{0,60}?(?:=\s*)?([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[×x]\s*10\s*(?:\^|\*\*)?\s*[+-]?\d+)?)\s*mol\b/gi)]
     .map((match) => match[1]!.replace(/\s+/g, ""))
     .map((raw) => {
       const power = raw.match(/(?:×|x)10(?:\^|\*\*)([+-]?\d+)$/i);

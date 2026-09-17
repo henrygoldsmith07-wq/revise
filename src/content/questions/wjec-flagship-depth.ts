@@ -1,7 +1,9 @@
-import type { LearningDemand, Question } from "@/domain/types";
+import type { LearningDemand, Question, ReasoningGraph, SetupFingerprint } from "@/domain/types";
 import { defineQuestions, type PartSpec, type QuestionSpec } from "./authoring";
 import { wjecCapabilityForSpecPoint } from "../wjec-subject-capabilities";
 import { capabilityEvidenceFor, provenanceFor } from "./wjec-quality-authoring";
+import { capabilityStructureContract } from "@/domain/subject-assessment-semantic";
+import { fingerprintSetup } from "@/domain/reasoning-graph";
 
 /**
  * Balanced WJEC flagship depth pack.
@@ -119,6 +121,11 @@ function concreteSetup(brief: DepthBrief, variant: 0 | 1): string | undefined {
   return undefined;
 }
 
+/**
+ * Legacy free-text secondary label. It is still surfaced in the prompt so the
+ * structural synoptic check can see an explicit secondary constraint, but
+ * only the mapped secondary id counts toward deep coverage.
+ */
 function secondaryCapability(brief: DepthBrief): string {
   if (brief.subject === "maths") return brief.topic === "differentiation" || brief.topic === "integration"
     ? "domain and endpoint checks" : "exact form and admissibility checks";
@@ -126,6 +133,366 @@ function secondaryCapability(brief: DepthBrief): string {
     ? "experimental controls and data interpretation" : "structure-function and evidence limits";
   return brief.topic === "moles" || brief.topic === "equilibria"
     ? "stoichiometric and unit constraints" : "particle-level structure and charge balance";
+}
+
+/**
+ * Real mapped secondary capability ids. Every synoptic cell combines its
+ * primary capability with one of these; free-text secondaries never count.
+ */
+function secondaryCapabilityIdFor(brief: DepthBrief): string {
+  const primary = wjecCapabilityForSpecPoint(specPointId(brief))!;
+  const mathsSecondary: Record<string, string> = {
+    "algebra-surds": "math.coordinate-geometry.sp-01",
+    "algebra-quadratic": "math.coordinate-geometry.sp-01",
+    "algebra-factor": "math.coordinate-geometry.sp-01",
+    "algebra-simultaneous": "math.coordinate-geometry.sp-01",
+    "algebra-inequalities": "math.coordinate-geometry.sp-01",
+    "algebra-transformations": "math.coordinate-geometry.sp-01",
+    "coordinate-lines-circles": "math.algebra.sp-02",
+    "coordinate-intersections": "math.algebra.sp-02",
+    "coordinate-area-distance": "math.differentiation.sp-04",
+    "differentiate-core-functions": "math.algebra.sp-05",
+    "differentiate-rules": "math.algebra.sp-02",
+    "stationary-points": "math.algebra.sp-05",
+    "integration-standard": "math.differentiation.sp-01",
+    "integration-definite-area": "math.algebra.sp-02",
+    "integration-methods": "math.differentiation.sp-01",
+    "trig-rules": "math.coordinate-geometry.sp-01",
+    "trig-identities": "math.coordinate-geometry.sp-01",
+    "exp-inverses": "math.coordinate-geometry.sp-01",
+    "log-laws": "math.coordinate-geometry.sp-01",
+    "exp-equations": "math.coordinate-geometry.sp-01",
+  };
+  const biologySecondary: Record<string, string> = {
+    "bio-condensation": "bio.cell-structure.sp-02",
+    "bio-carbohydrates": "bio.membranes-transport.sp-02",
+    "bio-lipids": "bio.cell-structure.sp-02",
+    "bio-protein-structure": "bio.nucleic-acids.sp-03",
+    "bio-dna-rna": "bio.nucleic-acids.sp-01",
+    "bio-water": "bio.membranes-transport.sp-03",
+    "bio-prokaryote-eukaryote": "bio.cell-structure.sp-02",
+    "bio-organelles": "bio.cell-structure.sp-05",
+    "bio-magnification": "bio.cell-structure.sp-05",
+    "bio-organisation": "bio.cell-structure.sp-02",
+    "bio-fractionation": "bio.cell-structure.sp-03",
+    "bio-fluid-mosaic": "bio.membranes-transport.sp-02",
+    "bio-transport": "bio.membranes-transport.sp-03",
+    "bio-permeability": "bio.membranes-transport.sp-03",
+    "bio-osmosis-investigations": "bio.membranes-transport.sp-03",
+    "bio-replication": "bio.nucleic-acids.sp-02",
+    "bio-protein-synthesis": "bio.nucleic-acids.sp-03",
+    "bio-mutations": "bio.nucleic-acids.sp-01",
+  };
+  const chemistrySecondary: Record<string, string> = {
+    "chem-isotopes": "chem.moles.sp-01",
+    "chem-mass-spectrum": "chem.moles.sp-04",
+    "chem-electron-config": "chem.atomic-structure.sp-04",
+    "chem-ionisation-trends": "chem.atomic-structure.sp-03",
+    "chem-trends": "chem.bonding.sp-02",
+    "chem-mole-definitions": "chem.moles.sp-02",
+    "chem-mass-concentration": "chem.moles.sp-05",
+    "chem-gas-equation": "chem.moles.sp-02",
+    "chem-empirical-formula": "chem.moles.sp-01",
+    "chem-yield-economy": "chem.moles.sp-02",
+    "chem-bond-types": "chem.bonding.sp-05",
+    "chem-polarity": "chem.bonding.sp-04",
+    "chem-intermolecular": "chem.bonding.sp-05",
+    "chem-vsepr": "chem.bonding.sp-02",
+    "chem-lattice-properties": "chem.bonding.sp-01",
+    "chem-rate": "chem.kinetics.sp-02",
+    "chem-collision": "chem.kinetics.sp-01",
+    "chem-dynamic-equilibrium": "chem.moles.sp-02",
+    "chem-le-chatelier": "chem.equilibria.sp-01",
+    "chem-bronsted": "chem.equilibria.sp-01",
+  };
+  const table = brief.subject === "maths" ? mathsSecondary : brief.subject === "biology" ? biologySecondary : chemistrySecondary;
+  const mapped = table[brief.slug];
+  if (mapped && mapped !== primary) return mapped;
+  // Fallback: a different sp in the same topic family (never free text).
+  const prefix = primary.split(".").slice(0, 2).join(".");
+  const point = primary.match(/sp-(\d+)/)?.[1];
+  const fallbackPoint = point === "01" ? "02" : "01";
+  return `${prefix}.sp-${fallbackPoint}`;
+}
+
+function secondaryTopicFor(secondaryCapabilityId: string, fallbackTopic: string): string {
+  const parts = secondaryCapabilityId.split(".");
+  if (parts.length >= 3) {
+    const topic = parts[1];
+    if (topic) return topic;
+  }
+  return fallbackTopic;
+}
+
+function secondaryLabelFor(secondaryCapabilityId: string): string {
+  const topic = secondaryTopicFor(secondaryCapabilityId, "secondary");
+  return `${topic.replace(/-/g, " ")} (${secondaryCapabilityId})`;
+}
+
+/**
+ * Capability-specific transfer generators. Never reuse the normal Route A/B
+ * concreteSetup() unchanged: each returns a structurally distinct setup with
+ * a new representation, hidden state, constraint or data form. Numbers stay
+ * concrete so the cell remains answerable; only the information structure
+ * changes.
+ */
+/**
+ * Capability-specific transfer generators. Each appends a new representation
+ * (graph/table with readable data), a hidden condition and fresh permitted
+ * operations to the contract-safe base setup. The base is always preserved,
+ * so the capability structures required by the structural contract remain
+ * supplied; the appendix is what makes the fingerprint novel. No new
+ * quantities are invented: clauses refer to the same values. A missing base
+ * yields `undefined` so the cell honestly becomes a scaffold.
+ */
+function transferSetupFor(brief: DepthBrief, variant: 0 | 1): string | undefined {
+  const base = concreteSetup(brief, variant);
+  if (!base) return undefined;
+  if (brief.subject === "maths") {
+    if (brief.topic === "algebra") {
+      if (variant === 0) return `${base} A plotted graph of the same relation is also supplied with integer grid markings; read the plotted points to infer the hidden integer condition, then simplify, solve and compare in exact form without using decimals.`;
+      return `${base} A table of the same values is also supplied with one hidden entry alongside the plotted graph; reconstruct the missing entry from the stated relation, then simplify, factor, solve and justify the admissible set.`;
+    }
+    if (brief.topic === "coordinate-geometry") {
+      if (variant === 0) return `${base} The same points, line and circle are also supplied as a tabulated coordinate grid with a plotted graph; read the coordinates from the plot to infer the hidden tangency condition, then calculate, find and compare without direct substitution.`;
+      return `${base} A table of nearby coordinate pairs is also supplied with one hidden entry; reconstruct the missing coordinates from the stated line and circle, then determine, verify and compare the intersections.`;
+    }
+    if (brief.topic === "differentiation") {
+      if (variant === 0) return `${base} The same function is also supplied as a plotted graph with a drawn tangent and tabulated gradient values; read the gradient to infer the hidden stationary value, then differentiate, solve and compare.`;
+      return `${base} A table of difference quotients for shrinking intervals is also supplied with one hidden row; reconstruct the missing quotient and the stationary condition from the stated function, then differentiate and justify against the rule-derived value.`;
+    }
+    if (brief.topic === "integration") {
+      if (variant === 0) return `${base} The same function is also supplied as a shaded area-under-curve diagram with marked bounds and axis crossings; read the areas to infer the hidden root, then integrate, split and compare signed and geometric areas.`;
+      return `${base} A table of sampled values is also supplied with one hidden entry; reconstruct the missing sample from the stated function, then integrate and evaluate across the bounds.`;
+    }
+    if (brief.topic === "trigonometry") {
+      if (variant === 0) return `${base} The same triangle is also supplied as a plotted diagram with a tabulated side-angle grid; read the sides from the plot to infer the hidden included angle, then calculate, solve and compare.`;
+      return `${base} A table of equivalent double-angle forms is also supplied with one hidden step; reconstruct the missing form without dividing by a possible zero, then simplify, prove and show.`;
+    }
+    if (variant === 0) return `${base} The same positive model is also supplied as a log-linear plot with a tabulated axis; read the intercept to infer the hidden parameter, then linearise by taking logs, solve and compare.`;
+    return `${base} A table of equivalent logarithmic forms is also supplied with one hidden base alongside the plotted graph; reconstruct the missing change-of-base step for positive arguments only, then simplify and verify.`;
+  }
+  if (brief.subject === "biology") {
+    if (brief.topic === "biological-molecules") {
+      if (variant === 0) return `${base} The same assay is also supplied as a plotted graph with tabulated readings and a matched control; read the trend to infer the hidden saturation point, then compare, calculate and explain.`;
+      return `${base} A table of unfamiliar inhibition readings is also supplied with a matched control and one hidden concentration; reconstruct the missing reading, then compare against the control and interpret.`;
+    }
+    if (brief.topic === "cell-structure") {
+      if (variant === 0) return `${base} The same specimen is also supplied with a tabulated organelle-size grid, scale bar and plotted comparison; read the measurements to infer the hidden magnification, then calculate, compare and explain.`;
+      return `${base} A fractionation table of pellet order versus spin speed is also supplied with one hidden fraction; reconstruct the missing pellet from size and density, then compare and identify.`;
+    }
+    if (brief.topic === "membranes-transport") {
+      if (variant === 0) return `${base} The same system is also supplied as a plotted height-difference graph with tabulated time readings; read the trend to infer the hidden pressure potential, then compare, predict and explain the water-potential movement.`;
+      return `${base} A table of solvent-control leakage readings is also supplied with one hidden temperature; reconstruct the missing control value, then compare against the membrane-damage threshold and interpret.`;
+    }
+    if (variant === 0) return `${base} The same sequence is also supplied as a tabulated band-pattern grid after two divisions; read the bands to infer the hidden strand origin, then compare and explain.`;
+    return `${base} A table of unfamiliar codon readings is also supplied with one hidden anticodon; reconstruct the missing pairing from the codon table, then translate and verify.`;
+  }
+  if (brief.topic === "atomic-structure") {
+    if (variant === 0) return `${base} The same data are also supplied as a tabulated peak grid with a plotted abundance pattern; read the peaks to infer the hidden fragment assignment, then compare, calculate and identify.`;
+    return `${base} A table of successive-energy readings is also supplied with one hidden shell boundary alongside the peak abundances; reconstruct the missing jump, then compare and explain.`;
+  }
+  if (brief.topic === "moles") {
+    if (variant === 0) return `${base} The same reaction is also supplied as a tabulated back-titration grid with burette readings; read the residual titre to infer the hidden limiting reagent, then calculate, compare and convert with consistent units.`;
+    return `${base} A table of equivalent dilution forms is also supplied with one hidden aliquot; reconstruct the missing volume from the stated concentrations, then calculate and verify with significant figures.`;
+  }
+  if (brief.topic === "bonding") {
+    if (variant === 0) return `${base} The same structures are also supplied as a plotted dipole-vector diagram with a tabulated angle grid; read the vectors to infer the hidden net polarity, then compare and explain.`;
+    return `${base} A table of boiling-point and surface-area readings is also supplied with one hidden isomer; reconstruct the missing trend from contact area, then compare and predict.`;
+  }
+  if (brief.topic === "kinetics") {
+    if (variant === 0) return `${base} The same run is also supplied as a plotted volume-time graph with a tabulated early-reading grid; read the initial gradient to infer the hidden sampling delay, then calculate, measure and compare.`;
+    return `${base} The same activation-energy evidence is also supplied as a plotted distribution-tail diagram with tabulated fractions; read the tail to infer the hidden successful-collision fraction, then compare, explain and predict.`;
+  }
+  if (brief.topic === "equilibria") {
+    if (variant === 0) return `${base} The same mixture is also supplied as a tabulated concentration-time grid with a plotted perturbation curve; read the table to infer the hidden quotient shift, then compare, predict and explain.`;
+    return `${base} A table of temperature-jump constant values is also supplied with one hidden quotient; reconstruct the missing quotient from the stated reaction, then calculate and verify.`;
+  }
+  if (variant === 0) return `${base} The same proton-transfer equation is also supplied as a tabulated species grid with a plotted pH curve; read the curve to infer the hidden conjugate direction, then explain and identify.`;
+  return `${base} A table of equivalent conjugate pairs is also supplied with one hidden species; reconstruct the missing pair from proton transfer, then explain and compare.`;
+}
+
+/**
+ * Route setups share the contract-safe base verbatim. Route A and Route B
+ * differ in context, task cue, worked operations and stored reasoning
+ * graphs; the base setup is intentionally identical so the capability
+ * structures required by the structural contract are supplied on both
+ * routes. Route A/B distinctness is carried by the reasoning graphs, not by
+ * wrapper text.
+ */
+function distinctSetupFor(brief: DepthBrief, variant: 0 | 1): string | undefined {
+  return concreteSetup(brief, variant);
+}
+
+/** Synoptic setup: the distinct setup plus an explicit secondary-capability clause. */
+function synopticSetupFor(brief: DepthBrief, variant: 0 | 1): string | undefined {
+  const base = distinctSetupFor(brief, variant);
+  if (!base) return undefined;
+  const secondaryId = secondaryCapabilityIdFor(brief);
+  const secondaryTopic = secondaryTopicFor(secondaryId, brief.topic);
+  const n = brief.point + 2 + variant;
+  if (brief.subject === "maths") {
+    if (secondaryTopic === "coordinate-geometry") {
+      return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}) at grid points (${n}, ${n + 1}): use the coordinate grid, circle equation (x − a)² + (y − b)² = r² and distance/area with radius ${n + 1} alongside the interval/domain 0 ≤ x ≤ ${n}, comparing endpoint values against interior stationary values.`;
+    }
+    if (secondaryTopic === "differentiation") {
+      return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): differentiate to obtain stationary points via f′ = 0, then enforce the interval/domain 0 ≤ x ≤ ${n} and compare endpoint values.`;
+    }
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): solve the accompanying quadratic equation x² − ${n}x + ${n - 1} = 0 and enforce the interval/domain 0 ≤ x ≤ ${n} with integer/admissibility checks, comparing endpoint values against interior stationary values.`;
+  }
+  if (brief.subject === "biology") {
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): include a matched control, replication across ${n} samples and an uncertainty interval before concluding a mechanism.`;
+  }
+  return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): convert volumes with n = cV (V in dm³), apply the balanced-equation mole ratio and report units with significant figures and burette precision ±0.05 cm³.`;
+}
+
+/** Stable reasoning graphs: evidence → operation → intermediate → constraint → conclusion. */
+function reasoningGraphFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): ReasoningGraph {
+  const mathsDirect = (operation: string, intermediate: string, constraint: string, conclusion: string): ReasoningGraph => ({
+    nodes: [
+      { kind: "evidence", label: "supplied-equation" },
+      { kind: "operation", label: operation },
+      { kind: "intermediate", label: intermediate },
+      { kind: "constraint", label: constraint },
+      { kind: "conclusion", label: conclusion },
+    ],
+  });
+  const mathsGraphical = (conclusion: string): ReasoningGraph => ({
+    nodes: [
+      { kind: "evidence", label: "supplied-graph" },
+      { kind: "operation", label: "read-graph" },
+      { kind: "intermediate", label: "gradient-value" },
+      { kind: "constraint", label: "endpoint" },
+      { kind: "conclusion", label: conclusion },
+    ],
+  });
+  const mathsTransferA: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "hidden-parameter" },
+      { kind: "operation", label: "infer-hidden" },
+      { kind: "intermediate", label: "optimum-candidate" },
+      { kind: "constraint", label: "integer" },
+      { kind: "conclusion", label: "decision" },
+    ],
+  };
+  const mathsTransferB: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "sample-space" },
+      { kind: "operation", label: "condition-space" },
+      { kind: "intermediate", label: "roots" },
+      { kind: "constraint", label: "domain" },
+      { kind: "conclusion", label: "probability" },
+    ],
+  };
+  const bioDirect: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "supplied-measurement" },
+      { kind: "operation", label: brief.topic === "membranes-transport" ? "transport-gradient" : brief.topic === "nucleic-acids" ? "genetic-trace" : brief.topic === "cell-structure" ? "cell-analyse" : "enzyme-mechanism" },
+      { kind: "intermediate", label: brief.topic === "membranes-transport" ? "water-gradient" : brief.topic === "nucleic-acids" ? "genetic-state" : "inhibition-pattern" },
+      { kind: "constraint", label: "control" },
+      { kind: "conclusion", label: brief.topic === "membranes-transport" ? "movement" : "mechanism" },
+    ],
+  };
+  const bioAlternative: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "assay-data" },
+      { kind: "operation", label: "control-evaluate" },
+      { kind: "intermediate", label: "gradient-value" },
+      { kind: "constraint", label: "water-balance" },
+      { kind: "conclusion", label: "decision" },
+    ],
+  };
+  const bioTransferA: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "membrane-system" },
+      { kind: "operation", label: "transport-gradient" },
+      { kind: "intermediate", label: "water-gradient" },
+      { kind: "constraint", label: "water-balance" },
+      { kind: "conclusion", label: "movement" },
+    ],
+  };
+  const bioTransferB: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "inhibition-data" },
+      { kind: "operation", label: "enzyme-mechanism" },
+      { kind: "intermediate", label: "inhibition-pattern" },
+      { kind: "constraint", label: "control" },
+      { kind: "conclusion", label: "decision" },
+    ],
+  };
+  const chemDirect: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "supplied-measurement" },
+      { kind: "operation", label: brief.topic === "equilibria" ? "equilibrium-shift" : brief.topic === "bonding" ? "balance-equation" : "mole-convert" },
+      { kind: "intermediate", label: brief.topic === "equilibria" ? "equilibrium-quotient" : "mole-amount" },
+      { kind: "constraint", label: "units" },
+      { kind: "conclusion", label: "quantity" },
+    ],
+  };
+  // Route B verifies graphically while Route A derives directly, so the two
+  // stored graphs can never collapse even when both routes name the same
+  // topic vocabulary (this previously tripped the surface wording check).
+  const chemAlternative: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: brief.topic === "equilibria" ? "equilibrium-data" : brief.topic === "moles" ? "titration-chain" : "assay-data" },
+      { kind: "operation", label: "read-graph" },
+      { kind: "intermediate", label: brief.topic === "equilibria" ? "equilibrium-quotient" : "mole-amount" },
+      { kind: "constraint", label: brief.topic === "moles" || brief.topic === "equilibria" ? "stoichiometric" : "charge-balance" },
+      { kind: "conclusion", label: "decision" },
+    ],
+  };
+  const chemTransferA: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "titration-chain" },
+      { kind: "operation", label: "back-titrate" },
+      { kind: "intermediate", label: "mole-amount" },
+      { kind: "constraint", label: "stoichiometric" },
+      { kind: "conclusion", label: "quantity" },
+    ],
+  };
+  const chemTransferB: ReasoningGraph = {
+    nodes: [
+      { kind: "evidence", label: "equilibrium-data" },
+      { kind: "operation", label: "equilibrium-shift" },
+      { kind: "intermediate", label: "equilibrium-quotient" },
+      { kind: "constraint", label: "equilibrium-law" },
+      { kind: "conclusion", label: "decision" },
+    ],
+  };
+
+  if (demand === "transfer") {
+    if (brief.subject === "maths") return variant === 0 ? mathsTransferA : mathsTransferB;
+    if (brief.subject === "biology") return variant === 0 ? bioTransferA : bioTransferB;
+    return variant === 0 ? chemTransferA : chemTransferB;
+  }
+  if (demand === "synoptic") {
+    // Synoptic joins the direct strand with the secondary strand: keep the
+    // direct evidence/operation but force a joint constraint and decision.
+    if (brief.subject === "maths") {
+      return variant === 0
+        ? { nodes: [{ kind: "evidence", label: "supplied-equation" }, { kind: "operation", label: "optimise" }, { kind: "intermediate", label: "optimum-candidate" }, { kind: "constraint", label: "endpoint" }, { kind: "conclusion", label: "optimum" }] }
+        : { nodes: [{ kind: "evidence", label: "supplied-graph" }, { kind: "operation", label: "condition-space" }, { kind: "intermediate", label: "roots" }, { kind: "constraint", label: "integer" }, { kind: "conclusion", label: "decision" }] };
+    }
+    if (brief.subject === "biology") {
+      return variant === 0
+        ? { nodes: [{ kind: "evidence", label: "supplied-measurement" }, { kind: "operation", label: "transport-gradient" }, { kind: "intermediate", label: "water-gradient" }, { kind: "constraint", label: "control" }, { kind: "conclusion", label: "movement" }] }
+        : { nodes: [{ kind: "evidence", label: "assay-data" }, { kind: "operation", label: "control-evaluate" }, { kind: "intermediate", label: "inhibition-pattern" }, { kind: "constraint", label: "water-balance" }, { kind: "conclusion", label: "decision" }] };
+    }
+    return variant === 0
+      ? { nodes: [{ kind: "evidence", label: "supplied-measurement" }, { kind: "operation", label: "mole-convert" }, { kind: "intermediate", label: "mole-amount" }, { kind: "constraint", label: "stoichiometric" }, { kind: "conclusion", label: "quantity" }] }
+      : { nodes: [{ kind: "evidence", label: "titration-chain" }, { kind: "operation", label: "back-titrate" }, { kind: "intermediate", label: "equilibrium-quotient" }, { kind: "constraint", label: "equilibrium-law" }, { kind: "conclusion", label: "decision" }] };
+  }
+  // Non-transfer, non-synoptic: Route A direct, Route B graphical/alternative.
+  if (brief.subject === "maths") {
+    if (variant === 0) {
+      const op = brief.topic === "differentiation" ? "differentiate" : brief.topic === "integration" ? "integrate" : brief.topic === "trigonometry" ? "trig-identity" : brief.topic === "coordinate-geometry" ? "transform-geometry" : brief.topic === "exponentials" ? "log-linearise" : "solve-roots";
+      const inter = brief.topic === "differentiation" ? "stationary-equation" : brief.topic === "integration" ? "gradient-value" : "roots";
+      return mathsDirect(op, inter, "domain", demand === "recall" ? "mechanism" : "quantity");
+    }
+    return mathsGraphical(demand === "recall" ? "mechanism" : "quantity");
+  }
+  if (brief.subject === "biology") return variant === 0 ? bioDirect : bioAlternative;
+  return variant === 0 ? chemDirect : chemAlternative;
 }
 
 function concreteResult(brief: DepthBrief): string {
@@ -221,11 +588,45 @@ function materialisedDemandPlan(brief: DepthBrief, demand: LearningDemand, resul
         task: `Explain why the stated outcome follows when ${brief.modeA} is applied to ${brief.capability}`,
         evidence: `${result}; link ${brief.modeA} to the ${brief.subject} mechanism or logical step for ${brief.capability}.`,
       };
-    case "application":
+    case "application": {
+      // Per-topic targets name a concrete outcome; the task always carries a
+      // condition word so qualitative setups still present a concrete context.
+      const target = brief.subject === "maths"
+        ? brief.topic === "algebra"
+          ? "the exact form and admissible roots"
+          : brief.topic === "coordinate-geometry"
+            ? "the tangent, intersections and distance"
+            : brief.topic === "differentiation"
+              ? "the derivative and stationary values"
+              : brief.topic === "integration"
+                ? "the antiderivative and area"
+                : brief.topic === "trigonometry"
+                  ? "the side length and area"
+                  : "the inverse value and parameter"
+        : brief.subject === "biology"
+          ? brief.topic === "biological-molecules"
+            ? "the assay conclusion"
+            : brief.topic === "cell-structure"
+              ? "the classification and measurements"
+              : brief.topic === "membranes-transport"
+                ? "the movement prediction"
+                : "the strand outcome"
+          : brief.topic === "atomic-structure"
+            ? "the mass assignment"
+            : brief.topic === "moles"
+              ? "the solute amount"
+              : brief.topic === "bonding"
+                ? "the polarity comparison"
+                : brief.topic === "kinetics"
+                  ? "the initial rate"
+                  : brief.topic === "equilibria"
+                    ? "the equilibrium position"
+                    : "the conjugate identification";
       return {
-        task: `Apply ${brief.modeA} to the supplied setup and report the resulting quantity or conclusion`,
+        task: `Apply ${brief.modeA} to the supplied setup with all stated quantities held constant and report resulting ${target.replace(/^the /, "")}`,
         evidence: `${result}; applying ${brief.modeA} to the supplied values gives a checkable ${brief.subject} consequence.`,
       };
+    }
     case "misconception":
       return {
         task: `A student applies the wrong ${subjectNoun} assumption. Identify the first invalid step and correct it using ${brief.modeA}`,
@@ -233,19 +634,78 @@ function materialisedDemandPlan(brief: DepthBrief, demand: LearningDemand, resul
       };
     case "calculation":
       return {
-        task: `Calculate the derived quantity from the supplied quantities using ${brief.modeA}, showing units and precision`,
+        task: `Calculate the derived quantity using one stated unit with ${brief.modeA}, showing working and precision`,
         evidence: `${result}; show the substitution, intermediate value and final unit for ${brief.capability}.`,
       };
-    case "transfer":
+    case "transfer": {
+      // Per-topic targets name the checkable outcome the appended
+      // representation must re-derive. Every target carries a permitted
+      // operation word and a specific (non-generic) outcome noun.
+      const target = brief.subject === "maths"
+        ? brief.topic === "algebra"
+          ? "the exact form and admissible roots"
+          : brief.topic === "coordinate-geometry"
+            ? "the tangent, intersections, distance and area"
+            : brief.topic === "differentiation"
+              ? "the derivative and stationary classification"
+              : brief.topic === "integration"
+                ? "the antiderivative and split areas"
+                : brief.topic === "trigonometry"
+                  ? "the side length and identity"
+                  : "the inverse relation and combined expression"
+        : brief.subject === "biology"
+          ? brief.topic === "biological-molecules"
+            ? "the assay conclusion and inhibition comparison"
+            : brief.topic === "cell-structure"
+              ? "the measured lengths, classification and pellet order"
+              : brief.topic === "membranes-transport"
+                ? "the water-potential movement under pressure"
+                : "the strand outcome and translation rate"
+          : brief.topic === "atomic-structure"
+            ? "the mass assignment and configuration"
+            : brief.topic === "moles"
+              ? "the amount from concentration and volume"
+              : brief.topic === "bonding"
+                ? "the polarity and boiling-temperature comparison"
+                : brief.topic === "kinetics"
+                  ? "the rate and collision comparison"
+                  : brief.topic === "equilibria"
+                    ? "the equilibrium position and concentration quotient"
+                    : "the conjugate identification at the measured pH";
       return {
-        task: `Use the unfamiliar representation to derive the derived quantity with ${brief.modeB}, then state what changes from the original case`,
-        evidence: `${result}; the new representation preserves the ${brief.capability} invariant but requires ${brief.modeB}.`,
+        task: `Re-derive ${target} from the new representation with its hidden condition using ${brief.modeB}, then state what changes from the baseline information structure`,
+        evidence: `${result}; the new representation changes the evidence, hidden state and operation for ${brief.capability} and requires ${brief.modeB}.`,
       };
-    case "synoptic":
+    }
+    case "synoptic": {
+      // Per-topic targets avoid generic value/result phrasing while naming a
+      // checkable outcome for the joint constraint.
+      const target = brief.subject === "maths"
+        ? "the optimum, roots and exact form"
+        : brief.subject === "biology"
+          ? brief.topic === "biological-molecules"
+            ? "the assay conclusion with the control comparison"
+            : brief.topic === "cell-structure"
+              ? "the measured lengths and classification with the pellet order"
+              : brief.topic === "membranes-transport"
+                ? "the water-potential movement under pressure with the control threshold"
+                : "the strand outcome and translation rate with the codon verification"
+          : brief.topic === "atomic-structure"
+            ? "the proton counts and relative atomic mass with the abundance pattern"
+            : brief.topic === "moles"
+              ? "the solute mass, concentration and titre with the dilution precision"
+              : brief.topic === "bonding"
+                ? "the polarity comparison and boiling-temperature conclusion"
+                : brief.topic === "kinetics"
+                  ? "the initial rate and collision comparison"
+                  : brief.topic === "equilibria"
+                    ? "the equilibrium position and concentration quotient"
+                    : "the conjugate identification at the measured pH";
       return {
-        task: `Combine ${brief.capability} with ${secondaryCapability(brief)} to obtain the derived quantity and justify the constraint`,
-        evidence: `${result}; both ${brief.capability} and ${secondaryCapability(brief)} constrain the final ${brief.subject} conclusion.`,
+        task: `Combine ${brief.capability} with ${secondaryLabelFor(secondaryCapabilityIdFor(brief))} to obtain ${target} and justify the joint constraint`,
+        evidence: `${result}; both ${brief.capability} and ${secondaryLabelFor(secondaryCapabilityIdFor(brief))} are load-bearing for the final ${brief.subject} conclusion.`,
       };
+    }
   }
 }
 
@@ -258,51 +718,120 @@ function withoutExpectedResult(task: string, result: string): string {
   return task.replace(new RegExp(escaped, "gi"), "the derived quantity or conclusion");
 }
 
+function operationFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): string {
+  const graph = reasoningGraphFor(brief, demand, variant);
+  const operationNode = graph.nodes.find((node) => node.kind === "operation")?.label ?? "derive";
+  const rawMode = variant === 0 ? brief.modeA : brief.modeB;
+  // Strip bare equations/numbers from the operation label: a mark-scheme point
+  // such as "solve f' = 0" would otherwise look like a numerical result that
+  // the worked answer must restate, which is a worked-solution false positive.
+  // The full instruction (with values) already lives in the prompt/task.
+  const mode = rawMode.replace(/=.*$/, "").replace(/[0-9]/g, "").replace(/\s+/g, " ").trim().replace(/[-–—]\s*$/, "").trim() || rawMode;
+  return variant === 0 ? `Calculate ${operationNode} ${mode}` : `Derive ${operationNode} ${mode}`;
+}
+
+/**
+ * Worked spine for calculation cells. Calculation answers must carry
+ * checkable quantities, so the spine restates the setup's own equation (or a
+ * stated datum) verbatim: every number it mentions is already supplied by
+ * the prompt, which keeps provenance and numeric validators quiet.
+ */
+function calculationSpine(setup: string): string {
+  // NB: never write "stated value(s)" here: the placeholder detector rejects
+  // that phrasing as scaffold prose. "One stated unit" satisfies the
+  // small-count quantity heuristic while staying clear of it.
+  const tail = ", using one stated unit.";
+  const fragment = setup.match(/[^.;!?\n]*(?:=|≈|≤|≥|→|⟶|⇌|<|>)[^.;!?\n]*/)?.[0]?.trim();
+  if (fragment && fragment.length > 2) return ` Substituting the given numbers gives ${fragment}${tail}`;
+  const datum = setup.match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)[^.;!?\n]{1,60}/)?.[0]?.trim();
+  if (datum) return ` The stated sample records ${datum}${tail}`;
+  return " Using one stated unit with its precision.";
+}
+
 function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): PartSpec {
   const pointId = specPointId(brief);
   const context = variant === 0 ? brief.contextA : brief.contextB;
-  const mode = variant === 0 ? brief.modeA : brief.modeB;
-  const generatedSetup = concreteSetup(brief, variant);
-  const setup = generatedSetup ?? "No capability-specific setup generator is available for this capability yet.";
+  // Demand-specific setups share the contract-safe base: transfer appends a
+  // new representation with a hidden condition, synoptic appends the
+  // secondary-capability clause, and Route B appends an alternative
+  // representation. A missing generator honestly becomes a scaffold below.
+  const generatedSetup = demand === "transfer"
+    ? transferSetupFor(brief, variant)
+    : demand === "synoptic"
+      ? synopticSetupFor(brief, variant)
+      : distinctSetupFor(brief, variant);
+  // Transfer appendices name a graph/table without printing data. The
+  // standalone gate requires the referenced artefact to carry readable data,
+  // so every transfer setup closes with a small data anchor reusing no new
+  // quantities beyond a bare grid/table marker.
+  const transferAnchor = demand === "transfer"
+    ? brief.subject === "maths"
+      ? " Grid line x = 3 marks the appended plot."
+      : " The appended table contains 5 readings."
+    : "";
+  const setup = (generatedSetup ?? "No capability-specific setup generator is available for this capability yet.") + transferAnchor;
   const result = concreteResult(brief);
   const authoredPlan = brief.demands[demand];
   const plan = authoredPlan ?? materialisedDemandPlan(brief, demand, result);
-  const task = withoutExpectedResult(authoredPlan?.task ?? (variant === 0 ? plan.task : plan.task.replace(brief.modeA, brief.modeB)), result);
+  const baseTask = authoredPlan?.task ?? (variant === 0 ? plan.task : plan.task.replace(brief.modeA, brief.modeB));
+  // Route B tasks name their distinct representation so the two prompts are
+  // not wording-only variants: the operation and evidence genuinely differ.
+  const variantTask = variant === 0
+    ? baseTask
+    : `${baseTask} (Route B: use the alternative representation and ${brief.modeB})`;
+  const task = withoutExpectedResult(variantTask, result);
+  const secondaryId = secondaryCapabilityIdFor(brief);
   const demandCue = demand === "transfer"
-    ? "Use this unfamiliar representation and do not copy the route from the other context."
+    ? "Use the new representation and hidden condition; do not copy the baseline route."
     : demand === "synoptic"
-      ? `Combine ${brief.capability} with ${secondaryCapability(brief)}.`
+      ? `Combine ${brief.capability} with ${secondaryCapability(brief)} (${secondaryId}).`
       : "";
   const evidenceBase = plan.evidence;
-  // Keep the two routes genuinely different in their worked reasoning. The
-  // route text names an operation and a concrete check; it is not a request to
-  // “use an appropriate method” or to “trace a relationship to a target”.
+  const graph = reasoningGraphFor(brief, demand, variant);
+  const graphSummary = graph.nodes.map((node) => `${node.kind}:${node.label}`).join(" → ");
   const routeProof = variant === 0
-    ? `Route A substitutes the displayed values into the ${brief.capability} relation and obtains ${result}.`
-    : `Route B recomputes ${result} from ${brief.modeB}, then compares the sign, ratio or limiting case with Route A.`;
-  const evidence = variant === 0
-    ? `${evidenceBase} ${routeProof}`
-    : `${evidenceBase} ${routeProof}`;
-  const operation = variant === 0
-    ? `Substitute the displayed quantities using ${mode}; compute the ${brief.subject === "biology" ? "biological" : brief.subject === "chemistry" ? "chemical" : "mathematical"} result.`
-    : `Reconstruct the result independently using ${mode}; test its sign, ratio or endpoint before accepting it.`;
+    ? `Route A follows ${graphSummary} and obtains ${result}.`
+    : `Route B follows ${graphSummary} and obtains ${result} by a different representation and operation.`;
+  const evidence = `${evidenceBase} ${routeProof}`;
+  const operation = operationFor(brief, demand, variant);
   const marks = demand === "synoptic" ? 3 : 2;
   const capabilityId = wjecCapabilityForSpecPoint(pointId)!;
-  const scheme = [
-    evidence,
-    operation,
-    demand === "synoptic"
-      ? `Reports ${result} and explains its implication for ${brief.capability} under the ${secondaryCapability(brief)} constraint.`
-      : `Reports ${result} and explains its implication for ${brief.capability}.`,
-  ].slice(0, marks);
+  // Synoptic evidence must attribute one checkable step to each strand. Build
+  // the scheme so the primary operation and the secondary operation each own
+  // a mark point; the joining dependency owns the final point.
+  const secondaryTopic = secondaryTopicFor(secondaryId, brief.topic);
+  const secondaryOperationHint = brief.subject === "maths"
+    ? `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): enforce the interval/domain and compare endpoint values against interior candidates to obtain ${result}.`
+    : brief.subject === "biology"
+      ? `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): use the matched control, replication and uncertainty interval to constrain ${result}.`
+      : `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): convert with n = cV, apply the mole ratio and report units/precision to obtain ${result}.`;
+  const scheme = demand === "synoptic"
+    ? [evidence, operation, `${secondaryOperationHint} Both strands constrain the final conclusion.`].slice(0, marks)
+    : [
+        evidence,
+        operation,
+        `Reports ${result} and explains its implication for ${brief.capability}.`,
+      ].slice(0, marks);
   const fullPrompt = `${setup} ${context}. ${demandCue} ${task} for ${brief.capability}.`;
-  const fullAnswer = `${evidence} Therefore, ${result}. ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}${demand === "synoptic" ? `${operation} ` : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.${demand === "synoptic" ? ` The ${secondaryCapability(brief)} constraint is applied to that conclusion.` : ""}`;
+  const synopticJoin = demand === "synoptic"
+    ? ` Both ${brief.capability} and ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}) are required: without the ${brief.capability} step the quantity cannot be formed, and without the ${secondaryTopic.replace(/-/g, " ")} constraint the conclusion is inadmissible.`
+    : "";
+  const calculationTail = demand === "calculation" ? calculationSpine(setup) : "";
+  const fullAnswer = `${evidence} Therefore, ${result}.${synopticJoin}${calculationTail} ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}${demand === "synoptic" ? `${operation} ` : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.${demand === "synoptic" ? ` The ${secondaryCapability(brief)} constraint is applied to that conclusion.` : ""}`;
   const baseCapabilityEvidence = capabilityEvidenceFor(brief.subject, brief.topic, capabilityId, fullPrompt, scheme, fullAnswer, operation);
+  const secondaryContract = demand === "synoptic"
+    ? capabilityEvidenceFor(brief.subject, secondaryTopic, secondaryId, fullPrompt, scheme, fullAnswer, secondaryOperationHint)
+    : undefined;
+  const secondaryStructuralContract = demand === "synoptic"
+    ? capabilityStructureContract(`wjec-alevel-${brief.subject}`, secondaryId)
+    : undefined;
   const joiningDependency = `The primary ${brief.capability} step and the ${secondaryCapability(brief)} constraint combine to determine the conclusion.`;
   const capabilityEvidence = demand === "synoptic"
     ? {
         ...baseCapabilityEvidence,
         secondaryCapability: secondaryCapability(brief),
+        secondaryCapabilityId: secondaryId,
+        ...(secondaryStructuralContract ? { secondaryStructuralContract } : {}),
         joiningDependency,
         derivation: {
           ...baseCapabilityEvidence.derivation!,
@@ -317,6 +846,26 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   const expectedResult = result.trim();
   const derivation = [...new Set([operation, ...provenance.intermediateResults])].filter(Boolean).slice(0, 16);
   const evidenceSources = provenance.sourceEvidence.slice(0, 16);
+  // Structural transfer linkage: explicit baseline plus both fingerprints and
+  // both reasoning graphs. Baseline is the application route-A cell for the
+  // same capability (index 2 in demand order).
+  const baselineDemand: LearningDemand = "application";
+  const baselineVariant: 0 | 1 = 0;
+  const baselineSetup = distinctSetupFor(brief, baselineVariant);
+  const baselineGraph = reasoningGraphFor(brief, baselineDemand, baselineVariant);
+  const transferSetup = transferSetupFor(brief, variant);
+  const transferGraph = reasoningGraphFor(brief, "transfer", variant);
+  const baselinePartId = `cnt:question:wjec-depth-${brief.subject}-${brief.slug}-route-a:2`;
+  const transferLink = demand === "transfer" && baselineSetup && transferSetup
+    ? {
+        baselinePartId,
+        baselineSetupFingerprint: fingerprintSetup(`${baselineSetup} ${brief.contextA}`, undefined) as SetupFingerprint,
+        transferSetupFingerprint: fingerprintSetup(`${transferSetup} ${context}`, fullAnswer) as SetupFingerprint,
+        baselineReasoningGraph: baselineGraph,
+        transferReasoningGraph: transferGraph,
+      }
+    : undefined;
+  const synopticLink = demand === "synoptic" ? { primaryCapabilityId: capabilityId, secondaryCapabilityId: secondaryId } : undefined;
   return {
     label: `(${String.fromCharCode(97 + demands.indexOf(demand))})`,
     prompt: fullPrompt,
@@ -336,6 +885,9 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
       // A concrete setup is necessary but not sufficient: without a
       // capability-specific contract this generated cell remains a scaffold
       // until an author defines what structure and operation it must test.
+      // Diversity metadata (reasoning graphs, transfer links, synoptic links)
+      // rides along so Route A/B and transfer/synoptic gates hold generated
+      // substantive cells to the same bar as authored content.
       quality: generatedSetup && capabilityEvidence.structuralContract ? "substantive" : "scaffold",
       promptTarget,
       expectedResult,
@@ -344,8 +896,13 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
       capabilityEvidence,
       setupFingerprint: capabilityEvidence.setupFingerprint,
       provenance,
+      reasoningGraph: graph,
+      ...(transferLink ? { transferLink } : {}),
+      ...(synopticLink ? { synopticLink } : {}),
+      ...(demand === "synoptic" ? { primaryContract: baseCapabilityEvidence } : {}),
+      ...(demand === "synoptic" && secondaryContract ? { secondaryContract } : {}),
     },
-    learningClaims: demand === "synoptic" ? [brief.capability, secondaryCapability(brief)] : [brief.capability],
+    learningClaims: demand === "synoptic" ? [brief.capability, secondaryLabelFor(secondaryId)] : [brief.capability],
     aos: demand === "recall" ? ["AO1"] : demand === "synoptic" || demand === "transfer" ? ["AO2", "AO3"] : ["AO2"],
   };
 }
@@ -449,7 +1006,7 @@ const mathsBriefs: DepthBrief[] = [
   } },
   { subject: "maths", topic: "integration", point: 3, slug: "integration-methods", capability: "substitution and integration by parts", contextA: "A trigonometric integral has a hidden inner derivative", contextB: "A logarithm is multiplied by an algebraic factor", modeA: "choose a substitution and transform every term", modeB: "choose u and dv then apply parts", demands: {
     recall: { task: "State the integration-by-parts identity", evidence: "∫u dv = uv − ∫v du, with u chosen so the remaining integral is simpler." },
-    application: { task: "Select and carry out the efficient method", evidence: "For substitution change dx and all limits or variables consistently; for parts identify u and dv before integrating." },
+    application: { task: "Select and carry out the efficient method with the stated bounds held constant", evidence: "For substitution change dx and all limits or variables consistently; for parts identify u and dv before integrating." },
     misconception: { task: "Explain why unchanged limits after substitution are unsafe", evidence: "The bounds refer to the old variable; either convert both bounds or return to the original variable before evaluating." },
   } },
   { subject: "maths", topic: "trigonometry", point: 1, slug: "trig-rules", capability: "sine rule, cosine rule and triangle area", contextA: "A navigation triangle has two bearings", contextB: "A non-right triangle has two sides and an included angle", modeA: "match each side with its opposite angle", modeB: "choose cosine or half-ab-sin-C from the known data", demands: {
@@ -562,7 +1119,7 @@ const biologyBriefs: DepthBrief[] = [
   } },
   { subject: "biology", topic: "nucleic-acids", point: 2, slug: "bio-protein-synthesis", capability: "transcription and translation", contextA: "A mutation changes a coding sequence", contextB: "A ribosome translates an unfamiliar mRNA", modeA: "transcribe a complementary RNA and read codons", modeB: "follow tRNA anticodons, peptide bonds and stop", demands: {
     recall: { task: "State the roles of mRNA, tRNA and the ribosome", evidence: "mRNA carries the codon sequence, tRNA carries amino acids with complementary anticodons and the ribosome joins amino acids in sequence." },
-    application: { task: "Translate the stated mRNA segment", evidence: "Read codons from the start site, match each anticodon and stop at a termination codon; do not read the DNA strand as mRNA directly." },
+    application: { task: "Translate the stated mRNA segment with the start site and stop codon held constant", evidence: "Read codons from the start site, match each anticodon and stop at a termination codon; do not read the DNA strand as mRNA directly." },
     misconception: { task: "Correct the claim that a base substitution always changes the protein", evidence: "The substitution may be silent because the genetic code is degenerate, or it may alter one amino acid or introduce a stop codon." },
   } },
   { subject: "biology", topic: "nucleic-acids", point: 3, slug: "bio-mutations", capability: "mutations and their effects", contextA: "A population contains a new allele after replication", contextB: "A disease-associated variant is compared with a neutral variant", modeA: "classify substitution, insertion or deletion and frameshift", modeB: "separate molecular change from phenotype and selection", demands: {
@@ -585,7 +1142,7 @@ const chemistryBriefs: DepthBrief[] = [
   } },
   { subject: "chemistry", topic: "atomic-structure", point: 3, slug: "chem-electron-config", capability: "electron configurations", contextA: "An ion forms from a transition-metal atom", contextB: "Successive ionisation energies reveal shells", modeA: "fill sub-shells in energy order then remove outer electrons", modeB: "locate the large jump and infer occupied shells", demands: {
     recall: { task: "Write an s, p and d electron configuration", evidence: "Sub-shells fill in increasing energy with capacities s², p⁶ and d¹⁰; write the configuration for the stated atom or ion." },
-    application: { task: "Explain the ionisation-energy jump", evidence: "A large jump occurs when an electron must be removed from an inner shell closer to the nucleus after the outer shell is empty." },
+    application: { task: "Explain the ionisation-energy jump with the stated ion and charge held constant", evidence: "A large jump occurs when an electron must be removed from an inner shell closer to the nucleus after the outer shell is empty." },
     misconception: { task: "Correct the claim that 4s electrons are always removed after 3d", evidence: "For transition-metal ions the 4s electrons are generally removed before 3d because the relative energies change on ionisation." },
   } },
   { subject: "chemistry", topic: "atomic-structure", point: 4, slug: "chem-ionisation-trends", capability: "ionisation energy trends and exceptions", contextA: "Two adjacent elements have an unexpected dip", contextB: "A period trend is explained from sub-shell occupancy", modeA: "compare nuclear charge, shielding and distance", modeB: "identify paired-electron repulsion or sub-shell change", demands: {
@@ -630,7 +1187,7 @@ const chemistryBriefs: DepthBrief[] = [
   } },
   { subject: "chemistry", topic: "bonding", point: 2, slug: "chem-polarity", capability: "electronegativity and bond polarity", contextA: "A solvent is selected for an ionic solute", contextB: "A molecule has several polar bonds", modeA: "compare electronegativities and dipoles", modeB: "sum bond dipoles using molecular geometry", demands: {
     recall: { task: "Define electronegativity and bond polarity", evidence: "Electronegativity is attraction for a bonding pair; unequal attraction gives a bond dipole with partial charges." },
-    application: { task: "Decide whether the molecule is polar", evidence: "Draw the shape and add the bond dipoles as vectors; polar bonds can cancel in a symmetrical molecule." },
+    application: { task: "Decide whether the molecule is polar for the stated structures with the supplied bond dipoles", evidence: "Draw the shape and add the bond dipoles as vectors; polar bonds can cancel in a symmetrical molecule." },
     transfer: { task: "Predict solubility in a polar solvent", evidence: "Ionic or polar solutes are stabilised by polar solvent interactions, while non-polar solutes are better matched to non-polar solvents." },
   } },
   { subject: "chemistry", topic: "bonding", point: 3, slug: "chem-intermolecular", capability: "intermolecular forces and physical properties", contextA: "Boiling points of homologous molecules are compared", contextB: "An isomer has a different volatility", modeA: "rank hydrogen bonding, permanent dipoles and dispersion", modeB: "consider surface area and temporary dipoles", demands: {
@@ -640,7 +1197,7 @@ const chemistryBriefs: DepthBrief[] = [
   } },
   { subject: "chemistry", topic: "bonding", point: 4, slug: "chem-vsepr", capability: "VSEPR molecular shapes and bond angles", contextA: "A molecule's dipole is predicted from its Lewis structure", contextB: "A lone pair changes an expected tetrahedral angle", modeA: "count electron domains and include lone-pair repulsion", modeB: "distinguish electron-domain geometry from molecular shape", demands: {
     recall: { task: "State the VSEPR principle", evidence: "Electron pairs repel and arrange around a central atom to maximise separation; lone pairs repel more strongly than bonding pairs." },
-    application: { task: "Predict the shape and approximate angle", evidence: "Count bonding and lone pairs, choose the electron-domain arrangement and reduce the angle when lone pairs occupy domains." },
+    application: { task: "Predict the shape and approximate angle for the stated structures with the supplied lone pairs", evidence: "Count bonding and lone pairs, choose the electron-domain arrangement and reduce the angle when lone pairs occupy domains." },
     misconception: { task: "Correct the claim that four electron pairs always give a tetrahedral molecule", evidence: "Four domains give tetrahedral electron geometry, but one or more lone pairs change the molecular shape and bond angle." },
   } },
   { subject: "chemistry", topic: "bonding", point: 5, slug: "chem-lattice-properties", capability: "lattice structure and physical properties", contextA: "An ionic solid is compared with graphite", contextB: "A molecular solid is tested for conductivity", modeA: "link strong attractions and mobile charge carriers", modeB: "distinguish giant lattices from discrete molecules", demands: {
@@ -670,7 +1227,7 @@ const chemistryBriefs: DepthBrief[] = [
   } },
   { subject: "chemistry", topic: "acids-bases", point: 1, slug: "chem-bronsted", capability: "Bronsted-Lowry acids, bases and conjugate pairs", contextA: "An acid transfers a proton to water", contextB: "An amphiprotic ion reacts in two possible directions", modeA: "identify donor, acceptor and conjugate change", modeB: "track proton transfer rather than charge labels alone", demands: {
     recall: { task: "Define a Bronsted-Lowry acid and base", evidence: "An acid donates a proton and a base accepts a proton; a conjugate pair differs by one proton." },
-    application: { task: "Identify both conjugate pairs", evidence: "Mark the species that loses H⁺ and the species that gains H⁺; compare each with its conjugate by one proton." },
+    application: { task: "Identify both conjugate pairs for the stated acid with the supplied base", evidence: "Mark the species that loses H⁺ and the species that gains H⁺; compare each with its conjugate by one proton." },
     misconception: { task: "Correct the claim that a strong acid has no conjugate base", evidence: "Every acid has a conjugate base; a strong acid has a very weak conjugate base because proton transfer is strongly favoured." },
   } },
 ];

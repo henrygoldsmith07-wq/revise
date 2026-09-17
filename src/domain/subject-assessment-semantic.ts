@@ -25,7 +25,7 @@ function normaliseEvidenceText(value: string): string {
     .trim();
 }
 
-function evidencePhrasePresent(text: string, phrase: string): boolean {
+export function evidencePhrasePresent(text: string, phrase: string): boolean {
   const haystack = normaliseEvidenceText(text);
   const needle = normaliseEvidenceText(phrase);
   if (!needle) return false;
@@ -110,7 +110,7 @@ const OPERATION_ALIASES: Record<string, readonly string[]> = {
   simplify: ["simplify", "simplified", "simplification", "rationalise", "rationalize", "index", "exact form", "prove", "show"],
 };
 
-function operationEvidencePresent(text: string, operation: string): boolean {
+export function operationEvidencePresent(text: string, operation: string): boolean {
   if (evidencePhrasePresent(text, operation)) return true;
   const aliases = OPERATION_ALIASES[operation.toLowerCase()] ?? [];
   return aliases.some((alias) => evidencePhrasePresent(text, alias));
@@ -629,7 +629,7 @@ function evidenceContributesToConclusion(evidence: string, conclusion: string): 
   return sharedNumbers.length > 0 && /(?:=|≈|\b(?:cm|mm|m|s|kg|g|mol|dm|MPa|kPa|J|N|Pa|%|μmol)\b)/i.test(`${evidence} ${conclusion}`);
 }
 
-function validateSynopticStructure(
+function validateSynopticDerivationStructure(
   contract: CapabilityEvidenceContract,
   part: QuestionPart,
   derivation: NonNullable<CapabilityEvidenceContract["derivation"]> | undefined,
@@ -1095,7 +1095,7 @@ export function validateCapabilityEvidence(
   )) {
     failures.push(`Secondary synoptic capability is not explicit: ${contract.secondaryCapability}.`);
   }
-  if (demand === "synoptic") failures.push(...validateSynopticStructure(contract, part, derivation));
+  if (demand === "synoptic") failures.push(...validateSynopticDerivationStructure(contract, part, derivation));
   return failures;
 }
 

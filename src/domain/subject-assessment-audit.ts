@@ -1,12 +1,20 @@
-import type { CapabilityNode } from "./capability-graph";
+﻿import type { CapabilityNode } from "./capability-graph";
 import {
   compareTransferStructures,
 } from "./subject-assessment-semantic";
+import {
+  compareTransferStructures as compareTransferReasoningGraphs,
+  fingerprintSetup,
+  isDistinctReasoningRoute,
+  isSupersetRoute,
+  MIN_REASONING_GRAPH_DISTANCE,
+  reasoningGraphForPart,
+} from "./reasoning-graph";
 export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
+export { fingerprintSetup, isDistinctReasoningRoute, isSupersetRoute, reasoningGraphForPart } from "./reasoning-graph";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
 import {
   addIssue,
-  isGeneratedDepthDraft,
   partText,
   validateBiologyPart,
   validateChemistryPart,
@@ -54,6 +62,11 @@ export type SubjectAssessmentIssueKind =
   | "capability-not-required"
   | "provenance"
   | "transfer-novelty"
+  | "transfer-not-novel"
+  | "duplicate-reasoning-graph"
+  | "secondary-capability-not-required"
+  | "missing-secondary-contract"
+  | "route-superset"
   | "synoptic-evidence"
   | "maths-equivalence"
   | "maths-domain"
@@ -122,6 +135,7 @@ export interface FlagshipSubjectAssessmentAudit extends PhysicsAssessmentQuality
   repairQueue: SubjectRepairQueueItem[];
 }
 
+
 function summariseCorrectness(issues: readonly SubjectAssessmentIssue[]): SubjectCorrectnessSummary {
   const byKind: Partial<Record<SubjectAssessmentIssueKind, number>> = {};
   for (const issue of issues) byKind[issue.kind] = (byKind[issue.kind] ?? 0) + 1;
@@ -166,7 +180,8 @@ function buildRepairQueue(
   };
 
   const priorityForSubjectIssue = (issue: SubjectAssessmentIssue): SubjectRepairPriority => {
-    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "capability-not-required" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "synoptic-evidence") return "missing-authored-demand";
+    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "capability-not-required" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "transfer-not-novel" || issue.kind === "synoptic-evidence" || issue.kind === "missing-secondary-contract" || issue.kind === "secondary-capability-not-required") return "missing-authored-demand";
+    if (issue.kind === "duplicate-reasoning-graph" || issue.kind === "route-superset") return "duplicate-reasoning";
     if (issue.kind === "not-self-contained") return "not-self-contained";
     if (issue.kind === "solution-substance") return "weak-worked-solution";
     if (issue.kind !== "generic-fallback" && issue.kind !== "demand-evidence") return "correctness-warning";
@@ -308,24 +323,64 @@ export function auditFlagshipSubject(input: {
     }
   }
 
-  // A transfer item must change the reasoning route as well as its wrapper.
-  // Compare it with the application/calculation routes for the same smallest
-  // capability.  When no baseline route exists the item remains a hypothesis
-  // and the authoring queue will ask for that missing comparison rather than
-  // claiming transfer evidence from a lone question.
+  // Layer C â€” diversity validity. Transfer needs a structurally distinct
+  // baseline, synoptic needs two mapped capabilities, and Route A/B need
+  // materially different reasoning graphs. No layer is bypassed for generated
+  // substantive content; only explicit `scaffold` cells keep a bypass.
   if (input.subjectId !== "wjec-alevel-physics") {
     const allParts = subjectQuestions.flatMap((question) => question.parts.map((part) => ({ question, part })));
+    const partById = new Map(allParts.map(({ question, part }) => [`${question.id}:${part.id}`, { question, part }]));
     for (const { question, part } of allParts) {
-      if (part.learning?.demand !== "transfer" || isGeneratedDepthDraft(question)) continue;
+      if (part.learning?.demand !== "transfer") continue;
+      if (part.learning?.quality === "scaffold") continue;
+      if (invalidParts.has(`${question.id}:${part.id}`)) continue;
       const capability = part.capabilityIds?.length === 1 ? part.capabilityIds[0] : undefined;
       const specPoint = part.specPointIds?.length === 1 ? part.specPointIds[0] : undefined;
       if (!capability || !specPoint) continue;
+      // Explicit baseline linkage is a hard requirement.
+      const baselineId = part.learning?.transferLink?.baselinePartId?.trim();
+      if (baselineId) {
+        const baselineEntry = [...partById.entries()].find(([key]) => key.endsWith(`:${baselineId}`) || key === baselineId);
+        if (!baselineEntry) {
+          addIssue(subjectIssues, question, part, "transfer-not-novel", "error", `Transfer baseline ${baselineId} does not exist in the same capability (transfer-not-novel).`);
+          invalidParts.add(`${question.id}:${part.id}`);
+          continue;
+        }
+        const baselineCapability = baselineEntry[1].part.capabilityIds?.[0];
+        if (baselineCapability !== capability) {
+          addIssue(subjectIssues, question, part, "transfer-not-novel", "error", "Transfer baseline is from a different capability; reference an explicit baseline task from the same capability (transfer-not-novel).");
+          invalidParts.add(`${question.id}:${part.id}`);
+          continue;
+        }
+      }
       const baselines = allParts.filter(({ question: candidateQuestion, part: candidate }) =>
         candidateQuestion.id !== question.id && candidate.specPointIds?.length === 1 && candidate.specPointIds[0] === specPoint &&
         candidate.capabilityIds?.length === 1 && candidate.capabilityIds[0] === capability &&
         (candidate.learning?.demand === "application" || candidate.learning?.demand === "calculation") &&
-        !isGeneratedDepthDraft(candidateQuestion));
+        candidate.learning?.quality !== "scaffold");
       if (!baselines.length) continue;
+      // An explicit stored link is the strongest transfer evidence: a named
+      // baseline plus setup fingerprints and reasoning graphs compared across
+      // eight structural and seven reasoning dimensions with a dual-change
+      // requirement. The value-stripped Jaccard heuristic below cannot resolve
+      // same-capability transfer (shared topic vocabulary always scores
+      // near-identical), so a passing stored link settles the question and
+      // the heuristic legs serve only link-less authored transfers. Rigor is
+      // equal-or-stronger on both paths, never bypassed.
+      const storedLink = part.learning?.transferLink;
+      if (storedLink) {
+        const comparison = compareTransferReasoningGraphs(
+          storedLink.baselineSetupFingerprint,
+          storedLink.transferSetupFingerprint,
+          storedLink.baselineReasoningGraph,
+          storedLink.transferReasoningGraph,
+        );
+        if (!comparison.isNovel) {
+          addIssue(subjectIssues, question, part, "transfer-not-novel", "error", `Transfer has no structural novelty against its explicit baseline (structural: ${comparison.structuralChanges.join(", ") || "none"}; reasoning: ${comparison.reasoningChanges.join(", ") || "none"}) (transfer-not-novel).`);
+          invalidParts.add(`${question.id}:${part.id}`);
+        }
+        continue;
+      }
       const transferText = partText(part);
       const structuralComparisons = baselines.map(({ part: baseline }) => compareTransferStructures(
         input.subjectId,
@@ -336,6 +391,65 @@ export function auditFlagshipSubject(input: {
       if (!hasStructuralChange || baselines.every(({ part: baseline }) => semanticRouteDistance(transferText, partText(baseline)) < 0.35)) {
         addIssue(subjectIssues, question, part, "transfer-novelty", "error", "Transfer route is semantically the same as the available application/calculation route; add an unfamiliar representation, hidden constraint or genuinely different operation.");
         invalidParts.add(`${question.id}:${part.id}`);
+        continue;
+      }
+      // Derived fingerprint + reasoning-graph gate for depth cells without a
+      // stored link; authored quality cells already passed the representation
+      // gate above and need no further diagnostic (they are not generated
+      // flagship drafts).
+      if ((part.learning?.familyId ?? "").includes("-depth:")) {
+        const transferGraph = reasoningGraphForPart(part, input.subjectId);
+        const transferFingerprint = fingerprintSetup(part.prompt, part.modelAnswer);
+        const novelAgainstSome = baselines.some(({ part: baseline }) => {
+          const baselineGraph = reasoningGraphForPart(baseline, input.subjectId);
+          const baselineFingerprint = fingerprintSetup(baseline.prompt, baseline.modelAnswer);
+          return compareTransferReasoningGraphs(baselineFingerprint, transferFingerprint, baselineGraph, transferGraph).isNovel;
+        });
+        if (!novelAgainstSome) {
+          addIssue(subjectIssues, question, part, "transfer-not-novel", "error", "Transfer has no structural novelty against any baseline route in the same capability (transfer-not-novel).");
+          invalidParts.add(`${question.id}:${part.id}`);
+        }
+      }
+    }
+    // Route A/B graph distance: two substantive parts sharing a specPoint,
+    // capability and demand count as distinct only when their reasoning graphs
+    // differ materially. Cosmetic alternatives (numbers, context names, family
+    // ids, modeA/modeB, rewritten prose, substitute-vs-recompute) collapse.
+    const routeGroups = new Map<string, Array<{ question: (typeof allParts)[number]["question"]; part: (typeof allParts)[number]["part"] }>>();
+    for (const entry of allParts) {
+      const { question, part } = entry;
+      if (part.learning?.quality !== "substantive") continue;
+      // Route A/B diversity is a depth-pack contract (two authored variants per
+      // demand). Authored quality singletons are not Route A/B pairs.
+      if (!(part.learning?.familyId ?? "").includes("-depth:")) continue;
+      if (!part.specPointIds?.length || !part.capabilityIds?.length || !part.learning?.demand) continue;
+      if (invalidParts.has(`${question.id}:${part.id}`)) continue;
+      const key = `${part.specPointIds[0]}::${part.capabilityIds[0]}::${part.learning.demand}`;
+      const rows = routeGroups.get(key) ?? [];
+      rows.push(entry);
+      routeGroups.set(key, rows);
+    }
+    for (const [, rows] of routeGroups) {
+      const byQuestion = new Map<string, (typeof rows)[number]>();
+      for (const row of rows) {
+        if (!byQuestion.has(row.question.id)) byQuestion.set(row.question.id, row);
+      }
+      if (byQuestion.size < 2) continue;
+      const entries = [...byQuestion.values()];
+      for (let i = 0; i < entries.length; i += 1) {
+        for (let j = i + 1; j < entries.length; j += 1) {
+          const left = entries[i]!;
+          const right = entries[j]!;
+          const leftGraph = reasoningGraphForPart(left.part, input.subjectId);
+          const rightGraph = reasoningGraphForPart(right.part, input.subjectId);
+          if (isSupersetRoute(leftGraph, rightGraph) || isSupersetRoute(rightGraph, leftGraph)) {
+            addIssue(subjectIssues, right.question, right.part, "route-superset", "error", `Route B is Route A plus a trivial verification step; change a core reasoning dependency or representation (route-superset). Baseline: ${left.question.id}:${left.part.id}.`);
+            invalidParts.add(`${right.question.id}:${right.part.id}`);
+          } else if (!isDistinctReasoningRoute(leftGraph, rightGraph, MIN_REASONING_GRAPH_DISTANCE)) {
+            addIssue(subjectIssues, right.question, right.part, "duplicate-reasoning-graph", "error", `Route A/B reasoning graphs are materially the same (distance below ${MIN_REASONING_GRAPH_DISTANCE}); change the representation, operation sequence or constraints (duplicate-reasoning-graph). Baseline: ${left.question.id}:${left.part.id}.`);
+            invalidParts.add(`${right.question.id}:${right.part.id}`);
+          }
+        }
       }
     }
   }
