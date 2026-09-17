@@ -9,6 +9,8 @@ import { checkEquationBalance, findUnbalancedEquations } from "./equation-balanc
 import { mathsEquivalent } from "./maths-equivalence";
 import {
   answerLeakageDetail,
+  capabilityNotRequiredReason,
+  capabilityStructureContract,
   hasSynopticAttribution,
   transferNoveltyClasses,
   validateCapabilityEvidence,
@@ -59,7 +61,7 @@ const GENERIC_FALLBACK_PHRASES = [
 ];
 
 function hasConcreteStructure(text: string): boolean {
-  return /\d|[=→⟶]|\b(?:figure|equation|formula|function|probability|vector|derivative|integral|gradient|root|domain|inequality|organism|cell|tissue|sample|species|compound|reaction|solution|concentration|mass|volume|force|graph|table|dataset|triangle|DNA|RNA|enzyme|protein|membrane|osmosis|water potential|bond|electron|molecule|mole|acid|base|ion|atom|pH|Kc|Kp|ATP)\b/i.test(text);
+  return /\d|[=→⟶<>≤≥√∫]|\b(?:figure|equation|formula|function|probabil(?:ity|ities)|vector|derivative|integral|antiderivative|gradient|root|domain|inequalit(?:y|ies)|surd|quadratic|polynomial|transformation|tangent|normal|trigonometric|triangle|logarithm|exponential|organism|cell|tissue|sample|species|compound|reaction|solution|concentration|mass|volume|force|graph|table|dataset|scale|magnification|resolution|sequence|codon|protein|carbohydrate|lipid|hydrolysis|enzyme|substrate|membrane|osmosis|water potential|solute|organelle|micrograph|fraction|pellet|DNA|RNA|bond|electron|molecule|mole|acid|base|ion|atom|isotope|configuration|spectrum|dipole|lattice|intermolecular|gas|pH|Kc|Kp|ATP)\b/i.test(text);
 }
 
 function hasResultEvidence(text: string): boolean {
@@ -310,7 +312,7 @@ function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecSubjectI
  * distinct subject operations.
  */
 export interface SubstantiveGateFailure {
-  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
+  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "capability-not-required" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
   detail: string;
 }
 
@@ -335,10 +337,17 @@ export function validateSubstantivePart(
   // (for example “Use the supplied data…” or “Build a causal chain…”).
   // Keep this list explicit rather than treating any imperative as a pass:
   // substantive cells still have to satisfy the demand/result gates below.
-  const hasCommandWord = /\b(?:state|define|describe|explain|calculate|recalculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|write|give|classify|suggest|justify|use|deduce|sketch|solve|estimate|outline|apply|process|summari[sz]e|choose|decide|locate|interpret|carry|reconstruct|combine|check|convert|minimi[sz]e|select|repair|test|reject|name|list|construct|formulate|balance|draw|infer|read|plot|measure|obtain|verify|confirm|discuss|assess|analyse|analyze|track|follow|build|relate|separate|map|translate|recover|weight|rank|distinguish|match|move|sum|treat|report|differentiate)\b/i.test(prompt);
+  const hasCommandWord = /\b(?:state|define|describe|explain|calculate|recalculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|write|give|classify|suggest|justify|use|deduce|sketch|solve|estimate|outline|apply|process|summari[sz]e|choose|decide|locate|interpret|carry|reconstruct|combine|check|convert|minimi[sz]e|maximi[sz]e|optimise|optimize|select|repair|test|reject|name|list|construct|formulate|balance|draw|infer|read|plot|measure|obtain|verify|confirm|discuss|assess|analyse|analyze|track|follow|build|relate|separate|map|translate|recover|weight|rank|distinguish|match|move|sum|treat|report|differentiate|simplify|rationalise|rationalize|integrate|factor|substitute|rearrange|prove)\b/i.test(prompt);
 
   if (meta?.quality !== "substantive") {
     failures.push({ kind: "generic-fallback", detail: "Mark this cell substantive only after replacing fallback/scaffold prose with a reviewed, answerable task." });
+  }
+  if (question.source === "generated" && meta?.quality === "substantive") {
+    const capabilityId = part.capabilityIds?.length === 1 ? part.capabilityIds[0] : undefined;
+    const contract = capabilityId ? capabilityStructureContract(subjectId, capabilityId) : undefined;
+    if (!meta.capabilityEvidence?.structuralContract || !contract) {
+      failures.push({ kind: "capability-evidence", detail: "Generated substantive content needs a capability-specific structural contract; unsupported capabilities remain scaffold/incomplete." });
+    }
   }
   if (!hasConcreteMarkScheme(part.markScheme, subjectId)) {
     failures.push({ kind: "generic-fallback", detail: "The mark scheme does not contain concrete, independently awardable subject evidence." });
@@ -370,6 +379,8 @@ export function validateSubstantivePart(
   for (const detail of validateCapabilityEvidence(meta?.capabilityEvidence, part, text)) {
     failures.push({ kind: "capability-evidence", detail });
   }
+  const capabilityNecessity = capabilityNotRequiredReason(meta?.capabilityEvidence, part);
+  if (capabilityNecessity) failures.push({ kind: "capability-not-required", detail: capabilityNecessity });
   const traceProvenance = meta?.provenance ?? (meta?.expectedResult ? {
     sourceEvidence: meta.evidenceSources ?? [],
     operation: meta.derivation?.[0] ?? "derive",
@@ -396,7 +407,9 @@ export function validateSubstantivePart(
     failures.push({ kind: "generic-fallback", detail: "The solution refers to stated conditions that the standalone prompt does not define." });
   }
 
-  const refersToDataArtifact = /\b(?:graph|table|dataset|data\s+set|diagram|figure|apparatus|spectrum|micrograph|chromatogram|circuit)\b|\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt) ||
+  // Treat apparatus/circuit as data references only when a measurement cue is
+  // attached; a biological apparatus name is not an absent artefact.
+  const refersToDataArtifact = /\b(?:graph|table|dataset|data\s+set|diagram|figure|spectrum|micrograph|chromatogram)\b|\b(?:apparatus|circuit)\b[^.!?]{0,60}\b(?:reading|measure|measurement|voltage|current|resistance|time|data|result|value)\b|\b(?:the|stated|displayed|supplied)\s+data\b/i.test(prompt) ||
     /\b(?:use|from|analyse|analyze|interpret|read)\s+(?:the\s+)?(?:data|graph|table|diagram|figure|spectrum|micrograph)\b/i.test(prompt);
   // “the graph shown below” is still only a reference: unless the prompt
   // carries values, coordinates, table delimiters or an explicit numeric

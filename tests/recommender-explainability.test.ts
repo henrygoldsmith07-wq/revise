@@ -63,7 +63,7 @@ const applicationRow = (topicId: string, mastery: number, attempts = 9): Applica
   evidence: attempts >= 10 ? "reliable" : "emerging",
 });
 
-const exam: ExamDate = { id: "e1", subjectId: "maths", date: "2025-09-01", label: "Paper 1" };
+const exam: ExamDate = { id: "e1", userId: "u", subjectId: "maths", date: "2025-09-01", label: "Paper 1" };
 
 function baseInput(overrides: Partial<Parameters<typeof recommend>[0]> = {}) {
   return {

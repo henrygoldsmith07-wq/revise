@@ -41,44 +41,82 @@ function specPointId(brief: DepthBrief): string {
  * deterministic setups, not generic prose placeholders: every route names a
  * quantity, a representation and enough data for an examiner-style response.
  */
-function concreteSetup(brief: DepthBrief, variant: 0 | 1): string {
+function concreteSetup(brief: DepthBrief, variant: 0 | 1): string | undefined {
   const n = brief.point + 2 + variant;
   if (brief.subject === "maths") {
-    if (brief.topic === "algebra") return `Let f(x) = x² − ${n}x + ${n - 1} for 0 ≤ x ≤ ${n}; use the displayed polynomial and this interval.`;
-    if (brief.topic === "coordinate-geometry") return `On a coordinate grid A(${n}, ${n + 1}) and B(${n + 2}, ${n - 1}) are joined, and the circle has centre (${n}, ${n}) and radius ${n + 1}.`;
-    if (brief.topic === "differentiation") return `For f(x) = x³ − ${n}x² + ${n}x on 0 ≤ x ≤ ${n}, inspect the point x = ${n - 1}.`;
-    if (brief.topic === "integration") return `A velocity is v(t) = ${n}t − ${n - 1} for 0 ≤ t ≤ ${n} seconds; use this function and interval.`;
-    if (brief.topic === "trigonometry") return `In triangle ABC, a = ${n} cm, b = ${n + 1} cm and the included angle C = 60°.`;
-    return `A calibration model is y = ${n}e^(0.2t) + ${n - 1} for t ≥ 0, with all logarithm arguments required to be positive.`;
+    switch (brief.slug) {
+      case "algebra-surds": return `The exact length is r = √${n * 10} /(√${n - 1} + 1), with the index form ${n * 2}^(1/2); rationalise the denominator without using decimals.`;
+      case "algebra-quadratic": return `The projectile height is h(t) = -t² + ${n + 2}t + ${n - 1}, and the parameterised quadratic is ax² + ${n}x + ${n - 1} = 0.`;
+      case "algebra-factor": return `The explicit polynomial is f(x) = x³ - ${n}x² + ${n - 1}x - ${n - 2}, and the candidate root is x = 2, so f(2) is available for a remainder check.`;
+      case "algebra-simultaneous": return `The two equations are y = x² - ${n}x + ${n - 1} and y = ${n - 2}x - ${n - 3}; both x and y coordinates must satisfy the same system.`;
+      case "algebra-inequalities": return `The admissible set is (x - ${n - 2})(x - ${n - 4}) ≤ 0 together with |x - ${n - 3}| < 2; endpoint inclusion must be decided from the symbols.`;
+      case "algebra-transformations": return `The parent curve is f(x) = x³ - ${n}x and the displayed transform is g(x) = |f(x + 2)|; intercepts and reflected branches are visible on the graph.`;
+      case "coordinate-lines-circles": return `On a coordinate grid A(${n}, ${n + 1}) and B(${n + 2}, ${n - 1}) are joined; the circle is (x - ${n})² + (y - ${n})² = ${n + 1}².`;
+      case "coordinate-intersections": return `The line y = ${n - 2}x + ${n - 1} intersects the circle x² + y² = ${n + 2}²; retain both coordinate solutions before checking tangency.`;
+      case "coordinate-area-distance": return `Three plotted points are A(${n}, ${n + 1}), B(${n + 2}, ${n - 1}) and C(${n - 1}, ${n + 3}); the constraint line is ${n - 1}x + ${n}y = ${n + 2}.`;
+      case "differentiate-core-functions": return `The explicit function is f(x) = eˣ + x³ - ${n}x² + ${n}x + ln(x) + sin(x), for x > 0.`;
+      case "differentiate-rules": return `Let u(x) = x² + ${n} and v(x) = eˣ; differentiate the two explicit targets y₁ = u(x)v(x) and y₂ = u(x)/v(x) using the product and quotient rules.`;
+      case "stationary-points": return `The cost curve is f(x) = x³ - ${n}x² + ${n}x on the closed domain ${n - 2} ≤ x ≤ ${n}; classify f′(x) = 0 and compare endpoint values.`;
+      case "integration-standard": return `The velocity function is v(t) = ${n}t - ${n - 1} for ${n - 2} ≤ t ≤ ${n} seconds; displacement is the integral of this explicit function.`;
+      case "integration-definite-area": return `The signed graph is v(t) = t² - ${n}t + ${n - 2} on ${n - 2} ≤ t ≤ ${n}; evaluate the definite integral and split at its roots.`;
+      case "integration-methods": return `The supplied integrals are ∫ x eˣ dx and ∫ 2x/(x² + ${n}) dx; choose integration by parts or substitution and transform every bound.`;
+      case "trig-rules": return `In triangle ABC, a = ${n} cm, b = ${n + 1} cm and the included angle C = 60°; the opposite side c and area are unknown.`;
+      case "trig-identities": return `The identity to prove is sin²θ + cos²θ = 1, followed by cos(2θ) = 1 - 2sin²θ for ${n - 2}° ≤ θ ≤ ${n + 2}°.`;
+      case "exp-inverses": return `The positive model is y = ${n}e^(0.2t) + ${n - 1} for t ≥ 0; inversion requires ln(y - ${n - 1}) and its domain.`;
+      case "log-laws": return `The positive logarithmic expression is log₂(${n}x) - log₂(x - 1) = 3 with x > 1; use product, quotient and change-of-base laws.`;
+      case "exp-equations": return `Two observations of the cooling model y = A e^(-kt) are (t,y)=(${n},${n + 4}) and (${n + 2},${n + 2}); both A and k are positive. The log-linear check uses ln(y) after isolating the positive exponential term.`;
+      default: return undefined;
+    }
   }
   if (brief.subject === "biology") {
-    if (brief.topic === "biological-molecules") {
-      if (brief.slug.includes("condensation")) return `A starch suspension is treated with amylase at pH 7 and 25 °C; reducing-sugar product is ${n}.0 mg before treatment and ${n + 1}.5 mg after treatment.`;
-      if (brief.slug.includes("carbohydrates")) return `A plant sample contains ${n}.0 mg starch before storage and ${n + 1}.5 mg after storage; the tissue is kept at pH 7 and 25 °C.`;
-      if (brief.slug.includes("lipids")) return `A membrane sample contains ${n}.0 mg phospholipid before repair and ${n + 1}.5 mg after repair; temperature is held at 25 °C.`;
-      if (brief.slug.includes("protein")) return `An enzyme extract contains ${n}.0 mg protein before a mutation and ${n + 1}.5 mg after purification; pH is 7 at 25 °C.`;
-      if (brief.slug.includes("dna-rna")) return `A DNA fragment is quantified at ${n}.0 ng before transcription and ${n + 1}.5 ng after processing; the sample is kept at pH 7.`;
-      return `A water sample contains ${n}.0 mg dissolved solute before heating and ${n + 1}.5 mg after cooling; pressure is held constant.`;
+    switch (brief.slug) {
+      case "bio-condensation": return `A starch polymer is treated with amylase at pH 7 and 25 °C; the reducing-sugar assay reads ${n}.0 mg before and ${n + 1}.5 mg after treatment, so bond formation and hydrolysis can be compared.`;
+      case "bio-carbohydrates": return `A plant sample contains glucose monomers, starch and glycogen; starch is ${n}.0 mg before storage and ${n + 1}.5 mg after storage in a controlled tissue sample.`;
+      case "bio-lipids": return `A phospholipid contains glycerol, three fatty-acid tails and a phosphate group; a membrane sample changes from ${n}.0 to ${n + 1}.5 mg at 25 °C.`;
+      case "bio-protein-structure": return `An enzyme is a polypeptide made from amino-acid residues joined by peptide bonds; a mutation changes one codon and the protein is purified at pH 7 and 25 °C.`;
+      case "bio-dna-rna": return `The supplied nucleic-acid sequence is DNA 5′-ATG CCA TAA-3′ and the corresponding RNA uses U; compare the base sequence before and after transcription.`;
+      case "bio-water": return `Two plant cells are separated by a partially permeable membrane; cell A has water potential -${n} kPa and cell B -${n - 2} kPa, with solute concentration and turgor data recorded.`;
+      case "bio-prokaryote-eukaryote": return `An electron micrograph shows a ${n} μm cell with a visible nucleus, mitochondria and a cell surface; a second cell has a nucleoid and plasmids, so organelles are diagnostic.`;
+      case "bio-organelles": return `A secretory cell contains rough ER, Golgi apparatus, vesicles, lysosomes and mitochondria; a peptide hormone is traced from synthesis to exocytosis.`;
+      case "bio-magnification": return `An electron micrograph has a ${n * 2} mm scale-bar image of a chloroplast; the scale bar represents ${n} μm and the microscope magnification is recorded.`;
+      case "bio-organisation": return `The observed hierarchy is organelle → cell → tissue → organ → organ system → organism; a labelled tissue sample links each level to its function.`;
+      case "bio-fractionation": return `A liver homogenate is filtered and centrifuged at ${n * 1000}g and ${n * 5000}g in cold isotonic buffer; nuclei, mitochondria and microsomes form separate pellets.`;
+      case "bio-fluid-mosaic": return `The supplied membrane diagram shows a phospholipid bilayer with integral/peripheral proteins, cholesterol and carbohydrate chains; lateral movement is measured at ${20 + n} °C.`;
+      case "bio-transport": return `An epithelial membrane has a high solute concentration outside and ATP-dependent pumps; a toxin blocks ATP production while a carrier protein and concentration gradient are observed.`;
+      case "bio-permeability": return `In a controlled beetroot-disc membrane experiment, pigment absorbance is ${0.10 + n / 100} and ${0.20 + n / 100} at ${20 + n} °C and ${30 + n} °C, with equal disc area, buffer volume and a solvent control.`;
+      case "bio-osmosis-investigations": return `A visking tube containing ${n}% sucrose is immersed in water across a selectively permeable membrane; mass and liquid height are recorded every ${n} minutes.`;
+      case "bio-replication": return `The DNA template 5′-ATG CCA TAA-3′ is labelled before two cell divisions; complementary nucleotides and the old/new strands are tracked.`;
+      case "bio-protein-synthesis": return `The coding DNA sequence 5′-ATG CCA TAA-3′ is transcribed to mRNA and translated by a ribosome; tRNA anticodons and the stop codon are supplied.`;
+      case "bio-mutations": return `A DNA sequence 5′-ATG CCA TAA-3′ changes by a substitution, insertion or deletion; the codon table and resulting amino-acid sequence are supplied.`;
+      default: return undefined;
     }
-    if (brief.topic === "cell-structure") return `An electron micrograph shows a ${n} μm cell with a visible nucleus and ${n + 1} mitochondria; the scale bar is ${n * 2} μm.`;
-    if (brief.topic === "membranes-transport") return `In a membrane assay, condition A changes by ${n}.0% and condition B by ${n - 1}.0% in ${n * 5} minutes; temperature is held at 25 °C.`;
-    return `A DNA fragment is 5′-ATG CCA TAA-3′ and an enzyme assay records ${n}.0 μmol product in ${n * 2}.0 s before a treatment and ${n + 2}.0 μmol in the same time after it.`;
   }
-  if (brief.topic === "atomic-structure") return `An element has isotopes of mass ${n * 10} and ${n * 10 + 2} with abundances ${n * 10}% and ${100 - n * 10}%; compare Mg2+ and Cl- electron counts explicitly.`;
-  if (brief.topic === "moles") {
-    const concentration = (n / 10 + 0.1).toFixed(3);
-    return `A ${n * 5}.00 cm³ aliquot of a ${concentration} mol dm⁻³ solution reacts 1:1 with ${n * 4}.00 cm³ of standard reagent.`;
+  if (brief.subject === "chemistry") {
+    switch (brief.slug) {
+      case "chem-isotopes": return `The mass spectrum contains isotopes at m/z ${n * 10} and ${n * 10 + 2} with abundances ${n * 10}% and ${100 - n * 10}%; identify proton and neutron counts for the same element.`;
+      case "chem-mass-spectrum": return `A mass spectrum has a molecular-ion peak at m/z ${n * 10}, an M+2 peak and fragment peaks at m/z ${n * 5} and ${n * 5 + 1}; compare abundance ratios with candidate structures.`;
+      case "chem-electron-config": return `An ion has atomic number ${n + 10} and charge 2+; the supplied subshell order is 1s, 2s, 2p, 3s, 3p, 4s, 3d for writing its electron configuration.`;
+      case "chem-ionisation-trends": return `Successive ionisation energies for adjacent elements are tabulated as ${n * 100}, ${n * 200}, ${n * 900} kJ mol⁻¹; the large jump identifies a shell boundary.`;
+      case "chem-trends": return `Period-three atoms Na, Mg, Al and Cl have supplied radii 186, 160, 143 and 99 pm and electronegativities 0.9, 1.2, 1.5 and 3.2; a bond between two named atoms has a measurable dipole.`;
+      case "chem-mole-definitions": return `A ${n}.00 g sample of NaCl (Mᵣ = 58.5) contains particles counted with N_A = 6.022 × 10²³ mol⁻¹; convert mass, moles and entities.`;
+      case "chem-mass-concentration": return `The reaction is NaOH(aq) + HCl(aq) → NaCl(aq) + H₂O(l); ${n * 5}.00 cm³ of ${((n / 10) + 0.1).toFixed(3)} mol dm⁻³ solution is diluted to ${n * 10}.00 cm³.`;
+      case "chem-gas-equation": return `A gas sample has p = ${100 + n * 10} kPa, V = ${(n / 10).toFixed(3)} m³, T = ${280 + n} K and n = ${n / 100} mol; use pV = nRT.`;
+      case "chem-empirical-formula": return `Combustion of a compound gives ${n * 2}.0 g carbon, ${n / 2}.0 g hydrogen and ${n}.0 g oxygen; use atomic masses to obtain the empirical formula.`;
+      case "chem-yield-economy": return `The balanced reaction 2CO(g) + O₂(g) → 2CO₂(g) produces ${n}.0 g CO₂ from ${n + 2}.0 g CO and ${n + 1}.0 g O₂; compare limiting reagent, percentage yield and atom economy.`;
+      case "chem-bond-types": return `The supplied Lewis structures are NH₃ and BF₃ alongside an ionic lattice and a metallic sample; compare electron transfer, sharing and dative donation.`;
+      case "chem-polarity": return `The molecular structures NH₃ and BF₃ have supplied electronegativities and bond-dipole arrows; vector addition determines the net molecular polarity.`;
+      case "chem-intermolecular": return `A table gives boiling points (−161.5, −24.2, 64.7 and 78.4 °C) for CH₄, CH₃Cl, CH₃OH and C₂H₅OH; molecular structures show dispersion, permanent dipole and hydrogen-bonding sites.`;
+      case "chem-vsepr": return `The Lewis structures NH₃ and BF₃ show bonding pairs and lone pairs around the central atom; predict their electron-domain geometry and bond angles.`;
+      case "chem-lattice-properties": return `Ionic NaCl, graphite and molecular iodine are supplied as lattice/particle diagrams; compare melting point and electrical conductivity from mobile charge carriers.`;
+      case "chem-rate": return `A gas-volume table records ${n * 10}.0 cm³ at ${n * 2}.0 s and a second catalyst run; plot volume against time and obtain the initial gradient.`;
+      case "chem-collision": return `A particle-energy diagram gives an activation energy of ${n * 5} kJ mol⁻¹ with and without a catalyst; powder and lumps have measured surface areas.`;
+      case "chem-dynamic-equilibrium": return `For N₂O₄(g) ⇌ 2NO₂(g), a ${n}.00 dm³ vessel contains ${n / 10} mol N₂O₄ and ${n / 20} mol NO₂ at ${300 + n} K; the sealed system is perturbed.`;
+      case "chem-le-chatelier": return `For N₂O₄(g) ⇌ 2NO₂(g), the equilibrium mixture is compressed at ${300 + n} K and its concentrations are tabulated before and after; compare Q and Kc.`;
+      case "chem-bronsted": return `The proton-transfer equation is NH₃(aq) + H₂O(l) ⇌ NH₄⁺(aq) + OH⁻(aq); identify acid, base and conjugate pairs.`;
+      default: return undefined;
+    }
   }
-  if (brief.topic === "bonding") return `The comparison uses NH₃ and BF₃, and a ${n}.0 g sample with specific heat capacity 4.2 J g⁻¹ °C⁻¹ is heated from ${20 + n} °C to ${30 + n} °C at constant pressure.`;
-  if (brief.topic === "kinetics") return `A reaction produces ${n * 10}.0 cm³ gas in ${n * 2}.0 s at 298 K; a second run produces ${n * 12}.0 cm³ in the same time after a catalyst is added.`;
-  if (brief.topic === "equilibria") {
-    const n4 = (n / 10).toFixed(2);
-    const no2 = (n / 20).toFixed(2);
-    return `For N₂O₄(g) ⇌ 2NO₂(g), a ${n}.00 dm³ vessel contains ${n4} mol N₂O₄ and ${no2} mol NO₂ at ${300 + n} K.`;
-  }
-  const acidConcentration = (n / 10 + 0.1).toFixed(3);
-  const baseConcentration = (n / 20 + 0.05).toFixed(3);
-  return `A ${n * 5}.00 cm³ sample of ${acidConcentration} mol dm⁻³ acid reacts with ${n * 4}.00 cm³ of ${baseConcentration} mol dm⁻³ base; the reaction is 1:1.`;
+  return undefined;
 }
 
 function secondaryCapability(brief: DepthBrief): string {
@@ -90,37 +128,77 @@ function secondaryCapability(brief: DepthBrief): string {
     ? "stoichiometric and unit constraints" : "particle-level structure and charge balance";
 }
 
-function concreteResult(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): string {
-  const n = brief.point + 2 + variant;
+function concreteResult(brief: DepthBrief): string {
   if (brief.subject === "maths") {
-    if (brief.topic === "differentiation") return `f′(${n - 1}) = ${3 * (n - 1) ** 2 - 2 * n * (n - 1) + n}`;
-    if (brief.topic === "integration") return `∫₀${n} v(t) dt = ${(n * n * n) / 2 - (n - 1) * n}`;
-    if (brief.topic === "trigonometry") return `the cosine-rule value is c² = ${n}² + ${n + 1}² − 2(${n})(${n + 1})cos 60° = ${n * n + (n + 1) ** 2 - n * (n + 1)}`;
-    if (brief.topic === "coordinate-geometry") return `AB² = 8, so the segment length is 2√2 units`;
-    return `f(${n - 1}) = ${(n - 1) ** 2 - n * (n - 1) + n - 1}`;
+    // Keep the result attached to the symbol/representation actually supplied
+    // by the setup.  The old topic fallback invented f(…) values for height,
+    // tangent and probability questions, which made a perfectly checkable
+    // route look like it used a different function.
+    switch (brief.slug) {
+      case "algebra-surds": return "The expression is reduced to an exact surd form by applying index laws and multiplying by the conjugate.";
+      case "algebra-quadratic": return "The discriminant and roots are obtained from the stated quadratic, retaining only roots in the physical domain.";
+      case "algebra-factor": return "Substitution gives the candidate remainder, and division by the stated linear factor gives the remaining polynomial.";
+      case "algebra-simultaneous": return "The simultaneous equations yield the admissible intersection coordinates after both roots are checked in the original system.";
+      case "algebra-inequalities": return "The sign chart and modulus condition give the admissible interval with the correct endpoint inclusion.";
+      case "algebra-transformations": return "The transformed curve is obtained by mapping the coordinates and reflecting only the required branches in the x-axis.";
+      case "coordinate-lines-circles": return "The radius and perpendicular gradient determine the tangent line through the supplied point.";
+      case "coordinate-intersections": return "Substitution gives both line-circle intersections, and the chord distance follows from those coordinates.";
+      case "coordinate-area-distance": return "The determinant and projection calculations give the triangle area and constrained perpendicular distance.";
+      case "differentiate-core-functions": return "Term-by-term differentiation gives the derivative of the supplied growth or calibration function on its stated domain.";
+      case "differentiate-rules": return "The product and quotient derivatives follow from the supplied component functions, with the quotient denominator squared.";
+      case "stationary-points": return "Solving the derivative equation and checking the second derivative and endpoints classifies the stationary points.";
+      case "integration-standard": return "Reverse differentiation gives an antiderivative of the supplied velocity or signal, including the constant where required.";
+      case "integration-definite-area": return "The signed integral and the split geometric areas follow from the stated roots and bounds.";
+      case "integration-methods": return "The selected substitution or integration-by-parts route produces an equivalent antiderivative with transformed bounds.";
+      case "trig-rules": return "The supplied triangle data determine the required side or area using the appropriate sine, cosine or half-ab-sin-C relation.";
+      case "trig-identities": return "The trigonometric identity is established by an equivalent double-angle form without dividing by a possible zero.";
+      case "exp-inverses": return "Taking logarithms of the positive model gives the inverse relation on its stated domain.";
+      case "log-laws": return "The logarithm laws combine the supplied expression into an equivalent equation while preserving its domain.";
+      case "exp-equations": return "The two supplied observations determine the positive model parameters after checking the original equation.";
+      default: return "The stated mathematical relation gives a checkable result on its supplied domain.";
+    }
   }
   if (brief.subject === "biology") {
-    const entity = brief.slug.includes("condensation") ? "reducing-sugar product from starch hydrolysis"
-      : brief.slug.includes("carbohydrates") ? "starch storage"
-        : brief.slug.includes("lipids") ? "phospholipid membrane"
-          : brief.slug.includes("protein") ? "enzyme protein activity"
-            : brief.slug.includes("dna-rna") ? "DNA/RNA fragment"
-              : brief.topic === "cell-structure" ? "mitochondrial count"
-                : brief.topic === "membranes-transport" ? "membrane transport response"
-                  : "enzyme-assay response";
-    return `the ${entity} measurement changes from ${n}.0 to ${n + 1}.5 units, a difference of 1.5 units; the ${brief.capability} mechanism explains that measured change`;
+    const entity = brief.slug.includes("condensation") ? "reducing-sugar product from the supplied starch assay"
+      : brief.slug.includes("carbohydrates") ? "the supplied carbohydrate storage measurement"
+        : brief.slug.includes("lipids") ? "the supplied phospholipid membrane measurement"
+          : brief.slug.includes("protein") ? "the supplied protein structure or activity observation"
+            : brief.slug.includes("dna-rna") ? "the supplied DNA/RNA sequence comparison"
+              : brief.slug.includes("water") ? "the supplied water-potential direction"
+                : brief.slug.includes("magnification") ? "the supplied image-to-object scale ratio"
+                  : brief.slug.includes("fractionation") ? "the supplied pellet order and organelle fraction"
+                    : brief.slug.includes("osmosis") ? "the supplied osmosis mass or height change"
+                      : brief.slug.includes("replication") || brief.slug.includes("synthesis") || brief.slug.includes("mutations") ? "the supplied DNA sequence and resulting strand or protein change"
+                        : brief.slug.includes("enzyme") ? "the supplied enzyme assay response"
+                          : "the supplied biological structure-function observation";
+    return `${entity} is interpreted from the stated structure, conditions and evidence; the ${brief.capability} mechanism explains the resulting biological conclusion.`;
   }
-  if (brief.topic === "atomic-structure") return `Mg2+ has 10 electrons and Cl- has 18; the weighted isotope mass is ${(n * 10 + 2 - n / 5).toFixed(2)} u after applying each abundance`;
-  if (brief.topic === "moles") return `n = cV = ${((n / 10 + 0.1) * (n * 5) / 1000).toFixed(5)} mol, with the 1:1 ratio giving the same amount of reacting species`;
-  if (brief.topic === "bonding") return `NH₃ is trigonal pyramidal while BF₃ is trigonal planar; the sample gains q = ${((n) * 4.2 * 10).toFixed(1)} J from q = mcΔT, while the particle model explains the polarity difference`;
-  if (brief.topic === "kinetics") return `the initial rate is ${n * 5}.0 cm³ s⁻¹ from ${n * 10}.0 cm³ divided by ${n * 2}.0 s, and the catalyst run is faster`;
-  if (brief.topic === "equilibria") {
-    const n2o4 = ((n / 10) / n).toFixed(3);
-    const no2 = ((n / 20) / n).toFixed(3);
-    const kc = ((Number(no2) ** 2) / Number(n2o4)).toFixed(3);
-    return `Kc = [NO₂]²/[N₂O₄] = (${no2})²/(${n2o4}) = ${kc}; use the concentrations from the ${n}.00 dm³ vessel before comparison`;
+  // Chemistry results stay tied to the species/data in each setup.  Avoid
+  // reusing unrelated Mg/Cl/NH3/heat-capacity examples across every brief;
+  // those invented values were previously reported as provenance errors.
+  switch (brief.slug) {
+    case "chem-isotopes": return "The isotope proton/neutron counts and the abundance-weighted relative atomic mass follow from the supplied mass-spectrum peaks.";
+    case "chem-mass-spectrum": return "The molecular-ion and fragment assignments are supported by the supplied m/z peaks and abundance pattern.";
+    case "chem-electron-config": return "The electron configuration follows the supplied atomic number, charge and s-p-d filling order.";
+    case "chem-ionisation-trends": return "The shell boundary and ionisation-energy exception follow from the supplied successive-energy pattern.";
+    case "chem-trends": return "The radius and electronegativity trend explains the supplied bond-dipole direction and magnitude comparison.";
+    case "chem-mole-definitions": return "The supplied mass and molar mass convert consistently between particles, amount of substance and mass.";
+    case "chem-mass-concentration": return "The supplied mass, concentration and volumes give the amount of solute after the stated dilution.";
+    case "chem-gas-equation": return "Substitution of the supplied SI pressure, volume, temperature and amount into pV = nRT gives a consistent gas result.";
+    case "chem-empirical-formula": return "Dividing the supplied element masses by their relative atomic masses gives the simplest whole-number formula ratio.";
+    case "chem-yield-economy": return "The balanced reaction and supplied masses identify the limiting reagent, theoretical yield and atom economy.";
+    case "chem-bond-types": return "The supplied structures distinguish electron transfer, sharing, dative donation and metallic delocalisation.";
+    case "chem-polarity": return "Vector addition of the supplied bond dipoles gives the molecular polarity for the stated structures.";
+    case "chem-intermolecular": return "The supplied boiling-point data are explained by the relative intermolecular forces and molecular surface area.";
+    case "chem-vsepr": return "Counting the supplied bonding and lone electron pairs gives the molecular shapes and bond angles.";
+    case "chem-lattice-properties": return "The supplied lattice diagrams account for the melting and conductivity comparison through charge mobility and attraction strength.";
+    case "chem-rate": return "The supplied volume-time data give the initial rate from the tangent or earliest linear gradient.";
+    case "chem-collision": return "The supplied surface-area and activation-energy evidence predicts the relative frequency of successful collisions.";
+    case "chem-dynamic-equilibrium": return "The supplied reversible mixture reaches equal forward and reverse rates, and its response follows Le Chatelier's principle.";
+    case "chem-le-chatelier": return "The supplied concentration and temperature changes alter the equilibrium position or constant according to the stated reaction.";
+    case "chem-bronsted": return "The supplied proton-transfer equation identifies each acid, base and conjugate pair from the direction of proton transfer.";
+    default: return "The supplied chemical species and data support a checkable conclusion under the stated conditions.";
   }
-  return `n = cV = ${((n / 10 + 0.1) * (n * 5) / 1000).toFixed(5)} mol for the acid/base reaction, with the 1:1 stoichiometric ratio and units shown`;
 }
 
 /**
@@ -184,8 +262,9 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   const pointId = specPointId(brief);
   const context = variant === 0 ? brief.contextA : brief.contextB;
   const mode = variant === 0 ? brief.modeA : brief.modeB;
-  const setup = concreteSetup(brief, variant);
-  const result = concreteResult(brief, demand, variant);
+  const generatedSetup = concreteSetup(brief, variant);
+  const setup = generatedSetup ?? "No capability-specific setup generator is available for this capability yet.";
+  const result = concreteResult(brief);
   const authoredPlan = brief.demands[demand];
   const plan = authoredPlan ?? materialisedDemandPlan(brief, demand, result);
   const task = withoutExpectedResult(authoredPlan?.task ?? (variant === 0 ? plan.task : plan.task.replace(brief.modeA, brief.modeB)), result);
@@ -212,13 +291,26 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   const scheme = [
     evidence,
     operation,
-    `Reports ${result} and explains its implication for ${brief.capability}.`,
+    demand === "synoptic"
+      ? `Reports ${result} and explains its implication for ${brief.capability} under the ${secondaryCapability(brief)} constraint.`
+      : `Reports ${result} and explains its implication for ${brief.capability}.`,
   ].slice(0, marks);
   const fullPrompt = `${setup} ${context}. ${demandCue} ${task} for ${brief.capability}.`;
-  const fullAnswer = `${evidence} Therefore, ${result}. ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.`;
+  const fullAnswer = `${evidence} Therefore, ${result}. ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}${demand === "synoptic" ? `${operation} ` : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.${demand === "synoptic" ? ` The ${secondaryCapability(brief)} constraint is applied to that conclusion.` : ""}`;
   const baseCapabilityEvidence = capabilityEvidenceFor(brief.subject, brief.topic, capabilityId, fullPrompt, scheme, fullAnswer, operation);
+  const joiningDependency = `The primary ${brief.capability} step and the ${secondaryCapability(brief)} constraint combine to determine the conclusion.`;
   const capabilityEvidence = demand === "synoptic"
-    ? { ...baseCapabilityEvidence, secondaryCapability: secondaryCapability(brief) }
+    ? {
+        ...baseCapabilityEvidence,
+        secondaryCapability: secondaryCapability(brief),
+        joiningDependency,
+        derivation: {
+          ...baseCapabilityEvidence.derivation!,
+          primaryEvidence: [scheme[0] ?? fullAnswer],
+          secondaryEvidence: [scheme[1] ?? scheme.at(-1) ?? fullAnswer],
+          joiningDependency,
+        },
+      }
     : baseCapabilityEvidence;
   const provenance = provenanceFor(fullPrompt, scheme, fullAnswer, operation);
   const promptTarget = task.trim();
@@ -241,12 +333,16 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
       // These rows now contain a concrete, standalone setup and worked result;
       // they are eligible for substantive review. A future authoring helper
       // that cannot instantiate its data must explicitly use `scaffold`.
-      quality: "substantive",
+      // A concrete setup is necessary but not sufficient: without a
+      // capability-specific contract this generated cell remains a scaffold
+      // until an author defines what structure and operation it must test.
+      quality: generatedSetup && capabilityEvidence.structuralContract ? "substantive" : "scaffold",
       promptTarget,
       expectedResult,
       derivation,
       evidenceSources,
       capabilityEvidence,
+      setupFingerprint: capabilityEvidence.setupFingerprint,
       provenance,
     },
     learningClaims: demand === "synoptic" ? [brief.capability, secondaryCapability(brief)] : [brief.capability],

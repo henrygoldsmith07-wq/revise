@@ -1,8 +1,9 @@
 import type { CapabilityNode } from "./capability-graph";
 import {
+  compareTransferStructures,
   transferNoveltyClasses,
 } from "./subject-assessment-semantic";
-export { answerLeakageDetail, classifyNumericalClaims, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
+export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
 import {
   addIssue,
@@ -51,6 +52,7 @@ export type SubjectAssessmentIssueKind =
   | "demand-evidence"
   | "answer-leakage"
   | "capability-evidence"
+  | "capability-not-required"
   | "provenance"
   | "transfer-novelty"
   | "synoptic-evidence"
@@ -165,7 +167,7 @@ function buildRepairQueue(
   };
 
   const priorityForSubjectIssue = (issue: SubjectAssessmentIssue): SubjectRepairPriority => {
-    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "synoptic-evidence") return "missing-authored-demand";
+    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "capability-not-required" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "synoptic-evidence") return "missing-authored-demand";
     if (issue.kind === "not-self-contained") return "not-self-contained";
     if (issue.kind === "solution-substance") return "weak-worked-solution";
     if (issue.kind !== "generic-fallback" && issue.kind !== "demand-evidence") return "correctness-warning";
@@ -326,10 +328,13 @@ export function auditFlagshipSubject(input: {
         !isGeneratedDepthDraft(candidateQuestion));
       if (!baselines.length) continue;
       const transferText = partText(part);
-      const transferClasses = new Set(transferNoveltyClasses(part.prompt));
-      const baselineClasses = new Set(baselines.flatMap(({ part: baseline }) => transferNoveltyClasses(baseline.prompt)));
-      const hasNewClass = [...transferClasses].some((novelty) => !baselineClasses.has(novelty));
-      if (!hasNewClass && baselines.every(({ part: baseline }) => semanticRouteDistance(transferText, partText(baseline)) < 0.35)) {
+      const structuralComparisons = baselines.map(({ part: baseline }) => compareTransferStructures(
+        input.subjectId,
+        baseline.prompt,
+        part.prompt,
+      ));
+      const hasStructuralChange = structuralComparisons.some((comparison) => comparison.meaningful);
+      if (!hasStructuralChange || baselines.every(({ part: baseline }) => semanticRouteDistance(transferText, partText(baseline)) < 0.35)) {
         addIssue(subjectIssues, question, part, "transfer-novelty", "error", "Transfer route is semantically the same as the available application/calculation route; add an unfamiliar representation, hidden constraint or genuinely different operation.");
         invalidParts.add(`${question.id}:${part.id}`);
       }

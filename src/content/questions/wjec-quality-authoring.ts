@@ -1,4 +1,5 @@
 import type { CapabilityEvidenceContract, LearningDemand, LearningProvenance, Question } from "@/domain/types";
+import { capabilityStructureContract, learnerVisibleSetup, setupFingerprintFor } from "@/domain/subject-assessment-semantic";
 import { defineQuestion } from "./authoring";
 import { wjecCapabilityForSpecPoint } from "../wjec-subject-capabilities";
 
@@ -44,7 +45,7 @@ const TOPIC_ENTITIES: Record<string, string[]> = {
  * downgrading it to a topic-level prompt.
  */
 const CAPABILITY_STRUCTURE_HINTS: Array<{ match: RegExp; entities: string[] }> = [
-  { match: /^math\.algebra\.sp-01$/, entities: ["surd", "√", "rationalis"] },
+  { match: /^math\.algebra\.sp-01$/, entities: ["surd", "√", "rationalise"] },
   { match: /^math\.algebra\.sp-02$/, entities: ["quadratic", "discriminant", "root"] },
   { match: /^math\.algebra\.sp-03$/, entities: ["polynomial", "factor theorem", "remainder", "root"] },
   { match: /^math\.algebra\.sp-04$/, entities: ["simultaneous", "equation"] },
@@ -93,21 +94,62 @@ const CAPABILITY_STRUCTURE_HINTS: Array<{ match: RegExp; entities: string[] }> =
 function hasPhrase(text: string, phrase: string): boolean {
   const escaped = phrase.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (!escaped) return false;
-  if (/[^A-Za-z\s]/.test(phrase)) {
-    const compactText = text.toLowerCase().replace(/\s+/g, "");
+  const normalised = text.toLowerCase().replace(/[−–—]/g, "-").replace(/\s+/g, " ");
+  const wordPhrase = /^[a-z0-9]+(?:[ -][a-z0-9]+)*$/i.test(phrase.trim());
+  if (!wordPhrase) {
+    const compactText = normalised.replace(/\s+/g, "");
     const compactPhrase = phrase.toLowerCase().replace(/\s+/g, "");
     if (compactText.includes(compactPhrase)) return true;
   }
-  if (new RegExp(`(?:^|[^a-z])${escaped}(?:$|[^a-z])`, "i").test(text)) return true;
+  const suffix = /\s/.test(phrase.trim()) ? "" : "(?:s|es|ed|d)?";
+  if (new RegExp(`(?:^|[^a-z0-9])${escaped}${suffix}(?:$|[^a-z0-9])`, "i").test(normalised)) return true;
   if (!/\s/.test(phrase) && phrase.trim().length >= 5) {
-    const stem = phrase.trim().slice(0, Math.max(5, phrase.trim().length - 2)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(?:^|[^a-z])${stem}[a-z]*`, "i").test(text);
+    // A small explicit inflection set covers common authoring forms without
+    // allowing a substring such as “optim” to match “optimum”.
+    const word = phrase.trim().toLowerCase();
+    const variants = word.endsWith("e") ? [word, `${word}d`, `${word}s`, `${word.slice(0, -1)}ing`] : [word, `${word}s`, `${word}ed`, `${word}ing`];
+    return variants.some((variant) => new RegExp(`(?:^|[^a-z0-9])${variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^a-z0-9])`, "i").test(normalised));
   }
   return false;
 }
 
 function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function capabilityOperationFor(
+  prompt: string,
+  observed: readonly string[],
+  explicitCommand: string | undefined,
+  contract: ReturnType<typeof capabilityStructureContract>,
+): string {
+  const candidates = uniqueStrings([...observed, ...(explicitCommand ? [explicitCommand] : [])]);
+  const aliases: Record<string, readonly string[]> = {
+    differentiate: ["differentiate", "differentiated", "differentiate", "derivative", "differentiable", "gradient", "tangent", "normal", "stationary", "rate"],
+    integrate: ["integrate", "integrated", "integral", "antiderivative", "area", "displacement", "evaluate", "evaluating"],
+    calculate: ["calculate", "compute", "find", "determine", "obtain", "convert", "evaluate", "report", "show", "measure", "measured", "distance", "area", "combine", "combined", "minimise", "minimize", "maximise", "maximize", "optimise", "optimize"],
+    explain: ["explain", "why", "because", "justify", "describe", "state", "define", "identify", "predict", "compare", "relate", "apply", "use"],
+    compare: ["compare", "contrast", "rank", "classify", "distinguish"],
+    solve: ["solve", "find", "determine", "obtain", "calculate"],
+    simplify: ["simplify", "rationalise", "rationalize", "prove", "show"],
+    select: ["select", "choose", "decide", "identify"],
+    predict: ["predict", "infer", "suggest"],
+    measure: ["measure", "read", "estimate", "plot", "calculate"],
+    control: ["control", "hold", "keep", "replicate", "randomise", "randomize"],
+    state: ["state", "define", "describe", "name", "list"],
+    write: ["write", "construct", "draw", "show"],
+    balance: ["balance", "oxidise", "oxidize", "reduce", "half-equation"],
+    probability: ["probability", "conditional", "bayes", "event", "sample space", "without replacement"],
+    stoichiometry: ["stoichiometry", "stoichiometric", "mole ratio", "titration", "titre", "limiting reagent", "yield", "purity"],
+  };
+  const visible = (operation: string): boolean => observed.includes(operation.toLowerCase()) ||
+    (aliases[operation.toLowerCase()] ?? [operation]).some((alias) => hasPhrase(prompt, alias));
+  for (const required of contract?.requiredOperations ?? []) if (visible(required)) return required;
+  for (const group of contract?.requiredOperationGroups ?? []) {
+    const permitted = group.find((operation) => visible(operation));
+    if (permitted) return permitted;
+  }
+  return candidates[0] ?? contract?.requiredOperations?.[0] ?? "derive";
 }
 
 /** Keep the learner-facing target separate from setup/context prose. */
@@ -131,51 +173,65 @@ export function capabilityEvidenceFor(
   answer: string,
   reasoning: string,
 ): CapabilityEvidenceContract {
-  const promptText = prompt;
-  const workedText = `${scheme.join("\n")}\n${answer}`;
+  const promptText = learnerVisibleSetup(prompt);
   const topicCandidates = TOPIC_ENTITIES[topic] ?? [];
   // The setup, rather than the model answer, must carry the concrete object
   // being assessed.  Looking at the answer first made a generic prompt appear
   // capability-specific simply because the worked solution named the topic.
   const structureHints = CAPABILITY_STRUCTURE_HINTS.find(({ match }) => match.test(capabilityId))?.entities ?? [];
   const hintedEntities = structureHints.filter((candidate) => hasPhrase(promptText, candidate));
-  const reasoningHints = structureHints.filter((candidate) => hasPhrase(reasoning, candidate));
   const topicEntities = topicCandidates.filter((candidate) => hasPhrase(promptText, candidate));
+  const structuralContract = capabilityStructureContract(`wjec-alevel-${subject}`, capabilityId);
+  const setupFingerprint = setupFingerprintFor(`wjec-alevel-${subject}`, promptText);
   const entities = uniqueStrings([
     ...hintedEntities.slice(0, 3),
     ...topicEntities.slice(0, 3),
-    // If the authored reasoning names a more precise structure than the
-    // prompt, keep that requirement so the audit rejects an answer-key-only
-    // claim instead of treating the route as topic-level evidence.
-    ...(hintedEntities.length || topicEntities.length ? [] : reasoningHints.slice(0, 1)),
   ]);
   if (!entities.length) {
     // Fall back to a concrete authored representation rather than a topic
-    // label.  If no named entity exists the audit will keep the contract
-    // unresolved until an author adds one.
+    // label. If no structure is present, retain the contract's first
+    // required structure so the audit fails loudly and the item becomes a
+    // repair task instead of passing on answer-key prose.
     const representation = promptText.match(/\b[A-Za-z][A-Za-z0-9′']*\s*(?:\([^)]*\))?\s*(?:=|≈|≤|≥|→|⟶)\s*[^.;\n]{1,50}/)?.[0]?.trim();
     const subjectEntity = promptText.match(/\b(?:function|equation|gradient|probability|enzyme|substrate|membrane|cell|DNA|RNA|molecule|mole|solution|reaction|equilibrium|acid|base|ion|electron|bond|rate|data|sample|species|vector|triangle|quadratic|root|integral|derivative|tangent|circle|sequence|gas|pressure|volume|concentration|titre|titration)\w*\b/i)?.[0];
-    entities.push(representation ?? subjectEntity ?? topic.replace(/[-_]/g, " "));
+    entities.push(representation ?? subjectEntity ?? structuralContract?.requiredStructures?.[0] ?? "concrete setup structure");
   }
   // Prefer commands and transformations that are actually visible in the
   // prompt.  A route operation copied only into the answer is not evidence
   // that the setup asked for that capability.
-  const promptOperations = uniqueStrings(OPERATION_WORDS.filter((operation) => hasPhrase(promptText, operation)));
-  const workedOperations = uniqueStrings(OPERATION_WORDS.filter((operation) => hasPhrase(workedText, operation)));
-  // Operations are sourced from the student-facing setup first. Including
-  // every verb in a model answer made a generic prompt look capability-aware
-  // after the fact; a worked route can add detail but cannot invent the task.
-  const operations = uniqueStrings(promptOperations.length ? promptOperations : workedOperations);
+  // Keep only canonical operations that are observable in the setup plus an
+  // explicit command word.  Treating every topic noun (“factor”, “different”
+  // or “volume”) as a required operation made the contract self-contradictory
+  // and allowed labels to stand in for actual work.
+  const setupOperations = setupFingerprint.operations;
+  const explicitCommands = [...promptText.matchAll(/\b(?:state|define|describe|explain|calculate|recalculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|write|give|classify|suggest|justify|use|deduce|sketch|solve|estimate|outline|apply|choose|decide|interpret|reconstruct|combine|check|convert|minimi[sz]e|maximi[sz]e|optimise|optimize|select|repair|test|reject|name|list|construct|formulate|balance|draw|infer|read|plot|measure|obtain|verify|confirm|discuss|assess|analyse|analyze|track|follow|build|relate|separate|map|translate|recover|weight|rank|distinguish|match|report|differentiate|simplify|rationalise|rationalize|integrate|factor|substitute|rearrange|prove)\b/gi)];
+  const explicitCommand = explicitCommands.at(-1)?.[0];
+  const promptOperations = uniqueStrings([...setupOperations, ...(explicitCommand ? [explicitCommand] : [])]);
+  // Operations are sourced from the learner-visible task only. A worked
+  // answer can add derivation detail but cannot invent the capability being
+  // assessed.
+  const operations = uniqueStrings(promptOperations);
   if (!operations.length) {
     const command = promptText.match(/\b(?:state|define|describe|explain|calculate|find|determine|predict|compare|evaluate|identify|correct|show|derive|solve|apply|interpret|measure|report|justify|use|check|balance|classify|estimate|select|infer|obtain|test|reject)\w*\b/i)?.[0];
-    operations.push(command ?? `${subject} operation`);
+    operations.push(command ?? structuralContract?.requiredOperations?.[0] ?? `${subject} operation`);
   }
   const relations = uniqueStrings((promptText.match(/(?:[A-Za-z][A-Za-z0-9′']*\s*(?:=|≈|≤|≥|→|⟶)\s*[^.;\n]{1,70})/g) ?? []).slice(0, 2));
+  const capabilityOperation = capabilityOperationFor(promptText, setupOperations, explicitCommand, structuralContract) ||
+    operations[0] || structuralContract?.requiredOperations?.[0] || (reasoning.trim() || `${subject} operation`);
+  const derivation = {
+    setupStructures: setupFingerprint.structures,
+    capabilityOperation,
+    intermediateResults: scheme.slice(0, 12),
+    finalResult: answer.trim() || "authored result",
+  };
   return {
     capabilityId,
     requiredEntities: entities,
     requiredOperations: operations.slice(0, 4),
     ...(relations.length ? { requiredRelations: relations } : {}),
+    ...(structuralContract ? { structuralContract } : {}),
+    setupFingerprint,
+    derivation,
   };
 }
 
@@ -211,7 +267,11 @@ function sourceEvidenceFromPrompt(prompt: string): string[] {
   const equations = evidenceSegments(prompt)
     .filter((segment) => /(?:\b[A-Za-z][A-Za-z0-9′']*\s*(?:\([^)]*\))?\s*=|P\s*\([^)]*\)\s*=)/.test(segment))
     .map((segment) => segment.trim());
-  const quantities = prompt.match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[×x]\s*10\s*(?:\^|\*\*)?\s*[+-]?\d+)?\s*(?:[A-Za-zμΩ%°][A-Za-z0-9μΩ°⁻¹⁻²³\- ]{0,14})?/g) ?? [];
+  // Record numeric atoms rather than a number plus an open-ended “unit”
+  // suffix.  A permissive suffix consumed the next prose word (“6 non-owner”
+  // or “1 is a local mini”), so the source was no longer literally present
+  // and otherwise sound items looked like invented provenance.
+  const quantities = numericLiterals(prompt);
   const named = prompt.match(/\b(?:[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)+|DNA|RNA|ATP|Kc|Kp|pH|NH₃|BF₃|N₂O₄|NO₂)\b/g) ?? [];
   return uniqueStrings([...equations, ...quantities.filter((value) => /\d/.test(value)), ...named]).slice(0, 8);
 }
@@ -292,8 +352,22 @@ export function qualityItem(subject: "maths" | "biology" | "chemistry", topic: s
   const likelyScaffold = fallbackMatch && !genericInstantiated;
   const capabilityId = wjecCapabilityForSpecPoint(specPoint)!;
   const baseCapabilityEvidence = capabilityEvidenceFor(subject, topic, capabilityId, prompt, scheme, answer, reasoning);
+  const joiningDependency = `The primary ${capabilityId} step and the ${family} constraint combine to determine the conclusion.`;
   const capabilityEvidence = demand === "synoptic"
-    ? { ...baseCapabilityEvidence, secondaryCapability: family }
+    ? {
+        ...baseCapabilityEvidence,
+        secondaryCapability: family,
+        joiningDependency,
+        derivation: {
+          ...baseCapabilityEvidence.derivation!,
+          // Keep the two attributable steps separate. The final mark-scheme
+          // point normally states the combined implication, so it is the
+          // strongest secondary/conclusion anchor for the removal test.
+          primaryEvidence: [scheme[0] ?? answer],
+          secondaryEvidence: [scheme[1] ?? scheme.at(-1) ?? answer],
+          joiningDependency,
+        },
+      }
     : baseCapabilityEvidence;
   const provenance = provenanceFor(prompt, scheme, answer, reasoning);
   const promptTarget = promptTargetFor(prompt);
@@ -305,12 +379,16 @@ export function qualityItem(subject: "maths" | "biology" | "chemistry", topic: s
     contextId: `${subject}:${slug}`,
     demand,
     reasoningMoves: [reasoning],
-    quality: likelyScaffold ? "scaffold" as const : "substantive" as const,
+    // A generated cell is only substantive when its capability has an
+    // explicit structural contract.  Unknown capabilities stay in the
+    // authoring queue instead of gaining depth credit from a generic prompt.
+    quality: likelyScaffold || !baseCapabilityEvidence.structuralContract ? "scaffold" as const : "substantive" as const,
     promptTarget,
     expectedResult,
     derivation,
     evidenceSources,
     capabilityEvidence,
+    setupFingerprint: capabilityEvidence.setupFingerprint,
     provenance,
   };
   return defineQuestion({ slug: `wjec-quality-${subject}-${slug}`, subjectId, topics: [topic], stem: prompt,

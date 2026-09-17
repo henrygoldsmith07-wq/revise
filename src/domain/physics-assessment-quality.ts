@@ -260,10 +260,6 @@ function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
 
-function questionPartsForPoint(question: Question, specPointId: Id): QuestionPart[] {
-  return question.parts.filter((part) => part.specPointIds?.includes(specPointId));
-}
-
 function partLearningMetadata(question: Question, part: QuestionPart) {
   return part.learning ?? (question.learning ? {
     familyId: question.learning.familyId,
@@ -400,6 +396,12 @@ export function auditPhysicsAssessmentQuality(input: {
   const pointIds = new Set(points.map(({ point }) => point.id));
   const nodeById = new Map(physicsNodes.map((node) => [node.id, node]));
   const trustedQuestion = input.trustedQuestion ?? (() => false);
+  // Index mapped parts once.  The coverage passes previously rescanned every
+  // question for every specification point (twice), which made the bank-wide
+  // audit increasingly sensitive to CPU contention as the flagship packs grew.
+  // Preserve the existing multi-point behavior by indexing a part under each
+  // specification point it names.
+  const partsByPoint = new Map<Id, Array<{ question: Question; part: QuestionPart }>>();
   const issues: PhysicsQualityIssue[] = [];
   const promptByDemand = new Map<string, Map<string, Id>>();
   /** Per statement+demand cell: every stored prompt keyed by question:part id. */
@@ -427,6 +429,11 @@ export function auditPhysicsAssessmentQuality(input: {
     }
     for (const part of question.parts) {
       const specPointIds = part.specPointIds ?? [];
+      for (const specPointId of specPointIds) {
+        const rows = partsByPoint.get(specPointId) ?? [];
+        rows.push({ question, part });
+        partsByPoint.set(specPointId, rows);
+      }
       if (specPointIds.length === 0) {
         addIssue(question, part, "missing-spec-point", "Map this part to exactly one WJEC specification statement.");
       }
@@ -508,16 +515,14 @@ export function auditPhysicsAssessmentQuality(input: {
   }
 
   const capabilityCoverage = points.map(({ topic, point }): PhysicsCapabilityCoverage => {
-    const mappedQuestions = physicsQuestions.flatMap((question) => questionPartsForPoint(question, point.id)
-      .map((part) => ({ question, part })));
+    const mappedQuestions = partsByPoint.get(point.id) ?? [];
     const capabilityIds = unique(mappedQuestions.flatMap(({ part }) => part.capabilityIds ?? []));
     const demands = demandCoverage(mappedQuestions, strictSubstantive, input.substantivePart);
     return { topicId: topic.id, specPointId: point.id, capabilityIds, demands,
       complete: demands.every((demand) => demand.complete && demand.distinct) };
   });
   const capabilityCoverageByCapability = points.flatMap(({ topic, point }): PhysicsCapabilityDemandCoverage[] => {
-    const mappedQuestions = physicsQuestions.flatMap((question) => questionPartsForPoint(question, point.id)
-      .map((part) => ({ question, part })));
+    const mappedQuestions = partsByPoint.get(point.id) ?? [];
     // Include every graph capability attached to the statement even when no
     // question has been authored yet; otherwise an empty skill disappears
     // from the authoring queue and can be mistaken for complete coverage.
