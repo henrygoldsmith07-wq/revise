@@ -1131,6 +1131,10 @@ export interface RecommendationFactors {
   fatigue?: number;
   /** Present only when technique steering applied (promote >1, demote <1). */
   techniqueSteer?: number;
+  /** 0–1, low when application (non-retrieval) evidence is weak relative to recall. Present only when an application gap exists. */
+  applicationGap?: number;
+  /** 0–1 retrieval strength (FSRS-derived). Present only when mastery evidence is separated. */
+  recallMastery?: number;
 }
 
 export interface RecommendationExplanation {
@@ -1148,6 +1152,8 @@ export interface RecommendationExplanation {
   paperLabel: string | null;
   /** The five factors that produced the score. */
   factors: RecommendationFactors;
+  /** Evidence-cited narrative: "Do X because Y", built only from computed numbers. Null when no numbers exist to cite. */
+  narrative?: string | null;
   /** How many cards/mistakes contributed, when relevant. */
   count?: number;
   overdueCount?: number;

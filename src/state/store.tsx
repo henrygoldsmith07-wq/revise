@@ -1026,8 +1026,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       techniqueByTopic: techniqueReports.byTopic,
       paperOutcomes: paperOutcomeLog,
       activeMinutes: currentActiveMinutes(),
+      recallMastery,
+      applicationMastery,
     });
-  }, [snapshot, mastery, topics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog]);
+  }, [snapshot, mastery, topics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog, recallMastery, applicationMastery]);
 
   // Unlike `recommendations`, this is not a list of competing activity
   // queues. It is one optimiser pass over the same snapshot, then one

@@ -4,6 +4,13 @@ import Link from "next/link";
 import { getSubject } from "@/domain/curriculum";
 import { useStore } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
+import {
+  ApplicationMasteryCard,
+  MarksLostByCause,
+  MasteryUncertaintyCard,
+  RecallMasteryCard,
+  RecurringMisconceptions,
+} from "@/components/AssessmentPanels";
 import { ButtonLink, Panel } from "@/components/ui";
 
 export default function ReadinessPage() {
@@ -22,6 +29,22 @@ export default function ReadinessPage() {
       </header>
 
       <ExamReadinessCard />
+
+      <section aria-labelledby="evidence-split-heading" className="space-y-4">
+        <h2 id="evidence-split-heading" className="text-base font-semibold text-ink">The evidence behind the score</h2>
+        <p className="text-sm text-ink3 max-w-3xl">
+          Recall and application are measured separately: remembering a fact is not the same as using it for marks. These panels show which of the two is holding the readiness score back.
+        </p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <RecallMasteryCard />
+          <ApplicationMasteryCard />
+        </div>
+        <MarksLostByCause />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <RecurringMisconceptions />
+          <MasteryUncertaintyCard />
+        </div>
+      </section>
 
       <Panel className="border-accent">
         <div className="flex flex-wrap items-center justify-between gap-3">

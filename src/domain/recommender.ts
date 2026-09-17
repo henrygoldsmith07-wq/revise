@@ -1,6 +1,9 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
+import { buildRecommendationNarrative } from "./explainability";
+import type { RecallMasteryRow } from "./recall-mastery";
+import type { ApplicationMasteryRow } from "./application-mastery";
 import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
 import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
 import { paperOutcomeGainMultiplier } from "./paper-outcome";
@@ -83,6 +86,10 @@ export interface RecommendInput {
   enableExploration?: boolean;
   /** RNG for exploration jitter — inject for deterministic tests (default Math.random). */
   rng?: () => number;
+  /** Recall-only evidence (FSRS strength) per topic; separates "knows it" from "can use it". */
+  recallMastery?: RecallMasteryRow[];
+  /** Application evidence (marked exam answers, recall excluded) per topic. */
+  applicationMastery?: ApplicationMasteryRow[];
 }
 
 /** Days until the exam, or null when no exam is set for that subject. */
@@ -110,6 +117,30 @@ function daysBetween(a: IsoDate, b: IsoDate): number {
 function weaknessFactor(mastery: number): number {
   // 0 mastery → 1.8, 0.5 → 1.4, 1.0 → 1.0
   return 1 + (1 - clamp01(mastery)) * 0.8;
+}
+
+/**
+ * Recall-vs-application separation. `weaknessFactor` reads the blended topic
+ * mastery, which cannot distinguish "recalls the definitions" from "applies
+ * them under exam conditions". When application evidence exists and is
+ * materially weaker than recall evidence, this returns a multiplicative boost
+ * (bounded 1.0–1.25) so application-poor topics rank higher — and, crucially,
+ * the narrative can name the split instead of hiding inside a blend. A gap is
+ * only claimed with real evidence on both sides; unknown never counts as weak.
+ */
+export function applicationGapFactor(
+  recall: RecallMasteryRow | undefined,
+  application: ApplicationMasteryRow | undefined,
+): { factor: number; gap: number } {
+  // No application evidence yet → unknown, not weak. No recall evidence →
+  // nothing to compare against, so the blended weakness already applies.
+  if (!application || application.evidence === "unmeasured") return { factor: 1, gap: 0 };
+  const recallScore = recall && recall.reviews >= 3 ? clamp01(recall.mastery) : null;
+  if (recallScore == null) return { factor: 1, gap: 0 };
+  const gap = clamp01(recallScore - clamp01(application.mastery));
+  // A 0.3+ split is the “recalls it, cannot use it” signature worth acting on.
+  const factor = 1 + Math.min(0.25, Math.max(0, gap - 0.15) * 0.6);
+  return { factor: Math.round(factor * 100) / 100, gap: Math.round(gap * 100) / 100 };
 }
 
 function forgettingFactor(retention: number | null, daysSince: number | null): number {
@@ -249,6 +280,8 @@ export function recommend(input: RecommendInput): Recommendation[] {
   const block = input.sessionLengthMinutes;
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
   const masteryById = new Map(input.mastery.map((m) => [m.topicId, m]));
+  const recallByTopic = new Map((input.recallMastery ?? []).map((r) => [r.topicId, r] as const));
+  const applicationByTopic = new Map((input.applicationMastery ?? []).map((r) => [r.topicId, r] as const));
   const out: Recommendation[] = [];
 
   const urgencyBySubject = new Map(
@@ -327,7 +360,18 @@ export function recommend(input: RecommendInput): Recommendation[] {
         overdue > 0
           ? `${cards.length} cards due, ${overdue} already overdue — recall them before they fade further.`
           : `${cards.length} cards due today. Clearing them keeps every topic warm.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "flashcards",
+          factors,
+          lastEvidencePercent: null,
+          daysSinceRetrieval: null,
+          daysToExam: daysTo,
+          recoverableMarks: examGain,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -384,7 +428,18 @@ export function recommend(input: RecommendInput): Recommendation[] {
       minutes,
       score: score,
       reason: `${list.length} mistakes are still unrepaired. Re-answering them is the highest-value 15 minutes you have.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "mistakes",
+          factors,
+          lastEvidencePercent: explanation.lastEvidencePercent,
+          daysSinceRetrieval: explanation.daysSinceRetrieval,
+          daysToExam: daysTo,
+          recoverableMarks: recoverable,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -404,11 +459,16 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const weak = weaknessFactor(weakRow.mastery);
     const forgetting = forgettingFactor(weakRow.retention, daysSinceFor(weakRow));
     const unc = uncertaintyFactor(weakRow.cardsTotal, weakRow.attempts);
+    const { factor: appGap, gap: appGapValue } = applicationGapFactor(recallByTopic.get(weakRow.topicId), applicationByTopic.get(weakRow.topicId));
     const factors: RecommendationFactors = { examGain: Math.round(examGain * 10) / 10, urgency: u, weakness: weak, forgetting, uncertainty: unc };
+    if (appGapValue >= 0.3) {
+      factors.applicationGap = appGapValue;
+      factors.recallMastery = Math.round(clamp01(recallByTopic.get(weakRow.topicId)!.mastery) * 100) / 100;
+    }
     const daysTo = daysToExam(input.exams, weakRow.subjectId, today);
     const prox = proximityFor(daysTo, examGain, minutes);
     const adaptive = adaptiveDifficultyFactor(topic, weakRow, input.adaptiveDifficultyOffset?.get(weakRow.topicId));
-    const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive;
+    const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive * appGap;
     const label = paperLabelFor(input.exams, weakRow.subjectId, today);
     const mphRounded = mph != null ? Math.round(mph * 10) / 10 : null;
     const explanation: RecommendationExplanation = {
@@ -431,7 +491,19 @@ export function recommend(input: RecommendInput): Recommendation[] {
       minutes,
       score: score * 1.05, // practice is the differentiated activity; slight prior
       reason,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "practice",
+          topicTitle: topic.title,
+          factors,
+          lastEvidencePercent: explanation.lastEvidencePercent,
+          daysSinceRetrieval: explanation.daysSinceRetrieval,
+          daysToExam: daysTo,
+          recoverableMarks: recoverable,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -470,7 +542,19 @@ export function recommend(input: RecommendInput): Recommendation[] {
       minutes,
       score,
       reason: `You have not started ${topic.title} yet. A 20-minute first pass turns a blank into something revisable.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "learn",
+          topicTitle: topic.title,
+          factors,
+          lastEvidencePercent: null,
+          daysSinceRetrieval: null,
+          daysToExam: daysTo,
+          recoverableMarks: examGain,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -520,7 +604,18 @@ export function recommend(input: RecommendInput): Recommendation[] {
         days != null && days <= 21
           ? `${days} days to the exam — full papers under timed conditions are what is left to gain.`
           : `You are solid across this subject. A timed paper tests whether it holds up under exam pressure.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "paper",
+          factors,
+          lastEvidencePercent: explanation.lastEvidencePercent,
+          daysSinceRetrieval: null,
+          daysToExam: days,
+          recoverableMarks: examGain,
+          minutes,
+        }),
+      },
       factors,
     });
   }

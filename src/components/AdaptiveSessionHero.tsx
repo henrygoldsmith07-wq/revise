@@ -32,6 +32,10 @@ export function AdaptiveSessionHero({
         {subject?.name ?? session.subjectId} — {session.topicTitle}
       </p>
 
+      {session.reason ? (
+        <p className="text-sm text-ink2 mt-2 leading-6">{session.reason}</p>
+      ) : null}
+
       {session.stoppedEarly ? (
         <p className="text-xs text-ink2 mt-1" role="note">{session.stoppedEarly.reason}</p>
       ) : null}

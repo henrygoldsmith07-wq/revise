@@ -128,6 +128,9 @@ function RecommendationWhy({
 
   const content = (
     <>
+      {explanation.narrative ? (
+        <p className="text-sm text-ink2 leading-6 font-medium">{explanation.narrative}</p>
+      ) : null}
       <p className="text-sm text-ink2 leading-6">{copy.summary}</p>
       <ul className="mt-3 space-y-2 text-xs text-ink3">
         {evidence.slice(0, 3).map((item) => (

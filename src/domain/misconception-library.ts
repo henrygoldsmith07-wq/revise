@@ -59,6 +59,13 @@ function coverage(pattern: string, evidence: string): number {
  * library. The `example` field carries the concrete wrong-answer symptom and
  * the `statement` carries the wrong belief, so the strongest of those four
  * comparisons is the score. Returns the best entry at or above 0.5, else null.
+ *
+ * Omission guard: a misconception is a visible wrong belief, not merely a
+ * missed mark. The missed scheme point can echo an entry on its own — for
+ * example a "do not accept: sign unchanged" warning, or a scheme point that
+ * paraphrases the common error — so a match may never rest on the missed
+ * point more than on the answer itself. A blank or vague answer therefore
+ * never produces a diagnosis; it is classified as a plain omission instead.
  */
 export function matchMisconception(
   entries: readonly Misconception[],
@@ -67,12 +74,16 @@ export function matchMisconception(
 ): MisconceptionMatch | null {
   let best: MisconceptionMatch | null = null;
   for (const entry of entries) {
-    const score = Math.max(
-      coverage(entry.example, missedPoint),
-      coverage(entry.statement, missedPoint),
-      coverage(entry.example, studentAnswer),
-      coverage(entry.statement, studentAnswer),
-    );
+    const pointCoverage = Math.max(coverage(entry.example, missedPoint), coverage(entry.statement, missedPoint));
+    const answerCoverage = Math.max(coverage(entry.example, studentAnswer), coverage(entry.statement, studentAnswer));
+    // Nothing in the student's own words carries the belief: omission, not
+    // misconception. Diagnosing here would invent a wrong belief from silence.
+    if (answerCoverage <= 0) continue;
+    // The diagnosis must be carried by the answer, not by the missed point.
+    // The small tolerance absorbs tokenisation noise between near-equal
+    // coverage; beyond it the evidence points at a plain omission instead.
+    if (answerCoverage < pointCoverage - 0.05) continue;
+    const score = Math.max(answerCoverage, pointCoverage);
     if (!best || score > best.score) best = { entry, score };
   }
   return best && best.score >= 0.5 ? best : null;
