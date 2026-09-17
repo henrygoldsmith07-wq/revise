@@ -470,6 +470,102 @@ describe("subject-specific correctness checks", () => {
     expect(subjectIssues(question).some((issue) => issue.kind === "capability-evidence" && /weaker than the canonical/i.test(issue.detail))).toBe(true);
   });
 
+  it("rejects a capability that is present in setup but unnecessary to the worked route", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "capability-not-required", "calculation",
+      "The supplied expression is r = √8. Simplify the unrelated sum 2 + 2 and report its exact form.",
+      "Simplify the unrelated sum: 2 + 2 = 4.",
+    );
+    const part = question.parts[0]!;
+    part.specPointIds = ["wjec-alevel-maths.algebra.sp-01"];
+    part.capabilityIds = ["math.algebra.sp-01"];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.algebra.sp-01",
+        requiredEntities: [],
+        requiredOperations: ["simplify"],
+        structuralContract: capabilityStructureContract("wjec-alevel-maths", "math.algebra.sp-01"),
+        setupFingerprint: setupFingerprintFor("wjec-alevel-maths", part.prompt),
+        derivation: {
+          setupStructures: ["radical-expression"],
+          capabilityOperation: "simplify",
+          intermediateResults: ["2 + 2 = 4"],
+          finalResult: "2 + 2 = 4",
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-not-required" && issue.severity === "error")).toBe(true);
+  });
+
+  it("does not reject a route that operates on the supplied capability structure", () => {
+    const question = substantiveFixture(
+      "wjec-alevel-maths", "capability-required", "calculation",
+      "For the supplied expression r = √8, simplify r by rationalising the denominator and report its exact form.",
+      "Use the conjugate and index laws: √8 = 2√2, so the exact form is 2√2.",
+    );
+    const part = question.parts[0]!;
+    part.specPointIds = ["wjec-alevel-maths.algebra.sp-01"];
+    part.capabilityIds = ["math.algebra.sp-01"];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId: "math.algebra.sp-01",
+        requiredEntities: [],
+        requiredOperations: ["simplify"],
+        structuralContract: capabilityStructureContract("wjec-alevel-maths", "math.algebra.sp-01"),
+        setupFingerprint: setupFingerprintFor("wjec-alevel-maths", part.prompt),
+        derivation: {
+          setupStructures: ["radical-expression"],
+          capabilityOperation: "simplify",
+          intermediateResults: ["√8 = 2√2"],
+          finalResult: "the exact form is 2√2",
+        },
+      },
+    };
+    const issues = subjectIssues(question);
+    expect(issues.some((issue) => issue.kind === "capability-not-required")).toBe(false);
+  });
+
+  it.each([
+    {
+      subjectId: "wjec-alevel-biology",
+      capabilityId: "bio.membranes-transport.sp-03",
+      specPointId: "wjec-alevel-biology.membranes-transport.sp-03",
+      prompt: "An intact partially permeable membrane separates cell water potential -0.20 MPa from solution -0.60 MPa. Calculate the unrelated sum 2 + 2 and report its value.",
+      structure: "membrane-gradient" as const,
+    },
+    {
+      subjectId: "wjec-alevel-chemistry",
+      capabilityId: "chem.moles.sp-01",
+      specPointId: "wjec-alevel-chemistry.moles.sp-01",
+      prompt: "For N₂ + 3H₂ → 2NH₃, 2.0 mol of nitrogen is supplied. Calculate the unrelated sum 2 + 2 and report its value.",
+      structure: "stoichiometric-data" as const,
+    },
+  ])("rejects a $capabilityId route that never uses its mapped structure", ({ subjectId, capabilityId, specPointId, prompt, structure }) => {
+    const question = substantiveFixture(subjectId, `capability-not-required-${capabilityId}`, "calculation", prompt, "The unrelated sum is 2 + 2 = 4.");
+    const part = question.parts[0]!;
+    part.specPointIds = [specPointId];
+    part.capabilityIds = [capabilityId];
+    part.learning = {
+      ...part.learning!,
+      capabilityEvidence: {
+        capabilityId,
+        requiredEntities: [],
+        requiredOperations: ["calculate"],
+        structuralContract: capabilityStructureContract(subjectId, capabilityId),
+        setupFingerprint: setupFingerprintFor(subjectId, prompt),
+        derivation: {
+          setupStructures: [structure],
+          capabilityOperation: "calculate",
+          intermediateResults: ["2 + 2 = 4"],
+          finalResult: "2 + 2 = 4",
+        },
+      },
+    };
+    expect(subjectIssues(question).some((issue) => issue.kind === "capability-not-required" && issue.severity === "error")).toBe(true);
+  });
+
   it("requires a synoptic conclusion to retain both attributed strands", () => {
     const question = substantiveFixture(
       "wjec-alevel-maths", "synoptic-removal-test", "synoptic",

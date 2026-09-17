@@ -1,6 +1,7 @@
 import type { CapabilityNode } from "./capability-graph";
 import {
   answerLeakageDetail,
+  capabilityNotRequiredReason,
   capabilityStructureContract,
   compareTransferStructures,
   hasSynopticAttribution,
@@ -8,7 +9,7 @@ import {
   validateCapabilityEvidence,
   validateProvenance,
 } from "./subject-assessment-semantic";
-export { answerLeakageDetail, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
+export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
 import { checkEquationBalance, findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
@@ -50,6 +51,7 @@ export type SubjectAssessmentIssueKind =
   | "demand-evidence"
   | "answer-leakage"
   | "capability-evidence"
+  | "capability-not-required"
   | "provenance"
   | "transfer-novelty"
   | "synoptic-evidence"
@@ -400,7 +402,7 @@ function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecFlagship
 }
 
 interface SubstantiveGateFailure {
-  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
+  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "capability-not-required" | "provenance" | "transfer-novelty" | "synoptic-evidence">;
   detail: string;
 }
 
@@ -456,6 +458,8 @@ export function validateSubstantivePart(
   for (const detail of validateCapabilityEvidence(meta?.capabilityEvidence, part, text)) {
     failures.push({ kind: "capability-evidence", detail });
   }
+  const capabilityNecessity = capabilityNotRequiredReason(meta?.capabilityEvidence, part);
+  if (capabilityNecessity) failures.push({ kind: "capability-not-required", detail: capabilityNecessity });
   const traceProvenance = meta?.provenance ?? (meta?.expectedResult ? {
     sourceEvidence: meta.evidenceSources ?? [],
     operation: meta.derivation?.[0] ?? "derive",
@@ -1539,7 +1543,7 @@ function buildRepairQueue(
   };
 
   const priorityForSubjectIssue = (issue: SubjectAssessmentIssue): SubjectRepairPriority => {
-    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "synoptic-evidence") return "missing-authored-demand";
+    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "capability-not-required" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "synoptic-evidence") return "missing-authored-demand";
     if (issue.kind === "not-self-contained") return "not-self-contained";
     if (issue.kind === "solution-substance") return "weak-worked-solution";
     if (issue.kind !== "generic-fallback" && issue.kind !== "demand-evidence") return "correctness-warning";

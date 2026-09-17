@@ -438,6 +438,142 @@ export function structuralContractDeficits(
   return deficits;
 }
 
+interface CapabilityRouteCueGroups {
+  /** A concrete object/representation cue, rather than a topic label alone. */
+  object: readonly RegExp[];
+  /** A second cue showing that the object is actually operated on. */
+  operation: readonly RegExp[];
+}
+
+/**
+ * Conservative route cues used by the capability-necessity check.  A single
+ * topic word is deliberately insufficient: the worked route must mention
+ * both the supplied object and an operation/relationship that acts on it.
+ * This catches a prompt that happens to contain a radical, membrane or
+ * reaction while the requested result is solved by unrelated arithmetic.
+ */
+const CAPABILITY_ROUTE_CUES: Partial<Record<CapabilityStructureKind, CapabilityRouteCueGroups>> = {
+  "radical-expression": { object: [/√|sqrt\s*\(|\bsurd\w*\b|\bradical\w*\b/i], operation: [/conjugate|rationalis\w*|index\s+law|simplif\w*/i] },
+  polynomial: { object: [/\bpolynomial\w*\b|\bquadratic\w*\b|discriminant|[xy]\s*(?:\^|\*\*)\s*[2-9]|x[²³⁴]/i], operation: [/substitut\w*|factor\w*|root\w*|discriminant|complete\s+the\s+square|divide/i] },
+  quadratic: { object: [/\bquadratic\w*\b|discriminant|x\s*(?:\^|\*\*)\s*2|x²/i], operation: [/root\w*|discriminant|complete\s+the\s+square|boundary|solve|compare/i] },
+  "factor-theorem-instance": { object: [/factor\s+theorem|remainder|polynomial|f\s*\([^)]*\)/i], operation: [/substitut\w*|divide|synthetic|factor\w*|root\w*|remainder/i] },
+  "simultaneous-equations": { object: [/simultaneous|system|two\s+equations?|intersection|coordinates?/i], operation: [/substitut\w*|eliminat\w*|solve|admissib|check\w*\s+both/i] },
+  "inequality-domain": { object: [/inequalit\w*|admissible|solution\s+set|interval|modulus|[<>≤≥]/i], operation: [/sign\s+chart|endpoint|interval|boundary|critical|set\s+notation|inclusion/i] },
+  "transformation-graph": { object: [/transform\w*|graph|curve|branch|modulus|coordinate/i], operation: [/map\w*|reflect\w*|translate\w*|stretch|intercept|coordinate|branch/i] },
+  "exponential-function": { object: [/exponential|\be\s*\^|exp\s*\(/i], operation: [/logarithm|ln|inverse|linear|positive|isolate|exponentiat/i] },
+  "logarithmic-expression": { object: [/logarithm|\bln\b|log\s*[_₀-₉0-9]*\s*\(/i], operation: [/law\w*|base|change|simplif\w*|solve|positive|domain|inverse/i] },
+  "coordinate-geometry": { object: [/coordinate|circle|line|tangent|point|radius|gradient/i], operation: [/distance|gradient|perpendicular|intersect|determinant|projection|radius|tangent/i] },
+  function: { object: [/\b(?:function|curve|model|stationary|derivative|point|component\s+functions?)s?\b|[A-Za-z]\s*\([^)]*\)\s*=|\bd[A-Za-z]\s*\/\s*d[A-Za-z]/i], operation: [/differentiat\w*|derivative|integrat\w*|gradient|substitut\w*|antiderivative|rate|stationary|endpoint|second\s+derivative|classif\w*|product\s+rule|tangent|normal|slope/i] },
+  "derivative-target": { object: [/derivative|differentiat\w*|d[A-Za-z]\s*\/\s*d[A-Za-z]|[A-Za-z]\s*[′']|tangent|normal|gradient/i], operation: [/power\s+rule|chain\s+rule|product\s+rule|quotient\s+rule|gradient|stationary|differentiat\w*|derivative\w*|substitut\w*|tangent|normal|slope/i] },
+  "tangent-normal": { object: [/tangent|normal|curve|line/i], operation: [/gradient|perpendicular|point|equation|differentiat\w*/i] },
+  "rate-of-change": { object: [/rate\s+of\s+change|\b(?:instantaneous\s+)?rate\b|d[A-Za-z]\s*\/\s*d[A-Za-z]|gradient/i], operation: [/differentiat\w*|per\s+(?:second|time)|gradient|slope|change|d[A-Za-z]\s*\/\s*d[A-Za-z]|product\s+rule/i] },
+  "optimisation-constraint": { object: [/optim\w*|maximum|minimum|constraint|feasible|admissible|enclosure/i], operation: [/differentiat\w*|derivative|endpoint|domain|compare|constraint|critical/i] },
+  integral: { object: [/integral|integrat\w*|antiderivative|∫/i], operation: [/bound|area|substitut\w*|parts|reverse\s+differentiation|constant|integrat\w*/i] },
+  "definite-integral": { object: [/definite\s+integral|integral|bounds?|∫/i], operation: [/bound|area|split|root|signed|integrat\w*|between/i] },
+  "trigonometric-triangle": { object: [/triangle|sine\s+rule|cosine\s+rule|sin|cos|tan/i], operation: [/opposite|included|angle|area|side|sine|cosine|half\s*[- ]?ab/i] },
+  "trigonometric-identity": { object: [/identity|sin|cos|tan|double\s+angle/i], operation: [/prove|equivalent|factor|double|rewrite|simplif\w*/i] },
+  "trigonometric-equation": { object: [/sin|cos|tan|trigonometric\s+equation/i], operation: [/solve|root|angle|factor|identity|interval|general\s+solution/i] },
+  "probability-events": { object: [/probabil\w*|event|sample\s+space|P\s*\(|outcomes?|report(?:ed)?\s+colour/i], operation: [/multiply|conditional|independent|tree|union|intersection|given|Bayes|count|probabil\w*|outcomes?|sample\s+space|∩|×|ratio|share|among|\|/i] },
+  "probability-tree": { object: [/tree|branch|event/i], operation: [/probabil\w*|multiply|conditional|branch|without\s+replacement/i] },
+  "conditional-probability": { object: [/conditional|conditioning|P\s*\([^)]*\|[^)]*\)|given\s+that|without\s+replacement|condition\w*|ordered\s+outcomes?/i], operation: [/divide|intersection|given|conditional|conditioning|Bayes|denominator|event|ratio|fraction|share|among|condition\w*|outcomes?|sample\s+space|\|/i] },
+  "vector-components": { object: [/vector|component|dot\s+product/i], operation: [/dot|component|magnitude|scalar|product|direction|coordinate/i] },
+  "membrane-gradient": { object: [/membrane|\bwater\b|water[- ]?potential|solute|concentration|osmosis|gradient|transport|carrier|pump|ATP|energy|sucrose|potato|tissue|solution|mass\s+change/i], operation: [/gradient|water[- ]?potential|potential|osmosis|solute|turgor|direction|flow|higher|lower|active|facilitated|diffusion|ATP|energy|movement|mass|sucrose|concentration|zero|crossing|isotonic|blot/i] },
+  "membrane-model": { object: [/membrane|bilayer|phospholipid|cholesterol|protein/i], operation: [/fluid|component|permeab\w*|lateral|transport|structure|function|disrupt/i] },
+  "enzyme-assay": { object: [/enzyme|substrate|active\s+site|assay|initial\s+rate|product\s+readings?|rate\s+data/i], operation: [/rate|catalys\w*|temperature|pH|inhibit\w*|denatur\w*|active\s+site|substrate|product|factor|gradient/i] },
+  micrograph: { object: [/micrograph|microscop\w*|scale\s+bar/i], operation: [/magnif\w*|resol\w*|scale|image|object|size|convert/i] },
+  "dna-sequence": { object: [/\bDNA\b|\bRNA\b|codon|sequence|strand/i], operation: [/complement|base|transcrib\w*|translat\w*|codon|strand|pair/i] },
+  "controlled-experiment": { object: [/experiment|investigation|assay|sample|treatment|control\w*|measurement|data|absorbance|disc|solvent/i], operation: [/control\w*|variable|replicat\w*|random|uncertaint\w*|valid\w*|reliab\w*|measure|temperature|absorbance|permeab\w*|equal|compare|disc|solvent/i] },
+  "biological-molecule": { object: [/polymer|monomer|carbohydrat\w*|lipid|protein|amino\s+acid|DNA|RNA/i], operation: [/bond|structure|hydrolys\w*|condens\w*|glycerol|fatty\s+acid|peptide|fold\w*|function/i] },
+  "cell-ultrastructure": { object: [/cell|organelle|nucleus|mitochond\w*|ribosome|micrograph|pellet|fraction|hierarchy|organisation|organization|tissue|level/i], operation: [/structure|function|visible|magnif\w*|resolution|homogenate|centrifug\w*|pellet|fraction|hierarch|nested|order|level/i] },
+  "table-dataset": { object: [/table|dataset|data\s+set|readings?|measurements?|data|volume|energy|radii|values?/i], operation: [/gradient|trend|compare|plot|calculate|rate|mean|uncertaint\w*|interpret|radii|electronegativ|dipole|boiling|volume|time/i] },
+  "graph-dataset": { object: [/graph|plot|trend|gradient|profile|data|rate|temperature/i], operation: [/gradient|area|plot|read|trend|rate|intercept|interpret|compare|factor|increase|calculate|ratio/i] },
+  "chemical-equation": { object: [/equation|reaction|reactant|product|species|formula|→|⟶|⇌/i], operation: [/balance|stoichiometr\w*|charge|coefficient|react\w*|product|equation/i] },
+  "stoichiometric-data": { object: [/mole|\bmol\b|amount|mass|concentration|volume|ratio|reagent|solution|yield|purity|\bn\s*\([^)]*\)|\bc\s*\([^)]*\)/i], operation: [/equation|react\w*|ratio|convert|molar|titr\w*|limiting|yield|mass|volume|concentration|calculate|amount|\bn\s*\([^)]*\)|\bc\s*\([^)]*\)/i] },
+  "titration-dataset": { object: [/titr\w*|titre|burette|aliquot|endpoint|equivalence|cm³|dm³|\bmol\b|acid|alkali|base|volume/i], operation: [/concentration|neutralis\w*|volume|titre|average|endpoint|pipette|calculate|amount|ratio|\bn\s*\([^)]*\)/i] },
+  "equilibrium-system": { object: [/equilibrium|reversible|Kc|Kp|⇌|partial\s+pressure|\[[A-Z][^\]]*\]|p\s*\([^)]*\)/i], operation: [/rate|Le\s+Chatelier|position|quotient|compress\w*|temperature|concentration|reactant|product|forward|reverse|Kc|Kp|ratio|substitut\w*|\[[A-Z][^\]]*\]|p\s*\([^)]*\)/i] },
+  "mass-spectrum": { object: [/mass\s+spectr|m\s*\/\s*z|isotope|peak/i], operation: [/fragment|abundance|molecular|ion|ratio|identify|assign/i] },
+  "electron-configuration": { object: [/electron\s+configur|sub[- ]shell|shell|1s|2p|3d|ionisation|ionisation[- ]energy|shell\s+boundary/i], operation: [/fill|remove|order|jump|occup\w*|configuration|electron|sub[- ]shell|ionisation|trend|exception|boundary/i] },
+  "molecular-structure": { object: [/molecule|structure|Lewis|VSEPR|formula|shape|isomer|intermolecular|bond|compound|dipole|electronegativ\w*|boiling|melting/i], operation: [/bond|dipole|angle|electron|lone\s+pair|shape|geometry|isomer|force|attraction|boil\w*|melt\w*|polar|electronegativ\w*/i] },
+  "redox-species": { object: [/oxid\w*|reduc\w*|redox|half[- ]equation|electron\s+transfer/i], operation: [/electron|charge|balance|half[- ]equation|oxidation|reduction|transfer/i] },
+  "gas-data": { object: [/ideal\s+gas|gas|pV\s*=|pressure|volume|temperature|kelvin/i], operation: [/SI|rearrang\w*|pV\s*=|substitut\w*|kelvin|absolute|gas\s+equation|pressure|volume/i] },
+  "bonding-model": { object: [/bond|lattice|molecule|ionic|covalent|metallic|dipole|electronegativ|intermolecular|force/i], operation: [/electron|sharing|transfer|delocal|shape|attraction|conduct|melting|hydrogen|polar|surface|boiling|force/i] },
+  "particle-model": { object: [/particle|collision|activation\s+energy|energy\s+profile|catalyst/i], operation: [/successful|surface|temperature|catalys\w*|activation|collision|rate|energy/i] },
+  "numeric-data": { object: [/data|measurement|reading|value|table|rate|temperature|concentration|volume|radii|values?/i], operation: [/calculate|gradient|ratio|percentage|convert|compare|mean|rate|substitut\w*|factor|increase|trend|difference|divide|multiply|interpolat\w*|extrapolat\w*|average/i] },
+};
+
+function capabilityRouteUsesStructure(kind: CapabilityStructureKind, route: string): boolean {
+  const cues = CAPABILITY_ROUTE_CUES[kind];
+  if (!cues) return false;
+  // Keep the object and operation in the same short reasoning window.  A
+  // route that says “use the supplied radical” in one paragraph and then
+  // solves an unrelated numeric expression in another must not pass merely
+  // because both words occur somewhere in the worked answer.
+  const segments = evidenceSegments(route);
+  return segments.some((segment, index) => {
+    const window = `${segment}\n${segments[index + 1] ?? ""}`;
+    return cues.object.some((pattern) => pattern.test(window)) &&
+      cues.operation.some((pattern) => pattern.test(window));
+  });
+}
+
+function requiredRouteStructures(
+  structural: CapabilityStructureContract,
+  actual: ReadonlySet<CapabilityStructureKind>,
+): { direct: CapabilityStructureKind[]; alternatives: CapabilityStructureKind[][] } {
+  return {
+    direct: (structural.requiredStructures ?? []).filter((kind) => actual.has(kind)),
+    // A structure group is an alternative representation of the same skill.
+    // Keep every represented alternative so the route can demonstrate the one
+    // it actually uses; choosing the first item would make the ordering of a
+    // contract create false “not required” failures.
+    alternatives: (structural.requiredStructureGroups ?? [])
+      .map((group) => group.filter((kind) => actual.has(kind)))
+      .filter((group) => group.length > 0),
+  };
+}
+
+/**
+ * Return a hard failure when a mapped non-recall capability is merely
+ * decorative.  Structural presence in the prompt is necessary but not
+ * sufficient: the worked route must carry out an operation on each required
+ * structure.  This is intentionally a conservative ablation proxy; it does
+ * not claim to prove a full symbolic solution, but it reliably rejects an
+ * unrelated target such as “use the supplied radical to calculate 2 + 2”.
+ */
+export function capabilityNotRequiredReason(
+  contract: CapabilityEvidenceContract | undefined,
+  part: QuestionPart,
+): string | null {
+  const structural = contract?.structuralContract;
+  const derivation = contract?.derivation;
+  if (!contract || !structural || !derivation || part.learning?.demand === "recall") return null;
+  const setup = learnerVisibleSetup(part.prompt);
+  const fingerprint = setupFingerprintFor(contract.capabilityId, setup);
+  const actual = new Set(fingerprint.structures);
+  const requirements = requiredRouteStructures(structural, actual);
+  // Other capability-evidence diagnostics own missing setup structures. Do
+  // not add a second “not required” message when the task is incomplete.
+  const expectedDirect = structural.requiredStructures ?? [];
+  const expectedGroups = structural.requiredStructureGroups ?? [];
+  if (!expectedDirect.length && !expectedGroups.length) return null;
+  if (expectedDirect.some((kind) => !actual.has(kind)) ||
+      expectedGroups.some((group) => !group.some((kind) => actual.has(kind)))) return null;
+  const route = `${derivation.intermediateResults.join("\n")}\n${derivation.finalResult}\n${part.markScheme.join("\n")}\n${part.modelAnswer}`.trim();
+  if (!route) return `Mapped capability ${contract.capabilityId} has no worked route; the task can be completed without demonstrating it.`;
+  for (const kind of requirements.direct) {
+    if (!capabilityRouteUsesStructure(kind, route)) {
+      return `Mapped capability structure ${kind} is supplied, but the worked route never uses it; the task can be completed without ${kind}.`;
+    }
+  }
+  for (const alternatives of requirements.alternatives) {
+    if (!alternatives.some((kind) => capabilityRouteUsesStructure(kind, route))) {
+      const kinds = alternatives.join(" | ");
+      return `Mapped capability structure group ${kinds} is supplied, but the worked route never uses any permitted representation; the task can be completed without the mapped capability.`;
+    }
+  }
+  return null;
+}
+
 function meaningfulEvidenceTokens(value: string): string[] {
   const stopWords = new Set([
     "about", "after", "before", "because", "could", "gives", "given", "into", "rather", "result", "results",
@@ -591,7 +727,7 @@ export function capabilityStructureContract(subjectId: string, capabilityId: str
     // Rate-versus-substrate, temperature and inhibition questions can be
     // qualitative enzyme-assay work or graph/data interpretation. Requiring
     // both structures made a valid mechanism explanation look incomplete.
-    if (/bio\.enzymes\.sp-03$/.test(id)) return makeStructureContract([], { requiredStructureGroups: [["enzyme-assay", "graph-dataset"]], requiredOperationGroups: [["compare", "calculate", "estimate", "explain", "predict", "identify", "correct"]] });
+    if (/bio\.enzymes\.sp-03$/.test(id)) return makeStructureContract([], { requiredStructureGroups: [["enzyme-assay", "graph-dataset", "numeric-data"]], requiredOperationGroups: [["compare", "calculate", "estimate", "explain", "predict", "identify", "correct"]] });
     if (/bio\.enzymes\.sp-04$/.test(id)) return makeStructureContract(["enzyme-assay", "graph-dataset"], { requiredOperationGroups: [["compare", "explain", "identify", "correct", "calculate", "predict"]] });
     if (/bio\.enzymes\.sp-05$/.test(id)) return makeStructureContract(["graph-dataset"], { requiredOperationGroups: [["compare", "explain", "identify", "correct", "calculate", "predict"]] });
     if (/bio\.nucleic-acids\.sp-01$/.test(id)) return makeStructureContract(["dna-sequence"], { requiredOperationGroups: [["compare", "explain", "identify", "correct", "calculate"]] });
