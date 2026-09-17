@@ -6,7 +6,6 @@ import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { Card, ExamDate, Topic, TopicMastery } from "@/domain/types";
 
 const NOW = new Date("2025-06-02T17:00:00.000Z");
-const TODAY = "2025-06-02";
 
 const topic = (id: string, subjectId = "maths"): Topic => ({
   id,
@@ -133,7 +132,7 @@ describe("recommender recall-vs-application separation", () => {
       }),
     ).find((r) => r.activity === "practice" && r.topicId === "t1")!;
     expect(rec.factors?.applicationGap).toBeDefined();
-    expect(rec.factors?.applicationGap!).toBeGreaterThanOrEqual(0.3);
+    expect(rec.factors?.applicationGap).toBeGreaterThanOrEqual(0.3);
     expect(rec.factors?.recallMastery).toBeCloseTo(0.85, 1);
   });
 

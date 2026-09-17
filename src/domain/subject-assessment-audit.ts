@@ -1,7 +1,6 @@
 import type { CapabilityNode } from "./capability-graph";
 import {
   compareTransferStructures,
-  transferNoveltyClasses,
 } from "./subject-assessment-semantic";
 export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
