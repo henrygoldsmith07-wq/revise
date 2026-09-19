@@ -1,4 +1,4 @@
-// Subject-specific deterministic correctness validators for the three
+﻿// Subject-specific deterministic correctness validators for the three
 // non-Physics WJEC flagships (Mathematics, Biology, Chemistry). Split out of
 // subject-assessment-audit.ts so each domain file stays inside the
 // per-module performance budget; the flagship audit composes these checks
@@ -21,6 +21,11 @@ import {
   isMappedCapabilityId,
   validateSynopticStructure,
 } from "./reasoning-graph";
+import {
+  validateSynopticSecondaryReal,
+  validateTransferAnswerability,
+  validateWorkedCompleteness,
+} from "./transfer-trust";
 import { promptOverload } from "./physics-assessment-quality";
 import type { Id, LearningDemand, Question, QuestionPart } from "./types";
 import type { SubjectAssessmentIssue, SubjectAssessmentIssueKind, WjecFlagshipSubjectId } from "./subject-assessment-audit";
@@ -322,7 +327,7 @@ function hasSynopticJoin(prompt: string, answer: string, subjectId: WjecSubjectI
  * distinct subject operations.
  */
 export interface SubstantiveGateFailure {
-  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "capability-not-required" | "provenance" | "transfer-novelty" | "transfer-not-novel" | "duplicate-reasoning-graph" | "secondary-capability-not-required" | "missing-secondary-contract" | "route-superset" | "synoptic-evidence">;
+  kind: Extract<SubjectAssessmentIssueKind, "generic-fallback" | "not-self-contained" | "solution-substance" | "demand-evidence" | "answer-leakage" | "capability-evidence" | "capability-not-required" | "provenance" | "transfer-novelty" | "transfer-not-novel" | "duplicate-reasoning-graph" | "duplicate-derived-reasoning" | "secondary-capability-not-required" | "missing-secondary-contract" | "missing-transfer-data" | "stale-transfer-baseline-fingerprint" | "stale-transfer-fingerprint" | "stale-reasoning-graph" | "worked-solution-incomplete" | "invalid-transfer-baseline" | "route-superset" | "synoptic-evidence">;
   detail: string;
 }
 
@@ -534,6 +539,11 @@ export function validateSubstantivePart(
     if (!hasCausalChain(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Explanation must show a subject-specific causal or logical chain." });
     }
+    if (meta?.quality === "substantive" && (meta?.familyId ?? "").includes("-depth:")) {
+      for (const detail of validateWorkedCompleteness(part, subjectId)) {
+        failures.push({ kind: "worked-solution-incomplete", detail });
+      }
+    }
   } else if (demand === "application") {
     if (scaffoldBypass) return failures;
     if (!hasConcreteApplicationContext(prompt, subjectId) || !hasResultEvidence(answer) || !hasSubjectSpecificEvidence(answer, subjectId)) {
@@ -549,6 +559,11 @@ export function validateSubstantivePart(
     if (!hasInlineQuantityOrRepresentation(prompt) || !hasWorkedEvidence(answer) || !hasSubjectSpecificEvidence(answer, subjectId)) {
       failures.push({ kind: "demand-evidence", detail: "Calculation/data work needs supplied quantities or a data representation and checkable working." });
     }
+    if (meta?.quality === "substantive" && (meta?.familyId ?? "").includes("-depth:")) {
+      for (const detail of validateWorkedCompleteness(part, subjectId)) {
+        failures.push({ kind: "worked-solution-incomplete", detail });
+      }
+    }
   } else if (demand === "transfer") {
     if (scaffoldBypass) return failures;
     const noveltyClasses = transferNoveltyClasses(prompt);
@@ -556,6 +571,18 @@ export function validateSubstantivePart(
       failures.push({ kind: "demand-evidence", detail: "Transfer must use a genuinely new representation or context and reach a conclusion." });
       if (noveltyClasses.length === 0) {
         failures.push({ kind: "transfer-novelty", detail: "Transfer prompt changes no observable representation, information structure, hidden state, constraint, data form or concept combination." });
+      }
+    }
+    // Trust gap: the new representation must be independently answerable
+    // before novelty is even considered. A graph/table/hidden entry without
+    // usable data fails here regardless of how novel it looks. Scoped to the
+    // generated depth pack that this trust contract governs.
+    if (meta?.quality === "substantive" && (meta?.familyId ?? "").includes("-depth:")) {
+      for (const detail of validateTransferAnswerability(part)) {
+        failures.push({ kind: "missing-transfer-data", detail });
+      }
+      for (const detail of validateWorkedCompleteness(part, subjectId)) {
+        failures.push({ kind: "worked-solution-incomplete", detail });
       }
     }
     // Layer C — structural transfer: explicit baseline plus fingerprint and
@@ -607,6 +634,15 @@ export function validateSubstantivePart(
             failures.push({ kind: "secondary-capability-not-required", detail: `${detail} (secondary-capability-not-required).` });
           } else {
             failures.push({ kind: "synoptic-evidence", detail });
+          }
+        }
+        // Trust gap: the stored secondary contract must agree with the
+        // canonical contract recomputed from current content.
+        for (const detail of validateSynopticSecondaryReal(part, subjectId)) {
+          if (/missing-secondary-contract/i.test(detail)) {
+            failures.push({ kind: "missing-secondary-contract", detail });
+          } else {
+            failures.push({ kind: "secondary-capability-not-required", detail });
           }
         }
       }

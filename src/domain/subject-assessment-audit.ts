@@ -4,12 +4,19 @@ import {
 } from "./subject-assessment-semantic";
 import {
   compareTransferStructures as compareTransferReasoningGraphs,
+  deriveVerifiedGraph,
   fingerprintSetup,
   isDistinctReasoningRoute,
   isSupersetRoute,
   MIN_REASONING_GRAPH_DISTANCE,
   reasoningGraphForPart,
+  verifiedGraphToPlain,
+  verifyStoredGraph,
 } from "./reasoning-graph";
+import {
+  validateBaselineIntegrity,
+  verifyTransferFingerprints,
+} from "./transfer-trust";
 export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export { fingerprintSetup, isDistinctReasoningRoute, isSupersetRoute, reasoningGraphForPart } from "./reasoning-graph";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
@@ -64,8 +71,15 @@ export type SubjectAssessmentIssueKind =
   | "transfer-novelty"
   | "transfer-not-novel"
   | "duplicate-reasoning-graph"
+  | "duplicate-derived-reasoning"
   | "secondary-capability-not-required"
   | "missing-secondary-contract"
+  | "missing-transfer-data"
+  | "stale-transfer-baseline-fingerprint"
+  | "stale-transfer-fingerprint"
+  | "stale-reasoning-graph"
+  | "worked-solution-incomplete"
+  | "invalid-transfer-baseline"
   | "route-superset"
   | "synoptic-evidence"
   | "maths-equivalence"
@@ -180,8 +194,9 @@ function buildRepairQueue(
   };
 
   const priorityForSubjectIssue = (issue: SubjectAssessmentIssue): SubjectRepairPriority => {
-    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "capability-not-required" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "transfer-not-novel" || issue.kind === "synoptic-evidence" || issue.kind === "missing-secondary-contract" || issue.kind === "secondary-capability-not-required") return "missing-authored-demand";
-    if (issue.kind === "duplicate-reasoning-graph" || issue.kind === "route-superset") return "duplicate-reasoning";
+    if (issue.kind === "answer-leakage" || issue.kind === "capability-evidence" || issue.kind === "capability-not-required" || issue.kind === "provenance" || issue.kind === "transfer-novelty" || issue.kind === "transfer-not-novel" || issue.kind === "synoptic-evidence" || issue.kind === "missing-secondary-contract" || issue.kind === "secondary-capability-not-required" || issue.kind === "missing-transfer-data" || issue.kind === "stale-transfer-baseline-fingerprint" || issue.kind === "stale-transfer-fingerprint" || issue.kind === "stale-reasoning-graph" || issue.kind === "invalid-transfer-baseline") return "missing-authored-demand";
+    if (issue.kind === "duplicate-reasoning-graph" || issue.kind === "duplicate-derived-reasoning" || issue.kind === "route-superset") return "duplicate-reasoning";
+    if (issue.kind === "worked-solution-incomplete") return "weak-worked-solution";
     if (issue.kind === "not-self-contained") return "not-self-contained";
     if (issue.kind === "solution-substance") return "weak-worked-solution";
     if (issue.kind !== "generic-fallback" && issue.kind !== "demand-evidence") return "correctness-warning";
@@ -323,13 +338,25 @@ export function auditFlagshipSubject(input: {
     }
   }
 
-  // Layer C â€” diversity validity. Transfer needs a structurally distinct
+  // Layer C - diversity validity. Transfer needs a structurally distinct
   // baseline, synoptic needs two mapped capabilities, and Route A/B need
   // materially different reasoning graphs. No layer is bypassed for generated
   // substantive content; only explicit `scaffold` cells keep a bypass.
   if (input.subjectId !== "wjec-alevel-physics") {
     const allParts = subjectQuestions.flatMap((question) => question.parts.map((part) => ({ question, part })));
     const partById = new Map(allParts.map(({ question, part }) => [`${question.id}:${part.id}`, { question, part }]));
+    // Stored reasoning graphs are authored hints: every substantive depth
+    // cell's stored nodes must be demonstrable in its current task and
+    // worked solution. Stale metadata invalidates the cell outright.
+    for (const { question, part } of allParts) {
+      if (part.learning?.quality !== "substantive") continue;
+      if (!(part.learning?.familyId ?? "").includes("-depth:")) continue;
+      if (invalidParts.has(`${question.id}:${part.id}`)) continue;
+      for (const detail of verifyStoredGraph(part, input.subjectId)) {
+        addIssue(subjectIssues, question, part, "stale-reasoning-graph", "error", detail);
+        invalidParts.add(`${question.id}:${part.id}`);
+      }
+    }
     for (const { question, part } of allParts) {
       if (part.learning?.demand !== "transfer") continue;
       if (part.learning?.quality === "scaffold") continue;
@@ -337,18 +364,34 @@ export function auditFlagshipSubject(input: {
       const capability = part.capabilityIds?.length === 1 ? part.capabilityIds[0] : undefined;
       const specPoint = part.specPointIds?.length === 1 ? part.specPointIds[0] : undefined;
       if (!capability || !specPoint) continue;
-      // Explicit baseline linkage is a hard requirement.
+      // Explicit baseline linkage is a hard requirement, and the baseline must
+      // be valid itself: a transfer cannot go deep on a broken baseline.
       const baselineId = part.learning?.transferLink?.baselinePartId?.trim();
-      if (baselineId) {
-        const baselineEntry = [...partById.entries()].find(([key]) => key.endsWith(`:${baselineId}`) || key === baselineId);
-        if (!baselineEntry) {
-          addIssue(subjectIssues, question, part, "transfer-not-novel", "error", `Transfer baseline ${baselineId} does not exist in the same capability (transfer-not-novel).`);
+      const baselineEntry = baselineId
+        ? [...partById.entries()].find(([key]) => key.endsWith(`:${baselineId}`) || key === baselineId)
+        : undefined;
+      if (baselineId && !baselineEntry) {
+        addIssue(subjectIssues, question, part, "invalid-transfer-baseline", "error", `Transfer baseline ${baselineId} does not exist in the same capability (invalid-transfer-baseline).`);
+        invalidParts.add(`${question.id}:${part.id}`);
+        continue;
+      }
+      if (baselineEntry && baselineEntry[1].part.capabilityIds?.[0] !== capability) {
+        addIssue(subjectIssues, question, part, "invalid-transfer-baseline", "error", "Transfer baseline is from a different capability; reference an explicit baseline task from the same capability (invalid-transfer-baseline).");
+        invalidParts.add(`${question.id}:${part.id}`);
+        continue;
+      }
+      if (baselineEntry) {
+        if (invalidParts.has(baselineEntry[0])) {
+          addIssue(subjectIssues, question, part, "invalid-transfer-baseline", "error", "Transfer baseline is itself invalid, so this transfer cannot count as deep (invalid-transfer-baseline).");
           invalidParts.add(`${question.id}:${part.id}`);
           continue;
         }
-        const baselineCapability = baselineEntry[1].part.capabilityIds?.[0];
-        if (baselineCapability !== capability) {
-          addIssue(subjectIssues, question, part, "transfer-not-novel", "error", "Transfer baseline is from a different capability; reference an explicit baseline task from the same capability (transfer-not-novel).");
+        let baselineBroken = false;
+        for (const detail of validateBaselineIntegrity(part, baselineEntry[1].part)) {
+          addIssue(subjectIssues, question, part, "invalid-transfer-baseline", "error", detail);
+          baselineBroken = true;
+        }
+        if (baselineBroken) {
           invalidParts.add(`${question.id}:${part.id}`);
           continue;
         }
@@ -359,21 +402,24 @@ export function auditFlagshipSubject(input: {
         (candidate.learning?.demand === "application" || candidate.learning?.demand === "calculation") &&
         candidate.learning?.quality !== "scaffold");
       if (!baselines.length) continue;
-      // An explicit stored link is the strongest transfer evidence: a named
-      // baseline plus setup fingerprints and reasoning graphs compared across
-      // eight structural and seven reasoning dimensions with a dual-change
-      // requirement. The value-stripped Jaccard heuristic below cannot resolve
-      // same-capability transfer (shared topic vocabulary always scores
-      // near-identical), so a passing stored link settles the question and
-      // the heuristic legs serve only link-less authored transfers. Rigor is
-      // equal-or-stronger on both paths, never bypassed.
+      // Stored metadata is never authoritative: fingerprints are recomputed
+      // from current content and novelty is decided on independently derived
+      // reasoning graphs. A passing stored link only skips the coarse
+      // Jaccard heuristic, which cannot resolve same-capability transfer;
+      // label, prompt-structural and graph gates still apply equally.
       const storedLink = part.learning?.transferLink;
       if (storedLink) {
+        for (const detail of verifyTransferFingerprints(part, baselineEntry?.[1].part)) {
+          const kind = /baseline/i.test(detail) ? "stale-transfer-baseline-fingerprint" : "stale-transfer-fingerprint";
+          addIssue(subjectIssues, question, part, kind as SubjectAssessmentIssueKind, "error", detail);
+          invalidParts.add(`${question.id}:${part.id}`);
+        }
+        if (invalidParts.has(`${question.id}:${part.id}`)) continue;
         const comparison = compareTransferReasoningGraphs(
-          storedLink.baselineSetupFingerprint,
-          storedLink.transferSetupFingerprint,
-          storedLink.baselineReasoningGraph,
-          storedLink.transferReasoningGraph,
+          fingerprintSetup(baselineEntry![1].part.prompt),
+          fingerprintSetup(part.prompt, part.modelAnswer),
+          verifiedGraphToPlain(deriveVerifiedGraph(baselineEntry![1].part, input.subjectId)),
+          verifiedGraphToPlain(deriveVerifiedGraph(part, input.subjectId)),
         );
         if (!comparison.isNovel) {
           addIssue(subjectIssues, question, part, "transfer-not-novel", "error", `Transfer has no structural novelty against its explicit baseline (structural: ${comparison.structuralChanges.join(", ") || "none"}; reasoning: ${comparison.reasoningChanges.join(", ") || "none"}) (transfer-not-novel).`);
@@ -411,10 +457,12 @@ export function auditFlagshipSubject(input: {
         }
       }
     }
-    // Route A/B graph distance: two substantive parts sharing a specPoint,
-    // capability and demand count as distinct only when their reasoning graphs
-    // differ materially. Cosmetic alternatives (numbers, context names, family
-    // ids, modeA/modeB, rewritten prose, substitute-vs-recompute) collapse.
+    // Route A/B graph distance, recomputed from content: two substantive parts
+    // sharing a specPoint, capability and demand count as distinct only when
+    // their independently derived reasoning graphs differ materially. Stored
+    // route labels, family ids and authored graphs are ignored completely;
+    // cosmetic alternatives (numbers, context names, modeA/modeB, rewritten
+    // prose, substitute-vs-recompute) collapse.
     const routeGroups = new Map<string, Array<{ question: (typeof allParts)[number]["question"]; part: (typeof allParts)[number]["part"] }>>();
     for (const entry of allParts) {
       const { question, part } = entry;
@@ -440,14 +488,35 @@ export function auditFlagshipSubject(input: {
         for (let j = i + 1; j < entries.length; j += 1) {
           const left = entries[i]!;
           const right = entries[j]!;
-          const leftGraph = reasoningGraphForPart(left.part, input.subjectId);
-          const rightGraph = reasoningGraphForPart(right.part, input.subjectId);
+          const leftGraph = verifiedGraphToPlain(deriveVerifiedGraph(left.part, input.subjectId));
+          const rightGraph = verifiedGraphToPlain(deriveVerifiedGraph(right.part, input.subjectId));
           if (isSupersetRoute(leftGraph, rightGraph) || isSupersetRoute(rightGraph, leftGraph)) {
             addIssue(subjectIssues, right.question, right.part, "route-superset", "error", `Route B is Route A plus a trivial verification step; change a core reasoning dependency or representation (route-superset). Baseline: ${left.question.id}:${left.part.id}.`);
             invalidParts.add(`${right.question.id}:${right.part.id}`);
-          } else if (!isDistinctReasoningRoute(leftGraph, rightGraph, MIN_REASONING_GRAPH_DISTANCE)) {
-            addIssue(subjectIssues, right.question, right.part, "duplicate-reasoning-graph", "error", `Route A/B reasoning graphs are materially the same (distance below ${MIN_REASONING_GRAPH_DISTANCE}); change the representation, operation sequence or constraints (duplicate-reasoning-graph). Baseline: ${left.question.id}:${left.part.id}.`);
-            invalidParts.add(`${right.question.id}:${right.part.id}`);
+          } else {
+            // Distinctness is decided from current content only. A pair is
+            // distinct when the derived reasoning graph clears the conservative
+            // distance floor, or when it changes at least one derived structural
+            // dimension (representation, operation sequence, hidden state,
+            // constraint) together with a real reasoning-path change
+            // (operation, representation, order or intermediate). Cosmetic
+            // rewording and number swaps leave all of these empty, so neither
+            // path can rescue a renamed copy.
+            const structural = compareTransferReasoningGraphs(
+              fingerprintSetup(left.part.prompt, left.part.modelAnswer),
+              fingerprintSetup(right.part.prompt, right.part.modelAnswer),
+              leftGraph,
+              rightGraph,
+            );
+            const pathChange = structural.reasoningChanges.some(
+              (change) => change === "operations" || change === "inputRepresentation" || change === "orderOfOperations" || change === "intermediateStates",
+            );
+            const distinct = isDistinctReasoningRoute(leftGraph, rightGraph, MIN_REASONING_GRAPH_DISTANCE) ||
+              (structural.structuralChanges.length >= 1 && pathChange);
+            if (!distinct) {
+              addIssue(subjectIssues, right.question, right.part, "duplicate-derived-reasoning", "error", `Route A/B derived reasoning graphs are materially the same (distance below ${MIN_REASONING_GRAPH_DISTANCE} and no structural representation change); change the representation, operation sequence or constraints (duplicate-derived-reasoning). Baseline: ${left.question.id}:${left.part.id}.`);
+              invalidParts.add(`${right.question.id}:${right.part.id}`);
+            }
           }
         }
       }

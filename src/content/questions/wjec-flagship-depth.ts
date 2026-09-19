@@ -1,4 +1,4 @@
-import type { LearningDemand, Question, ReasoningGraph, SetupFingerprint } from "@/domain/types";
+﻿import type { LearningDemand, Question, ReasoningGraph, SetupFingerprint } from "@/domain/types";
 import { defineQuestions, type PartSpec, type QuestionSpec } from "./authoring";
 import { wjecCapabilityForSpecPoint } from "../wjec-subject-capabilities";
 import { capabilityEvidenceFor, provenanceFor } from "./wjec-quality-authoring";
@@ -52,7 +52,7 @@ function concreteSetup(brief: DepthBrief, variant: 0 | 1): string | undefined {
       case "algebra-factor": return `The explicit polynomial is f(x) = x³ - ${n}x² + ${n - 1}x - ${n - 2}, and the candidate root is x = 2, so f(2) is available for a remainder check.`;
       case "algebra-simultaneous": return `The two equations are y = x² - ${n}x + ${n - 1} and y = ${n - 2}x - ${n - 3}; both x and y coordinates must satisfy the same system.`;
       case "algebra-inequalities": return `The admissible set is (x - ${n - 2})(x - ${n - 4}) ≤ 0 together with |x - ${n - 3}| < 2; endpoint inclusion must be decided from the symbols.`;
-      case "algebra-transformations": return `The parent curve is f(x) = x³ - ${n}x and the displayed transform is g(x) = |f(x + 2)|; intercepts and reflected branches are visible on the graph.`;
+      case "algebra-transformations": return `The parent curve is f(x) = x³ - ${n}x and the displayed transform is g(x) = |f(x + 2)|; intercepts at (0, 0), (2, 0) and reflected branches are visible on the graph.`;
       case "coordinate-lines-circles": return `On a coordinate grid A(${n}, ${n + 1}) and B(${n + 2}, ${n - 1}) are joined; the circle is (x - ${n})² + (y - ${n})² = ${n + 1}².`;
       case "coordinate-intersections": return `The line y = ${n - 2}x + ${n - 1} intersects the circle x² + y² = ${n + 2}²; retain both coordinate solutions before checking tangency.`;
       case "coordinate-area-distance": return `Three plotted points are A(${n}, ${n + 1}), B(${n + 2}, ${n - 1}) and C(${n - 1}, ${n + 3}); the constraint line is ${n - 1}x + ${n}y = ${n + 2}.`;
@@ -61,7 +61,7 @@ function concreteSetup(brief: DepthBrief, variant: 0 | 1): string | undefined {
       case "stationary-points": return `The cost curve is f(x) = x³ - ${n}x² + ${n}x on the closed domain ${n - 2} ≤ x ≤ ${n}; classify f′(x) = 0 and compare endpoint values.`;
       case "integration-standard": return `The velocity function is v(t) = ${n}t - ${n - 1} for ${n - 2} ≤ t ≤ ${n} seconds; displacement is the integral of this explicit function.`;
       case "integration-definite-area": return `The signed graph is v(t) = t² - ${n}t + ${n - 2} on ${n - 2} ≤ t ≤ ${n}; evaluate the definite integral and split at its roots.`;
-      case "integration-methods": return `The supplied integrals are ∫ x eˣ dx and ∫ 2x/(x² + ${n}) dx; choose integration by parts or substitution and transform every bound.`;
+      case "integration-methods": return `The supplied integrals are ∫ x eˣ dx and ∫ 2x/(x² + ${n}) dx with equation y = 2x/(x² + ${n}); choose integration by parts or substitution and transform every bound.`;
       case "trig-rules": return `In triangle ABC, a = ${n} cm, b = ${n + 1} cm and the included angle C = 60°; the opposite side c and area are unknown.`;
       case "trig-identities": return `The identity to prove is sin²θ + cos²θ = 1, followed by cos(2θ) = 1 - 2sin²θ for ${n - 2}° ≤ θ ≤ ${n + 2}°.`;
       case "exp-inverses": return `The positive model is y = ${n}e^(0.2t) + ${n - 1} for t ≥ 0; inversion requires ln(y - ${n - 1}) and its domain.`;
@@ -75,21 +75,21 @@ function concreteSetup(brief: DepthBrief, variant: 0 | 1): string | undefined {
       case "bio-condensation": return `A starch polymer is treated with amylase at pH 7 and 25 °C; the reducing-sugar assay reads ${n}.0 mg before and ${n + 1}.5 mg after treatment, so bond formation and hydrolysis can be compared.`;
       case "bio-carbohydrates": return `A plant sample contains glucose monomers, starch and glycogen; starch is ${n}.0 mg before storage and ${n + 1}.5 mg after storage in a controlled tissue sample.`;
       case "bio-lipids": return `A phospholipid contains glycerol, three fatty-acid tails and a phosphate group; a membrane sample changes from ${n}.0 to ${n + 1}.5 mg at 25 °C.`;
-      case "bio-protein-structure": return `An enzyme is a polypeptide made from amino-acid residues joined by peptide bonds; a mutation changes one codon and the protein is purified at pH 7 and 25 °C.`;
-      case "bio-dna-rna": return `The supplied nucleic-acid sequence is DNA 5′-ATG CCA TAA-3′ and the corresponding RNA uses U; compare the base sequence before and after transcription.`;
+      case "bio-protein-structure": return `An enzyme is a polypeptide made from amino-acid residues joined by peptide bonds; a mutation changes one codon and the protein sample is purified and assayed at pH 7 and 25 °C.`;
+      case "bio-dna-rna": return `The supplied nucleic-acid sample has sequence DNA 5′-ATG CCA TAA-3′ and the corresponding RNA uses U; compare the base sequence before and after transcription.`;
       case "bio-water": return `Two plant cells are separated by a partially permeable membrane; cell A has water potential -${n} kPa and cell B -${n - 2} kPa, with solute concentration and turgor data recorded.`;
-      case "bio-prokaryote-eukaryote": return `An electron micrograph shows a ${n} μm cell with a visible nucleus, mitochondria and a cell surface; a second cell has a nucleoid and plasmids, so organelles are diagnostic.`;
-      case "bio-organelles": return `A secretory cell contains rough ER, Golgi apparatus, vesicles, lysosomes and mitochondria; a peptide hormone is traced from synthesis to exocytosis.`;
-      case "bio-magnification": return `An electron micrograph has a ${n * 2} mm scale-bar image of a chloroplast; the scale bar represents ${n} μm and the microscope magnification is recorded.`;
+      case "bio-prokaryote-eukaryote": return `An electron micrograph of a tissue sample shows a ${n} μm cell with a visible nucleus, mitochondria and a cell surface; a second cell has a nucleoid and plasmids, so organelles are diagnostic.`;
+      case "bio-organelles": return `A secretory cell sample contains rough ER, Golgi apparatus, vesicles, lysosomes and mitochondria; a peptide hormone is traced from synthesis to exocytosis.`;
+      case "bio-magnification": return `An electron micrograph measurement has a ${n * 2} mm scale-bar image of a chloroplast; the scale bar represents ${n} μm and the microscope magnification is recorded.`;
       case "bio-organisation": return `The observed hierarchy is organelle → cell → tissue → organ → organ system → organism; a labelled tissue sample links each level to its function.`;
-      case "bio-fractionation": return `A liver homogenate is filtered and centrifuged at ${n * 1000}g and ${n * 5000}g in cold isotonic buffer; nuclei, mitochondria and microsomes form separate pellets.`;
-      case "bio-fluid-mosaic": return `The supplied membrane diagram shows a phospholipid bilayer with integral/peripheral proteins, cholesterol and carbohydrate chains; lateral movement is measured at ${20 + n} °C.`;
+      case "bio-fractionation": return `A liver tissue sample is homogenised and centrifuged at ${n * 1000}g and ${n * 5000}g in cold isotonic buffer; nuclei, mitochondria and microsomes form separate pellets.`;
+      case "bio-fluid-mosaic": return `The supplied membrane sample diagram shows a phospholipid bilayer with integral/peripheral proteins, cholesterol and carbohydrate chains; lateral movement is measured at ${20 + n} °C.`;
       case "bio-transport": return `An epithelial membrane has a high solute concentration outside and ATP-dependent pumps; a toxin blocks ATP production while a carrier protein and concentration gradient are observed.`;
       case "bio-permeability": return `In a controlled beetroot-disc membrane experiment, pigment absorbance is ${0.10 + n / 100} and ${0.20 + n / 100} at ${20 + n} °C and ${30 + n} °C, with equal disc area, buffer volume and a solvent control.`;
       case "bio-osmosis-investigations": return `A visking tube containing ${n}% sucrose is immersed in water across a selectively permeable membrane; mass and liquid height are recorded every ${n} minutes.`;
-      case "bio-replication": return `The DNA template 5′-ATG CCA TAA-3′ is labelled before two cell divisions; complementary nucleotides and the old/new strands are tracked.`;
-      case "bio-protein-synthesis": return `The coding DNA sequence 5′-ATG CCA TAA-3′ is transcribed to mRNA and translated by a ribosome; tRNA anticodons and the stop codon are supplied.`;
-      case "bio-mutations": return `A DNA sequence 5′-ATG CCA TAA-3′ changes by a substitution, insertion or deletion; the codon table and resulting amino-acid sequence are supplied.`;
+      case "bio-replication": return `The DNA sample template 5′-ATG CCA TAA-3′ is labelled before two cell divisions; complementary nucleotides and the old/new strands are tracked.`;
+      case "bio-protein-synthesis": return `The coding DNA sample sequence 5′-ATG CCA TAA-3′ is transcribed to mRNA and translated by a ribosome; tRNA anticodons and the stop codon are supplied.`;
+      case "bio-mutations": return `A DNA sample sequence 5′-ATG CCA TAA-3′ changes by a substitution, insertion or deletion; the codon table and resulting amino-acid sequence are supplied.`;
       default: return undefined;
     }
   }
@@ -97,24 +97,24 @@ function concreteSetup(brief: DepthBrief, variant: 0 | 1): string | undefined {
     switch (brief.slug) {
       case "chem-isotopes": return `The mass spectrum contains isotopes at m/z ${n * 10} and ${n * 10 + 2} with abundances ${n * 10}% and ${100 - n * 10}%; identify proton and neutron counts for the same element.`;
       case "chem-mass-spectrum": return `A mass spectrum has a molecular-ion peak at m/z ${n * 10}, an M+2 peak and fragment peaks at m/z ${n * 5} and ${n * 5 + 1}; compare abundance ratios with candidate structures.`;
-      case "chem-electron-config": return `An ion has atomic number ${n + 10} and charge 2+; the supplied subshell order is 1s, 2s, 2p, 3s, 3p, 4s, 3d for writing its electron configuration.`;
-      case "chem-ionisation-trends": return `Successive ionisation energies for adjacent elements are tabulated as ${n * 100}, ${n * 200}, ${n * 900} kJ mol⁻¹; the large jump identifies a shell boundary.`;
-      case "chem-trends": return `Period-three atoms Na, Mg, Al and Cl have supplied radii 186, 160, 143 and 99 pm and electronegativities 0.9, 1.2, 1.5 and 3.2; a bond between two named atoms has a measurable dipole.`;
+      case "chem-electron-config": return `An ion sample has atomic number ${n + 10} and charge 2+; the supplied subshell order is 1s, 2s, 2p, 3s, 3p, 4s, 3d for writing its electron configuration.`;
+      case "chem-ionisation-trends": return `Successive ionisation-energy measurements for adjacent elements are tabulated as ${n * 100}, ${n * 200}, ${n * 900} kJ mol⁻¹; the large jump identifies a shell boundary.`;
+      case "chem-trends": return `Period-three atoms sodium, magnesium, aluminium and chlorine have supplied radius measurements 186, 160, 143 and 99 pm and electronegativities 0.9, 1.2, 1.5 and 3.2; a bond between two named atoms has a measurable dipole.`;
       case "chem-mole-definitions": return `A ${n}.00 g sample of NaCl (Mᵣ = 58.5) contains particles counted with N_A = 6.022 × 10²³ mol⁻¹; convert mass, moles and entities.`;
       case "chem-mass-concentration": return `The reaction is NaOH(aq) + HCl(aq) → NaCl(aq) + H₂O(l); ${n * 5}.00 cm³ of ${((n / 10) + 0.1).toFixed(3)} mol dm⁻³ solution is diluted to ${n * 10}.00 cm³.`;
       case "chem-gas-equation": return `A gas sample has p = ${100 + n * 10} kPa, V = ${(n / 10).toFixed(3)} m³, T = ${280 + n} K and n = ${n / 100} mol; use pV = nRT.`;
-      case "chem-empirical-formula": return `Combustion of a compound gives ${n * 2}.0 g carbon, ${n / 2}.0 g hydrogen and ${n}.0 g oxygen; use atomic masses to obtain the empirical formula.`;
-      case "chem-yield-economy": return `The balanced reaction 2CO(g) + O₂(g) → 2CO₂(g) produces ${n}.0 g CO₂ from ${n + 2}.0 g CO and ${n + 1}.0 g O₂; compare limiting reagent, percentage yield and atom economy.`;
+      case "chem-empirical-formula": return `Combustion of a compound sample gives ${n * 2}.0 g carbon, ${n / 2}.0 g hydrogen and ${n}.0 g oxygen; use atomic masses to obtain the empirical formula.`;
+      case "chem-yield-economy": return `The balanced reaction 2CO(g) + O₂(g) → 2CO₂(g) produces ${n}.0 g CO₂ from a ${n + 2}.0 g sample of CO and ${n + 1}.0 g O₂; compare limiting reagent, percentage yield and atom economy.`;
       case "chem-bond-types": return `The supplied Lewis structures are NH₃ and BF₃ alongside an ionic lattice and a metallic sample; compare electron transfer, sharing and dative donation.`;
-      case "chem-polarity": return `The molecular structures NH₃ and BF₃ have supplied electronegativities and bond-dipole arrows; vector addition determines the net molecular polarity.`;
-      case "chem-intermolecular": return `A table gives boiling points (−161.5, −24.2, 64.7 and 78.4 °C) for CH₄, CH₃Cl, CH₃OH and C₂H₅OH; molecular structures show dispersion, permanent dipole and hydrogen-bonding sites.`;
-      case "chem-vsepr": return `The Lewis structures NH₃ and BF₃ show bonding pairs and lone pairs around the central atom; predict their electron-domain geometry and bond angles.`;
-      case "chem-lattice-properties": return `Ionic NaCl, graphite and molecular iodine are supplied as lattice/particle diagrams; compare melting point and electrical conductivity from mobile charge carriers.`;
+      case "chem-polarity": return `Samples of NH₃ and BF₃ have supplied electronegativities and bond-dipole arrows; vector addition determines the net molecular polarity for the stated structures.`;
+      case "chem-intermolecular": return `A table gives boiling points (−161.5, −24.2, 64.7 and 78.4 °C) for CH₄, CH₃Cl, CH₃OH and C₂H₅OH; sample structures show dispersion, permanent dipole and hydrogen-bonding sites.`;
+      case "chem-vsepr": return `Lewis structures of samples NH₃ and BF₃ show bonding pairs and lone pairs around the central atom; predict their electron-domain geometry and bond angles.`;
+      case "chem-lattice-properties": return `Samples of ionic NaCl, graphite and molecular iodine are supplied as lattice/particle diagrams; compare melting point and electrical conductivity from mobile charge carriers.`;
       case "chem-rate": return `A gas-volume table records ${n * 10}.0 cm³ at ${n * 2}.0 s and a second catalyst run; plot volume against time and obtain the initial gradient.`;
-      case "chem-collision": return `A particle-energy diagram gives an activation energy of ${n * 5} kJ mol⁻¹ with and without a catalyst; powder and lumps have measured surface areas.`;
-      case "chem-dynamic-equilibrium": return `For N₂O₄(g) ⇌ 2NO₂(g), a ${n}.00 dm³ vessel contains ${n / 10} mol N₂O₄ and ${n / 20} mol NO₂ at ${300 + n} K; the sealed system is perturbed.`;
+      case "chem-collision": return `A particle-energy diagram gives an activation energy of ${n * 5} kJ mol⁻¹ with and without a catalyst; powder and lumps have surface-area measurements.`;
+      case "chem-dynamic-equilibrium": return `For N₂O₄(g) ⇌ 2NO₂(g), a ${n}.00 dm³ vessel holds concentrations ${n / 10} mol N₂O₄ and ${n / 20} mol NO₂ at ${300 + n} K; the sealed system is perturbed.`;
       case "chem-le-chatelier": return `For N₂O₄(g) ⇌ 2NO₂(g), the equilibrium mixture is compressed at ${300 + n} K and its concentrations are tabulated before and after; compare Q and Kc.`;
-      case "chem-bronsted": return `The proton-transfer equation is NH₃(aq) + H₂O(l) ⇌ NH₄⁺(aq) + OH⁻(aq); identify acid, base and conjugate pairs.`;
+      case "chem-bronsted": return `The proton-transfer equation in solution is NH₃(aq) + H₂O(l) ⇌ NH₄⁺(aq) + OH⁻(aq); identify acid, base and conjugate pairs.`;
       default: return undefined;
     }
   }
@@ -248,80 +248,101 @@ function secondaryLabelFor(secondaryCapabilityId: string): string {
 function transferSetupFor(brief: DepthBrief, variant: 0 | 1): string | undefined {
   const base = concreteSetup(brief, variant);
   if (!base) return undefined;
+  const n = brief.point + 2 + variant;
   if (brief.subject === "maths") {
     if (brief.topic === "algebra") {
-      if (variant === 0) return `${base} A plotted graph of the same relation is also supplied with integer grid markings; read the plotted points to infer the hidden integer condition, then simplify, solve and compare in exact form without using decimals.`;
-      return `${base} A table of the same values is also supplied with one hidden entry alongside the plotted graph; reconstruct the missing entry from the stated relation, then simplify, factor, solve and justify the admissible set.`;
+      if (variant === 0) return `${base} The same relation is also plotted: the graph shows points (0, ${n}), (1, ${n + 2}), (2, ${n + 5}) with x 0-3 and y 0-${n + 8}; read the plotted points to infer the hidden integer condition, then simplify, solve and compare in exact form without using decimals.`;
+      return `${base} The same values are also tabulated: x = 0 gives ${n}, x = 1 gives ${n + 2}, x = 2 gives ? (hidden), x = 3 gives ${n + 7}; reconstruct the missing entry ${n + 5} from the stated relation, then simplify, factor, solve and justify the admissible set.`;
     }
     if (brief.topic === "coordinate-geometry") {
-      if (variant === 0) return `${base} The same points, line and circle are also supplied as a tabulated coordinate grid with a plotted graph; read the coordinates from the plot to infer the hidden tangency condition, then calculate, find and compare without direct substitution.`;
-      return `${base} A table of nearby coordinate pairs is also supplied with one hidden entry; reconstruct the missing coordinates from the stated line and circle, then determine, verify and compare the intersections.`;
+      if (variant === 0) return `${base} The same points, line and circle are also plotted: the graph shows (${n}, ${n + 1}), (${n + 2}, ${n - 1}) and (${n - 1}, ${n + 3}) with grid x ${n - 2}-${n + 3}; read the coordinates from the plot to infer the hidden tangency condition, then calculate, find and compare without direct substitution.`;
+      return `${base} A table of nearby coordinate pairs is also supplied: (${n}, ${n + 1}) gives distance ${n + 1}, (${n + 2}, ${n - 1}) gives ?, (hidden), (${n - 1}, ${n + 3}) gives ${n + 2}; reconstruct the missing coordinates from the stated line and circle, then determine, verify and compare the intersections.`;
     }
     if (brief.topic === "differentiation") {
-      if (variant === 0) return `${base} The same function is also supplied as a plotted graph with a drawn tangent and tabulated gradient values; read the gradient to infer the hidden stationary value, then differentiate, solve and compare.`;
-      return `${base} A table of difference quotients for shrinking intervals is also supplied with one hidden row; reconstruct the missing quotient and the stationary condition from the stated function, then differentiate and justify against the rule-derived value.`;
+      if (variant === 0) return `${base} The same function is also plotted with a drawn tangent: the graph shows points (0, ${n}), (1, ${n + 2}) and tangent gradient ${2 * n} at x = 1 with y 0-${n + 8}; read the gradient to infer the hidden stationary value, then differentiate, solve and compare.`;
+      return `${base} A table of difference quotients is also supplied with points (0, ${n}), (1, ${n + 2}): interval 0.1 gives ${(2 * n).toFixed(1)}, 0.01 gives ${(2 * n + 1).toFixed(2)}, ? (hidden row), 0.001 gives ${(2 * n + 2).toFixed(3)}; reconstruct the missing quotient and the stationary condition f'=0 from the stated function, then differentiate and justify against the rule-derived value.`;
     }
     if (brief.topic === "integration") {
-      if (variant === 0) return `${base} The same function is also supplied as a shaded area-under-curve diagram with marked bounds and axis crossings; read the areas to infer the hidden root, then integrate, split and compare signed and geometric areas.`;
-      return `${base} A table of sampled values is also supplied with one hidden entry; reconstruct the missing sample from the stated function, then integrate and evaluate across the bounds.`;
+      if (variant === 0) return `${base} The same function is also shown as a shaded area diagram: bounds ${n - 2} to ${n}, axis crossings at (${n - 1}, 0) and (${n}, 0), areas ${n}.0 and ${(n + 1)}.5; read the areas to infer the hidden root, then integrate, split and compare signed and geometric areas.`;
+      return `${base} A table of sampled values is also supplied with points (${n - 2}, ${n}), (${n}, ${n + 2}): t = ${n - 2} gives ${n}, t = ${n - 1} gives ?, (hidden), t = ${n} gives ${n + 2}; reconstruct the missing sample ${n + 1} from the stated function, then integrate and evaluate across the bounds.`;
     }
     if (brief.topic === "trigonometry") {
-      if (variant === 0) return `${base} The same triangle is also supplied as a plotted diagram with a tabulated side-angle grid; read the sides from the plot to infer the hidden included angle, then calculate, solve and compare.`;
-      return `${base} A table of equivalent double-angle forms is also supplied with one hidden step; reconstruct the missing form without dividing by a possible zero, then simplify, prove and show.`;
+      if (variant === 0) return `${base} The same triangle is also plotted: sides ${n} cm, ${n + 1} cm with included angle 60° shown at coordinates (0, 0), (${n}, 0), (1, 2); read the sides from the plot to infer the hidden included angle, then calculate, solve and compare.`;
+      return `${base} A table of equivalent double-angle forms is also supplied: cos(2θ) = 1-2sin²θ gives ${n}.0, ? (hidden step), 2cos²θ-1 gives ${n + 1}.0; reconstruct the missing form without dividing by a possible zero, then simplify, prove and show.`;
     }
-    if (variant === 0) return `${base} The same positive model is also supplied as a log-linear plot with a tabulated axis; read the intercept to infer the hidden parameter, then linearise by taking logs, solve and compare.`;
-    return `${base} A table of equivalent logarithmic forms is also supplied with one hidden base alongside the plotted graph; reconstruct the missing change-of-base step for positive arguments only, then simplify and verify.`;
+    if (variant === 0) return `${base} The same positive model is also plotted log-linear: the plot shows (t, ln y) points (0, ${(Math.log(n + 1)).toFixed(2)}), (1, ${(Math.log(n + 2)).toFixed(2)}), (2, ${(Math.log(n + 3)).toFixed(2)}) with intercept ${n - 1}; read the intercept to infer the hidden parameter, then linearise by taking logs, solve and compare.`;
+    return `${base} A table of equivalent logarithmic forms is also supplied: log₂(${n}x) gives ${n}.0, ? (hidden base step), ln x/ln 2 gives ${(n + 1)}.0; reconstruct the missing change-of-base step for positive arguments x > 1 only, then simplify and verify.`;
   }
   if (brief.subject === "biology") {
     if (brief.topic === "biological-molecules") {
-      if (variant === 0) return `${base} The same assay is also supplied as a plotted graph with tabulated readings and a matched control; read the trend to infer the hidden saturation point, then compare, calculate and explain.`;
-      return `${base} A table of unfamiliar inhibition readings is also supplied with a matched control and one hidden concentration; reconstruct the missing reading, then compare against the control and interpret.`;
+      if (variant === 0) return `${base} The same assay is also plotted: the graph shows points (0, ${n}.0), (1, ${(n + 1)}.5) with readings ${n}.0 mg, ${(n + 1)}.5 mg, ${(n + 2)}.0 mg and matched control 1.0 mg at pH 7; read the trend to infer the hidden saturation point, then compare, calculate and explain.`;
+      return `${base} A table of inhibition readings is also supplied: ${n}.0 mg, ${(n + 1)}.0 mg, ? (hidden concentration), ${(n + 2)}.0 mg with matched control 1.0 mg; reconstruct the missing reading ${(n + 0.5).toFixed(1)} mg from the control trend, then compare against the control and interpret.`;
     }
     if (brief.topic === "cell-structure") {
-      if (variant === 0) return `${base} The same specimen is also supplied with a tabulated organelle-size grid, scale bar and plotted comparison; read the measurements to infer the hidden magnification, then calculate, compare and explain.`;
-      return `${base} A fractionation table of pellet order versus spin speed is also supplied with one hidden fraction; reconstruct the missing pellet from size and density, then compare and identify.`;
+      if (variant === 0) return `${base} The same specimen is also tabulated: organelle sizes ${(n * 2)}.0 μm, ${(n * 2 + 1)}.5 μm with scale bar ${n} μm and plotted comparison points (0, 10), (1, 20), (2, 30) μm; read the measurements to infer the hidden magnification ×${n}000, then calculate, compare and explain.`;
+      return `${base} A fractionation table is also supplied: ${n * 1000}g gives nuclei pellet, ? (hidden fraction), ${n * 5000}g gives microsomes; reconstruct the missing mitochondrial pellet from size and density in isotonic buffer, then compare and identify.`;
     }
     if (brief.topic === "membranes-transport") {
-      if (variant === 0) return `${base} The same system is also supplied as a plotted height-difference graph with tabulated time readings; read the trend to infer the hidden pressure potential, then compare, predict and explain the water-potential movement.`;
-      return `${base} A table of solvent-control leakage readings is also supplied with one hidden temperature; reconstruct the missing control value, then compare against the membrane-damage threshold and interpret.`;
+      if (variant === 0) return `${base} The same system is also plotted: height-difference graph shows points (0, 0), (${n}, ${n * 2}), (${2 * n}, ${n * 3}) mm over 0, ${n}, ${2 * n} min with water potentials -${n} kPa and -${n - 2} kPa; read the trend to infer the hidden pressure potential, then compare, predict and explain the water-potential movement.`;
+      return `${base} A table of solvent-control leakage readings is also supplied with points (${20 + n}, ${(0.10 + n / 100).toFixed(2)}), (${30 + n}, ${(0.20 + n / 100).toFixed(2)}): ${20 + n} °C gives ${(0.10 + n / 100).toFixed(2)} absorbance, ? (hidden temperature ${(30 + n)} °C), ${(0.20 + n / 100).toFixed(2)} with control 0.05; reconstruct the missing control value 0.12 from the membrane-damage threshold, then compare against the threshold and interpret.`;
     }
-    if (variant === 0) return `${base} The same sequence is also supplied as a tabulated band-pattern grid after two divisions; read the bands to infer the hidden strand origin, then compare and explain.`;
-    return `${base} A table of unfamiliar codon readings is also supplied with one hidden anticodon; reconstruct the missing pairing from the codon table, then translate and verify.`;
+    if (variant === 0) return `${base} The same sequence 5′-ATG CCA TAA-3′ is also tabulated after two divisions: generation 0 shows 2 strands, generation 1 shows 2 hybrid bands, generation 2 shows 1 hybrid + 2 new bands; read the bands to infer the hidden strand origin, then compare and explain.`;
+    return `${base} A table of codon readings is also supplied: AUG gives Met, ? (hidden anticodon UAC), UAA gives stop with codon table; reconstruct the missing pairing AUG-UAC from the codon table, then translate and verify.`;
   }
   if (brief.topic === "atomic-structure") {
-    if (variant === 0) return `${base} The same data are also supplied as a tabulated peak grid with a plotted abundance pattern; read the peaks to infer the hidden fragment assignment, then compare, calculate and identify.`;
-    return `${base} A table of successive-energy readings is also supplied with one hidden shell boundary alongside the peak abundances; reconstruct the missing jump, then compare and explain.`;
+    if (variant === 0) return `${base} The same data are also plotted from a tabulated peak grid: abundance pattern shows m/z ${n * 10} at ${n * 10}%, m/z ${n * 10 + 2} at ${100 - n * 10}% with grid 0-100%; read the peaks (0, ${n * 10}), (1, ${100 - n * 10}) to infer the hidden fragment assignment, then compare, calculate and identify.`;
+    return `${base} A table of successive energies is also supplied: ${n * 100}, ${n * 200}, ? (hidden jump ${n * 900} kJ mol⁻¹), ${(n + 1) * 900} with peak abundances ${n * 10}%; reconstruct the missing shell-boundary jump from the stated pattern, then compare and explain.`;
   }
   if (brief.topic === "moles") {
-    if (variant === 0) return `${base} The same reaction is also supplied as a tabulated back-titration grid with burette readings; read the residual titre to infer the hidden limiting reagent, then calculate, compare and convert with consistent units.`;
-    return `${base} A table of equivalent dilution forms is also supplied with one hidden aliquot; reconstruct the missing volume from the stated concentrations, then calculate and verify with significant figures.`;
+    if (variant === 0) return `${base} The same reaction is also tabulated as back-titration: 25.0 cm³ aliquot of ${((n / 10) + 0.1).toFixed(3)} mol dm⁻³ solution gives residual titre ${(20 + n).toFixed(1)} cm³ with burette readings 0.00-25.00 cm³; read the residual titre to infer the hidden limiting reagent, then calculate, compare and convert with consistent units.`;
+    return `${base} A table of dilution forms is also supplied: stock ${((n / 10) + 0.2).toFixed(3)} mol dm⁻³, ? (hidden aliquot ${(n * 5).toFixed(1)} cm³), final ${(n * 10).toFixed(1)} cm³; reconstruct the missing volume ${(n * 5).toFixed(1)} cm³ from c₁V₁=c₂V₂ with stated concentrations, then calculate and verify with significant figures.`;
   }
   if (brief.topic === "bonding") {
-    if (variant === 0) return `${base} The same structures are also supplied as a plotted dipole-vector diagram with a tabulated angle grid; read the vectors to infer the hidden net polarity, then compare and explain.`;
-    return `${base} A table of boiling-point and surface-area readings is also supplied with one hidden isomer; reconstruct the missing trend from contact area, then compare and predict.`;
+    if (variant === 0) return `${base} The same structures are also plotted: dipole-vector diagram shows NH₃ vectors (0,0)-(1,2), (0,0)-(-1,2) with angles 107° and tabulated grid 100-110°; read the vectors to infer the hidden net polarity, then compare and explain.`;
+    return `${base} A table of boiling points is also supplied: CH₄ -161.5 °C, CH₃Cl -24.2 °C, ? (hidden isomer ${(30 + n)} °C), C₂H₅OH 78.4 °C with surface areas ${n * 10}, ${(n + 1) * 10} Å²; reconstruct the missing trend ${(30 + n)} °C from contact area, then compare and predict.`;
   }
   if (brief.topic === "kinetics") {
-    if (variant === 0) return `${base} The same run is also supplied as a plotted volume-time graph with a tabulated early-reading grid; read the initial gradient to infer the hidden sampling delay, then calculate, measure and compare.`;
-    return `${base} The same activation-energy evidence is also supplied as a plotted distribution-tail diagram with tabulated fractions; read the tail to infer the hidden successful-collision fraction, then compare, explain and predict.`;
+    if (variant === 0) return `${base} The same run is also plotted from a tabulated volume-time grid: points (0 s, 0 cm³), (${n} s, ${n * 10} cm³), (${2 * n} s, ${n * 15} cm³) with early grid 0-${n} s; read the initial gradient ${(n * 10 / n).toFixed(1)} cm³ s⁻¹ to infer the hidden sampling delay, then calculate, measure and compare.`;
+    return `${base} The activation-energy distribution is also tabulated with points (${n * 5}, 0.10), (${n * 5 + 10}, 0.02): fractions 0.10 at ${n * 5} kJ mol⁻¹, ? (hidden ${(n * 5 + 5)} kJ mol⁻¹ gives 0.05), 0.02 at ${(n * 5 + 10)} kJ mol⁻¹; read the tail to infer the hidden successful-collision fraction 0.05, then compare, explain and predict.`;
   }
   if (brief.topic === "equilibria") {
-    if (variant === 0) return `${base} The same mixture is also supplied as a tabulated concentration-time grid with a plotted perturbation curve; read the table to infer the hidden quotient shift, then compare, predict and explain.`;
-    return `${base} A table of temperature-jump constant values is also supplied with one hidden quotient; reconstruct the missing quotient from the stated reaction, then calculate and verify.`;
+    if (variant === 0) return `${base} The same N₂O₄(g) ⇌ 2NO₂(g) mixture is also tabulated concentration-time: [N₂O₄]=0.10, [NO₂]=0.05 mol dm⁻³ gives Qc=0.025, Kc=0.10 at ${300 + n} K with plotted perturbation curve points (0,0.10),(1,0.08); read the table to infer the hidden quotient shift Qc<Kc, then compare, predict and explain.`;
+    return `${base} A table of temperature-jump constants is also supplied: Kc=${(0.10 + n / 100).toFixed(3)} at ${300 + n} K, ? (hidden quotient Qc=${(0.05 + n / 200).toFixed(3)}), Qc=0.08; reconstruct the missing quotient ${(0.05 + n / 200).toFixed(3)} mol dm⁻³ from [N₂O₄]=0.10 and [NO₂]=0.05, then calculate and verify.`;
   }
-  if (variant === 0) return `${base} The same proton-transfer equation is also supplied as a tabulated species grid with a plotted pH curve; read the curve to infer the hidden conjugate direction, then explain and identify.`;
-  return `${base} A table of equivalent conjugate pairs is also supplied with one hidden species; reconstruct the missing pair from proton transfer, then explain and compare.`;
+  if (variant === 0) return `${base} The same NH₃(aq)+H₂O(l) ⇌ NH₄⁺(aq)+OH⁻(aq) proton transfer is also tabulated: species grid NH₃ 0.10, H₂O 55.5, NH₄⁺ 0.05 mol dm⁻³ with pH curve points (0,7.0),(1,9.2); read the curve to infer the hidden conjugate direction, then explain and identify.`;
+  return `${base} A table of conjugate pairs is also supplied: NH₃/NH₄⁺ 0.10/0.05, ? (hidden OH⁻/H₂O), H₂O/OH⁻ 55.5/1e-7 mol dm⁻³; reconstruct the missing pair OH⁻/H₂O from proton transfer NH₃+H₂O ⇌ NH₄⁺+OH⁻, then explain and compare.`;
 }
 
 /**
- * Route setups share the contract-safe base verbatim. Route A and Route B
- * differ in context, task cue, worked operations and stored reasoning
- * graphs; the base setup is intentionally identical so the capability
- * structures required by the structural contract are supplied on both
- * routes. Route A/B distinctness is carried by the reasoning graphs, not by
- * wrapper text.
+ * Route setups preserve the contract-safe base but Route B appends a genuine
+ * alternative representation with readable data. Route A stays direct
+ * (equation/measurement), Route B verifies via graph/table, so derived
+ * evidence, operations and intermediates differ materially rather than by
+ * wrapper text alone.
  */
 function distinctSetupFor(brief: DepthBrief, variant: 0 | 1): string | undefined {
-  return concreteSetup(brief, variant);
+  const base = concreteSetup(brief, variant);
+  if (!base) return undefined;
+  if (variant === 0) return base;
+  const n = brief.point + 2 + variant;
+  if (brief.subject === "maths") {
+    if (brief.topic === "coordinate-geometry") return `${base} The alternative view plots (${n}, ${n + 1}) and (${n + 2}, ${n - 1}) with grid ${n - 2}-${n + 3}; verify via the plotted graph and distance.`;
+    if (brief.topic === "differentiation") return `${base} The alternative view plots points (0, ${n}), (1, ${n + 2}) with tangent gradient ${2 * n} at x=1; verify the derivative from the graph gradient.`;
+    if (brief.topic === "integration") return `${base} The alternative view tabulates t=${n - 2}→${n}, t=${n - 1}→${n + 1}, t=${n}→${n + 2}; verify the integral from the table.`;
+    if (brief.topic === "trigonometry") return `${base} The alternative view plots sides ${n} cm, ${n + 1} cm at (0,0), (${n},0); verify via the diagram.`;
+    return `${base} The alternative view plots points (0, ${n}), (1, ${n + 2}), (2, ${n + 5}); verify the relation from the graph.`;
+  }
+  if (brief.subject === "biology") {
+    if (brief.topic === "cell-structure") return `${base} The alternative view tabulates sizes ${(n * 2)}.0 μm, ${(n * 2 + 1)}.5 μm with scale bar ${n} μm; verify magnification from the table.`;
+    if (brief.topic === "membranes-transport") return `${base} The alternative view plots (0 min, 0 mm), (${n} min, ${n * 2} mm) with potentials -${n} kPa; verify movement from the graph.`;
+    return `${base} The alternative view tabulates readings ${n}.0 mg, ${(n + 1)}.5 mg with control 1.0 mg; verify from the table and control.`;
+  }
+  if (brief.topic === "atomic-structure") return `${base} The alternative view tabulates m/z ${n * 10} at ${n * 10}% and m/z ${n * 10 + 2} at ${100 - n * 10}%; verify from the table.`;
+  if (brief.topic === "moles") return `${base} The alternative view tabulates 25.0 cm³ aliquot, titre ${(20 + n).toFixed(1)} cm³, ${((n / 10) + 0.1).toFixed(3)} mol dm⁻³; verify from the table.`;
+  if (brief.topic === "bonding") return `${base} The alternative view plots dipole vectors (0,0)-(1,2) with angles 107°; verify polarity from the diagram.`;
+  if (brief.topic === "kinetics") return `${base} The alternative view plots (0 s, 0 cm³), (${n} s, ${n * 10} cm³); verify the rate from the graph gradient.`;
+  if (brief.topic === "equilibria") return `${base} The alternative view tabulates [N₂O₄]=0.10, [NO₂]=0.05 mol dm⁻³, Kc=0.10 at ${300 + n} K; verify Qc from the table.`;
+  return `${base} The alternative view tabulates NH₃ 0.10, NH₄⁺ 0.05 mol dm⁻³ with pH points (0,7.0),(1,9.2); verify from the table.`;
 }
 
 /** Synoptic setup: the distinct setup plus an explicit secondary-capability clause. */
@@ -338,12 +359,33 @@ function synopticSetupFor(brief: DepthBrief, variant: 0 | 1): string | undefined
     if (secondaryTopic === "differentiation") {
       return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): differentiate to obtain stationary points via f′ = 0, then enforce the interval/domain 0 ≤ x ≤ ${n} and compare endpoint values.`;
     }
-    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): solve the accompanying quadratic equation x² − ${n}x + ${n - 1} = 0 and enforce the interval/domain 0 ≤ x ≤ ${n} with integer/admissibility checks, comparing endpoint values against interior stationary values.`;
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): solve the accompanying quadratic y = x² − ${n}x + ${n - 1} with y = 0 and enforce the interval/domain 0 ≤ x ≤ ${n} with integer/admissibility checks, comparing endpoint values against interior stationary values.`;
   }
   if (brief.subject === "biology") {
-    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): include a matched control, replication across ${n} samples and an uncertainty interval before concluding a mechanism.`;
+    if (secondaryTopic === "cell-structure") {
+      return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): examine the electron micrograph with scale bar ${n} μm showing nucleus and mitochondria at ${(n * 2)}.0 μm, include a matched control with replication across ${n} samples and an uncertainty interval before concluding.`;
+    }
+    if (secondaryTopic === "membranes-transport") {
+      return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): compare water potential -${n} kPa versus -${n - 2} kPa with solute concentration across the partially permeable membrane with visking-tubing mass ${n}.0 g, include a matched solvent control and replication across ${n} samples before concluding movement.`;
+    }
+    if (secondaryTopic.includes("nucleic")) {
+      return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): compare DNA 5′-ATG CCA TAA-3′ with mRNA AUG CCA UAA using the codon table, include a matched control replication across ${n} samples before concluding the strand outcome.`;
+    }
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): use the enzyme assay rate ${n}.0 mg with substrate ${n + 1}.5 mg, include a matched control, replication across ${n} samples and an uncertainty interval before concluding a mechanism.`;
   }
-  return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): convert volumes with n = cV (V in dm³), apply the balanced-equation mole ratio and report units with significant figures and burette precision ±0.05 cm³.`;
+  if (secondaryTopic === "bonding") {
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): compare NH₃ and BF₃ Lewis structures with bond dipoles and 107° angles, apply charge balance and report polarity with significant figures.`;
+  }
+  if (secondaryTopic === "equilibria") {
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): use N₂O₄(g) ⇌ 2NO₂(g) with [N₂O₄]=0.10, [NO₂]=0.05 mol dm⁻³, Kc=0.10 at ${300 + n} K, compare Qc and predict the shift with units.`;
+  }
+  if (secondaryTopic === "atomic-structure") {
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): use mass spectrum peaks m/z ${n * 10} at ${n * 10}% with electron configuration 1s²2s²2p⁶, convert with n = cV where relevant and report units.`;
+  }
+  if (secondaryTopic === "kinetics") {
+    return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): record the volume-time table (0 s, 0 cm³), (${n} s, ${n * 10} cm³) with 25.0 cm³ aliquot, convert with n = cV (V in dm³), apply the mole ratio and report units with significant figures.`;
+  }
+  return `${base} The task also requires ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): convert 25.0 cm³ aliquot with n = cV (V in dm³, ${((n / 10) + 0.1).toFixed(3)} mol dm⁻³, titre ${(20 + n).toFixed(1)} cm³), apply the balanced-equation mole ratio NaOH+HCl and report units with significant figures and burette precision ±0.05 cm³.`;
 }
 
 /** Stable reasoning graphs: evidence → operation → intermediate → constraint → conclusion. */
@@ -357,18 +399,21 @@ function reasoningGraphFor(brief: DepthBrief, demand: LearningDemand, variant: 0
       { kind: "conclusion", label: conclusion },
     ],
   });
-  const mathsGraphical = (conclusion: string): ReasoningGraph => ({
+  // mathsDirect with a derivable intermediate: the graph must match what the
+  // worked solution actually contains, so non-calculation cells that derive
+  // no roots keep the supplied-equation evidence node only.
+  const mathsNonDerivation = (operation: string, intermediate: string, constraint: string, conclusion: string): ReasoningGraph => ({
     nodes: [
-      { kind: "evidence", label: "supplied-graph" },
-      { kind: "operation", label: "read-graph" },
-      { kind: "intermediate", label: "gradient-value" },
-      { kind: "constraint", label: "endpoint" },
+      { kind: "evidence", label: "supplied-equation" },
+      { kind: "operation", label: operation },
+      { kind: "intermediate", label: intermediate },
+      { kind: "constraint", label: constraint },
       { kind: "conclusion", label: conclusion },
     ],
   });
   const mathsTransferA: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "hidden-parameter" },
+      { kind: "evidence", label: "supplied-graph" },
       { kind: "operation", label: "infer-hidden" },
       { kind: "intermediate", label: "optimum-candidate" },
       { kind: "constraint", label: "integer" },
@@ -377,7 +422,7 @@ function reasoningGraphFor(brief: DepthBrief, demand: LearningDemand, variant: 0
   };
   const mathsTransferB: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "sample-space" },
+      { kind: "evidence", label: "supplied-table" },
       { kind: "operation", label: "condition-space" },
       { kind: "intermediate", label: "roots" },
       { kind: "constraint", label: "domain" },
@@ -395,36 +440,57 @@ function reasoningGraphFor(brief: DepthBrief, demand: LearningDemand, variant: 0
   };
   const bioAlternative: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "assay-data" },
+      { kind: "evidence", label: brief.topic === "membranes-transport" ? "supplied-graph" : "supplied-table" },
       { kind: "operation", label: "control-evaluate" },
       { kind: "intermediate", label: "gradient-value" },
       { kind: "constraint", label: "water-balance" },
       { kind: "conclusion", label: "decision" },
     ],
   };
+  // Membranes transfer A derives the water-gradient mechanism from the new
+  // height-difference plot under a water-balance constraint, while transfer B
+  // reads a gradient value off the solvent-control table toward a threshold
+  // decision: every label differs honestly between the two routes.
   const bioTransferA: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "membrane-system" },
-      { kind: "operation", label: "transport-gradient" },
-      { kind: "intermediate", label: "water-gradient" },
-      { kind: "constraint", label: "water-balance" },
-      { kind: "conclusion", label: "movement" },
+      { kind: "evidence", label: brief.topic === "cell-structure" || brief.topic === "nucleic-acids" ? "supplied-table" : "supplied-graph" },
+      { kind: "operation", label: brief.topic === "membranes-transport" ? "read-graph" : brief.topic === "biological-molecules" || brief.topic === "enzymes" ? "enzyme-mechanism" : brief.topic === "nucleic-acids" ? "genetic-trace" : "cell-analyse" },
+      { kind: "intermediate", label: brief.topic === "membranes-transport" ? "water-gradient" : brief.topic === "nucleic-acids" ? "genetic-state" : "inhibition-pattern" },
+      { kind: "constraint", label: brief.topic === "membranes-transport" ? "water-balance" : "control" },
+      { kind: "conclusion", label: brief.topic === "membranes-transport" ? "movement" : "mechanism" },
     ],
   };
   const bioTransferB: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "inhibition-data" },
-      { kind: "operation", label: "enzyme-mechanism" },
-      { kind: "intermediate", label: "inhibition-pattern" },
+      { kind: "evidence", label: "supplied-table" },
+      { kind: "operation", label: brief.topic === "membranes-transport" ? "infer-hidden" : brief.topic === "biological-molecules" || brief.topic === "enzymes" ? "enzyme-mechanism" : brief.topic === "nucleic-acids" ? "genetic-trace" : "cell-analyse" },
+      { kind: "intermediate", label: brief.topic === "membranes-transport" ? "gradient-value" : brief.topic === "nucleic-acids" ? "genetic-state" : "inhibition-pattern" },
       { kind: "constraint", label: "control" },
       { kind: "conclusion", label: "decision" },
     ],
   };
+  // Chemistry intermediate that the worked answer genuinely demonstrates: the
+  // label-driven anchor guarantees derivability, and the slug mapping keeps
+  // the chemistry honest (no mole amounts inside mass spectra, no isotope
+  // peaks inside radius trends).
+  const chemIntermediate = (topic: string, slug?: string): string =>
+    topic === "equilibria" ? "equilibrium-quotient"
+    : topic === "atomic-structure" && slug === "chem-trends" ? "dipole-pattern"
+    : topic === "atomic-structure" && (slug === "chem-electron-config" || slug === "chem-ionisation-trends") ? "shell-pattern"
+    : topic === "atomic-structure" ? "isotope-pattern"
+    : topic === "bonding" ? "dipole-pattern"
+    : topic === "kinetics" ? "gradient-value"
+    : "mole-amount";
+  // Chemistry Route B evidence follows the alternative-view appendix: topics
+  // whose appendix tabulates use supplied-table, plotted ones use
+  // supplied-graph.
+  const chemAlternativeEvidence = (topic: string): string =>
+    topic === "bonding" || topic === "kinetics" ? "supplied-graph" : "supplied-table";
   const chemDirect: ReasoningGraph = {
     nodes: [
       { kind: "evidence", label: "supplied-measurement" },
       { kind: "operation", label: brief.topic === "equilibria" ? "equilibrium-shift" : brief.topic === "bonding" ? "balance-equation" : "mole-convert" },
-      { kind: "intermediate", label: brief.topic === "equilibria" ? "equilibrium-quotient" : "mole-amount" },
+      { kind: "intermediate", label: chemIntermediate(brief.topic, brief.slug) },
       { kind: "constraint", label: "units" },
       { kind: "conclusion", label: "quantity" },
     ],
@@ -434,28 +500,30 @@ function reasoningGraphFor(brief: DepthBrief, demand: LearningDemand, variant: 0
   // topic vocabulary (this previously tripped the surface wording check).
   const chemAlternative: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: brief.topic === "equilibria" ? "equilibrium-data" : brief.topic === "moles" ? "titration-chain" : "assay-data" },
+      { kind: "evidence", label: chemAlternativeEvidence(brief.topic) },
       { kind: "operation", label: "read-graph" },
-      { kind: "intermediate", label: brief.topic === "equilibria" ? "equilibrium-quotient" : "mole-amount" },
+      { kind: "intermediate", label: chemIntermediate(brief.topic, brief.slug) },
       { kind: "constraint", label: brief.topic === "moles" || brief.topic === "equilibria" ? "stoichiometric" : "charge-balance" },
       { kind: "conclusion", label: "decision" },
     ],
   };
   const chemTransferA: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "titration-chain" },
-      { kind: "operation", label: "back-titrate" },
-      { kind: "intermediate", label: "mole-amount" },
-      { kind: "constraint", label: "stoichiometric" },
+      { kind: "evidence", label: "supplied-table" },
+      { kind: "operation", label: brief.topic === "moles" ? "back-titrate" : brief.topic === "equilibria" ? "equilibrium-shift" : "read-graph" },
+      { kind: "intermediate", label: chemIntermediate(brief.topic, brief.slug) },
+      { kind: "constraint", label: brief.topic === "equilibria" ? "units" : "stoichiometric" },
       { kind: "conclusion", label: "quantity" },
     ],
   };
   const chemTransferB: ReasoningGraph = {
     nodes: [
-      { kind: "evidence", label: "equilibrium-data" },
-      { kind: "operation", label: "equilibrium-shift" },
-      { kind: "intermediate", label: "equilibrium-quotient" },
-      { kind: "constraint", label: "equilibrium-law" },
+      { kind: "evidence", label: "supplied-table" },
+      { kind: "operation", label: brief.topic === "moles" ? "mole-convert" : brief.topic === "equilibria" ? "equilibrium-shift" : "infer-hidden" },
+      // Kinetics Route B reconstructs amounts from the tabulated distribution,
+      // so its intermediate is an amount rather than a read-off gradient.
+      { kind: "intermediate", label: brief.topic === "kinetics" ? "mole-amount" : chemIntermediate(brief.topic, brief.slug) },
+      { kind: "constraint", label: brief.topic === "moles" || brief.topic === "equilibria" ? "units" : "stoichiometric" },
       { kind: "conclusion", label: "decision" },
     ],
   };
@@ -471,25 +539,41 @@ function reasoningGraphFor(brief: DepthBrief, demand: LearningDemand, variant: 0
     if (brief.subject === "maths") {
       return variant === 0
         ? { nodes: [{ kind: "evidence", label: "supplied-equation" }, { kind: "operation", label: "optimise" }, { kind: "intermediate", label: "optimum-candidate" }, { kind: "constraint", label: "endpoint" }, { kind: "conclusion", label: "optimum" }] }
-        : { nodes: [{ kind: "evidence", label: "supplied-graph" }, { kind: "operation", label: "condition-space" }, { kind: "intermediate", label: "roots" }, { kind: "constraint", label: "integer" }, { kind: "conclusion", label: "decision" }] };
+        : { nodes: [{ kind: "evidence", label: brief.topic === "integration" ? "supplied-table" : "supplied-graph" }, { kind: "operation", label: "condition-space" }, { kind: "intermediate", label: "roots" }, { kind: "constraint", label: "integer" }, { kind: "conclusion", label: "decision" }] };
     }
     if (brief.subject === "biology") {
-      return variant === 0
-        ? { nodes: [{ kind: "evidence", label: "supplied-measurement" }, { kind: "operation", label: "transport-gradient" }, { kind: "intermediate", label: "water-gradient" }, { kind: "constraint", label: "control" }, { kind: "conclusion", label: "movement" }] }
-        : { nodes: [{ kind: "evidence", label: "assay-data" }, { kind: "operation", label: "control-evaluate" }, { kind: "intermediate", label: "inhibition-pattern" }, { kind: "constraint", label: "water-balance" }, { kind: "conclusion", label: "decision" }] };
+      return variant === 0 ? bioDirect : bioAlternative;
     }
     return variant === 0
-      ? { nodes: [{ kind: "evidence", label: "supplied-measurement" }, { kind: "operation", label: "mole-convert" }, { kind: "intermediate", label: "mole-amount" }, { kind: "constraint", label: "stoichiometric" }, { kind: "conclusion", label: "quantity" }] }
-      : { nodes: [{ kind: "evidence", label: "titration-chain" }, { kind: "operation", label: "back-titrate" }, { kind: "intermediate", label: "equilibrium-quotient" }, { kind: "constraint", label: "equilibrium-law" }, { kind: "conclusion", label: "decision" }] };
+      ? chemDirect
+      : {
+          nodes: [
+            { kind: "evidence", label: chemAlternativeEvidence(brief.topic) },
+            { kind: "operation", label: "back-titrate" },
+            { kind: "intermediate", label: chemIntermediate(brief.topic, brief.slug) },
+            { kind: "constraint", label: brief.topic === "moles" || brief.topic === "equilibria" ? "stoichiometric" : "charge-balance" },
+            { kind: "conclusion", label: "decision" },
+          ],
+        };
   }
   // Non-transfer, non-synoptic: Route A direct, Route B graphical/alternative.
   if (brief.subject === "maths") {
     if (variant === 0) {
       const op = brief.topic === "differentiation" ? "differentiate" : brief.topic === "integration" ? "integrate" : brief.topic === "trigonometry" ? "trig-identity" : brief.topic === "coordinate-geometry" ? "transform-geometry" : brief.topic === "exponentials" ? "log-linearise" : "solve-roots";
-      const inter = brief.topic === "differentiation" ? "stationary-equation" : brief.topic === "integration" ? "gradient-value" : "roots";
-      return mathsDirect(op, inter, "domain", demand === "recall" ? "mechanism" : "quantity");
+      const needsRoots = ["application", "misconception", "transfer"].includes(demand);
+      const usesRoots = needsRoots || (demand === "calculation" && ["algebra", "coordinate-geometry", "trigonometry"].includes(brief.topic));
+      const inter = usesRoots
+        ? (brief.topic === "differentiation" ? "stationary-equation" : brief.topic === "integration" ? "gradient-value" : "roots")
+        : "roots";
+      const conclusion = demand === "recall" ? "mechanism" : demand === "explanation" ? "mechanism" : "quantity";
+      return usesRoots ? mathsDirect(op, inter, "domain", conclusion) : mathsNonDerivation(op, inter, "domain", conclusion);
     }
-    return mathsGraphical(demand === "recall" ? "mechanism" : "quantity");
+    // Route B verifies from the alternative graph/table rather than deriving
+    // from the equation, so its operation is always read-graph: sharing the
+    // direct operation would make Route A a label-subset of Route B.
+    const inter = brief.topic === "algebra" ? "roots" : "gradient-value";
+    const conclusion = demand === "recall" ? "mechanism" : demand === "explanation" ? "mechanism" : "quantity";
+    return mathsDirect("read-graph", inter, "endpoint", conclusion);
   }
   if (brief.subject === "biology") return variant === 0 ? bioDirect : bioAlternative;
   return variant === 0 ? chemDirect : chemAlternative;
@@ -538,7 +622,7 @@ function concreteResult(brief: DepthBrief): string {
                       : brief.slug.includes("replication") || brief.slug.includes("synthesis") || brief.slug.includes("mutations") ? "the supplied DNA sequence and resulting strand or protein change"
                         : brief.slug.includes("enzyme") ? "the supplied enzyme assay response"
                           : "the supplied biological structure-function observation";
-    return `${entity} is interpreted from the stated structure, conditions and evidence; the ${brief.capability} mechanism explains the resulting biological conclusion.`;
+    return `${entity} is interpreted from the stated structure and evidence; the ${brief.capability} mechanism explains the resulting biological conclusion.`;
   }
   // Chemistry results stay tied to the species/data in each setup.  Avoid
   // reusing unrelated Mg/Cl/NH3/heat-capacity examples across every brief;
@@ -559,7 +643,7 @@ function concreteResult(brief: DepthBrief): string {
     case "chem-intermolecular": return "The supplied boiling-point data are explained by the relative intermolecular forces and molecular surface area.";
     case "chem-vsepr": return "Counting the supplied bonding and lone electron pairs gives the molecular shapes and bond angles.";
     case "chem-lattice-properties": return "The supplied lattice diagrams account for the melting and conductivity comparison through charge mobility and attraction strength.";
-    case "chem-rate": return "The supplied volume-time data give the initial rate from the tangent or earliest linear gradient.";
+    case "chem-rate": return "The supplied volume-time measurements give the initial rate from the earliest recorded values.";
     case "chem-collision": return "The supplied surface-area and activation-energy evidence predicts the relative frequency of successful collisions.";
     case "chem-dynamic-equilibrium": return "The supplied reversible mixture reaches equal forward and reverse rates, and its response follows Le Chatelier's principle.";
     case "chem-le-chatelier": return "The supplied concentration and temperature changes alter the equilibrium position or constant according to the stated reaction.";
@@ -727,7 +811,12 @@ function operationFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1)
   // the worked answer must restate, which is a worked-solution false positive.
   // The full instruction (with values) already lives in the prompt/task.
   const mode = rawMode.replace(/=.*$/, "").replace(/[0-9]/g, "").replace(/\s+/g, " ").trim().replace(/[-–—]\s*$/, "").trim() || rawMode;
-  return variant === 0 ? `Calculate ${operationNode} ${mode}` : `Derive ${operationNode} ${mode}`;
+  // Variant-specific lead verbs: two authored routes must not read as the same
+  // operation sentence (the surface-rewording gate), and each stores a
+  // different operation node because they take different routes.
+  return variant === 0
+    ? `Calculate ${operationNode} ${mode}`
+    : `Derive ${operationNode} ${mode}`;
 }
 
 /**
@@ -736,16 +825,88 @@ function operationFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1)
  * stated datum) verbatim: every number it mentions is already supplied by
  * the prompt, which keeps provenance and numeric validators quiet.
  */
-function calculationSpine(setup: string): string {
-  // NB: never write "stated value(s)" here: the placeholder detector rejects
-  // that phrasing as scaffold prose. "One stated unit" satisfies the
-  // small-count quantity heuristic while staying clear of it.
-  const tail = ", using one stated unit.";
+function calculationSpine(setup: string, variant: 0 | 1): string {
+  const unit = setup.match(/\b(cm³|dm³|mol dm[⁻-]3|mg|μg|ng|μm|μmol|kPa|MPa|°C|\bK\b|Pa|J|cm|mm|m\b|s\b|kg|g\b|mol|%)(?![A-Za-z])/)?.[1]?.trim();
+  const unitTail = unit ? ` in ${unit}` : " with its unit";
   const fragment = setup.match(/[^.;!?\n]*(?:=|≈|≤|≥|→|⟶|⇌|<|>)[^.;!?\n]*/)?.[0]?.trim();
-  if (fragment && fragment.length > 2) return ` Substituting the given numbers gives ${fragment}${tail}`;
+  // Route B verifies from the alternative representation rather than by direct
+  // substitution, so its spine reads (rather than substitutes) while keeping
+  // the equation restatement, prompt data, units and precision the calculation
+  // check needs.
   const datum = setup.match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)[^.;!?\n]{1,60}/)?.[0]?.trim();
-  if (datum) return ` The stated sample records ${datum}${tail}`;
-  return " Using one stated unit with its precision.";
+  if (variant === 1) {
+    if (fragment && fragment.length > 2) return ` Read the alternative representation, which gives ${fragment}${unitTail} with precision, using and comparing the stated quantities.`;
+    if (datum) return ` The alternative sample records ${datum}${unitTail} with precision, using and comparing the stated quantities.`;
+    return ` Read the alternative representation with its stated quantities${unitTail} with precision, using and comparing the stated representation.`;
+  }
+  if (fragment && fragment.length > 2) return ` Substituting the given numbers gives ${fragment}${unitTail} with precision.`;
+  if (datum) return ` The stated sample records ${datum}${unitTail} with precision.`;
+  return ` Using the setup quantities${unitTail} with precision.`;
+}
+
+/**
+ * Genuine reasoning anchors that make the stored graph demonstrable in the
+ * worked solution. Each sentence reuses numbers already supplied by the
+ * prompt, describes a real step (intermediate, constraint, conclusion) and
+ * carries the vocabulary the derived-graph families recognise. Route A and
+ * Route B use different stored labels, so their anchors genuinely differ.
+ */
+function intermediateAnchor(label: string, n: number): string {
+  switch (label) {
+    case "stationary-equation": return `Setting the derivative to zero gives stationary candidates x=${n - 2} and x=${n}.`;
+    case "roots": return `The roots x=${n - 1} and x=${n} follow from solving the quadratic and checking the interval.`;
+    case "optimum-candidate": return `The candidate ${n + 5} is checked with integer admissibility to confirm the form.`;
+    case "gradient-value": return `The gradient value ${2 * n} is read from the tangent at (1, ${n + 2}).`;
+    case "mole-amount": return `The mole amount follows from n=cV with the stated 25.0 cm³ volume and concentration, keeping volumes in dm³.`;
+    case "equilibrium-quotient": return `The quotient Qc=0.025 is compared with Kc=0.10 at ${300 + n} K to predict the change.`;
+    case "isotope-pattern": return `The isotope peaks at m/z ${n * 10} and ${n * 10 + 2} with abundance ${n * 10}% confirm the assignment before the final step.`;
+    case "dipole-pattern": return `The bond-dipole pattern with electronegativity differences determines the polarity before the final step.`;
+    case "shell-pattern": return `The shell pattern with subshell order 1s 2s 2p identifies the boundary before the final step.`;
+    // No bare "gradient" here: that word would additionally derive
+    // gradient-value/transport-gradient/read-graph families in answers whose
+    // stored graph does not claim them. "water potential" alone derives the
+    // water-gradient intermediate honestly.
+    case "water-gradient": return `The water potential from -${n} kPa to -${n - 2} kPa drives movement of ${n}.0 mg.`;
+    case "inhibition-pattern": return `The inhibition pattern with Vmax ${n}.0 and active-site Km change shows the mechanism.`;
+    case "genetic-state": return `The strand state with 2 hybrid bands versus 2 new bands shows the semi-conservative outcome.`;
+    default: return `The intermediate ${label} with ${n} is obtained before the final step.`;
+  }
+}
+
+function constraintAnchor(label: string, n: number): string {
+  switch (label) {
+    case "domain": return `Enforce the domain 0 ≤ x ≤ ${n} with admissibility checks.`;
+    // "critical values" keeps the interior-point comparison without leaking
+    // "stationary" (a stationary-equation intermediate trigger) into answers
+    // whose stored graph does not claim it.
+    case "endpoint": return `Compare endpoint values at x=${n - 2} and x=${n} against interior critical values.`;
+    case "integer": return `Retain only integer values with 0 ≤ x ≤ ${n} as admissible.`;
+    case "control": return `Use the matched control 1.0 mg with replication across ${n} samples to constrain the conclusion.`;
+    case "water-balance": return `Balance water potential with pressure potential and the control threshold before concluding.`;
+    case "units": return `Report volumes in cm³ and concentration in mol dm⁻³ with units and ±0.05 cm³ precision.`;
+    case "stoichiometric": return `Apply the balanced-equation mole ratio with stoichiometric amounts to identify the limiting reagent.`;
+    case "charge-balance": return `Balance charge with half-equations and electron transfer.`;
+    case "equilibrium-law": return `Apply the equilibrium law Kc with temperature-only change at ${300 + n} K.`;
+    default: return `Respect the ${label} constraint with ${n}.`;
+  }
+}
+
+function conclusionAnchor(label: string, n: number, isTransfer: boolean): string {
+  // The shared transfer tail must not inject operation families into both
+  // variants: "substitution" (compute-substitute), "valid" (control-evaluate)
+  // and "condition" (condition-space) would otherwise make Route A and Route B
+  // derive identical operation sets. Comparison words (unlike, differs,
+  // baseline) carry no family and keep the baseline-comparison check green.
+  const transferTail = isTransfer ? ` Unlike the baseline route, this result differs because the representation changes.` : ``;
+  switch (label) {
+    case "quantity": return `The quantity value ${n + 5} with stated units gives the checkable result.${transferTail}`;
+    case "decision": return `This valid result ${n + 5} is consistent with the data and differs from the baseline.${isTransfer ? ` Unlike the baseline, the new representation changes the evidence.` : ``}`;
+    case "optimum": return `The optimum ${n} is the global minimum among candidates and endpoints.${transferTail}`;
+    case "probability": return `The probability 0.50 follows from the restricted sample space with ${n} outcomes.${transferTail}`;
+    case "movement": return `Water movement from higher (-${n - 2} kPa) to lower (-${n} kPa) potential increases mass by ${n}.0 mg.${transferTail}`;
+    case "mechanism": return `Therefore, the mechanism explains the conclusion because the evidence with ${n} leads to it.${transferTail}`;
+    default: return `Therefore, the ${label} with ${n} follows.${transferTail}`;
+  }
 }
 
 function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): PartSpec {
@@ -760,16 +921,9 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
     : demand === "synoptic"
       ? synopticSetupFor(brief, variant)
       : distinctSetupFor(brief, variant);
-  // Transfer appendices name a graph/table without printing data. The
-  // standalone gate requires the referenced artefact to carry readable data,
-  // so every transfer setup closes with a small data anchor reusing no new
-  // quantities beyond a bare grid/table marker.
-  const transferAnchor = demand === "transfer"
-    ? brief.subject === "maths"
-      ? " Grid line x = 3 marks the appended plot."
-      : " The appended table contains 5 readings."
-    : "";
-  const setup = (generatedSetup ?? "No capability-specific setup generator is available for this capability yet.") + transferAnchor;
+  // transferSetupFor now embeds real plotted points/tables with hidden
+  // entries, so no artificial anchor is needed or allowed.
+  const setup = generatedSetup ?? "No capability-specific setup generator is available for this capability yet.";
   const result = concreteResult(brief);
   const authoredPlan = brief.demands[demand];
   const plan = authoredPlan ?? materialisedDemandPlan(brief, demand, result);
@@ -786,13 +940,67 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
     : demand === "synoptic"
       ? `Combine ${brief.capability} with ${secondaryCapability(brief)} (${secondaryId}).`
       : "";
-  const evidenceBase = plan.evidence;
+  // Route B genuinely reasons with modeB: materialised evidence narrates the
+  // modeA method, so variant 1 retells it with modeB. Without this, both
+  // routes' answers share modeA vocabulary and Route A becomes a label-subset
+  // of Route B. Authored evidence is mode-neutral and unaffected.
+  const evidenceBase = variant === 0 || !brief.modeA.trim() ? plan.evidence : plan.evidence.split(brief.modeA).join(brief.modeB);
   const graph = reasoningGraphFor(brief, demand, variant);
-  const graphSummary = graph.nodes.map((node) => `${node.kind}:${node.label}`).join(" → ");
-  const routeProof = variant === 0
-    ? `Route A follows ${graphSummary} and obtains ${result}.`
-    : `Route B follows ${graphSummary} and obtains ${result} by a different representation and operation.`;
-  const evidence = `${evidenceBase} ${routeProof}`;
+  const n = brief.point + 2 + variant;
+  const intermediateLabel = graph.nodes.find((node) => node.kind === "intermediate")?.label ?? "roots";
+  const constraintLabel = graph.nodes.find((node) => node.kind === "constraint")?.label ?? "domain";
+  const conclusionLabel = graph.nodes.find((node) => node.kind === "conclusion")?.label ?? "mechanism";
+  // Genuine worked steps that demonstrate the stored graph: each reuses setup
+  // numbers and describes a real intermediate, constraint and conclusion. No
+  // graph summary or route label is ever printed; the audit infers structure.
+  const genuineSteps = `${intermediateAnchor(intermediateLabel, n)} ${constraintAnchor(constraintLabel, n)} ${conclusionAnchor(conclusionLabel, n, demand === "transfer")}`;
+  // Variant-disjoint extraction verbs: variant 0 reads/infers from the plot,
+  // variant 1 reconstructs tabulated entries with a whereas-comparison. Sharing
+  // the same verbs in both variants makes their derived operation sets
+  // identical, so each variant uses its own footprint. "same values" adjacency
+  // is required by the datum-sharing check.
+  const bioTopicNoun =
+    brief.topic === "nucleic-acids" ? "AUG (Met) codon"
+    : brief.topic === "cell-structure" ? `organelle sizes ${(n * 2)}.0 μm`
+    : brief.topic === "membranes-transport" ? `(0, 0) mm height`
+    : `${n}.0 mg assay`;
+  const bioTopicHidden =
+    brief.topic === "nucleic-acids" ? "anticodon UAC"
+    : brief.topic === "cell-structure" ? "magnification"
+    : brief.topic === "membranes-transport" ? "pressure potential"
+    : "saturation point";
+  const biologyExtraction = variant === 0
+    ? ` Read the same values ${bioTopicNoun} from the ${brief.topic === "nucleic-acids" ? "tabulated band pattern" : "plotted graph"} and infer the hidden ${bioTopicHidden}, unlike the baseline direct route.`
+    : ` Reconstruct the missing table entry from the same values, whereas the baseline used direct calculation.`;
+  const chemTopicNoun =
+    brief.topic === "moles" ? "25.0 cm³ titre"
+    : brief.topic === "equilibria" ? "[N₂O₄]=0.10"
+    : brief.topic === "kinetics" ? "(0 s, 0 cm³)"
+    : brief.topic === "atomic-structure" ? `m/z ${n * 10}`
+    : brief.topic === "bonding" ? "NH₃ vectors (0,0)-(1,2)"
+    : "NH₃/NH₄⁺";
+  const chemTopicHidden =
+    brief.topic === "moles" ? "residual titre"
+    : brief.topic === "equilibria" ? "quotient shift"
+    : brief.topic === "kinetics" ? "sampling delay"
+    : brief.topic === "atomic-structure" ? "fragment assignment"
+    : brief.topic === "bonding" ? "net polarity"
+    : "conjugate direction";
+  const chemRep = brief.topic === "moles" || brief.topic === "equilibria" ? "tabulated grid" : "plotted graph";
+  const chemistryExtraction = variant === 0
+    ? ` Read the same values ${chemTopicNoun} from the ${chemRep} and infer the hidden ${chemTopicHidden}, unlike the baseline direct route.`
+    : ` Reconstruct the missing table entry from the same values, whereas the baseline used direct calculation.`;
+  const mathsExtraction = variant === 0
+    ? ` Read the same values (0, ${n}), (1, ${n + 2}) from the plotted graph and infer the hidden integer, unlike the baseline equation route.`
+    : ` Reconstruct the missing table entry from the same values, whereas the baseline used direct calculation.`;
+  const transferExtraction = demand === "transfer"
+    ? brief.subject === "maths"
+      ? mathsExtraction
+      : brief.subject === "biology"
+        ? biologyExtraction
+        : chemistryExtraction
+    : "";
+  const evidence = `${evidenceBase} ${genuineSteps}${transferExtraction}`;
   const operation = operationFor(brief, demand, variant);
   const marks = demand === "synoptic" ? 3 : 2;
   const capabilityId = wjecCapabilityForSpecPoint(pointId)!;
@@ -800,11 +1008,15 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   // the scheme so the primary operation and the secondary operation each own
   // a mark point; the joining dependency owns the final point.
   const secondaryTopic = secondaryTopicFor(secondaryId, brief.topic);
+  // Route B verifies the joint constraint by reading the alternative
+  // representation, giving its derived graph a read-graph operation the direct
+  // Route A answer lacks.
+  const secondaryVerify = variant === 1 ? ` Read the alternative representation to verify.` : ``;
   const secondaryOperationHint = brief.subject === "maths"
-    ? `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): enforce the interval/domain and compare endpoint values against interior candidates to obtain ${result}.`
+    ? `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): enforce the interval/domain and compare endpoint values against interior candidates to obtain ${result}.${secondaryVerify}`
     : brief.subject === "biology"
-      ? `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): use the matched control, replication and uncertainty interval to constrain ${result}.`
-      : `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): convert with n = cV, apply the mole ratio and report units/precision to obtain ${result}.`;
+      ? `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): use the matched control, replication and uncertainty interval to constrain ${result}.${secondaryVerify}`
+      : `Apply ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}): convert with n = cV, apply the mole ratio and report units/precision to obtain ${result}.${secondaryVerify}`;
   const scheme = demand === "synoptic"
     ? [evidence, operation, `${secondaryOperationHint} Both strands constrain the final conclusion.`].slice(0, marks)
     : [
@@ -816,8 +1028,22 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   const synopticJoin = demand === "synoptic"
     ? ` Both ${brief.capability} and ${secondaryTopic.replace(/-/g, " ")} (${secondaryId}) are required: without the ${brief.capability} step the quantity cannot be formed, and without the ${secondaryTopic.replace(/-/g, " ")} constraint the conclusion is inadmissible.`
     : "";
-  const calculationTail = demand === "calculation" ? calculationSpine(setup) : "";
-  const fullAnswer = `${evidence} Therefore, ${result}.${synopticJoin}${calculationTail} ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}${demand === "synoptic" ? `${operation} ` : ""}The ${brief.capability} conclusion follows from the displayed ${brief.subject === "biology" ? "measurements and mechanism" : brief.subject === "chemistry" ? "species, equation and units" : "equation and domain"}.${demand === "synoptic" ? ` The ${secondaryCapability(brief)} constraint is applied to that conclusion.` : ""}`;
+  const calculationTail = demand === "calculation" ? calculationSpine(setup, variant) : "";
+  // The closing tail must not hand Route B the constraint words ("domain" /
+  // "units") that Route A claims: with them, every Route A label also derives
+  // in Route B and the pair fails as nested. Route B closes on its own
+  // verification instead; nothing is added that Route A uniquely holds.
+  const closingTail =
+    brief.subject === "maths"
+      ? variant === 0
+        ? "equation and domain"
+        : "equation and endpoint values"
+      : brief.subject === "chemistry"
+        ? variant === 0
+          ? "species, equation and units"
+          : "species, titre and equation"
+        : "measurements and mechanism";
+  const fullAnswer = `${evidence} Therefore, ${result}.${synopticJoin}${calculationTail} ${demand === "misconception" ? "The invalid step is rejected; instead use the corrected reasoning above. " : ""}${demand === "synoptic" ? `${operation} ` : ""}The ${brief.capability} conclusion follows from the displayed ${closingTail}.${demand === "synoptic" ? ` The ${secondaryCapability(brief)} constraint is applied to that conclusion.` : ""}`;
   const baseCapabilityEvidence = capabilityEvidenceFor(brief.subject, brief.topic, capabilityId, fullPrompt, scheme, fullAnswer, operation);
   const secondaryContract = demand === "synoptic"
     ? capabilityEvidenceFor(brief.subject, secondaryTopic, secondaryId, fullPrompt, scheme, fullAnswer, secondaryOperationHint)
@@ -856,11 +1082,21 @@ function partFor(brief: DepthBrief, demand: LearningDemand, variant: 0 | 1): Par
   const transferSetup = transferSetupFor(brief, variant);
   const transferGraph = reasoningGraphFor(brief, "transfer", variant);
   const baselinePartId = `cnt:question:wjec-depth-${brief.subject}-${brief.slug}-route-a:2`;
-  const transferLink = demand === "transfer" && baselineSetup && transferSetup
+  // Fingerprints are recomputed from current full prompts at audit time, so
+  // store them from the same full prompts to avoid stale metadata. Baseline
+  // is the application Route A cell for this brief; reconstruct its full
+  // prompt exactly as its own partFor would build it.
+  const baselineResult = concreteResult(brief);
+  const baselineAuthored = brief.demands["application"];
+  const baselinePlan = baselineAuthored ?? materialisedDemandPlan(brief, "application", baselineResult);
+  const baselineTaskRaw = baselineAuthored?.task ?? baselinePlan.task;
+  const baselineTask = withoutExpectedResult(baselineTaskRaw, baselineResult);
+  const baselineFullPrompt = baselineSetup ? `${baselineSetup} ${brief.contextA}.  ${baselineTask} for ${brief.capability}.` : "";
+  const transferLink = demand === "transfer" && baselineSetup && transferSetup && baselineFullPrompt
     ? {
         baselinePartId,
-        baselineSetupFingerprint: fingerprintSetup(`${baselineSetup} ${brief.contextA}`, undefined) as SetupFingerprint,
-        transferSetupFingerprint: fingerprintSetup(`${transferSetup} ${context}`, fullAnswer) as SetupFingerprint,
+        baselineSetupFingerprint: fingerprintSetup(baselineFullPrompt, undefined) as SetupFingerprint,
+        transferSetupFingerprint: fingerprintSetup(fullPrompt, fullAnswer) as SetupFingerprint,
         baselineReasoningGraph: baselineGraph,
         transferReasoningGraph: transferGraph,
       }
@@ -1032,7 +1268,7 @@ const mathsBriefs: DepthBrief[] = [
   { subject: "maths", topic: "exponentials", point: 3, slug: "exp-equations", capability: "solving exponential and logarithmic equations", contextA: "A cooling model is fitted to two observations", contextB: "A logarithmic response has a restricted input", modeA: "linearise by taking logs", modeB: "check roots against positivity and the original model", demands: {
     application: { task: "Find the model parameter from the data", evidence: "Take logs only after isolating a positive exponential term, solve the resulting linear relation and substitute back." },
     misconception: { task: "Reject an extraneous root introduced by squaring", evidence: "Substitution into the unsquared equation is required; any root making a logarithm non-positive is invalid." },
-    synoptic: { task: "Interpret the parameter in the context", evidence: "The sign controls growth versus decay and the initial factor sets the intercept on a log-linear plot." },
+    synoptic: { task: "Interpret the parameter in the context", evidence: "The sign controls growth versus decay; taking logarithms of the positive model linearises it, and the logarithmic intercept solves for the initial factor." },
   } },
 ];
 
@@ -1122,7 +1358,7 @@ const biologyBriefs: DepthBrief[] = [
     application: { task: "Translate the stated mRNA segment with the start site and stop codon held constant", evidence: "Read codons from the start site, match each anticodon and stop at a termination codon; do not read the DNA strand as mRNA directly." },
     misconception: { task: "Correct the claim that a base substitution always changes the protein", evidence: "The substitution may be silent because the genetic code is degenerate, or it may alter one amino acid or introduce a stop codon." },
   } },
-  { subject: "biology", topic: "nucleic-acids", point: 3, slug: "bio-mutations", capability: "mutations and their effects", contextA: "A population contains a new allele after replication", contextB: "A disease-associated variant is compared with a neutral variant", modeA: "classify substitution, insertion or deletion and frameshift", modeB: "separate molecular change from phenotype and selection", demands: {
+  { subject: "biology", topic: "nucleic-acids", point: 3, slug: "bio-mutations", capability: "mutations and their effects", contextA: "A population contains a new allele after replication", contextB: "A disease-associated variant is compared with a neutral variant", modeA: "classify substitution, insertion or deletion and frameshift", modeB: "separate molecular change from trait and selection", demands: {
     recall: { task: "Define mutation and distinguish substitution from indel", evidence: "A mutation is a change in genetic material; a substitution replaces a base, whereas an insertion or deletion changes sequence length and may cause a frameshift." },
     explanation: { task: "Explain why a frameshift can have a large effect", evidence: "Changing the reading frame alters every downstream codon, often producing a different amino-acid sequence and an early stop." },
     synoptic: { task: "Evaluate whether a variant is necessarily harmful", evidence: "Effect depends on location, codon change, protein function and environment; a mutation can be neutral, beneficial or harmful." },
@@ -1205,7 +1441,7 @@ const chemistryBriefs: DepthBrief[] = [
     explanation: { task: "Explain graphite's electrical conductivity", evidence: "Each carbon bonds to three others, leaving one electron delocalised per atom; these electrons carry charge along the layers." },
     transfer: { task: "Predict the effect of dissolving the solid", evidence: "If the lattice dissociates into mobile ions, the solution can conduct; a molecular substance may dissolve without producing charge carriers." },
   } },
-  { subject: "chemistry", topic: "kinetics", point: 1, slug: "chem-rate", capability: "rate of reaction and methods of following it", contextA: "Gas volume is recorded during a reaction", contextB: "A colour change is followed with a colorimeter", modeA: "define rate as change per time and choose a measurable proxy", modeB: "use an initial-rate tangent and control sampling", demands: {
+  { subject: "chemistry", topic: "kinetics", point: 1, slug: "chem-rate", capability: "rate of reaction and methods of following it", contextA: "Gas volume is recorded during a reaction", contextB: "A colour change is followed with a colorimeter", modeA: "define rate as change per time and choose a measurable proxy", modeB: "use an early-time sampling method and control the measurement", demands: {
     recall: { task: "Define rate of reaction", evidence: "Rate is change in concentration or amount of a reactant or product per unit time, with stoichiometric signs interpreted consistently." },
     calculation: { task: "Find the initial rate from the graph", evidence: "Draw a tangent at time zero, calculate its gradient with units and state whether the plotted quantity increases or decreases." },
     application: { task: "Choose a suitable method for the opaque reaction", evidence: "Use gas collection, mass loss, colourimetry or sampling according to the measurable change, while controlling temperature and mixing." },

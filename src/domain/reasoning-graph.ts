@@ -98,7 +98,7 @@ const OPERATION_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
   ["trig-identity", /\b(?:sine|cosine|tangent|identity|double\s+angle|pythagor\w*|harmonic)\b/i],
   ["log-linearise", /\b(?:logarithm|exponential|linearis\w*|change\s+of\s+base|inverse\s+function|half[- ]?life)\b/i],
   ["mole-convert", /\b(?:mole|molar|avogadro|concentration|aliquot|titre|titration|dilut\w*|n\s*=\s*c|n\s*=\s*m)\b/i],
-  ["back-titrate", /\b(?:back[- ]?titration|residual|excess|limiting\s+reagent|back\s+titrat\w*)\b/i],
+  ["back-titrate", /\b(?:residual|excess|limiting\s+reagent|back[- ]?titrat\w*)\b/i],
   ["balance-equation", /\b(?:balanc\w*|half[- ]?equation|oxidation|reduction|electron\s+transfer|charge\s+balance|stoichiometr\w*|mole\s+ratio)\b/i],
   ["equilibrium-shift", /\b(?:equilibrium|le\s*chatelier|Kc|Kp|Qc|partial\s+pressure|perturb\w*|shift)\b/i],
   ["transport-gradient", /\b(?:diffusion|osmosis|water\s+potential|pressure\s+potential|solute|turgor|gradient|membrane|permeab\w*)\b/i],
@@ -137,10 +137,10 @@ const CONSTRAINT_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
 ] as const;
 
 const EVIDENCE_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
-  ["supplied-equation", /\b(?:f\s*\(|equation|formula|y\s*=|P\s*\(|pV\s*=|n\s*=)\b/i],
-  ["supplied-graph", /\b(?:graph|plot|curve|figure|tangent|intercept)\b/i],
-  ["supplied-table", /\b(?:table|dataset|survey|values?\s+are|data\s+values)\b/i],
-  ["supplied-measurement", /\b(?:aliquot|titre|assay|measurement|observation|sample|tissue|solution|concentration|mass|volume)\b/i],
+  ["supplied-equation", /\b(?:f\s*\(|equation|formula|y\s*=|P\s*\(|pV\s*=|n\s*=)\b|[A-Za-z][A-Za-z]*(?:\([^)]*\))?\s*=\s*\S|[(<>=<>≤≥][^<>=]{0,30}(?:≤|≥|<|>|=)[^<>=]{0,30}[)]?/i],
+  ["supplied-graph", /\b(?:graph|plot|curve|figure|tangent|intercept|diagram|grid|micrograph)\b/i],
+  ["supplied-table", /\b(?:table|tabulat\w*|dataset|survey|values?\s+are|data\s+values)\b/i],
+  ["supplied-measurement", /\b(?:aliquots?|titres?|assay\w*|measurements?|observations?|samples?|tissues?|solutions?|concentrations?|mass(?:es)?|volumes?)\b/i],
   ["inferred-parameter", /\b(?:infer\w*|hidden|latent|posterior|prior|unobserved|missing)\b/i],
   ["coupled-gradient", /\b(?:gradient|coupled|secondary\s+active|ATP|proton\s+gradient)\b/i],
 ] as const;
@@ -152,6 +152,9 @@ const INTERMEDIATE_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
   ["gradient-value", /\b(?:gradient|slope|tangent|rate|d[A-Za-z]\s*\/\s*d[A-Za-z])\b/i],
   ["mole-amount", /\b(?:mole|amount|n\s*=|concentration|titre|aliquot)\b/i],
   ["equilibrium-quotient", /\b(?:Kc|Kp|Qc|quotient|position|yield)\b/i],
+  ["isotope-pattern", /\b(?:isotope|abundance|m\/z|relative\s+atomic\s+mass|fragment)\b/i],
+  ["dipole-pattern", /\b(?:dipole|electronegativ|polarity|hydrogen[\s-]?bond|intermolecular|boiling\s+point)\b/i],
+  ["shell-pattern", /\b(?:shell|subshell|ionisation|electron\s+configuration|aufbau)\b/i],
   ["water-gradient", /\b(?:water\s+potential|pressure\s+potential|gradient|movement|turgor)\b/i],
   ["inhibition-pattern", /\b(?:inhib\w*|Vmax|Km|rate\s+response|active\s+site)\b/i],
   ["genetic-state", /\b(?:strand|template|band|hybrid|allele|genotype|phenotype)\b/i],
@@ -348,6 +351,9 @@ function nodesByKind(graph: ReasoningGraph, kind: ReasoningGraphNodeKind): strin
 }
 
 function setOverlap(left: readonly string[], right: readonly string[]): number {
+  // Identical absence is agreement, not difference: two routes that both lack
+  // a dimension must not earn a reasoning-path change from thin air.
+  if (!left.length && !right.length) return 1;
   if (!left.length || !right.length) return 0;
   const rightSet = new Set(right);
   let shared = 0;
@@ -431,7 +437,11 @@ export function isDistinctReasoningRoute(left: ReasoningGraph, right: ReasoningG
 export function isSupersetRoute(base: ReasoningGraph, candidate: ReasoningGraph): boolean {
   const baseLabels = new Set(base.nodes.map((node) => node.label.toLowerCase().trim()));
   const extra = candidate.nodes.filter((node) => !baseLabels.has(node.label.toLowerCase().trim()));
-  if (!extra.length) return true;
+  // No extra node means the candidate adds nothing beyond the base: it is the
+  // base, a subset, or a label-equal restatement. None of those is "the base
+  // plus a trivial verification step", so this must not be flagged as a
+  // superset. Identical routes are caught by the distinctness gate instead.
+  if (!extra.length) return false;
   const nonTrivial = extra.filter((node) => {
     const label = node.label.toLowerCase().trim();
     if (TRIVIAL_CHECK_LABELS.has(label)) return false;
@@ -516,6 +526,135 @@ export function compareTransferParts(
 /** Stable part identity used for baseline linkage diagnostics. */
 export function partIdentity(questionId: Id, partId: Id): string {
   return `${questionId}:${partId}`;
+}
+
+/**
+ * A derived reasoning-graph node bound to the concrete span that evidences
+ * it. Nodes without evidence are never invented: a kind with no span is
+ * reported missing instead.
+ */
+export interface EvidencedNode {
+  kind: ReasoningGraphNodeKind;
+  label: string;
+  /** Trimmed source span (at most 140 characters) proving the node. */
+  evidence: string;
+}
+
+export interface VerifiedGraph {
+  nodes: EvidencedNode[];
+  /** Node kinds for which the content supplied no evidence. */
+  missing: ReasoningGraphNodeKind[];
+}
+
+function firstSpan(text: string, pattern: RegExp): string | null {
+  const found = text.match(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`));
+  if (!found || !found[0]) return null;
+  const span = found[0].replace(/\s+/g, " ").trim();
+  return span.length > 140 ? `${span.slice(0, 137).trimEnd()}…` : span;
+}
+
+function solutionStepsOf(part: QuestionPart): string[] {
+  return [...(part.markScheme ?? []), ...part.modelAnswer.split(/[.;\n]+/).map((step) => step.trim()).filter(Boolean)];
+}
+
+function evidencedFamilies(
+  text: string,
+  kind: ReasoningGraphNodeKind,
+  families: ReadonlyArray<readonly [string, RegExp]>,
+  limit: number,
+): EvidencedNode[] {
+  const out: EvidencedNode[] = [];
+  for (const [label] of families) {
+    if (out.length >= limit) break;
+    const pattern = families.find(([name]) => name === label)?.[1];
+    if (!pattern) continue;
+    const evidence = firstSpan(text, pattern);
+    if (evidence) out.push({ kind, label, evidence });
+  }
+  return out;
+}
+
+/**
+ * Operations in the order they first appear in the worked solution. The
+ * family-list order carries no information about how the learner actually
+ * proceeds; textual order is what makes "derive then verify" a different
+ * path from "read then reconstruct". Other node kinds keep family order
+ * since only the operation sequence enters the order-of-operations metric.
+ */
+function evidencedOperationsInOrder(
+  text: string,
+  families: ReadonlyArray<readonly [string, RegExp]>,
+): EvidencedNode[] {
+  const hits: Array<{ index: number; node: EvidencedNode }> = [];
+  for (const [label, pattern] of families) {
+    const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+    const found = re.exec(text);
+    if (!found || found.index === undefined) continue;
+    const span = found[0].replace(/\s+/g, " ").trim();
+    const evidence = span.length > 140 ? `${span.slice(0, 137).trimEnd()}…` : span;
+    hits.push({ index: found.index, node: { kind: "operation", label, evidence } });
+  }
+  hits.sort((a, b) => a.index - b.index);
+  return hits.map((hit) => hit.node);
+}
+
+/**
+ * Derive the reasoning graph from the actual learner-visible content only:
+ * evidence kinds from the prompt, operations/intermediates from the worked
+ * scheme and answer, constraints from either, conclusions from the answer.
+ * Authored `reasoningGraph` metadata is deliberately ignored here; use
+ * `verifyStoredGraph` to check it against this derivation.
+ */
+export function deriveVerifiedGraph(part: QuestionPart, subjectId?: string): VerifiedGraph {
+  void subjectId;
+  const solutionText = solutionStepsOf(part).join("\n");
+  const promptAndSolution = `${part.prompt}\n${solutionText}`;
+  const nodes: EvidencedNode[] = [
+    ...evidencedFamilies(part.prompt, "evidence", EVIDENCE_FAMILIES, EVIDENCE_FAMILIES.length),
+    ...evidencedOperationsInOrder(solutionText, OPERATION_FAMILIES),
+    ...evidencedFamilies(solutionText, "intermediate", INTERMEDIATE_FAMILIES, INTERMEDIATE_FAMILIES.length),
+    ...evidencedFamilies(promptAndSolution, "constraint", CONSTRAINT_FAMILIES, CONSTRAINT_FAMILIES.length),
+    ...evidencedFamilies(part.modelAnswer, "conclusion", CONCLUSION_FAMILIES, CONCLUSION_FAMILIES.length),
+  ];
+  const kinds: ReasoningGraphNodeKind[] = ["evidence", "operation", "intermediate", "constraint", "conclusion"];
+  const missing = kinds.filter((kind) => !nodes.some((node) => node.kind === kind));
+  return { nodes, missing };
+}
+
+/** Strip evidence spans so a verified graph can enter graph-distance metrics. */
+export function verifiedGraphToPlain(graph: VerifiedGraph): ReasoningGraph {
+  return { nodes: graph.nodes.map(({ kind, label }) => ({ kind, label })) };
+}
+
+/**
+ * Check authored `reasoningGraph` metadata against the derived graph. Every
+ * stored (kind, label) pair must have a derived counterpart in the same kind:
+ * a stored operation, evidence item or intermediate the task never demonstrates
+ * is a hard `stale-reasoning-graph` failure. A stored intermediate that is a
+ * verbatim re-statement of an evidence label (for example "supplied-equation"
+ * used where the derivation produces an operation) is treated as a missing
+ * intermediate claim, since it carries no independent reasoning step.
+ */
+export function verifyStoredGraph(part: QuestionPart, subjectId?: string): string[] {
+  const stored = part.learning?.reasoningGraph;
+  if (!stored || stored.nodes.length === 0) return [];
+  const derived = deriveVerifiedGraph(part, subjectId);
+  const storedEvidenceLabels = new Set(
+    stored.nodes.filter((n) => n.kind === "evidence").map((n) => n.label.toLowerCase().trim()),
+  );
+  const failures: string[] = [];
+  for (const node of stored.nodes) {
+    const kind = node.kind;
+    const label = node.label.toLowerCase().trim();
+    const demonstrated = derived.nodes.some(
+      (proven) => proven.kind === kind && proven.label.toLowerCase().trim() === label,
+    );
+    const isEchoedEvidence = kind === "intermediate" && storedEvidenceLabels.has(label);
+    if (!demonstrated && !isEchoedEvidence) {
+      failures.push(`Stored reasoning graph claims ${kind} "${node.label}" without evidence in the task or worked solution (stale-reasoning-graph).`);
+    }
+  }
+  return failures;
 }
 
 /** A capability id is a real mapped skill, not free-text prose. */
