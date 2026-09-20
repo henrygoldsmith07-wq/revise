@@ -138,12 +138,19 @@ export const payloadSchemas = {
     count: z.number().int().min(1).max(25).default(10),
   }),
   ocr: z.object({
-    // ~8 MB of base64 is roughly a 6 MB photo, which is plenty for a page of
-    // handwriting and small enough to keep the request from timing out.
     image: z.string().max(8_000_000),
     mediaType: z.string().max(60).default("image/jpeg"),
     hint: z.enum(["handwriting", "printed", "auto"]).default("auto"),
   }),
+  "diagnose-error": z.object({
+    prompt: z.string().max(2000),
+    point: z.string().max(1000),
+    answer: z.string().max(8000),
+    awarded: z.number().min(0).max(30),
+    maxMarks: z.number().min(0).max(30),
+    command: z.string().max(30).nullable().optional(),
+  }),
+  "route-spec": z.object({ subjectId: z.string(), text: z.string().max(4000) }),
 } satisfies Record<AiTask, z.ZodType>;
 
 // --- tasks -----------------------------------------------------------------
@@ -387,4 +394,44 @@ export async function extractQuestions(subjectId: string, text: string) {
     () => ({ questions: [] }),
     4000,
   );
+}
+
+/**
+ * Post-marking error diagnosis via classifier.dev.
+ * Only runs on incorrect/partial parts AFTER marking fixed awarded/max.
+ * Never overrides the mark — returns an error-type label + remediation.
+ */
+export async function diagnoseError(input: {
+  prompt: string; point: string; answer: string;
+  awarded: number; maxMarks: number; command?: string | null;
+}) {
+  const { diagnoseError: runDiagnosis } = await import("./error-classifier");
+  const result = await runDiagnosis({
+    subjectId: "unknown", topicId: "unknown", questionId: "unknown", partId: "unknown",
+    prompt: input.prompt, point: input.point, answer: input.answer,
+    awarded: input.awarded, maxMarks: input.maxMarks,
+  });
+  return {
+    data: {
+      category: result.category, confidence: result.confidence, reasons: result.reasons,
+      taxonomyVersion: result.taxonomyVersion, provenance: result.provenance,
+      gated: result.gated, ...(result.rawLabel ? { rawLabel: result.rawLabel } : {}),
+    },
+    source: (result.provenance === "classifier-dev" ? "ai" : "fallback") as "ai" | "fallback",
+    provider: result.provenance === "classifier-dev" ? "classifier.dev" : result.provenance,
+  };
+}
+
+/** Hierarchical spec routing: subject -> topic -> small candidate set. */
+export async function routeSpec(input: { subjectId: string; text: string }) {
+  const { routeSpecPoints } = await import("@/domain/spec-routing");
+  const route = routeSpecPoints(input.subjectId, input.text);
+  return {
+    data: {
+      topics: route.topics.map((t) => t.id),
+      candidates: route.candidates,
+    },
+    source: "fallback" as const,
+    provider: "deterministic",
+  };
 }

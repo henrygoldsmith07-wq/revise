@@ -238,6 +238,7 @@ searchable. No other file changes. Add the subject to `src/domain/spec.ts:SPEC_M
 - [`docs/revision-engine.md`](docs/revision-engine.md) — the algorithms and the evidence behind them
 - [`docs/benchmark.md`](docs/benchmark.md) — harnesses and outcome benchmarks
 - [`docs/roadmap.md`](docs/roadmap.md) — competitor-gap backlog and the path to "what should I revise next?" intelligence
+- [`docs/error-diagnosis.md`](docs/error-diagnosis.md) — post-marking error diagnosis (classifier.dev): versioned taxonomy, interventions, routing and evaluation
 
 ## Content accuracy — statement-level provenance
 

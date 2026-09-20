@@ -9,6 +9,7 @@ export async function aiOcr(...args: Parameters<(typeof import("@/ai/client"))["
   return run(...args);
 }
 
+
 export async function aiCardsFromNotes(...args: Parameters<(typeof import("@/ai/client"))["aiCardsFromNotes"]>) {
   const { aiCardsFromNotes: run } = await import("@/ai/client");
   return run(...args);
@@ -56,5 +57,15 @@ export async function aiSocratic(...args: Parameters<(typeof import("@/ai/client
 
 export async function aiStatus(...args: Parameters<(typeof import("@/ai/client"))["aiStatus"]>) {
   const { aiStatus: run } = await import("@/ai/client");
+  return run(...args);
+}
+
+export async function aiDiagnoseError(...args: Parameters<(typeof import("@/ai/client"))["aiDiagnoseError"]>) {
+  const { aiDiagnoseError: run } = await import("@/ai/client");
+  return run(...args);
+}
+
+export async function aiRouteSpec(...args: Parameters<(typeof import("@/ai/client"))["aiRouteSpec"]>) {
+  const { aiRouteSpec: run } = await import("@/ai/client");
   return run(...args);
 }

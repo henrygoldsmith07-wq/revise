@@ -159,5 +159,13 @@ async function dispatch(task: AiTask, payload: unknown) {
       const p = payload as { subjectId: string; text: string };
       return tasks.extractQuestions(p.subjectId, p.text);
     }
+    case "diagnose-error": {
+      const p = payload as { prompt: string; point: string; answer: string; awarded: number; maxMarks: number; command?: string | null };
+      return tasks.diagnoseError(p);
+    }
+    case "route-spec": {
+      const p = payload as { subjectId: string; text: string };
+      return tasks.routeSpec(p);
+    }
   }
 }

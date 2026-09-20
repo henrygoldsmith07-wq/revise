@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { aiMark } from "@/lib/optional-ai";
+import { aiDiagnoseError, aiMark } from "@/lib/optional-ai";
 import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { misconceptionsForTopic } from "@/content";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
@@ -30,6 +30,10 @@ import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/ma
 import type { LowConfidenceMarkDecision } from "@/domain/mark-escalation";
 import { planRemediation, type RemediationAction } from "@/domain/remediation";
 import type { RemediationPlan } from "@/domain/remediation";
+import { diagnoseAttemptErrors, isActionable } from "@/domain/error-diagnosis-plan";
+import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
+import { isErrorCategory } from "@/domain/error-taxonomy";
+import type { ErrorCategory } from "@/domain/error-taxonomy";
 import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { AnswerInput } from "./AnswerInput";
@@ -41,6 +45,61 @@ import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 // points were earned → dropped marks become mistakes and mistake cards without
 // the student having to do anything. That last step is the whole point; a
 // mistake you have to file manually is a mistake you never revisit.
+/**
+ * Post-marking refinement of the error diagnosis via classifier.dev.
+ *
+ * Contract: the marks passed in are already final and are passed back out
+ * unchanged. Only the error *type* can change, only for parts the local read
+ * could not act on, and only when the remote verdict clears the confidence
+ * threshold. Any failure — offline, no provider, timeout, gated reply —
+ * returns null and the deterministic diagnosis stays on screen.
+ */
+async function refineErrorDiagnosis(
+  question: Question,
+  marked: MarkedPart[],
+  answers: Record<string, string>,
+  current: AttemptErrorDiagnosis,
+): Promise<AttemptErrorDiagnosis | null> {
+  const uncertain = current.parts.filter((part) => !isActionable(part));
+  if (!uncertain.length) return null;
+  const bySignal = new Map<string, ReturnType<typeof verdictFromEnvelope>>();
+  await Promise.all(
+    uncertain.map(async (part) => {
+      const envelope = await aiDiagnoseError({
+        prompt: `${question.stem}\n${question.parts.find((candidate) => candidate.id === part.partId)?.prompt ?? ""}`,
+        point: marked.find((entry) => entry.partId === part.partId)?.missedPoints[0] ?? "",
+        answer: answers[part.partId] ?? "",
+        awarded: part.awarded,
+        maxMarks: part.max,
+      });
+      if (envelope.source !== "ai") return;
+      bySignal.set(part.partId, verdictFromEnvelope(envelope.data));
+    }),
+  );
+  if (!bySignal.size) return null;
+  // Re-run the diagnosis with the refined verdicts. Only a part that produced
+  // a confident remote answer changes; the rest keep the local read.
+  return diagnoseAttemptErrors({
+    question,
+    marked,
+    answers,
+    classify: (signal) => bySignal.get(signal.partId) ?? null,
+  });
+}
+
+/** Narrow the wire shape onto the domain verdict, refusing impossible labels. */
+function verdictFromEnvelope(data: { category: string; confidence: number; reasons: string[]; provenance?: string; gated?: boolean; rawLabel?: string }) {
+  return {
+    category: (isErrorCategory(data.category) ? data.category : "other") as ErrorCategory,
+    confidence: data.confidence,
+    reasons: data.reasons,
+    provenance: (data.provenance === "classifier-dev" ? "classifier-dev" : "local-fallback") as "classifier-dev" | "local-fallback",
+    gated: Boolean(data.gated),
+    ...(data.rawLabel ? { rawLabel: data.rawLabel } : {}),
+  };
+}
+
+
 
 export interface QuestionDraft {
   answers: Record<string, string>;
@@ -106,6 +165,8 @@ export function QuestionRunner({
     workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
+    /** Post-marking error diagnosis; never changes the marks above. */
+    errorDiagnosis?: AttemptErrorDiagnosis;
     nextAction: { label: string; href: null; why: string };
   } | null>(null);
   // Stamped after mount: reading the clock during render makes the render
@@ -266,6 +327,12 @@ export function QuestionRunner({
 
     const retest = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, store.attempts, store.questions) : undefined;
     const remediation = planRemediation(question, submittedAnswers, marked, topic, misconceptionsForTopic(question.topicIds[0] ?? ""));
+    // Post-marking error diagnosis. The marks above are already final; this
+    // only decides *why* each dropped mark was lost so the next action is the
+    // right one. It is computed from the deterministic local classifier first,
+    // so the result view renders immediately and offline; a confident
+    // classifier.dev verdict may refine it below, and can never change a mark.
+    let errorDiagnosis = diagnoseAttemptErrors({ question, marked, answers: submittedAnswers });
 
     const farTransferLink = farTransfer
       ? completeDelayedFarTransfer(farTransfer, attempt, {
@@ -320,6 +387,14 @@ export function QuestionRunner({
                   href: null,
                   why: "Strong unaided evidence. The tutor loop moves on to the next weakest capability.",
                 };
+    // When the diagnosis names one error, the next action says so in those
+    // words. The error type is what makes "micro-practice the missed point"
+    // concrete: a misconception gets an explanation, a slip gets a check.
+    const diagnosisHeadline = errorDiagnosis.headline;
+    if (diagnosisHeadline && awarded < max) {
+      nextAction.label = diagnosisHeadline.intervention.action;
+      nextAction.why = `${diagnosisHeadline.intervention.action} (${diagnosisHeadline.label}, ${diagnosisHeadline.awarded}/${diagnosisHeadline.max} — diagnosed as ${diagnosisHeadline.category}${diagnosisHeadline.provenance === "classifier-dev" ? "" : " on-device"}).`;
+    }
     // A rubric fallback grade (the AI never ran, or the provider failed) gets a
     // second chance: queue the persisted attempt for an AI re-grade. The drain
     // pass retries with exponential backoff + jitter and upgrades this attempt
@@ -335,6 +410,7 @@ export function QuestionRunner({
       note,
       retest,
       remediation,
+      errorDiagnosis,
       confidence: markConfidence,
       copiedAnswer,
       workingAnalysis,
@@ -343,6 +419,16 @@ export function QuestionRunner({
       withheld,
       nextAction,
     });
+    // Refinement pass: classifier.dev may sharpen the error type on the parts
+    // the local read was unsure about. It runs after the mark is persisted and
+    // can only replace the diagnosis, never the marks — and if it fails or is
+    // disabled, the deterministic diagnosis above is already on screen.
+    if (!errorDiagnosis.clean) {
+      void refineErrorDiagnosis(question, marked, submittedAnswers, errorDiagnosis).then((refined) => {
+        if (!refined) return;
+        setResult((current) => (current ? { ...current, errorDiagnosis: refined } : current));
+      });
+    }
     return persistedAttempt;
   }
 
