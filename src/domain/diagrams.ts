@@ -38,6 +38,7 @@ export interface DiagramBounds {
 /** The diagram lives on the card's `back` as JSON behind this marker. */
 const MARKER = "@diagram:";
 const CARD_IMAGE_REF = "@card-image";
+export const MAX_DIAGRAM_HOTSPOTS = 24;
 
 function safeDiagramImageUrl(value: string | undefined): string | null {
   const url = value?.trim();
@@ -87,17 +88,11 @@ export function diagramPercentPosition(
  */
 export function buildDiagramSpec(imageUrlRaw: string | undefined, hotspots: Hotspot[]): DiagramSpec | null {
   const imageUrl = imageUrlRaw?.trim();
-  if (!imageUrl || !hotspots.length) return null;
+  if (!imageUrl || !hotspots.length || hotspots.length > MAX_DIAGRAM_HOTSPOTS) return null;
   if (hotspots.some((hotspot) => !hotspot.label.trim())) return null;
   return {
     imageUrl,
-    hotspots: hotspots.map((hotspot, index) => ({
-      id: String(hotspot.id || index),
-      x: clampPercent(Number(hotspot.x)),
-      y: clampPercent(Number(hotspot.y)),
-      label: hotspot.label.trim().slice(0, 120),
-      note: hotspot.note?.trim() ? hotspot.note.trim().slice(0, 300) : undefined,
-    })),
+    hotspots: normaliseHotspots(hotspots),
   };
 }
 
@@ -113,15 +108,11 @@ export function parseDiagram(card: Card): DiagramSpec | null {
     const referencedImage = raw?.imageUrl === CARD_IMAGE_REF ? card.imageUrl : raw?.imageUrl;
     const imageUrl = safeDiagramImageUrl(referencedImage);
     if (!imageUrl || !Array.isArray(raw.hotspots) || !raw.hotspots.length) return null;
-    const hotspots = raw.hotspots
-      .filter((h) => typeof h?.label === "string" && h.label.trim().length > 0)
-      .map((h, index) => ({
-        id: String(h.id ?? index),
-        x: clampPercent(Number(h.x)),
-        y: clampPercent(Number(h.y)),
-        label: String(h.label).slice(0, 120),
-        note: h.note ? String(h.note).slice(0, 300) : undefined,
-      }));
+    const hotspots = normaliseHotspots(
+      raw.hotspots
+        .filter((hotspot) => typeof hotspot?.label === "string" && hotspot.label.trim().length > 0)
+        .slice(0, MAX_DIAGRAM_HOTSPOTS),
+    );
     return hotspots.length ? { imageUrl, hotspots } : null;
   } catch {
     return null;
@@ -135,6 +126,24 @@ export function isDiagramCard(card: Card): boolean {
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 50;
   return Math.max(0, Math.min(100, value));
+}
+
+function normaliseHotspots(hotspots: Hotspot[]): Hotspot[] {
+  const usedIds = new Set<string>();
+  return hotspots.map((hotspot, index) => {
+    const requested = String(hotspot.id ?? "").trim() || `point-${index + 1}`;
+    let id = requested;
+    let suffix = 2;
+    while (usedIds.has(id)) id = `${requested}-${suffix++}`;
+    usedIds.add(id);
+    return {
+      id,
+      x: clampPercent(Number(hotspot.x)),
+      y: clampPercent(Number(hotspot.y)),
+      label: String(hotspot.label).trim().slice(0, 120),
+      note: hotspot.note ? String(hotspot.note).trim().slice(0, 300) || undefined : undefined,
+    };
+  });
 }
 
 // --- the labelling round ---------------------------------------------------
