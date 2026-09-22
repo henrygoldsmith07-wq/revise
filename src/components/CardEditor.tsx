@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { toBase64 } from "./AnswerInput";
 import { RichText } from "./RichText";
+import { DiagramHotspotEditor } from "./DiagramHotspotEditor";
 import { Button, Field, Panel, Pill, cx } from "./ui";
 import { DeleteIcon, ICON_SIZE, PhotoIcon } from "./icons";
 import { normaliseTags } from "@/domain/scheduling";
 import { buildCloze, clozeSource as resolvedClozeSource } from "@/domain/cloze";
+import { buildDiagramSpec, parseDiagram, serialiseDiagram, type Hotspot } from "@/domain/diagrams";
 import { topicsFor } from "@/domain/curriculum";
 import type { Card, CardKind, Id } from "@/domain/types";
 
@@ -51,19 +53,26 @@ export interface CardDraft {
   topicId: Id;
   /** Complete, unblanked sentence for a cloze card. */
   clozeSource?: string;
+  /** True when an image card is an interactive label-a-diagram card. */
+  diagramMode?: boolean;
+  diagramHotspots?: Hotspot[];
 }
 
 export function draftFromCard(card: Card): CardDraft {
+  const diagram = parseDiagram(card);
   return {
     front: card.front,
-    back: card.back,
+    // Never expose the internal @diagram JSON as an answer in the editor.
+    back: diagram ? "" : card.back,
     kind: card.kind,
     tags: card.tags,
     note: card.note ?? "",
-    imageUrl: card.imageUrl,
+    imageUrl: card.imageUrl ?? diagram?.imageUrl,
     audioUrl: card.audioUrl,
     topicId: card.topicId,
     clozeSource: resolvedClozeSource(card) ?? undefined,
+    diagramMode: Boolean(diagram),
+    diagramHotspots: diagram?.hotspots,
   };
 }
 
@@ -72,11 +81,15 @@ export function applyDraft(card: Card, draft: CardDraft, now: Date = new Date())
     draft.kind === "cloze"
       ? buildCloze(draft.clozeSource ?? draft.front, draft.back)
       : null;
+  const diagram =
+    draft.kind === "image" && draft.diagramMode
+      ? buildDiagramSpec(draft.imageUrl, draft.diagramHotspots ?? [])
+      : null;
   const invalidCloze = draft.kind === "cloze" && !cloze;
   const next: Card = {
     ...card,
     front: cloze?.front ?? (invalidCloze ? draft.clozeSource ?? draft.front : draft.front).trim(),
-    back: cloze?.back ?? draft.back.trim(),
+    back: cloze?.back ?? (diagram ? serialiseDiagram(diagram, { referenceCardImage: true }) : draft.back.trim()),
     kind: invalidCloze ? "basic" : draft.kind,
     tags: normaliseTags(draft.tags),
     topicId: draft.topicId,
@@ -142,8 +155,13 @@ export function CardEditor({
       return;
     }
     const base64 = await toBase64(file);
+    const replacingDiagramImage = Boolean(draft.imageUrl && draft.diagramMode);
     setError(null);
-    set({ imageUrl: `data:${file.type};base64,${base64}`, kind: draft.kind === "basic" ? "image" : draft.kind });
+    set({
+      imageUrl: `data:${file.type};base64,${base64}`,
+      kind: draft.kind === "basic" ? "image" : draft.kind,
+      ...(replacingDiagramImage ? { diagramHotspots: [] } : {}),
+    });
   }
 
   async function attachAudio(file: File) {
@@ -197,10 +215,16 @@ export function CardEditor({
 
   const topics = topicsFor(subjectId);
   const builtCloze = draft.kind === "cloze" ? buildCloze(draft.clozeSource ?? draft.front, draft.back) : null;
+  const builtDiagram =
+    draft.kind === "image" && draft.diagramMode
+      ? buildDiagramSpec(draft.imageUrl, draft.diagramHotspots ?? [])
+      : null;
   const canSave =
     draft.kind === "cloze"
       ? Boolean(builtCloze)
-      : draft.front.trim().length > 0 && draft.back.trim().length > 0;
+      : draft.kind === "image" && draft.diagramMode
+        ? Boolean(draft.front.trim() && builtDiagram)
+        : draft.front.trim().length > 0 && draft.back.trim().length > 0;
 
   return (
     <div className="space-y-4">
@@ -285,16 +309,18 @@ export function CardEditor({
             />
           </Field>
 
-          <Field label="Back" hint="The answer, exactly as an examiner would want it.">
-            <textarea
-              ref={backRef}
-              value={draft.back}
-              onFocus={() => setFocusField("back")}
-              onChange={(e) => set({ back: e.target.value })}
-              rows={4}
-              className="field nice-scroll"
-            />
-          </Field>
+          {draft.kind === "image" && draft.diagramMode ? null : (
+            <Field label="Back" hint="The answer, exactly as an examiner would want it.">
+              <textarea
+                ref={backRef}
+                value={draft.back}
+                onFocus={() => setFocusField("back")}
+                onChange={(e) => set({ back: e.target.value })}
+                rows={4}
+                className="field nice-scroll"
+              />
+            </Field>
+          )}
         </>
       )}
 
@@ -364,7 +390,11 @@ export function CardEditor({
           />
         </label>
         {draft.imageUrl ? (
-          <Button size="sm" variant="ghost" onClick={() => set({ imageUrl: undefined })}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => set({ imageUrl: undefined, diagramMode: false, diagramHotspots: [] })}
+          >
             <DeleteIcon size={ICON_SIZE.sm} aria-hidden />
             Remove image
           </Button>
@@ -393,6 +423,39 @@ export function CardEditor({
         ) : null}
       </div>
 
+      {draft.kind === "image" && draft.imageUrl ? (
+        <div className="space-y-3 rounded-[10px] border border-line p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-ink">Image answer type</p>
+              <p className="text-xs text-ink3 mt-0.5">
+                Turn the image into an active label-placement exercise, or keep a normal text answer.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant={draft.diagramMode ? "primary" : "secondary"}
+              onClick={() =>
+                set({
+                  diagramMode: !draft.diagramMode,
+                  diagramHotspots: draft.diagramHotspots ?? [],
+                })
+              }
+            >
+              {draft.diagramMode ? "Use normal image answer" : "Create label diagram"}
+            </Button>
+          </div>
+          {draft.diagramMode ? (
+            <DiagramHotspotEditor
+              imageUrl={draft.imageUrl}
+              hotspots={draft.diagramHotspots ?? []}
+              onChange={(diagramHotspots) => set({ diagramHotspots })}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
       <Panel className="card-2">
@@ -415,7 +478,15 @@ export function CardEditor({
           </div>
           <div className="pt-3 border-t border-line">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1">Back</p>
-            <RichText className="text-base">{draft.back || "_(empty)_"}</RichText>
+            {draft.kind === "image" && draft.diagramMode ? (
+              <p className="text-sm text-ink2">
+                {builtDiagram
+                  ? `${builtDiagram.hotspots.length} labelled point${builtDiagram.hotspots.length === 1 ? "" : "s"} — reviewed in Label a diagram mode.`
+                  : "Add and name at least one point to complete this diagram card."}
+              </p>
+            ) : (
+              <RichText className="text-base">{draft.back || "_(empty)_"}</RichText>
+            )}
             {draft.kind === "cloze" && builtCloze ? (
               <p className="text-xs text-ink3 mt-2">Completed sentence: {builtCloze.clozeSource}</p>
             ) : null}
@@ -434,7 +505,9 @@ export function CardEditor({
           <span className="text-xs text-ink3 self-center">
             {draft.kind === "cloze"
               ? "The hidden answer must appear in the complete sentence."
-              : "Both sides need content."}
+              : draft.kind === "image" && draft.diagramMode
+                ? "Add an image, a prompt and at least one named diagram point."
+                : "Both sides need content."}
           </span>
         ) : null}
       </div>
