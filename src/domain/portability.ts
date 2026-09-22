@@ -130,6 +130,12 @@ export function parsePortabilitySnapshot(text: string): ParsedPortability {
     return { ok: false, snapshot: null, warnings: ["This does not look like a Revise export (missing app/formatVersion)."], counts: { cards: 0, attempts: 0, reviewLogs: 0, mistakes: 0 } };
   }
   const snap = body as unknown as PortabilitySnapshot;
+  // Grade-loop fields were added additively to format v1. Older v1 exports
+  // remain valid and simply restore with no recorded forecast/outcome history.
+  if (!Array.isArray(snap.gradePredictions)) snap.gradePredictions = [];
+  if (!Array.isArray(snap.gradeActuals)) snap.gradeActuals = [];
+  snap.gradePredictionsCount = snap.gradePredictions.length;
+  snap.gradeActualsCount = snap.gradeActuals.length;
   if (!Array.isArray(snap.cards?.cards)) warnings.push("Cards deck missing — the rest of the export was read.");
   if (typeof snap.seedVersion !== "number") warnings.push("No seedVersion — restore may behave differently on a newer app.");
   return {
@@ -203,12 +209,12 @@ export function privacyDisclosure(cloudEnabled: boolean): string[] {
   if (!cloudEnabled) {
     return [
       "Local-only mode: everything is stored in your browser (IndexedDB) and never sent to a server.",
-      "No analytics, no cookies, no account required. Your cards, attempts and review logs leave this device only if you export or share a deck.",
+      "No analytics, no cookies, no account required. Your cards, attempts, review logs and recorded assessment outcomes leave this device only if you export or share data.",
       "Clear site data or use Settings → Data → Delete to remove everything. Nothing can be recovered after that.",
     ];
   }
   return [
-    "Cloud sync relays your data to Supabase so it can appear on other devices. The server stores the same rows that live in IndexedDB — it is a replica, not a separate source of truth.",
+    "Cloud sync relays supported study rows to Supabase so they can appear on other devices. Local metadata such as forecast calibration history stays on this device unless you export it.",
     "Data is scoped by your user id with row-level security. Use Settings → Data → Export to get a machine-readable copy, or Delete to remove your account's rows locally and on next sync on the server.",
     "You can switch back to local-only at any time — queued changes stay local and nothing new is uploaded.",
   ];
