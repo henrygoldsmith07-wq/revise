@@ -375,7 +375,6 @@ function requiresStructuredNumericMatch(point: string): boolean {
 export function isNumericPoint(point: string): boolean {
   if (!/\d/.test(point)) return false;
   return (
-    requiresStructuredNumericMatch(point) ||
     /\b(answer|calculate|value|concentration|mol|kJ)\b/i.test(point) ||
     /\d\s*(?:J|Pa|N)\b/i.test(point) ||
     /\bm\s*s(?:[-^]?\d+)?\b/i.test(point)
