@@ -34,6 +34,17 @@ export function tokenise(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
+      // Preserve meaningful maths notation as words before punctuation is
+      // stripped. This lets rubric matching distinguish π from a bare number,
+      // or ≤ from an equality that happens to share the same boundary value.
+      .replace(/π/g, " pi ")
+      .replace(/θ/g, " theta ")
+      .replace(/δ/g, " delta ")
+      .replace(/√/g, " sqrt ")
+      .replace(/≤/g, " leq ")
+      .replace(/≥/g, " geq ")
+      .replace(/≈/g, " approx ")
+      .replace(/±/g, " plusminus ")
       .replace(/[^a-z0-9+\-.^/=²³ ]/g, " ")
       .split(/\s+/)
       .filter((w) => w.length > 1 && !STOP_WORDS.has(w))
@@ -243,8 +254,28 @@ function sameToTwoSigFigs(a: number, b: number): boolean {
 }
 
 
+function requiredMathNotationPresent(point: string, answer: string): boolean {
+  const requirements: Array<{ expected: RegExp; actual: RegExp }> = [
+    { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
+    { expected: /≤|<=|\bless\s+than\s+or\s+equal\b/i, actual: /≤|<=|\bless\s+than\s+or\s+equal\b/i },
+    { expected: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i, actual: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i },
+    { expected: /π|\bpi\b/i, actual: /π|\bpi\b/i },
+  ];
+  for (const requirement of requirements) {
+    if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
+  }
+
+  // An exact radical is structural notation, not merely the number under it.
+  // Explicit alternatives such as "√2 or 1.414" remain eligible for numeric
+  // matching because the scheme itself says a decimal form is acceptable.
+  const exactRadical = /√|\bsqrt\b/i.test(point) && !/\b(?:or|accept|approximately|approx)\b/i.test(point);
+  if (exactRadical && !/(?:√|\bsqrt\b)/i.test(answer)) return false;
+  return true;
+}
+
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 function numericMatch(point: string, answer: string): boolean {
+  if (!requiredMathNotationPresent(point, answer)) return false;
   const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
   if (!wanted.length) return false;
   const given = extractNumbersCached(answer.replace(/[−–—]/g, "-"));
