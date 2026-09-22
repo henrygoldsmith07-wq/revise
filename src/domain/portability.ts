@@ -9,10 +9,10 @@ import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
 //
 // Three promises in one module, all offline-first:
 //
-//  1. **Portability (GDPR Art. 20)** — export everything in a single JSON
-//     snapshot; import is just `parseDeckJson` + `materialiseDeck` per store
-//     plus the non-card stores. No server is required; the file never leaves
-//     the device unless the user shares it.
+//  1. **Portability (GDPR Art. 20)** — export user-held study data in one
+//     machine-readable JSON archive. Card decks have a first-class importer;
+//     full snapshot restore is intentionally not claimed until every linked
+//     history row can be restored without breaking ids or evidence provenance.
 //  2. **Deletion (Art. 17) + retention** — purging is an explicit, reversible
 //     step in the UI; the helpers here are pure so the UI can show exactly
 //     what will disappear before it does.
@@ -105,7 +105,7 @@ export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySn
     seedVersion: input.seedVersion ?? 1,
     notes: [
       "This is a complete, machine-readable export of your Revise data. Keep it private — it contains authored cards, study history and any recorded assessment outcomes.",
-      "To restore: Settings → Data → Import and choose this file.",
+      "Card content can be re-imported from the Library deck importer. Keep this full snapshot as the machine-readable archive for study history and recorded outcomes; full snapshot restore is not yet available.",
     ],
   };
 }
