@@ -102,24 +102,28 @@ describe("markPart", () => {
   it("does not ignore required plus-minus notation", () => {
     const solve = part({ marks: 1, markScheme: ["x = ±2"], prompt: "Solve x² = 4." });
     expect(markPart(solve, "x = 2").awarded).toBe(0);
+    expect(markPart(solve, "x = ±3").awarded).toBe(0);
     expect(markPart(solve, "x = ±2").awarded).toBe(1);
   });
 
   it("does not ignore inequality direction when the boundary number matches", () => {
     const inequality = part({ marks: 1, markScheme: ["x ≤ 3"], prompt: "State the solution set." });
     expect(markPart(inequality, "3").awarded).toBe(0);
+    expect(markPart(inequality, "x ≤ 4").awarded).toBe(0);
     expect(markPart(inequality, "x ≤ 3").awarded).toBe(1);
   });
 
   it("requires pi when an exact answer is expressed in pi", () => {
     const exact = part({ marks: 1, markScheme: ["2π"], prompt: "Give the exact circumference." });
     expect(markPart(exact, "2").awarded).toBe(0);
+    expect(markPart(exact, "3π").awarded).toBe(0);
     expect(markPart(exact, "2π").awarded).toBe(1);
   });
 
   it("requires radical notation for an exact surd unless the scheme offers an approximation", () => {
     const exact = part({ marks: 1, markScheme: ["√2"], prompt: "Give the exact length." });
     expect(markPart(exact, "2").awarded).toBe(0);
+    expect(markPart(exact, "√3").awarded).toBe(0);
     expect(markPart(exact, "√2").awarded).toBe(1);
 
     const flexible = part({ marks: 1, markScheme: ["√2 or 1.414"], prompt: "Give the length." });
