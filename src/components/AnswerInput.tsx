@@ -74,6 +74,11 @@ export function AnswerInput({
     valueRef.current = value;
   }, [value]);
 
+  const emitChange = (next: string) => {
+    valueRef.current = next;
+    onChange(next);
+  };
+
   const toggleVoice = () => {
     if (listening) {
       recognition.current?.stop();
@@ -93,7 +98,7 @@ export function AnswerInput({
         const result = event.results[i];
         if (result.isFinal) addition += result[0].transcript;
       }
-      if (addition) onChange(`${valueRef.current}${valueRef.current ? " " : ""}${addition.trim()}`);
+      if (addition) emitChange(`${valueRef.current}${valueRef.current ? " " : ""}${addition.trim()}`);
     };
     engine.onend = () => setListening(false);
     engine.onerror = () => {
@@ -111,8 +116,7 @@ export function AnswerInput({
     const start = textarea?.selectionStart ?? valueRef.current.length;
     const end = textarea?.selectionEnd ?? start;
     const inserted = insertMathToken(valueRef.current, tokenId, start, end);
-    valueRef.current = inserted.value;
-    onChange(inserted.value);
+    emitChange(inserted.value);
     requestAnimationFrame(() => {
       const current = textareaRef.current;
       current?.focus();
@@ -149,7 +153,7 @@ export function AnswerInput({
           </label>
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={() => {
-              onChange(valueRef.current ? `${valueRef.current}\n${photoDraft}` : photoDraft);
+              emitChange(valueRef.current ? `${valueRef.current}\n${photoDraft}` : photoDraft);
               setPhotoDraft(null);
               setStatus("Your checked transcription has been added to the answer.");
             }}>Use this transcription</Button>
@@ -164,7 +168,7 @@ export function AnswerInput({
         ref={textareaRef}
         id={id}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => emitChange(e.target.value)}
         rows={rows}
         placeholder={placeholder ?? "Write your answer as you would in the exam…"}
         className="field nice-scroll resize-y font-normal text-base leading-6"
