@@ -23,12 +23,7 @@ export function buildCloze(sourceRaw: string, answerRaw: string): BuiltCloze | n
   const answer = answerRaw.trim();
   if (!source || !answer) return null;
 
-  const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, "\\  const index = source.toLocaleLowerCase("en-GB").indexOf(answer.toLocaleLowerCase("en-GB"));
-  if (index < 0) return null;
-
-  return {
-    front: source.slice(0, index) + CLOZE_BLANK + source.slice(index + answer.length),
-    back: source.slice(index, index + answer.length),");
+  const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = new RegExp(escaped, "i").exec(source);
   if (!match || match.index == null) return null;
   const index = match.index;
