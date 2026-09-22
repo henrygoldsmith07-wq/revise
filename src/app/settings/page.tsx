@@ -559,6 +559,8 @@ function DataControls() {
       { store: "mistakes", count: store.mistakes.length },
       { store: "plannedSessions", count: store.plannedSessions.length },
       { store: "examDates", count: store.examDates.length },
+      { store: "gradePredictions", count: store.gradePredictionLog.filter((row) => row.anonId === store.userId).length },
+      { store: "gradeActuals", count: store.gradeActuals.filter((row) => row.anonId === store.userId).length },
       { store: "papers", count: store.papers.length },
       { store: "questions", count: store.questions.length },
     ],
@@ -605,6 +607,8 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     mistakes: store.mistakes,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    gradePredictions: store.gradePredictionLog.filter((row) => row.anonId === store.userId),
+    gradeActuals: store.gradeActuals.filter((row) => row.anonId === store.userId),
     interventionOutcomes: store.interventionOutcomes,
     settings: store.settings,
     streak: store.streak,
@@ -631,6 +635,8 @@ function exportDataLegacy(store: ReturnType<typeof useStore>) {
     papers: store.papers,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    gradePredictions: store.gradePredictionLog.filter((row) => row.anonId === store.userId),
+    gradeActuals: store.gradeActuals.filter((row) => row.anonId === store.userId),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
