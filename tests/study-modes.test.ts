@@ -299,6 +299,24 @@ describe("diagrams", () => {
     expect(parseDiagram(card("x", "f", "@diagram:{\"imageUrl\":\"u\",\"hotspots\":[]}"))).toBeNull();
   });
 
+  it("rejects unsafe nested diagram image URLs", () => {
+    const payload = (imageUrl: string) =>
+      card(
+        "unsafe",
+        "Label this",
+        serialiseDiagram({
+          imageUrl,
+          hotspots: [{ id: "1", x: 50, y: 50, label: "Point" }],
+        }),
+      );
+
+    expect(parseDiagram(payload("javascript:alert(1)"))).toBeNull();
+    expect(parseDiagram(payload("file:///tmp/image.png"))).toBeNull();
+    expect(parseDiagram(payload("//tracker.example/image.png"))).toBeNull();
+    expect(parseDiagram(payload("https://example.com/image.png"))?.imageUrl).toBe("https://example.com/image.png");
+    expect(parseDiagram(payload("/diagrams/animal-cell.svg"))?.imageUrl).toBe("/diagrams/animal-cell.svg");
+  });
+
   it("clamps out-of-range coordinates into the image", () => {
     const wild = card("x", "f", '@diagram:{"imageUrl":"u","hotspots":[{"id":"1","x":-40,"y":900,"label":"L"}]}');
     const parsed = parseDiagram(wild)!;
