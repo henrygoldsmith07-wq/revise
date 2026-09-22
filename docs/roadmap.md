@@ -132,7 +132,7 @@ These exist today and are the foundation the roadmap builds on:
 
 - Proper native-quality mobile/PWA UX.
 - Notifications.
-- Sync grade-prediction calibration history across devices *(the portable export includes it today; the calibration metadata itself is currently device-local).*.
+- Sync grade-prediction calibration history across devices *(the portable export includes it today; the calibration metadata itself is currently device-local).*
 - Reliable offline exam packs.
 
 ## 13. Evidence & efficacy
