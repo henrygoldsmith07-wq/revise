@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { allTopics } from "@/domain/curriculum";
 import {
+  buildDiagramSpec,
+  diagramPercentPosition,
   diagramScore,
   isDiagramCard,
   isDiagramComplete,
@@ -255,6 +257,36 @@ describe("diagrams", () => {
   it("round-trips through a card's back", () => {
     expect(isDiagramCard(diagramCard)).toBe(true);
     expect(parseDiagram(diagramCard)).toEqual(spec);
+  });
+
+  it("can reference the card image without duplicating a data URL in the payload", () => {
+    const imageUrl = "data:image/png;base64,AAAA";
+    const compact = card("compact", "Label the cell", serialiseDiagram(spec, { referenceCardImage: true }));
+    compact.imageUrl = imageUrl;
+    expect(compact.back).not.toContain(imageUrl);
+    expect(parseDiagram(compact)).toEqual({ ...spec, imageUrl });
+  });
+
+  it("maps image clicks to clamped percentage coordinates", () => {
+    expect(
+      diagramPercentPosition(150, 75, { left: 100, top: 50, width: 200, height: 100 }),
+    ).toEqual({ x: 25, y: 25 });
+    expect(
+      diagramPercentPosition(999, -20, { left: 100, top: 50, width: 200, height: 100 }),
+    ).toEqual({ x: 100, y: 0 });
+    expect(
+      diagramPercentPosition(0, 0, { left: 0, top: 0, width: 0, height: 100 }),
+    ).toBeNull();
+  });
+
+  it("normalises authored hotspots and blocks blank labels", () => {
+    expect(
+      buildDiagramSpec(" image.png ", [{ id: "a", x: -20, y: 120, label: " Nucleus ", note: " control " }]),
+    ).toEqual({
+      imageUrl: "image.png",
+      hotspots: [{ id: "a", x: 0, y: 100, label: "Nucleus", note: "control" }],
+    });
+    expect(buildDiagramSpec("image.png", [{ id: "a", x: 50, y: 50, label: " " }])).toBeNull();
   });
 
   it("is not confused by an ordinary card", () => {
