@@ -332,7 +332,7 @@ export function QuestionRunner({
     // right one. It is computed from the deterministic local classifier first,
     // so the result view renders immediately and offline; a confident
     // classifier.dev verdict may refine it below, and can never change a mark.
-    let errorDiagnosis = diagnoseAttemptErrors({ question, marked, answers: submittedAnswers });
+    const errorDiagnosis = diagnoseAttemptErrors({ question, marked, answers: submittedAnswers });
 
     const farTransferLink = farTransfer
       ? completeDelayedFarTransfer(farTransfer, attempt, {
