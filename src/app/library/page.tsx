@@ -9,7 +9,7 @@ import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";
 import { knowledgeVsAnswering } from "@/domain/exam-technique";
 import { buildSubjectGraph } from "@/domain/knowledge-graph";
 import { createCard } from "@/domain/scheduling";
-import { buildCloze } from "@/domain/cloze";
+import { buildCloze, normaliseCloze } from "@/domain/cloze";
 import { classifyTopic } from "@/domain/topic-status";
 import type { Card, Topic } from "@/domain/types";
 import { useStore, useSubjects } from "@/state/store";
@@ -288,18 +288,20 @@ function TopicDetail({
     const existing = new Set(cards.map((c) => c.front.trim()));
     const fresh: Card[] = result.data.cards
       .filter((generated) => !existing.has(generated.front.trim()))
-      .map((generated) =>
-        createCard({
+      .map((generated) => {
+        const cloze = generated.kind === "cloze" ? normaliseCloze(generated.front, generated.back) : null;
+        return createCard({
           id: crypto.randomUUID(),
           userId: store.userId,
           subjectId: topic.subjectId,
           topicId: topic.id,
-          front: generated.front,
-          back: generated.back,
-          kind: generated.kind,
+          front: cloze?.front ?? generated.front,
+          back: cloze?.back ?? generated.back,
+          kind: generated.kind === "cloze" && !cloze ? "basic" : generated.kind,
+          ...(cloze ? { clozeSource: cloze.clozeSource } : {}),
           origin: result.source === "ai" ? "ai" : "seed",
-        }),
-      );
+        });
+      });
     await store.addCards(fresh);
     setStatus(
       fresh.length
