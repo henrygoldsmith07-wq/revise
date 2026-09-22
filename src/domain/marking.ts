@@ -258,21 +258,27 @@ function sameToTwoSigFigs(a: number, b: number): boolean {
 
 
 function requiredMathNotationPresent(point: string, answer: string): boolean {
-  const requirements: Array<{ expected: RegExp; actual: RegExp }> = [
-    { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
+  const hasAlternative = /\b(?:or|accept|approximately|approx)\b/i.test(point);
+  const alwaysRequired: Array<{ expected: RegExp; actual: RegExp }> = [
     { expected: /≤|<=|\bless\s+than\s+or\s+equal\b/i, actual: /≤|<=|\bless\s+than\s+or\s+equal\b/i },
     { expected: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i, actual: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i },
-    { expected: /π|\bpi\b/i, actual: /π|\bpi\b/i },
   ];
-  for (const requirement of requirements) {
+  for (const requirement of alwaysRequired) {
     if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
   }
 
-  // An exact radical is structural notation, not merely the number under it.
-  // Explicit alternatives such as "√2 or 1.414" remain eligible for numeric
-  // matching because the scheme itself says a decimal form is acceptable.
-  const exactRadical = /√|\bsqrt\b/i.test(point) && !/\b(?:or|accept|approximately|approx)\b/i.test(point);
-  if (exactRadical && !/(?:√|\bsqrt\b)/i.test(answer)) return false;
+  // Exact-form symbols are required unless the scheme explicitly offers
+  // another representation (for example "√2 or 1.414").
+  if (!hasAlternative) {
+    const exactRequirements: Array<{ expected: RegExp; actual: RegExp }> = [
+      { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
+      { expected: /π|\bpi\b/i, actual: /π|\bpi\b/i },
+      { expected: /√|\bsqrt\b/i, actual: /√|\bsqrt\b/i },
+    ];
+    for (const requirement of exactRequirements) {
+      if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
+    }
+  }
   return true;
 }
 
@@ -393,6 +399,7 @@ function evidenceScore(point: string, answer: string): number {
   const symbolic = symbolicMatch(answer, point);
   if (symbolic === "equivalent") return 1;
   if (symbolic === "not-equivalent") return 0;
+  if (requiresStructuredNumericMatch(point)) return numericEquivalent(point, answer) ? 1 : 0;
   return Math.max(pointCoverage(point, answer), numericEquivalent(point, answer) ? 0.9 : 0);
 }
 
