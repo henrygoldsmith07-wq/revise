@@ -123,11 +123,11 @@ export function CardEditor({
     const field = focusField;
     const ref = field === "front" ? frontRef : backRef;
     const element = ref.current;
-    const value = field === "front" ? draft.front : draft.back;
+    const value = field === "front" ? (draft.kind === "cloze" ? draft.clozeSource ?? draft.front : draft.front) : draft.back;
     const start = element?.selectionStart ?? value.length;
     const end = element?.selectionEnd ?? value.length;
     const next = value.slice(0, start) + snippet + value.slice(end);
-    set(field === "front" ? { front: next } : { back: next });
+    set(field === "front" ? (draft.kind === "cloze" ? { clozeSource: next } : { front: next }) : { back: next });
     // Put the caret after what we inserted rather than at the end of the field.
     requestAnimationFrame(() => {
       element?.focus();
