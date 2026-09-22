@@ -211,7 +211,7 @@ function Library() {
             <EmptyState title="No subject selected" body="Choose your subjects in settings to see their curriculum here." />
           ) : null}
 
-          <ManualCard subjectId={subjectId} />
+          <ManualCard key={subjectId} subjectId={subjectId} />
         </>
       )}
     </div>
@@ -518,18 +518,12 @@ function TopicDetail({
 
 function ManualCard({ subjectId }: { subjectId: string }) {
   const store = useStore();
-  const topics = useMemo(() => (subjectId ? topicsFor(subjectId) : []), [subjectId]);
+  const topics = subjectId ? topicsFor(subjectId) : [];
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
   const [kind, setKind] = useState<"basic" | "cloze">("basic");
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (topics.some((topic) => topic.id === topicId)) return;
-    setTopicId(topics[0]?.id ?? "");
-    setSaved(false);
-  }, [topicId, topics]);
 
   const cloze = kind === "cloze" ? buildCloze(front, back) : null;
   const canSave =
