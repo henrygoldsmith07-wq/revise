@@ -155,7 +155,7 @@ describe("parseDeckJson", () => {
     });
   });
 
-  it("rejects a cloze source that cannot produce its hidden answer", () => {
+  it("downgrades a malformed cloze to basic instead of storing a fake cloze", () => {
     const report = parseDeckJson(
       JSON.stringify({
         cards: [
@@ -168,8 +168,10 @@ describe("parseDeckJson", () => {
         ],
       }),
     );
-    expect(report.accepted).toBe(0);
-    expect(report.rejected[0]?.reason).toContain("cloze answer");
+    expect(report.accepted).toBe(1);
+    expect(report.deck!.cards[0].kind).toBe("basic");
+    expect(report.deck!.cards[0].clozeSource).toBeUndefined();
+    expect(report.warnings.some((warning) => warning.includes("imported as basic"))).toBe(true);
   });
 
   it("clamps out-of-range scheduling rather than trusting it", () => {
