@@ -32,7 +32,9 @@ function percentLabel(value: number | null): string {
 function biasLabel(bias: number | null): string {
   if (bias == null) return "No pairs";
   if (Math.abs(bias) < 0.5) return "Near neutral";
-  return bias > 0 ? percentLabel(bias) + " low" : percentLabel(Math.abs(bias)) + " high";
+  return bias > 0
+    ? String(Math.round(bias * 10) / 10) + " pts low"
+    : String(Math.round(Math.abs(bias) * 10) / 10) + " pts high";
 }
 
 function biasExplanation(bias: number | null): string {
@@ -243,7 +245,7 @@ export function GradePredictionRealityPanel() {
                       {new Date(actual.takenAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-4 text-right">
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-ink3">Actual</p>
                       <p className="text-sm font-semibold tabular-nums text-ink">{percentLabel(actual.percent)}</p>
@@ -262,6 +264,16 @@ export function GradePredictionRealityPanel() {
                         </p>
                       </div>
                     ) : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (!window.confirm("Remove this recorded result?")) return;
+                        void store.removeGradeActual(actual.id).then(() => setMessage("Recorded result removed."));
+                      }}
+                    >
+                      Remove
+                    </Button>
                   </div>
                 </li>
               );
