@@ -39,6 +39,15 @@ export interface DiagramBounds {
 const MARKER = "@diagram:";
 const CARD_IMAGE_REF = "@card-image";
 
+function safeDiagramImageUrl(value: string | undefined): string | null {
+  const url = value?.trim();
+  if (!url) return null;
+  if (/^\/(?!\/)/.test(url)) return url; // bundled /public asset
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(url)) return url;
+  return null;
+}
+
 /**
  * Serialise a diagram. User-authored data URLs can reference the card's
  * `imageUrl` instead of embedding the same image bytes a second time inside
@@ -101,7 +110,8 @@ export function parseDiagram(card: Card): DiagramSpec | null {
   if (!card.back.startsWith(MARKER)) return null;
   try {
     const raw = JSON.parse(card.back.slice(MARKER.length)) as { imageUrl?: string; hotspots?: Hotspot[] };
-    const imageUrl = raw?.imageUrl === CARD_IMAGE_REF ? card.imageUrl : raw?.imageUrl;
+    const referencedImage = raw?.imageUrl === CARD_IMAGE_REF ? card.imageUrl : raw?.imageUrl;
+    const imageUrl = safeDiagramImageUrl(referencedImage);
     if (!imageUrl || !Array.isArray(raw.hotspots) || !raw.hotspots.length) return null;
     const hotspots = raw.hotspots
       .filter((h) => typeof h?.label === "string" && h.label.trim().length > 0)
