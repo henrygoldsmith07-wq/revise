@@ -66,6 +66,7 @@ function DiagramRound({
 
   const complete = isDiagramComplete(round);
   const score = diagramScore(round);
+  const revealedNotes = spec.hotspots.filter((hotspot) => round.placed[hotspot.id] && hotspot.note);
 
   function tapHotspot(hotspotId: string) {
     if (!picked || round.placed[hotspotId]) return;
@@ -126,6 +127,16 @@ function DiagramRound({
           })}
         </div>
       </Panel>
+
+      {revealedNotes.length ? (
+        <ul className="space-y-1.5" aria-label="Revealed diagram notes">
+          {revealedNotes.map((hotspot) => (
+            <li key={hotspot.id} className="text-xs text-ink2 card card-2 px-3 py-2">
+              <span className="font-semibold text-ink">{hotspot.label}:</span> {hotspot.note}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {complete ? (
         <Panel className="fade-in">
