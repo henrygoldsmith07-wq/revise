@@ -70,6 +70,20 @@ describe("pairPredictionsWithActuals", () => {
     expect(pairs).toHaveLength(0);
   });
 
+  it("never pairs an outcome with another user's forecast", () => {
+    const predictions = [
+      prediction({ id: "other-user", anonId: "p2", createdAt: "2026-03-10T00:00:00.000Z", predictedPercent: 74 }),
+      prediction({ id: "own-user", anonId: "p1", createdAt: "2026-03-01T00:00:00.000Z", predictedPercent: 68 }),
+    ];
+    const pairs = pairPredictionsWithActuals(
+      predictions,
+      [actual({ id: "own-result", anonId: "p1", takenAt: "2026-03-15T00:00:00.000Z", percent: 70 })],
+    );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]?.predictionId).toBe("own-user");
+    expect(pairs[0]?.error).toBe(2);
+  });
+
   it("computes days before exam from the paired prediction's exam date", () => {
     const pairs = pairPredictionsWithActuals([prediction({})], [actual({})]);
     expect(pairs[0].daysBeforeExam).toBe(75); // Mar 1 → May 15: measured from prediction, not actual
