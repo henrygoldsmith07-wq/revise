@@ -59,7 +59,7 @@ The app is one loop — **board → topic → card → exam question** — and n
 | **Exam practice** | Structured questions marked point-by-point against the mark scheme, with examiner-style feedback, model answers, safe draft-preserving navigation, five- or ten-minute sprints and a weak-topic exam built from the last seven days of misses. |
 | **Mistake tracking** | Every dropped mark becomes a classified mistake that is retested until it closes; unresolved recent mistakes surface for the student to fix. |
 | **Past papers** | Upload or photograph a paper and mark scheme, extract questions, map them to topics, practise them question-by-question or sit them in full exam conditions with a fixed clock, no in-paper aids, auto-submit and marking after the paper, then close with full-denominator scoring and a repair route. |
-| **Honest pace forecast** | At this pace, N topics stay untouched before the exam date — a real projection from the last seven days of reviews, never a fake pass percentage. |
+| **Honest pace forecast** | At this pace, N topics stay untouched before the exam date — a real projection from the last seven days of reviews, never a fake pass percentage. |\n| **Prediction reality check** | Weekly grade forecasts are frozen before the outcome, then dated mocks, timed papers and final results are joined only to forecasts that already existed. Readiness shows error, bias and interval coverage instead of letting later predictions rewrite history. |
 | **Keyboard** | Shortcuts throughout, with a `?` sheet generated from the live bindings. |
 | **Offline** | IndexedDB-first with a durable outbox; installable PWA; the complete written lesson, recall and practice loop works without a connection. |
 
