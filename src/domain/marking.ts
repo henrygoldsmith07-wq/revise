@@ -356,9 +356,15 @@ export interface PartialCreditCalibration {
 }
 
 /** Evaluate whether a mark-scheme point looks like a calculation/numeric point. */
+function requiresStructuredNumericMatch(point: string): boolean {
+  if (!/\d/.test(point)) return false;
+  return /(?:±|≤|≥|π|√|\+\s*\/\s*-|<=|>=|\bsqrt\b|\bpi\b)/i.test(point);
+}
+
 export function isNumericPoint(point: string): boolean {
   if (!/\d/.test(point)) return false;
   return (
+    requiresStructuredNumericMatch(point) ||
     /\b(answer|calculate|value|concentration|mol|kJ)\b/i.test(point) ||
     /\d\s*(?:J|Pa|N)\b/i.test(point) ||
     /\bm\s*s(?:[-^]?\d+)?\b/i.test(point)
@@ -701,6 +707,7 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     // and reject a pure expression that differs, even if a stray digit matches.
     // Unknown (unparseable/prose) never hurts: it falls through to the rubric.
     const sym = symbolicMatch(trimmed, point);
+    const structuredNumeric = requiresStructuredNumericMatch(point);
     const numeric = isNumericPoint(point);
     const strict = Boolean(calibration?.strictNumericPoints && numeric);
     let ok =
@@ -708,11 +715,13 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
         ? true
         : sym === "not-equivalent"
           ? false
-          : strict
-            ? (num && cov >= thresh)
-            : numeric
-              ? (num || cov >= thresh)
-              : (cov >= thresh || num);
+          : structuredNumeric
+            ? num
+            : strict
+              ? (num && cov >= thresh)
+              : numeric
+                ? (num || cov >= thresh)
+                : (cov >= thresh || num);
     if (ok && !num && sym === "unknown") {
       const discriminative = [...(pointTokenSets[pointIndex] ?? [])].filter(
         (t) => (documentFrequency.get(t) ?? 0) === 1,
