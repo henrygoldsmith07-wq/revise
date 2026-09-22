@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCloze, CLOZE_BLANK, clozeReveal, clozeSource, validCloze } from "@/domain/cloze";
+import { buildCloze, CLOZE_BLANK, clozeReveal, clozeSource, normaliseCloze, validCloze } from "@/domain/cloze";
 
 describe("buildCloze", () => {
   it("blanks the hidden answer and keeps the complete source", () => {
@@ -64,5 +64,25 @@ describe("cloze reveal compatibility", () => {
 
   it("falls back to the answer when a legacy cloze cannot be reconstructed", () => {
     expect(clozeReveal({ kind: "cloze", front: "What is osmosis?", back: "Water movement" })).toBe("Water movement");
+  });
+});
+
+describe("normaliseCloze", () => {
+  it("upgrades a legacy blank prompt into a canonical source", () => {
+    expect(normaliseCloze("Water moves by […] across a membrane.", "osmosis")).toEqual({
+      front: "Water moves by […] across a membrane.",
+      back: "osmosis",
+      clozeSource: "Water moves by osmosis across a membrane.",
+    });
+  });
+
+  it("turns a complete generated sentence into a cloze when the answer is present", () => {
+    expect(normaliseCloze("ATP is the immediate energy carrier.", "ATP")?.front).toBe(
+      "[…] is the immediate energy carrier.",
+    );
+  });
+
+  it("returns null for a fake cloze that has no recoverable deletion", () => {
+    expect(normaliseCloze("What is the immediate energy carrier?", "ATP")).toBeNull();
   });
 });
