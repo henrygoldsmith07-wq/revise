@@ -22,6 +22,15 @@ describe("buildCloze", () => {
     expect(built?.front).toBe(CLOZE_BLANK + " transfers energy; ATP is regenerated.");
   });
 
+  it("treats punctuation and maths characters as literal hidden text", () => {
+    expect(buildCloze("Use E = mc^2 in this model.", "E = mc^2")?.front).toBe(
+      "Use " + CLOZE_BLANK + " in this model.",
+    );
+    expect(buildCloze("The concentration [H+] increases.", "[H+]")?.front).toBe(
+      "The concentration " + CLOZE_BLANK + " increases.",
+    );
+  });
+
   it("refuses empty or unrelated hidden answers", () => {
     expect(buildCloze("", "ATP")).toBeNull();
     expect(buildCloze("ATP transfers energy.", "")).toBeNull();
