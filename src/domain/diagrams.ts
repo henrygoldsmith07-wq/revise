@@ -28,11 +28,68 @@ export interface DiagramSpec {
   hotspots: Hotspot[];
 }
 
+export interface DiagramBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 /** The diagram lives on the card's `back` as JSON behind this marker. */
 const MARKER = "@diagram:";
+const CARD_IMAGE_REF = "@card-image";
 
-export function serialiseDiagram(spec: DiagramSpec): string {
-  return `${MARKER}${JSON.stringify(spec)}`;
+/**
+ * Serialise a diagram. User-authored data URLs can reference the card's
+ * `imageUrl` instead of embedding the same image bytes a second time inside
+ * the JSON payload.
+ */
+export function serialiseDiagram(
+  spec: DiagramSpec,
+  options: { referenceCardImage?: boolean } = {},
+): string {
+  const stored = {
+    ...spec,
+    imageUrl: options.referenceCardImage ? CARD_IMAGE_REF : spec.imageUrl,
+  };
+  return `${MARKER}${JSON.stringify(stored)}`;
+}
+
+/** Turn a pointer coordinate into stable percentage coordinates on an image. */
+export function diagramPercentPosition(
+  clientX: number,
+  clientY: number,
+  bounds: DiagramBounds,
+): { x: number; y: number } | null {
+  if (!Number.isFinite(bounds.width) || !Number.isFinite(bounds.height) || bounds.width <= 0 || bounds.height <= 0) {
+    return null;
+  }
+  const x = clampPercent(((clientX - bounds.left) / bounds.width) * 100);
+  const y = clampPercent(((clientY - bounds.top) / bounds.height) * 100);
+  return {
+    x: Math.round(x * 10) / 10,
+    y: Math.round(y * 10) / 10,
+  };
+}
+
+/**
+ * Validate and normalise an authored diagram before it enters storage. Blank
+ * labels block saving rather than being silently discarded.
+ */
+export function buildDiagramSpec(imageUrlRaw: string | undefined, hotspots: Hotspot[]): DiagramSpec | null {
+  const imageUrl = imageUrlRaw?.trim();
+  if (!imageUrl || !hotspots.length) return null;
+  if (hotspots.some((hotspot) => !hotspot.label.trim())) return null;
+  return {
+    imageUrl,
+    hotspots: hotspots.map((hotspot, index) => ({
+      id: String(hotspot.id || index),
+      x: clampPercent(Number(hotspot.x)),
+      y: clampPercent(Number(hotspot.y)),
+      label: hotspot.label.trim().slice(0, 120),
+      note: hotspot.note?.trim() ? hotspot.note.trim().slice(0, 300) : undefined,
+    })),
+  };
 }
 
 /**
@@ -43,8 +100,9 @@ export function serialiseDiagram(spec: DiagramSpec): string {
 export function parseDiagram(card: Card): DiagramSpec | null {
   if (!card.back.startsWith(MARKER)) return null;
   try {
-    const raw = JSON.parse(card.back.slice(MARKER.length)) as DiagramSpec;
-    if (!raw?.imageUrl || !Array.isArray(raw.hotspots) || !raw.hotspots.length) return null;
+    const raw = JSON.parse(card.back.slice(MARKER.length)) as { imageUrl?: string; hotspots?: Hotspot[] };
+    const imageUrl = raw?.imageUrl === CARD_IMAGE_REF ? card.imageUrl : raw?.imageUrl;
+    if (!imageUrl || !Array.isArray(raw.hotspots) || !raw.hotspots.length) return null;
     const hotspots = raw.hotspots
       .filter((h) => typeof h?.label === "string" && h.label.trim().length > 0)
       .map((h, index) => ({
@@ -54,7 +112,7 @@ export function parseDiagram(card: Card): DiagramSpec | null {
         label: String(h.label).slice(0, 120),
         note: h.note ? String(h.note).slice(0, 300) : undefined,
       }));
-    return hotspots.length ? { imageUrl: raw.imageUrl, hotspots } : null;
+    return hotspots.length ? { imageUrl, hotspots } : null;
   } catch {
     return null;
   }
