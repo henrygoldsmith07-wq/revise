@@ -101,7 +101,7 @@ These exist today and are the foundation the roadmap builds on:
 - Import existing Anki/Quizlet-style decks *(extend — CSV/TSV exists; add the
   richer card types below)*.
 - Better flashcard creation.
-- Image occlusion.
+- Image occlusion *(extend — user-authored hotspot label diagrams now ship with tap placement, notes and offline-safe storage; rectangular hide/reveal masks remain).*
 - Cloze cards *(shipped — complete-sentence authoring, deterministic blank generation, legacy reconstruction, review reveal and deck round-trip validation).*
 - More flexible notes.
 
