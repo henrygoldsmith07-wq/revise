@@ -96,7 +96,7 @@ export function GradePredictionRealityPanel() {
     setSaving(true);
     setMessage(null);
     try {
-      const takenAt = new Date(date + "T12:00:00").toISOString();
+      const takenAt = new Date(date + "T00:00:00").toISOString();
       await store.recordGradeActual({
         subjectId,
         percent: numericPercent,
@@ -107,6 +107,8 @@ export function GradePredictionRealityPanel() {
       setPercent("");
       setLabel("");
       setMessage("Result saved and matched only against forecasts that existed before it.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save that result.");
     } finally {
       setSaving(false);
     }
