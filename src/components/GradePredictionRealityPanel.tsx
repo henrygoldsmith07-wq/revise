@@ -68,6 +68,10 @@ export function GradePredictionRealityPanel() {
     [ownPredictions, ownActuals],
   );
   const matchedByActual = useMemo(() => outcomeByActualId(outcomes), [outcomes]);
+  const predictionById = useMemo(
+    () => new Map(ownPredictions.map((row) => [row.id, row] as const)),
+    [ownPredictions],
+  );
 
   const [subjectId, setSubjectId] = useState(() => store.settings.subjectIds[0] ?? "");
   const [kind, setKind] = useState<ActualResultRecord["kind"]>("mock");
@@ -234,6 +238,7 @@ export function GradePredictionRealityPanel() {
             {recentActuals.map((actual) => {
               const matched = matchedByActual.get(actual.id);
               const subject = getSubject(actual.subjectId);
+              const pairedPrediction = matched ? predictionById.get(matched.predictionId) : undefined;
               const delta = matched ? actual.percent - matched.predictedPercent : null;
               return (
                 <li key={actual.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -257,6 +262,11 @@ export function GradePredictionRealityPanel() {
                       <p className="text-sm font-semibold tabular-nums text-ink">
                         {matched ? percentLabel(matched.predictedPercent) : "No prior forecast"}
                       </p>
+                      {pairedPrediction ? (
+                        <p className="text-[10px] text-ink3 tabular-nums">
+                          {percentLabel(pairedPrediction.lowerPercent)}–{percentLabel(pairedPrediction.upperPercent)}
+                        </p>
+                      ) : null}
                     </div>
                     {delta != null ? (
                       <div>
@@ -264,6 +274,11 @@ export function GradePredictionRealityPanel() {
                         <p className="text-sm font-semibold tabular-nums text-ink">
                           {delta > 0 ? "+" : ""}{Math.round(delta * 10) / 10} pts
                         </p>
+                        <div className="mt-1">
+                          <Pill tone={matched?.insideInterval ? "success" : "review"}>
+                            {matched?.insideInterval ? "Inside range" : "Outside range"}
+                          </Pill>
+                        </div>
                       </div>
                     ) : null}
                     <Button
