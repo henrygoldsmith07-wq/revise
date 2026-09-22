@@ -1,5 +1,5 @@
 import { createCard, normaliseTags } from "./scheduling";
-import { buildCloze } from "./cloze";
+import { normaliseCloze } from "./cloze";
 import type { Card, DeckExport, DeckExportCard, Id } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -148,12 +148,15 @@ export function parseDeckJson(text: string): ImportReport {
       return;
     }
     const scheduling = record.scheduling as Record<string, unknown> | undefined;
-    const kind = normaliseKind(record.kind);
+    const requestedKind = normaliseKind(record.kind);
     const importedClozeSource = str(record.clozeSource) || undefined;
-    const cloze = kind === "cloze" && importedClozeSource ? buildCloze(importedClozeSource, back) : null;
-    if (kind === "cloze" && importedClozeSource && !cloze) {
-      rejected.push({ row: index + 1, reason: "cloze answer not found in clozeSource" });
-      return;
+    const cloze =
+      requestedKind === "cloze"
+        ? normaliseCloze(front, back, importedClozeSource)
+        : null;
+    const kind = requestedKind === "cloze" && !cloze ? "basic" : requestedKind;
+    if (requestedKind === "cloze" && !cloze) {
+      warnings.push(`Row ${index + 1} was labelled cloze but had no recoverable deletion, so it was imported as basic.`);
     }
     cards.push({
       front: cloze?.front ?? front,
