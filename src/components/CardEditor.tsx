@@ -6,6 +6,7 @@ import { RichText } from "./RichText";
 import { Button, Field, Panel, Pill, cx } from "./ui";
 import { DeleteIcon, ICON_SIZE, PhotoIcon } from "./icons";
 import { normaliseTags } from "@/domain/scheduling";
+import { buildCloze, clozeSource as resolvedClozeSource } from "@/domain/cloze";
 import { topicsFor } from "@/domain/curriculum";
 import type { Card, CardKind, Id } from "@/domain/types";
 
@@ -25,7 +26,7 @@ const MAX_AUDIO_BYTES = 2_000_000;
 
 const KINDS: { value: CardKind; label: string; hint: string }[] = [
   { value: "basic", label: "Basic", hint: "Question on the front, answer on the back" },
-  { value: "cloze", label: "Cloze", hint: "Blank out a term with […]" },
+  { value: "cloze", label: "Cloze", hint: "Hide one answer inside a complete sentence" },
   { value: "equation", label: "Equation", hint: "Maths-heavy — LaTeX between $ signs" },
   { value: "image", label: "Image", hint: "A diagram to identify or label" },
   { value: "audio", label: "Audio", hint: "A clip to recall from" },
@@ -37,7 +38,6 @@ const SNIPPETS: { label: string; insert: string; hint: string }[] = [
   { label: "Table", insert: "| Term | Meaning |\n| --- | --- |\n| a | b |", hint: "pipe table" },
   { label: "Bullets", insert: "- first\n- second", hint: "- list" },
   { label: "Bold", insert: "**important**", hint: "**…**" },
-  { label: "Cloze blank", insert: "[…]", hint: "blank" },
 ];
 
 export interface CardDraft {
@@ -49,6 +49,8 @@ export interface CardDraft {
   imageUrl?: string;
   audioUrl?: string;
   topicId: Id;
+  /** Complete, unblanked sentence for a cloze card. */
+  clozeSource?: string;
 }
 
 export function draftFromCard(card: Card): CardDraft {
@@ -61,25 +63,32 @@ export function draftFromCard(card: Card): CardDraft {
     imageUrl: card.imageUrl,
     audioUrl: card.audioUrl,
     topicId: card.topicId,
+    clozeSource: resolvedClozeSource(card) ?? undefined,
   };
 }
 
 export function applyDraft(card: Card, draft: CardDraft, now: Date = new Date()): Card {
+  const cloze =
+    draft.kind === "cloze"
+      ? buildCloze(draft.clozeSource ?? draft.front, draft.back)
+      : null;
   const next: Card = {
     ...card,
-    front: draft.front.trim(),
-    back: draft.back.trim(),
+    front: cloze?.front ?? draft.front.trim(),
+    back: cloze?.back ?? draft.back.trim(),
     kind: draft.kind,
     tags: normaliseTags(draft.tags),
     topicId: draft.topicId,
     note: draft.note.trim() || undefined,
     imageUrl: draft.imageUrl,
     audioUrl: draft.audioUrl,
+    ...(cloze ? { clozeSource: cloze.clozeSource } : {}),
     updatedAt: now.toISOString(),
   };
   if (!next.note) delete next.note;
   if (!next.imageUrl) delete next.imageUrl;
   if (!next.audioUrl) delete next.audioUrl;
+  if (draft.kind !== "cloze" || !cloze) delete next.clozeSource;
   return next;
 }
 
@@ -186,7 +195,11 @@ export function CardEditor({
   }
 
   const topics = topicsFor(subjectId);
-  const canSave = draft.front.trim().length > 0 && draft.back.trim().length > 0;
+  const builtCloze = draft.kind === "cloze" ? buildCloze(draft.clozeSource ?? draft.front, draft.back) : null;
+  const canSave =
+    draft.kind === "cloze"
+      ? Boolean(builtCloze)
+      : draft.front.trim().length > 0 && draft.back.trim().length > 0;
 
   return (
     <div className="space-y-4">
@@ -195,7 +208,13 @@ export function CardEditor({
           <button
             key={kind.value}
             type="button"
-            onClick={() => set({ kind: kind.value })}
+            onClick={() =>
+              set(
+                kind.value === "cloze"
+                  ? { kind: "cloze", clozeSource: draft.clozeSource ?? draft.front }
+                  : { kind: kind.value },
+              )
+            }
             title={kind.hint}
             className={cx(
               "pill transition-colors",
@@ -221,27 +240,59 @@ export function CardEditor({
         ))}
       </div>
 
-      <Field label="Front" hint="The prompt. Ask a question — a heading tests nothing.">
-        <textarea
-          ref={frontRef}
-          value={draft.front}
-          onFocus={() => setFocusField("front")}
-          onChange={(e) => set({ front: e.target.value })}
-          rows={3}
-          className="field nice-scroll"
-        />
-      </Field>
+      {draft.kind === "cloze" ? (
+        <>
+          <Field
+            label="Complete sentence"
+            hint="Write the sentence with the answer visible. Revise will blank the first matching occurrence."
+          >
+            <textarea
+              ref={frontRef}
+              value={draft.clozeSource ?? draft.front}
+              onFocus={() => setFocusField("front")}
+              onChange={(e) => set({ clozeSource: e.target.value })}
+              rows={3}
+              className="field nice-scroll"
+              placeholder="Mitochondria release energy by aerobic respiration."
+            />
+          </Field>
+          <Field label="Hidden answer" hint="This exact text must appear in the complete sentence.">
+            <textarea
+              ref={backRef}
+              value={draft.back}
+              onFocus={() => setFocusField("back")}
+              onChange={(e) => set({ back: e.target.value })}
+              rows={2}
+              className="field nice-scroll"
+              placeholder="aerobic respiration"
+            />
+          </Field>
+        </>
+      ) : (
+        <>
+          <Field label="Front" hint="The prompt. Ask a question — a heading tests nothing.">
+            <textarea
+              ref={frontRef}
+              value={draft.front}
+              onFocus={() => setFocusField("front")}
+              onChange={(e) => set({ front: e.target.value })}
+              rows={3}
+              className="field nice-scroll"
+            />
+          </Field>
 
-      <Field label="Back" hint="The answer, exactly as an examiner would want it.">
-        <textarea
-          ref={backRef}
-          value={draft.back}
-          onFocus={() => setFocusField("back")}
-          onChange={(e) => set({ back: e.target.value })}
-          rows={4}
-          className="field nice-scroll"
-        />
-      </Field>
+          <Field label="Back" hint="The answer, exactly as an examiner would want it.">
+            <textarea
+              ref={backRef}
+              value={draft.back}
+              onFocus={() => setFocusField("back")}
+              onChange={(e) => set({ back: e.target.value })}
+              rows={4}
+              className="field nice-scroll"
+            />
+          </Field>
+        </>
+      )}
 
       <Field label="Note" hint="Optional context shown under the answer. Never tested.">
         <textarea value={draft.note} onChange={(e) => set({ note: e.target.value })} rows={2} className="field" />
@@ -348,7 +399,7 @@ export function CardEditor({
         <div className="space-y-3">
           <div>
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1">Front</p>
-            <RichText className="text-base text-ink">{draft.front || "_(empty)_"}</RichText>
+            <RichText className="text-base text-ink">{(builtCloze?.front ?? draft.front) || "_(empty)_"}</RichText>
             {draft.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -361,6 +412,9 @@ export function CardEditor({
           <div className="pt-3 border-t border-line">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1">Back</p>
             <RichText className="text-base">{draft.back || "_(empty)_"}</RichText>
+            {draft.kind === "cloze" && builtCloze ? (
+              <p className="text-xs text-ink3 mt-2">Completed sentence: {builtCloze.clozeSource}</p>
+            ) : null}
             {draft.audioUrl ? <audio controls src={draft.audioUrl} className="w-full mt-2 h-9" /> : null}
             {draft.note ? <p className="text-xs text-ink3 mt-2 italic">{draft.note}</p> : null}
           </div>
@@ -372,7 +426,13 @@ export function CardEditor({
           {saveLabel}
         </Button>
         {onCancel ? <Button onClick={onCancel}>Cancel</Button> : null}
-        {!canSave ? <span className="text-xs text-ink3 self-center">Both sides need content.</span> : null}
+        {!canSave ? (
+          <span className="text-xs text-ink3 self-center">
+            {draft.kind === "cloze"
+              ? "The hidden answer must appear in the complete sentence."
+              : "Both sides need content."}
+          </span>
+        ) : null}
       </div>
     </div>
   );
