@@ -120,6 +120,12 @@ describe("markPart", () => {
     expect(markPart(exact, "2π").awarded).toBe(1);
   });
 
+  it("accepts an explicit decimal alternative to pi but not the coefficient alone", () => {
+    const flexible = part({ marks: 1, markScheme: ["2π or 6.28"], prompt: "Give the circumference." });
+    expect(markPart(flexible, "2").awarded).toBe(0);
+    expect(markPart(flexible, "6.28").awarded).toBe(1);
+  });
+
   it("requires radical notation for an exact surd unless the scheme offers an approximation", () => {
     const exact = part({ marks: 1, markScheme: ["√2"], prompt: "Give the exact length." });
     expect(markPart(exact, "2").awarded).toBe(0);
@@ -127,6 +133,7 @@ describe("markPart", () => {
     expect(markPart(exact, "√2").awarded).toBe(1);
 
     const flexible = part({ marks: 1, markScheme: ["√2 or 1.414"], prompt: "Give the length." });
+    expect(markPart(flexible, "2").awarded).toBe(0);
     expect(markPart(flexible, "1.414").awarded).toBe(1);
   });
 });
