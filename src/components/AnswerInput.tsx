@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { aiOcr } from "@/lib/optional-ai";
+import { insertMathToken, MATH_TOKENS, type MathTokenId } from "@/domain/math-input";
 import { Button, cx } from "./ui";
 import { DictateIcon, DictateStopIcon, ICON_SIZE, PhotoIcon } from "./icons";
 
@@ -46,19 +47,24 @@ export function AnswerInput({
   placeholder,
   rows = 5,
   id,
+  mathMode = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   rows?: number;
   id?: string;
+  /** Show a compact maths-symbol palette for algebra/calculation answers. */
+  mathMode?: boolean;
 }) {
   const [listening, setListening] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [photoDraft, setPhotoDraft] = useState<string | null>(null);
+  const [mathOpen, setMathOpen] = useState(false);
   const speechAvailable = useSyncExternalStore(NO_SUBSCRIBE, speechSupported, speechUnsupportedOnServer);
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Dictation results arrive asynchronously, long after the render that
   // started them, so the callback needs the latest value rather than the one
@@ -98,6 +104,20 @@ export function AnswerInput({
     engine.start();
     setListening(true);
     setStatus(null);
+  };
+
+  const insertMath = (tokenId: MathTokenId) => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? valueRef.current.length;
+    const end = textarea?.selectionEnd ?? start;
+    const inserted = insertMathToken(valueRef.current, tokenId, start, end);
+    valueRef.current = inserted.value;
+    onChange(inserted.value);
+    requestAnimationFrame(() => {
+      const current = textareaRef.current;
+      current?.focus();
+      current?.setSelectionRange(inserted.selectionStart, inserted.selectionEnd);
+    });
   };
 
   const onPhoto = async (file: File) => {
@@ -141,6 +161,7 @@ export function AnswerInput({
         Your answer
       </label>
       <textarea
+        ref={textareaRef}
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -188,12 +209,53 @@ export function AnswerInput({
             e.target.value = "";
           }}
         />
+        {mathMode ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            type="button"
+            onClick={() => setMathOpen((open) => !open)}
+            aria-expanded={mathOpen}
+            aria-controls={id ? `${id}-math-tools` : undefined}
+            className="min-h-10"
+          >
+            Maths symbols
+          </Button>
+        ) : null}
         {value.trim() ? (
           <span className="text-[11px] text-ink3 sm:ml-auto tabular-nums">
             {value.trim().split(/\s+/).length} words
           </span>
         ) : null}
       </div>
+      {mathMode && mathOpen ? (
+        <div
+          id={id ? `${id}-math-tools` : undefined}
+          className="mt-2 rounded-lg border border-line bg-surface2 p-2"
+          aria-label="Maths symbols"
+        >
+          <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">
+            Insert at cursor
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {MATH_TOKENS.map((token) => (
+              <button
+                key={token.id}
+                type="button"
+                title={token.title}
+                aria-label={token.title}
+                onClick={() => insertMath(token.id)}
+                className="min-w-10 min-h-10 rounded-md border border-line bg-surface px-2 text-sm font-medium text-ink hover:border-ink3 active:scale-[0.98]"
+              >
+                {token.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-ink3 mt-1.5">
+            Select part of your working before pressing x², x³, √ or a/b to wrap it.
+          </p>
+        </div>
+      ) : null}
       {status ? (
         <p className="text-[11px] text-ink3 mt-1" role="status" aria-live="polite">
           {status}
