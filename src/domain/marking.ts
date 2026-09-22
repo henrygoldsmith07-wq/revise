@@ -18,8 +18,11 @@ const STOP_WORDS = new Set([
   "more", "less", "also", "into", "each", "their", "they", "you", "your", "we", "one", "two",
 ]);
 
+const MATH_NOTATION_TOKENS = new Set(["pi", "theta", "delta", "sqrt", "leq", "geq", "approx", "plusminus"]);
+
 /** Cheap stemmer: enough to make "oxidised"/"oxidise"/"oxidation" agree. */
 function stem(word: string): string {
+  if (MATH_NOTATION_TOKENS.has(word)) return word;
   let w = word;
   for (const suffix of ["ations", "ation", "ising", "izing", "ised", "ized", "ise", "ize", "ing", "ies", "es", "ed", "s"]) {
     if (w.length > suffix.length + 3 && w.endsWith(suffix)) {
