@@ -114,7 +114,7 @@ import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
 import { attachDelayedRetentionOutcome, attachTransferOutcome, calibrateInterventions, createInterventionOutcome } from "@/domain/intervention-calibration";
 import type { InterventionCalibration } from "@/domain/intervention-calibration";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
-import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
+import { gradePredictionSnapshotId, type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
 import { assignArm as assignExperimentArm, policyTaskFor,
   type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
@@ -1176,12 +1176,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       const week = Math.floor(Date.now() / (7 * 86_400_000));
       let appended = false;
       for (const p of predictions) {
-        const weekKey = `${userId}:${p.subjectId}:${week}`;
-        if (existing.some((r) => r.id === `gp-${weekKey}`)) continue;
+        const snapshotId = gradePredictionSnapshotId(userId, p.subjectId, week);
+        if (existing.some((r) => r.id === snapshotId)) continue;
         const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId &&
           trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)).length;
         const record: GradePredictionRecord = {
-          id: `gp-${weekKey}`,
+          id: snapshotId,
           anonId: userId,
           subjectId: p.subjectId,
           predictedPercent: p.percent,
