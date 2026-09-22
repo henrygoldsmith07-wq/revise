@@ -516,12 +516,18 @@ function TopicDetail({
 
 function ManualCard({ subjectId }: { subjectId: string }) {
   const store = useStore();
-  const topics = subjectId ? topicsFor(subjectId) : [];
+  const topics = useMemo(() => (subjectId ? topicsFor(subjectId) : []), [subjectId]);
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
   const [kind, setKind] = useState<"basic" | "cloze">("basic");
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (topics.some((topic) => topic.id === topicId)) return;
+    setTopicId(topics[0]?.id ?? "");
+    setSaved(false);
+  }, [topicId, topics]);
 
   const cloze = kind === "cloze" ? buildCloze(front, back) : null;
   const canSave =
