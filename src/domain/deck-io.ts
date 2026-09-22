@@ -1,4 +1,5 @@
 import { createCard, normaliseTags } from "./scheduling";
+import { buildCloze } from "./cloze";
 import type { Card, DeckExport, DeckExportCard, Id } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -147,15 +148,22 @@ export function parseDeckJson(text: string): ImportReport {
       return;
     }
     const scheduling = record.scheduling as Record<string, unknown> | undefined;
+    const kind = normaliseKind(record.kind);
+    const importedClozeSource = str(record.clozeSource) || undefined;
+    const cloze = kind === "cloze" && importedClozeSource ? buildCloze(importedClozeSource, back) : null;
+    if (kind === "cloze" && importedClozeSource && !cloze) {
+      rejected.push({ row: index + 1, reason: "cloze answer not found in clozeSource" });
+      return;
+    }
     cards.push({
-      front,
-      back,
-      kind: normaliseKind(record.kind),
+      front: cloze?.front ?? front,
+      back: cloze?.back ?? back,
+      kind,
       tags: normaliseTags(Array.isArray(record.tags) ? record.tags.map((t) => String(t)) : []),
       note: str(record.note) || undefined,
       imageUrl: safeMedia(record.imageUrl),
       audioUrl: safeMedia(record.audioUrl),
-      clozeSource: str(record.clozeSource) || undefined,
+      clozeSource: cloze?.clozeSource ?? importedClozeSource,
       topicId: str(record.topicId, 200) || undefined,
       subjectId: str(record.subjectId, 200) || undefined,
       scheduling: scheduling
