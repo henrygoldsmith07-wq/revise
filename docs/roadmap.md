@@ -103,7 +103,7 @@ These exist today and are the foundation the roadmap builds on:
   richer card types below)*.
 - Better flashcard creation.
 - Image occlusion.
-- Cloze cards.
+- Cloze cards *(shipped — complete-sentence authoring, deterministic blank generation, legacy reconstruction, review reveal and deck round-trip validation).*
 - More flexible notes.
 
 ## 10. Planning & prediction
