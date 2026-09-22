@@ -65,9 +65,8 @@ These exist today and are the foundation the roadmap builds on:
 
 - Handwriting input *(extend — OCR exists; make it first-class for working-out)*.
 - Better OCR (maths notation, poor photos, small handwriting).
-- Mathematical expression input.
-- Better equation equivalence (two algebraically-equal answers should be marked
-  equal, not string-compared).
+- Mathematical expression input *(extend — contextual caret-aware maths palette now covers operators, powers, roots, fractions, Greek symbols, inequalities and scientific notation; richer 2D typesetting remains).*.
+- Better equation equivalence *(extend — deterministic single-variable polynomial equivalence is shipped, including factored/expanded forms, rational coefficients and unicode ×/÷/powers; extend to roots, trig and multivariable expressions).*
 
 ## 5. Languages & subjects
 
