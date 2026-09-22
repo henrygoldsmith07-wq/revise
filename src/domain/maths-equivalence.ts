@@ -137,6 +137,7 @@ type Token =
 export function preprocessMath(text: string): string {
   let t = text.replace(/\s+/g, " ");
   t = t.replace(/×|·|⋅|∗|∙/g, "*");
+  t = t.replace(/÷|∕/g, "/");
   t = t.replace(/−|–|—/g, "-");
   t = t.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4").replace(/⁵/g, "^5");
   t = t
