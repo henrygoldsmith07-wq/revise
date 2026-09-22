@@ -231,6 +231,7 @@ interface StoreValue extends Snapshot {
   paperOutcomeLog: PaperOutcomeRecord[];
   paperOutcomeGains: Map<Id, number>;
   recordGradeActual(input: { subjectId: Id; percent: number; kind: "mock" | "paper" | "final"; takenAt?: string; label?: string }): Promise<void>;
+  removeGradeActual(id: Id): Promise<void>;
   beginPaperOutcome(input: { subjectId: Id; paperId: Id; paperRunId?: Id; predictedMarks: number; totalMarks: number }): Promise<void>;
   closePaperOutcome(paperRunId: Id, actualMarks: number, markingReview?: PaperOutcomeReview): Promise<void>;
   /** Immediate → transfer → delayed-retention intervention evidence. */
@@ -1335,6 +1336,15 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     setGradeActuals(next);
   }, [userId]);
 
+  const removeGradeActual = useCallback<StoreValue["removeGradeActual"]>(async (id) => {
+    const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
+    const target = log.find((row) => row.id === id);
+    if (!target || target.anonId !== userId) return;
+    const next = log.filter((row) => row.id !== id);
+    await writeReviseMeta("gradeActuals", next);
+    setGradeActuals(next);
+  }, [userId]);
+
   // Paper-outcome loop, part 1: freeze the prediction the moment a recommended
   // paper is started, BEFORE any question is answered. Called with the
   // calibration-adjusted simulation for this exact paper.
@@ -1822,6 +1832,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       paperOutcomeLog,
       paperOutcomeGains,
       recordGradeActual,
+    removeGradeActual,
       beginPaperOutcome,
       closePaperOutcome: closePaperOutcomeRecord,
       interventionOutcomes,
