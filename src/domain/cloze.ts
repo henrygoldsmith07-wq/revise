@@ -36,6 +36,26 @@ export function buildCloze(sourceRaw: string, answerRaw: string): BuiltCloze | n
   };
 }
 
+/**
+ * Normalise any cloze-shaped input into the canonical representation.
+ * Accepts the new explicit source, a legacy prompt containing the blank token,
+ * or a complete sentence whose answer is still visible.
+ */
+export function normaliseCloze(frontRaw: string, backRaw: string, sourceRaw?: string): BuiltCloze | null {
+  const front = frontRaw.trim();
+  const back = backRaw.trim();
+  const explicitSource = sourceRaw?.trim();
+  if (explicitSource) return buildCloze(explicitSource, back);
+
+  const blankIndex = front.indexOf(CLOZE_BLANK);
+  if (blankIndex >= 0 && back) {
+    const reconstructed = front.slice(0, blankIndex) + back + front.slice(blankIndex + CLOZE_BLANK.length);
+    return buildCloze(reconstructed, back);
+  }
+
+  return buildCloze(front, back);
+}
+
 /** Reconstruct the full sentence for legacy cloze cards when possible. */
 export function clozeSource(card: Pick<Card, "kind" | "front" | "back" | "clozeSource">): string | null {
   if (card.kind !== "cloze") return null;
