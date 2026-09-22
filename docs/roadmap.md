@@ -115,7 +115,7 @@ These exist today and are the foundation the roadmap builds on:
 - Better predicted grades.
 - Confidence ranges around predicted grades *(extend — bands exist; tighten them
   as data grows)*.
-- Actual grade-vs-prediction tracking (close the loop: did the prediction hold?).
+- Actual grade-vs-prediction tracking *(shipped — weekly forecast snapshots, dated mock/paper/final outcomes, strict as-of pairing, MAE/bias/interval coverage and per-subject history on Readiness).*
 
 ## 11. Personalisation
 
@@ -132,6 +132,7 @@ These exist today and are the foundation the roadmap builds on:
 
 - Proper native-quality mobile/PWA UX.
 - Notifications.
+- Sync grade-prediction calibration history across devices *(the portable export includes it today; the calibration metadata itself is currently device-local).*.
 - Reliable offline exam packs.
 
 ## 13. Evidence & efficacy
