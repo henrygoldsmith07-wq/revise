@@ -212,7 +212,10 @@ export function CardEditor({
               set(
                 kind.value === "cloze"
                   ? { kind: "cloze", clozeSource: draft.clozeSource ?? draft.front }
-                  : { kind: kind.value },
+                  : {
+                      kind: kind.value,
+                      front: draft.kind === "cloze" ? draft.clozeSource ?? draft.front : draft.front,
+                    },
               )
             }
             title={kind.hint}
