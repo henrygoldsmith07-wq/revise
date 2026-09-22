@@ -10,6 +10,7 @@ import {
   serialiseDeck,
 } from "@/domain/deck-io";
 import { createCard, gradeCard } from "@/domain/scheduling";
+import { parseDiagram, serialiseDiagram } from "@/domain/diagrams";
 import type { Card } from "@/domain/types";
 
 const NOW = new Date("2025-06-10T09:00:00.000Z");
@@ -91,6 +92,33 @@ describe("export", () => {
     expect(materialised.front).toBe("Mitochondria release energy by […].");
     expect(materialised.back).toBe("aerobic respiration");
     expect(materialised.clozeSource).toBe("Mitochondria release energy by aerobic respiration.");
+  });
+
+  it("round-trips compact hotspot diagrams without duplicating image bytes", () => {
+    const imageUrl = "data:image/png;base64,AAAA";
+    const diagram = card("Label the cell", {
+      kind: "image",
+      imageUrl,
+      back: serialiseDiagram(
+        {
+          imageUrl,
+          hotspots: [{ id: "nucleus", x: 31, y: 47, label: "Nucleus", note: "Contains DNA" }],
+        },
+        { referenceCardImage: true },
+      ),
+    });
+    expect(diagram.back).not.toContain(imageUrl);
+
+    const deck = exportDeck([diagram], { name: "Diagram", includeScheduling: false });
+    const parsed = parseDeckJson(serialiseDeck(deck));
+    const materialised = materialiseDeck(parsed.deck!, materialiseOptions).cards[0];
+
+    expect(materialised.imageUrl).toBe(imageUrl);
+    expect(materialised.back).not.toContain(imageUrl);
+    expect(parseDiagram(materialised)).toEqual({
+      imageUrl,
+      hotspots: [{ id: "nucleus", x: 31, y: 47, label: "Nucleus", note: "Contains DNA" }],
+    });
   });
 });
 
