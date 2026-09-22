@@ -119,7 +119,7 @@ export function GradePredictionRealityPanel() {
   }
 
   return (
-    <section aria-labelledby="prediction-reality-heading" className="space-y-4">
+    <section aria-label="Prediction reality check" className="space-y-4">
       <SectionHeading
         title="Prediction reality check"
         hint="Close the loop with real mocks, timed papers and final results. Revise only compares an outcome with a forecast that existed before you sat it."
@@ -128,7 +128,7 @@ export function GradePredictionRealityPanel() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
         <Panel className="space-y-4">
           <div>
-            <p id="prediction-reality-heading" className="text-sm font-semibold text-ink">Record a real result</p>
+            <p className="text-sm font-semibold text-ink">Record a real result</p>
             <p className="text-xs text-ink3 mt-1">
               Use the date you actually sat the assessment, not the day you type it in. That keeps later forecasts from retroactively making an older prediction look better.
             </p>
@@ -284,6 +284,7 @@ export function GradePredictionRealityPanel() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      aria-label={"Remove " + (subject?.name ?? actual.subjectId) + " " + RESULT_KIND_LABEL[actual.kind] + " result"}
                       onClick={() => {
                         if (!window.confirm("Remove this recorded result?")) return;
                         void store.removeGradeActual(actual.id).then(() => setMessage("Recorded result removed."));
