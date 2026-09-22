@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyseGradeLoop,
   gradeConfidenceNarrative,
+  gradePredictionSnapshotId,
   pairPredictionsWithActuals,
   type ActualResultRecord,
   type GradePredictionRecord,
@@ -42,6 +43,13 @@ function actual(over: Partial<ActualResultRecord>): ActualResultRecord {
     ...over,
   };
 }
+
+describe("gradePredictionSnapshotId", () => {
+  it("names weekly snapshots per account as well as subject", () => {
+    expect(gradePredictionSnapshotId("p1", SUBJECT, 42)).not.toBe(gradePredictionSnapshotId("p2", SUBJECT, 42));
+    expect(gradePredictionSnapshotId("p1", SUBJECT, 42)).toContain("p1");
+  });
+});
 
 describe("pairPredictionsWithActuals", () => {
   it("pairs each actual with the latest prediction made before it", () => {
