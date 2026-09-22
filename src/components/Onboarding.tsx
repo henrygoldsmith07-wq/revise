@@ -88,10 +88,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     return Boolean(date && date < today);
   });
   const enteredDatesValid = invalidDates.length === 0;
-  const datesValid =
-    chosenSubjects.length > 0 &&
-    missingDates.length === 0 &&
-    enteredDatesValid;
   const onDatesPhase = phase === PHASES.length - 1;
   const canContinue = phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : enteredDatesValid;
 
@@ -280,13 +276,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             {missingDates.length ? (
               <p className="text-xs text-ink3" role="status">
                 {missingDates.length === chosenSubjects.length
-                  ? "No dates yet is fine — choose ‘Skip dates for now’ below, or add them later in Settings."
-                  : `Still to add: ${missingDates.map((s) => s.name).join(", ")}. You can also skip now and add them later in Settings.`}
+                  ? "No dates yet is fine — build your plan now and add them later in Settings."
+                  : `Still to add: ${missingDates.map((s) => s.name).join(", ")}. You can build now and add them later in Settings.`}
               </p>
             ) : null}
             {invalidDates.length ? (
               <p className="text-xs text-danger" role="status">
-                Choose today or a future date, or clear the date and skip for now.
+                Choose today or a future date, or clear the invalid date before building your plan.
               </p>
             ) : null}
           </Panel>
