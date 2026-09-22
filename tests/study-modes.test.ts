@@ -289,6 +289,33 @@ describe("diagrams", () => {
     expect(buildDiagramSpec("image.png", [{ id: "a", x: 50, y: 50, label: " " }])).toBeNull();
   });
 
+  it("renames duplicate hotspot ids so every placed label has independent state", () => {
+    const duplicateIds = {
+      imageUrl: "/diagrams/animal-cell.svg",
+      hotspots: [
+        { id: "same", x: 20, y: 30, label: "Nucleus" },
+        { id: "same", x: 70, y: 60, label: "Mitochondrion" },
+      ],
+    };
+    const parsed = parseDiagram(card("dupes", "Label", serialiseDiagram(duplicateIds)))!;
+    expect(parsed.hotspots.map((hotspot) => hotspot.id)).toEqual(["same", "same-2"]);
+
+    let round = startDiagramRound(parsed, 1);
+    round = placeLabel(round, "same", "Nucleus").round;
+    round = placeLabel(round, "same-2", "Mitochondrion").round;
+    expect(isDiagramComplete(round)).toBe(true);
+  });
+
+  it("rejects authored specs that exceed the hotspot safety cap", () => {
+    const tooMany = Array.from({ length: 25 }, (_, index) => ({
+      id: String(index),
+      x: 50,
+      y: 50,
+      label: `Point ${index}`,
+    }));
+    expect(buildDiagramSpec("image.png", tooMany)).toBeNull();
+  });
+
   it("is not confused by an ordinary card", () => {
     expect(parseDiagram(deck[0])).toBeNull();
     expect(isDiagramCard(deck[0])).toBe(false);
