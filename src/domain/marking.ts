@@ -257,28 +257,30 @@ function sameToTwoSigFigs(a: number, b: number): boolean {
 }
 
 
+function matchesExplicitNumericAlternative(point: string, answer: string): boolean {
+  const marker = /\b(?:or|accept|approximately|approx)\b/i.exec(point);
+  if (!marker) return false;
+  const alternativeText = point.slice(marker.index + marker[0].length);
+  const wanted = extractNumbersCached(alternativeText.replace(/[−–—]/g, "-")).filter((hit) => hit.value != null);
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-")).filter((hit) => hit.value != null);
+  return wanted.some((expected) =>
+    given.some((actual) => numbersClose(expected.value!, actual.value!)),
+  );
+}
+
 function requiredMathNotationPresent(point: string, answer: string): boolean {
-  const hasAlternative = /\b(?:or|accept|approximately|approx)\b/i.test(point);
-  const alwaysRequired: Array<{ expected: RegExp; actual: RegExp }> = [
+  const relationalRequirements: Array<{ expected: RegExp; actual: RegExp }> = [
     { expected: /≤|<=|\bless\s+than\s+or\s+equal\b/i, actual: /≤|<=|\bless\s+than\s+or\s+equal\b/i },
     { expected: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i, actual: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i },
+    { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
   ];
-  for (const requirement of alwaysRequired) {
+  for (const requirement of relationalRequirements) {
     if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
   }
 
-  // Exact-form symbols are required unless the scheme explicitly offers
-  // another representation (for example "√2 or 1.414").
-  if (!hasAlternative) {
-    const exactRequirements: Array<{ expected: RegExp; actual: RegExp }> = [
-      { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
-      { expected: /π|\bpi\b/i, actual: /π|\bpi\b/i },
-      { expected: /√|\bsqrt\b/i, actual: /√|\bsqrt\b/i },
-    ];
-    for (const requirement of exactRequirements) {
-      if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
-    }
-  }
+  const numericAlternativeMatches = matchesExplicitNumericAlternative(point, answer);
+  if (/π|\bpi\b/i.test(point) && !/π|\bpi\b/i.test(answer) && !numericAlternativeMatches) return false;
+  if (/√|\bsqrt\b/i.test(point) && !/(?:√|\bsqrt\b)/i.test(answer) && !numericAlternativeMatches) return false;
   return true;
 }
 
