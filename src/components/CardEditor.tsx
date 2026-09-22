@@ -86,6 +86,10 @@ export function applyDraft(card: Card, draft: CardDraft, now: Date = new Date())
       ? buildDiagramSpec(draft.imageUrl, draft.diagramHotspots ?? [])
       : null;
   const invalidCloze = draft.kind === "cloze" && !cloze;
+  const invalidDiagram = draft.kind === "image" && draft.diagramMode && !diagram;
+  // UI validation normally prevents this. Keeping the old card is safer than
+  // writing an unanswerable @diagram card if a caller bypasses the button.
+  if (invalidDiagram) return card;
   const next: Card = {
     ...card,
     front: cloze?.front ?? (invalidCloze ? draft.clozeSource ?? draft.front : draft.front).trim(),
