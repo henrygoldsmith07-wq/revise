@@ -72,11 +72,12 @@ export function applyDraft(card: Card, draft: CardDraft, now: Date = new Date())
     draft.kind === "cloze"
       ? buildCloze(draft.clozeSource ?? draft.front, draft.back)
       : null;
+  const invalidCloze = draft.kind === "cloze" && !cloze;
   const next: Card = {
     ...card,
-    front: cloze?.front ?? draft.front.trim(),
+    front: cloze?.front ?? (invalidCloze ? draft.clozeSource ?? draft.front : draft.front).trim(),
     back: cloze?.back ?? draft.back.trim(),
-    kind: draft.kind,
+    kind: invalidCloze ? "basic" : draft.kind,
     tags: normaliseTags(draft.tags),
     topicId: draft.topicId,
     note: draft.note.trim() || undefined,
