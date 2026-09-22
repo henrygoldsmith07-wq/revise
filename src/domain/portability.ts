@@ -2,6 +2,7 @@ import type { Id, IsoInstant, UserSettings } from "./types";
 import type { DeckExport } from "./types";
 import { exportDeck } from "./deck-io";
 import type { Card } from "./types";
+import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
 
 // ---------------------------------------------------------------------------
 // Data portability, privacy and account controls.
@@ -38,6 +39,12 @@ export interface PortabilitySnapshot {
   plannedSessions: unknown[];
   examDatesCount: number;
   examDates: unknown[];
+  /** Forecast snapshots used to audit predicted grades against later outcomes. */
+  gradePredictionsCount: number;
+  gradePredictions: GradePredictionRecord[];
+  /** Mocks, timed papers and final results entered by the student. */
+  gradeActualsCount: number;
+  gradeActuals: ActualResultRecord[];
   /** Immediate, transfer and delayed-retention intervention evidence. */
   interventionOutcomesCount: number;
   interventionOutcomes: unknown[];
@@ -59,6 +66,8 @@ export interface PortabilityInput {
   mistakes: unknown[];
   plannedSessions: unknown[];
   examDates: unknown[];
+  gradePredictions?: GradePredictionRecord[];
+  gradeActuals?: ActualResultRecord[];
   interventionOutcomes?: unknown[];
   settings?: UserSettings | null;
   streak?: unknown | null;
@@ -85,13 +94,17 @@ export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySn
     plannedSessions: input.plannedSessions,
     examDatesCount: input.examDates.length,
     examDates: input.examDates,
+    gradePredictionsCount: input.gradePredictions?.length ?? 0,
+    gradePredictions: input.gradePredictions ?? [],
+    gradeActualsCount: input.gradeActuals?.length ?? 0,
+    gradeActuals: input.gradeActuals ?? [],
     interventionOutcomesCount: input.interventionOutcomes?.length ?? 0,
     interventionOutcomes: input.interventionOutcomes ?? [],
     settings: input.settings ?? null,
     streak: input.streak ?? null,
     seedVersion: input.seedVersion ?? 1,
     notes: [
-      "This is a complete, machine-readable export of your Revise data. Keep it private — it contains every card you authored.",
+      "This is a complete, machine-readable export of your Revise data. Keep it private — it contains authored cards, study history and any recorded assessment outcomes.",
       "To restore: Settings → Data → Import and choose this file.",
     ],
   };
