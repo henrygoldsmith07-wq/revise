@@ -166,7 +166,7 @@ export function parseDeckJson(text: string): ImportReport {
       note: str(record.note) || undefined,
       imageUrl: safeMedia(record.imageUrl),
       audioUrl: safeMedia(record.audioUrl),
-      clozeSource: cloze?.clozeSource ?? importedClozeSource,
+      clozeSource: cloze?.clozeSource,
       topicId: str(record.topicId, 200) || undefined,
       subjectId: str(record.subjectId, 200) || undefined,
       scheduling: scheduling
