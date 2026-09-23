@@ -80,10 +80,13 @@ function bestWorkedSolutionScore(point: string, modelAnswer: string, modelSteps:
  */
 function canonicaliseAuthoredNumericNotation(text: string): string {
   let out = text.replace(/[−–—]/g, "-");
-  // A symbolic radical such as √⟨c²⟩ is a formula, not another authored
-  // numerical result. Remove the whole symbolic radicand before numeric
-  // comparison so its exponent cannot be mistaken for a required value.
-  out = out.replace(/(?:√|\bsqrt\s*)\s*⟨[^⟩]+⟩/gi, " ");
+  // A symbolic radical is a formula, not another authored numerical result.
+  // Remove common bracketed symbolic radicands before numeric comparison so
+  // exponents such as the 2 in √⟨c²⟩ / √(x²+y²) cannot be mistaken for an
+  // expected answer. Numeric radicands are intentionally left for evaluation.
+  out = out.replace(/(?:√|\bsqrt\s*)\s*([⟨(\[])([^⟩)\]]+)[⟩)\]]/gi, (match, _open: string, radicand: string) =>
+    /[a-z]/i.test(radicand) ? " " : match,
+  );
   // Handle an explicit coefficient before a numeric radical as multiplication
   // before replacing standalone radicals. Otherwise `2√2` would become
   // `21.414...` and look like a contradiction instead of the value 2.828....
@@ -179,60 +182,34 @@ export function firstIncorrectStep(part: QuestionPart, answer: string): WorkingA
     }
     const forward = stepSimilarity(step.text, modelSteps[nextModel]!);
     if (forward >= STEP_THRESHOLD) { covered[nextModel] = true; nextModel++; continue; }
-    let laterIndex = -1;
-    let laterScore = 0;
-    for (let mi = nextModel + 1; mi < modelSteps.length; mi++) {
-      const score = stepSimilarity(step.text, modelSteps[mi]!);
-      if (score > laterScore) { laterScore = score; laterIndex = mi; }
+    const futureIndex = modelSteps.slice(nextModel + 1).findIndex((m) => stepSimilarity(step.text, m) >= STEP_THRESHOLD);
+    if (futureIndex >= 0) {
+      return { modelSteps, steps, consistentWithModel: false, firstIncorrect: { stepIndex: step.index, studentStep: step.text, expected: modelSteps[nextModel]!, similarity: forward, reason: "missing-expected-step" } };
     }
-    if (laterIndex >= 0 && laterScore >= STEP_THRESHOLD) return {
-      modelSteps, steps, consistentWithModel: false,
-      firstIncorrect: { stepIndex: step.index, studentStep: step.text, expected: modelSteps[nextModel]!, similarity: 0, reason: "missing-expected-step" },
-    };
-    return {
-      modelSteps, steps, consistentWithModel: false,
-      firstIncorrect: { stepIndex: step.index, studentStep: step.text, expected: modelSteps[nextModel]!, similarity: forward, reason: "content-mismatch" },
-    };
+    if (contradiction !== null && contradiction === step.index) {
+      return { modelSteps, steps, consistentWithModel: false, firstIncorrect: { stepIndex: step.index, studentStep: step.text, expected: modelSteps[nextModel]!, similarity: 0, reason: "contradictory-working" } };
+    }
+    if (forward < STEP_THRESHOLD) {
+      return { modelSteps, steps, consistentWithModel: false, firstIncorrect: { stepIndex: step.index, studentStep: step.text, expected: modelSteps[nextModel]!, similarity: forward, reason: "content-mismatch" } };
+    }
   }
-  const skipped = covered.findIndex((coveredStep) => !coveredStep);
-  if (skipped >= 0) return {
-    modelSteps, steps, consistentWithModel: false,
-    firstIncorrect: { stepIndex: steps[steps.length - 1]?.index ?? 0, studentStep: steps[steps.length - 1]?.text ?? "", expected: modelSteps[skipped]!, similarity: 0, reason: "missing-expected-step" },
-  };
+  const missingIndex = covered.findIndex((v) => !v);
+  if (missingIndex >= 0) return { modelSteps, steps, consistentWithModel: false, firstIncorrect: { stepIndex: steps.length, studentStep: "", expected: modelSteps[missingIndex]!, similarity: 0, reason: "working-runs-out" } };
   return { modelSteps, steps, firstIncorrect: null, consistentWithModel: true };
 }
 
-export function consistentWithModel(part: QuestionPart, answer: string): boolean {
-  return firstIncorrectStep(part, answer).consistentWithModel;
-}
-
-export function analyseAttemptWorking(question: Question, answers: Record<string, string>, marked: readonly MarkedPart[]): AttemptWorkingEvidence[] {
-  if (question.kind !== "calculation" && !question.parts.some((part) => (part.calculationRules?.length ?? 0) > 0)) return [];
-  return question.parts.flatMap((part) => {
-    if (question.kind !== "calculation" && !(part.calculationRules?.length ?? 0)) return [];
-    const answer = answers[part.id] ?? "";
-    const analysis = firstIncorrectStep(part, answer);
-    const diagnosis = diagnoseWorking({ modelSteps: analysis.modelSteps, answer, similarityFn: stepSimilarity });
-    const firstIncorrectIndex = analysis.firstIncorrect?.stepIndex ?? (diagnosis.firstErrorIndex ?? null);
-    const firstErrorKind = analysis.firstIncorrect?.reason === "contradictory-working" ? "contradictory-working" : diagnosis.firstErrorIndex != null ? diagnosis.kind : analysis.firstIncorrect ? "method-error" : "none";
-    const result = marked.find((candidate) => candidate.partId === part.id);
-    const evidence = result?.evidence ?? [];
-    const count = (kind: NonNullable<QuestionPart["calculationRules"]>[number]["kind"]): number => {
-      const rules = part.calculationRules?.filter((rule) => rule.kind === kind) ?? [];
-      return rules.filter((rule) => evidence.find((point) => point.point === part.markScheme[part.calculationRules?.indexOf(rule) ?? -1])?.status === "credited").length;
-    };
-    const carriedForward = evidence.some((point) => point.status === "credited" && /error carried forward/i.test(point.explanation));
-    return [{
-      partId: part.id,
-      firstIncorrectStep: firstIncorrectIndex,
-      firstErrorKind,
-      consistentWithModel: analysis.consistentWithModel,
-      methodMarksAwarded: count("method"),
-      accuracyMarksAwarded: count("accuracy"),
-      followThroughMarksAwarded: count("follow-through"),
-      ...(carriedForward ? { errorCarriedForward: true } : {}),
-      unitMarksAwarded: count("unit"),
-      precisionMarksAwarded: count("precision"),
-    }];
-  });
+export function buildWorkingEvidence(part: QuestionPart, marked: MarkedPart, answer: string): AttemptWorkingEvidence {
+  const analysis = firstIncorrectStep(part, answer);
+  const diagnosis = diagnoseWorking(part, answer);
+  return {
+    partId: part.id,
+    steps: analysis.steps,
+    firstIncorrectStep: analysis.firstIncorrect?.stepIndex ?? null,
+    firstIncorrectReason: analysis.firstIncorrect?.reason ?? null,
+    firstIncorrectExpected: analysis.firstIncorrect?.expected ?? null,
+    consistentWithModel: analysis.consistentWithModel,
+    score: marked.score,
+    maxScore: marked.maxScore,
+    diagnosis,
+  };
 }
