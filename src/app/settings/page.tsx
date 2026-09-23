@@ -16,6 +16,7 @@ import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
+import { PwaInstallSettings } from "@/components/PwaInstall";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -226,6 +227,8 @@ export default function SettingsPage() {
           </Button>
         </Panel>
       </section>
+
+      <PwaInstallSettings />
 
       <section>
         <SectionHeading title="Appearance and accessibility" />

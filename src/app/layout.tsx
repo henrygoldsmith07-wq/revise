@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { PwaInstallProvider } from "@/components/PwaInstall";
 import { ShortcutProvider } from "@/components/shortcuts";
 import { StoreProvider } from "@/state/store";
 
@@ -42,11 +43,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body className={`${inter.variable} antialiased`}>
-        <StoreProvider>
-          <ShortcutProvider>
-            <AppShell>{children}</AppShell>
-          </ShortcutProvider>
-        </StoreProvider>
+        <PwaInstallProvider>
+          <StoreProvider>
+            <ShortcutProvider>
+              <AppShell>{children}</AppShell>
+            </ShortcutProvider>
+          </StoreProvider>
+        </PwaInstallProvider>
         <ServiceWorker />
       </body>
     </html>
