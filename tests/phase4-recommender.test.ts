@@ -12,7 +12,6 @@ import {
   evaluateVsBaseline,
   evaluateAllBaselines,
 } from "@/domain/recommender-enhancements";
-import { createCard } from "@/domain/scheduling";
 import type { Topic, TopicMastery } from "@/domain/types";
 
 const NOW = new Date("2025-06-10T09:00:00.000Z");

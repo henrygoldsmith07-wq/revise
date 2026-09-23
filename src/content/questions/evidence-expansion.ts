@@ -166,8 +166,8 @@ const physics: ExpansionItem[] = [
     calculator: true,
     stem: "In a laboratory, a ball is launched horizontally at 4.0 m/s from a bench of height 0.80 m. Calculate the time of flight, the horizontal range, and explain why the horizontal velocity can be treated as constant.",
     parts: [
-      part("Calculate the time of flight.", 2, ["Vertical motion: s = ½gt²", "t = √(2s/g) = √(2×0.80/9.8)", "t ≈ 0.40 s"], "Vertically: 0.80 = ½(9.8)t² so t = √(0.163) ≈ 0.40 s.", "Projectile motion separates into independent components.", ["AO2"]),
-      part("Calculate the horizontal range.", 2, ["Range = horizontal speed × time", "range = 4.0 × 0.40", "range ≈ 1.6 m"], "Range = 4.0 × 0.40 = 1.6 m.", "Range follows from uniform horizontal velocity and flight time.", ["AO2"]),
+      part("Calculate the time of flight.", 2, ["Vertical motion: s = ½gt² so t = √(2s/g)", "t = √(2×0.80/9.8) ≈ 0.40 s"], "Vertically: 0.80 = ½(9.8)t² so t = √(0.163) ≈ 0.40 s.", "Projectile motion separates into independent components.", ["AO2"]),
+      part("Calculate the horizontal range.", 2, ["Range = horizontal speed × time", "range = 4.0 × 0.40 ≈ 1.6 m"], "Range = 4.0 × 0.40 = 1.6 m.", "Range follows from uniform horizontal velocity and flight time.", ["AO2"]),
       part("Explain why the horizontal velocity stays constant.", 1, ["No horizontal resultant force acts once launched (air resistance neglected)"], "With air resistance neglected there is no horizontal resultant force, and by Newton's first law the horizontal velocity remains constant.", "Newton's laws applied to projectile motion.", ["AO1", "AO2"]),
     ],
   },

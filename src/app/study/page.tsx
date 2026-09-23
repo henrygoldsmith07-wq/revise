@@ -7,14 +7,17 @@ import { isDiagramCard } from "@/domain/diagrams";
 import { allTopics, getSubject, topicsFor } from "@/domain/curriculum";
 import type { StudyMode } from "@/domain/study-modes";
 import { useStore, useSubjects } from "@/state/store";
+import type { Card } from "@/domain/types";
 import { DiagramMode } from "@/components/modes/DiagramMode";
 import { LearnMode } from "@/components/modes/LearnMode";
 import { MatchGame } from "@/components/modes/MatchGame";
 import { TestMode } from "@/components/modes/TestMode";
 import { AudioMode } from "@/components/modes/AudioMode";
 import { ExplanationMode } from "@/components/modes/ExplanationMode";
+import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button, EmptyState, Panel, Pill, SectionHeading, cx } from "@/components/ui";
 import { ICON_SIZE, ModesIcon } from "@/components/icons";
+import { DailySessionCard } from "@/components/DailySessionCard";
 import type { LucideIcon } from "@/components/icons";
 import { AudioIcon, PracticeIcon, ReviewIcon, TodayIcon, TutorIcon } from "@/components/icons";
 
@@ -56,8 +59,8 @@ const MODES: {
   {
     mode: "diagram",
     label: "Label a diagram",
-    blurb: "Drag labels onto the right points.",
-    when: "For the figures examiners keep asking you to label.",
+    blurb: "Retrieve each label, then tap the right point.",
+    when: "For the figures examiners keep asking you to label from memory.",
     Icon: ModesIcon,
   },
   {
@@ -89,6 +92,13 @@ function Study() {
   const store = useStore();
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
+  const subjectOptions = useMemo(
+    () => [
+      { id: "", name: "All subjects", detail: "Every enrolled deck" },
+      ...subjects.map((subject) => ({ id: subject.id, name: subject.name, detail: "Subject deck" })),
+    ],
+    [subjects],
+  );
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "study" ? store.revisionCheckpoint : null;
@@ -102,6 +112,8 @@ function Study() {
   const [subjectId, setSubjectId] = useState(params.get("subject") ?? "");
   const [topicId, setTopicId] = useState(params.get("topic") ?? "");
   const [query, setQuery] = useState(params.get("q") ?? "");
+  // The daily session is the default; the six mode cards sit behind "More".
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const pool = useMemo(() => {
     const scoped = store.cards.filter(
@@ -120,12 +132,14 @@ function Study() {
     return topicId ? scoped.filter((topic) => topic.id === topicId) : scoped;
   }, [subjectId, topicId, store.settings.subjectIds]);
 
+  const cards = store.cards;
+
   const activePool = useMemo(() => {
     if (!resumeQueueIds?.length) return pool;
-    const byId = new Map(store.cards.map((card) => [card.id, card] as const));
-    const restored = resumeQueueIds.map((id) => byId.get(id)).filter((card): card is (typeof store.cards)[number] => Boolean(card));
+    const byId = new Map(cards.map((card) => [card.id, card] as const));
+    const restored = resumeQueueIds.map((id) => byId.get(id)).filter((card): card is Card => Boolean(card));
     return restored.length ? restored : pool;
-  }, [pool, resumeQueueIds, store.cards]);
+  }, [pool, resumeQueueIds, cards]);
 
   const checkpointHref = useMemo(() => {
     const next = new URLSearchParams();
@@ -176,30 +190,34 @@ function Study() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Study</h1>
         <p className="text-sm text-ink3 mt-0.5">
-          The same cards, worked five different ways. Spaced repetition is still the backbone — these are for when
-          you need a different angle on it.
+          One default session first. The other modes are behind “More” for when you want a different angle.
         </p>
       </header>
 
+      <DailySessionCard subjectIds={store.settings.subjectIds} />
+
+      <div>
+        <Button variant="ghost" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
+          {moreOpen ? "Hide other ways to study" : "More ways to study"}
+        </Button>
+      </div>
+
+      {moreOpen ? (
+        <>
       <Panel className="space-y-3">
         <SectionHeading title="What are you studying?" hint={`${pool.length} cards selected`} />
+        <SubjectPicker
+          options={subjectOptions}
+          selectedIds={[subjectId]}
+          onChange={(ids) => {
+            setSubjectId(ids[0] ?? "");
+            setTopicId("");
+          }}
+          selectionMode="single"
+          ariaLabel="Subject"
+          density="compact"
+        />
         <div className="flex flex-wrap gap-2">
-          <select
-            value={subjectId}
-            onChange={(e) => {
-              setSubjectId(e.target.value);
-              setTopicId("");
-            }}
-            className="field field-inline text-sm"
-            aria-label="Subject"
-          >
-            <option value="">All subjects</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
           {subjectId ? (
             <select
               value={topicId}
@@ -260,6 +278,8 @@ function Study() {
           action={<Button onClick={() => { setQuery(""); setSubjectId(""); setTopicId(""); }}>Clear filter</Button>}
         />
       )}
+        </>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { ExamBoard, Id, Qualification, Subject, Topic, Unit } from "../types";
+import { honestSubject } from "./honesty";
 
 // ---------------------------------------------------------------------------
 // The curriculum registry. Boards, qualifications and subjects are *data*, not
@@ -29,12 +30,22 @@ export function registerQualification(q: Qualification): Qualification {
 }
 
 export function registerSubject(entry: CurriculumModule): CurriculumModule {
-  modules.set(entry.subject.id, entry);
-  return entry;
+  const honest = honestSubject(entry);
+  modules.set(honest.subject.id, honest);
+  return honest;
 }
 
 export function allBoards(): ExamBoard[] {
   return [...boards.values()];
+}
+
+/** Boards a student can actually enrol on: registered boards that have at
+ *  least one subject module. A board row with no content (e.g. Eduqas) is
+ *  never offered, so the first screen cannot dead-end. */
+export function availableBoards(): ExamBoard[] {
+  return allBoards().filter((board) =>
+    allQualifications(board.id).some((q) => allSubjects(q.id).length > 0),
+  );
 }
 
 export function allQualifications(boardId?: Id): Qualification[] {

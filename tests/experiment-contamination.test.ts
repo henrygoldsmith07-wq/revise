@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignArm, policyTaskFor, EXPERIMENT_ARMS, type ExperimentArm, type PolicyTask } from "@/domain/recommendation-experiment";
+import { assignArm, policyTaskFor, type ExperimentArm } from "@/domain/recommendation-experiment";
 
 // ---------------------------------------------------------------------------
 // Experiment contamination prevention — proves that different arms produce

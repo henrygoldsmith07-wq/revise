@@ -52,22 +52,50 @@ async function run<T>(
   jsonHint: string,
   fallback: () => T,
   maxTokens = 1400,
+  /** Task-specific salvage for a near-miss reply, tried before a model retry. */
+  repair?: (raw: unknown) => T | null,
 ): Promise<AiEnvelope<T>> {
   const provider = getProvider();
   if (!provider) return { data: fallback(), source: "fallback", provider: null };
 
-  try {
+  const complete = async (extraFeedback?: string): Promise<T> => {
     const text = await provider.complete({
       system,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "user", content: prompt },
+        // One corrective pass: reasoning models often break a strict schema on
+        // the first try, and telling them which constraint failed fixes most
+        // of those without a second full prompt.
+        ...(extraFeedback ? [{ role: "user" as const, content: extraFeedback }] : []),
+      ],
       jsonHint,
       maxTokens,
     });
     const raw = extractJson<unknown>(text);
     if (raw == null) throw new Error("no JSON in model reply");
     const parsed = schema.safeParse(raw);
-    if (!parsed.success) throw new Error(`schema: ${parsed.error.issues[0]?.message ?? "invalid"}`);
-    return { data: parsed.data, source: "ai", provider: provider.name };
+    if (!parsed.success) {
+      const salvaged = repair?.(raw);
+      if (salvaged !== null && salvaged !== undefined) return salvaged;
+      throw new Error(`schema: ${parsed.error.issues[0]?.message ?? "invalid"}`);
+    }
+    return parsed.data;
+  };
+
+  try {
+    let data: T;
+    try {
+      data = await complete();
+    } catch (firstError) {
+      // Retry once with the validation failure quoted back; anything that
+      // fails twice was never going to parse, so fall through to offline.
+      const message = firstError instanceof Error ? firstError.message : "AI request failed";
+      if (!message.startsWith("schema:")) throw firstError;
+      data = await complete(
+        `Your previous reply did not match the required JSON contract: ${message}. Reply again with corrected JSON only — same shape, no prose around it.`,
+      );
+    }
+    return { data, source: "ai", provider: provider.name };
   } catch (error) {
     // A model failure must never become a user-facing failure.
     return {
@@ -110,12 +138,19 @@ export const payloadSchemas = {
     count: z.number().int().min(1).max(25).default(10),
   }),
   ocr: z.object({
-    // ~8 MB of base64 is roughly a 6 MB photo, which is plenty for a page of
-    // handwriting and small enough to keep the request from timing out.
     image: z.string().max(8_000_000),
     mediaType: z.string().max(60).default("image/jpeg"),
     hint: z.enum(["handwriting", "printed", "auto"]).default("auto"),
   }),
+  "diagnose-error": z.object({
+    prompt: z.string().max(2000),
+    point: z.string().max(1000),
+    answer: z.string().max(8000),
+    awarded: z.number().min(0).max(30),
+    maxMarks: z.number().min(0).max(30),
+    command: z.string().max(30).nullable().optional(),
+  }),
+  "route-spec": z.object({ subjectId: z.string(), text: z.string().max(4000) }),
 } satisfies Record<AiTask, z.ZodType>;
 
 // --- tasks -----------------------------------------------------------------
@@ -359,4 +394,44 @@ export async function extractQuestions(subjectId: string, text: string) {
     () => ({ questions: [] }),
     4000,
   );
+}
+
+/**
+ * Post-marking error diagnosis via classifier.dev.
+ * Only runs on incorrect/partial parts AFTER marking fixed awarded/max.
+ * Never overrides the mark — returns an error-type label + remediation.
+ */
+export async function diagnoseError(input: {
+  prompt: string; point: string; answer: string;
+  awarded: number; maxMarks: number; command?: string | null;
+}) {
+  const { diagnoseError: runDiagnosis } = await import("./error-classifier");
+  const result = await runDiagnosis({
+    subjectId: "unknown", topicId: "unknown", questionId: "unknown", partId: "unknown",
+    prompt: input.prompt, point: input.point, answer: input.answer,
+    awarded: input.awarded, maxMarks: input.maxMarks,
+  });
+  return {
+    data: {
+      category: result.category, confidence: result.confidence, reasons: result.reasons,
+      taxonomyVersion: result.taxonomyVersion, provenance: result.provenance,
+      gated: result.gated, ...(result.rawLabel ? { rawLabel: result.rawLabel } : {}),
+    },
+    source: (result.provenance === "classifier-dev" ? "ai" : "fallback") as "ai" | "fallback",
+    provider: result.provenance === "classifier-dev" ? "classifier.dev" : result.provenance,
+  };
+}
+
+/** Hierarchical spec routing: subject -> topic -> small candidate set. */
+export async function routeSpec(input: { subjectId: string; text: string }) {
+  const { routeSpecPoints } = await import("@/domain/spec-routing");
+  const route = routeSpecPoints(input.subjectId, input.text);
+  return {
+    data: {
+      topics: route.topics.map((t) => t.id),
+      candidates: route.candidates,
+    },
+    source: "fallback" as const,
+    provider: "deterministic",
+  };
 }

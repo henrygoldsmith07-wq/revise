@@ -45,7 +45,16 @@ export type QuestionTypeTag =
   | "contradictory"
   | "irrelevant-but-correct"
   | "misconception"
-  | "different-ability";
+  | "different-ability"
+  // Physics marking benchmark labels. These are explicit case types rather
+  // than inferred from the mark, so coverage gaps remain visible to editors.
+  | "method-marks"
+  | "equivalent-algebra"
+  | "significant-figures"
+  | "units"
+  | "error-carried-forward"
+  | "first-incorrect-step"
+  | "borderline-explanation";
 
 export type AbilityLevel = "foundation" | "intermediate" | "higher" | "mixed";
 
@@ -61,6 +70,13 @@ export interface MarkerMetadata {
   experienceYears?: number;
   /** board familiarity, e.g. "AQA", "WJEC" */
   boardFamiliarity?: string;
+  /**
+   * Explicit attestation that this marker worked independently before seeing
+   * the other marker's award.  A distinct marker id alone cannot establish
+   * independent marking, so Physics calibration requires this flag on both
+   * first-pass markers.
+   */
+  independentlyMarked?: boolean;
   markedAt?: IsoInstant;
 }
 
@@ -217,9 +233,19 @@ export function validateAnswerCorpusRecord(record: unknown, index: number): { re
     if (v !== null && v !== undefined && typeof v === "object") {
       const mm = v as Record<string, unknown>;
       if (mm.markerId !== undefined && typeof mm.markerId !== "string") issues.push(`Record ${rowNum}: ${metaField}.markerId must be string`);
+      if (mm.independentlyMarked !== undefined && typeof mm.independentlyMarked !== "boolean") issues.push(`Record ${rowNum}: ${metaField}.independentlyMarked must be boolean`);
     } else if (v !== null && v !== undefined && typeof v !== "object") {
       issues.push(`Record ${rowNum}: ${metaField} must be object or null`);
     }
+  }
+
+  // Keep imported rows usable for exploratory marking work, but make the
+  // missing independence attestation visible before a Physics row reaches
+  // the stricter benchmark calibration gate.
+  if (r.subject === "wjec-alevel-physics" && r.reviewStatus === "adjudicated" &&
+    (!((r.marker1Meta as Record<string, unknown> | null | undefined)?.independentlyMarked === true) ||
+      !((r.marker2Meta as Record<string, unknown> | null | undefined)?.independentlyMarked === true))) {
+    warnings.push(`Record ${rowNum}: Physics adjudication lacks independent first-pass marker attestations`);
   }
 
   // Cross-field warnings
@@ -431,8 +457,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
   return [
     {
       id: "dev-001-1mark-state",
-      questionId: "seed-q:dev-1mark",
-      partId: "seed-q:dev-1mark:a",
+      questionId: "cnt:question:dev-1mark",
+      partId: "cnt:question:dev-1mark:a",
       subject: "wjec-alevel-physics",
       specification: "A200QS",
       ...base,
@@ -453,8 +479,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-002-calculation",
-      questionId: "seed-q:dev-calc",
-      partId: "seed-q:dev-calc:a",
+      questionId: "cnt:question:dev-calc",
+      partId: "cnt:question:dev-calc:a",
       subject: "aqa-alevel-chemistry",
       specification: "7405",
       ...base,
@@ -477,8 +503,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-003-explain-partial",
-      questionId: "seed-q:dev-explain",
-      partId: "seed-q:dev-explain:a",
+      questionId: "cnt:question:dev-explain",
+      partId: "cnt:question:dev-explain:a",
       subject: "wjec-alevel-chemistry",
       specification: "A100QS",
       ...base,
@@ -499,8 +525,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-004-evaluate-extended",
-      questionId: "seed-q:dev-evaluate",
-      partId: "seed-q:dev-evaluate:a",
+      questionId: "cnt:question:dev-evaluate",
+      partId: "cnt:question:dev-evaluate:a",
       subject: "aqa-gcse-biology",
       specification: "8461",
       ...base,
@@ -522,8 +548,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-005-practical-method",
-      questionId: "seed-q:dev-practical",
-      partId: "seed-q:dev-practical:a",
+      questionId: "cnt:question:dev-practical",
+      partId: "cnt:question:dev-practical:a",
       subject: "edexcel-gcse-chemistry",
       specification: "1CH0",
       ...base,
@@ -544,8 +570,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-006-data-interpretation",
-      questionId: "seed-q:dev-data",
-      partId: "seed-q:dev-data:a",
+      questionId: "cnt:question:dev-data",
+      partId: "cnt:question:dev-data:a",
       subject: "ocr-alevel-biology",
       specification: "H420",
       ...base,
@@ -566,8 +592,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-007-contradictory",
-      questionId: "seed-q:dev-contradictory",
-      partId: "seed-q:dev-contradictory:a",
+      questionId: "cnt:question:dev-contradictory",
+      partId: "cnt:question:dev-contradictory:a",
       subject: "wjec-alevel-biology",
       specification: "A400QS",
       ...base,
@@ -589,8 +615,8 @@ export function devFixtureRecords(): AnswerCorpusRecord[] {
     },
     {
       id: "dev-008-irrelevant-but-correct",
-      questionId: "seed-q:dev-irrelevant",
-      partId: "seed-q:dev-irrelevant:a",
+      questionId: "cnt:question:dev-irrelevant",
+      partId: "cnt:question:dev-irrelevant:a",
       subject: "aqa-gcse-physics",
       specification: "8463",
       ...base,

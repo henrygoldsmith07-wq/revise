@@ -80,7 +80,8 @@ export function parseQuery(query: string): ParsedQuery {
     if (!body) continue;
 
     const colon = body.indexOf(":");
-    const group = groups[groups.length - 1];
+    const group = groups.at(-1);
+    if (!group) continue; // unreachable: groups starts with one entry and never shrinks
 
     if (colon < 0) {
       group.push({ negated, kind: "text", value: body.toLowerCase() });
@@ -133,19 +134,16 @@ export function parseQuery(query: string): ParsedQuery {
           warnings.push(`"prop:${value}" should look like prop:lapses>3.`);
           break;
         }
-        const [, property, comparator, num] = match;
+        const property = match[1];
+        const comparator = match[2];
+        const num = match[3];
+        if (!property || !comparator || !num) break;
         if (!(PROPERTIES as readonly string[]).includes(property.toLowerCase())) {
           warnings.push(`Unknown property "${property}". Try: ${PROPERTIES.join(", ")}.`);
           break;
         }
-        group.push({
-          negated,
-          kind: "prop",
-          value,
-          property: property.toLowerCase() as Term["property"],
-          comparator: comparator as Comparator,
-          number: Number(num),
-        });
+        const propTerm: Term = { negated, kind: "prop", value, property: property.toLowerCase() as NonNullable<Term["property"]>, comparator: comparator as Comparator, number: Number(num) };
+        group.push(propTerm);
         break;
       }
       default:

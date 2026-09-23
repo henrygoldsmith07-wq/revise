@@ -76,6 +76,22 @@ describe("export", () => {
     expect(cards[0].reps).toBe(0);
     expect(cards[0].lapses).toBe(0);
   });
+
+  it("round-trips clozeSource with the deck", () => {
+    const cloze = card("Mitochondria release energy by […].", {
+      kind: "cloze",
+      back: "aerobic respiration",
+      clozeSource: "Mitochondria release energy by aerobic respiration.",
+    });
+    const deck = exportDeck([cloze], { name: "Cloze", includeScheduling: false });
+    const parsed = parseDeckJson(serialiseDeck(deck));
+    const materialised = materialiseDeck(parsed.deck!, materialiseOptions).cards[0];
+
+    expect(materialised.kind).toBe("cloze");
+    expect(materialised.front).toBe("Mitochondria release energy by […].");
+    expect(materialised.back).toBe("aerobic respiration");
+    expect(materialised.clozeSource).toBe("Mitochondria release energy by aerobic respiration.");
+  });
 });
 
 describe("parseDeckJson", () => {
@@ -115,6 +131,47 @@ describe("parseDeckJson", () => {
     );
     expect(report.deck!.cards[0].imageUrl).toBeUndefined();
     expect(report.deck!.cards[0].audioUrl).toBe("data:audio/mp3;base64,AAAA");
+  });
+
+  it("normalises cloze cards from the stored complete sentence", () => {
+    const report = parseDeckJson(
+      JSON.stringify({
+        cards: [
+          {
+            front: "stale prompt",
+            back: "aerobic respiration",
+            kind: "cloze",
+            clozeSource: "Mitochondria release energy by aerobic respiration.",
+          },
+        ],
+      }),
+    );
+    expect(report.accepted).toBe(1);
+    expect(report.deck!.cards[0]).toMatchObject({
+      kind: "cloze",
+      front: "Mitochondria release energy by […].",
+      back: "aerobic respiration",
+      clozeSource: "Mitochondria release energy by aerobic respiration.",
+    });
+  });
+
+  it("downgrades a malformed cloze to basic instead of storing a fake cloze", () => {
+    const report = parseDeckJson(
+      JSON.stringify({
+        cards: [
+          {
+            front: "Mitochondria release energy by […].",
+            back: "photosynthesis",
+            kind: "cloze",
+            clozeSource: "Mitochondria release energy by aerobic respiration.",
+          },
+        ],
+      }),
+    );
+    expect(report.accepted).toBe(1);
+    expect(report.deck!.cards[0].kind).toBe("basic");
+    expect(report.deck!.cards[0].clozeSource).toBeUndefined();
+    expect(report.warnings.some((warning) => warning.includes("imported as basic"))).toBe(true);
   });
 
   it("clamps out-of-range scheduling rather than trusting it", () => {

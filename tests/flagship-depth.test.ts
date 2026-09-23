@@ -42,23 +42,23 @@ function miniQuestion(over: Partial<Question> & { id: string; topicId: string })
 
 describe("classifyDepth", () => {
   it("routes unfamiliar-context questions to transfer", () => {
-    const q = miniQuestion({ id: "seed-q:unfamiliar-context-x", topicId: "wjec-alevel-physics.waves" });
+    const q = miniQuestion({ id: "cnt:question:unfamiliar-context-x", topicId: "wjec-alevel-physics.waves" });
     expect(classifyDepth(q)).toBe("transfer");
   });
 
   it("routes misconception questions to misconception", () => {
-    const q = miniQuestion({ id: "seed-q:misconception-newton-3", topicId: "wjec-alevel-physics.momentum" });
+    const q = miniQuestion({ id: "cnt:question:misconception-newton-3", topicId: "wjec-alevel-physics.momentum" });
     expect(classifyDepth(q)).toBe("misconception");
   });
 
   it("treats 6+ mark questions as synoptic even without a slug signal", () => {
-    const q = { ...miniQuestion({ id: "seed-q:plain", topicId: "wjec-alevel-maths.algebra" }), totalMarks: 6 };
+    const q = { ...miniQuestion({ id: "cnt:question:plain", topicId: "wjec-alevel-maths.algebra" }), totalMarks: 6 };
     expect(classifyDepth(q as Question)).toBe("synoptic");
   });
 
   it("splits recall from application by marks and AO", () => {
     const oneMarkAo1 = miniQuestion({
-      id: "seed-q:r1",
+      id: "cnt:question:r1",
       topicId: "wjec-alevel-biology.cells",
       totalMarks: 1,
       parts: [{ id: "p", label: "", prompt: "", marks: 1, markScheme: [], modelAnswer: "", aos: ["AO1"], specPointIds: [] }],

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useFocusTrap } from "./useFocusTrap";
 import { Button, cx } from "./ui";
@@ -80,17 +80,24 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
   const [sets, setSets] = useState<Shortcut[][]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const registry = useMemo<ShortcutRegistry>(() => {
-    const flat = sets.flat();
-    return {
-      all: flat,
+  // `register` must be identity-stable for the lifetime of the provider: it is
+  // captured by every registration effect through whatever registry object was
+  // current when the effect last ran. If it changed with `sets`, a register →
+  // state → re-render cascade could re-run consumers' effects and recurse
+  // ("Maximum update depth exceeded"). Functional updates make it loop-free.
+  const register = useCallback((shortcuts: Shortcut[]) => {
+    setSets((prev) => [...prev, shortcuts]);
+    return () => setSets((prev) => prev.filter((s) => s !== shortcuts));
+  }, []);
+
+  const registry = useMemo<ShortcutRegistry>(
+    () => ({
+      all: sets.flat(),
       openHelp: () => setHelpOpen(true),
-      register(shortcuts) {
-        setSets((prev) => [...prev, shortcuts]);
-        return () => setSets((prev) => prev.filter((s) => s !== shortcuts));
-      },
-    };
-  }, [sets]);
+      register,
+    }),
+    [register, sets],
+  );
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

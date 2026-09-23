@@ -3,9 +3,7 @@ import {
   diagnoseStep,
   diagnoseWorking,
   isRoundingOf,
-  type StepDiagnosis,
 } from "@/domain/step-diagnosis";
-import { splitSteps } from "@/domain/working-analysis";
 
 describe("isRoundingOf", () => {
   it("accepts values that agree after re-rounding", () => {

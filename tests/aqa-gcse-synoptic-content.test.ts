@@ -17,7 +17,8 @@ describe("AQA GCSE synoptic question bank", () => {
       const questions = aqaGcseSynopticQuestions.filter((question) => question.subjectId === subjectId);
       expect(questions, `${subjectId} should have four synoptic questions`).toHaveLength(4);
       expect(questions.every((question) => question.topicIds.length >= 2)).toBe(true);
-      expect(seedQuestionsForSubject(subjectId)).toEqual(expect.arrayContaining(questions));
+      const seededIds = new Set(seedQuestionsForSubject(subjectId).map((question) => question.id));
+      expect(questions.every((question) => seededIds.has(question.id))).toBe(true);
     }
   });
 

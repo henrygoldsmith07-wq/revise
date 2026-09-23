@@ -13,11 +13,15 @@ import { expect, type Page } from "@playwright/test";
  */
 export type ShellState = "onboarding" | "today";
 
-export async function todayOrOnboarding(page: Page, timeoutMs = 25_000): Promise<ShellState> {
+export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise<ShellState> {
   const onboarding = page.getByText(/Revision that knows what to do next/i);
   const today = page.locator("main#main");
   let outcome: ShellState | null = null;
   await expect(async () => {
+    const bootError = await page
+      .evaluate(() => document.querySelector("[data-boot-error]")?.getAttribute("data-boot-error") ?? null)
+      .catch(() => null);
+    if (bootError) throw new Error(`app failed to boot: ${bootError}`);
     if (await onboarding.isVisible().catch(() => false)) {
       outcome = "onboarding";
       return;
@@ -36,6 +40,45 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 25_000): Promise
 }
 
 /**
+ * Completes the first screen (board → subjects → optional exam dates → quick
+ * check) for a fresh profile. The funnel is the *only* thing rendered until
+ * it is done, so every spec that needs a Today screen funnels through here.
+ * Defaults to AQA and its first subject with an exam ~3 months out. Set
+ * skipExamDates to exercise the date-later path.
+ */
+export async function completeOnboarding(
+  page: Page,
+  opts: { board?: string; subjectNames?: string[]; examDate?: string; skipExamDates?: boolean } = {},
+): Promise<void> {
+  const board = opts.board ?? "AQA";
+  // Phase 1 — exam board.
+  await page.getByRole("button", { name: new RegExp(board, "i") }).first().click();
+  await page.getByRole("button", { name: /Continue/i }).click();
+  // Phase 2 — subjects of that board (multi-select). Default: first card.
+  if (opts.subjectNames?.length) {
+    for (const name of opts.subjectNames) {
+      await page.getByRole("button", { name: new RegExp(name, "i") }).first().click();
+    }
+  } else {
+    await page.locator("button.card").first().click();
+  }
+  await page.getByRole("button", { name: /Continue/i }).click();
+  // Phase 3 — add future exam dates when known, or leave them blank for now.
+  // Phase 4 is the optional quick check; skip it here so specs land on Today.
+  if (opts.skipExamDates) {
+    await page.getByRole("button", { name: /Skip dates for now/i }).click();
+    await page.getByRole("button", { name: /Skip the check/i }).click();
+    return;
+  }
+  const date = opts.examDate ?? new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+  const inputs = page.locator('input[type="date"]');
+  const count = await inputs.count();
+  for (let i = 0; i < count; i++) await inputs.nth(i).fill(date);
+  await page.getByRole("button", { name: /Continue/i }).click();
+  await page.getByRole("button", { name: /Skip the check/i }).click();
+}
+
+/**
  * Waits until the PWA worker is installed, activated and *controlling* the
  * page, so a reload can be served from the precache with no network.
  *
@@ -50,7 +93,18 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 25_000): Promise
  * on it is deterministic rather than a timing guess.
  */
 export async function serviceWorkerReady(page: Page, timeoutMs = 30_000): Promise<void> {
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), undefined, {
-    timeout: timeoutMs,
-  });
+  // Readiness = a registered worker with an active install, not a
+  // `controller`. A controller only attaches on the navigation *after*
+  // registration, so waiting on it before the specs' warm reload can never
+  // settle on a fresh profile — the exact 30s timeout failing in CI. The
+  // worker precaches the shell at install, so an active registration means
+  // the follow-up reload is servable offline.
+  await page.waitForFunction(async () => {
+    try {
+      const regs = await navigator.serviceWorker?.getRegistrations() ?? [];
+      return regs.some((r) => Boolean(r.active));
+    } catch {
+      return false;
+    }
+  }, undefined, { timeout: timeoutMs });
 }

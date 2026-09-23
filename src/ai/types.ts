@@ -15,6 +15,8 @@ export const AI_TASKS = [
   "extract-questions",
   "ocr",
   "cards-from-notes",
+  "diagnose-error",
+  "route-spec",
 ] as const;
 
 export type AiTask = (typeof AI_TASKS)[number];
@@ -87,6 +89,16 @@ export const summariseResponseSchema = z.object({
   bullets: z.array(z.string().min(1).max(400)).max(10).default([]),
 });
 
+export const errorDiagnosisSchema = z.object({
+  category: z.string(),
+  confidence: z.number().min(0).max(1),
+  reasons: z.array(z.string()).max(6).default([]),
+  taxonomyVersion: z.string().default("error-v1"),
+  provenance: z.string().default("classifier-dev"),
+  gated: z.boolean().default(false),
+  rawLabel: z.string().optional(),
+});
+
 /**
  * The response registry is shared by the server and browser. Keeping the
  * wrappers here prevents a provider or API change from widening one boundary
@@ -103,6 +115,11 @@ export const RESPONSE_SCHEMAS = {
   "extract-questions": z.object({ questions: z.array(generatedQuestionSchema).min(1).max(40) }),
   ocr: ocrResponseSchema,
   "cards-from-notes": z.object({ cards: z.array(generatedCardSchema).min(1).max(25) }),
+  "diagnose-error": errorDiagnosisSchema,
+  "route-spec": z.object({
+    topics: z.array(z.string()).max(3),
+    candidates: z.array(z.object({ specPointId: z.string(), topicId: z.string(), ref: z.string(), text: z.string() })).max(8),
+  }),
 } satisfies Record<AiTask, z.ZodType>;
 
 export type GeneratedCard = z.infer<typeof generatedCardSchema>;
@@ -113,6 +130,7 @@ export type SocraticResponse = z.infer<typeof socraticResponseSchema>;
 export type DiagnoseResponse = z.infer<typeof diagnoseResponseSchema>;
 export type OcrResponse = z.infer<typeof ocrResponseSchema>;
 export type SummariseResponse = z.infer<typeof summariseResponseSchema>;
+export type ErrorDiagnosisResponse = z.infer<typeof errorDiagnosisSchema>;
 
 /** Every AI response carries how it was produced, and the UI always shows it. */
 export interface AiEnvelope<T> {

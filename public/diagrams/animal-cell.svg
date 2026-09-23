@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 460" role="img" aria-labelledby="title desc">
+  <title id="title">Unlabelled eukaryotic cell diagram</title>
+  <desc id="desc">A monochrome cell cross-section with a nucleus, mitochondria, vacuole and ribosomes.</desc>
+  <rect width="720" height="460" fill="#fafafa"/>
+  <ellipse cx="360" cy="230" rx="292" ry="178" fill="#ededed" stroke="#202020" stroke-width="6"/>
+  <ellipse cx="360" cy="230" rx="280" ry="166" fill="#f8f8f8" stroke="#707070" stroke-width="2" stroke-dasharray="5 7"/>
+  <circle cx="236" cy="214" r="58" fill="#dedede" stroke="#202020" stroke-width="5"/>
+  <circle cx="236" cy="214" r="17" fill="#8b8b8b" stroke="#202020" stroke-width="3"/>
+  <path d="M430 128c-24-20-57-5-57 20 0 27 35 38 59 19 20-16 18-25-2-39Z" fill="#d5d5d5" stroke="#202020" stroke-width="4"/>
+  <path d="M421 136c13 6 13 22 0 31M401 132c13 6 13 22 0 31" fill="none" stroke="#606060" stroke-width="3"/>
+  <path d="M467 297c-25-19-58-4-57 21 1 26 35 37 59 18 20-16 18-25-2-39Z" fill="#d5d5d5" stroke="#202020" stroke-width="4"/>
+  <path d="M458 305c13 6 13 22 0 31M438 301c13 6 13 22 0 31" fill="none" stroke="#606060" stroke-width="3"/>
+  <ellipse cx="350" cy="335" rx="63" ry="32" fill="#e3e3e3" stroke="#606060" stroke-width="3"/>
+  <g fill="#595959">
+    <circle cx="315" cy="137" r="4"/><circle cx="334" cy="125" r="4"/><circle cx="355" cy="143" r="4"/>
+    <circle cx="297" cy="294" r="4"/><circle cx="318" cy="307" r="4"/><circle cx="340" cy="290" r="4"/>
+    <circle cx="531" cy="205" r="4"/><circle cx="549" cy="220" r="4"/><circle cx="526" cy="239" r="4"/>
+  </g>
+  <path d="M113 151c20 13 25 31 13 49M568 287c20 13 25 31 13 49" fill="none" stroke="#8b8b8b" stroke-width="3"/>
+</svg>

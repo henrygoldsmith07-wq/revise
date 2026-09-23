@@ -713,10 +713,10 @@ const physics: ExpansionItem[] = [
   {
     slug: "physics-orbital-speed",
     topic: "fields",
-    kind: "extended",
-    stem: "A satellite moves in a circular orbit of radius r around a planet of mass M.",
-    difficulty: 4,
-    parts: [part("Show that its orbital speed is v = √(GM/r).", 3, ["Gravitational force is GMm/r²", "Centripetal force is mv²/r", "Equating gives GMm/r² = mv²/r, so v² = GM/r"], "The gravitational force provides the centripetal force: GMm/r² = mv²/r. Cancelling m and rearranging gives v² = GM/r, hence v = √(GM/r).", "derive orbital speed by equating gravitational and centripetal forces", 4, ["AO2"])],
+    kind: "calculation",
+    stem: "The Hubble Space Telescope orbits 540 km above Earth's surface. Take Earth's radius as 6.37 × 10⁶ m and GM_Earth = 4.0 × 10¹⁴ m³ s⁻².",
+    difficulty: 3,
+    parts: [part("Calculate the telescope's orbital speed and period.", 3, ["Orbital radius = 6.37 × 10⁶ + 0.54 × 10⁶ = 6.91 × 10⁶ m", "v = √(GM/r) = √(4.0 × 10¹⁴/6.91 × 10⁶) = 7.61 × 10³ m s⁻¹", "T = 2πr/v = 5706 s ≈ 95 min"], "The orbital radius is 6.91 × 10⁶ m. v = √(GM/r) = √(4.0×10¹⁴/6.91×10⁶) = 7.61 × 10³ m s⁻¹. The period is T = 2πr/v = 2π × 6.91×10⁶/7610 ≈ 5706 s, about 95 minutes.", "apply circular-orbit relations to a satellite altitude", 4, ["AO2"])],
   },
   {
     slug: "physics-induced-emf",

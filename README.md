@@ -7,18 +7,22 @@ highest-value thing you should do next.
 Open the app → get a recommended task → complete it → get marked instantly →
 progress updates → next task.
 
-Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE** —
-**440 topics, 718 seed questions**, every topic with `specPoints` and provenance —
-as real, authored revision content. The architecture is board-agnostic: adding
-a new board or qualification means adding one curriculum module and changing
-nothing else.
+Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
+Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
+authored against the specification. The other 28 are **reference-tier**: a
+cloned outline for navigation, labelled unverified, with GCSE paper structures
+taken from the spec manifest rather than the A-level clone. Adding a board
+still means one curriculum module and nothing else changing.
+
+New students start on the four flagships. Settings and onboarding group subjects
+as Flagship vs Reference so cloned boards cannot look spec-checked.
 
 ## Running it
 
 ```bash
 npm install
 npm run dev          # http://localhost:3000
-npm test             # 728 tests (97 files) — see docs/benchmark.md and /benchmarks for outcome benchmarks
+npm test             # unit + domain suite (tests/) — see docs/benchmark.md for outcome benchmarks
 npm run build        # production build
 ```
 
@@ -27,20 +31,6 @@ as a single local profile against IndexedDB, with every feature working — card
 marking, planning, analytics, search — and only cross-device sync and
 model-written prose unavailable. See [`.env.example`](.env.example) for the
 optional Supabase and AI provider settings.
-
-### Signing in
-
-With Supabase configured, Settings → Account offers two ways in:
-**Continue with Google**, or a one-time email sign-in link. Both resolve to the
-same Supabase user when the address matches, so your cards, attempts and
-history are the same either way and every row stays reachable under the
-existing `auth.uid()` row-level security — no policy changes were needed.
-
-Google is enabled in the Supabase dashboard, not here: **Authentication →
-Providers → Google**, with a Google Cloud OAuth 2.0 Client ID whose authorised
-redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`. Until it
-is switched on there, the button reports Google as unconfigured and the email
-link keeps working.
 
 ## Pulse connection
 
@@ -56,29 +46,23 @@ source immediately.
 
 ## What it does
 
+The app is one loop — **board → topic → card → exam question** — and nothing else. The first screen locks in the board, subject and exam date; every destination after that is a step in the loop.
+
 | Area | Behaviour |
 |------|-----------|
-| **Effectiveness study** | Opt-in four-arm prospective experiment ? Revise vs self-directed control, weakest-topic-first and most-overdue-first baselines ? measuring marks per hour, delayed retention, unseen transfer, calibration and adherence with an honest no-claims gate. |
-| **Recommendation** | Scores every candidate activity on one scale — due reviews, mistake repair, weak-topic practice, first-pass learning, timed papers — and shows the winner with a plain-English reason. |
-| **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, and failed cards reinserted within the same session. |
-| **Exam practice** | Structured questions marked point-by-point against the mark scheme, with examiner-style feedback, model answers, safe draft-preserving navigation and five- or ten-minute question sprints. |
-| **Mistake tracking** | Every dropped mark becomes a classified mistake *and* a flashcard automatically, and closes only once the card is recalled reliably. |
-| **Past papers** | Upload or photograph a paper and mark scheme, extract questions, map them to topics, navigate by question, practise them question-by-question or sit them in full exam conditions with a fixed clock, no in-paper aids, auto-submit and marking after the paper, then close with full-denominator scoring and a repair route. |
-| **Planning** | An adaptive timetable from exam dates, availability, mastery and mistakes. Missed blocks roll forward on their own. |
-| **Analytics** | Mastery per topic, measured Retention Mastery from 1/7/30-day recall, predicted grades with honest confidence bands, review forecast, mistake patterns, marks-available-per-topic headroom. |
-| **Mistake diagnosis** | Ranks likely root causes from missed points, answer/working evidence, timing, command words and the authored misconception library; one-off evidence stays an early signal. |
-| **Marking evidence** | Double-marked answer corpus with independent-marker agreement, disagreement review, adjudication and versioned JSON import/export. |
-| **Study modes** | Learn (recognition → typed production), Test (a fixed paper marked at the end), Match (timed pairing), Diagram labelling, hands-free Listen, and Explanation mastery — teach a topic from memory and see which authored key points made it into the explanation. |
-| **From notes** | One click: drop a PDF, paste notes or photograph a page, and get flashcards back, previewed before they join the deck. |
-| **Onboarding** | Four questions that each change what the app does, ending with a built plan rather than an empty state. |
-| **Sharing** | A link that carries the deck in its fragment (never sent to a server), or a file via the native share sheet. |
-| **Card browser** | Anki-flavoured query language (`tag:paper-1 is:leech prop:lapses>3`), saved searches, tag chips, multi-select and bulk edit. |
-| **Card maintenance** | Suspend indefinitely or bury for a day, rich editor (LaTeX, images, audio, tables), and per-card statistics — ease, lapses, interval, true retention, full review history. |
-| **Custom study** | Build a session by filter, pool, order and size. Studying ahead runs as a preview and leaves scheduling untouched. |
-| **Decks** | Export as a backup (scheduling intact) or to share (scheduling stripped); import Revise JSON or any Anki/Quizlet CSV/TSV. |
+| **Onboarding** | First screen only: board → subjects → required exam dates. Nothing renders until it is complete. |
+| **Topic status** | Every topic reads in plain language — covered, shaky, untouched — with a what-to-do-next sentence, never a raw score pretending to be a grade. |
+| **Lessons** | Every authored topic follows a written, step-by-step lesson: clear objectives, process explanations, active recall, worked application, exam technique and check questions; a lesson streak rewards finishing. |
+| **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, failed cards reinserted within the same session, and real cloze cards built from a complete sentence + hidden answer. Today sizes one bounded review session (15–25 minutes) and stops — the loop, not a dashboard. |
+| **Study modes** | The same card pool worked five ways — including Learn (recognition → typed production), Match (timed pairing), hands-free Listen and Diagram labelling. |
+| **Exam questions after cards** | Right after each reviewed card, an official-style exam question on that same spec point appears when one exists — revision turns into exam practice in place. |
+| **Exam practice** | Structured questions marked point-by-point against the mark scheme, with examiner-style feedback, model answers, safe draft-preserving navigation, contextual maths-symbol entry, five- or ten-minute sprints and a weak-topic exam built from the last seven days of misses. |
+| **Mistake tracking** | Every dropped mark becomes a classified mistake that is retested until it closes; unresolved recent mistakes surface for the student to fix. |
+| **Past papers** | Upload or photograph a paper and mark scheme, extract questions, map them to topics, practise them question-by-question or sit them in full exam conditions with a fixed clock, no in-paper aids, auto-submit and marking after the paper, then close with full-denominator scoring and a repair route. |
+| **Honest pace forecast** | At this pace, N topics stay untouched before the exam date — a real projection from the last seven days of reviews, never a fake pass percentage. |
+| **Prediction reality check** | Weekly grade forecasts are frozen before the outcome, then dated mocks, timed papers and final results are joined only to forecasts that already existed. Readiness shows error, bias and interval coverage instead of letting later predictions rewrite history. |
 | **Keyboard** | Shortcuts throughout, with a `?` sheet generated from the live bindings. |
-| **Input** | Typing, voice dictation, or a photo of handwritten working (OCR). LaTeX throughout. |
-| **Offline** | IndexedDB-first with a durable outbox. Installable PWA. Everything works on a train. |
+| **Offline** | IndexedDB-first with a durable outbox; installable PWA; the complete written lesson, recall and practice loop works without a connection. |
 
 ## Depth first: flagship subject combinations
 
@@ -87,7 +71,7 @@ Chemistry, Physics - are being built to per-statement depth: for every
 specification point, retrieval cards plus simple, application,
 unfamiliar-context, misconception and harder/synoptic questions, each with
 a worked solution and verified provenance. The headline the depth ledger
-(on /benchmarks) makes computable is not "440 topics" but:
+makes computable is not "440 topics" but:
 
 > N% of WJEC A-level Physics specification statements have at least four
 > independently reviewed exam questions covering recall, application and
@@ -137,7 +121,7 @@ src/data/        IndexedDB primary store, repository, outbox sync to Supabase
 src/ai/          Provider abstraction, prompts, schemas, offline fallbacks
 src/state/       One store; all derived numbers recomputed, never cached
 src/components/  Le Studio UI primitives, question runner, answer input
-src/app/         Next.js App Router pages (incl. /benchmarks, /answer-corpus live evidence ledger + /case-study)
+src/app/         Next.js App Router pages — the loop: today, review, study, lessons, practice, past papers, library
 supabase/        Postgres schema with row-level security
 docs/            Architecture, revision engine, benchmarks
 ```
@@ -253,8 +237,9 @@ searchable. No other file changes. Add the subject to `src/domain/spec.ts:SPEC_M
 
 - [`docs/architecture.md`](docs/architecture.md) — data flow, sync, AI layer, quality gates
 - [`docs/revision-engine.md`](docs/revision-engine.md) — the algorithms and the evidence behind them
-- [`docs/benchmark.md`](docs/benchmark.md) — harnesses + the live ledger at [benchmarks](src/app/benchmarks) + [case study](src/app/case-study)
+- [`docs/benchmark.md`](docs/benchmark.md) — harnesses and outcome benchmarks
 - [`docs/roadmap.md`](docs/roadmap.md) — competitor-gap backlog and the path to "what should I revise next?" intelligence
+- [`docs/error-diagnosis.md`](docs/error-diagnosis.md) — post-marking error diagnosis (classifier.dev): versioned taxonomy, interventions, routing and evaluation
 
 ## Content accuracy — statement-level provenance
 

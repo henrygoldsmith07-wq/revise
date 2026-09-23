@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { aiGenerateQuestions } from "@/ai/client";
+import { aiGenerateQuestions } from "@/lib/optional-ai";
+import { remapContentIdString } from "@/data/content-ids";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
+import { diagnosePrerequisiteWeakness, type PrerequisiteDiagnosis } from "@/domain/prerequisite-diagnosis";
 import { remediationForMistake } from "@/domain/remediation";
 import { rankQuestionsForExposure } from "@/domain/question-exposure";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
@@ -16,6 +17,11 @@ import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { parseQuickSessionMinutes, type QuickSessionMinutes } from "@/domain/quick-session";
+import { buildWeakTopicExam } from "@/domain/weak-topic-exam";
+import { reviewedWjecTopicEdges } from "@/content/capabilities";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
+import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
+import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
 import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionMode";
 import { RichText } from "@/components/RichText";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
@@ -43,6 +49,15 @@ function Practice() {
   const questionParam = params.get("question");
   const retestId = params.get("retest");
   const mode = params.get("mode") === "recall" ? "recall" : "practice";
+  // Adaptive ladder rungs arrive as ?adaptiveStep=supported|independent|transfer.
+  // Supported keeps the full hint ladder; the evidence rungs pass 0 so the
+  // attempt stays unaided and mastery counts it at full weight.
+  const adaptiveStep = params.get("adaptiveStep");
+  const adaptiveHintBudget = adaptiveStep === "independent" || adaptiveStep === "transfer" ? 0 : undefined;
+  // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
+  // marking here replans the runner's next step and hands the student back
+  // to it — one tutor flow, not a redirect between pages.
+  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "practice" ? store.revisionCheckpoint : null;
@@ -57,11 +72,19 @@ function Practice() {
   const farTransferRetest = retestId
     ? farTransferRetests.find((retest) => retest.retestId === retestId && retest.status !== "completed")
     : undefined;
-  const requestedQuestionParam = farTransferRetest?.candidateQuestionId ?? questionParam;
+  // Legacy deep links (?question=seed-q:...) predate the cnt: namespace
+  // (see src/data/content-ids.ts) — remap so they keep resolving to the
+  // seeded bank instead of landing on an empty queue.
+  const requestedQuestionParam = farTransferRetest?.candidateQuestionId ?? (questionParam ? remapContentIdString(questionParam) : questionParam);
   const [subjectId, setSubjectId] = useState(subjectParam ?? farTransferRetest?.subjectId ?? subjects[0]?.id ?? "");
   const [topicId, setTopicId] = useState(topicParam ?? farTransferRetest?.topicIds[0] ?? "");
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
+  const [weakExam, setWeakExam] = useState(() => params.get("weak") === "1");
+  const weakExamPlan = useMemo(
+    () => buildWeakTopicExam({ mistakes: store.mistakes, questions: store.questions }),
+    [store.mistakes, store.questions],
+  );
   const [sessionAttempts, setSessionAttempts] = useState<Attempt[]>([]);
   const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>({});
   const [closed, setClosed] = useState(false);
@@ -96,6 +119,41 @@ function Practice() {
     [originalAttempt, retestMistake, retestQuestion],
   );
 
+  // Repeated misses on the selected topic? If so, is the real weakness one of
+  // its prerequisites? When it is, steer there instead of building yet another
+  // queue of the failing topic's own questions. Skipped in retest / weak-topic
+  // / far-transfer modes, which have their own focused intent.
+  const prereqDiagnosis: PrerequisiteDiagnosis | null = useMemo(() => {
+    if (weakExam || retestMistake || farTransferRetest || !topicId) return null;
+    const topic = getTopic(topicId);
+    if (!topic) return null;
+    return diagnosePrerequisiteWeakness({
+      topicId,
+      topics: topicsFor(topic.subjectId),
+      attempts: store.attempts,
+      mistakes: store.mistakes,
+      mastery: store.mastery,
+      cards: store.cards,
+      questions: store.questions,
+      ...(requiresWjecContentReview(topic.subjectId) ? { edges: reviewedWjecTopicEdges(topic.subjectId) } : {}),
+      now: new Date(),
+    });
+  }, [
+    topicId,
+    weakExam,
+    retestMistake,
+    farTransferRetest,
+    store.attempts,
+    store.mistakes,
+    store.mastery,
+    store.cards,
+    store.questions,
+  ]);
+  const prereqTarget =
+    prereqDiagnosis?.failing && prereqDiagnosis.verdict && prereqDiagnosis.verdict.kind !== "topic-itself"
+      ? getTopic(prereqDiagnosis.verdict.prereqTopicId)
+      : undefined;
+
   /**
    * Order the pool once, then hold it. Marking an answer changes mastery and
    * marks the question as seen, so a live re-sort would swap the question out
@@ -105,12 +163,16 @@ function Practice() {
    */
   const orderFor = (subject: string, topic: string): string[] => {
     if (retestQuestion) return [retestQuestion.id];
-    let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
-    if (requestedQuestionParam) pool = pool.filter((q) => q.id === requestedQuestionParam);
-    else {
-      if (subject) pool = pool.filter((q) => q.subjectId === subject);
-      if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
+    // An explicit ?question= deep link names one bank item (e.g. command-word
+    // spec, ⌘K search): resolve it directly instead of filtering it out when
+    // its subject is not enrolled. Every other path stays in-subject.
+    if (requestedQuestionParam) {
+      const direct = questionsById.get(requestedQuestionParam);
+      if (direct) return [direct.id];
     }
+    let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
+    if (subject) pool = pool.filter((q) => q.subjectId === subject);
+    if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
     // Exposure control keeps unseen questions ahead of secure repeats, while
     // still allowing weak questions back into the queue when they need work.
     return rankQuestionsForExposure({
@@ -223,7 +285,7 @@ function Practice() {
       <PostSessionClosure
         closure={closure}
         hint="Your answers are recorded and dropped marks are available in the mistake queue."
-        secondary={{ href: "/practice", label: "Practise another topic" }}
+        secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise another topic" }}
       />
     );
   }
@@ -278,6 +340,10 @@ function Practice() {
   }
 
   const topics = subjectId ? topicsFor(subjectId) : [];
+
+  if (weakExam) {
+    return <WeakTopicExamMode onExit={() => setWeakExam(false)} />;
+  }
 
   if (quickMinutes) {
     return (
@@ -347,6 +413,33 @@ function Practice() {
         </Panel>
       ) : null}
 
+      {weakExamPlan.questionIds.length ? (
+        <section>
+          <SectionHeading title="This week's misses" hint="Questions behind marks dropped in the last 7 days — re-sat now that the mark scheme is known." />
+          <button
+            type="button"
+            onClick={() => setWeakExam(true)}
+            className="card p-4 text-left hover:border-ink3 transition-colors w-full"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">Weak-topic exam</p>
+                <p className="text-xs text-ink3 mt-1">
+                  {weakExamPlan.questionIds.length} question{weakExamPlan.questionIds.length === 1 ? "" : "s"} ·{" "}
+                  {weakExamPlan.totalMarks} marks ·{" "}
+                  {weakExamPlan.topics
+                    .map((topic) => getTopic(topic.topicId)?.title ?? topic.topicId)
+                    .join(", ")}
+                </p>
+              </div>
+              <Pill tone="danger" className="shrink-0">
+                {weakExamPlan.totalMarks} marks lost
+              </Pill>
+            </div>
+          </button>
+        </section>
+      ) : null}
+
       <QuickSessionPicker onSelect={setQuickMinutes} />
 
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
@@ -387,6 +480,14 @@ function Practice() {
 
       {note ? <p className="text-xs text-ink3">{note}</p> : null}
 
+      {prereqDiagnosis && prereqTarget && current ? (
+        <PrerequisiteCheck
+          diagnosis={prereqDiagnosis}
+          targetTitle={getTopic(topicId)?.title ?? topicId}
+          prereq={{ id: prereqTarget.id, title: prereqTarget.title }}
+        />
+      ) : null}
+
       {retestMistake && current ? (
         <Panel className="card-2 border-l-4 border-l-accent">
           <div className="flex flex-wrap items-center gap-2">
@@ -412,8 +513,8 @@ function Practice() {
       ) : retestId ? (
         <Panel>
           <p className="text-sm text-ink2">That mistake or its source question is no longer available.</p>
-          <ButtonLink href="/progress" variant="primary" className="inline-block mt-3">
-            Return to Progress
+          <ButtonLink href="/" variant="primary" className="inline-block mt-3">
+            Back to Today
           </ButtonLink>
         </Panel>
       ) : null}
@@ -451,7 +552,9 @@ function Practice() {
             question={current}
             mode={mode}
             retestMistake={retestMistake}
+            repairTeachingSeen={Boolean(retestRemediation)}
             farTransfer={farTransferRetest}
+            hintBudget={adaptiveHintBudget}
             draft={questionDrafts[current.id]}
             onDraftChange={(draft) => setQuestionDrafts((previous) => ({ ...previous, [current.id]: draft }))}
             onFinished={(attempt) => {
@@ -466,10 +569,15 @@ function Practice() {
               });
             }}
           />
-          {retestMistake ? (
-            <ButtonLink href="/progress" variant="primary" className="inline-block">
-              Back to Progress
+          {retestMistake && !returnHref ? (
+            <ButtonLink href="/" variant="primary" className="inline-block">
+              Back to Today
             </ButtonLink>
+          ) : null}
+          {returnHref ? (
+            <p className="text-[11px] text-ink3">
+              Opened from your adaptive session — this mark replans the next step automatically.
+            </p>
           ) : null}
         </>
       ) : (

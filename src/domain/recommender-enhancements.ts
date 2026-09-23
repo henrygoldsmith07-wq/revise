@@ -1,5 +1,5 @@
-import type { Id, Attempt, Topic, TopicMastery } from "./types";
-import type { OutcomePair, RecommendInput } from "./recommender";
+import type { Id, Topic, TopicMastery } from "./types";
+import type { OutcomePair } from "./recommender";
 
 // ---------------------------------------------------------------------------
 // Recommender enhancements — Phase 4
@@ -254,7 +254,7 @@ export function evaluateVsBaseline(input: {
   baseline: Baseline;
   marksLostByTopic?: Map<Id, number>;
 }): ExperimentResult {
-  const { pairs, topics, mastery, baseline, marksLostByTopic } = input;
+  const { pairs, baseline } = input;
   const n = pairs.length;
   if (n < 10) {
     return {

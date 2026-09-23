@@ -94,16 +94,16 @@ function buildTimeline(input: {
   for (const e of myEvents) {
     const t = new Date(e.at).getTime();
     if (e.type === "app_opened") nodes.push({ t, kind: "opened" });
-    else if (e.type === "recommendation_displayed") nodes.push({ t, kind: "displayed", taskId: e.detail });
-    else if (e.type === "recommendation_accepted") nodes.push({ t, kind: "accepted", taskId: e.detail });
-    else if (e.type === "feedback_read") nodes.push({ t, kind: "feedback", attemptId: e.detail });
+    else if (e.type === "recommendation_displayed") nodes.push({ t, kind: "displayed", ...(e.detail != null ? { taskId: e.detail } : {}) });
+    else if (e.type === "recommendation_accepted") nodes.push({ t, kind: "accepted", ...(e.detail != null ? { taskId: e.detail } : {}) });
+    else if (e.type === "feedback_read") nodes.push({ t, kind: "feedback", ...(e.detail != null ? { attemptId: e.detail } : {}) });
   }
   for (const a of myAttempts) {
     const created = new Date(a.createdAt).getTime();
     const taskId = `${a.mode}:${a.topicIds[0] ?? a.questionId}`;
     if (a.elapsedMs > 0) nodes.push({ t: created - Math.min(a.elapsedMs, 45 * 60_000), kind: "started", taskId });
-    nodes.push({ t: created, kind: "submitted", taskId, attemptId: undefined, topicId: a.topicIds[0] ?? null, hasRetest: Boolean(a.retestMistakeId), repairSuccess: Boolean(a.retestMistakeId) && a.max > 0 && a.awarded === a.max });
-    nodes.push({ t: created, kind: "completed", taskId, attemptId: undefined });
+    nodes.push({ t: created, kind: "submitted", taskId, topicId: a.topicIds[0] ?? null, hasRetest: Boolean(a.retestMistakeId), repairSuccess: Boolean(a.retestMistakeId) && a.max > 0 && a.awarded === a.max });
+    nodes.push({ t: created, kind: "completed", taskId });
     if (a.retestMistakeId && a.max > 0 && a.awarded === a.max) {
       nodes.push({ t: created, kind: "repair", attemptId: String(a.retestMistakeId) });
     }
@@ -155,7 +155,10 @@ function median(values: number[]): number | null {
   if (!values.length) return null;
   const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
-  return Math.round((s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2) * 10) / 10;
+  const a = s[mid];
+  const b = s[mid - 1];
+  if (a == null) return null;
+  return Math.round((s.length % 2 ? a : b != null ? (a + b) / 2 : a) * 10) / 10;
 }
 
 const DEFAULT_MIN_DENOMINATOR = 5;
@@ -173,7 +176,7 @@ export function analyseFunnel(input: {
 
   const sessions = new Map<number, Node[]>();
   nodes.forEach((node, i) => {
-    const sid = sessionIds[i];
+    const sid = sessionIds[i] ?? 0;
     const list = sessions.get(sid) ?? [];
     list.push(node);
     sessions.set(sid, list);
@@ -218,6 +221,7 @@ export function analyseFunnel(input: {
     for (let fi = 0; fi < feedbacks.length; fi++) {
       if (usedFeedback.has(fi)) continue;
       const f = feedbacks[fi];
+      if (!f) continue;
       if (sNode.t > f.t && sNode.t - f.t <= 45 * 60_000) {
         usedFeedback.add(fi);
         return true;

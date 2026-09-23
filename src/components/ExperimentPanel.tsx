@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useStore } from "@/state/store";
 import { analyseExperiment } from "@/domain/recommendation-experiment";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
 import { Panel, SectionHeading } from "./ui";
 
 // Live view of the prospective recommendation experiment for the enrolled
@@ -48,15 +49,23 @@ export function ExperimentPanel() {
   const analysis = useMemo(() => {
     const userId = store.userId;
     const assignments = arm ? [{ anonId: userId, arm: arm.arm, assignedAt: arm.assignedAt, version: 1 as const }] : [];
-    const attempts = store.attempts.map((a) => ({
+    const attempts = store.attempts.map((a) => {
+      const question = store.questions.find((candidate) => candidate.id === a.questionId);
+      const trusted = question
+        ? trustedAssessmentAttempt(a, question, store.attempts, store.questions)
+        : a.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(a);
+      return {
       anonId: a.userId,
+      subjectId: a.subjectId,
+      trusted,
       topicIds: a.topicIds,
       questionId: a.questionId,
       awarded: a.awarded,
       max: a.max,
       elapsedMs: a.elapsedMs ?? 0,
       createdAt: a.createdAt,
-    }));
+      };
+    });
     const reviews = store.reviewLogs.map((r) => ({
       anonId: r.userId,
       cardId: r.cardId,
@@ -65,7 +74,7 @@ export function ExperimentPanel() {
     }));
     const masteryByTopic = new Map(store.mastery.map((m) => [m.topicId, m.mastery]));
     return analyseExperiment({ assignments, events: [], attempts, reviews, masteryByTopic, baselineAssessments: [], finalAssessments: [] });
-  }, [arm, store.attempts, store.reviewLogs, store.mastery, store.userId]);
+  }, [arm, store.attempts, store.questions, store.reviewLogs, store.mastery, store.userId]);
 
   if (!arm) return null;
   const mine = analysis.arms.find((a) => a.arm === arm.arm);

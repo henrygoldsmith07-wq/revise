@@ -8,11 +8,16 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // Match CI's worker count everywhere: unbounded local workers starve app
-  // boot ("Loading your revision data…") and turn timing into flakes.
-  workers: 2,
+  // The offline/persistence specs seed a large IndexedDB fixture during first
+  // boot. Running them in parallel makes independent browser contexts compete
+  // for the same CPU and turns hydration into a timing race. One worker keeps
+  // the browser gate deterministic; Vitest retains parallelism for unit work.
+  workers: 1,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
-  timeout: 45_000,
+  // 120s: a fresh profile seeds ~4.6k records into IndexedDB before the shell
+  // renders (tens of seconds on CI's two cores with parallel workers), and the
+  // offline walk then runs its whole journey inside the same test budget.
+  timeout: 120_000,
   expect: { timeout: 10_000 },
   use: {
     baseURL: BASE_URL,

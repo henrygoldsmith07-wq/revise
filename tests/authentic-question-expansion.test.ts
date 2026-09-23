@@ -21,7 +21,10 @@ describe("massive authentic question expansion", () => {
 
   it("gives every topic a fresh authored question for both boards", () => {
     for (const subject of CORE_A_LEVEL_SUBJECTS) {
-      const questions = authenticExpansionQuestions.filter((question) => question.subjectId === subject.id);
+      const questions = [
+        ...authenticExpansionQuestions,
+        ...seedQuestions.filter((question) => question.id.includes("wjec-alevel-expansion-")),
+      ].filter((question) => question.subjectId === subject.id);
       for (const topic of topicsFor(subject.id)) {
         expect(
           questions.some((question) => question.topicIds.includes(topic.id)),

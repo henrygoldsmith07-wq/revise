@@ -1,4 +1,4 @@
-import type { AoCode, Question } from "@/domain/types";
+import type { AoCode, LearningDemand, Question } from "@/domain/types";
 import { defineQuestion } from "./authoring";
 
 /**
@@ -30,6 +30,48 @@ interface ItemSpec {
   parts: PartSpec[];
 }
 
+/** Explicit demand labels for the first authored Physics depth pass. */
+const FLAGSHIP_DEMANDS: Record<string, readonly LearningDemand[]> = {
+  "depth-energy-fx-graph": ["calculation", "synoptic"],
+  "depth-energy-gpe-epelastic": ["calculation", "calculation"],
+  "depth-materials-strain-energy-density": ["application", "calculation"],
+  "depth-unfamiliar-materials-climbing-rope": ["transfer", "calculation"],
+  "depth-momentum-impulse-average-force": ["calculation", "application"],
+  "depth-misconception-momentum-ke": ["misconception"],
+  "depth-unfamiliar-quantum-electron-diffraction": ["transfer", "calculation"],
+  "depth-synoptic-quantum-transitions-efficiency": ["synoptic", "synoptic"],
+  "depth-waves-grating": ["calculation", "transfer"],
+  "depth-unfamiliar-waves-fibre": ["transfer", "calculation"],
+  "depth-circuits-internal-r": ["calculation", "explanation"],
+  "depth-circular-banked": ["calculation", "application"],
+  "depth-fields-orbit": ["calculation", "explanation"],
+  "depth-unfamiliar-fields-mass-spec": ["transfer", "calculation"],
+  "depth-thermal-latent": ["calculation", "transfer"],
+  "depth-nuclear-half-life": ["calculation", "explanation"],
+  "depth-kinematics-projectile": ["calculation", "transfer"],
+};
+
+/** Authored reasoning move per part of the first depth pass (index-aligned with FLAGSHIP_DEMANDS rows). */
+const FLAGSHIP_MOVES: Record<string, readonly string[]> = {
+  "depth-energy-fx-graph": ["integrate a piecewise force-extension graph by splitting it into triangle and rectangle", "name the energy store that receives dissipated work"],
+  "depth-energy-gpe-epelastic": ["equate gravitational loss to elastic gain at a turning point", "carry the elastic result into a speed calculation"],
+  "depth-materials-strain-energy-density": ["divide strain energy by volume to obtain density", "rearrange the density relation to solve for a material property"],
+  "depth-unfamiliar-materials-climbing-rope": ["apply energy conservation in an unfamiliar loading scenario", "rearrange a proportionality to answer a design question"],
+  "depth-momentum-impulse-average-force": ["convert a force-time graph area into impulse and force", "apply the impulse-momentum relation to a rebound"],
+  "depth-misconception-momentum-ke": ["separate momentum conservation from kinetic-energy conservation"],
+  "depth-unfamiliar-quantum-electron-diffraction": ["transfer wavelength interference reasoning to matter waves", "carry a wavelength result into an energy calculation"],
+  "depth-synoptic-quantum-transitions-efficiency": ["chain photon energy into atomic transitions", "compare delivered energy to photon energy for an efficiency bound"],
+  "depth-waves-grating": ["compare two dispersed wavelengths through the grating equation", "bound the visible orders from the grating spacing"],
+  "depth-unfamiliar-waves-fibre": ["apply refraction conditions to a guided-wave context", "carry a geometric result into a timing calculation"],
+  "depth-circuits-internal-r": ["solve simultaneous terminal-voltage equations for emf and internal resistance", "explain terminal p.d. via energy dissipation inside the cell"],
+  "depth-circular-banked": ["resolve along and normal to an incline before applying circular conditions", "apply the circular motion condition to a real surface"],
+  "depth-fields-orbit": ["equate gravitational and centripetal force for a circular orbit", "explain orbital dependence through the equated-force model"],
+  "depth-unfamiliar-fields-mass-spec": ["apply the magnetic-radius relation in an unfamiliar instrument", "carry a velocity result through the selector geometry"],
+  "depth-thermal-latent": ["separate sensible heating from latent heating during a state change", "apply the heating model to an unfamiliar substance"],
+  "depth-nuclear-half-life": ["chain the exponential decay law to activity", "explain activity through per-nucleus probability"],
+  "depth-kinematics-projectile": ["resolve projectile motion into independent components", "transfer component reasoning to an unfamiliar launch"],
+};
+
 function build(item: ItemSpec): Question {
   const prefix = `wjec-alevel-physics.${item.topic}`;
   return defineQuestion({
@@ -44,7 +86,7 @@ function build(item: ItemSpec): Question {
     reviewer: "authored/flagship-depth-review",
     lastChecked: "2026-08-22",
     specVersion: "2024-1.0",
-    parts: item.parts.map((part) => ({
+    parts: item.parts.map((part, index) => ({
       prompt: part.prompt,
       marks: part.marks,
       scheme: part.scheme,
@@ -52,6 +94,13 @@ function build(item: ItemSpec): Question {
       aos: part.aos,
       specPointIds: [`${prefix}.${part.point}`],
       learningClaims: [part.claim],
+      capabilityIds: [`phys.${item.topic}.${part.point}`],
+      learning: FLAGSHIP_DEMANDS[item.slug]?.[index] ? {
+        familyId: `physics-flagship:${item.slug}`,
+        contextId: `physics-flagship:${item.slug}:part-${index + 1}`,
+        demand: FLAGSHIP_DEMANDS[item.slug]![index]!,
+        reasoningMoves: [FLAGSHIP_MOVES[item.slug]?.[index] ?? "reason through the authored data in the stated physical context"],
+      } : undefined,
     })),
   });
 }
@@ -266,7 +315,7 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
         point: "sp-05",
         claim: "calculate de Broglie wavelength and interpret electron diffraction evidence",
         aos: ["AO2"],
-        scheme: ["λ = h/p", "= 6.63e-34 / 4.0e-24", "= 1.66e-10 ≈ 1.7 × 10⁻¹⁰ m"],
+        scheme: ["λ = h/p", "λ = 6.63e-34 / 4.0e-24 = 1.7e-10 m"],
         answer: "λ = h/p = 6.63 × 10⁻³⁴ ÷ 4.0 × 10⁻²⁴ ≈ 1.7 × 10⁻¹⁰ m - comparable to atomic spacings, which is why crystals diffract electrons.",
       },
     ],
@@ -300,10 +349,303 @@ export const flagshipPhysicsDepthQuestions: Question[] = [
         scheme: [
           "Electrical energy per electron = eV = 1.60e-19 × 1.9 = 3.04e-19 J",
           "Photon needs 3.21e-19 J > 3.04e-19 J, so one 1.9 V electron cannot supply it at face value",
-          "Maximum efficiency = photon energy ÷ electrical energy = 3.21/3.04 ≈ 106% → impossible above 100%, therefore the stated wavelength/voltage pair is inconsistent; with V = 2.0 V efficiency would be ≈ 84%",
+          "An efficiency above 100% is impossible, so the stated wavelength/voltage pair is inconsistent",
+          "With V = 2.0 V the ceiling would be 3.21/3.20 ≈ 84% (or 100% × photon energy ÷ electrical energy once numbers are consistent)",
         ],
         answer:
           "Each electron delivers Ve = 1.60 × 10⁻¹⁹ × 1.9 = 3.04 × 10⁻¹⁹ J, but a 620 nm photon requires 3.21 × 10⁻¹⁹ J. One electron alone cannot emit that photon - the pair (λ, V) is inconsistent because the implied efficiency exceeds 100%. At V = 2.0 V the ceiling would be 3.21/3.20 ≈ 84%.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-waves-grating",
+    topic: "waves",
+    stem: "Monochromatic light of wavelength 589 nm is incident normally on a diffraction grating with 500 lines per millimetre. A second spectral line at 546 nm is also present.",
+    difficulty: 4,
+    parts: [
+      {
+        prompt: "(a) Calculate the angular separation of the two wavelengths in the second order.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply the grating equation nλ = d sinθ to determine wavelength or angle",
+        aos: ["AO2"],
+        scheme: [
+          "d = 1 / 5.00×10⁵ m⁻¹ = 2.00×10⁻⁶ m",
+          "sinθ₁ = 2 × 589×10⁻⁹ / 2.00×10⁻⁶ = 0.589 → θ₁ = 36.1°; sinθ₂ = 2 × 546×10⁻⁹ / 2.00×10⁻⁶ = 0.546 → θ₂ = 33.1°",
+          "Angular separation = 36.1 − 33.1 = 3.0°",
+        ],
+        answer:
+          "Line spacing d = 1 / (500 × 10³ m⁻¹) = 2.00 × 10⁻⁶ m. For n = 2, sinθ = nλ/d gives θ₁ = arcsin(2 × 589×10⁻⁹/2.00×10⁻⁶) = 36.1° and θ₂ = arcsin(2 × 546×10⁻⁹/2.00×10⁻⁶) = 33.1°. The second-order lines are separated by 36.1 − 33.1 = 3.0°.",
+      },
+      {
+        prompt: "(b) Determine the highest order visible for the 589 nm line and explain the limit.",
+        marks: 2,
+        point: "sp-02",
+        claim: "apply Young slits and grating equations to determine wavelength",
+        aos: ["AO2", "AO3"],
+        scheme: [
+          "Require sinθ = nλ/d ≤ 1, so n ≤ d/λ = 2.00e-6/589e-9 = 3.4",
+          "The highest complete order is n = 3 (sinθ = 0.884); n = 4 would need sinθ = 1.18, which is impossible",
+        ],
+        answer:
+          "Maximum n satisfies nλ ≤ d, so n ≤ d/λ = 2.00×10⁻⁶ / 589×10⁻⁹ ≈ 3.4. The highest visible order is n = 3 (sinθ = 0.884); fourth order would require sinθ = 1.18, which no angle satisfies.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-unfamiliar-waves-fibre",
+    topic: "waves",
+    stem: "Unfamiliar context: A step-index optical fibre used in a hospital endoscope has a glass core of refractive index 1.48 surrounded by cladding of refractive index 1.45. Light is launched from air.",
+    difficulty: 4,
+    parts: [
+      {
+        prompt: "(a) Calculate the critical angle at the core–cladding boundary.",
+        marks: 2,
+        point: "sp-04",
+        claim: "state conditions for total internal reflection and apply the critical-angle relation",
+        aos: ["AO2"],
+        scheme: ["sin C = n2/n1 = 1.45/1.48", "C = 78.4°"],
+        answer: "sin C = 1.45/1.48 = 0.980; C = arcsin(0.980) = 78.4°.",
+      },
+      {
+        prompt: "(b) Explain why cladding is used rather than leaving the core in air, in terms of the path of rays that just undergo TIR.",
+        marks: 3,
+        point: "sp-04",
+        claim: "state conditions for total internal reflection and apply the critical-angle relation",
+        aos: ["AO1", "AO3"],
+        scheme: [
+          "TIR requires light in the denser medium at i ≥ C",
+          "Air cladding would give a much smaller C (sin C = 1/1.48 → C ≈ 42.5°)",
+          "A larger C with glass cladding means only rays close to the axis TIR, reducing modal dispersion / protecting the TIR surface from contamination",
+        ],
+        answer:
+          "TIR needs the ray in glass at an angle greater than C. Against air, C ≈ 42.5°, so many steep rays would still TIR and travel very different path lengths (modal dispersion). Cladding raises C to 78°, so only near-axial rays are guided, the outer surface is protected, and pulse spreading is reduced.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-circuits-internal-r",
+    topic: "electric-circuits",
+    stem: "A cell is connected first to a 6.8 Ω resistor, then to a 2.2 Ω resistor. A high-resistance voltmeter across the cell terminals reads 1.40 V in the first case and 0.88 V in the second.",
+    difficulty: 4,
+    parts: [
+      {
+        prompt: "(a) Using the two terminal-voltage measurements, determine the cell's emf and internal resistance.",
+        marks: 4,
+        point: "sp-02",
+        claim: "apply the relations for electric circuits to solve numerical problems",
+        aos: ["AO2"],
+        scheme: [
+          "Two unknowns require two equations: ε = V₁ + I₁r and ε = V₂ + I₂r",
+          "I₁ = 1.40/6.8 = 0.206 A and I₂ = 0.88/2.2 = 0.40 A",
+          "Subtracting gives r = (1.40 − 0.88)/(0.40 − 0.206) = 2.68 Ω",
+          "ε = 1.40 + 0.206 × 2.68 = 1.95 V (accept 1.9–2.0 V)",
+        ],
+        answer:
+          "Write ε = V + Ir for each load. I₁ = 1.40/6.8 = 0.206 A and I₂ = 0.88/2.2 = 0.40 A. Subtracting eliminates ε: 1.40 − 0.88 = r(0.40 − 0.206), so r = 0.52/0.194 = 2.68 Ω. Then ε = 1.40 + 0.206 × 2.68 = 1.95 V.",
+      },
+      {
+        prompt: "(b) The 6.8 Ω resistor is replaced by a 2.2 Ω resistor. Explain, without further calculation, what happens to the terminal p.d.",
+        marks: 2,
+        point: "sp-03",
+        claim: "interpret or evaluate results related to electric circuits",
+        aos: ["AO2", "AO3"],
+        scheme: [
+          "Smaller R increases current",
+          "Lost volts Ir increase, so terminal p.d. ε − Ir falls",
+        ],
+        answer:
+          "The smaller load increases the current. Lost volts Ir therefore increase, so the terminal p.d. falls below 1.40 V.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-circular-banked",
+    topic: "circular-shm",
+    stem: "A car of mass 1200 kg travels at 18 m s⁻¹ around a level circular bend of radius 45 m. The road is not banked.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the centripetal force required and state which force provides it.",
+        marks: 3,
+        point: "sp-02",
+        claim: "derive and apply centripetal acceleration a = v²/r = ω²r",
+        aos: ["AO1", "AO2"],
+        scheme: [
+          "F = mv²/r = 1200 × 18² / 45",
+          "= 8640 N",
+          "Provided by friction toward the centre (not a separate centripetal force)",
+        ],
+        answer:
+          "F = mv²/r = 1200 × 324 / 45 = 8640 N toward the centre. On a level road this is the frictional force from the tyres; there is no extra 'centripetal force' on a free-body diagram.",
+      },
+      {
+        prompt: "(b) A mass–spring oscillator of mass 0.40 kg and spring constant 36 N m⁻¹ is set into SHM. Calculate its period.",
+        marks: 2,
+        point: "sp-05",
+        claim: "calculate period of a simple pendulum and a mass-spring system",
+        aos: ["AO2"],
+        scheme: ["T = 2π√(m/k)", "= 2π√(0.40/36) = 0.66 s"],
+        answer: "T = 2π√(m/k) = 2π√(0.40/36) = 2π × 0.105 = 0.66 s.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-fields-orbit",
+    topic: "fields",
+    stem: "A satellite of mass 350 kg is in a circular orbit of radius 7.00 × 10⁶ m about Earth. G = 6.67 × 10⁻¹¹ N m² kg⁻²; M_E = 5.97 × 10²⁴ kg.",
+    difficulty: 4,
+    parts: [
+      {
+        prompt: "(a) Calculate the gravitational field strength and the gravitational potential at the orbit.",
+        marks: 4,
+        point: "sp-04",
+        claim: "apply inverse-square laws to calculate field strength potential and orbital motion",
+        aos: ["AO2"],
+        scheme: [
+          "g = GM/r² = 6.67e-11 × 5.97e24 / (7.00e6)²",
+          "= 8.12 N kg⁻¹",
+          "V = −GM/r = −6.67e-11 × 5.97e24 / 7.00e6",
+          "= −5.69 × 10⁷ J kg⁻¹",
+        ],
+        answer:
+          "g = GM/r² = (6.67 × 10⁻¹¹ × 5.97 × 10²⁴) / (4.90 × 10¹³) = 8.12 N kg⁻¹. Potential V = −GM/r = −5.69 × 10⁷ J kg⁻¹ (negative because zero is taken at infinity).",
+      },
+      {
+        prompt: "(b) Show that the orbital speed is about 7.5 km s⁻¹.",
+        marks: 2,
+        point: "sp-04",
+        claim: "apply inverse-square laws to calculate field strength potential and orbital motion",
+        aos: ["AO2"],
+        scheme: ["v² = GM/r", "v = √(6.67e-11 × 5.97e24 / 7.00e6) = 7.54 × 10³ m s⁻¹"],
+        answer: "For a circular orbit g = v²/r so v = √(GM/r) = √(3.98×10¹⁴ / 7.00×10⁶) = 7.54 × 10³ m s⁻¹ ≈ 7.5 km s⁻¹.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-unfamiliar-fields-mass-spec",
+    topic: "fields",
+    stem: "Unfamiliar context: In a time-of-flight mass spectrometer, a singly charged ion of mass 3.2 × 10⁻²⁶ kg is accelerated from rest through 2.5 kV, then enters a uniform magnetic field of 0.40 T perpendicular to its velocity.",
+    difficulty: 5,
+    calculator: true,
+    parts: [
+      {
+        prompt: "(a) Calculate the speed of the ion after acceleration (e = 1.60 × 10⁻¹⁹ C).",
+        marks: 3,
+        point: "sp-06",
+        claim: "apply F = BIl sinθ and F = BQv to determine trajectories",
+        aos: ["AO2"],
+        scheme: [
+          "½mv² = qV",
+          "v = √(2qV/m) = √(2 × 1.60e-19 × 2500 / 3.2e-26)",
+          "= 1.58 × 10⁵ m s⁻¹",
+        ],
+        answer: "Loss of electrical PE equals gain of KE: ½mv² = qV → v = √(2qV/m) = √(2.50×10¹⁰) = 1.58 × 10⁵ m s⁻¹.",
+      },
+      {
+        prompt: "(b) Calculate the radius of the subsequent circular path.",
+        marks: 2,
+        point: "sp-06",
+        claim: "apply F = BIl sinθ and F = BQv to determine trajectories",
+        aos: ["AO2"],
+        scheme: ["r = mv/Bq = 3.2e-26 × 1.58e5 / (0.40 × 1.60e-19)", "r = 0.079 m"],
+        answer: "Magnetic force provides centripetal force: r = mv/Bq = (3.2×10⁻²⁶ × 1.58×10⁵) / (0.40 × 1.60×10⁻¹⁹) = 7.9 × 10⁻² m.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-thermal-latent",
+    topic: "thermal",
+    stem: "A 0.12 kg block of ice at 0 °C is dropped into 0.40 kg of water at 25 °C in an insulated cup. Specific heat capacity of water = 4200 J kg⁻¹ K⁻¹; specific latent heat of fusion of ice = 3.3 × 10⁵ J kg⁻¹.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the energy required to melt the ice, and the energy available from cooling the water to 0 °C.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply Q = mcΔT for temperature changes and Q = mL for changes of state",
+        aos: ["AO2"],
+        scheme: [
+          "Q_melt = mL = 0.12 × 3.3e5 = 3.96 × 10⁴ J",
+          "Q_cool = mcΔT = 0.40 × 4200 × 25 = 4.20 × 10⁴ J",
+          "Enough energy to melt all the ice, with 2.4 × 10³ J left",
+        ],
+        answer:
+          "To melt the ice needs Q = mL = 0.12 × 3.3×10⁵ = 3.96×10⁴ J. Cooling the water to 0 °C releases mcΔT = 0.40 × 4200 × 25 = 4.20×10⁴ J, so all the ice melts and 2.4×10³ J remains to warm the mixture.",
+      },
+      {
+        prompt: "(b) Calculate the final temperature of the mixture.",
+        marks: 3,
+        point: "sp-02",
+        claim: "apply Q = mcΔT for temperature changes and Q = mL for changes of state",
+        aos: ["AO2"],
+        scheme: [
+          "Surplus 2.4×10³ J warms 0.52 kg of water",
+          "ΔT = Q / mc = 2400 / (0.52 × 4200) = 1.1 °C",
+          "Final temperature ≈ 1.1 °C",
+        ],
+        answer:
+          "After melting, 0.52 kg of water shares the leftover 2.4×10³ J: ΔT = 2400 / (0.52 × 4200) ≈ 1.1 K, so the mixture finishes at about 1.1 °C.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-nuclear-half-life",
+    topic: "nuclear",
+    stem: "A sample of a radioactive isotope has an activity of 8.0 × 10⁴ Bq. After 18.0 minutes the activity has fallen to 1.0 × 10⁴ Bq.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Determine the half-life of the isotope.",
+        marks: 2,
+        point: "sp-03",
+        claim: "define activity decay constant half-life and use A = λN and N = N0 e^(−λt)",
+        aos: ["AO2"],
+        scheme: [
+          "Activity falls by a factor of 8 = 2³, so three half-lives",
+          "t½ = 18.0 / 3 = 6.0 min",
+        ],
+        answer: "8.0×10⁴ → 1.0×10⁴ is a factor of 8 = 2³, so three half-lives elapse in 18 min. t½ = 6.0 min.",
+      },
+      {
+        prompt: "(b) Calculate the decay constant in s⁻¹.",
+        marks: 2,
+        point: "sp-03",
+        claim: "define activity decay constant half-life and use A = λN and N = N0 e^(−λt)",
+        aos: ["AO2"],
+        scheme: ["λ = ln2 / t½", "t½ = 360 s; λ = 0.693/360 = 1.93 × 10⁻³ s⁻¹"],
+        answer: "λ = ln 2 / t½ = 0.693 / 360 s = 1.93 × 10⁻³ s⁻¹.",
+      },
+    ],
+  }),
+  build({
+    slug: "depth-kinematics-projectile",
+    topic: "kinematics-dynamics",
+    stem: "A ball is thrown horizontally at 12 m s⁻¹ from a cliff 45 m above the sea. Take g = 9.81 m s⁻² and neglect air resistance.",
+    difficulty: 3,
+    parts: [
+      {
+        prompt: "(a) Calculate the time to reach the sea and the horizontal distance travelled.",
+        marks: 3,
+        point: "sp-06",
+        claim: "resolve motion in two dimensions including projectile motion with constant acceleration",
+        aos: ["AO2"],
+        scheme: [
+          "Resolve vertically: s = ½gt² → 45 = 0.5 × 9.81 × t²",
+          "t = √(2s/g) = 3.03 s",
+          "x = u t = 12 × 3.03 = 36 m",
+        ],
+        answer:
+          "Vertical: u = 0, s = 45 m, a = 9.81, so t = √(2s/g) = √(90/9.81) = 3.03 s. Horizontal velocity is constant, so range = 12 × 3.03 = 36 m.",
+      },
+      {
+        prompt: "(b) Calculate the speed on impact.",
+        marks: 2,
+        point: "sp-06",
+        claim: "resolve motion in two dimensions including projectile motion with constant acceleration",
+        aos: ["AO2"],
+        scheme: ["v_y = gt = 9.81 × 3.03 = 29.7 m s⁻¹", "v = √(12² + 29.7²) = 32.0 m s⁻¹"],
+        answer: "Vertical component v_y = 9.81 × 3.03 = 29.7 m s⁻¹; impact speed = √(12² + 29.7²) = 32 m s⁻¹.",
       },
     ],
   }),

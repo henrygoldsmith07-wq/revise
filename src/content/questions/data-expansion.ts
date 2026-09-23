@@ -1,5 +1,6 @@
 import type { AoCode, Question, QuestionKind } from "@/domain/types";
 import { defineQuestions } from "./authoring";
+import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /** Original table, graph and experimental-data questions for every subject variant. */
 
@@ -535,4 +536,5 @@ export const dataExpansionQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
+  ...wjecAlevelCoverageQuestions({ id: "data", prefix: "Data:", reviewer: "authored/data-question-expansion-review", kind: "structured" }),
 ];

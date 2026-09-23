@@ -1,12 +1,13 @@
 import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
+import { wjecPhysicsExpansion } from "./wjec-alevel-expansions";
 
 // WJEC A Level Physics (A200QS). Grouped by the specification's broad content
 // areas; check the current WJEC spec for exact assessment objectives.
 const SUBJECT_ID = "wjec-alevel-physics";
 
-const { units, topics } = buildUnits(SUBJECT_ID, [
+const baseCurriculum = buildUnits(SUBJECT_ID, [
   {
     slug: "motion-energy",
     title: "Motion, Energy and Matter",
@@ -121,7 +122,7 @@ const { units, topics } = buildUnits(SUBJECT_ID, [
         keyPoints: [
           "v = fλ, and the frequency of a wave is unchanged when it refracts.",
           "Two-source interference: dλ = ax/D for Young's slits; nλ = d sinθ for a grating.",
-          "Stationary waves need two identical waves travelling in opposite directions; nodes are always λ/2 apart.",
+          "Stationary waves need equal-amplitude coherent waves of the same frequency travelling in opposite directions; ideal nodes have zero displacement and are λ/2 apart.",
           "Total internal reflection requires light in the denser medium and an angle beyond the critical angle, sin C = 1/n.",
         ],
         commonErrors: [
@@ -397,6 +398,16 @@ const { units, topics } = buildUnits(SUBJECT_ID, [
     ],
   },
 ]);
+
+const expandedCurriculum = buildUnits(SUBJECT_ID, wjecPhysicsExpansion);
+const units = [
+  ...baseCurriculum.units,
+  ...expandedCurriculum.units.map((unit, index) => ({ ...unit, order: baseCurriculum.units.length + index })),
+];
+const topics = [
+  ...baseCurriculum.topics,
+  ...expandedCurriculum.topics.map((topic, index) => ({ ...topic, order: baseCurriculum.topics.length + index })),
+];
 
 export const wjecPhysics: CurriculumModule = registerSubject({
   subject: {

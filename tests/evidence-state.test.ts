@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessEvidenceState, evidenceStateLabel, DEFAULT_THRESHOLDS } from "@/domain/evidence-state";
+import { assessEvidenceState, evidenceStateLabel } from "@/domain/evidence-state";
 
 describe("evidence state", () => {
   it("starts at insufficient-data with no data", () => {

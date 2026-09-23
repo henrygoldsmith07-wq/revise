@@ -45,17 +45,33 @@ export type DepthCategory = "recall" | "application" | "transfer" | "misconcepti
  * 3–5 mark application; everything else recall.
  */
 export function classifyDepth(question: Question): DepthCategory {
+  // Generated and authored depth packs carry an explicit demand. Honour it
+  // before inferring from ids/marks so the coverage ledger reports the actual
+  // learning design (including calculation and explanation as application
+  // practice) rather than flattening every new item into an AO/mark heuristic.
+  switch (question.learning?.demand) {
+    case "recall": return "recall";
+    case "misconception": return "misconception";
+    case "transfer": return "transfer";
+    case "synoptic": return "synoptic";
+    case "application":
+    case "explanation":
+    case "calculation": return "application";
+    default: break;
+  }
   const slug = question.id.toLowerCase();
   if (/unfamiliar/.test(slug)) return "transfer";
   if (/misconception/.test(slug)) return "misconception";
   if (/synoptic|extended-response|evidence-expansion|case-study/.test(slug)) return "synoptic";
   if (question.totalMarks >= 6) return "synoptic";
-  const aoWeights = { AO1: 0, AO2: 0, AO3: 0 } as Record<string, number>;
+  const aoWeights = { AO1: 0, AO2: 0, AO3: 0 } as Record<"AO1" | "AO2" | "AO3", number>;
   for (const part of question.parts) {
     for (const ao of part.aos ?? []) aoWeights[ao] = (aoWeights[ao] ?? 0) + 1;
   }
-  if (aoWeights.AO3 > 0 && aoWeights.AO3 >= (aoWeights.AO2 ?? 0)) return "transfer";
-  if (question.totalMarks >= 3 || aoWeights.AO2 > 0) return "application";
+  const ao3 = aoWeights.AO3 ?? 0;
+  const ao2 = aoWeights.AO2 ?? 0;
+  if (ao3 > 0 && ao3 >= ao2) return "transfer";
+  if (question.totalMarks >= 3 || ao2 > 0) return "application";
   return "recall";
 }
 

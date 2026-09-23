@@ -16,15 +16,17 @@
 -- student can never read or write another's revision data.
 -- ---------------------------------------------------------------------------
 
--- Shared trigger: the client sends updated_at, but a direct write (psql, the
--- dashboard) must never leave the column stale or sync would skip the row.
+-- Shared trigger: the client sends updated_at, but a stale/duplicate device
+-- write must never replace a newer row. Returning OLD makes the comparison
+-- atomic inside the UPDATE used by Supabase upsert; no client-side race can
+-- make an older answer, card state or review log win.
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
 as $$
 begin
   if new.updated_at is null or new.updated_at <= old.updated_at then
-    new.updated_at = greatest(now(), old.updated_at + interval '1 millisecond');
+    return old;
   end if;
   return new;
 end;
@@ -171,6 +173,35 @@ create table if not exists public.streaks (
   updated_at timestamptz not null default now()
 );
 
+-- Completed lessons + lesson streak: one row per user, so the client
+-- upserts on user_id directly, exactly like settings and streaks.
+create table if not exists public.lesson_progress (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  id uuid,
+  subject_id text,
+  topic_id text,
+  due date,
+  date date,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- --- idempotency ledger -------------------------------------------------------
+-- The outbox retries on flaky networks, and a request that times out may have
+-- actually committed. Without a ledger, a retried push upserts the same review
+-- twice: FSRS sees a phantom extra grade, accuracy metrics double-count, and a
+-- "sync_writes" row is the server-side dedup guard.
+--
+-- Every queued mutation carries a UUID idempotency key. The client claims the
+-- key on first delivery; a replayed request hits `on conflict do nothing` and
+-- is acknowledged as already-applied instead of writing a second time.
+create table if not exists public.sync_writes (
+  id uuid primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists sync_writes_user_created_idx on public.sync_writes (user_id, created_at);
+
 -- --- row-level security -----------------------------------------------------
 -- One policy per table, covering all four verbs. `with check` on insert and
 -- update stops a client rewriting user_id to another account's id.
@@ -180,7 +211,8 @@ declare
 begin
   foreach target in array array[
     'cards', 'review_logs', 'questions', 'attempts', 'mistakes',
-    'papers', 'planned_sessions', 'exam_dates', 'user_settings', 'streaks'
+    'papers', 'planned_sessions', 'exam_dates', 'user_settings', 'streaks',
+    'lesson_progress', 'sync_writes'
   ]
   loop
     execute format('alter table public.%I enable row level security', target);

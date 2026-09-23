@@ -1,13 +1,14 @@
 import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
+import { wjecMathsExpansion } from "./wjec-alevel-expansions";
 
 // WJEC A Level Mathematics (A00-A60). Topic grouping follows the broad
 // content areas of the specification; always check the current WJEC spec
 // document for exact assessment objectives and weightings.
 const SUBJECT_ID = "wjec-alevel-maths";
 
-const { units, topics } = buildUnits(SUBJECT_ID, [
+const baseCurriculum = buildUnits(SUBJECT_ID, [
   {
     slug: "pure",
     title: "Pure Mathematics",
@@ -466,6 +467,16 @@ const { units, topics } = buildUnits(SUBJECT_ID, [
     ],
   },
 ]);
+
+const expandedCurriculum = buildUnits(SUBJECT_ID, wjecMathsExpansion);
+const units = [
+  ...baseCurriculum.units,
+  ...expandedCurriculum.units.map((unit, index) => ({ ...unit, order: baseCurriculum.units.length + index })),
+];
+const topics = [
+  ...baseCurriculum.topics,
+  ...expandedCurriculum.topics.map((topic, index) => ({ ...topic, order: baseCurriculum.topics.length + index })),
+];
 
 export const wjecMaths: CurriculumModule = registerSubject({
   subject: {

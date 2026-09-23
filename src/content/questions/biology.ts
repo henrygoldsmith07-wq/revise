@@ -76,7 +76,7 @@ export const biologyQuestions = defineQuestions([
           "So the water potential of the solution equals the water potential of the cells",
         ],
         specPointIds: ["wjec-alevel-biology.membranes-transport.sp-01"],
-        learningClaims: ["explain why the tissue gained mass in the most dilute solution."],
+        learningClaims: ["use the zero-mass-change intercept to find the tissue water potential."],
         answer:
           "Where the mass change is zero there is no net osmosis, so the water potential of the external solution equals the water potential of the cells — reading this value off the graph gives the tissue's water potential.",
       },
@@ -106,7 +106,7 @@ export const biologyQuestions = defineQuestions([
           "Oxygen is the final electron acceptor, combining with electrons and protons to form water",
         ],
         specPointIds: ["wjec-alevel-biology.respiration.sp-01"],
-        learningClaims: ["state how the point at which there is no change in mass can be used."],
+        learningClaims: ["explain chemiosmosis and oxidative phosphorylation of ADP to ATP."],
         answer:
           "Reduced NAD and reduced FAD are oxidised at the inner mitochondrial membrane, releasing electrons. These pass along a chain of electron carriers, losing energy at each transfer. That energy pumps protons from the matrix into the intermembrane space, establishing an electrochemical gradient. Protons then diffuse back into the matrix through ATP synthase, and this flow (chemiosmosis) drives the phosphorylation of ADP to ATP. Oxygen acts as the final electron acceptor, combining with electrons and protons to form water.",
       },

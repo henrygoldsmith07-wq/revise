@@ -7,28 +7,20 @@ import type { ReactNode } from "react";
 import { useStore } from "@/state/store";
 import { cx } from "./ui";
 import {
-  CardsIcon,
-  GenerateIcon,
   ICON_SIZE,
-  ModesIcon,
+  LessonsIcon,
   LibraryIcon,
+  ModesIcon,
+  OfflineIcon,
   PapersIcon,
-  EvidenceIcon,
   PlanIcon,
   PracticeIcon,
   ProgressIcon,
-  ResponseTimeIcon,
   ReviewIcon,
   SearchIcon,
-  OfflineIcon,
   SettingsIcon,
   SyncIcon,
   TodayIcon,
-  TeacherIcon,
-  TutorIcon,
-  BenchmarkIcon,
-  CaseStudyIcon,
-  CorpusIcon,
   WarningIcon,
 } from "./icons";
 import type { LucideIcon } from "./icons";
@@ -39,24 +31,22 @@ import { Onboarding } from "./Onboarding";
 // Navigation is verb-first: every destination is something the student does,
 // not a noun they browse. "Today" is always first because the product's whole
 // claim is that it knows what you should do next.
+// The app is the loop board → topic → card → exam question: Today feeds due
+// cards, Study drills them, Lessons teaches a topic, Practice and Past papers
+// are the exam questions, Library is the topic index. Schedule is the layer
+// above the loop — it places those same actions across the run-up to each
+// exam, derived from the same planner the store already maintains.
+
 const NAV: { href: string; label: string; Icon: LucideIcon; primary?: boolean }[] = [
   { href: "/", label: "Today", Icon: TodayIcon, primary: true },
   { href: "/review", label: "Review", Icon: ReviewIcon, primary: true },
   { href: "/study", label: "Study", Icon: ModesIcon, primary: true },
-  { href: "/practice", label: "Practice", Icon: PracticeIcon },
-  { href: "/planner", label: "Plan", Icon: PlanIcon, primary: true },
-  { href: "/progress", label: "Progress", Icon: ProgressIcon, primary: true },
-  { href: "/teacher", label: "Teacher P2", Icon: TeacherIcon },
-  { href: "/response-time", label: "Response time", Icon: ResponseTimeIcon },
-  { href: "/generate", label: "From notes", Icon: GenerateIcon },
-  { href: "/cards", label: "Cards", Icon: CardsIcon },
-  { href: "/papers", label: "Past papers", Icon: PapersIcon },
+  { href: "/lesson", label: "Lessons", Icon: LessonsIcon, primary: true },
+  { href: "/practice", label: "Practice", Icon: PracticeIcon, primary: true },
+  { href: "/papers", label: "Past papers", Icon: PapersIcon, primary: true },
+  { href: "/readiness", label: "Readiness", Icon: ProgressIcon },
+  { href: "/schedule", label: "Schedule", Icon: PlanIcon },
   { href: "/library", label: "Library", Icon: LibraryIcon },
-  { href: "/question-evidence", label: "Question evidence", Icon: EvidenceIcon },
-  { href: "/tutor", label: "Tutor", Icon: TutorIcon },
-  { href: "/benchmarks", label: "Benchmarks", Icon: BenchmarkIcon },
-  { href: "/answer-corpus", label: "Answer corpus", Icon: CorpusIcon },
-  { href: "/case-study", label: "Case study", Icon: CaseStudyIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
@@ -133,9 +123,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       { key: "r", group: "Go to", label: "Review", run: () => router.push("/review") },
       { key: "p", group: "Go to", label: "Practice", run: () => router.push("/practice") },
       { key: "m", group: "Go to", label: "Study modes", run: () => router.push("/study") },
-      { key: "e", group: "Go to", label: "Cards from notes", run: () => router.push("/generate") },
-      { key: "l", group: "Go to", label: "Cards", run: () => router.push("/cards") },
-      { key: "t", group: "Go to", label: "Plan", run: () => router.push("/planner") },
+      { key: "h", group: "Go to", label: "Lessons", run: () => router.push("/lesson") },
+      { key: "a", group: "Go to", label: "Past papers", run: () => router.push("/papers") },
       { key: "d", group: "Global", label: "Toggle dark mode", run: toggleTheme },
     ],
     [router, settings.theme],
@@ -157,6 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-56 flex-col border-r border-line bg-surface z-20" aria-label="Primary">
         <div className="px-4 py-5">
           <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 22px static icon; next/image adds setup cost with no benefit here */}
             <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
             <p className="text-sm font-semibold tracking-tight">Revise</p>
           </div>
@@ -201,6 +191,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="lg:hidden sticky top-0 z-20 bg-surface border-b border-line" role="banner">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- 22px static icon; next/image adds setup cost with no benefit here */}
             <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold tracking-tight">Revise</p>
@@ -213,9 +204,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button type="button" onClick={() => setSearchOpen(true)} className="btn btn-ghost" aria-label="Search">
               <SearchIcon size={ICON_SIZE.lg} aria-hidden />
             </button>
-            <Link href="/teacher" className="btn btn-ghost" aria-label="Teacher P2">
-              <TeacherIcon size={ICON_SIZE.lg} aria-hidden />
-            </Link>
             <Link href="/settings" className="btn btn-ghost" aria-label="Settings">
               <SettingsIcon size={ICON_SIZE.lg} aria-hidden />
             </Link>
@@ -247,7 +235,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line elev-nav pb-safe"
         aria-label="Primary sections (mobile)"
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {NAV.filter((item) => item.primary).map((item) => (
             <Link
               key={item.href}

@@ -1,4 +1,6 @@
 import type { Id, Misconception, Question } from "@/domain/types";
+import { honestQuestion } from "@/domain/curriculum/honesty";
+import { enrichCuratedPhysicsLearning } from "./questions/physics-part-learning";
 import { biologyQuestions } from "./questions/biology";
 import { biologyAqaQuestions } from "./questions/biology-aqa";
 import { biologyAqaExtraQuestions } from "./questions/biology-aqa-extra";
@@ -28,14 +30,42 @@ import { ocrAuthoredQuestions } from "./questions/ocr-authored";
 import { extendedResponseQuestions } from "./questions/extended-responses";
 import { evidenceExpansionQuestions } from "./questions/evidence-expansion";
 import { flagshipPhysicsDepthQuestions } from "./questions/flagship-physics-depth";
+import { physicsCoverageQuestions } from "./questions/physics-coverage";
+import { physicsStatementCoverageQuestions } from "./questions/physics-statement-coverage";
+import { physicsReasoningDepthQuestions } from "./questions/physics-reasoning-depth";
+import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
+import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
+import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
+import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
+import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
+import { physicsCapacitorRcQuestions } from "./questions/physics-capacitor-rc";
+import { physicsMotionGraphQuestions } from "./questions/physics-motion-graphs";
+import { physicsDepth50MechanicsQuestions } from "./questions/physics-depth-50-mechanics";
+import { physicsDepth50CircuitsFieldsQuestions } from "./questions/physics-depth-50-circuits-fields";
+import { physicsDepth50AppliedQuestions } from "./questions/physics-depth-50-applied";
+import { physicsDepth50OrbitsQuestions } from "./questions/physics-depth-50-orbits";
+import { physicsDepthNearCompleteCoreQuestions } from "./questions/physics-depth-near-complete-core";
+import { physicsDepthNearCompleteMaterialsQuestions } from "./questions/physics-depth-near-complete-materials";
+import { physicsDepthNearCompleteWavesQuestions } from "./questions/physics-depth-near-complete-waves";
+import { physicsDepthNearCompleteQuantumQuestions } from "./questions/physics-depth-near-complete-quantum";
+import { physicsDepthNearCompleteGapQuestions } from "./questions/physics-depth-near-complete-gaps";
+import { physicsDepthCompletionEnergyQuantumQuestions } from "./questions/physics-depth-completion-energy-quantum";
+import { physicsDepthCompletionCircuitsMechanicsQuestions } from "./questions/physics-depth-completion-circuits-mechanics";
+import { physicsDepthCompletionFieldsThermalNuclearQuestions } from "./questions/physics-depth-completion-fields-thermal-nuclear";
+import { physicsDepthCompletionPracticalQuestions } from "./questions/physics-depth-completion-practical";
+import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
+import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
+import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
+import { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts } from "./questions/wjec-flagship-depth";
 import { seedMisconceptions } from "./misconceptions";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
+export { authoredDiagrams, diagramForTopic } from "./diagram-cards";
 export { CONTENT_SCHEMAS, contentCardSchema, contentQuestionPartSchema, contentQuestionSchema, contentTopicSchema } from "./schema";
 
 /** The authored question bank. Uploaded and AI-generated questions live in
  *  IndexedDB alongside these and are treated identically everywhere else. */
-export const seedQuestions: Question[] = [
+const BASE_SEED_QUESTIONS: Question[] = [
   ...flagshipPhysicsDepthQuestions,
   ...evidenceExpansionQuestions,
   ...authenticExpansionQuestions,
@@ -54,6 +84,31 @@ export const seedQuestions: Question[] = [
   ...chemistryExtraQuestions,
   ...physicsQuestions,
   ...physicsExtraQuestions,
+  ...wjecAlevelExpansionQuestions,
+  ...wjecPhysicsQualityExpansionQuestions,
+  ...physicsCoverageQuestions,
+  ...physicsStatementCoverageQuestions,
+  ...physicsReasoningDepthQuestions,
+  ...physicsCapacitorEnergyQuestions,
+  ...physicsCapacitorRcQuestions,
+  ...physicsMotionGraphQuestions,
+  ...physicsDepth50MechanicsQuestions,
+  ...physicsDepth50CircuitsFieldsQuestions,
+  ...physicsDepth50AppliedQuestions,
+  ...physicsDepth50OrbitsQuestions,
+  ...physicsDepthNearCompleteCoreQuestions,
+  ...physicsDepthNearCompleteMaterialsQuestions,
+  ...physicsDepthNearCompleteWavesQuestions,
+  ...physicsDepthNearCompleteQuantumQuestions,
+  ...physicsDepthNearCompleteGapQuestions,
+  ...physicsDepthCompletionEnergyQuantumQuestions,
+  ...physicsDepthCompletionCircuitsMechanicsQuestions,
+  ...physicsDepthCompletionFieldsThermalNuclearQuestions,
+  ...physicsDepthCompletionPracticalQuestions,
+  ...wjecMathsQualityQuestions,
+  ...wjecBiologyQualityQuestions,
+  ...wjecChemistryQualityQuestions,
+  ...wjecFlagshipDepthQuestions,
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,
@@ -65,7 +120,14 @@ export const seedQuestions: Question[] = [
   ...aqaGcseQuestions,
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
-];
+  ...wjecRepairDepthQuestions,
+  // Keep the generated Physics depth pack after the curated bank so a fresh
+  // learner sees reviewed authored items first. Coverage and adaptive
+  // selection are keyed by ids, not array position.
+  ...wjecPhysicsDeepQuestions,
+].map(honestQuestion);
+
+export const seedQuestions: Question[] = enrichCuratedPhysicsLearning(BASE_SEED_QUESTIONS);
 
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
 export { gcseExpansionQuestions };
@@ -75,6 +137,14 @@ export { unfamiliarContextQuestions };
 export { authenticSourceQuestions };
 export { ocrAuthoredQuestions };
 export { extendedResponseQuestions };
+export { wjecAlevelExpansionQuestions };
+export { wjecPhysicsDeepQuestions };
+export { wjecPhysicsQualityExpansionQuestions };
+export { physicsCoverageQuestions };
+export { physicsReasoningDepthQuestions };
+export { physicsDepthNearCompleteCoreQuestions, physicsDepthNearCompleteMaterialsQuestions, physicsDepthNearCompleteWavesQuestions, physicsDepthNearCompleteQuantumQuestions, physicsDepthNearCompleteGapQuestions };
+export { physicsDepthCompletionEnergyQuantumQuestions, physicsDepthCompletionCircuitsMechanicsQuestions, physicsDepthCompletionFieldsThermalNuclearQuestions, physicsDepthCompletionPracticalQuestions };
+export { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts };
 
 export function seedQuestionsForSubject(subjectId: Id): Question[] {
   return seedQuestions.filter((q) => q.subjectId === subjectId);

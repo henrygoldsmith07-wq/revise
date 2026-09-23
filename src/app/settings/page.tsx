@@ -8,14 +8,15 @@ const ARM_LABELS: Record<string, string> = {
 } as const;
 
 import { useEffect, useState } from "react";
-import { aiStatus } from "@/ai/client";
-import { allSubjects, subjectLabel } from "@/domain/curriculum";
+import { aiStatus } from "@/lib/optional-ai";
+import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
 import { buildPortabilitySnapshot, deletionPreview, portabilityFilename, privacyDisclosure } from "@/domain/portability";
 import { clearAll } from "@/data/db";
+import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
-import Link from "next/link";
+import { PwaInstallSettings } from "@/components/PwaInstall";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -23,6 +24,30 @@ export default function SettingsPage() {
   const store = useStore();
   const { settings } = store;
   const [ai, setAi] = useState<{ available: boolean; name: string | null } | null>(null);
+  const [keyRevealed, setKeyRevealed] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyMessage, setKeyMessage] = useState<string | null>(null);
+  const [keyText, setKeyText] = useState("");
+  const [keyFp, setKeyFp] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The fingerprint only renders inside the enabled block, so there is
+    // nothing to clear when the toggle turns off.
+    if (!settings.e2eeEnabled) return;
+    void keyFingerprint().then(setKeyFp);
+  }, [settings.e2eeEnabled]);
+
+  function revealKey() {
+    if (keyRevealed) {
+      setKeyRevealed(false);
+      setKeyText("");
+      return;
+    }
+    void exportEncryptionKey().then((k) => {
+      setKeyText(k);
+      setKeyRevealed(true);
+    });
+  }
 
   useEffect(() => {
     void aiStatus().then(setAi);
@@ -64,37 +89,97 @@ export default function SettingsPage() {
       </section>
 
       <section>
+        <SectionHeading
+          title="Exam countdown"
+          hint="One-time heads-up when a subject enters the timed-paper fortnight."
+        />
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink">Notify me when a subject is 14 days from an exam</p>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                A one-time banner on Today — timed papers and weak-topic retests now beat opening new topics — plus a
+                browser notification when your browser allows it. Never repeats for the same run-up.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={settings.examNotifications ? "primary" : "secondary"}
+              aria-pressed={Boolean(settings.examNotifications)}
+              onClick={() => {
+                const next = !settings.examNotifications;
+                if (
+                  next &&
+                  typeof window !== "undefined" &&
+                  "Notification" in window &&
+                  window.Notification.permission === "default"
+                ) {
+                  void window.Notification.requestPermission().catch(() => {});
+                }
+                void store.updateSettings({ examNotifications: next });
+              }}
+            >
+              {settings.examNotifications ? "On" : "Off"}
+            </Button>
+          </div>
+        </Panel>
+      </section>
+
+      <section>
         <SectionHeading title="Subjects" hint="Only these are planned, recommended and predicted." />
         <Panel>
-          <ul className="space-y-2">
-            {allSubjects().map((subject) => {
-              const on = settings.subjectIds.includes(subject.id);
-              return (
-                <li key={subject.id} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-ink">{subject.name}</p>
-                    <p className="text-[11px] text-ink3 truncate">
-                      {subjectLabel(subject.id)}
-                      {subject.specCode ? ` · ${subject.specCode}` : ""}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={on ? "primary" : "secondary"}
-                    onClick={() =>
-                      void store.updateSettings({
-                        subjectIds: on
-                          ? settings.subjectIds.filter((id) => id !== subject.id)
-                          : [...settings.subjectIds, subject.id],
-                      })
-                    }
-                  >
-                    {on ? "Taking" : "Add"}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+          {[
+            { title: "Flagship depth", list: allSubjects().filter((s) => s.contentTier === "flagship") },
+            { title: "Reference (not spec-checked)", list: allSubjects().filter((s) => s.contentTier !== "flagship") },
+          ].map((group) => (
+            <div key={group.title} className="mb-4 last:mb-0">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2">{group.title}</p>
+              <ul className="space-y-2">
+                {group.list.map((subject) => {
+                  const on = settings.subjectIds.includes(subject.id);
+                  const grades = gradesFor(subject.id);
+                  return (
+                    <li key={subject.id} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-ink">{subject.name}</p>
+                        <p className="text-[11px] text-ink3 truncate">
+                          {subjectLabel(subject.id)}
+                          {subject.specCode ? ` · ${subject.specCode}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {on && grades.length ? (
+                          <Segmented
+                            ariaLabel={`Target grade for ${subject.name}`}
+                            value={settings.targetGrades[subject.id] ?? ""}
+                            onChange={(grade) =>
+                              void store.updateSettings({
+                                targetGrades: { ...settings.targetGrades, [subject.id]: grade },
+                              })
+                            }
+                            options={grades.map((g) => ({ value: g, label: g }))}
+                          />
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant={on ? "primary" : "secondary"}
+                          onClick={() =>
+                            void store.updateSettings({
+                              subjectIds: on
+                                ? settings.subjectIds.filter((id) => id !== subject.id)
+                                : [...settings.subjectIds, subject.id],
+                            })
+                          }
+                        >
+                          {on ? "Taking" : "Add"}
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </Panel>
       </section>
 
@@ -142,6 +227,8 @@ export default function SettingsPage() {
           </Button>
         </Panel>
       </section>
+
+      <PwaInstallSettings />
 
       <section>
         <SectionHeading title="Appearance and accessibility" />
@@ -222,6 +309,110 @@ export default function SettingsPage() {
       <DataControls />
 
       <section>
+        <SectionHeading title="Sync encryption" hint="End-to-end encryption for everything that leaves this device." />
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink">Encrypt synced data (AES-GCM)</p>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                When on, every card, answer and review is encrypted with a key generated on this device before it
+                reaches the sync server. The server stores opaque ciphertext: a database breach yields nothing
+                readable. Turn it on per device; the key never leaves unless you export it below.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={settings.e2eeEnabled ? "primary" : "secondary"}
+              aria-pressed={Boolean(settings.e2eeEnabled)}
+              onClick={() => void store.updateSettings({ e2eeEnabled: !settings.e2eeEnabled })}
+            >
+              {settings.e2eeEnabled ? "On" : "Off"}
+            </Button>
+          </div>
+          {settings.e2eeEnabled ? (
+            <div className="mt-4 pt-3 border-t border-line space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Pill title="First 16 hex digits of the SHA-256 key fingerprint — confirms two devices hold the same key">
+                  Key fingerprint: {keyFp ?? "…"}
+                </Pill>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="secondary" onClick={() => void revealKey()}>
+                  {keyRevealed ? "Hide key" : "Back up key"}
+                </Button>
+                {keyRevealed ? (
+                  <textarea
+                    readOnly
+                    value={keyText}
+                    rows={2}
+                    aria-label="Your encryption key — copy it somewhere safe"
+                    className="w-full card card-2 p-2 text-[10px] font-mono break-all"
+                  />
+                ) : null}
+              </div>
+              <div>
+                <p className="text-[11px] text-ink3 mb-1">
+                  Restoring on a new device: paste the key from your backup, then pull your data.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="password"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder="Paste a backed-up key"
+                    aria-label="Paste a backed-up encryption key"
+                    className="flex-1 min-w-0 card p-2 text-xs font-mono"
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!keyInput.trim()}
+                    onClick={() =>
+                      void importEncryptionKey(keyInput.trim()).then((ok) => {
+                        setKeyMessage(ok ? "Key installed. Pull your data to decrypt it here." : "That does not look like a valid key.");
+                        if (ok) setKeyInput("");
+                      })
+                    }
+                  >
+                    Use key
+                  </Button>
+                </div>
+                {keyMessage ? (
+                  <p className="text-[11px] text-ink2 mt-1" role="status">
+                    {keyMessage}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </Panel>
+      </section>
+
+      <section>
+        <SectionHeading title="On-device marking" hint="Optional. Keeps grading working when the AI service is down." />
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink">Grade answers with the on-device model</p>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                When the AI provider is unreachable, a small language model running in this browser (WebGPU) can
+                grade practice answers instead. The first use downloads about 2GB of model weights once; nothing is
+                sent anywhere. Cloud AI is still preferred whenever it is reachable.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant={settings.localAiMarking ? "primary" : "secondary"}
+              aria-pressed={Boolean(settings.localAiMarking)}
+              onClick={() => void store.updateSettings({ localAiMarking: !settings.localAiMarking })}
+            >
+              {settings.localAiMarking ? "On" : "Off"}
+            </Button>
+          </div>
+        </Panel>
+      </section>
+
+      <section>
         <SectionHeading title="Pulse" hint="Off by default. Nothing is shared until you switch it on." />
         <Panel>
           <div className="flex items-center justify-between gap-3">
@@ -245,6 +436,7 @@ export default function SettingsPage() {
         </Panel>
       </section>
 
+
       <section>
         <SectionHeading title="Privacy" hint="What leaves this device, and what never does." />
         <Panel>
@@ -253,26 +445,10 @@ export default function SettingsPage() {
               <li key={line}>{line}</li>
             ))}
           </ul>
-          <p className="text-[11px] text-ink3 mt-3">
-            More: <Link className="underline" href="/benchmarks">Benchmarks</Link> ·{" "}
-            <Link className="underline" href="/case-study">Case study</Link> ·{" "}
-            <a className="underline" href="/docs/benchmark.md">Benchmark docs</a>
-          </p>
+
         </Panel>
       </section>
     </div>
-  );
-}
-
-/** Google's four-colour "G", inlined so the button needs no network image. */
-function GoogleMark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true" className="inline-block align-[-2px] mr-2">
-      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z" />
-      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z" />
-      <path fill="#FBBC05" d="M3.97 10.72a5.41 5.41 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z" />
-      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
-    </svg>
   );
 }
 
@@ -335,27 +511,6 @@ function Account() {
     setMessage(error ? error.message : "Check your email for a sign-in link.");
   }
 
-  /**
-   * Hands off to Google. This is a full navigation by nature — the browser
-   * comes back to the same redirect target the magic link uses, where the
-   * Supabase browser client exchanges the code for a session on load.
-   *
-   * Google and the magic link resolve to the SAME Supabase user when the
-   * address matches, so every row stays reachable under `auth.uid()` and no
-   * row-level security policy has to change.
-   */
-  async function signInWithGoogle() {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${location.origin}/` },
-    });
-    // On success the browser is already navigating away; only a failure to
-    // start the handoff is worth reporting here.
-    if (error) setMessage(error.message);
-  }
-
   async function signOut() {
     await getSupabase()?.auth.signOut();
     setUser(null);
@@ -376,15 +531,6 @@ function Account() {
           </>
         ) : (
           <>
-            <Button variant="primary" onClick={() => void signInWithGoogle()}>
-              <GoogleMark />
-              Continue with Google
-            </Button>
-            <div className="flex items-center gap-3">
-              <span className="h-px flex-1 bg-[var(--line)]" />
-              <span className="text-xs text-ink3">or</span>
-              <span className="h-px flex-1 bg-[var(--line)]" />
-            </div>
             <Field label="Email" hint="We send a one-time sign-in link — no password to forget.">
               <input
                 type="email"
@@ -416,6 +562,8 @@ function DataControls() {
       { store: "mistakes", count: store.mistakes.length },
       { store: "plannedSessions", count: store.plannedSessions.length },
       { store: "examDates", count: store.examDates.length },
+      { store: "gradePredictions", count: store.gradePredictionLog.filter((row) => row.anonId === store.userId).length },
+      { store: "gradeActuals", count: store.gradeActuals.filter((row) => row.anonId === store.userId).length },
       { store: "papers", count: store.papers.length },
       { store: "questions", count: store.questions.length },
     ],
@@ -462,6 +610,9 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     mistakes: store.mistakes,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    gradePredictions: store.gradePredictionLog.filter((row) => row.anonId === store.userId),
+    gradeActuals: store.gradeActuals.filter((row) => row.anonId === store.userId),
+    interventionOutcomes: store.interventionOutcomes,
     settings: store.settings,
     streak: store.streak,
   });
@@ -487,6 +638,8 @@ function exportDataLegacy(store: ReturnType<typeof useStore>) {
     papers: store.papers,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    gradePredictions: store.gradePredictionLog.filter((row) => row.anonId === store.userId),
+    gradeActuals: store.gradeActuals.filter((row) => row.anonId === store.userId),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);

@@ -8,7 +8,7 @@
 // Pure domain: no React, no storage, no network.
 // ---------------------------------------------------------------------------
 
-import { analyseExperiment, EXPERIMENT_ARMS, type ExperimentAnalysis } from "./recommendation-experiment";
+import { EXPERIMENT_ARMS, type ExperimentAnalysis } from "./recommendation-experiment";
 
 export interface EfficacyEvidence {
   /** The headline number: revise marks/hour minus control marks/hour. */

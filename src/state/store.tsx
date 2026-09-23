@@ -8,22 +8,55 @@ import { predictGrade } from "@/domain/grades";
 import type { GradePrediction } from "@/domain/grades";
 import { computeTopicMastery } from "@/domain/mastery";
 import {
-  applyRetestToMistake,
   evaluateMistakeRetest,
   mistakesFromAttempt,
-  shouldResolve,
 } from "@/domain/mistakes";
+import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
 import { computeApplicationMastery } from "@/domain/application-mastery";
+import { trustedAssessmentContent } from "@/domain/physics-content-review";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
-import { buildPlan, rescheduleMissed } from "@/domain/planner";
+import { buildPlan, rescheduleMissed, summarizePlanChange } from "@/domain/planner";
+import { buildSubjectEvidence } from "@/domain/subject-allocation";
+import { currentPhaseBuckets, techniqueEntryNotices } from "@/domain/phase-notice";
+import type { PhaseBucket, PhaseNotice, PhaseSubject } from "@/domain/phase-notice";
 import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
-import { recommend } from "@/domain/recommender";
+import { daysToExam, recommend } from "@/domain/recommender";
+import { buildAdaptiveSession } from "@/domain/adaptive-session";
+import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
+import { reviewedWjecTopicEdges } from "@/content/capabilities";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
+import {
+  knowledgeVsAnswering,
+  knowledgeVsAnsweringByTopic,
+  type KnowledgeAnsweringReport,
+} from "@/domain/exam-technique";
+import {
+  buildPaperOutcomeRecord,
+  closePaperOutcome,
+  paperOutcomeGainMultiplier,
+  type PaperOutcomeReview,
+  type PaperOutcomeRecord,
+} from "@/domain/paper-outcome";
+import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
+import { buildExamReadiness, summariseExamReadiness } from "@/domain/exam-readiness";
+import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
+import {
+  abandonRevisionTwinSession,
+  buildRevisionTwinChoices,
+  completeRevisionTwinSession as completeTwinSession,
+  createRevisionTwinSession,
+  createRevisionTwinState,
+  revisionTwinReport,
+} from "@/domain/revision-twin";
+import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
 import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
+import { getDeviceIdentity, nextLamport } from "@/data/device";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
-import { buildAssessmentInsight, calibrateFromHistory, simulatePaper } from "@/domain/assessment";
-import { calibrateDifficulty, traceQuestions } from "@/domain/knowledge-tracing";
+import { calibrateFromHistory, simulatePaper } from "@/domain/assessment";
+import { calibrateDifficulty } from "@/domain/knowledge-tracing";
 import type { DifficultyCalibrationReport, QuestionTrace } from "@/domain/knowledge-tracing";
 import { calculateCalculationMastery } from "@/domain/calculation-mastery";
 import type { CalculationMasteryReport } from "@/domain/calculation-mastery";
@@ -40,7 +73,7 @@ import type {
 } from "@/domain/learning-controls";
 import { questionExposureReport } from "@/domain/question-exposure";
 import type { QuestionExposureReport } from "@/domain/question-exposure";
-import { rootPrerequisiteRemediation as buildRootPrerequisiteRemediation } from "@/domain/prerequisites";
+import { prerequisiteEdges, rootPrerequisiteRemediation as buildRootPrerequisiteRemediation } from "@/domain/prerequisites";
 import type { RootPrerequisiteRemediation } from "@/domain/prerequisites";
 import { validateFsrs } from "@/domain/fsrs-tuning";
 import type { FsrsValidation } from "@/domain/fsrs-tuning";
@@ -54,6 +87,7 @@ import type {
   ExamDate,
   GamificationStats,
   Id,
+  LessonProgress,
   Mistake,
   Paper,
   PaperSimulation,
@@ -65,20 +99,28 @@ import type {
   StreakState,
   TopicMastery,
   UserSettings,
+  InterventionOutcomeRecord,
 } from "@/domain/types";
 import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type { MasteryInterval } from "@/domain/mastery-uncertainty";
 import * as repo from "@/data/repository";
-import { LOCAL_USER_ID } from "@/data/repository";
+import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
+import { domainEngine } from "@/data/domain-engine";
 import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
+import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
+import { attachDelayedRetentionOutcome, attachTransferOutcome, calibrateInterventions, createInterventionOutcome } from "@/domain/intervention-calibration";
+import type { InterventionCalibration } from "@/domain/intervention-calibration";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
-import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
+import { gradePredictionSnapshotId, type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
 import { assignArm as assignExperimentArm, policyTaskFor,
-  type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType, type ExperimentArm } from "@/domain/recommendation-experiment";
+  type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
+import { StorageRecovery } from "@/components/StorageRecovery";
+import { estimateStorageQuota } from "@/data/storage-quota";
+import type { StorageQuota } from "@/data/storage-quota";
 import {
   createRevisionCheckpoint,
   type RevisionCheckpoint,
@@ -113,6 +155,8 @@ interface StoreValue extends Snapshot {
   applicationMastery: ApplicationMasteryRow[];
   recallMastery: RecallMasteryRow[];
   recommendations: Recommendation[];
+  /** One ranked, bounded sequence for the next focused learning window. */
+  adaptiveSession: AdaptiveSessionPlan | null;
   predictions: GradePrediction[];
   dueCards: Card[];
   assessment: AssessmentInsight | null;
@@ -122,6 +166,10 @@ interface StoreValue extends Snapshot {
   recurringMisconceptions: MisconceptionTally[];
   /** Why the plan last changed itself, or null when nothing has. */
   replanSummary: string | null;
+  /** What the latest manual rebuild changed, in plain language (empty = nothing material). */
+  planChangelog: string[];
+  /** One-time notice shown when a subject enters the timed-paper fortnight; null otherwise. */
+  examPhaseNotice: PhaseNotice | null;
   calibrations: Map<Id, Calibration>;
   questionTraces: QuestionTrace[];
   difficultyCalibration: DifficultyCalibrationReport;
@@ -135,6 +183,13 @@ interface StoreValue extends Snapshot {
   revisionCheckpoint: RevisionCheckpoint | null;
   responseTimeCalibration: ResponseTimeCalibrationReport;
   syncStatus: SyncStatus;
+  revisionTwin: RevisionTwinState;
+  revisionTwinChoices: RevisionTwinChoice[];
+  revisionTwinReport: RevisionTwinReport;
+  examReadiness: ExamReadiness[];
+  examReadinessSummary: ExamReadinessSummary;
+  storageQuota: StorageQuota;
+  refreshStorageQuota(): Promise<void>;
   /** Build a paper simulation for the given subject/paper without mutating state. */
   previewPaper(subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null;
   // actions
@@ -153,8 +208,17 @@ interface StoreValue extends Snapshot {
   upsertExamDate(exam: ExamDate): Promise<void>;
   removeExamDate(id: Id): Promise<void>;
   updateSettings(patch: Partial<UserSettings>): Promise<void>;
+  /** Re-evaluate countdown phases; surfaces a one-time notice when a subject enters the timed-paper fortnight. */
+  refreshPhaseNotices(): Promise<void>;
+  /** Clear the one-time phase notice (it never re-appears for the same run-up). */
+  dismissExamPhaseNotice(): void;
+  /** Mark one lesson finished and roll the lesson streak forward; returns the new progress. */
+  completeLesson(lessonId: Id): Promise<LessonProgress>;
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
   clearRevisionCheckpoint(): Promise<void>;
+  startRevisionTwinSession(choice: RevisionTwinChoice, title?: string): Promise<RevisionTwinSession>;
+  completeRevisionTwinSession(id: Id, actualMarks: number, actualMinutes?: number): Promise<void>;
+  abandonRevisionTwinSession(id: Id): Promise<void>;
   syncNow(): Promise<void>;
   experimentArm: ExperimentAssignment | null;
   joinExperiment(): Promise<void>;
@@ -164,7 +228,16 @@ interface StoreValue extends Snapshot {
   funnelEvents: FunnelEvent[];
   gradePredictionLog: GradePredictionRecord[];
   gradeActuals: ActualResultRecord[];
-  recordGradeActual(subjectId: Id, percent: number, kind: "mock" | "paper" | "final"): Promise<void>;
+  paperOutcomeLog: PaperOutcomeRecord[];
+  paperOutcomeGains: Map<Id, number>;
+  recordGradeActual(input: { subjectId: Id; percent: number; kind: "mock" | "paper" | "final"; takenAt?: string; label?: string }): Promise<void>;
+  removeGradeActual(id: Id): Promise<void>;
+  beginPaperOutcome(input: { subjectId: Id; paperId: Id; paperRunId?: Id; predictedMarks: number; totalMarks: number }): Promise<void>;
+  closePaperOutcome(paperRunId: Id, actualMarks: number, markingReview?: PaperOutcomeReview): Promise<void>;
+  /** Immediate → transfer → delayed-retention intervention evidence. */
+  interventionOutcomes: InterventionOutcomeRecord[];
+  interventionCalibrations: Map<string, InterventionCalibration>;
+  recordInterventionOutcome(outcome: InterventionOutcomeRecord): Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -176,6 +249,81 @@ export function useStore(): StoreValue {
 }
 
 let syncInFlight = false;
+// Module-scoped like syncInFlight: counts background-hydration runs so a
+// superseded stream can detect it was replaced. Deliberately not a ref — the
+// epoch is coordination state for background work, never render input.
+let hydrationEpoch = 0;
+
+// --- session fatigue clock (module-scoped, like syncInFlight) ---------------
+// Timestamp of the first graded action of the current study session, or null
+// when no session is running. The recommender derives time-on-task from it to
+// apply fatigue penalties; 30 idle minutes ends the session.
+let sessionStartedAt: number | null = null;
+const SESSION_IDLE_RESET_MS = 30 * 60_000;
+
+/** Record a graded action as session activity; called from review/record paths. */
+function touchSessionClock(): void {
+  const now = Date.now();
+  if (sessionStartedAt == null || now - sessionStartedAt > SESSION_IDLE_RESET_MS) sessionStartedAt = now;
+}
+
+/** Minutes of continuous study in the current session (0 when none/idle-ended). */
+function currentActiveMinutes(): number {
+  if (sessionStartedAt == null) return 0;
+  const elapsed = (Date.now() - sessionStartedAt) / 60_000;
+  return elapsed > SESSION_IDLE_RESET_MS / 60_000 ? 0 : elapsed;
+}
+
+/** Shared evidence gate for store-level summaries and readiness signals. */
+function trustedSnapshotAttempt(attempt: Attempt, questions: readonly Question[], history: readonly Attempt[]): boolean {
+  const question = questions.find((row) => row.id === attempt.questionId);
+  if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
+  return trustedAssessmentAttempt(attempt, question, history, questions);
+}
+
+/**
+ * One-time migration: before lesson progress moved into the synced store it
+ * lived in localStorage (revise.lessons.*). Returns the legacy values when
+ * they exist, so existing students keep their progress across the switch.
+ */
+function legacyLessonProgress(): { completed: Record<string, boolean>; streak: { count: number; lastDay: string } } | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const completedRaw = localStorage.getItem("revise.lessons.completed");
+    if (!completedRaw) return null;
+    const completed = JSON.parse(completedRaw) as Record<string, boolean>;
+    const streakRaw = localStorage.getItem("revise.lessons.streak");
+    const streak = streakRaw ? (JSON.parse(streakRaw) as { count: number; lastDay: string }) : { count: 0, lastDay: "" };
+    return Object.keys(completed).length ? { completed, streak } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Local-time YYYY-MM-DD for lesson streaks (a day flips at midnight, not UTC). */
+function localDayKey(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Pure streak roll used by completeLesson. Several lessons finished the same
+ * day count as one streak day; a lesson on the day after the last one extends
+ * the streak; any longer gap restarts it.
+ */
+export function nextLessonStreak(
+  current: { count: number; lastDay: string },
+  today: string,
+  yesterday: string,
+): { count: number; lastDay: string } {
+  if (current.lastDay === today) return current;
+  if (current.lastDay === yesterday) return { count: current.count + 1, lastDay: today };
+  return { count: 1, lastDay: today };
+}
 
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -184,6 +332,18 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [funnelEvents, setFunnelEvents] = useState<FunnelEvent[]>([]);
   const [gradePredictionLog, setGradePredictionLog] = useState<GradePredictionRecord[]>([]);
   const [gradeActuals, setGradeActuals] = useState<ActualResultRecord[]>([]);
+  const [revisionTwin, setRevisionTwin] = useState<RevisionTwinState | null>(null);
+  const [storageQuota, setStorageQuota] = useState<StorageQuota>(() => ({
+    usageBytes: null,
+    quotaBytes: null,
+    percent: null,
+    status: "unavailable",
+    checkedAt: new Date().toISOString(),
+  }));
+  // Sat papers with their sit-time prediction frozen in — the reality check
+  // that feeds the recommender's paper gain factor back from evidence.
+  const [paperOutcomeLog, setPaperOutcomeLog] = useState<PaperOutcomeRecord[]>([]);
+  const [interventionOutcomes, setInterventionOutcomes] = useState<InterventionOutcomeRecord[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     online: true,
@@ -194,8 +354,65 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     syncing: false,
   });
   const bootstrapped = useRef(false);
+  // Boot must never fail silently. If IndexedDB or a migration rejects, keep
+  // the reason visible so the student can retry instead of staring at a
+  // spinner forever.
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [bootAttempt, setBootAttempt] = useState(0);
   const [replanSummary, setReplanSummary] = useState<string | null>(null);
+  const [planChangelog, setPlanChangelog] = useState<string[]>([]);
+  const [examPhaseNotice, setExamPhaseNotice] = useState<PhaseNotice | null>(null);
+  // Heavy analytics run off-thread (Comlink worker) and land here when ready;
+  // small histories compute synchronously inside the same effect. Until the
+  // first compute lands these hold the same defaults the sync path returned.
+  const [assessment, setAssessment] = useState<AssessmentInsight | null>(null);
+  const [questionTraces, setQuestionTraces] = useState<QuestionTrace[]>([]);
+  const [difficultyCalibration, setDifficultyCalibration] = useState<DifficultyCalibrationReport>(() => calibrateDifficulty([]));
+  const [forgettingCalibration, setForgettingCalibration] = useState<FsrsValidation>(() => validateFsrs({ cards: [], logs: [] }));
   const lastFingerprint = useRef<ReplanFingerprint | null>(null);
+
+  // --- progressive history hydration ---------------------------------------
+  //
+  // Boot loads only the newest HISTORY_FIRST_PAGE review logs / attempts so
+  // first paint never waits on a 5,000-row history. This streams the rest in
+  // background chunks (IndexedDB cursor, oldest-first) and merges each chunk
+  // exactly once, keyed by row id so a row that arrived via a newer functional
+  // update is never clobbered by its older streamed copy. A sync-pull reload
+  // calls startHydration() again, superseding any stream still running.
+  const hydrateHistory = useCallback(async (epoch: number) => {
+    for await (const chunk of repo.streamHistory(repo.HISTORY_CHUNK, userId)) {
+      if (epoch !== hydrationEpoch) return; // superseded by a reload
+      const { reviewLogs, attempts } = chunk;
+      if (!reviewLogs?.length && !attempts?.length) continue;
+      setSnapshot((prev) => {
+        if (!prev) return prev;
+        let nextLogs = prev.reviewLogs;
+        if (reviewLogs?.length) {
+          const known = new Set(prev.reviewLogs.map((l) => l.id));
+          const fresh = reviewLogs.filter((l) => !known.has(l.id));
+          if (fresh.length) nextLogs = [...fresh, ...prev.reviewLogs];
+        }
+        let nextAttempts = prev.attempts;
+        if (attempts?.length) {
+          const known = new Set(prev.attempts.map((a) => a.id));
+          const fresh = attempts.filter((a) => !known.has(a.id));
+          if (fresh.length) nextAttempts = [...fresh, ...prev.attempts];
+        }
+        if (nextLogs === prev.reviewLogs && nextAttempts === prev.attempts) return prev;
+        return { ...prev, reviewLogs: nextLogs, attempts: nextAttempts };
+      });
+    }
+  }, [userId]);
+  /** Start (or restart, superseding any prior run) background history hydration. */
+  const startHydration = useCallback(() => {
+    hydrationEpoch += 1;
+    void hydrateHistory(hydrationEpoch).catch((error) => {
+      // A stream can fail after the first page has rendered (for example when
+      // a later IndexedDB row is malformed). Route it through the same
+      // recovery UI as boot failures instead of leaving a rejected promise.
+      setBootError(error instanceof Error ? error.message : String(error));
+    });
+  }, [hydrateHistory]);
 
   const recordFunnel = useCallback(async (type: FunnelEventType, detail?: string) => {
     const now = Date.now();
@@ -218,41 +435,91 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
-    void recordFunnel("app_opened");
+    void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
-      const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs] = await Promise.all([
-        repo.loadSnapshot(userId),
-        repo.loadRevisionCheckpoint(userId),
-        readReviseMeta<ExperimentAssignment>("experimentAssignment"),
-        readReviseMeta<FunnelEvent[]>("funnelEvents"),
-        readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
-        readReviseMeta<ActualResultRecord[]>("gradeActuals"),
-      ]);
-      setRevisionCheckpoint(checkpoint ?? null);
-      setExperimentArm(assignment ?? null);
-      setFunnelEvents(funnel ?? []);
-      setGradePredictionLog(gradePreds ?? []);
-      setGradeActuals(gradeActs ?? []);
-      setSnapshot(loaded);
-      lastFingerprint.current = computeFingerprint({
-        exams: loaded.examDates,
-        targetGrades: loaded.settings.targetGrades,
-        availability: loaded.settings.availability,
-        sessionLengthMinutes: loaded.settings.sessionLengthMinutes,
-        subjectIds: loaded.settings.subjectIds,
-      });
-      setNeedsOnboarding(!(await repo.hasOnboarded()));
-      // A plan that has drifted into the past is worse than no plan: fold
-      // missed sessions forward before the dashboard renders anything.
-      const today = todayIso();
-      const stale = loaded.plannedSessions.some((s) => s.date < today && s.status === "pending");
-      if (stale) {
-        const healed = rescheduleMissed(loaded.plannedSessions, today, 6);
-        await repo.savePlan(healed);
-        setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
+      try {
+        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin, paperOutcomes, savedInterventions] = await Promise.all([
+          repo.loadSnapshot(userId),
+          repo.loadRevisionCheckpoint(userId),
+          readReviseMeta<ExperimentAssignment>("experimentAssignment"),
+          readReviseMeta<FunnelEvent[]>("funnelEvents"),
+          readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
+          readReviseMeta<ActualResultRecord[]>("gradeActuals"),
+          repo.loadRevisionTwin(userId),
+          readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes"),
+          readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes"),
+        ]);
+        setRevisionCheckpoint(checkpoint ?? null);
+        setExperimentArm(assignment ?? null);
+        setFunnelEvents(funnel ?? []);
+        setGradePredictionLog(gradePreds ?? []);
+        setGradeActuals(gradeActs ?? []);
+        setRevisionTwin(twin ?? createRevisionTwinState(userId));
+        setPaperOutcomeLog(paperOutcomes ?? []);
+        // The metadata key predates account-scoped storage, so keep other
+        // learners' rows on disk but never let them influence this learner's
+        // calibration or appear in the adaptive planner.
+        setInterventionOutcomes((savedInterventions ?? []).filter((row) => row.userId === userId));
+        setSnapshot(loaded);
+        // First page is on screen; stream the rest of history in the background.
+        startHydration();
+        // Import legacy localStorage lesson progress into the synced row once,
+        // so the switch to cross-device storage never resets a student.
+        const legacy = legacyLessonProgress();
+        if (legacy && Object.keys(loaded.lessonProgress.completed).length === 0) {
+          const migrated: LessonProgress = {
+            ...loaded.lessonProgress,
+            completed: legacy.completed,
+            streak: legacy.streak,
+            updatedAt: new Date().toISOString(),
+          };
+          await repo.saveLessonProgress(migrated);
+          setSnapshot((prev) => (prev ? { ...prev, lessonProgress: migrated } : prev));
+        }
+        lastFingerprint.current = computeFingerprint({
+          exams: loaded.examDates,
+          targetGrades: loaded.settings.targetGrades,
+          availability: loaded.settings.availability,
+          sessionLengthMinutes: loaded.settings.sessionLengthMinutes,
+          subjectIds: loaded.settings.subjectIds,
+        });
+        setNeedsOnboarding(!(await repo.hasOnboarded(userId)));
+        setBootError(null);
+        // A plan that has drifted into the past is worse than no plan: fold
+        // missed sessions forward before the dashboard renders anything.
+        const today = todayIso();
+        const stale = loaded.plannedSessions.some((s) => s.date < today && s.status === "pending");
+        if (stale) {
+          const healed = rescheduleMissed(loaded.plannedSessions, today, 6);
+          await repo.savePlan(healed);
+          setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
+        }
+      } catch (error) {
+        console.error("[store] boot failed", error);
+        bootstrapped.current = false;
+        setBootError(error instanceof Error ? error.message : "Could not load your revision data.");
       }
     })();
-  }, [userId]);
+    // recordFunnel is a stable useCallback; startHydration likewise. The
+    // exhaustive-deps lint flags them anyway on this long-lived boot effect
+    // (pre-existing pattern in this file); both are intentionally stable.
+  }, [userId, startHydration, recordFunnel, bootAttempt]);
+
+  const refreshStorageQuota = useCallback(async () => {
+    setStorageQuota(await estimateStorageQuota());
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void refreshStorageQuota().catch(() => undefined);
+    });
+    const timer = window.setInterval(() => void refreshStorageQuota().catch(() => undefined), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [refreshStorageQuota]);
 
   // Network status drives the offline banner and gates sync attempts.
   useEffect(() => {
@@ -274,17 +541,59 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const refreshPending = () => {
-      void outboxSize().then((pending) => setSyncStatus((s) => ({ ...s, pending })));
+      void outboxSize(userId).then((pending) => setSyncStatus((s) => ({ ...s, pending })));
     };
     refreshPending();
     window.addEventListener(SYNC_QUEUE_EVENT, refreshPending);
     return () => window.removeEventListener(SYNC_QUEUE_EVENT, refreshPending);
+  }, [userId]);
+
+  // --- AI marking resilience: DLQ drain + in-place mark upgrades -----------
+  //
+  // Marks that fell back to the rubric (offline, 429, provider down) sit in
+  // the dead-letter queue. When the tab is online we drain a small batch on a
+  // slow timer — backoff+jitter inside the drain keeps the free-tier endpoint
+  // safe — and when a retry succeeds the stored attempt is upgraded, so the
+  // student's history ends up AI-graded without them doing anything.
+  useEffect(() => {
+    if (!syncStatus.online) return;
+    let cancelled = false;
+    const drain = () => {
+      if (!cancelled) void drainDeadMarks();
+    };
+    drain(); // catch up on backlog as soon as we're online
+    const timer = setInterval(drain, 90_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [syncStatus.online]);
+
+  // A successful DLQ re-grade already wrote through the repository; reflect
+  // it in the in-memory snapshot so open views re-render without a reload.
+  useEffect(() => {
+    function onResolved(event: Event) {
+      const detail = (event as CustomEvent<AiDlqResolvedDetail>).detail;
+      if (!detail?.attempt) return;
+      setSnapshot((prev) =>
+        prev
+          ? {
+              ...prev,
+              attempts: prev.attempts.some((a) => a.id === detail.attempt.id)
+                ? prev.attempts.map((a) => (a.id === detail.attempt.id ? detail.attempt : a))
+                : [detail.attempt, ...prev.attempts],
+            }
+          : prev,
+      );
+    }
+    window.addEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+    return () => window.removeEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
   }, []);
 
   const completeOnboarding = useCallback(async () => {
-    await repo.markOnboarded();
+    await repo.markOnboarded(userId);
     setNeedsOnboarding(false);
-  }, []);
+  }, [userId]);
 
   const syncNow = useCallback(async () => {
     if (!isSupabaseConfigured || syncInFlight) return;
@@ -292,7 +601,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     setSyncStatus((s) => ({ ...s, syncing: true }));
     try {
       const result = await sync(userId);
-      const pending = await outboxSize();
+      const pending = await outboxSize(userId);
       const error =
         result.failed > 0
           ? "Some changes are still waiting to sync. We’ll keep trying."
@@ -306,12 +615,17 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         lastSyncedAt: result.skipped || result.failed > 0 ? s.lastSyncedAt : new Date().toISOString(),
         lastSyncError: error,
       }));
-      if (result.pulled > 0) setSnapshot(await repo.loadSnapshot(userId));
+      if (result.pulled > 0) {
+        setSnapshot(await repo.loadSnapshot(userId));
+        // History changed server-side; restart hydration from the fresh
+        // baseline, superseding any stream still running.
+        startHydration();
+      }
     } catch (caught) {
       // Keep a diagnostic trail instead of swallowing the failure: without it,
       // a permanently broken sync looks identical to a slow one.
       console.warn("[sync] failed", caught);
-      const pending = await outboxSize();
+      const pending = await outboxSize(userId);
       setSyncStatus((s) => ({
         ...s,
         syncing: false,
@@ -321,7 +635,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     } finally {
       syncInFlight = false;
     }
-  }, [userId]);
+  }, [userId, startHydration]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !snapshot || !syncStatus.online) return;
@@ -358,6 +672,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       reviewLogs: snapshot.reviewLogs,
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
+      questions: snapshot.questions,
+      trustedQuestion: trustedAssessmentContent,
     });
   }, [snapshot, topics]);
 
@@ -373,6 +689,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const masteryUncertainty = useMemo(() => {
     if (!snapshot) return [];
 
+    const trustedAttempts = snapshot.attempts.filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
+    const trustedAttemptIds = new Set(trustedAttempts.map((attempt) => attempt.id));
+    const trustedQuestions = new Set(snapshot.questions.filter(trustedAssessmentContent).map((question) => question.id));
+    const trustedMistakes = snapshot.mistakes.filter((mistake) => mistake.subjectId !== "wjec-alevel-physics" ||
+      Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId) && mistake.questionId && trustedQuestions.has(mistake.questionId)));
+
     const cardsByTopic = new Map<Id, Card[]>();
     for (const card of snapshot.cards) {
       const rows = cardsByTopic.get(card.topicId) ?? [];
@@ -381,7 +703,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     }
 
     const attemptsByTopic = new Map<Id, Attempt[]>();
-    for (const attempt of snapshot.attempts) {
+    for (const attempt of trustedAttempts) {
       for (const topicId of attempt.topicIds) {
         const rows = attemptsByTopic.get(topicId) ?? [];
         rows.push(attempt);
@@ -390,7 +712,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     }
 
     const mistakesByTopic = new Map<Id, Mistake[]>();
-    for (const mistake of snapshot.mistakes) {
+    for (const mistake of trustedMistakes) {
       const rows = mistakesByTopic.get(mistake.topicId) ?? [];
       rows.push(mistake);
       mistakesByTopic.set(mistake.topicId, rows);
@@ -410,6 +732,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       topics,
       questions: snapshot.questions,
       attempts: snapshot.attempts,
+      trustedQuestion: trustedAssessmentContent,
     });
   }, [snapshot, topics]);
 
@@ -419,35 +742,84 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return snapshot.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
   }, [snapshot, subjectIds]);
 
-  const assessment = useMemo(() => {
-    if (!snapshot) return null;
-    if (!snapshot.attempts.length && !snapshot.mistakes.length) return null;
-    const questionsById = new Map(snapshot.questions.map((q) => [q.id, q] as const));
-    return buildAssessmentInsight({
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
-      mastery,
-      questionsById,
-    });
-  }, [snapshot, mastery]);
-
-  const questionTraces = useMemo(() => {
-    if (!snapshot) return [];
-    const attemptsByQuestion = new Map<Id, Attempt[]>();
-    for (const attempt of snapshot.attempts) {
-      const rows = attemptsByQuestion.get(attempt.questionId) ?? [];
+  // --- heavy analytics, off the main thread --------------------------------
+  //
+  // Assessment insight, question traces, difficulty calibration and FSRS
+  // validation all scale with history and used to recompute synchronously in
+  // useMemo after every grade — past ~5k attempts that stalls the render.
+  // They now route through domainEngine (Comlink worker, same-thread fallback
+  // for small histories) and land in state; every consumer keeps its exact
+  // shape, so the UI is untouched. The Map used to key attempts by question
+  // is rebuilt here per epoch — keys, not row contents, is what the compute
+  // needs.
+  const attemptsByQuestion = useMemo(() => {
+    const map = new Map<Id, Attempt[]>();
+    for (const attempt of snapshot?.attempts ?? []) {
+      if (snapshot && !trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts)) continue;
+      const rows = map.get(attempt.questionId) ?? [];
       rows.push(attempt);
-      attemptsByQuestion.set(attempt.questionId, rows);
+      map.set(attempt.questionId, rows);
     }
-    return traceQuestions({ questions: snapshot.questions, attemptsByQuestion });
+    return map;
   }, [snapshot]);
-  const difficultyCalibration = useMemo(() => calibrateDifficulty(questionTraces), [questionTraces]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    let cancelled = false;
+    (async () => {
+      const questionsById = new Map(snapshot.questions.map((q) => [q.id, q] as const));
+      const nextAssessment =
+        snapshot.attempts.length || snapshot.mistakes.length
+          ? await domainEngine.assess({
+              attempts: snapshot.attempts,
+              mistakes: snapshot.mistakes,
+              mastery,
+              questionsById,
+            })
+          : null;
+      const traces = await domainEngine.trace({ questions: snapshot.questions, attemptsByQuestion });
+      if (cancelled) return;
+      setAssessment(nextAssessment);
+      setQuestionTraces(traces);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // mastery is intentionally excluded: it is recomputed from the same
+    // snapshot in the same pass, and including it would double-fire the
+    // effect on every grade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, attemptsByQuestion]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const calibrated = await domainEngine.calibrate({ traces: questionTraces });
+      if (!cancelled) setDifficultyCalibration(calibrated);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [questionTraces]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    let cancelled = false;
+    (async () => {
+      const validated = await domainEngine.validate({ cards: snapshot.cards, logs: snapshot.reviewLogs });
+      if (!cancelled) setForgettingCalibration(validated);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [snapshot]);
   const calculationMastery = useMemo(() => {
     if (!snapshot) return calculateCalculationMastery({ questions: [], attempts: [], mistakes: [] });
     return calculateCalculationMastery({
       questions: snapshot.questions,
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
+      trustedQuestion: trustedAssessmentContent,
     });
   }, [snapshot]);
   const sparseEvidenceConfidence = useMemo(() => {
@@ -458,6 +830,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       cards: snapshot.cards,
       attempts: snapshot.attempts,
       mistakes: snapshot.mistakes,
+      questions: snapshot.questions,
     });
   }, [snapshot, topics, mastery]);
   const predictionOutcome = useMemo(() => {
@@ -468,10 +841,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     if (!snapshot) return adaptiveDifficultyCalibration({ questions: [], traces: [] });
     return adaptiveDifficultyCalibration({ questions: snapshot.questions, traces: questionTraces });
   }, [snapshot, questionTraces]);
-  const forgettingCalibration = useMemo(
-    () => validateFsrs({ cards: snapshot?.cards ?? [], logs: snapshot?.reviewLogs ?? [] }),
-    [snapshot],
-  );
   const questionExposure = useMemo(() => {
     if (!snapshot) return questionExposureReport({ questions: [], attempts: [] });
     return questionExposureReport({ questions: snapshot.questions, attempts: snapshot.attempts });
@@ -482,12 +851,31 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return new Map(assessment.expectedMarksPerHour.map((r) => [r.topicId, r.value] as const));
   }, [assessment]);
   const rootPrerequisiteRemediation = useMemo(
-    () => buildRootPrerequisiteRemediation({ topics, mastery, marksPerHour }),
+    () => buildRootPrerequisiteRemediation({
+      topics,
+      mastery,
+      marksPerHour,
+      // The legacy topic graph remains useful for reference subjects, but
+      // All four WJEC flagships require the exact capability-edge attestation.
+      edges: [
+        ...prerequisiteEdges().filter((edge) => !requiresWjecContentReview(edge.topicId.split(".")[0])),
+        ...reviewedWjecTopicEdges(),
+      ],
+    }),
     [topics, mastery, marksPerHour],
   );
 
   const recurringMisconceptions = useMemo(
-    () => (snapshot ? tallyMisconceptions(snapshot.mistakes, seedMisconceptions) : []),
+    () => {
+      if (!snapshot) return [];
+      const trustedAttemptIds = new Set(snapshot.attempts
+        .filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts))
+        .map((attempt) => attempt.id));
+      const trustedQuestions = new Set(snapshot.questions.filter(trustedAssessmentContent).map((question) => question.id));
+      const mistakes = snapshot.mistakes.filter((mistake) => mistake.subjectId !== "wjec-alevel-physics" ||
+        Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId) && mistake.questionId && trustedQuestions.has(mistake.questionId)));
+      return tallyMisconceptions(mistakes, seedMisconceptions);
+    },
     [snapshot],
   );
 
@@ -522,6 +910,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
         subjectIds: snapshot.settings.subjectIds,
         targetGrades: snapshot.settings.targetGrades,
+        evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
         existing: snapshot.plannedSessions,
         previous,
       });
@@ -544,6 +933,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     for (const a of snapshot.attempts.filter((x) => x.mode === "paper")) {
       const q = snapshot.questions.find((qq) => qq.id === a.questionId);
       const subjectId = a.subjectId;
+      if (!trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)) continue;
       // predicted marks for this attempt: sum of topic mastery averaged across its topics
       const qMastery = q ? q.topicIds.reduce((s, id) => s + (masteryMap.get(id) ?? 0.4), 0) / Math.max(1, q.topicIds.length) : 0.4;
       const predicted = a.max * (0.35 + qMastery * 0.6);
@@ -567,9 +957,57 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         questions: snapshot?.questions ?? [],
         papers: snapshot?.papers ?? [],
         subjects: allSubjects().filter((subject) => subjectIds.includes(subject.id)),
+        trustedQuestion: trustedAssessmentContent,
       }),
     [snapshot, subjectIds],
   );
+
+  // --- session fatigue tracking ---------------------------------------------
+  // The recommender needs time-on-task, but a ref read inside a render-path
+  // memo trips the React-compiler lint — so the session clock is module-scoped
+  // like syncInFlight/hydrationEpoch. It starts on the student's first graded
+  // action; 30 idle minutes ends the session (fatigue resets for a fresh one).
+  // Grading re-renders the store anyway, which refreshes the derived value.
+  // Knowledge-vs-answering evidence, per enrolled subject and per topic —
+  // the recommender steers on it (learn-first when knowledge-heavy, timed
+  // practice when answering-heavy) and Today's hero can explain itself.
+  const techniqueReports = useMemo(() => {
+    const bySubject = new Map<Id, KnowledgeAnsweringReport>();
+    const byTopic = new Map<Id, KnowledgeAnsweringReport>();
+    if (!snapshot) return { bySubject, byTopic };
+    for (const subjectId of subjectIds) {
+      bySubject.set(
+        subjectId,
+        knowledgeVsAnswering({
+          subjectId,
+          mistakes: snapshot.mistakes,
+          questions: snapshot.questions,
+          attempts: snapshot.attempts,
+        }),
+      );
+      for (const row of knowledgeVsAnsweringByTopic({
+        subjectId,
+        mistakes: snapshot.mistakes,
+        questions: snapshot.questions,
+        attempts: snapshot.attempts,
+      })) {
+        byTopic.set(row.topicId, row.report);
+      }
+    }
+    return { bySubject, byTopic };
+  }, [snapshot, subjectIds]);
+
+  // Per-subject multiplier for paper recommendations: >1 when sat papers keep
+  // beating their frozen predictions (more headroom than the model sees), <1
+  // when they fall short. 1.0 with fewer than two recorded outcomes.
+  const paperOutcomeGains = useMemo(() => {
+    const out = new Map<Id, number>();
+    if (!snapshot) return out;
+    for (const subjectId of subjectIds) {
+      out.set(subjectId, paperOutcomeGainMultiplier(paperOutcomeLog, subjectId));
+    }
+    return out;
+  }, [snapshot, subjectIds, paperOutcomeLog]);
 
   const recommendations = useMemo(() => {
     if (!snapshot) return [];
@@ -578,13 +1016,28 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       mastery,
       cards: snapshot.cards,
       mistakes: snapshot.mistakes,
+      questions: snapshot.questions,
+      attempts: snapshot.attempts,
       exams: snapshot.examDates,
       plan: snapshot.plannedSessions,
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
       subjectIds,
       marksPerHour,
+      techniqueSplit: techniqueReports.bySubject,
+      techniqueByTopic: techniqueReports.byTopic,
+      paperOutcomes: paperOutcomeLog,
+      activeMinutes: currentActiveMinutes(),
+      recallMastery,
+      applicationMastery,
     });
-  }, [snapshot, mastery, topics, subjectIds, marksPerHour]);
+  }, [snapshot, mastery, topics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog, recallMastery, applicationMastery]);
+
+  // Unlike `recommendations`, this is not a list of competing activity
+  // queues. It is one optimiser pass over the same snapshot, then one
+  // sequence for the winning topic. Today and /adaptive-session consume this
+  // exact value so the hero cannot drift from the route it opens. The memo
+  // body lives after `examReadiness` (readiness gates adaptive stopping);
+  // this binding keeps the return shape stable for consumers above it.
 
   // Experiment arm enforcement: baseline arms see their assigned policy,
   // not the production recommender. Control sees no recommendation.
@@ -597,15 +1050,22 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     const masteryRows = mastery.map((m) => ({
       topicId: m.topicId,
       mastery: m.mastery ?? 0,
-      lastStudiedAt: null as string | null,
+      // Preserve the same recency tie-break used by the pure experiment
+      // policy. Returning null here made equal-mastery topics appear random.
+      lastStudiedAt: m.lastStudiedAt,
     }));
     const today = todayIso();
-    const dueByTopic = new Map<Id, number>();
+    const dueByTopic = new Map<Id, { count: number; oldestDue: string }>();
     for (const card of snapshot.cards) {
-      if (card.due <= today) dueByTopic.set(card.topicId, (dueByTopic.get(card.topicId) ?? 0) + 1);
+      if (card.due > today) continue;
+      const current = dueByTopic.get(card.topicId) ?? { count: 0, oldestDue: card.due };
+      dueByTopic.set(card.topicId, {
+        count: current.count + 1,
+        oldestDue: card.due < current.oldestDue ? card.due : current.oldestDue,
+      });
     }
-    const dueCounts = [...dueByTopic.entries()].map(([topicId, due]) => ({
-      topicId, due, oldestDue: today as string,
+    const dueCounts = [...dueByTopic.entries()].map(([topicId, row]) => ({
+      topicId, due: row.count, oldestDue: row.oldestDue,
     }));
     const pick = policyTaskFor(arm, { mastery: masteryRows, dueCounts });
     if (!pick || !pick.topicId) return recommendations;
@@ -623,8 +1083,90 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return subjectIds
       .map((id) => getSubject(id))
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
-      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates));
+      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates, undefined, snapshot.questions));
   }, [snapshot, mastery, subjectIds]);
+
+  const farTransferRetests = useMemo(
+    () => delayedFarTransferRetests({ attempts: snapshot?.attempts ?? [], questions: snapshot?.questions ?? [], today: todayIso() }),
+    [snapshot],
+  );
+
+  const twinState = useMemo(() => revisionTwin ?? createRevisionTwinState(userId), [revisionTwin, userId]);
+  const twinReport = useMemo(() => revisionTwinReport(twinState), [twinState]);
+  const revisionTwinChoices = useMemo(
+    () => buildRevisionTwinChoices({ recommendations: experimentRecs, sessions: twinState.sessions }),
+    [experimentRecs, twinState.sessions],
+  );
+
+  const examReadiness = useMemo(() => {
+    if (!snapshot) return [];
+    const predictionBySubject = new Map(predictions.map((prediction) => [prediction.subjectId, prediction] as const));
+    return allSubjects()
+      .filter((subject) => subjectIds.includes(subject.id))
+      .flatMap((subject) => {
+        const prediction = predictionBySubject.get(subject.id);
+        if (!prediction) return [];
+        const topicRows = mastery.filter((row) => row.subjectId === subject.id);
+        const evidencedTopics = topicRows.filter((row) => row.cardsTotal > 0 || row.attempts > 0).length;
+        const coverageAverage = topicRows.length ? topicRows.reduce((sum, row) => sum + row.mastery, 0) / topicRows.length : 0;
+        const recallRows = recallMastery.filter((row) => row.subjectId === subject.id);
+        const recallCards = recallRows.reduce((sum, row) => sum + row.cardsTotal, 0);
+        const recallReviews = recallRows.reduce((sum, row) => sum + row.reviews, 0);
+        const retained = recallRows.filter((row) => row.cardsTotal > 0);
+        const retentionAverage = retained.length ? retained.reduce((sum, row) => sum + row.currentRetention, 0) / retained.length : null;
+        const timed = snapshot.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0 &&
+          trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
+        const available = timed.reduce((sum, attempt) => sum + attempt.max, 0);
+        const awarded = timed.reduce((sum, attempt) => sum + Math.max(0, Math.min(attempt.max, attempt.awarded)), 0);
+        const pace = responseTimeCalibration.rows.find((row) => row.subjectId === subject.id);
+        const transfers = farTransferRetests.filter((retest) => retest.subjectId === subject.id);
+        const completedTransfers = transfers.filter((retest) => retest.status === "completed");
+        const passedTransfers = completedTransfers.filter((retest) => retest.outcome?.passed).length;
+        return [buildExamReadiness({
+          subject,
+          prediction,
+          targetGrade: snapshot.settings.targetGrades[subject.id] ?? null,
+          examDays: daysToExam(snapshot.examDates, subject.id, todayIso()),
+          coverage: { average: coverageAverage, topics: topicRows.length, evidencedTopics },
+          retention: { average: retentionAverage, cards: recallCards, reviews: recallReviews },
+          timed: { accuracy: available ? awarded / available : null, attempts: timed.length, marks: available },
+          pace: { ratio: pace?.ratio ?? null, attempts: pace?.attempts ?? 0 },
+          transfer: {
+            passRate: completedTransfers.length ? passedTransfers / completedTransfers.length : null,
+            completed: completedTransfers.length,
+            due: transfers.filter((retest) => retest.status === "due").length,
+          },
+        })];
+      });
+  }, [snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
+
+  const examReadinessSummary = useMemo(() => summariseExamReadiness(examReadiness), [examReadiness]);
+
+  // Unlike `recommendations`, this is not a list of competing activity
+  // queues. It is one optimiser pass over the same snapshot, then one
+  // sequence for the winning topic. Today and /adaptive-session consume this
+  // exact value so the hero cannot drift from the route it opens. Declared
+  // after `examReadiness`: readiness gates adaptive stopping, so the
+  // optimiser reads the computed rows rather than preceding them.
+  const adaptiveSession = useMemo(() => {
+    if (!snapshot) return null;
+    return buildAdaptiveSession({
+      topics,
+      cards: snapshot.cards,
+      reviewLogs: snapshot.reviewLogs,
+      questions: snapshot.questions,
+      attempts: snapshot.attempts,
+      mistakes: snapshot.mistakes,
+      mastery,
+      exams: snapshot.examDates,
+      subjectIds,
+      recallMastery,
+      applicationMastery,
+      readiness: examReadiness,
+      interventionOutcomes,
+      targetMinutes: 20,
+    });
+  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery, examReadiness, interventionOutcomes]);
   // Close the grade loop: snapshot predictions weekly so later mocks can be
   // paired against what Revise believed at the time - not retro-fitted.
   useEffect(() => {
@@ -634,11 +1176,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       const week = Math.floor(Date.now() / (7 * 86_400_000));
       let appended = false;
       for (const p of predictions) {
-        const weekKey = `${p.subjectId}:${week}`;
-        if (existing.some((r) => r.id === `gp-${weekKey}`)) continue;
-        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId && a.max > 0).length;
+        const snapshotId = gradePredictionSnapshotId(userId, p.subjectId, week);
+        if (existing.some((r) => r.id === snapshotId)) continue;
+        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId &&
+          trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)).length;
         const record: GradePredictionRecord = {
-          id: `gp-${weekKey}`,
+          id: snapshotId,
           anonId: userId,
           subjectId: p.subjectId,
           predictedPercent: p.percent,
@@ -701,7 +1244,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const reviewCard = useCallback<StoreValue["reviewCard"]>(
     async (card, grade, elapsedMs, confidence) => {
       const now = new Date();
-      const updated = gradeCard(card, grade, now);
+      touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
+      // CRDT: every grade gets a Lamport stamp so concurrent reviews on two
+      // devices merge by replay instead of last-write-wins discarding one.
+      const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
+      const updated = gradeCard(card, grade, now, { deviceId, lamport });
       const log: ReviewLog = {
         id: crypto.randomUUID(),
         userId,
@@ -715,16 +1262,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       await repo.saveCard(updated);
       await repo.saveReviewLog(log);
 
-      // A mistake card that has been recalled reliably closes its mistake.
-      let resolvedMistakes: Mistake[] = [];
-      if (updated.sourceMistakeId && shouldResolve(updated)) {
-        const mistake = snapshot?.mistakes.find((m) => m.id === updated.sourceMistakeId);
-        if (mistake && !mistake.resolved) {
-          const closed = { ...mistake, resolved: true, resolvedAt: now.toISOString() };
-          await repo.saveMistake(closed);
-          resolvedMistakes = [closed];
-        }
-      }
+      // Card recall updates retention, but cannot prove independent exam repair.
+      const deferred = (snapshot?.mistakes ?? []).flatMap((mistake) => {
+        const next = deferRepairAfterRetrieval(mistake, updated, log);
+        return next === mistake ? [] : [next];
+      });
+      if (deferred.length) await repo.saveMistakes(deferred);
 
       setSnapshot((prev) => {
         if (!prev) return prev;
@@ -732,13 +1275,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           ...prev,
           cards: prev.cards.map((c) => (c.id === updated.id ? updated : c)),
           reviewLogs: [...prev.reviewLogs, log],
-          mistakes: resolvedMistakes.length
-            ? prev.mistakes.map((m) => resolvedMistakes.find((r) => r.id === m.id) ?? m)
-            : prev.mistakes,
+          mistakes: prev.mistakes.map((mistake) => deferred.find((m) => m.id === mistake.id) ?? mistake),
         };
         void bumpGamification(
           prev.streak,
-          grade === "again" ? XP.review : XP.correctReview + (resolvedMistakes.length ? XP.mistakeResolved : 0),
+          grade === "again" ? XP.review : XP.correctReview,
           {},
           next,
         ).then((streak) => patch((p) => ({ ...p, streak })));
@@ -771,16 +1312,93 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     await writeReviseMeta("experimentEvents", next);
   }, [experimentArm]);
 
-  const recordGradeActual = useCallback(async (subjectId: Id, percent: number, kind: "mock" | "paper" | "final") => {
-    const record: ActualResultRecord = { id: crypto.randomUUID(), anonId: userId, subjectId, percent, kind, takenAt: new Date().toISOString() };
+  const recordGradeActual = useCallback<StoreValue["recordGradeActual"]>(async (input) => {
+    if (!Number.isFinite(input.percent) || input.percent < 0 || input.percent > 100) {
+      throw new Error("Result percentage must be between 0 and 100.");
+    }
+    const takenAt = input.takenAt ?? new Date().toISOString();
+    const takenAtMs = new Date(takenAt).getTime();
+    if (!Number.isFinite(takenAtMs)) throw new Error("Result date is invalid.");
+    if (takenAtMs > Date.now() + 5 * 60_000) throw new Error("Result date cannot be in the future.");
+
+    const record: ActualResultRecord = {
+      id: crypto.randomUUID(),
+      anonId: userId,
+      subjectId: input.subjectId,
+      percent: input.percent,
+      kind: input.kind,
+      takenAt: new Date(takenAtMs).toISOString(),
+      label: input.label?.trim() || undefined,
+    };
     const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
-    await writeReviseMeta("gradeActuals", [...log.slice(-500), record]);
-    setGradeActuals([...log.slice(-500), record]);
+    const next = [...log.slice(-500), record];
+    await writeReviseMeta("gradeActuals", next);
+    setGradeActuals(next);
   }, [userId]);
+
+  const removeGradeActual = useCallback<StoreValue["removeGradeActual"]>(async (id) => {
+    const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
+    const target = log.find((row) => row.id === id);
+    if (!target || target.anonId !== userId) return;
+    const next = log.filter((row) => row.id !== id);
+    await writeReviseMeta("gradeActuals", next);
+    setGradeActuals(next);
+  }, [userId]);
+
+  // Paper-outcome loop, part 1: freeze the prediction the moment a recommended
+  // paper is started, BEFORE any question is answered. Called with the
+  // calibration-adjusted simulation for this exact paper.
+  const beginPaperOutcome = useCallback<StoreValue["beginPaperOutcome"]>(
+    async (input) => {
+      const record = buildPaperOutcomeRecord({
+        userId,
+        subjectId: input.subjectId,
+        paperId: input.paperId,
+        paperRunId: input.paperRunId,
+        predictedMarks: input.predictedMarks,
+        totalMarks: input.totalMarks,
+        satAt: new Date().toISOString(),
+      });
+      const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
+      const next = [...log.filter((o) => o.id !== record.id), record].slice(-200);
+      await writeReviseMeta("paperOutcomes", next);
+      setPaperOutcomeLog(next);
+    },
+    [userId],
+  );
+
+  // Paper-outcome loop, part 2: close the record with the actual awarded
+  // marks once marking completes. The (predicted, actual) pair then feeds
+  // paperOutcomeGainMultiplier on the next recommend() pass.
+  const closePaperOutcomeRecord = useCallback<StoreValue["closePaperOutcome"]>(
+    async (paperRunId, actualMarks, markingReview) => {
+      const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
+      const target = log.find((o) => o.paperRunId === paperRunId);
+      if (!target) return; // no frozen prediction (untimed path or legacy run) — nothing to learn
+      const next = [...log.filter((o) => o.id !== target.id), closePaperOutcome(target, actualMarks, markingReview)].slice(-200);
+      await writeReviseMeta("paperOutcomes", next);
+      setPaperOutcomeLog(next);
+    },
+    [],
+  );
+
+  const recordInterventionOutcome = useCallback<StoreValue["recordInterventionOutcome"]>(
+    async (outcome) => {
+      if (outcome.userId !== userId) throw new Error("Cannot record intervention evidence for another user.");
+      const all = (await readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes")) ?? [];
+      const own = all.filter((row) => row.userId === userId);
+      const nextOwn = [...own.filter((row) => row.id !== outcome.id), outcome];
+      const nextAll = [...all.filter((row) => row.userId !== userId), ...nextOwn].slice(-2000);
+      await writeReviseMeta("interventionOutcomes", nextAll);
+      setInterventionOutcomes(nextOwn);
+    },
+    [userId],
+  );
 
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
+      touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
       const isRetest = Boolean(attempt.retestMistakeId);
       const retestMistake = isRetest
         ? snapshot?.mistakes.find((mistake) => mistake.id === attempt.retestMistakeId && !mistake.resolved)
@@ -788,12 +1406,14 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       if (isRetest && !retestMistake) {
         throw new Error("Cannot retest an unavailable or already resolved mistake.");
       }
-      const retestEvaluation = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt) : undefined;
-      const updatedMistake = retestMistake && retestEvaluation
-        ? applyRetestToMistake(retestMistake, retestEvaluation, attempt)
-        : undefined;
+      const retestEvaluation = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, snapshot?.attempts, snapshot?.questions) : undefined;
+      if (retestEvaluation?.status === "not-applicable") throw new Error("This question does not test the captured weakness.");
+      const updatedMistakes = (snapshot?.mistakes ?? []).flatMap((mistake) => {
+        const updated = advanceMistakeRepair(mistake, question, attempt, snapshot?.attempts, snapshot?.questions);
+        return updated === mistake ? [] : [updated];
+      });
+      const updatedById = new Map(updatedMistakes.map((m) => [m.id, m]));
 
-      await repo.saveAttempt(attempt);
       // Prospective experiment telemetry: derive started/completed events
       // from the recorded attempt so no extra student action is required.
       if (experimentArm) {
@@ -802,24 +1422,60 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         void recordExperimentEvent("started", { taskId: expTaskId, activity: attempt.mode, topicId: expTopicId }, new Date(new Date(attempt.createdAt).getTime() - Math.max(0, attempt.elapsedMs || 0)).toISOString());
         void recordExperimentEvent("completed", { taskId: expTaskId, activity: attempt.mode, topicId: expTopicId }, attempt.createdAt);
       }
-      if (updatedMistake) await repo.saveMistake(updatedMistake);
 
       // A failed retest updates the original mistake in place. It must not
       // create another card for the same gap.
       const misconceptions = [...new Set(question.topicIds.flatMap((id) => misconceptionsForTopic(id)))];
-      const drafts = isRetest ? [] : mistakesFromAttempt(attempt, question, undefined, undefined, misconceptions);
-      if (drafts.length) {
-        await repo.saveMistakes(drafts.map((d) => d.mistake));
-        await repo.saveCards(drafts.map((d) => d.card));
+      const repairedParts = new Set(updatedMistakes.flatMap((m) => repairTargetParts(m, question)));
+      const drafts = mistakesFromAttempt(attempt, question, undefined, new Date(attempt.createdAt), misconceptions)
+        .filter((draft) => !draft.mistake.partId || !repairedParts.has(draft.mistake.partId));
+      await repo.saveLearningResult(attempt, [...updatedMistakes, ...drafts.map((d) => d.mistake)], drafts.map((d) => d.card));
+      // Intervention evidence is appended only after the attempt is safely in
+      // the learning-result transaction. Transfer and retention rungs attach
+      // to the open chain from the same capability; they never manufacture a
+      // durable result from an immediate same-question success.
+      if (attempt.intervention) {
+        const context = attempt.intervention;
+        const all = (await readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes")) ?? [];
+        const current = all.filter((row) => row.userId === attempt.userId);
+        const related = [...current].reverse().find((row) => row.userId === attempt.userId && row.capabilityId === context.capabilityId &&
+          (row.activity ?? "question") === "question" &&
+          Date.parse(row.createdAt) <= Date.parse(attempt.createdAt) &&
+          (!context.chainId ? !row.chainId : row.chainId === context.chainId) &&
+          (context.kind === "transfer" ? !row.transfer : context.kind === "retention" ? Boolean(row.transfer) && !row.delayedRetention : false));
+        let next: InterventionOutcomeRecord[];
+        if (related && context.kind === "transfer") {
+          const updated = attachTransferOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [] });
+          next = [...current.filter((row) => row.id !== related.id), updated];
+        } else if (related && context.kind === "retention") {
+          const lastLearningAt = current.filter((row) => row.capabilityId === context.capabilityId && row.updatedAt < attempt.createdAt)
+            .map((row) => row.updatedAt).sort().at(-1);
+          const updated = attachDelayedRetentionOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [], lastLearningAt });
+          next = [...current.filter((row) => row.id !== related.id), updated];
+        } else {
+          const priorQuestionAt = current.filter((row) => row.capabilityId === context.capabilityId &&
+            row.chainId === context.chainId && (row.activity ?? "question") === "question" && row.createdAt < attempt.createdAt)
+            .map((row) => row.createdAt).sort().at(-1) ?? "";
+          const supportObservations = current.filter((row) => row.capabilityId === context.capabilityId &&
+            row.chainId === context.chainId && row.activity && row.activity !== "question" &&
+            row.createdAt > priorQuestionAt && row.createdAt <= attempt.createdAt);
+          const outcome = createInterventionOutcome({ userId: attempt.userId, subjectId: attempt.subjectId, context, attempt, question,
+            actualMinutes: attempt.elapsedMs / 60_000 + supportObservations.reduce((sum, row) => sum + row.actualMinutes, 0),
+            questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [] });
+          // Planned durations remain visible but cannot enter empirical gain.
+          outcome.timeMeasured = outcome.timeMeasured === true && supportObservations.every((row) => row.timeMeasured === true);
+          next = [...current, outcome];
+        }
+        const nextAll = [...all.filter((row) => row.userId !== attempt.userId), ...next].slice(-2000);
+        await writeReviseMeta("interventionOutcomes", nextAll);
+        if (attempt.userId === userId) setInterventionOutcomes(next);
       }
       setSnapshot((prev) => {
         if (!prev) return prev;
         const next: Snapshot = {
           ...prev,
-          attempts: [...prev.attempts, attempt],
-          mistakes: updatedMistake
-            ? prev.mistakes.map((mistake) => (mistake.id === updatedMistake.id ? updatedMistake : mistake))
-            : [...prev.mistakes, ...drafts.map((d) => d.mistake)],
+          attempts: [...prev.attempts.filter((a) => a.id !== attempt.id), attempt],
+          mistakes: [...prev.mistakes.map((mistake) => updatedById.get(mistake.id) ?? mistake), ...drafts.map((d) => d.mistake)],
           cards: [...prev.cards, ...drafts.map((d) => d.card)],
         };
         const retestXp = retestEvaluation?.status === "resolved" ? XP.mistakeResolved : 0;
@@ -828,9 +1484,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         );
         return next;
       });
-      return updatedMistake ? [updatedMistake] : drafts.map((d) => d.mistake);
+      return [...updatedMistakes, ...drafts.map((d) => d.mistake)];
     },
-    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent],
+    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent, userId],
   );
 
   const addCards = useCallback<StoreValue["addCards"]>(
@@ -844,10 +1500,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   const removeCard = useCallback<StoreValue["removeCard"]>(
     async (id) => {
-      await repo.deleteCard(id);
+      await repo.deleteCard(id, userId);
       patch((prev) => ({ ...prev, cards: prev.cards.filter((c) => c.id !== id) }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const updateCards = useCallback<StoreValue["updateCards"]>(
@@ -863,11 +1519,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const removeCards = useCallback<StoreValue["removeCards"]>(
     async (ids) => {
       if (!ids.length) return;
-      await repo.deleteCards(ids);
+      await repo.deleteCards(ids, userId);
       const gone = new Set(ids);
       patch((prev) => ({ ...prev, cards: prev.cards.filter((c) => !gone.has(c.id)) }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const addQuestions = useCallback<StoreValue["addQuestions"]>(
@@ -903,11 +1559,20 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       subjectIds: snapshot.settings.subjectIds,
       subjects,
       targetGrades: snapshot.settings.targetGrades,
+      evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
       existing: snapshot.plannedSessions,
     });
+    const changelog = summarizePlanChange({
+      previous: snapshot.plannedSessions,
+      next: plan,
+      exams: snapshot.examDates,
+      subjectNames: Object.fromEntries(subjects.map((s) => [s.id, s.name])),
+      today: todayIso(),
+    });
     await repo.replacePlan(userId, plan);
+    setPlanChangelog(changelog);
     patch((prev) => ({ ...prev, plannedSessions: plan }));
-  }, [snapshot, userId, topics, mastery, patch]);
+  }, [snapshot, userId, topics, mastery, patch, setPlanChangelog]);
 
   const rescheduleMissedSessions = useCallback<StoreValue["rescheduleMissedSessions"]>(async () => {
     if (!snapshot) return;
@@ -956,10 +1621,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   const removeExamDate = useCallback<StoreValue["removeExamDate"]>(
     async (id) => {
-      await repo.deleteExamDate(id);
+      await repo.deleteExamDate(id, userId);
       patch((prev) => ({ ...prev, examDates: prev.examDates.filter((e) => e.id !== id) }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const updateSettings = useCallback<StoreValue["updateSettings"]>(
@@ -970,6 +1635,70 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       patch((prev) => ({ ...prev, settings: next }));
     },
     [snapshot, patch],
+  );
+
+  const refreshPhaseNotices = useCallback<StoreValue["refreshPhaseNotices"]>(async () => {
+    if (!snapshot) return;
+    const subjects: PhaseSubject[] = snapshot.settings.subjectIds.map((subjectId) => {
+      const subject = getSubject(subjectId);
+      return {
+        subjectId,
+        name: subject?.name ?? subjectId,
+        days: daysToExam(snapshot.examDates, subjectId, todayIso()),
+      };
+    });
+    const previous = (snapshot.settings.examNotices ?? {}) as Record<string, PhaseBucket | null | undefined>;
+    const notices = techniqueEntryNotices(subjects, previous);
+    // Record every subject's current bucket so a transition is announced
+    // exactly once — and a subject pushed back out of the window can be
+    // re-announced when it later re-enters.
+    const buckets = currentPhaseBuckets(subjects);
+    const examNotices: Record<string, string> = {};
+    for (const [subjectId, bucket] of Object.entries(buckets)) {
+      if (bucket) examNotices[subjectId] = bucket;
+    }
+    const changed =
+      Object.keys(examNotices).length !== Object.keys(previous).length ||
+      Object.entries(examNotices).some(([subjectId, bucket]) => previous[subjectId] !== bucket);
+    if (changed) await updateSettings({ examNotices });
+    const notice = notices[0] ?? null;
+    if (notice) setExamPhaseNotice(notice);
+    if (
+      notice &&
+      snapshot.settings.examNotifications &&
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      window.Notification.permission === "granted"
+    ) {
+      try {
+        new window.Notification(notice.title, { body: notice.body });
+      } catch {
+        // Some environments throw on construction (private browsing, iframes);
+        // the in-app banner still shows, so the notice is not lost.
+      }
+    }
+  }, [snapshot, updateSettings]);
+
+  const dismissExamPhaseNotice = useCallback<StoreValue["dismissExamPhaseNotice"]>(() => {
+    setExamPhaseNotice(null);
+  }, []);
+
+  const completeLesson = useCallback<StoreValue["completeLesson"]>(
+    async (lessonId) => {
+      const current = snapshot?.lessonProgress ?? defaultLessonProgress(userId);
+      // Several lessons finished the same day still count as one streak day.
+      const streak = nextLessonStreak(current.streak, localDayKey(), localDayKey(-1));
+      const next: LessonProgress = {
+        ...current,
+        completed: { ...current.completed, [lessonId]: true },
+        streak,
+        updatedAt: new Date().toISOString(),
+      };
+      await repo.saveLessonProgress(next);
+      patch((prev) => ({ ...prev, lessonProgress: next }));
+      return next;
+    },
+    [patch, snapshot, userId],
   );
 
   const saveRevisionCheckpoint = useCallback<StoreValue["saveRevisionCheckpoint"]>(
@@ -987,6 +1716,45 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     setRevisionCheckpoint(null);
   }, [userId]);
 
+  const startRevisionTwinSession = useCallback<StoreValue["startRevisionTwinSession"]>(
+    async (choice, title) => {
+      const state = revisionTwin ?? createRevisionTwinState(userId);
+      if (state.sessions.some((session) => session.status === "active")) throw new Error("A revision block is already active.");
+      const session = createRevisionTwinSession({ id: crypto.randomUUID(), userId, choice, title });
+      const next: RevisionTwinState = { ...state, sessions: [session, ...state.sessions], updatedAt: new Date().toISOString() };
+      await repo.saveRevisionTwin(next);
+      setRevisionTwin(next);
+      return session;
+    },
+    [revisionTwin, userId],
+  );
+
+  const completeRevisionTwinSession = useCallback<StoreValue["completeRevisionTwinSession"]>(
+    async (id, actualMarks, actualMinutes) => {
+      const state = revisionTwin;
+      const session = state?.sessions.find((row) => row.id === id && row.status === "active");
+      if (!state || !session) return;
+      const updated = completeTwinSession(session, { actualMarks, actualMinutes });
+      const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
+      await repo.saveRevisionTwin(next);
+      setRevisionTwin(next);
+    },
+    [revisionTwin],
+  );
+
+  const abandonTwinSession = useCallback<StoreValue["abandonRevisionTwinSession"]>(
+    async (id) => {
+      const state = revisionTwin;
+      const session = state?.sessions.find((row) => row.id === id && row.status === "active");
+      if (!state || !session) return;
+      const updated = abandonRevisionTwinSession(session);
+      const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
+      await repo.saveRevisionTwin(next);
+      setRevisionTwin(next);
+    },
+    [revisionTwin],
+  );
+
   const value: StoreValue | null = useMemo(() => {
     if (!snapshot) return null;
     return {
@@ -1000,12 +1768,15 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       applicationMastery,
       recallMastery,
       recommendations: experimentRecs,
+      adaptiveSession,
       predictions,
       dueCards,
       assessment,
       marksPerHour,
       recurringMisconceptions,
       replanSummary,
+      planChangelog,
+      examPhaseNotice,
       calibrations,
       questionTraces,
       difficultyCalibration,
@@ -1018,6 +1789,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       rootPrerequisiteRemediation,
       revisionCheckpoint,
       responseTimeCalibration,
+      revisionTwin: twinState,
+      revisionTwinChoices,
+      revisionTwinReport: twinReport,
+      examReadiness,
+      examReadinessSummary,
+      storageQuota,
+      refreshStorageQuota,
       previewPaper,
       syncStatus,
       reviewCard,
@@ -1034,8 +1812,14 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       upsertExamDate,
       removeExamDate,
       updateSettings,
+      refreshPhaseNotices,
+      dismissExamPhaseNotice,
+      completeLesson,
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
+      startRevisionTwinSession,
+      completeRevisionTwinSession,
+      abandonRevisionTwinSession: abandonTwinSession,
       syncNow,
       experimentArm,
       joinExperiment,
@@ -1045,7 +1829,15 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       funnelEvents,
       gradePredictionLog,
       gradeActuals,
+      paperOutcomeLog,
+      paperOutcomeGains,
       recordGradeActual,
+      removeGradeActual,
+      beginPaperOutcome,
+      closePaperOutcome: closePaperOutcomeRecord,
+      interventionOutcomes,
+      interventionCalibrations: calibrateInterventions(interventionOutcomes),
+      recordInterventionOutcome,
     };
   }, [
     snapshot,
@@ -1056,13 +1848,15 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     masteryUncertainty,
     applicationMastery,
     recallMastery,
-    recommendations,
+    experimentRecs,
     predictions,
+    adaptiveSession,
     dueCards,
     assessment,
     marksPerHour,
     recurringMisconceptions,
     replanSummary,
+    planChangelog,
     calibrations,
     questionTraces,
     difficultyCalibration,
@@ -1075,6 +1869,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     rootPrerequisiteRemediation,
     revisionCheckpoint,
     responseTimeCalibration,
+    twinState,
+    revisionTwinChoices,
+    twinReport,
+    examReadiness,
+    examReadinessSummary,
+    storageQuota,
+    refreshStorageQuota,
     previewPaper,
     syncStatus,
     reviewCard,
@@ -1091,32 +1892,72 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     upsertExamDate,
     removeExamDate,
     updateSettings,
+    refreshPhaseNotices,
+    dismissExamPhaseNotice,
+    examPhaseNotice,
+    completeLesson,
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
+    startRevisionTwinSession,
+    completeRevisionTwinSession,
+    abandonTwinSession,
     syncNow,
     experimentArm,
     joinExperiment,
     leaveExperiment,
     recordExperimentEvent,
+    recordFunnel,
+    funnelEvents,
     gradePredictionLog,
     gradeActuals,
+    paperOutcomeLog,
+    paperOutcomeGains,
     recordGradeActual,
+    removeGradeActual,
+    beginPaperOutcome,
+    closePaperOutcomeRecord,
+    interventionOutcomes,
+    recordInterventionOutcome,
   ]);
 
+  if (bootError) {
+    return (
+      <StorageRecovery
+        error={new Error(bootError)}
+        onRetry={() => {
+          setBootError(null);
+          bootstrapped.current = false;
+          setBootAttempt((attempt) => attempt + 1);
+        }}
+      />
+    );
+  }
   if (!value) return <BootScreen />;
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
-function BootScreen() {
+function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () => void } = {}) {
   return (
     <div className="min-h-dvh grid place-items-center bg-bg">
-      <div className="flex flex-col items-center gap-3 text-ink3">
-        <div className="flex gap-1.5" aria-hidden>
-          <span className="typing-dot" />
-          <span className="typing-dot" />
-          <span className="typing-dot" />
-        </div>
-        <p className="text-sm">Loading your revision data…</p>
+      <div className="flex flex-col items-center gap-3 text-ink3 max-w-sm px-6 text-center">
+        {error ? (
+          <>
+            <p className="text-sm text-ink">Could not load your revision data</p>
+            <p className="text-xs text-ink3">{error}</p>
+            <button type="button" className="btn btn-primary mt-2" onClick={onRetry}>
+              Try again
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex gap-1.5" aria-hidden>
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </div>
+            <p className="text-sm">Loading your revision data…</p>
+          </>
+        )}
       </div>
     </div>
   );

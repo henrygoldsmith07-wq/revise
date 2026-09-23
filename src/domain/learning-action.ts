@@ -1,0 +1,155 @@
+import { requiresWjecContentReview } from "./physics-content-review";
+import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
+import { repairTargetParts } from "./repair-evidence";
+import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
+import { humanVerifiedPhysicsQuestion, trustedAssessmentContent } from "./physics-content-review";
+import type { Attempt, InterventionOutcomeRecord, Mistake, Question, InterventionPriorState } from "./types";
+
+export interface LearningAction {
+  kind: "diagnose" | "guided" | "independent" | "transfer" | "retention";
+  question: Question;
+  capabilityId: string;
+  topicId?: string;
+  priorState: InterventionPriorState;
+  priorAccuracy?: number;
+  mistakeId?: string;
+  teaching: boolean;
+  minutes: number;
+  reason: string;
+  /** An explicit policy prior, not a measured causal effect or calibrated prediction. */
+  expectedGainPerMinute: number;
+  /** Total durable marks the action is expected to recover over `minutes`. */
+  expectedDurableGain: number;
+  calibrated: boolean;
+  calibrationSampleSize: number;
+  contentTrust: "human-verified" | "needs-human-review";
+}
+
+export function selectLearningAction(input: {
+  topicId: string; nodes: readonly CapabilityNode[]; questions: readonly Question[];
+  attempts: readonly Attempt[]; mistakes: readonly Mistake[]; now: Date; remainingMinutes?: number;
+  interventionOutcomes?: readonly InterventionOutcomeRecord[];
+}): LearningAction | undefined {
+  const { topicId, nodes, questions, attempts, now } = input;
+  const trustedQuestions = questions.filter(trustedAssessmentContent);
+  const evidence = deriveSkillEvidence(nodes, trustedQuestions, attempts);
+  const baselineEvidence = evidence;
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
+  const exposedQuestions = attempts.flatMap(attempt => questionById.has(attempt.questionId) ? [questionById.get(attempt.questionId)!] : []);
+  const freshness = new Map<Question, ReturnType<typeof questionFreshness>>();
+  const freshReasoning = (question: Question) => {
+    let result = freshness.get(question);
+    if (!result) { result = questionFreshness(question, exposedQuestions); freshness.set(question, result); }
+    return result;
+  };
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
+    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    if (!attempt || !question) return false;
+    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+  };
+  const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
+  const candidates: LearningAction[] = [];
+  const hasLearningMetadata = (q: Question) => Boolean(q.learning || q.parts.some((part) => partLearningMetadata(q, part)));
+  const eligible = questions.filter((q) => q.topicIds.includes(topicId) && hasLearningMetadata(q) &&
+    !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? ""));
+  const add = (kind: LearningAction["kind"], capabilityId: string, pool: Question[], reason: string, mistake?: Mistake) => {
+    const trustedPool = (kind === "transfer" || kind === "retention")
+      ? pool.filter(trustedAssessmentContent)
+      : pool;
+    const selectedPool = trustedPool;
+    for (const question of selectedPool) {
+      const minutes = Math.max(0.5, question.learning?.expectedMinutes ?? question.totalMarks * 0.75);
+      if (minutes > (input.remainingMinutes ?? Infinity)) continue;
+      const lost = mistake?.marksLost ?? evidence.get(capabilityId)?.lostMarks ?? 1;
+      const gap = 1 - (evidence.get(capabilityId)?.accuracy ?? 0.35);
+      const effect = effectivenessFor(kind, capabilityId, calibrations, question.subjectId);
+      const trust = humanVerifiedPhysicsQuestion(question) ? "human-verified" as const : "needs-human-review" as const;
+      // Rank by durable gain PER LEARNER MINUTE, the north-star metric. A
+      // capability where many marks are at stake has more headroom, but the
+      // influence is bounded (square root) so a five-mark loss does not
+      // linearly outrank a cheaper, equally-efficient action. Total expected
+      // gain is surfaced separately and used only for the session budget.
+      const recoverable = Math.sqrt(Math.min(5, Math.max(1, lost)));
+      const expectedGainPerMinute = effect.gainPerMinute * (0.4 + gap) * recoverable;
+      candidates.push({ kind, question, capabilityId, priorState: evidence.get(capabilityId)?.state ?? "unknown", ...(mistake ? { mistakeId: mistake.id } : {}),
+        topicId: nodes.find((node) => node.id === capabilityId)?.topicId ?? question.topicIds[0] ?? topicId,
+        ...(baselineEvidence.get(capabilityId)?.accuracy != null ? { priorAccuracy: baselineEvidence.get(capabilityId)!.accuracy! } : {}),
+        teaching: kind === "guided", minutes, reason,
+        expectedGainPerMinute,
+        expectedDurableGain: expectedGainPerMinute * minutes,
+        calibrated: effect.calibrated,
+        calibrationSampleSize: effect.sampleSize,
+        contentTrust: trust });
+    }
+  };
+  const open = input.mistakes.filter((m) => !m.resolved && m.topicId === topicId && trustedMistake(m));
+  for (const mistake of open) {
+    const capabilityId = mistake.capabilityIds?.length === 1 ? mistake.capabilityIds[0]! : undefined;
+    if (!capabilityId) continue;
+    const target = nodes.find((n) => n.id === capabilityId);
+    if (!target) continue;
+    const stage = mistake.repair?.stage ?? "diagnosed";
+    if (stage === "transfer" && (!mistake.repair?.dueAt || !Number.isFinite(Date.parse(mistake.repair.dueAt)) ||
+      Date.parse(mistake.repair.dueAt) > now.getTime())) continue;
+    // Physics prerequisite links are hypotheses until a subject expert has
+    // reviewed the exact edge; do not steer a learner using an unreviewed
+    // dependency merely because it appears earlier in the curriculum.
+    const root = smallestUnprovenCapability([capabilityId], nodes, evidence, { trustedOnly: true });
+    if (root && root.id !== capabilityId && ["weak", "unknown"].includes(evidence.get(root.id)?.state ?? "unknown")) {
+      const probes = questions.filter((q) => q.subjectId === root.subjectId && hasLearningMetadata(q) &&
+        !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? "") &&
+        questionCapabilities(q).includes(root.id) && unseenQuestion(q, attempts, questions));
+      add("diagnose", root.id, probes, `Check ${root.label.toLowerCase()} first; the upstream cause is still a hypothesis.`, mistake);
+      if (probes.length) continue;
+    }
+    const relevant = eligible.filter((q) => repairTargetParts(mistake, q).length > 0);
+    const fresh = relevant.filter((q) => unseenQuestion(q, attempts, questions));
+    if (["detected", "diagnosed", "taught"].includes(stage)) {
+      const source = relevant.filter((q) => q.id === mistake.questionId);
+      add("guided", capabilityId, source, `Repair ${target.label.toLowerCase()}, then complete one guided attempt.`, mistake);
+    } else if (stage === "guided-success") {
+      add("independent", capabilityId, fresh.filter((q) => questionDemands(q).some((demand) => ["application", "calculation"].includes(demand))),
+        `The guided answer held. Test ${target.label.toLowerCase()} on a fresh question without help.`, mistake);
+    } else if (stage === "independent-success") {
+      const source = questions.find((q) => q.id === mistake.questionId);
+      add("transfer", capabilityId, fresh.filter((q) => source && isTransferQuestion(q, source)),
+        "Independent success held. Apply the same skill in an unfamiliar context.", mistake);
+    } else if (stage === "transfer") {
+      add("retention", capabilityId, fresh.filter((q) => freshReasoning(q).newContext &&
+        questionDemands(q).some((demand) => ["application", "calculation", "transfer", "synoptic"].includes(demand))),
+        "The delayed check is due. Retrieve and apply the skill without help to test whether the repair lasted.", mistake);
+    }
+  }
+  if (!candidates.length) {
+    const waiting = new Set(open.filter((m) => m.repair?.stage === "transfer" && m.repair.dueAt && Date.parse(m.repair.dueAt) > now.getTime()).flatMap((m) => m.capabilityIds ?? []));
+    const targets = nodes.filter((n) => n.topicId === topicId && !waiting.has(n.id));
+    const orderedTargets = [...targets].sort((a, b) => {
+      const rank = (id: string) => ({ unknown: 0, weak: 1, developing: 2, secure: 3 }[evidence.get(id)?.state ?? "unknown"]);
+      return rank(a.id) - rank(b.id);
+    });
+    for (const target of orderedTargets) {
+      const pool = eligible.filter((q) => questionCapabilities(q).includes(target.id) && unseenQuestion(q, attempts, questions) && !isTransferQuestion(q));
+      if (!pool.length) continue;
+      add("diagnose", target.id, pool, `One short question will check ${target.label.toLowerCase()} before choosing an explanation.`);
+      break;
+    }
+  }
+  return candidates.sort((a, b) =>
+    b.expectedGainPerMinute - a.expectedGainPerMinute ||
+    Number(freshReasoning(b.question).newReasoning) - Number(freshReasoning(a.question).newReasoning) ||
+    Number(b.kind === "retention") - Number(a.kind === "retention") ||
+    // Between equal-value actions, take the smallest intervention likely to
+    // produce the durable gain: a check before teaching before independent
+    // practice before transfer before a delayed retention re-test.
+    INTERVENTION_SMALLNESS[a.kind] - INTERVENTION_SMALLNESS[b.kind] ||
+    a.question.id.localeCompare(b.question.id))[0];
+}
+
+/** Rough cost of each intervention; smaller is cheaper in learner minutes. */
+const INTERVENTION_SMALLNESS: Record<LearningAction["kind"], number> = {
+  diagnose: 0, guided: 1, independent: 2, transfer: 3, retention: 4,
+};

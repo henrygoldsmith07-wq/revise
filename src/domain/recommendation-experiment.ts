@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // The prospective recommendation experiment — the instrument behind Revise's
 // central claim: "what should I revise next?" beats self-directed revision.
@@ -24,6 +25,14 @@ import type { Id, IsoDate, IsoInstant } from "./types";
 
 export const EXPERIMENT_ARMS = ["revise", "baseline-mastery", "baseline-overdue", "control"] as const;
 export type ExperimentArm = (typeof EXPERIMENT_ARMS)[number];
+
+/** Human-readable preregistration labels for the four policy arms. */
+export const EXPERIMENT_ARM_LABELS: Record<ExperimentArm, string> = {
+  revise: "adaptive Revise",
+  "baseline-mastery": "weakest-topic-first",
+  "baseline-overdue": "due-review-first",
+  control: "student-selected revision",
+};
 
 export interface ExperimentAssignment {
   anonId: string;
@@ -82,6 +91,9 @@ export function policyTaskFor(
 
 export interface AttemptLike {
   anonId: string;
+  /** Optional trust metadata; required for Physics descriptive outcomes. */
+  subjectId?: Id;
+  trusted?: boolean;
   topicIds: Id[];
   questionId: Id;
   awarded: number;
@@ -143,6 +155,18 @@ export interface BaselineAssessment {
   takenAt: IsoInstant;
   /** Frozen assessment form/version for comparability across arms. */
   assessmentVersion: string;
+  /** Optional attestation that the baseline was independently human marked. */
+  humanMarked?: boolean;
+}
+
+/** Held-out assessment taken after a genuine delay; this is the durable endpoint. */
+export interface DelayedAssessmentEvidence {
+  percent: number;
+  maxMarks: number;
+  takenAt: IsoInstant;
+  assessmentVersion: string;
+  heldOutFamilies: boolean;
+  humanMarked: boolean;
 }
 
 export interface FinalAssessment {
@@ -154,11 +178,19 @@ export interface FinalAssessment {
   assessmentVersion: string;
   /** Must reference the same version as baseline for valid gain calculation. */
   matchesBaselineVersion: boolean;
+  /** Required for Physics efficacy, attested by the trial's human assessor. */
+  heldOutFamilies?: boolean;
+  humanMarked?: boolean;
+  delayedDays?: number;
+  /** Total observed revision time, including teaching and retrieval, before the final assessment. */
+  revisionMinutes?: number;
+  /** Required for a Physics primary outcome; a delayed unseen form, not a same-day retry. */
+  delayedAssessment?: DelayedAssessmentEvidence;
 }
 
 /**
  * Primary outcome per participant:
- *   (finalPercent − baselinePercent) / revisionHours
+ *   (delayedPercent − baselinePercent) / revisionHours for Physics
  * Only computed when BOTH assessments exist and are on the same scale.
  */
 export interface ParticipantPrimaryOutcome {
@@ -187,6 +219,9 @@ export interface ExperimentReadinessGates {
 }
 
 export interface ExperimentAnalysis {
+  /** All prespecified alternatives; intervals are exploratory, not multiplicity-adjusted. */
+  comparisons?: Array<{ baseline: Exclude<ExperimentArm, "revise">; effect: number; ci95Lower: number; ci95Upper: number;
+    reviseN: number; baselineN: number; multiplicityAdjusted: false }>;
   arms: ArmOutcome[];
   /** Per-participant primary outcomes (paired baseline→final only). */
   primaryOutcomes: ParticipantPrimaryOutcome[];
@@ -251,16 +286,26 @@ function armOutcome(
   const participants = new Set<string>();
   for (const [anon, w] of windows) if (w.arm === arm) participants.add(anon);
 
-  // Post-assignment attempts for this arm only.
+  // Post-assignment attempts for this arm only.  Invalid scores or unmeasured
+  // time are discarded before any throughput, transfer or unseen exposure
+  // metric is calculated.  Physics additionally needs an explicit trust
+  // attestation from the content/marking gate.
+  const validAttempt = (a: AttemptLike): boolean =>
+    typeof a.anonId === "string" && typeof a.questionId === "string" && Array.isArray(a.topicIds) &&
+    Number.isFinite(a.awarded) && Number.isFinite(a.max) && a.max > 0 && a.awarded >= 0 && a.awarded <= a.max &&
+    Number.isFinite(a.elapsedMs) && a.elapsedMs > 0 && Number.isFinite(Date.parse(a.createdAt));
+  const eligibleAttempt = (a: AttemptLike): boolean =>
+    validAttempt(a) && (requiresWjecContentReview(a.subjectId) ? a.trusted === true : a.trusted !== false);
   const mine = attempts.filter((a) => {
     const w = windows.get(a.anonId);
-    return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt;
+    return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt && eligibleAttempt(a);
   });
   const myEvents = events.filter((e) => windows.get(e.anonId)?.arm === arm);
   // Only reviews AFTER assignment — pre-experiment FSRS history is baseline.
   const myReviews = reviews.filter((r) => {
     const w = windows.get(r.anonId);
-    return w?.arm === arm && new Date(r.reviewedAt).getTime() >= w.assignedAt;
+    return w?.arm === arm && Number.isFinite(Date.parse(r.reviewedAt)) && typeof r.cardId === "string" &&
+      typeof r.grade === "string" && new Date(r.reviewedAt).getTime() >= w.assignedAt;
   });
 
   const hours = mine.reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
@@ -285,15 +330,19 @@ function armOutcome(
   // Per-participant unseen exposure: a question is unseen if THIS participant never attempted it before THEIR assignment.
   const seenByParticipant = new Map<string, Set<Id>>();
   for (const a of attempts) {
+    if (!validAttempt(a)) continue;
     const w = windows.get(a.anonId);
     if (!w || new Date(a.createdAt).getTime() >= w.assignedAt) continue;
     const set = seenByParticipant.get(a.anonId) ?? new Set<Id>();
     set.add(a.questionId);
     seenByParticipant.set(a.anonId, set);
   }
-  const unseenAttempts = mine.filter((a) => {
-    const prior = seenByParticipant.get(a.anonId);
-    return !prior || !prior.has(a.questionId);
+  const unseenAttempts = [...mine].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).filter((a) => {
+    const prior = seenByParticipant.get(a.anonId) ?? new Set<Id>();
+    const unseen = !prior.has(a.questionId);
+    prior.add(a.questionId);
+    seenByParticipant.set(a.anonId, prior);
+    return unseen;
   });
 
   // Unseen transfer score: accuracy on the unseen subset.
@@ -340,13 +389,11 @@ function armOutcome(
   const cutoff = now.getTime() - DROPOUT_DAYS * 86_400_000;
   let neverActivated = 0;
   let inactive = 0;
-  let completedStudy = 0;
   for (const p of participants) {
     const myAttempts = attempts.filter((a) => a.anonId === p).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const lastAttempt = myAttempts.at(-1);
     if (!lastAttempt) neverActivated++;
     else if (new Date(lastAttempt.createdAt).getTime() < cutoff) inactive++;
-    else completedStudy++;
   }
   const dropoutRate = participants.size ? round((neverActivated + inactive) / participants.size) : null;
 
@@ -435,6 +482,7 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   const primaryOutcomes: Array<{ anonId: string; arm: ExperimentArm; baselinePercent: number; finalPercent: number; gainPercent: number; revisionHours: number; marksGainedPerHour: number | null; assessmentVersion: string }> = [];
   let missingBaselineN = 0;
   let missingFinalN = 0;
+  const comparisonScales = new Set<string>();
 
   const baselinesByAnon = new Map<string, typeof input.baselineAssessments[number]>();
   for (const b of input.baselineAssessments) baselinesByAnon.set(b.anonId, b);
@@ -444,20 +492,48 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     const final = input.finalAssessments.find((f) => f.anonId === anonId);
     if (!baseline) { missingBaselineN++; continue; }
     if (!final) { missingFinalN++; continue; }
-    if (!final.matchesBaselineVersion) continue;
+    if (final.matchesBaselineVersion !== true || typeof baseline.assessmentVersion !== "string" || !baseline.assessmentVersion.trim() ||
+      typeof final.assessmentVersion !== "string" || !final.assessmentVersion.trim() ||
+      final.assessmentVersion !== baseline.assessmentVersion ||
+      final.subjectId !== baseline.subjectId || final.maxMarks !== baseline.maxMarks ||
+      !Number.isInteger(baseline.maxMarks) || baseline.maxMarks <= 0 ||
+      !Number.isInteger(final.maxMarks) || final.maxMarks <= 0 ||
+      ![baseline.percent, final.percent].every((score) => Number.isFinite(score) && score >= 0 && score <= 100) ||
+      !Number.isFinite(Date.parse(baseline.takenAt)) || !Number.isFinite(Date.parse(final.takenAt)) ||
+      Date.parse(baseline.takenAt) > w.assignedAt || Date.parse(final.takenAt) <= w.assignedAt) continue;
+    // A Physics baseline is part of the durable marks endpoint.  Missing
+    // attestation is as unsafe as an explicit rejection: a self/auto-marked
+    // baseline can make later gain per hour look larger than it is.
+    if (requiresWjecContentReview(baseline.subjectId) && baseline.humanMarked !== true) continue;
+    let endpointPercent = final.percent;
+    if (requiresWjecContentReview(final.subjectId)) {
+      const delayed = final.delayedAssessment;
+      if (final.heldOutFamilies !== true || final.humanMarked !== true || !Number.isFinite(final.delayedDays) || (final.delayedDays ?? 0) < 7 ||
+        !Number.isFinite(final.revisionMinutes) || (final.revisionMinutes ?? 0) <= 0 ||
+        !delayed || delayed.heldOutFamilies !== true || delayed.humanMarked !== true ||
+        typeof delayed.assessmentVersion !== "string" || !delayed.assessmentVersion.trim() ||
+        delayed.assessmentVersion !== baseline.assessmentVersion || delayed.maxMarks !== baseline.maxMarks ||
+        !Number.isFinite(delayed.percent) || delayed.percent < 0 || delayed.percent > 100 ||
+        !Number.isFinite(Date.parse(delayed.takenAt)) || Date.parse(delayed.takenAt) <= Date.parse(final.takenAt) ||
+        Date.parse(delayed.takenAt) - Date.parse(final.takenAt) < 7 * 86_400_000) continue;
+      endpointPercent = delayed.percent;
+    }
 
-    const hours = input.attempts
-      .filter((a) => a.anonId === anonId && new Date(a.createdAt).getTime() >= w.assignedAt)
+    const attemptHours = input.attempts
+      .filter((a) => a.anonId === anonId && new Date(a.createdAt).getTime() >= w.assignedAt &&
+      Date.parse(a.createdAt) <= Date.parse(final.takenAt) && Number.isFinite(a.elapsedMs) && a.elapsedMs > 0)
       .reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
-    if (hours < 0.25) continue;
+    const hours = final.revisionMinutes !== undefined ? final.revisionMinutes / 60 : attemptHours;
+    if (!Number.isFinite(hours) || hours < 0.25) continue;
+    comparisonScales.add(JSON.stringify([baseline.subjectId, baseline.assessmentVersion, baseline.maxMarks]));
 
     primaryOutcomes.push({
       anonId, arm: w.arm,
       baselinePercent: baseline.percent,
-      finalPercent: final.percent,
-      gainPercent: round(final.percent - baseline.percent),
+      finalPercent: endpointPercent,
+      gainPercent: round(endpointPercent - baseline.percent),
       revisionHours: Math.round(hours * 100) / 100,
-      marksGainedPerHour: round((final.percent - baseline.percent) / hours),
+      marksGainedPerHour: round((endpointPercent - baseline.percent) * baseline.maxMarks / 100 / hours),
       assessmentVersion: final.assessmentVersion ?? "unknown",
     });
   }
@@ -481,10 +557,10 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     revise.delayedRetention != null && control.delayedRetention != null &&
     bm.delayedRetention != null && bo.delayedRetention != null;
   // Efficacy claim requires all three evidence types.
-  const fullEfficacyReady = efficacyClaimReady && transferReady && retentionReady;
+  const fullEfficacyReady = efficacyClaimReady && transferReady && retentionReady && comparisonScales.size === 1;
 
   const gates = { operationallyUsable, descriptiveResultsReady, primaryOutcomeReady: primaryOutcomeReady, efficacyClaimReady: fullEfficacyReady };
-  const readiness = efficacyClaimReady ? "efficacy-claim-ready" : primaryOutcomeReady ? "primary-outcome-ready" : descriptiveResultsReady ? "descriptive-results-ready" : operationallyUsable ? "operationally-usable" : "enrolling";
+  const readiness = fullEfficacyReady ? "efficacy-claim-ready" : primaryOutcomeReady ? "primary-outcome-ready" : descriptiveResultsReady ? "descriptive-results-ready" : operationallyUsable ? "operationally-usable" : "enrolling";
 
   const revOuts = primaryOutcomes.filter((o) => o.arm === "revise");
   const ctlOuts = primaryOutcomes.filter((o) => o.arm === "control");
@@ -492,6 +568,16 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   const ctlMean = ctlOuts.length ? ctlOuts.reduce((a, o) => a + (o.marksGainedPerHour ?? 0), 0) / ctlOuts.length : null;
   // Primary endpoint: assessment marks gained per revision hour.
   const effect = fullEfficacyReady && revMean != null && ctlMean != null ? round(revMean - ctlMean) : null;
+  const comparisons: NonNullable<ExperimentAnalysis["comparisons"]> = [];
+  if (fullEfficacyReady) {
+    const reviseGains = revOuts.map((outcome) => outcome.marksGainedPerHour!);
+    for (const baseline of ["baseline-mastery", "baseline-overdue", "control"] as const) {
+      const baselineGains = primaryOutcomes.filter((outcome) => outcome.arm === baseline).map((outcome) => outcome.marksGainedPerHour!);
+      const interval = bootstrapDifferenceCI(reviseGains, baselineGains, { iterations: 2000, seed: 42 });
+      comparisons.push({ baseline, effect: interval.estimate, ci95Lower: interval.ci95Lower, ci95Upper: interval.ci95Upper,
+        reviseN: reviseGains.length, baselineN: baselineGains.length, multiplicityAdjusted: false });
+    }
+  }
 
   // Strongest simple baseline comparison with bootstrap CI.
   let primaryComparison: ExperimentAnalysis["primaryComparison"] = null;
@@ -525,11 +611,11 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
       ? "Arms populated but revision hours/marks not yet reportable."
       : !primaryOutcomeReady
         ? `Only ${primaryOutcomes.length} paired baseline-final outcomes so far.`
-        : !efficacyClaimReady
-          ? `Primary outcomes computed but every arm needs at least ${minP} paired outcomes.`
+        : !fullEfficacyReady
+          ? `Primary outcomes are provisional: every arm needs at least ${minP} paired outcomes on one shared assessment scale, unseen transfer and delayed retention.`
           : `Revise gained ${effect! > 0 ? "+" : ""}${effect} assessment marks per revision hour versus self-directed revision (${revOuts.length} vs ${ctlOuts.length} paired participants). Prospective design.`;
 
   return { arms, primaryOutcomes, enrolledN, activatedN: [...windows.keys()].filter((anon: string) => attempts.some((a: { anonId: string }) => a.anonId === anon)).length, primaryOutcomeEligibleN: primaryOutcomes.length, missingBaselineN, missingFinalN, withdrawnN: 0,     marksGainedPerHourEffect: effect,
-    primaryComparison,
+    primaryComparison, comparisons,
     sufficientData: fullEfficacyReady, readiness, gates, note };
 }

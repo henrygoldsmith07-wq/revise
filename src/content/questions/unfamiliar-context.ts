@@ -1,5 +1,6 @@
 import type { AoCode, Question, QuestionKind } from "@/domain/types";
 import { defineQuestions } from "./authoring";
+import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /** Original transfer questions that place familiar ideas in unfamiliar settings. */
 
@@ -515,7 +516,7 @@ const physics: ContextItem[] = [
     topic: "fields",
     stem: "Unfamiliar context: A probe moves farther from a moon. Its gravitational potential changes from −2.0 × 10⁷ to −1.2 × 10⁷ J kg⁻¹.",
     difficulty: 2,
-    parts: [part("Calculate the change in gravitational potential energy per kilogram and explain the sign.", 2, ["Change = final − initial", "ΔV = (−1.2 × 10⁷) − (−2.0 × 10⁷) = +8.0 × 10⁶ J kg⁻¹", "Positive change means energy is supplied as the probe moves away"], "The change is +8.0 × 10⁶ J kg⁻¹. The positive value means gravitational potential energy per kilogram increases as the probe moves away and work is done against the field.", "interpret gravitational potential changes in a spaceflight context")],
+    parts: [part("Calculate the change in gravitational potential energy per kilogram and explain the sign.", 2, ["ΔV = final − initial = (−1.2 × 10⁷) − (−2.0 × 10⁷) = +8.0 × 10⁶ J kg⁻¹", "A positive change means energy is supplied as the probe moves away"], "The change is +8.0 × 10⁶ J kg⁻¹. The positive value means gravitational potential energy per kilogram increases as the probe moves away and work is done against the field.", "interpret gravitational potential changes in a spaceflight context")],
   },
   {
     slug: "insulated-cup",
@@ -558,4 +559,5 @@ export const unfamiliarContextQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
+  ...wjecAlevelCoverageQuestions({ id: "transfer", prefix: "Unfamiliar context:", reviewer: "authored/unfamiliar-context-review", kind: "extended" }),
 ];

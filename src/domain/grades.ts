@@ -1,5 +1,7 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { daysToExam } from "./recommender";
-import type { Attempt, ExamDate, Id, IsoDate, Subject, TopicMastery } from "./types";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import type { Attempt, ExamDate, Id, IsoDate, Question, Subject, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
 // Grade prediction. Two signals, blended by how much evidence exists behind
@@ -46,7 +48,7 @@ export function gradeForPercent(subject: Subject, percent: number): string {
   for (const row of sorted) {
     if (percent >= row.percent) return row.grade;
   }
-  return sorted.length ? sorted[sorted.length - 1].grade : "U";
+  return sorted.length ? sorted[sorted.length - 1]?.grade ?? "U" : "U";
 }
 
 /** Find the next boundary and allocate available topic headroom towards it. */
@@ -73,9 +75,16 @@ export function predictGrade(
   attempts: Attempt[],
   exams: ExamDate[] = [],
   today: IsoDate = new Date().toISOString().slice(0, 10),
+  questions: Question[] = [],
 ): GradePrediction {
   const rows = mastery.filter((m) => m.subjectId === subject.id);
-  const subjectAttempts = attempts.filter((a) => a.subjectId === subject.id);
+  const questionById = new Map(questions.map((question) => [question.id, question] as const));
+  const subjectAttempts = attempts.filter((attempt) => {
+    if (attempt.subjectId !== subject.id) return false;
+    const question = questionById.get(attempt.questionId);
+    if (!question) return !requiresWjecContentReview(subject.id) && trustworthyAttempt(attempt);
+    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+  });
 
   const coverage = rows.length ? rows.reduce((a, m) => a + m.mastery, 0) / rows.length : 0;
   const marksMax = subjectAttempts.reduce((a, x) => a + x.max, 0);
@@ -169,9 +178,11 @@ export function calibrationReport(pairs: Array<{ predicted: number; actual: numb
   const buckets: Array<{ sumP: number; sumA: number; count: number }> = Array.from({ length: B }, () => ({ sumP: 0, sumA: 0, count: 0 }));
   for (const p of pairs) {
     const idx = Math.min(B - 1, Math.max(0, Math.floor(p.predicted * B)));
-    buckets[idx].sumP += p.predicted;
-    buckets[idx].sumA += p.actual;
-    buckets[idx].count += 1;
+    const b = buckets[idx];
+    if (!b) continue;
+    b.sumP += p.predicted;
+    b.sumA += p.actual;
+    b.count += 1;
   }
   const bins: CalibrationBin[] = buckets.map((b, i) => ({
     bucket: `${(i / B).toFixed(1)}–${((i + 1) / B).toFixed(1)}`,

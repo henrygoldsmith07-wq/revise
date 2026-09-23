@@ -4,7 +4,7 @@
 // Recommendations: weakness, evidence, action, expected benefit.
 // ---------------------------------------------------------------------------
 
-import type { MarkEvidence } from "./types";
+import type { MarkEvidence, RecommendationFactors } from "./types";
 import type { AnswerCorpusRecord } from "./answer-corpus";
 import type { Recommendation } from "./types";
 
@@ -82,4 +82,82 @@ export function explainRecommendation(rec: Recommendation): RecommendationExplan
     expectedBenefit: benefit,
     confidenceNote,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Evidence-cited narrative: "Do X because Y", built from computed numbers only.
+//
+// The factor pills are honest but they read like a dashboard, not a reason. A
+// student should be able to see *the claim, the numbers behind it, and the
+// action* in one sentence — e.g. "Do exam questions on electrolysis because
+// you recalled the definitions (84% recall) but earned 38% of application
+// marks, and the topic has not been practised for 12 days." Every clause
+// below is guarded: a number that is null is never phrased, so the narrative
+// can only contain evidence the engine actually computed.
+// ---------------------------------------------------------------------------
+
+export interface NarrativeInput {
+  activity: Recommendation["activity"];
+  /** Topic title, for practice/learn recs. */
+  topicTitle?: string;
+  factors: RecommendationFactors;
+  lastEvidencePercent: number | null;
+  daysSinceRetrieval: number | null;
+  daysToExam: number | null;
+  recoverableMarks: number | null;
+  minutes: number | null;
+}
+
+function pluralise(n: number, singular: string, plural: string): string {
+  return n === 1 ? singular : plural;
+}
+
+export function buildRecommendationNarrative(input: NarrativeInput): string | null {
+  const clauses: string[] = [];
+  const action =
+    input.activity === "practice" && input.topicTitle
+      ? `Do exam questions on ${input.topicTitle}`
+      : input.activity === "learn" && input.topicTitle
+        ? `Start ${input.topicTitle}`
+        : input.activity === "flashcards"
+          ? "Clear your due reviews"
+          : input.activity === "mistakes"
+            ? "Repair your unrepaired mistakes"
+            : input.activity === "paper"
+              ? "Sit a timed paper"
+              : null;
+  if (!action) return null;
+  const f = input.factors;
+
+  // Recall-vs-application split — the strongest clause when present.
+  if (f.applicationGap != null && f.recallMastery != null) {
+    clauses.push(
+      `you recalled the definitions (${Math.round(f.recallMastery * 100)}% recall) but application marks are much weaker`,
+    );
+  } else if (input.lastEvidencePercent != null && input.lastEvidencePercent < 55) {
+    clauses.push(`your last evidence here is ${input.lastEvidencePercent}%`);
+  }
+
+  if (input.daysSinceRetrieval != null && input.daysSinceRetrieval >= 5) {
+    clauses.push(
+      `it has not been practised for ${input.daysSinceRetrieval} ${pluralise(input.daysSinceRetrieval, "day", "days")}`,
+    );
+  }
+
+  if (input.daysToExam != null && input.daysToExam <= 21) {
+    clauses.push(
+      input.daysToExam <= 0
+        ? "the exam is now"
+        : `the exam is in ${input.daysToExam} ${pluralise(input.daysToExam, "day", "days")}`,
+    );
+  }
+
+  if (input.recoverableMarks != null && input.recoverableMarks >= 2) {
+    clauses.push(
+      `about ${Math.round(input.recoverableMarks * 10) / 10} exam marks are recoverable in ~${input.minutes ?? 20} min`,
+    );
+  }
+
+  if (!clauses.length) return null;
+  return `${action} because ${clauses.join(" and ")}.`;
 }

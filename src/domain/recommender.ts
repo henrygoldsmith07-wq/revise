@@ -1,5 +1,13 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
+import { buildRecommendationNarrative } from "./explainability";
+import type { RecallMasteryRow } from "./recall-mastery";
+import type { ApplicationMasteryRow } from "./application-mastery";
+import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
+import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
+import { paperOutcomeGainMultiplier } from "./paper-outcome";
+import { trustedAssessmentAttempt } from "./learning-evidence";
 import type {
   ActivityKind,
   Card,
@@ -13,7 +21,10 @@ import type {
   RecommendationFactors,
   Topic,
   TopicMastery,
+  Attempt,
+  Question,
 } from "./types";
+import type { PaperOutcomeRecord } from "./paper-outcome";
 
 // ---------------------------------------------------------------------------
 // "What should I do right now?" — scored as
@@ -44,6 +55,9 @@ export interface RecommendInput {
   mastery: TopicMastery[];
   cards: Card[];
   mistakes: Mistake[];
+  /** Optional bank/history lookups used to exclude untrusted Physics losses. */
+  questions?: Question[];
+  attempts?: Attempt[];
   exams: ExamDate[];
   plan: PlannedSession[];
   sessionLengthMinutes: number;
@@ -58,12 +72,24 @@ export interface RecommendInput {
   adaptiveDifficultyOffset?: Map<Id, number>;
   /** Historical per-topic marks-gained-per-hour derived from actual outcomes (overrides marksPerHour when both present). */
   historicalGain?: Map<Id, number>;
+  /** Knowledge-vs-answering report per subject; steers what kind of work the ranking prefers. */
+  techniqueSplit?: Map<Id, KnowledgeAnsweringReport>;
+  /** Per-topic reports (each topic's own losses aggregated); preferred over the subject report for topic-level recs. */
+  techniqueByTopic?: Map<Id, KnowledgeAnsweringReport>;
+  /** Sat-paper (predicted, actual) outcome records; feeds the paper gain factor back from reality. */
+  paperOutcomes?: PaperOutcomeRecord[];
   /** Cross-topic total recommendations already issued — drives ε/exploration decay (default 0). */
   totalRecommendationsIssued?: number;
+  /** Minutes the student has already studied this session — drives fatigue penalties (default 0). */
+  activeMinutes?: number;
   /** When true, surface an extra exploration candidate among tied topics (default false in deterministic rank). */
   enableExploration?: boolean;
   /** RNG for exploration jitter — inject for deterministic tests (default Math.random). */
   rng?: () => number;
+  /** Recall-only evidence (FSRS strength) per topic; separates "knows it" from "can use it". */
+  recallMastery?: RecallMasteryRow[];
+  /** Application evidence (marked exam answers, recall excluded) per topic. */
+  applicationMastery?: ApplicationMasteryRow[];
 }
 
 /** Days until the exam, or null when no exam is set for that subject. */
@@ -91,6 +117,30 @@ function daysBetween(a: IsoDate, b: IsoDate): number {
 function weaknessFactor(mastery: number): number {
   // 0 mastery → 1.8, 0.5 → 1.4, 1.0 → 1.0
   return 1 + (1 - clamp01(mastery)) * 0.8;
+}
+
+/**
+ * Recall-vs-application separation. `weaknessFactor` reads the blended topic
+ * mastery, which cannot distinguish "recalls the definitions" from "applies
+ * them under exam conditions". When application evidence exists and is
+ * materially weaker than recall evidence, this returns a multiplicative boost
+ * (bounded 1.0–1.25) so application-poor topics rank higher — and, crucially,
+ * the narrative can name the split instead of hiding inside a blend. A gap is
+ * only claimed with real evidence on both sides; unknown never counts as weak.
+ */
+export function applicationGapFactor(
+  recall: RecallMasteryRow | undefined,
+  application: ApplicationMasteryRow | undefined,
+): { factor: number; gap: number } {
+  // No application evidence yet → unknown, not weak. No recall evidence →
+  // nothing to compare against, so the blended weakness already applies.
+  if (!application || application.evidence === "unmeasured") return { factor: 1, gap: 0 };
+  const recallScore = recall && recall.reviews >= 3 ? clamp01(recall.mastery) : null;
+  if (recallScore == null) return { factor: 1, gap: 0 };
+  const gap = clamp01(recallScore - clamp01(application.mastery));
+  // A 0.3+ split is the “recalls it, cannot use it” signature worth acting on.
+  const factor = 1 + Math.min(0.25, Math.max(0, gap - 0.15) * 0.6);
+  return { factor: Math.round(factor * 100) / 100, gap: Math.round(gap * 100) / 100 };
 }
 
 function forgettingFactor(retention: number | null, daysSince: number | null): number {
@@ -167,7 +217,8 @@ export function syntheticOutcomePairs(seed: number, n: number, subjectId: Id, to
     const noise = (rnd() - 0.5) * 10;
     const actual = Math.max(0, Math.round(predicted + noise + (rnd() > 0.5 ? 2 : -1)));
     const d = new Date(base + i * 86_400_000).toISOString().slice(0, 10);
-    out.push({ subjectId, topicId: topicIds[i % topicIds.length], predicted, actual, date: d, driverActivity: rnd() > 0.5 ? "practice" : "flashcards" });
+    const topicId = topicIds.length ? topicIds[i % topicIds.length] : undefined;
+    out.push({ subjectId, ...(topicId ? { topicId } : {}), predicted, actual, date: d, driverActivity: rnd() > 0.5 ? "practice" : "flashcards" });
   }
   return out;
 }
@@ -191,13 +242,6 @@ export function benchmarkRecommendationQuality(pairs: OutcomePair[]): {
   const correlation = denP && denA ? num / Math.sqrt(denP * denA) : 0;
   const hitRate = pairs.filter((p) => Math.abs(p.actual - p.predicted) <= 5).length / n;
   return { n, mae: Math.round(mae * 10) / 10, bias: Math.round(bias * 10) / 10, correlation: Math.round(correlation * 100) / 100, hitRate: Math.round(hitRate * 100) / 100 };
-}
-
-function avgRetentionForTopic(cards: Card[], topicId: string, now: Date): number | null {
-  const mine = cards.filter((c) => c.topicId === topicId);
-  if (!mine.length) return null;
-  const vals = mine.map((c) => retrievability(c, now));
-  return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
 function paperLabelFor(exams: ExamDate[], subjectId: Id, today: string): string | null {
@@ -236,6 +280,8 @@ export function recommend(input: RecommendInput): Recommendation[] {
   const block = input.sessionLengthMinutes;
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
   const masteryById = new Map(input.mastery.map((m) => [m.topicId, m]));
+  const recallByTopic = new Map((input.recallMastery ?? []).map((r) => [r.topicId, r] as const));
+  const applicationByTopic = new Map((input.applicationMastery ?? []).map((r) => [r.topicId, r] as const));
   const out: Recommendation[] = [];
 
   const urgencyBySubject = new Map(
@@ -314,13 +360,31 @@ export function recommend(input: RecommendInput): Recommendation[] {
         overdue > 0
           ? `${cards.length} cards due, ${overdue} already overdue — recall them before they fade further.`
           : `${cards.length} cards due today. Clearing them keeps every topic warm.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "flashcards",
+          factors,
+          lastEvidencePercent: null,
+          daysSinceRetrieval: null,
+          daysToExam: daysTo,
+          recoverableMarks: examGain,
+          minutes,
+        }),
+      },
       factors,
     });
   }
 
   // --- 2. Unrepaired mistakes. Direct marks you have already dropped.
-  const openMistakes = input.mistakes.filter((m) => !m.resolved);
+  const questionById = new Map((input.questions ?? []).map((question) => [question.id, question] as const));
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
+    const attempt = mistake.attemptId ? input.attempts?.find((row) => row.id === mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    return Boolean(attempt && question && trustedAssessmentAttempt(attempt, question, input.attempts ?? [], input.questions ?? []));
+  };
+  const openMistakes = input.mistakes.filter((m) => !m.resolved && trustedMistake(m));
   const mistakesBySubject = new Map<Id, Mistake[]>();
   for (const m of openMistakes) {
     if (!input.subjectIds.includes(m.subjectId)) continue;
@@ -364,7 +428,18 @@ export function recommend(input: RecommendInput): Recommendation[] {
       minutes,
       score: score,
       reason: `${list.length} mistakes are still unrepaired. Re-answering them is the highest-value 15 minutes you have.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "mistakes",
+          factors,
+          lastEvidencePercent: explanation.lastEvidencePercent,
+          daysSinceRetrieval: explanation.daysSinceRetrieval,
+          daysToExam: daysTo,
+          recoverableMarks: recoverable,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -384,11 +459,16 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const weak = weaknessFactor(weakRow.mastery);
     const forgetting = forgettingFactor(weakRow.retention, daysSinceFor(weakRow));
     const unc = uncertaintyFactor(weakRow.cardsTotal, weakRow.attempts);
+    const { factor: appGap, gap: appGapValue } = applicationGapFactor(recallByTopic.get(weakRow.topicId), applicationByTopic.get(weakRow.topicId));
     const factors: RecommendationFactors = { examGain: Math.round(examGain * 10) / 10, urgency: u, weakness: weak, forgetting, uncertainty: unc };
+    if (appGapValue >= 0.3) {
+      factors.applicationGap = appGapValue;
+      factors.recallMastery = Math.round(clamp01(recallByTopic.get(weakRow.topicId)!.mastery) * 100) / 100;
+    }
     const daysTo = daysToExam(input.exams, weakRow.subjectId, today);
     const prox = proximityFor(daysTo, examGain, minutes);
     const adaptive = adaptiveDifficultyFactor(topic, weakRow, input.adaptiveDifficultyOffset?.get(weakRow.topicId));
-    const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive;
+    const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive * appGap;
     const label = paperLabelFor(input.exams, weakRow.subjectId, today);
     const mphRounded = mph != null ? Math.round(mph * 10) / 10 : null;
     const explanation: RecommendationExplanation = {
@@ -411,7 +491,19 @@ export function recommend(input: RecommendInput): Recommendation[] {
       minutes,
       score: score * 1.05, // practice is the differentiated activity; slight prior
       reason,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "practice",
+          topicTitle: topic.title,
+          factors,
+          lastEvidencePercent: explanation.lastEvidencePercent,
+          daysSinceRetrieval: explanation.daysSinceRetrieval,
+          daysToExam: daysTo,
+          recoverableMarks: recoverable,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -450,7 +542,19 @@ export function recommend(input: RecommendInput): Recommendation[] {
       minutes,
       score,
       reason: `You have not started ${topic.title} yet. A 20-minute first pass turns a blank into something revisable.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "learn",
+          topicTitle: topic.title,
+          factors,
+          lastEvidencePercent: null,
+          daysSinceRetrieval: null,
+          daysToExam: daysTo,
+          recoverableMarks: examGain,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -464,7 +568,13 @@ export function recommend(input: RecommendInput): Recommendation[] {
     if (avg < 0.6 && (days == null || days > 21)) continue;
     const minutes = Math.min(block * 2, 90);
     // A paper's gain is calibration + stamina: modelled as (1 - avg) * ~6 marks scaled to paper size.
-    const examGain = (1 - avg) * 9 + (days != null && days <= 21 ? 3 : 0);
+    // Reality check: sat papers compared against their frozen predictions drift the gain —
+    // beating the prediction means more recoverable headroom than the static mastery model
+    // sees (multiplier >1); repeatedly falling short demotes papers until technique catches up.
+    const outcomeMultiplier = input.paperOutcomes
+      ? paperOutcomeGainMultiplier(input.paperOutcomes, subjectId)
+      : 1;
+    const examGain = ((1 - avg) * 9 + (days != null && days <= 21 ? 3 : 0)) * outcomeMultiplier;
     const u = urgency(subjectId);
     const weak = 1 + (1 - avg) * 0.5;
     const avgRetention = rows.reduce((a, m) => a + (m.retention ?? 0.5), 0) / rows.length;
@@ -494,7 +604,18 @@ export function recommend(input: RecommendInput): Recommendation[] {
         days != null && days <= 21
           ? `${days} days to the exam — full papers under timed conditions are what is left to gain.`
           : `You are solid across this subject. A timed paper tests whether it holds up under exam pressure.`,
-      explanation,
+      explanation: {
+        ...explanation,
+        narrative: buildRecommendationNarrative({
+          activity: "paper",
+          factors,
+          lastEvidencePercent: explanation.lastEvidencePercent,
+          daysSinceRetrieval: null,
+          daysToExam: days,
+          recoverableMarks: examGain,
+          minutes,
+        }),
+      },
       factors,
     });
   }
@@ -520,7 +641,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
       out.push({
         activity: session.activity,
         subjectId: session.subjectId,
-        topicId: session.topicId,
+        ...(session.topicId ? { topicId: session.topicId } : {}),
         minutes: session.minutes,
         score: 28 * u,
         reason: session.reason || "Scheduled in today's plan.",
@@ -548,7 +669,91 @@ export function recommend(input: RecommendInput): Recommendation[] {
   // --- Phase 4 overlays: historical gain, exploration, tie-awareness ----
   applyPhase4Overlays({ out, input, today });
 
+  // --- Technique steering: what KIND of work pays, per scope -----------
+  // Topic-level recs steer on their own topic's losses; subject-wide recs
+  // read the subject split. Knowledge leak → learn/repair promoted, drilling
+  // demoted; answering leak → a named timed run attached to practice.
+  if (input.techniqueSplit && input.techniqueSplit.size > 0) {
+    applyTechniqueSteering({ out, input, today });
+  }
+
+  // --- Fatigue overlay: time-on-task + circadian penalties ---------------
+  // Applied after the plan boost: the student's own plan still wins ties, but
+  // heavy-load activities (practice, papers) are demoted when they have been
+  // studying for hours or it is late — low-load recall work floats to the top
+  // instead. The factor is recorded in the factors so the "why?" pill shows
+  // the honest reason the ranking changed.
+  const fatigueCtx: FatigueContext = {
+    activeMinutes: input.activeMinutes ?? 0,
+    hourOfDay: now.getHours(),
+  };
+  if (fatigueCtx.activeMinutes > 0 || circadianFatigue(fatigueCtx.hourOfDay) > 0) {
+    for (const r of out) {
+      const f = fatigueFactor(r.activity, fatigueCtx);
+      if (f < 1) {
+        r.score *= f;
+        if (r.factors) r.factors.fatigue = Math.round(f * 100) / 100;
+      }
+    }
+  }
+
   return dedupe(out).sort((a, b) => b.score - a.score);
+}
+
+// ---------------------------------------------------------------------------
+// Technique steering: what KIND of work pays, per scope.
+//
+// The knowledge-vs-answering split says where marks are actually being lost.
+// A topic-level report (that topic's own losses) is preferred; subject-level
+// recs — flashcards, papers, mistake repair — read the subject report. When
+// knowledge is the leak, learning and repair work is promoted and heavy
+// question drilling is demoted (more questions on unknown content is
+// busywork). When answering is the leak, a timed run is attached directly to
+// practice — "practise technique" is not a plan, so the rec names the exact
+// quick-session box the app can run. Mixed or unproven scopes steer nothing:
+// the overlay never invents a direction the evidence cannot support.
+// ---------------------------------------------------------------------------
+
+const TECHNIQUE_PROMOTE = { knowledge: 1.12, answering: 1.1 } as const;
+const TECHNIQUE_DEMOTE = { knowledge: 0.88, answering: 0.9 } as const;
+
+function applyTechniqueSteering(ctx: { out: Recommendation[]; input: RecommendInput; today: IsoDate }): void {
+  const { out, input: recInput } = ctx;
+  const subjectSplit = recInput.techniqueSplit;
+  const topicSplit = recInput.techniqueByTopic;
+  if (!subjectSplit) return;
+
+  for (const r of out) {
+    // Topic recs steer only on their own topic's losses; subject-wide recs
+    // (flashcards, papers, mistake repair) read the subject-level split.
+    const report = r.topicId ? topicSplit?.get(r.topicId) : subjectSplit.get(r.subjectId);
+    if (!report || !report.reliable) continue;
+    if (report.verdict !== "knowledge" && report.verdict !== "answering") continue;
+    const leak = report.verdict;
+
+    const promotes =
+      leak === "knowledge"
+        ? r.activity === "learn" || r.activity === "flashcards" || r.activity === "mistakes"
+        : r.activity === "practice" || r.activity === "paper";
+    const steer = promotes ? TECHNIQUE_PROMOTE[leak] : TECHNIQUE_DEMOTE[leak];
+    r.score *= steer;
+    if (r.factors) r.factors.techniqueSteer = steer;
+    r.techniqueKnowledgeShare = report.knowledgeShare;
+
+    // An answering leak converts the practice rec into a named timed run —
+    // but never overrides the student's own plan (planned sessions keep
+    // their reason, the boost already biasing them is enough).
+    if (leak === "answering" && r.activity === "practice" && !r.plannedSessionId) {
+      const timed = timedSessionRecommendation(report);
+      if (timed) {
+        r.techniqueQuickMinutes = timed.minutes;
+        r.techniqueKnowledgeShare = report.knowledgeShare;
+        r.reason = `Timed run: ${timed.questionCount} questions against the clock — answering is the leak here (~${Math.round(
+          report.answeringShare * 100,
+        )}% of lost marks), not knowledge.`;
+      }
+    }
+  }
 }
 
 /** Phase 4 overlays: historical gain, exploration, tie annotation. Separated so rank invariants remain testable. */
@@ -614,6 +819,26 @@ export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
   paper: "Past paper",
   mistakes: "Mistake repair",
 };
+
+/**
+ * Where each recommendation sends the student. A "learn" recommendation is a
+ * first pass on an untouched topic — that is a lesson, not practice questions
+ * on material never taught; everything with a topic drills in /practice, and
+ * subject-wide recommendations review.
+ */
+export function hrefForRecommendation(
+  rec: Pick<Recommendation, "activity" | "subjectId"> & { topicId?: Id | null; techniqueQuickMinutes?: 5 | 10 | null },
+): string {
+  // Technique steering converts practice into a named timed run; it opens
+  // the clocked quick session, scoped to the subject (not one topic) so the
+  // run samples wherever the answering leak actually lives.
+  if (rec.activity === "practice" && rec.techniqueQuickMinutes) {
+    return `/practice?quick=${rec.techniqueQuickMinutes}&subject=${rec.subjectId}`;
+  }
+  if (rec.activity === "learn" && rec.subjectId) return `/lesson?subject=${rec.subjectId}`;
+  if (rec.topicId) return `/practice?topic=${rec.topicId}`;
+  return "/review";
+}
 
 export const ACTIVITY_BLURB: Record<ActivityKind, string> = {
   learn: "First pass over new material, then immediate self-testing.",

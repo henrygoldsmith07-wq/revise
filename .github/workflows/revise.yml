@@ -1,13 +1,14 @@
 name: Revise
 
-# A push to a PR branch used to start the whole pipeline twice — once for the
-# push and once for the pull_request — because both triggers matched every
-# path. Pushes are now watched on the default branch only; PR branches are
-# covered by the pull_request trigger.
 on:
   push:
-    branches: [main]
+    paths:
+      - "**"
+      - ".github/workflows/revise.yml"
   pull_request:
+    paths:
+      - "**"
+      - ".github/workflows/revise.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,6 +29,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm run verify
+      - name: Verify client performance budget
+        run: npm run perf:budget
       - name: Verify required Playwright dependency
         run: npm ls @playwright/test
       - name: Playwright E2E (Chromium, hard fail)
