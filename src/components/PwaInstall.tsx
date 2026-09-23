@@ -36,13 +36,13 @@ function iosNow(): boolean {
  */
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [ios, setIos] = useState(false);
+  // Read browser state in lazy initialisers instead of synchronously setting it
+  // from an effect. The initialisers are SSR-safe, and subsequent changes still
+  // arrive through the browser event subscriptions below.
+  const [installed, setInstalled] = useState(standaloneNow);
+  const [ios] = useState(iosNow);
 
   useEffect(() => {
-    setInstalled(standaloneNow());
-    setIos(iosNow());
-
     const displayMode = window.matchMedia("(display-mode: standalone)");
     const refreshInstalled = () => setInstalled(standaloneNow());
     const capturePrompt = (event: Event) => {
