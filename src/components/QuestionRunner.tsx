@@ -20,6 +20,7 @@ import {
   type DelayedFarTransferRetest,
 } from "@/domain/delayed-far-transfer";
 import { markMcq, rubricConfidence } from "@/domain/marking";
+import { shouldOfferMathInput } from "@/domain/math-input";
 import { answerLooksCopied } from "@/domain/learning-evidence";
 import { analyseAttemptWorking } from "@/domain/working-analysis";
 import { EditorialBadge } from "./EditorialBadge";
@@ -522,6 +523,12 @@ export function QuestionRunner({
                       onDraftChange?.({ answers: nextAnswers, choice });
                     }}
                     rows={Math.min(10, Math.max(3, part.marks + 1))}
+                    mathMode={shouldOfferMathInput({
+                      questionKind: question.kind,
+                      subjectName: getSubject(question.subjectId)?.name,
+                      stem: question.stem,
+                      prompt: part.prompt,
+                    })}
                   />
                 )}
               </div>
