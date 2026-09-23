@@ -250,6 +250,49 @@ describe("interpretation", () => {
 });
 
 describe("timing", () => {
+  it("beats calculation when a quantitative answer was mostly correct but rushed", () => {
+    const p = part({
+      prompt: "Calculate the kinetic energy of the object.",
+      marks: 4,
+      markScheme: ["substitutes into E = 1/2 mv²", "answer = 25 J"],
+    });
+    const q = question(p, { calculatorAllowed: true });
+    const result = run(
+      {
+        question: q,
+        part: p,
+        attempt: attempt(
+          { p1: "E = 1/2 × 2 × 5² = 25" },
+          marked({ awarded: 3, max: 4, missedPoints: ["unit J"] }),
+          3,
+          4,
+        ),
+      },
+      { timing: "rushed", secondsSpent: 12, marksLost: 1 },
+    );
+    expect(result.klass).toBe("timing");
+    expect(result.confidence).toBe("high");
+    expect(result.reasons.some((r) => r.includes("12s"))).toBe(true);
+  });
+
+  it("keeps calculation for rushed attempts that did not demonstrate most of the method", () => {
+    const p = part({
+      prompt: "Calculate the kinetic energy of the object.",
+      marks: 4,
+      markScheme: ["substitutes into E = 1/2 mv²", "answer = 25 J"],
+    });
+    const q = question(p, { calculatorAllowed: true });
+    const result = run(
+      {
+        question: q,
+        part: p,
+        attempt: attempt({ p1: "E = mv" }, marked({ awarded: 1, max: 4, missedPoints: ["answer = 25 J"] }), 1, 4),
+      },
+      { timing: "rushed", secondsSpent: 8, marksLost: 3 },
+    );
+    expect(result.klass).toBe("calculation");
+  });
+
   it("is called when the run was rushed on a part that was mostly earned", () => {
     const p = part({ prompt: "Describe the cardiac cycle.", marks: 6, markScheme: ["atria contract", "ventricles contract"] });
     const q = question(p);
