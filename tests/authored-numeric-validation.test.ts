@@ -46,6 +46,20 @@ describe("authored numeric validation", () => {
     expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
   });
 
+  it("ignores exponents inside parenthesised symbolic radicals", () => {
+    const result = validateWorkedSolution(
+      part("Magnitude = √(x² + y²) = 5.0 N", "The magnitude is 5.0 N."),
+    );
+    expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
+  });
+
+  it("ignores exponents inside square-bracket symbolic radicals", () => {
+    const result = validateWorkedSolution(
+      part("r = √[a² + b²] = 13 cm", "Therefore r = 13 cm."),
+    );
+    expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
+  });
+
   it("accepts an authored decimal equivalent of a pi answer", () => {
     const result = validateWorkedSolution(part("Correct answer 2π", "The value is approximately 6.283."));
     expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
