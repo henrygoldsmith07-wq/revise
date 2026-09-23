@@ -98,9 +98,11 @@ describe("seed cards", () => {
   });
 
   it("blanks a content word, not a stop word", () => {
-    const cloze = makeCloze("The concentration of reactants decreases over time");
+    const source = "The concentration of reactants decreases over time";
+    const cloze = makeCloze(source);
     expect(cloze).not.toBeNull();
     expect(cloze!.front).toContain("[…]");
+    expect(cloze!.clozeSource).toBe(source);
     expect(["the", "of", "over"]).not.toContain(cloze!.back.toLowerCase());
   });
 

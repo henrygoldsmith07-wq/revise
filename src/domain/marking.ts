@@ -18,8 +18,11 @@ const STOP_WORDS = new Set([
   "more", "less", "also", "into", "each", "their", "they", "you", "your", "we", "one", "two",
 ]);
 
+const MATH_NOTATION_TOKENS = new Set(["pi", "theta", "delta", "sqrt", "leq", "geq", "approx", "plusminus"]);
+
 /** Cheap stemmer: enough to make "oxidised"/"oxidise"/"oxidation" agree. */
 function stem(word: string): string {
+  if (MATH_NOTATION_TOKENS.has(word)) return word;
   let w = word;
   for (const suffix of ["ations", "ation", "ising", "izing", "ised", "ized", "ise", "ize", "ing", "ies", "es", "ed", "s"]) {
     if (w.length > suffix.length + 3 && w.endsWith(suffix)) {
@@ -34,6 +37,17 @@ export function tokenise(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
+      // Preserve meaningful maths notation as words before punctuation is
+      // stripped. This lets rubric matching distinguish π from a bare number,
+      // or ≤ from an equality that happens to share the same boundary value.
+      .replace(/π/g, " pi ")
+      .replace(/θ/g, " theta ")
+      .replace(/δ/g, " delta ")
+      .replace(/√/g, " sqrt ")
+      .replace(/≤/g, " leq ")
+      .replace(/≥/g, " geq ")
+      .replace(/≈/g, " approx ")
+      .replace(/±/g, " plusminus ")
       .replace(/[^a-z0-9+\-.^/=²³ ]/g, " ")
       .split(/\s+/)
       .filter((w) => w.length > 1 && !STOP_WORDS.has(w))
@@ -243,8 +257,36 @@ function sameToTwoSigFigs(a: number, b: number): boolean {
 }
 
 
+function matchesExplicitNumericAlternative(point: string, answer: string): boolean {
+  const marker = /\b(?:or|accept|approximately|approx)\b/i.exec(point);
+  if (!marker) return false;
+  const alternativeText = point.slice(marker.index + marker[0].length);
+  const wanted = extractNumbersCached(alternativeText.replace(/[−–—]/g, "-")).filter((hit) => hit.value != null);
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-")).filter((hit) => hit.value != null);
+  return wanted.some((expected) =>
+    given.some((actual) => numbersClose(expected.value!, actual.value!)),
+  );
+}
+
+function requiredMathNotationPresent(point: string, answer: string): boolean {
+  const relationalRequirements: Array<{ expected: RegExp; actual: RegExp }> = [
+    { expected: /≤|<=|\bless\s+than\s+or\s+equal\b/i, actual: /≤|<=|\bless\s+than\s+or\s+equal\b/i },
+    { expected: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i, actual: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i },
+    { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
+  ];
+  for (const requirement of relationalRequirements) {
+    if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
+  }
+
+  const numericAlternativeMatches = matchesExplicitNumericAlternative(point, answer);
+  if (/π|\bpi\b/i.test(point) && !/π|\bpi\b/i.test(answer) && !numericAlternativeMatches) return false;
+  if (/√|\bsqrt\b/i.test(point) && !/(?:√|\bsqrt\b)/i.test(answer) && !numericAlternativeMatches) return false;
+  return true;
+}
+
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 function numericMatch(point: string, answer: string): boolean {
+  if (!requiredMathNotationPresent(point, answer)) return false;
   const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
   if (!wanted.length) return false;
   const given = extractNumbersCached(answer.replace(/[−–—]/g, "-"));
@@ -325,6 +367,11 @@ export interface PartialCreditCalibration {
 }
 
 /** Evaluate whether a mark-scheme point looks like a calculation/numeric point. */
+function requiresStructuredNumericMatch(point: string): boolean {
+  if (!/\d/.test(point)) return false;
+  return /(?:±|≤|≥|π|√|\+\s*\/\s*-|<=|>=|\bsqrt\b|\bpi\b)/i.test(point);
+}
+
 export function isNumericPoint(point: string): boolean {
   if (!/\d/.test(point)) return false;
   return (
@@ -353,6 +400,7 @@ function evidenceScore(point: string, answer: string): number {
   const symbolic = symbolicMatch(answer, point);
   if (symbolic === "equivalent") return 1;
   if (symbolic === "not-equivalent") return 0;
+  if (requiresStructuredNumericMatch(point)) return numericEquivalent(point, answer) ? 1 : 0;
   return Math.max(pointCoverage(point, answer), numericEquivalent(point, answer) ? 0.9 : 0);
 }
 
@@ -670,6 +718,7 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     // and reject a pure expression that differs, even if a stray digit matches.
     // Unknown (unparseable/prose) never hurts: it falls through to the rubric.
     const sym = symbolicMatch(trimmed, point);
+    const structuredNumeric = requiresStructuredNumericMatch(point);
     const numeric = isNumericPoint(point);
     const strict = Boolean(calibration?.strictNumericPoints && numeric);
     let ok =
@@ -677,11 +726,13 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
         ? true
         : sym === "not-equivalent"
           ? false
-          : strict
-            ? (num && cov >= thresh)
-            : numeric
-              ? (num || cov >= thresh)
-              : (cov >= thresh || num);
+          : structuredNumeric
+            ? num
+            : strict
+              ? (num && cov >= thresh)
+              : numeric
+                ? (num || cov >= thresh)
+                : (cov >= thresh || num);
     if (ok && !num && sym === "unknown") {
       const discriminative = [...(pointTokenSets[pointIndex] ?? [])].filter(
         (t) => (documentFrequency.get(t) ?? 0) === 1,

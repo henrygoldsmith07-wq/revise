@@ -46,6 +46,14 @@ describe("tokenise", () => {
     const b = tokenise("oxidation");
     expect([...a].some((t) => [...b].includes(t))).toBe(true);
   });
+
+  it("preserves meaningful maths notation as rubric tokens", () => {
+    const tokens = tokenise("x ≤ 3, y = ±2, area = 2πr² and length = √2");
+    expect(tokens.has("leq")).toBe(true);
+    expect(tokens.has("plusminus")).toBe(true);
+    expect(tokens.has("pi")).toBe(true);
+    expect(tokens.has("sqrt")).toBe(true);
+  });
 });
 
 describe("pointCoverage", () => {
@@ -89,6 +97,44 @@ describe("markPart", () => {
       "T = 36.75",
     );
     expect(marked.awarded).toBe(1);
+  });
+
+  it("does not ignore required plus-minus notation", () => {
+    const solve = part({ marks: 1, markScheme: ["x = ±2"], prompt: "Solve x² = 4." });
+    expect(markPart(solve, "x = 2").awarded).toBe(0);
+    expect(markPart(solve, "x = ±3").awarded).toBe(0);
+    expect(markPart(solve, "x = ±2").awarded).toBe(1);
+  });
+
+  it("does not ignore inequality direction when the boundary number matches", () => {
+    const inequality = part({ marks: 1, markScheme: ["x ≤ 3"], prompt: "State the solution set." });
+    expect(markPart(inequality, "3").awarded).toBe(0);
+    expect(markPart(inequality, "x ≤ 4").awarded).toBe(0);
+    expect(markPart(inequality, "x ≤ 3").awarded).toBe(1);
+  });
+
+  it("requires pi when an exact answer is expressed in pi", () => {
+    const exact = part({ marks: 1, markScheme: ["2π"], prompt: "Give the exact circumference." });
+    expect(markPart(exact, "2").awarded).toBe(0);
+    expect(markPart(exact, "3π").awarded).toBe(0);
+    expect(markPart(exact, "2π").awarded).toBe(1);
+  });
+
+  it("accepts an explicit decimal alternative to pi but not the coefficient alone", () => {
+    const flexible = part({ marks: 1, markScheme: ["2π or 6.28"], prompt: "Give the circumference." });
+    expect(markPart(flexible, "2").awarded).toBe(0);
+    expect(markPart(flexible, "6.28").awarded).toBe(1);
+  });
+
+  it("requires radical notation for an exact surd unless the scheme offers an approximation", () => {
+    const exact = part({ marks: 1, markScheme: ["√2"], prompt: "Give the exact length." });
+    expect(markPart(exact, "2").awarded).toBe(0);
+    expect(markPart(exact, "√3").awarded).toBe(0);
+    expect(markPart(exact, "√2").awarded).toBe(1);
+
+    const flexible = part({ marks: 1, markScheme: ["√2 or 1.414"], prompt: "Give the length." });
+    expect(markPart(flexible, "2").awarded).toBe(0);
+    expect(markPart(flexible, "1.414").awarded).toBe(1);
   });
 });
 

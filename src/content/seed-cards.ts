@@ -1,4 +1,5 @@
 import { createCard } from "@/domain/scheduling";
+import { buildCloze, type BuiltCloze } from "@/domain/cloze";
 import { serialiseDiagram } from "@/domain/diagrams";
 import type { Card, Id, Topic } from "@/domain/types";
 import { diagramForTopic } from "./diagram-cards";
@@ -40,15 +41,14 @@ function firstClause(point: string): string {
  * cards test production rather than recognition, which is what an exam asks
  * for; blanking a stop word would test nothing.
  */
-export function makeCloze(sentence: string): { front: string; back: string } | null {
+export function makeCloze(sentence: string): BuiltCloze | null {
   const candidates = [...sentence.matchAll(/\b[A-Za-z][A-Za-z-]{5,}\b/g)]
     .map((m) => ({ word: m[0], index: m.index ?? 0 }))
     .filter((c) => !/^(because|through|between|against|another|instead|however)$/i.test(c.word));
   if (!candidates.length) return null;
   // The longest word is a decent proxy for the most technical one.
   const pick = candidates.reduce((a, b) => (b.word.length > a.word.length ? b : a));
-  const front = sentence.slice(0, pick.index) + "[…]" + sentence.slice(pick.index + pick.word.length);
-  return { front, back: pick.word };
+  return buildCloze(sentence, pick.word);
 }
 
 export function seedCardsForTopic(topic: Topic, userId: Id, now: Date = new Date()): Card[] {
@@ -97,7 +97,7 @@ export function seedCardsForTopic(topic: Topic, userId: Id, now: Date = new Date
             topicId: topic.id,
             front: cloze.front,
             back: cloze.back,
-            clozeSource: point,
+            clozeSource: cloze.clozeSource,
             kind: "cloze",
             origin: "seed",
             specPointIds: linkedSp,

@@ -20,6 +20,7 @@ import {
   type DelayedFarTransferRetest,
 } from "@/domain/delayed-far-transfer";
 import { markMcq, rubricConfidence } from "@/domain/marking";
+import { shouldOfferMathInput } from "@/domain/math-input";
 import { answerLooksCopied } from "@/domain/learning-evidence";
 import { analyseAttemptWorking } from "@/domain/working-analysis";
 import { EditorialBadge } from "./EditorialBadge";
@@ -332,7 +333,7 @@ export function QuestionRunner({
     // right one. It is computed from the deterministic local classifier first,
     // so the result view renders immediately and offline; a confident
     // classifier.dev verdict may refine it below, and can never change a mark.
-    let errorDiagnosis = diagnoseAttemptErrors({ question, marked, answers: submittedAnswers });
+    const errorDiagnosis = diagnoseAttemptErrors({ question, marked, answers: submittedAnswers });
 
     const farTransferLink = farTransfer
       ? completeDelayedFarTransfer(farTransfer, attempt, {
@@ -522,6 +523,12 @@ export function QuestionRunner({
                       onDraftChange?.({ answers: nextAnswers, choice });
                     }}
                     rows={Math.min(10, Math.max(3, part.marks + 1))}
+                    mathMode={shouldOfferMathInput({
+                      questionKind: question.kind,
+                      subjectName: getSubject(question.subjectId)?.name,
+                      stem: question.stem,
+                      prompt: part.prompt,
+                    })}
                   />
                 )}
               </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { speak, speechAvailable, stopSpeaking } from "@/lib/speech";
 import type { Card } from "@/domain/types";
+import { clozeReveal } from "@/domain/cloze";
 import { RichText } from "../RichText";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "../ui";
 import { AudioIcon, AudioOffIcon, ForwardIcon, ICON_SIZE } from "../icons";
@@ -73,7 +74,8 @@ export function AudioMode({ cards, onExit }: { cards: Card[]; onExit: () => void
           timers.current.push(
             setTimeout(() => {
               setPhase("answer");
-              speak(target.back, {
+              const answer = target.kind === "cloze" ? clozeReveal(target) : target.back;
+              speak(answer, {
                 onEnd: () => {
                   timers.current.push(setTimeout(() => playFromRef.current(at + 1), 900));
                 },
@@ -121,7 +123,7 @@ export function AudioMode({ cards, onExit }: { cards: Card[]; onExit: () => void
         <RichText className="text-lg text-ink text-center">{card.front}</RichText>
         {phase === "answer" ? (
           <div className="mt-4 pt-4 border-t border-line fade-in">
-            <RichText className="text-base text-center">{card.back}</RichText>
+            <RichText className="text-base text-center">{card.kind === "cloze" ? clozeReveal(card) : card.back}</RichText>
           </div>
         ) : phase === "thinking" ? (
           <p className="text-center text-sm text-ink3 mt-4">Say the answer out loud…</p>
