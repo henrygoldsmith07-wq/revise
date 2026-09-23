@@ -32,6 +32,20 @@ describe("authored numeric validation", () => {
     ]);
   });
 
+  it("ignores exponents inside symbolic rms radicals when checking the final authored value", () => {
+    const result = validateWorkedSolution(
+      part("c_rms = √⟨c²⟩ = 1.37×10³ m s⁻¹", "Therefore c_rms = 1.37×10³ m s⁻¹."),
+    );
+    expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
+  });
+
+  it("keeps symbolic rms radicals from inventing a required numeric 2", () => {
+    const result = validateWorkedSolution(
+      part("c_rms = √⟨c²⟩ ≈ 500 m s⁻¹", "The root-mean-square speed is approximately 500 m s⁻¹."),
+    );
+    expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
+  });
+
   it("accepts an authored decimal equivalent of a pi answer", () => {
     const result = validateWorkedSolution(part("Correct answer 2π", "The value is approximately 6.283."));
     expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
