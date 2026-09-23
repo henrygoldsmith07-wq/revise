@@ -103,11 +103,13 @@ test("a 0-confidence AI mark is escalated to the human-review queue", async ({ p
   // The mark came from "AI", so the escalation banner — not a crash — is the
   // contract for a zero-confidence grade. Scope the queue assertion to that
   // banner: the runner can legitimately render other live status regions
-  // (for example the working-analysis result) at the same time.
+  // (for example the working-analysis result) at the same time. Assert the
+  // student-facing sentence rather than an implementation shorthand so copy
+  // and accessibility stay covered together.
   const reviewStatus = main.getByRole("status").filter({ hasText: "Human review requested" });
   await expect(reviewStatus).toBeVisible({ timeout: 20_000 });
-  await expect(reviewStatus).toContainText("AI confidence 0%");
-  await expect(reviewStatus).toContainText("second-marker");
+  await expect(reviewStatus).toContainText("AI mark confidence is 0%, below the 60% threshold");
+  await expect(reviewStatus).toContainText("second-marker decision");
 
   // The escalation is persisted with the attempt: it stays visible on the
   // runner's result banner, and the pending record travels with the attempt
