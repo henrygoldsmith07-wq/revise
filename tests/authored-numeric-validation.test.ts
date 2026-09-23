@@ -19,6 +19,19 @@ describe("authored numeric validation", () => {
     expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
   });
 
+  it("accepts a coefficient multiplied by a surd as its decimal equivalent", () => {
+    const result = validateWorkedSolution(part("Correct answer 2√2", "The answer is approximately 2.828."));
+    expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
+  });
+
+  it("does not concatenate a radical coefficient with the evaluated radical", () => {
+    const result = validateWorkedSolution(part("Correct answer 2√2", "The answer is 21.414."));
+    expect(result.status).toBe("fail");
+    expect(result.issues).toEqual([
+      expect.objectContaining({ kind: "numeric-mismatch", severity: "error" }),
+    ]);
+  });
+
   it("accepts an authored decimal equivalent of a pi answer", () => {
     const result = validateWorkedSolution(part("Correct answer 2π", "The value is approximately 6.283."));
     expect(result.issues.filter((issue) => issue.kind === "numeric-mismatch")).toEqual([]);
