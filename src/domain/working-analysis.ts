@@ -80,9 +80,13 @@ function bestWorkedSolutionScore(point: string, modelAnswer: string, modelSteps:
  */
 function canonicaliseAuthoredNumericNotation(text: string): string {
   let out = text.replace(/[−–—]/g, "-");
-  // Handle an explicit coefficient before a radical as multiplication before
-  // replacing standalone radicals. Otherwise `2√2` would become `21.414...`
-  // and look like a contradiction instead of the value 2.828....
+  // A symbolic radical such as √⟨c²⟩ is a formula, not another authored
+  // numerical result. Remove the whole symbolic radicand before numeric
+  // comparison so its exponent cannot be mistaken for a required value.
+  out = out.replace(/(?:√|\bsqrt\s*)\s*⟨[^⟩]+⟩/gi, " ");
+  // Handle an explicit coefficient before a numeric radical as multiplication
+  // before replacing standalone radicals. Otherwise `2√2` would become
+  // `21.414...` and look like a contradiction instead of the value 2.828....
   out = out.replace(/(-?\d+(?:\.\d+)?)\s*(?:√|\bsqrt\s*)\s*\(?\s*(-?\d+(?:\.\d+)?)\s*\)?/gi, (_match, coefficient: string, radicand: string) => {
     const value = Number(coefficient) * Math.sqrt(Number(radicand));
     return Number.isFinite(value) ? String(value) : _match;
