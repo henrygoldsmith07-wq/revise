@@ -85,6 +85,11 @@ export interface GradeLoopReport {
 
 const MIN_PAIRS = 5;
 
+/** Stable per-account id for the weekly forecast snapshot. */
+export function gradePredictionSnapshotId(anonId: string, subjectId: Id, week: number): Id {
+  return `gp-${anonId}:${subjectId}:${week}`;
+}
+
 function round(n: number): number {
   return Math.round(n * 1000) / 1000;
 }

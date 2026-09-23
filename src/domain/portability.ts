@@ -2,16 +2,17 @@ import type { Id, IsoInstant, UserSettings } from "./types";
 import type { DeckExport } from "./types";
 import { exportDeck } from "./deck-io";
 import type { Card } from "./types";
+import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
 
 // ---------------------------------------------------------------------------
 // Data portability, privacy and account controls.
 //
 // Three promises in one module, all offline-first:
 //
-//  1. **Portability (GDPR Art. 20)** — export everything in a single JSON
-//     snapshot; import is just `parseDeckJson` + `materialiseDeck` per store
-//     plus the non-card stores. No server is required; the file never leaves
-//     the device unless the user shares it.
+//  1. **Portability (GDPR Art. 20)** — export user-held study data in one
+//     machine-readable JSON archive. Card decks have a first-class importer;
+//     full snapshot restore is intentionally not claimed until every linked
+//     history row can be restored without breaking ids or evidence provenance.
 //  2. **Deletion (Art. 17) + retention** — purging is an explicit, reversible
 //     step in the UI; the helpers here are pure so the UI can show exactly
 //     what will disappear before it does.
@@ -38,6 +39,12 @@ export interface PortabilitySnapshot {
   plannedSessions: unknown[];
   examDatesCount: number;
   examDates: unknown[];
+  /** Forecast snapshots used to audit predicted grades against later outcomes. */
+  gradePredictionsCount: number;
+  gradePredictions: GradePredictionRecord[];
+  /** Mocks, timed papers and final results entered by the student. */
+  gradeActualsCount: number;
+  gradeActuals: ActualResultRecord[];
   /** Immediate, transfer and delayed-retention intervention evidence. */
   interventionOutcomesCount: number;
   interventionOutcomes: unknown[];
@@ -59,6 +66,8 @@ export interface PortabilityInput {
   mistakes: unknown[];
   plannedSessions: unknown[];
   examDates: unknown[];
+  gradePredictions?: GradePredictionRecord[];
+  gradeActuals?: ActualResultRecord[];
   interventionOutcomes?: unknown[];
   settings?: UserSettings | null;
   streak?: unknown | null;
@@ -85,14 +94,18 @@ export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySn
     plannedSessions: input.plannedSessions,
     examDatesCount: input.examDates.length,
     examDates: input.examDates,
+    gradePredictionsCount: input.gradePredictions?.length ?? 0,
+    gradePredictions: input.gradePredictions ?? [],
+    gradeActualsCount: input.gradeActuals?.length ?? 0,
+    gradeActuals: input.gradeActuals ?? [],
     interventionOutcomesCount: input.interventionOutcomes?.length ?? 0,
     interventionOutcomes: input.interventionOutcomes ?? [],
     settings: input.settings ?? null,
     streak: input.streak ?? null,
     seedVersion: input.seedVersion ?? 1,
     notes: [
-      "This is a complete, machine-readable export of your Revise data. Keep it private — it contains every card you authored.",
-      "To restore: Settings → Data → Import and choose this file.",
+      "This is a complete, machine-readable export of your Revise data. Keep it private — it contains authored cards, study history and any recorded assessment outcomes.",
+      "Card content can be re-imported from the Library deck importer. Keep this full snapshot as the machine-readable archive for study history and recorded outcomes; full snapshot restore is not yet available.",
     ],
   };
 }
@@ -117,6 +130,12 @@ export function parsePortabilitySnapshot(text: string): ParsedPortability {
     return { ok: false, snapshot: null, warnings: ["This does not look like a Revise export (missing app/formatVersion)."], counts: { cards: 0, attempts: 0, reviewLogs: 0, mistakes: 0 } };
   }
   const snap = body as unknown as PortabilitySnapshot;
+  // Grade-loop fields were added additively to format v1. Older v1 exports
+  // remain valid and simply restore with no recorded forecast/outcome history.
+  if (!Array.isArray(snap.gradePredictions)) snap.gradePredictions = [];
+  if (!Array.isArray(snap.gradeActuals)) snap.gradeActuals = [];
+  snap.gradePredictionsCount = snap.gradePredictions.length;
+  snap.gradeActualsCount = snap.gradeActuals.length;
   if (!Array.isArray(snap.cards?.cards)) warnings.push("Cards deck missing — the rest of the export was read.");
   if (typeof snap.seedVersion !== "number") warnings.push("No seedVersion — restore may behave differently on a newer app.");
   return {
@@ -190,12 +209,12 @@ export function privacyDisclosure(cloudEnabled: boolean): string[] {
   if (!cloudEnabled) {
     return [
       "Local-only mode: everything is stored in your browser (IndexedDB) and never sent to a server.",
-      "No analytics, no cookies, no account required. Your cards, attempts and review logs leave this device only if you export or share a deck.",
+      "No analytics, no cookies, no account required. Your cards, attempts, review logs and recorded assessment outcomes leave this device only if you export or share data.",
       "Clear site data or use Settings → Data → Delete to remove everything. Nothing can be recovered after that.",
     ];
   }
   return [
-    "Cloud sync relays your data to Supabase so it can appear on other devices. The server stores the same rows that live in IndexedDB — it is a replica, not a separate source of truth.",
+    "Cloud sync relays supported study rows to Supabase so they can appear on other devices. Local metadata such as forecast calibration history stays on this device unless you export it.",
     "Data is scoped by your user id with row-level security. Use Settings → Data → Export to get a machine-readable copy, or Delete to remove your account's rows locally and on next sync on the server.",
     "You can switch back to local-only at any time — queued changes stay local and nothing new is uploaded.",
   ];
