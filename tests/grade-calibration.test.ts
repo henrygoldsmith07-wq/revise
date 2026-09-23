@@ -14,7 +14,9 @@ import type { Attempt, TopicMastery } from "@/domain/types";
 //  3. predictGrade confidence grows and bias shrinks as evidence accumulates
 // ---------------------------------------------------------------------------
 
-const S = getSubject("wjec-alevel-chemistry")!;
+// Generic calibration mechanics use a reference subject. These synthetic
+// histories are not reviewed WJEC evidence or empirical grade validation.
+const S = getSubject("aqa-alevel-chemistry")!;
 const TOPICS = topicsFor(S.id);
 
 function masteryFor(val: number, topicIds: string[]): TopicMastery[] {

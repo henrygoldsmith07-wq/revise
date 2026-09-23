@@ -1,4 +1,6 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type { QuestionTrace } from "./knowledge-tracing";
+import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { masteryIntervals } from "./mastery-uncertainty";
 import type { Attempt, Card, Id, Mistake, Question, Topic, TopicMastery } from "./types";
 import type { MasteryInterval } from "./mastery-uncertainty";
@@ -33,26 +35,41 @@ export function sparseEvidenceConfidence(input: {
   cards: Card[];
   attempts: Attempt[];
   mistakes: Mistake[];
+  /** Optional bank snapshot used to keep unreviewed Physics out of confidence. */
+  questions?: Question[];
   now?: Date;
 }): SparseEvidenceConfidenceReport {
   const masteryByTopic = new Map(input.mastery.map((row) => [row.topicId, row.mastery]));
   const cardsByTopic = new Map<Id, Card[]>();
   const attemptsByTopic = new Map<Id, Attempt[]>();
   const mistakesByTopic = new Map<Id, Mistake[]>();
+  const questionById = new Map((input.questions ?? []).map((question) => [question.id, question] as const));
+  const attemptById = new Map(input.attempts.map((attempt) => [attempt.id, attempt] as const));
+  const trustedAttempt = (attempt: Attempt): boolean => {
+    const question = questionById.get(attempt.questionId);
+    if (!question) return !requiresWjecContentReview(attempt.subjectId);
+    return trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? []);
+  };
+  const trustedMistake = (mistake: Mistake): boolean => {
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
+    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
+    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
+    return Boolean(attempt && question && trustedAttempt(attempt));
+  };
 
   for (const card of input.cards) {
     const rows = cardsByTopic.get(card.topicId) ?? [];
     rows.push(card);
     cardsByTopic.set(card.topicId, rows);
   }
-  for (const attempt of input.attempts) {
+  for (const attempt of input.attempts.filter(trustedAttempt)) {
     for (const topicId of attempt.topicIds) {
       const rows = attemptsByTopic.get(topicId) ?? [];
       rows.push(attempt);
       attemptsByTopic.set(topicId, rows);
     }
   }
-  for (const mistake of input.mistakes) {
+  for (const mistake of input.mistakes.filter(trustedMistake)) {
     const rows = mistakesByTopic.get(mistake.topicId) ?? [];
     rows.push(mistake);
     mistakesByTopic.set(mistake.topicId, rows);
@@ -152,8 +169,8 @@ function priorRate(topicIds: Id[], prior: Map<Id, TopicPrior>): number {
 export function buildPredictionOutcomePairs(input: { attempts: Attempt[]; questions: Question[] }): PredictionOutcomePair[] {
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
   const grouped = new Map<string, Attempt[]>();
-  for (const attempt of input.attempts.filter((row) => row.mode === "paper")) {
-    const key = `${attempt.subjectId}:${groupKey(attempt)}`;
+  for (const attempt of input.attempts.filter((row) => row.mode === "paper" && trustworthyAttempt(row))) {
+    const key = `${attempt.userId}:${attempt.subjectId}:${groupKey(attempt)}`;
     const rows = grouped.get(key) ?? [];
     rows.push(attempt);
     grouped.set(key, rows);
@@ -166,6 +183,10 @@ export function buildPredictionOutcomePairs(input: { attempts: Attempt[]; questi
   const pairs: PredictionOutcomePair[] = [];
 
   for (const group of groups) {
+    // A partial trusted subset is not a whole paper. Keep practice evidence
+    // elsewhere, but exclude the entire Physics sitting from calibration.
+    if (requiresWjecContentReview(group[0]?.subjectId) && group.some((attempt) =>
+      !authenticPaperEvidence(attempt, questionsById.get(attempt.questionId), input.attempts, input.questions))) continue;
     let predictedMarks = 0;
     let actualMarks = 0;
     let marksAvailable = 0;

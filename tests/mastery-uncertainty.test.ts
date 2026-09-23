@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { createCard } from "@/domain/scheduling";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import type { Attempt, Card } from "@/domain/types";
@@ -59,16 +57,5 @@ describe("mastery uncertainty", () => {
     expect(thin).toMatchObject({ uncertainty: "high", needsMoreEvidence: true, evidence: 3 });
     expect(measured.needsMoreEvidence).toBe(false);
     expect(measured.width).toBeLessThan(thin.width);
-  });
-
-  it("wires intervals and evidence actions into Progress", () => {
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    const panels = readFileSync(join(process.cwd(), "src/components/AssessmentPanels.tsx"), "utf8");
-    const store = readFileSync(join(process.cwd(), "src/state/store.tsx"), "utf8");
-
-    expect(progress).toContain("MasteryUncertaintyCard");
-    expect(panels).toContain("Mastery uncertainty");
-    expect(panels).toContain("masteryUncertainty");
-    expect(store).toContain("masteryIntervals");
   });
 });

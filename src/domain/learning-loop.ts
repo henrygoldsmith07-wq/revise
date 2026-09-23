@@ -119,6 +119,42 @@ export function markCompleted(loop: LearningLoop, completed: boolean, now = new 
   };
 }
 
+/**
+ * The learning-loop effectiveness rules, written explicitly (no chained
+ * ternary precedence to misread):
+ *
+ *   1. Accuracy never "improves" from a baseline of null until the first
+ *      evidence clears the floor — a weak first attempt proves a gap, not a
+ *      regression, and a single strong first attempt is directional, not a
+ *      proven gain over nothing.
+ *   2. With a measured baseline, a gain must clear it by a small noise
+ *      epsilon; 0.60 → 0.61 is wobble, 0.60 → 0.65 is improvement.
+ *   3. A teaching intervention is only "effective" when the accuracy gain is
+ *      accompanied by rising (or at least not-falling) mastery — otherwise
+ *      the apparent gain is not evidence the learning lasted.
+ *   4. Unknown stays unknown: no baseline and sub-floor accuracy is not
+ *      recorded as improvement, and a single noisy answer never flips a
+ *      well-evidenced loop to "effective" on its own (the epsilon + mastery
+ *      clauses both must hold).
+ */
+
+/** First-evidence floor: accuracy at/above this on the first assessment is a
+ * directional gain; below it, the baseline was unknown so nothing improved. */
+export const IMPROVEMENT_FLOOR = 0.55;
+/** Noise epsilon a measured gain must exceed to count as real improvement. */
+export const IMPROVEMENT_EPSILON = 0.03;
+
+/** Whether one assessment counts as improved over the recorded baseline. */
+export function accuracyImproved(baseline: number | null, accuracy: number): boolean {
+  if (baseline === null) return accuracy >= IMPROVEMENT_FLOOR;
+  return accuracy >= baseline + IMPROVEMENT_EPSILON;
+}
+
+/** Whether mastery evidence also rose (or is unmeasured) alongside the gain. */
+export function masteryImproved(masteryAtDetection: number, masteryAfter: number | null): boolean {
+  return masteryAfter === null || masteryAfter > masteryAtDetection;
+}
+
 export function recordSubsequentAssessment(loop: LearningLoop, input: {
   awarded: number;
   max: number;
@@ -126,16 +162,16 @@ export function recordSubsequentAssessment(loop: LearningLoop, input: {
   now?: Date;
 }): LearningLoop {
   const at = (input.now ?? new Date()).toISOString();
-  const accuracy = input.max ? input.awarded / input.max : 0;
-  const improved = accuracy > loop.weaknessEvidence.accuracyAtDetection! || loop.weaknessEvidence.accuracyAtDetection == null ? accuracy > 0.55 : accuracy > loop.weaknessEvidence.accuracyAtDetection;
-  const effective = improved && (loop.masteryAfter == null || input.masteryAfter > loop.weaknessEvidence.masteryAtDetection);
+  const roundedAccuracy = input.max ? Math.round((input.awarded / input.max) * 1000) / 1000 : 0;
+  const improved = accuracyImproved(loop.weaknessEvidence.accuracyAtDetection, roundedAccuracy);
+  const effective = improved && masteryImproved(loop.weaknessEvidence.masteryAtDetection, input.masteryAfter);
   return {
     ...loop,
     subsequentPerformance: {
       assessedAt: at,
       awarded: input.awarded,
       max: input.max,
-      accuracy: Math.round(accuracy * 1000) / 1000,
+      accuracy: roundedAccuracy,
       improved,
     },
     masteryAfter: input.masteryAfter,

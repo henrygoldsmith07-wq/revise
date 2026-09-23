@@ -13,10 +13,11 @@ describe("security — RLS + schema invariants", () => {
     }
     expect(sql).toContain("with check (user_id = auth.uid())");
   });
-  it("updated_at trigger prevents stale sync skips", () => {
+  it("updated_at trigger rejects stale duplicate-device writes", () => {
     const sql = schema();
     expect(sql).toContain("touch_updated_at");
-    expect(sql).toContain("greatest(now()");
+    expect(sql).toContain("new.updated_at <= old.updated_at");
+    expect(sql).toContain("return old;");
   });
   it("text columns that must be scoped contain user_id", () => {
     const sql = schema();
@@ -28,5 +29,13 @@ describe("security — API route guards", () => {
     const route = readFileSync(join(process.cwd(), "src/app/api/ai/route.ts"), "utf8");
     expect(route).toContain("payloadSchemas");
     expect(route).toContain("safeParse");
+  });
+
+  it("/api/ai authenticates when Supabase is configured and caps body size", () => {
+    const route = readFileSync(join(process.cwd(), "src/app/api/ai/route.ts"), "utf8");
+    expect(route).toContain("getUser");
+    expect(route).toContain("status: 401");
+    expect(route).toContain("MAX_BODY_CHARS");
+    expect(route).toContain("status: 413");
   });
 });

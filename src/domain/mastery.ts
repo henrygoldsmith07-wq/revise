@@ -1,5 +1,7 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
-import type { Attempt, Card, Id, Mistake, ReviewLog, Topic, TopicMastery } from "./types";
+import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
 // Mastery is the number every other engine reads: the planner sizes sessions
@@ -15,12 +17,48 @@ export const WEAK_THRESHOLD = 0.55;
 const FULL_EVIDENCE = 8;
 const NEUTRAL_PRIOR = 0.4;
 
+// --- Bayesian cold-start prior ----------------------------------------------
+//
+// "Unmeasured = 0%" is honest but demoralising: a new student sees a wall of
+// zeros before they have done anything. A Beta-Binomial prior fixes the
+// psychology without lying: start from the cohort's average performance and
+// narrow toward the student's own evidence as it accumulates.
+//
+//   predictedMastery = (evidence·raw + α) / (evidence + α + β)
+//
+// with α/β chosen so the prior mean is COHORT_PRIOR_MEAN at strength
+// COHORT_PRIOR_STRENGTH pseudo-observations. With no evidence the estimate IS
+// the prior; each real observation shrinks the prior's share n₀/(n₀+n), so
+// "Predicted mastery" converges onto "Proven mastery" as variance collapses.
+// The engines (planner, recommender, grade prediction) keep reading `mastery`
+// — the proven estimate — so a never-opened topic still routes to "learn".
+
+/** Cohort average performance the prior starts from. */
+export const COHORT_PRIOR_MEAN = 0.45;
+/** Pseudo-observations the prior carries; higher = slower to move off the prior. */
+export const COHORT_PRIOR_STRENGTH = 6;
+
+/** Beta-Binomial posterior mean blending raw performance with the cohort prior. */
+export function bayesianMastery(raw: number, evidence: number): number {
+  const alpha = COHORT_PRIOR_MEAN * COHORT_PRIOR_STRENGTH;
+  const beta = (1 - COHORT_PRIOR_MEAN) * COHORT_PRIOR_STRENGTH;
+  return (raw * evidence + alpha) / (evidence + alpha + beta);
+}
+
+/** Share of the predicted mastery still carried by the prior (1 = pure prior). */
+export function priorRemaining(evidence: number): number {
+  return COHORT_PRIOR_STRENGTH / (COHORT_PRIOR_STRENGTH + Math.max(0, evidence));
+}
+
 export interface MasteryInput {
   topics: Topic[];
   cards: Card[];
   reviewLogs: ReviewLog[];
   attempts: Attempt[];
   mistakes: Mistake[];
+  /** Optional bank snapshot used to exclude unreviewed Physics marks. */
+  questions?: Question[];
+  trustedQuestion?: (question: Question) => boolean;
   now?: Date;
 }
 
@@ -35,7 +73,13 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
 
   const cardsByTopic = groupBy(input.cards, (c) => c.topicId);
   const attemptsByTopic = new Map<Id, Attempt[]>();
+  const questionById = new Map((input.questions ?? []).map((question) => [question.id, question]));
+  const trustedQuestion = input.trustedQuestion ?? (() => true);
   for (const attempt of input.attempts) {
+    const question = questionById.get(attempt.questionId);
+    if (question) {
+      if (!trustedQuestion(question) || !trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? [])) continue;
+    } else if (requiresWjecContentReview(attempt.subjectId) || !trustworthyAttempt(attempt)) continue;
     for (const topicId of attempt.topicIds) {
       const list = attemptsByTopic.get(topicId) ?? [];
       list.push(attempt);
@@ -43,8 +87,16 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     }
   }
   const logsByTopic = groupBy(input.reviewLogs, (l) => l.topicId);
+  const trustedMistakes = input.mistakes.filter((mistake) => {
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
+    const question = mistake.questionId ? questionById.get(mistake.questionId) : undefined;
+    // A mistake on an unreviewed Physics item is useful feedback to the
+    // learner, but it cannot lower or otherwise establish trusted mastery.
+    const attempt = mistake.attemptId ? input.attempts.find((row) => row.id === mistake.attemptId) : undefined;
+    return Boolean(question && attempt && trustedQuestion(question) && trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? []));
+  });
   const openMistakes = groupBy(
-    input.mistakes.filter((m) => !m.resolved),
+    trustedMistakes.filter((m) => !m.resolved),
     (m) => m.topicId,
   );
 
@@ -78,6 +130,11 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     // would inflate the predicted grade and hide the topic from the planner.
     let mastery = evidence === 0 ? 0 : NEUTRAL_PRIOR * (1 - weight) + raw * weight;
 
+    // Bayesian view for the student: the cohort prior predicts where a new
+    // topic probably sits, and narrows onto the proven estimate with evidence.
+    const predicted = evidence === 0 ? COHORT_PRIOR_MEAN : bayesianMastery(raw, evidence);
+    const priorShare = priorRemaining(evidence);
+
     // Unresolved mistakes are direct evidence of an unrepaired gap.
     const openCount = (openMistakes.get(topic.id) ?? []).length;
     mastery *= Math.max(0.6, 1 - openCount * 0.06);
@@ -94,12 +151,16 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
       ...logs.map((l) => l.reviewedAt),
       ...attempts.map((a) => a.createdAt),
     ].sort();
-    const lastStudiedAt = timestamps.length ? timestamps[timestamps.length - 1] : null;
+    const lastStudiedAt = timestamps.length ? timestamps[timestamps.length - 1] ?? null : null;
 
     return {
       topicId: topic.id,
       subjectId: topic.subjectId,
       mastery,
+      /** Cohort-prior posterior — what a cold-start topic displays. */
+      predictedMastery: Math.round(predicted * 1000) / 1000,
+      /** Fraction of the prediction still carried by the prior (0–1). */
+      priorRemaining: Math.round(priorShare * 1000) / 1000,
       retention,
       confidence,
       cardsTotal: cards.length,

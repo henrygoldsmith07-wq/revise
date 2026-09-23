@@ -49,6 +49,13 @@ export interface Subject {
   gradeBoundaries: { grade: string; percent: number }[];
   /** Which spec document this subject's content tracks, and when it was last checked. */
   spec?: SubjectSpec;
+  /**
+   * Flagship subjects are authored against that board's spec. Reference subjects
+   * reuse a flagship outline for navigation and must not be labelled "checked".
+   */
+  contentTier?: "flagship" | "reference";
+  /** Shown in the UI when contentTier is "reference". */
+  contentDisclaimer?: string;
 }
 
 export interface Unit {
@@ -62,6 +69,28 @@ export type AoCode = "AO1" | "AO2" | "AO3";
 export type VerificationStatus = "unverified" | "checked" | "verified";
 export type ContentSource = "authored" | "licensed" | "generated" | "past-paper" | "import" | "adapted" | "unreviewed";
 
+/** Separate checks stop a single "verified" stamp hiding a weak component. */
+export interface HumanVerificationRecord {
+  status: "pending" | "approved" | "changes-requested";
+  reviewerId?: Id;
+  /** Role of the qualified Physics reviewer who made the decision. */
+  reviewerRole?: "examiner" | "teacher" | "subject-expert";
+  /** Free-text qualification evidence, e.g. "WJEC A-level Physics examiner". */
+  reviewerQualification?: string;
+  reviewedAt?: IsoInstant;
+  /** Fingerprint of the exact question, scheme, solution and mappings reviewed. */
+  contentFingerprint?: string;
+  checks: {
+    question: boolean;
+    marking: boolean;
+    workedSolution: boolean;
+    capabilityMapping: boolean;
+    specificationMapping?: boolean;
+    examRealism?: boolean;
+  };
+  notes?: string;
+}
+
 /** Cite a licensed source when provenance is "licensed". Paraphrased claims stay compliant without verbatim text. */
 export interface LicensedSource {
   /** Human citation, e.g. "Edexcel GCE Mathematics spec 9MA0, §2.1 (2024)" */
@@ -69,6 +98,30 @@ export interface LicensedSource {
   licence?: string;
   url?: string;
   accessedAt?: IsoDate;
+}
+
+/**
+ * Provenance for an extracted exam question. A paper id alone is not enough:
+ * the source must be traceable to an immutable board document and explicitly
+ * checked before it can contribute trusted paper evidence.
+ */
+export interface PaperQuestionProvenance {
+  board: string;
+  specification: string;
+  specificationVersion?: string;
+  paperId: Id;
+  /** Immutable sitting identity; different series must never be merged. */
+  sittingId?: Id;
+  year?: number;
+  series?: string;
+  questionNumber: string;
+  sourceUrl: string;
+  /** Digest/manifest id for the source file or licensed archive snapshot. */
+  sourceDigest: string;
+  status: "pending" | "verified" | "rejected";
+  verifiedBy?: Id;
+  verifiedAt?: IsoInstant;
+  notes?: string;
 }
 
 export interface SpecPoint {
@@ -171,6 +224,41 @@ export interface Misconception {
 export type CardKind = "basic" | "cloze" | "image" | "equation" | "mistake" | "audio";
 export type RecallGrade = "again" | "hard" | "good" | "easy";
 
+/**
+ * Immutable FSRS snapshot taken just before the first Lamport-stamped grade
+ * was appended to a card's op log. Together, `base` + `log` are a complete
+ * description of the card's scheduling history: the FSRS fields are a pure
+ * function of replaying the log from the base (see domain/sync-crdt.ts).
+ * Written once, never mutated afterwards.
+ */
+export interface CardSyncBase {
+  due: IsoDate;
+  stability: number;
+  difficulty: number;
+  reps: number;
+  lapses: number;
+  state: number;
+}
+
+/**
+ * One grading event in a card's CRDT operation log. The pair
+ * `(lamport, deviceId)` is a total order — the Lamport counter orders events
+ * on one device, and the deviceId breaks ties across devices — so every
+ * replica replays the same log into the same FSRS state.
+ */
+export interface CardGradeEvent {
+  /** The grade applied, FSRS-style. */
+  grade: RecallGrade;
+  /** Wall-clock moment of the review (display + elapsed-day computation). */
+  reviewedAt: IsoInstant;
+  /** Minting device — part of the total order and of the event's identity. */
+  deviceId: string;
+  /** Minting device's Lamport counter — the other half of the total order. */
+  lamport: number;
+  /** Present only on the first event of a log: the pre-logging FSRS snapshot. */
+  base?: CardSyncBase;
+}
+
 export interface Card {
   id: Id;
   userId: Id;
@@ -205,6 +293,16 @@ export interface Card {
   suspended?: boolean;
   /** Buried cards reappear on this date. Bury is a one-day snooze. */
   buriedUntil?: IsoDate;
+  /**
+   * CRDT operation log: every grade this card has ever received, Lamport-
+   * stamped. This is the source of truth for the card's FSRS state across
+   * devices — `syncCardState` replays it, so two devices that graded the same
+   * card concurrently converge on one deterministic schedule instead of one
+   * grade silently erasing the other. Optional: cards authored before the
+   * sync upgrade have no log and fall back to last-write-wins until their
+   * next review.
+   */
+  log?: CardGradeEvent[];
   // FSRS state
   due: IsoDate;
   stability: number;
@@ -233,6 +331,244 @@ export interface ReviewLog {
 
 export type QuestionKind = "mcq" | "short" | "structured" | "calculation" | "extended";
 
+/**
+ * Part-level learning metadata. A structured question can contain several
+ * demands, so putting the demand only on Question.learning loses the evidence
+ * needed to audit coverage and to diagnose a single capability. The family,
+ * context and reasoning moves are authored facts; they are never inferred from
+ * a topic name or from the student's score.
+ */
+export type ReasoningGraphNodeKind = "evidence" | "operation" | "intermediate" | "constraint" | "conclusion";
+
+export interface ReasoningGraphNode {
+  kind: ReasoningGraphNodeKind;
+  label: string;
+}
+
+export interface ReasoningGraph {
+  nodes: ReasoningGraphNode[];
+}
+
+export interface SetupFingerprint {
+  relationshipTopology: string;
+  knownVsUnknown: string;
+  hiddenState: string;
+  representationType: string;
+  operationSequence: string;
+  suppliedVsInferred: string;
+  constraintType: string;
+  requestedOutput: string;
+}
+
+export interface TransferLink {
+  baselinePartId: Id;
+  baselineSetupFingerprint: SetupFingerprint;
+  transferSetupFingerprint: SetupFingerprint;
+  baselineReasoningGraph: ReasoningGraph;
+  transferReasoningGraph: ReasoningGraph;
+}
+
+export interface SynopticLink {
+  primaryCapabilityId: Id;
+  secondaryCapabilityId: Id;
+}
+
+export interface LearningPartMetadata {
+  familyId: Id;
+  contextId: Id;
+  demand: LearningDemand;
+  /** Distinct cognitive operations required by this part. */
+  reasoningMoves: string[];
+  /**
+   * Authoring quality gate. Scaffold cells may guide authors, but cannot
+   * establish deep coverage or trusted learning evidence.
+   */
+  quality?: "substantive" | "scaffold";
+  /**
+   * Authoring-only target/result split.  `promptTarget` is the task exposed
+   * to a learner; the remaining fields stay with the hidden answer evidence
+   * and must never be interpolated into the prompt.
+   */
+  promptTarget?: string;
+  expectedResult?: string;
+  derivation?: string[];
+  evidenceSources?: string[];
+  /**
+   * Concrete evidence contract for the mapped capability.  These are
+   * authored entities/operations rather than a topic label, so the audit can
+   * tell whether a generated item actually instantiates the intended skill.
+   */
+  capabilityEvidence?: CapabilityEvidenceContract;
+  /** Machine-readable description of the learner-visible setup.  This is
+   * derived from the rendered prompt and is kept alongside the authored
+   * contract so audits can show exactly which structures were supplied. */
+  setupFingerprint?: CapabilitySetupFingerprint;
+  /**
+   * Claim-level provenance for a worked answer.  The audit uses this to keep
+   * supplied data, intermediate results and the final result distinct and to
+   * reject answers that invent unsupported values.
+   */
+  provenance?: LearningProvenance;
+  /**
+   * Ordered semantic reasoning graph: evidence → operation → intermediate
+   * state → constraint/check → conclusion. Stable labels, not prose.
+   */
+  reasoningGraph?: ReasoningGraph;
+  /**
+   * Structural transfer linkage. Every substantive transfer cell references
+   * an explicit baseline task from the same capability plus both setup
+   * fingerprints and both reasoning graphs.
+   */
+  transferLink?: TransferLink;
+  /**
+   * Explicit synoptic linkage with real mapped capability ids. Both strands
+   * need independent structural contracts (see primaryContract /
+   * secondaryContract).
+   */
+  synopticLink?: SynopticLink;
+  primaryContract?: CapabilityEvidenceContract;
+  secondaryContract?: CapabilityEvidenceContract;
+}
+
+export interface CapabilityEvidenceContract {
+  capabilityId: Id;
+  /** Named entities, representations or quantities that must be present. */
+  requiredEntities: string[];
+  /** Operations/transformations the learner must perform or explain. */
+  requiredOperations: string[];
+  /** Optional relations, constraints or laws that make the evidence checkable. */
+  requiredRelations?: string[];
+  /** Structural contract for the supplied problem, independent of labels or
+   * answer-key prose.  A missing required structure is a hard capability
+   * evidence failure for substantive content. */
+  structuralContract?: CapabilityStructureContract;
+  /** Fingerprint of the learner-visible setup used to satisfy the contract. */
+  setupFingerprint?: CapabilitySetupFingerprint;
+  /** The route evidence attributable to this capability. */
+  derivation?: CapabilityDerivationEvidence;
+  /**
+   * A second capability is required for a synoptic part.  Keeping this as an
+   * authored label (rather than inferring it from the topic name) lets the
+   * audit verify that both strands are explicit and attributable.
+   */
+  secondaryCapability?: string;
+  /** Optional stable secondary capability id for structural synoptic checks. */
+  secondaryCapabilityId?: Id;
+  secondaryStructuralContract?: CapabilityStructureContract;
+  /** Explicit join used by structural synoptic validation. */
+  joiningDependency?: string;
+}
+
+/** Observable problem structures used by subject-specific capability
+ * contracts.  These deliberately describe inputs/representations rather
+ * than topic labels so a prompt cannot pass by naming a skill. */
+export type CapabilityStructureKind =
+  | "polynomial"
+  | "quadratic"
+  | "radical-expression"
+  | "factor-theorem-instance"
+  | "simultaneous-equations"
+  | "inequality-domain"
+  | "transformation-graph"
+  | "exponential-function"
+  | "logarithmic-expression"
+  | "coordinate-geometry"
+  | "function"
+  | "derivative-target"
+  | "tangent-normal"
+  | "rate-of-change"
+  | "optimisation-constraint"
+  | "integral"
+  | "definite-integral"
+  | "trigonometric-triangle"
+  | "trigonometric-identity"
+  | "trigonometric-equation"
+  | "probability-events"
+  | "probability-tree"
+  | "conditional-probability"
+  | "vector-components"
+  | "table-dataset"
+  | "graph-dataset"
+  | "membrane-gradient"
+  | "membrane-model"
+  | "enzyme-assay"
+  | "micrograph"
+  | "dna-sequence"
+  | "controlled-experiment"
+  | "biological-molecule"
+  | "cell-ultrastructure"
+  | "chemical-equation"
+  | "stoichiometric-data"
+  | "titration-dataset"
+  | "equilibrium-system"
+  | "mass-spectrum"
+  | "electron-configuration"
+  | "molecular-structure"
+  | "redox-species"
+  | "gas-data"
+  | "bonding-model"
+  | "particle-model"
+  | "numeric-data";
+
+export interface CapabilitySetupFingerprint {
+  /** Canonical subject family, when known. */
+  subject?: "maths" | "biology" | "chemistry" | "physics";
+  structures: CapabilityStructureKind[];
+  /** Representations actually supplied, e.g. equation, graph or table. */
+  representations: string[];
+  /** Learner-visible operations/commands, canonicalised. */
+  operations: string[];
+  /** Equations, ratios, gradients or other explicit relationships. */
+  relationships: string[];
+  /** Expected response form inferred from the target command. */
+  outputTypes: string[];
+}
+
+export interface CapabilityStructureContract {
+  requiredStructures?: CapabilityStructureKind[];
+  /** Alternative structure sets for capabilities whose valid instances have
+   * different representations (for example a rate, tangent or optimisation
+   * item under one differentiation statement). Each group requires one of
+   * its members. */
+  requiredStructureGroups?: CapabilityStructureKind[][];
+  requiredRepresentations?: string[];
+  requiredOperations?: string[];
+  /** Alternative operations accepted for the same structure.  This is useful
+   * when a statement is assessed through a calculation, explanation or
+   * misconception repair while retaining one machine-checkable contract. */
+  requiredOperationGroups?: string[][];
+  requiredRelationships?: string[];
+  expectedOutputTypes?: string[];
+  /** Structures that are tempting substitutes but do not exercise this
+   * capability by themselves (for example a polynomial for a surd task). */
+  invalidSubstituteStructures?: CapabilityStructureKind[];
+  /** If true, at least one contract operation must be present in the setup
+   * and a second operation must be attributable in the derivation. */
+  requireDerivationOperation?: boolean;
+}
+
+export interface CapabilityDerivationEvidence {
+  setupStructures: CapabilityStructureKind[];
+  capabilityOperation: string;
+  intermediateResults: string[];
+  finalResult: string;
+  /** Synoptic routes can expose which worked steps belong to each strand. */
+  primaryEvidence?: string[];
+  secondaryEvidence?: string[];
+  joiningDependency?: string;
+}
+
+export interface LearningProvenance {
+  /** Values, observations, species or representations supplied by the prompt. */
+  sourceEvidence: string[];
+  /** The authored operation/law that turns the sources into the answer. */
+  operation: string;
+  /** Checkable intermediate values or conclusions, in route order. */
+  intermediateResults: string[];
+  /** The final quantity/conclusion the worked answer establishes. */
+  finalResult: string;
+}
+
 export interface QuestionPart {
   id: Id;
   label: string;
@@ -247,6 +583,65 @@ export interface QuestionPart {
   specPointIds?: Id[];
   /** Which learning claims earn the marks for this part (paraphrased, 1:1 with markScheme when present). */
   learningClaims?: string[];
+  /** Explicit, reviewed skill mapping; never inferred from a whole-topic score. */
+  capabilityIds?: Id[];
+  /** Demand and family for this part when a structured question mixes skills. */
+  learning?: LearningPartMetadata;
+  /** Optional explicit one-rule-per-mark calculation rubric. */
+  calculationRules?: CalculationMarkRule[];
+}
+
+export interface CalculationMarkRule {
+  kind: "method" | "accuracy" | "follow-through" | "unit" | "precision";
+  /** Named working line, e.g. F or a. Aliases are authored, not guessed by OCR. */
+  label: string;
+  aliases?: string[];
+  expected: number;
+  method?: { operator: "+" | "-" | "*" | "/"; operands: [number | string, number | string] };
+  unitAliases?: string[];
+  significantFigures?: number;
+}
+
+export type LearningDemand = "recall" | "explanation" | "application" | "misconception" | "calculation" | "transfer" | "synoptic";
+
+export interface LearningQuestionMetadata {
+  /** Questions that differ only in numbers or wording share a family. */
+  familyId: Id;
+  contextId: Id;
+  demand: LearningDemand;
+  expectedMinutes: number;
+  /** Optional authored operations used to detect cosmetic reskins. */
+  reasoningMoves?: string[];
+  quality?: "substantive" | "scaffold";
+  promptTarget?: string;
+  expectedResult?: string;
+  derivation?: string[];
+  evidenceSources?: string[];
+  capabilityEvidence?: CapabilityEvidenceContract;
+  setupFingerprint?: CapabilitySetupFingerprint;
+  provenance?: LearningProvenance;
+  reasoningGraph?: ReasoningGraph;
+  transferLink?: TransferLink;
+  synopticLink?: SynopticLink;
+  primaryContract?: CapabilityEvidenceContract;
+  secondaryContract?: CapabilityEvidenceContract;
+}
+
+export type MistakeRepairStage = "detected" | "diagnosed" | "taught" | "guided-success" | "independent-success" | "transfer" | "delayed-retention" | "resolved";
+
+export interface MistakeRepairEvidence {
+  attemptId: Id;
+  questionId: Id;
+  at: IsoInstant;
+  stage: MistakeRepairStage;
+}
+
+export interface MistakeRepairState {
+  version: 1;
+  stage: MistakeRepairStage;
+  evidence: MistakeRepairEvidence[];
+  /** A full elapsed delay after the last relevant practice/exposure. */
+  dueAt?: IsoInstant;
 }
 
 export type QuestionValidationStage = "draft" | "in_review" | "validated" | "needs_changes" | "rejected" | "retired";
@@ -307,7 +702,8 @@ export type QuestionValidationIssueCode =
   | "missing-reviewer"
   | "missing-last-checked"
   | "stale-provenance"
-  | "missing-licence";
+  | "missing-licence"
+  | "missing-paper-provenance";
 
 export interface QuestionValidationIssue {
   code: QuestionValidationIssueCode;
@@ -375,10 +771,15 @@ export interface Question {
   specPointIds?: Id[];
   /** Persisted question-specific validation lifecycle; moderation remains a separate publishing gate. */
   validation?: QuestionValidationRecord;
+  /** Component-level editorial review for flagship question content. */
+  humanVerification?: HumanVerificationRecord;
   /** Set when extracted from an uploaded paper. */
   paperId?: Id;
   paperQuestionNumber?: string;
+  /** Authenticated provenance required for trusted WJEC past-paper evidence. */
+  paperProvenance?: PaperQuestionProvenance;
   createdAt: IsoInstant;
+  learning?: LearningQuestionMetadata;
 }
 
 export type MarkEvidenceStatus = "credited" | "missed" | "unreported";
@@ -449,6 +850,26 @@ export interface FarTransferAttemptLink {
   outcome?: FarTransferOutcome;
 }
 
+/** Human marking attestation for a paper response.
+ *
+ * Paper provenance and paper marking are separate trust dimensions: an
+ * authenticated WJEC PDF does not make an automatically marked response a
+ * gold outcome. The reviewer/date fields make that distinction explicit in
+ * persisted attempts; adjudicated rows additionally record that two markers
+ * were involved.
+ */
+export type PaperMarkingReviewStatus = "unreviewed" | "human-reviewed" | "adjudicated";
+
+export interface PaperMarkingReview {
+  status: PaperMarkingReviewStatus;
+  reviewerId?: Id;
+  reviewedAt?: IsoInstant;
+  /** Number of qualified human markers whose marks contributed to this row. */
+  markerCount?: number;
+  /** Optional fingerprint of the exact answer/marking reviewed. */
+  markingFingerprint?: string;
+}
+
 export interface Attempt {
   id: Id;
   userId: Id;
@@ -470,15 +891,102 @@ export interface Attempt {
   /** A high-scoring source answer or its completed delayed transfer check. */
   farTransfer?: FarTransferAttemptLink;
   confidence?: 1 | 2 | 3 | 4 | 5;
+  /** Highest hint tier used before submitting, from the adaptive hint ladder. */
+  hintTier?: "cue" | "prompt" | "scaffold" | "worked-solution";
+  /** The repair explanation/credited point was visible before submission. */
+  repairTeachingSeen?: boolean;
+  /** True when the submitted response substantially matches the authored answer. */
+  copiedAnswer?: boolean;
+  /** First-error and mark-component evidence for calculation working. */
+  workingAnalysis?: AttemptWorkingEvidence[];
+  /** The adaptive intervention that produced this immediate observation. */
+  intervention?: InterventionAttemptContext;
   elapsedMs: number;
   mode: "practice" | "paper" | "recall";
   /** Optional provenance for attempts completed inside a paper sitting. */
   paperId?: Id;
   paperSpecId?: Id;
   paperRunId?: Id;
+  /** Explicit human-marking gate for authenticated paper evidence. */
+  paperMarking?: PaperMarkingReview;
   /** Links a targeted practice attempt back to the open mistake it is testing. */
   retestMistakeId?: Id;
   createdAt: IsoInstant;
+}
+
+export type WorkingErrorKind =
+  | "none"
+  | "rounding-error"
+  | "unit-error"
+  | "arithmetic-slip"
+  | "incorrect-rearrangement"
+  | "substitution-error"
+  | "method-error"
+  | "contradictory-working";
+
+export interface AttemptWorkingEvidence {
+  partId: Id;
+  firstIncorrectStep: number | null;
+  firstErrorKind: WorkingErrorKind;
+  consistentWithModel: boolean;
+  methodMarksAwarded: number;
+  accuracyMarksAwarded: number;
+  followThroughMarksAwarded: number;
+  /** True when a later mark follows the student's earlier value (ECF). */
+  errorCarriedForward?: boolean;
+  unitMarksAwarded: number;
+  precisionMarksAwarded: number;
+}
+
+export type InterventionKind = "diagnose" | "guided" | "independent" | "transfer" | "retention";
+export type InterventionPriorState = "unknown" | "weak" | "developing" | "secure";
+export type InterventionSupport = "none" | "cue" | "prompt" | "scaffold" | "worked-solution";
+export type InterventionActivity = "question" | "retrieval" | "teaching";
+export type InterventionObservationResult = "passed" | "missed" | "viewed" | "scheduled";
+
+/** Context carried on an attempt so intervention effects can be followed. */
+export interface InterventionAttemptContext {
+  id: Id;
+  /** Stable repair/intervention chain id used to join later transfer checks. */
+  chainId?: Id;
+  kind: InterventionKind;
+  capabilityId: Id;
+  topicId: Id;
+  priorState: InterventionPriorState;
+  priorAccuracy?: number;
+  plannedMinutes: number;
+  support: InterventionSupport;
+  /** Question attempts, card retrievals and teaching gates share one event path. */
+  activity?: InterventionActivity;
+}
+
+export interface InterventionOutcomeRecord {
+  id: Id;
+  /** Joins immediate, transfer and delayed observations for one repair chain. */
+  chainId?: Id;
+  /** Non-question activities are retained for intervention audits but never
+   * counted as mark-based durable evidence. */
+  activity?: InterventionActivity;
+  userId: Id;
+  subjectId: Id;
+  topicId: Id;
+  capabilityId: Id;
+  kind: InterventionKind;
+  priorState: InterventionPriorState;
+  /** Measured pre-intervention independent accuracy; absence prevents gain calibration. */
+  priorAccuracy?: number;
+  evidenceVersion?: 2;
+  immediateQuestionId?: Id;
+  immediateFamilyId?: Id;
+  timeMeasured?: boolean;
+  plannedMinutes: number;
+  actualMinutes: number;
+  support: InterventionSupport;
+  immediate: { awarded: number; max: number; independent: boolean; attemptId: Id; at: IsoInstant; result?: InterventionObservationResult; /** True only when the Physics question itself is trusted content. */ trusted?: boolean };
+  transfer?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant; familyId?: Id; trusted?: boolean };
+  delayedRetention?: { awarded: number; max: number; independent: boolean; questionId: Id; attemptId: Id; at: IsoInstant; familyId?: Id; trusted?: boolean };
+  createdAt: IsoInstant;
+  updatedAt: IsoInstant;
 }
 
 export type CommandWord =
@@ -546,6 +1054,9 @@ export interface Mistake {
   description: string;
   /** Classification used to spot repeat patterns across topics. */
   category: "recall" | "method" | "arithmetic" | "interpretation" | "communication" | "unclassified";
+  /** Physics working diagnosis, when a calculation response was analysable. */
+  firstIncorrectStep?: number;
+  workingErrorKind?: WorkingErrorKind;
   cardId?: Id;
   resolved: boolean;
   createdAt: IsoInstant;
@@ -555,6 +1066,8 @@ export interface Mistake {
   /** Most recent targeted retest, whether or not it earned the point. */
   lastRetestAttemptId?: Id;
   lastRetestedAt?: IsoInstant;
+  capabilityIds?: Id[];
+  repair?: MistakeRepairState;
 }
 
 export interface AssessmentInsight {
@@ -653,6 +1166,13 @@ export interface Paper {
   title: string;
   year?: number;
   series?: string;
+  /** Source manifest fields retained at paper level for audit/export. */
+  sittingId?: Id;
+  sourceUrl?: string;
+  sourceDigest?: string;
+  provenanceStatus?: "pending" | "verified" | "rejected";
+  provenanceVerifiedBy?: Id;
+  provenanceVerifiedAt?: IsoInstant;
   paperSpecId?: Id;
   /** Extracted plain text, kept so questions can be re-extracted later. */
   sourceText?: string;
@@ -714,6 +1234,34 @@ export interface UserSettings {
   aiEnabled: boolean;
   /** Whether Pulse may read this account's study history. Off by default. */
   pulseEnabled: boolean;
+  /**
+   * Lab routes (benchmarks, teacher, corpora, case study) stay off the student
+   * nav until this is switched on in Settings.
+   */
+  labMode: boolean;
+  /** Subject the student last studied in lessons, so /lesson lands where they left off. */
+  lastLessonSubject?: string;
+  /**
+   * When the AI provider is unreachable, allow the on-device WebLLM model to
+   * grade formative answers (downloads ~2GB of weights once; opt-in).
+   */
+  localAiMarking?: boolean;
+  /**
+   * Encrypt everything that leaves for the sync backend with an on-device
+   * AES-GCM key. The server stores opaque blobs only; a database breach
+   * yields ciphertext, not student answers. See data/e2ee.ts.
+   */
+  e2eeEnabled?: boolean;
+  /**
+   * One-time countdown markers: the phase bucket ("early" | "technique" |
+   * "final") each subject was in the last time it was evaluated, keyed by
+   * subject id. Lets a subject entering the timed-paper fortnight be
+   * announced exactly once per transition — and re-announced if its exam is
+   * pushed back out of the window and it later re-enters.
+   */
+  examNotices?: Record<string, string>;
+  /** When on, a subject entering the timed-paper fortnight also fires a browser notification. */
+  examNotifications?: boolean;
   updatedAt: IsoInstant;
 }
 
@@ -724,6 +1272,14 @@ export interface TopicMastery {
   subjectId: Id;
   /** 0–1. Blends recall stability, question accuracy and recency. */
   mastery: number;
+  /**
+   * 0–1 Bayesian posterior blending the cohort prior with this student's
+   * evidence — what a cold-start topic shows as "Predicted mastery". Converges
+   * onto `mastery` as evidence accumulates (see `priorRemaining`).
+   */
+  predictedMastery?: number;
+  /** 0–1 share of `predictedMastery` still carried by the prior (1 = pure prior). */
+  priorRemaining?: number;
   /** 0–1 predicted probability of recall right now (forgetting curve). */
   retention: number;
   confidence: number;
@@ -747,6 +1303,14 @@ export interface RecommendationFactors {
   forgetting: number;
   /** 0.7–1.4, higher when evidence is thin. */
   uncertainty: number;
+  /** Present only when fatigue/circadian penalties demoted this option (<1). */
+  fatigue?: number;
+  /** Present only when technique steering applied (promote >1, demote <1). */
+  techniqueSteer?: number;
+  /** 0–1, low when application (non-retrieval) evidence is weak relative to recall. Present only when an application gap exists. */
+  applicationGap?: number;
+  /** 0–1 retrieval strength (FSRS-derived). Present only when mastery evidence is separated. */
+  recallMastery?: number;
 }
 
 export interface RecommendationExplanation {
@@ -764,6 +1328,8 @@ export interface RecommendationExplanation {
   paperLabel: string | null;
   /** The five factors that produced the score. */
   factors: RecommendationFactors;
+  /** Evidence-cited narrative: "Do X because Y", built only from computed numbers. Null when no numbers exist to cite. */
+  narrative?: string | null;
   /** How many cards/mistakes contributed, when relevant. */
   count?: number;
   overdueCount?: number;
@@ -779,6 +1345,10 @@ export interface Recommendation {
   /** Higher runs first. */
   score: number;
   plannedSessionId?: Id;
+  /** Set when technique steering converted this rec into a timed run (the quick-session length). */
+  techniqueQuickMinutes?: 5 | 10;
+  /** Knowledge share of lost marks for the subject when technique steering applied. */
+  techniqueKnowledgeShare?: number;
   /** Structured breakdown for the "why this?" disclosure. */
   explanation?: RecommendationExplanation;
   /** Alias for tests that want the factors without unwrapping explanation. */
@@ -867,6 +1437,27 @@ export interface DeckExport {
   cards: DeckExportCard[];
 }
 
+// --- lesson progress (synced, like settings/streak) -------------------------
+
+/**
+ * Which lessons the student finished and their lesson streak. One row per
+ * user so it syncs across devices. Merged as a grow-only set (OR-set CRDT):
+ * completion events from any device are unioned by lesson id, and the streak
+ * is a pure fold over per-day completion records — so completing different
+ * lessons on different devices both survive, and a week-long offline run on
+ * one device cannot erase daily progress made on another.
+ */
+export interface LessonProgress {
+  userId: Id;
+  /** lesson id -> true once that lesson has been completed. */
+  completed: Record<string, boolean>;
+  /** Consecutive days with at least one finished lesson (local-time days). */
+  streak: { count: number; lastDay: string };
+  /** lesson id -> the local day (YYYY-MM-DD) it was first completed on. */
+  completedOn?: Record<string, string>;
+  updatedAt: IsoInstant;
+}
+
 // --- sync ------------------------------------------------------------------
 
 export type SyncEntity =
@@ -879,14 +1470,28 @@ export type SyncEntity =
   | "plannedSessions"
   | "examDates"
   | "settings"
-  | "streak";
+  | "streak"
+  | "lessonProgress";
 
 export interface OutboxItem {
   id: Id;
   entity: SyncEntity;
   op: "upsert" | "delete";
   payload: unknown;
+  /** Account that created this queue entry; missing means a legacy row. */
+  ownerId?: Id;
   queuedAt: IsoInstant;
   attempts: number;
   lastError?: string;
+  /**
+   * UUID idempotency key, minted once per logical mutation. The server
+   * records it in `sync_writes` and rejects a duplicate, so a hung request
+   * retried by the browser or service worker can never double-count a
+   * review or double-award accuracy metrics.
+   */
+  idempotencyKey?: string;
+  /** Logical timestamp captured when the item was queued, for causal ordering. */
+  lamport?: number;
+  /** Minting device id — pairs with lamport for causal ordering diagnostics. */
+  deviceId?: string;
 }

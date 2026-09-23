@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { seedMisconceptions, seedQuestions, seedQuestionsForSubject, seedQuestionsForTopic } from "@/content";
 import { makeCloze, seedCardsForTopic } from "@/content/seed-cards";
+import { isDiagramCard, parseDiagram } from "@/domain/diagrams";
 import {
   allSubjects,
   allTopics,
@@ -76,10 +77,32 @@ describe("seed cards", () => {
     }
   });
 
+  it("seeds original diagram cards for the core label-a-diagram subjects", () => {
+    for (const candidate of [
+      { subject: "biology", slug: "cell-structure" },
+      { subject: "physics", slug: "electric-circuits" },
+      { subject: "maths", slug: "probability" },
+      { subject: "chemistry", slug: "energetics" },
+    ]) {
+      const topic = allTopics().find(
+        (entry) => entry.subjectId.includes(candidate.subject) && entry.id.endsWith(`.${candidate.slug}`),
+      );
+      expect(topic, `${candidate.subject}/${candidate.slug} topic`).toBeDefined();
+      const diagramCards = seedCardsForTopic(topic!, "u").filter(isDiagramCard);
+      expect(diagramCards, `${candidate.subject}/${candidate.slug} diagram`).toHaveLength(1);
+      const diagram = parseDiagram(diagramCards[0]!);
+      expect(diagram?.imageUrl).toBe(diagramCards[0]!.imageUrl);
+      expect(diagram?.hotspots.length).toBeGreaterThanOrEqual(4);
+      expect(diagramCards[0]!.kind).toBe("image");
+    }
+  });
+
   it("blanks a content word, not a stop word", () => {
-    const cloze = makeCloze("The concentration of reactants decreases over time");
+    const source = "The concentration of reactants decreases over time";
+    const cloze = makeCloze(source);
     expect(cloze).not.toBeNull();
     expect(cloze!.front).toContain("[…]");
+    expect(cloze!.clozeSource).toBe(source);
     expect(["the", "of", "over"]).not.toContain(cloze!.back.toLowerCase());
   });
 
@@ -141,7 +164,7 @@ describe("seed question bank", () => {
   it("uses unique, stable ids", () => {
     const ids = seedQuestions.map((q) => q.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every((id) => id.startsWith("seed-q:"))).toBe(true);
+    expect(ids.every((id) => id.startsWith("cnt:question:"))).toBe(true);
   });
 
   it("finds questions by topic", () => {
@@ -151,7 +174,9 @@ describe("seed question bank", () => {
 });
 
 describe("grade prediction", () => {
-  const subject = allSubjects()[0];
+  // Generic prediction mechanics use a reference subject. WJEC evidence now
+  // requires reviewed question fixtures, covered in wjec-subject-quality.
+  const subject = allSubjects().find((s) => s.id === "aqa-alevel-biology")!;
   const mastery = (value: number): TopicMastery[] =>
     topicsFor(subject.id).map((t) => ({
       topicId: t.id,

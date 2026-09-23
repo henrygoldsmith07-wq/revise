@@ -33,7 +33,11 @@ function escapeHtml(text: string): string {
 
 function renderMath(expression: string, displayMode: boolean): string {
   try {
-    return katex.renderToString(expression, { displayMode, throwOnError: false, output: "html" });
+    // htmlAndMathml emits the visual HTML *and* a MathML twin carrying the
+    // TeX source (<annotation>), so JAWS/NVDA read the equation aloud while
+    // sighted users see the typeset form. The HTML half is aria-hidden by
+    // KaTeX itself, leaving exactly one accessible representation.
+    return katex.renderToString(expression, { displayMode, throwOnError: false, output: "htmlAndMathml" });
   } catch {
     return escapeHtml(expression);
   }

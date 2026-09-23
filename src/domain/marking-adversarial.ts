@@ -239,9 +239,14 @@ function runMixedClaims(structured: Question[], marker: Marker): AdversarialCate
     const part = q.parts[0];
     const sentences = part.modelAnswer.split(/(?<=\.)\s+/);
     if (sentences.length < 2) continue;
-    const flipped = flipPolarity(sentences[0]);
-    if (!flipped.changed) continue;
-    const mixed = [flipped.text, ...sentences.slice(1)].join(" ");
+    // Flip the first sentence that contains a reversible polarity cue. Some
+    // otherwise valid multi-step answers place the causal increase/decrease
+    // in sentence two or three; skipping those answers made the category
+    // disappear from small deterministic samples.
+    const flipIndex = sentences.findIndex((sentence) => flipPolarity(sentence).changed);
+    if (flipIndex < 0) continue;
+    const flipped = flipPolarity(sentences[flipIndex]!);
+    const mixed = sentences.map((sentence, index) => index === flipIndex ? flipped.text : sentence).join(" ");
     const clean = cleanScore(q, marker);
     const { awarded, max } = marker(q, answerFor(q, part.id, mixed));
     results.push({

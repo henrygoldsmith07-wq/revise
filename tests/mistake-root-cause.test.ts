@@ -127,7 +127,7 @@ describe("mistake root-cause diagnosis", () => {
 
     const cause = report.rootCauses[0]!;
     expect(cause.source).toBe("authored");
-    expect(cause.misconceptionId).toBe("seed-misconception:inequality-sign-reversal");
+    expect(cause.misconceptionId).toBe("cnt:misconception:inequality-sign-reversal");
     expect(cause.nextStep).toMatch(/reverse the inequality sign/i);
   });
 

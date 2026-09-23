@@ -31,6 +31,17 @@ function question(id: string, parts: QuestionPart[]): Question {
   };
 }
 
+function formatHardContradictions(result: ReturnType<typeof validateWorkedSolutions>): string {
+  const hardIssues = result.issues.filter((issue) => issue.severity === "error");
+  if (!hardIssues.length) return "No hard authored answer-key contradictions.";
+  return [
+    `Found ${hardIssues.length} hard authored answer-key contradiction${hardIssues.length === 1 ? "" : "s"}:`,
+    ...hardIssues.map((issue) =>
+      `- ${issue.questionId}/${issue.partId}${issue.pointIndex == null ? "" : ` point ${issue.pointIndex + 1}`}: ${issue.kind} — ${issue.detail}`,
+    ),
+  ].join("\n");
+}
+
 describe("worked solution validation", () => {
   it("passes a model answer that covers each mark-scheme point", () => {
     const result = validateWorkedSolution(part());
@@ -129,11 +140,26 @@ describe("worked solution validation", () => {
     ]);
   });
 
+  it("formats hard contradictions with question, part and mark-point context", () => {
+    const result = validateWorkedSolutions([
+      question("bad-key", [
+        part({
+          id: "calc",
+          markScheme: ["Correct answer 12 N"],
+          modelAnswer: "Correct answer: 10 N.",
+        }),
+      ]),
+    ]);
+
+    expect(formatHardContradictions(result)).toContain("bad-key/calc point 1: numeric-mismatch");
+    expect(formatHardContradictions(result)).toContain("Correct answer 12 N");
+  });
+
   it("finds no hard answer-key contradictions in the authored seed bank", () => {
     const result = validateWorkedSolutions(seedQuestions);
 
     expect(result.questionCount).toBeGreaterThan(0);
     expect(result.partCount).toBeGreaterThan(0);
-    expect(result.errors).toBe(0);
-  });
+    expect(result.errors, formatHardContradictions(result)).toBe(0);
+  }, 60_000);
 });

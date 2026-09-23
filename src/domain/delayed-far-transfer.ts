@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type {
   Attempt,
   FarTransferAttemptLink,
@@ -7,6 +8,7 @@ import type {
   IsoDate,
   Question,
 } from "./types";
+import { independentAttempt, isTransferQuestion, questionFamily, trustedAssessmentAttempt } from "./learning-evidence";
 
 export const DELAYED_FAR_TRANSFER_DELAY_DAYS = 7;
 export const FAR_TRANSFER_SOURCE_THRESHOLD = 0.8;
@@ -27,6 +29,8 @@ export interface ScheduleDelayedFarTransferInput {
   questions: readonly Question[];
   attemptedQuestionIds?: readonly Id[];
   delayDays?: number;
+  /** Full history is required when a Physics source is a paper response. */
+  history?: readonly Attempt[];
 }
 
 export interface DelayedFarTransferRetest extends FarTransferAttemptLink {
@@ -103,6 +107,9 @@ export function selectFarTransferCandidate(
   const candidates = questions
     .filter((candidate) => candidate.subjectId === source.subjectId)
     .filter((candidate) => candidate.id !== source.id && !attempted.has(candidate.id))
+    .filter((candidate) => isTransferQuestion(candidate) && questionFamily(candidate) !== questionFamily(source))
+    .filter((candidate) => candidate.learning?.contextId !== source.learning?.contextId)
+    .filter((candidate) => !questions.some((q) => attempted.has(q.id) && questionFamily(q) === questionFamily(candidate)))
     .filter((candidate) => normalise(candidate.stem) !== sourceStem)
     .map((candidate) => {
       const sharedSpecPointIds = overlap(sourceSpecPoints, questionSpecPointIds(candidate));
@@ -116,7 +123,7 @@ export function selectFarTransferCandidate(
         noveltyScore: noveltyScore(source, candidate),
       };
     })
-    .filter((candidate) => candidate.sharedSpecPointIds.length || candidate.sharedLearningClaims.length || candidate.sharedTopicIds.length)
+    .filter((candidate) => candidate.sharedSpecPointIds.length || candidate.sharedLearningClaims.length)
     .sort((a, b) => {
       // Mapped spec points and learning claims are stronger evidence than a
       // shared topic, while novelty breaks ties inside the same anchor.
@@ -150,7 +157,7 @@ function score(attempt: Attempt): number {
 
 function eligibleSource(attempt: Attempt): boolean {
   return (
-    !attempt.farTransfer &&
+    !attempt.farTransfer && independentAttempt(attempt) &&
     attempt.max > 0 &&
     score(attempt) >= FAR_TRANSFER_SOURCE_THRESHOLD &&
     attempt.markEscalation?.status !== "pending"
@@ -159,6 +166,9 @@ function eligibleSource(attempt: Attempt): boolean {
 
 export function scheduleDelayedFarTransfer(input: ScheduleDelayedFarTransferInput): FarTransferAttemptLink | undefined {
   if (!eligibleSource(input.attempt)) return undefined;
+  const history = input.history ?? [input.attempt];
+  if (requiresWjecContentReview(input.question.subjectId) &&
+    !trustedAssessmentAttempt(input.attempt, input.question, history, input.questions)) return undefined;
 
   const delayDays = validDelayDays(input.delayDays);
   const scheduledFor = scheduledDate(input.attempt.createdAt, delayDays);
@@ -202,7 +212,15 @@ export function scoreFarTransferRetest(retestAttempt: Attempt): FarTransferOutco
 export function completeDelayedFarTransfer(
   retest: DelayedFarTransferRetest,
   attempt: Attempt,
-): FarTransferAttemptLink {
+  context?: { question?: Question; questions?: readonly Question[]; history?: readonly Attempt[] },
+): FarTransferAttemptLink | undefined {
+  if (!independentAttempt(attempt) || attempt.questionId !== retest.candidateQuestionId ||
+    attempt.userId !== retest.userId || attempt.subjectId !== retest.subjectId ||
+    Date.parse(attempt.createdAt) < Date.parse(`${retest.scheduledFor}T00:00:00Z`)) return undefined;
+  if (requiresWjecContentReview(attempt.subjectId)) {
+    const question = context?.question;
+    if (!question || !context?.questions || !trustedAssessmentAttempt(attempt, question, context.history ?? [attempt], context.questions)) return undefined;
+  }
   return {
     retestId: retest.retestId,
     role: "retest",
@@ -245,6 +263,8 @@ export function delayedFarTransferRetests(input: {
     if (sourceAttempt.farTransfer?.role === "retest") continue;
     const sourceQuestion = input.questions.find((question) => question.id === sourceAttempt.questionId);
     if (!sourceQuestion) continue;
+    if (requiresWjecContentReview(sourceAttempt.subjectId) &&
+      !trustedAssessmentAttempt(sourceAttempt, sourceQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions)) continue;
 
     const stored = sourceAttempt.farTransfer?.role === "source" ? sourceAttempt.farTransfer : undefined;
     const link = stored ?? scheduleDelayedFarTransfer({
@@ -252,17 +272,23 @@ export function delayedFarTransferRetests(input: {
       question: sourceQuestion,
       questions: input.questions,
       attemptedQuestionIds: (attemptsByUser.get(sourceAttempt.userId) ?? []).map((attempt) => attempt.questionId),
+      history: attemptsByUser.get(sourceAttempt.userId) ?? [],
     });
     if (!link) continue;
 
-    const completed = completedByRetestId.get(link.retestId);
+    const candidate = completedByRetestId.get(link.retestId);
+    const candidateQuestion = input.questions.find((question) => question.id === candidate?.questionId);
+    const completed = candidate && candidate.userId === sourceAttempt.userId && candidate.subjectId === sourceAttempt.subjectId &&
+      candidate.questionId === link.candidateQuestionId && independentAttempt(candidate) &&
+      candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && candidate.createdAt.slice(0, 10) >= link.scheduledFor &&
+      (!requiresWjecContentReview(candidate.subjectId) || Boolean(candidateQuestion && trustedAssessmentAttempt(candidate, candidateQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions))) ? candidate : undefined;
     records.set(link.retestId, {
       ...link,
       userId: sourceAttempt.userId,
       subjectId: sourceAttempt.subjectId,
       topicIds: sourceAttempt.topicIds,
       status: completed ? "completed" : link.scheduledFor <= today ? "due" : "scheduled",
-      outcome: completed?.farTransfer?.outcome,
+      outcome: completed ? scoreFarTransferRetest(completed) : undefined,
     });
   }
 

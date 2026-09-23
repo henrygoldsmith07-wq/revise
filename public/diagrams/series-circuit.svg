@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Unlabelled series circuit diagram</title>
+  <desc id="desc">A simple closed circuit with a cell, switch, resistor, lamp and ammeter.</desc>
+  <rect width="720" height="420" fill="#fafafa"/>
+  <path d="M92 90h535v245H92Z" fill="none" stroke="#202020" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M92 90v80m0 95v70M627 90v245" fill="none" stroke="#202020" stroke-width="6"/>
+  <path d="M74 170h36M80 192h24" stroke="#202020" stroke-width="6"/>
+  <circle cx="92" cy="213" r="5" fill="#202020"/>
+  <path d="M240 90v34l36 22 36-22V90" fill="none" stroke="#202020" stroke-width="5"/>
+  <circle cx="240" cy="124" r="5" fill="#202020"/><circle cx="312" cy="124" r="5" fill="#202020"/>
+  <path d="M389 90l13-20 13 40 13-40 13 40 13-40 13 20" fill="none" stroke="#202020" stroke-width="5"/>
+  <circle cx="535" cy="90" r="30" fill="#ededed" stroke="#202020" stroke-width="5"/>
+  <path d="m518 73 34 34m0-34-34 34" stroke="#202020" stroke-width="4"/>
+  <circle cx="330" cy="335" r="34" fill="#ededed" stroke="#202020" stroke-width="5"/>
+  <circle cx="330" cy="335" r="7" fill="#202020"/>
+  <path d="M92 213h88m300 0h147" fill="none" stroke="#202020" stroke-width="6"/>
+</svg>

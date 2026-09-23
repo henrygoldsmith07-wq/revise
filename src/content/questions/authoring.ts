@@ -1,8 +1,10 @@
-import type { AoCode, ContentSource, Id, LicensedSource, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
+import type { AoCode, ContentSource, HumanVerificationRecord, Id, LicensedSource, LearningPartMetadata, LearningQuestionMetadata, PaperQuestionProvenance, Question, QuestionKind, QuestionPart, VerificationStatus } from "@/domain/types";
 
 // Compact authoring format for the seed question bank. Ids are deterministic
-// (`seed-q:<slug>`) so re-seeding never duplicates a question or orphans the
-// attempts already recorded against it.
+// (`cnt:question:<slug>`, namespaced — see src/data/content-ids.ts) so
+// re-seeding never duplicates a question or orphans the attempts already
+// recorded against it, and so operator tooling can never mistake bank rows
+// for its own fixtures.
 
 export interface PartSpec {
   label?: string;
@@ -14,6 +16,10 @@ export interface PartSpec {
   aos?: AoCode[];
   specPointIds?: string[];
   learningClaims?: string[];
+  capabilityIds?: string[];
+  /** Part-level demand/family metadata for structured quality questions. */
+  learning?: LearningPartMetadata;
+  calculationRules?: QuestionPart["calculationRules"];
 }
 
 export interface QuestionSpec {
@@ -33,14 +39,17 @@ export interface QuestionSpec {
   lastChecked?: string | null;
   reviewer?: string | null;
   specVersion?: string;
+  humanVerification?: HumanVerificationRecord;
+  paperProvenance?: PaperQuestionProvenance;
   aos?: AoCode[];
   specPointIds?: string[];
+  learning?: LearningQuestionMetadata;
 }
 
 const SEED_CREATED_AT = "2025-01-01T00:00:00.000Z";
 
 export function defineQuestion(spec: QuestionSpec): Question {
-  const id = `seed-q:${spec.slug}`;
+  const id = `cnt:question:${spec.slug}`;
   const parts: QuestionPart[] = spec.parts.map((part, i) => ({
     id: `${id}:${i}`,
     label: part.label ?? (spec.parts.length > 1 ? `(${"abcdefgh"[i]})` : ""),
@@ -50,7 +59,12 @@ export function defineQuestion(spec: QuestionSpec): Question {
     modelAnswer: part.answer,
     aos: part.aos,
     specPointIds: (part as { specPointIds?: string[] }).specPointIds,
-    learningClaims: (part as { learningClaims?: string[] }).learningClaims,
+    learningClaims: part.learningClaims?.length
+      ? part.learningClaims
+      : [part.prompt.replace(/^\([a-z]\)\s*/i, "").replace(/\.+$/, "").trim()].filter(Boolean),
+    ...(part.capabilityIds ? { capabilityIds: part.capabilityIds } : {}),
+    ...(part.learning ? { learning: part.learning } : {}),
+    ...(part.calculationRules ? { calculationRules: part.calculationRules } : {}),
   }));
 
   const aos =
@@ -80,6 +94,9 @@ export function defineQuestion(spec: QuestionSpec): Question {
     aos: aos.length ? aos : undefined,
     specPointIds: specPointIds.length ? specPointIds : undefined,
     createdAt: SEED_CREATED_AT,
+    ...(spec.humanVerification ? { humanVerification: spec.humanVerification } : {}),
+    ...(spec.paperProvenance ? { paperProvenance: spec.paperProvenance } : {}),
+    ...(spec.learning ? { learning: spec.learning } : {}),
   };
 }
 

@@ -13,7 +13,7 @@
 // say "not enough yet" instead of flashing a volatile 73%.
 // ---------------------------------------------------------------------------
 
-import type { AssessmentInsight, Attempt, Card, Id, IsoDate, Mistake, ReviewLog, TechniqueVsKnowledge } from "./types";
+import type { Attempt, Card, Id, IsoDate, Mistake, ReviewLog, TechniqueVsKnowledge } from "./types";
 import { retrievability, todayIso } from "./scheduling";
 
 export const RETENTION_CHECKPOINTS: ReadonlyArray<1 | 7 | 30> = [1, 7, 30] as const;
@@ -45,20 +45,10 @@ export interface RetentionReport {
   narrative: string;
 }
 
-function daysBetweenIso(a: IsoDate, b: IsoDate): number {
-  return Math.round(
-    (new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / 86_400_000,
-  );
-}
-
 function isoDateDaysAgo(today: IsoDate, days: number): IsoDate {
   return new Date(new Date(`${today}T00:00:00Z`).getTime() - days * 86_400_000)
     .toISOString()
     .slice(0, 10);
-}
-
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n));
 }
 
 /** Mean FSRS retrievability for the given cards right now. */
@@ -247,10 +237,7 @@ function mistakeWeightForKnowledgeTechnique(m: Mistake): { knowledge: number; te
   return { knowledge: m.marksLost * 0.5, technique: m.marksLost * 0.5 };
 }
 
-export function techniqueVsKnowledge(
-  mistakes: Mistake[],
-  _insight?: AssessmentInsight,
-): TechniqueVsKnowledge {
+export function techniqueVsKnowledge(mistakes: Mistake[]): TechniqueVsKnowledge {
   let knowledgeLost = 0;
   let techniqueLost = 0;
   for (const m of mistakes) {
@@ -419,7 +406,7 @@ export function dashboardSnapshot(input: {
   } else if (marksPerHour.headlineMarksPerHour != null && marksPerHour.headlineMarksPerHour < 8) {
     headline = marksPerHour.narrative;
   } else {
-    headline = retention.narrative !== techniqueVsKnowledge([], undefined).narrative
+    headline = retention.narrative !== techniqueVsKnowledge([]).narrative
       ? retention.narrative
       : "Core signals are stable — tighten technique under timed conditions to squeeze the next grade.";
   }

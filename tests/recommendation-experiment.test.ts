@@ -103,6 +103,8 @@ describe("analyseExperiment", () => {
       attempts,
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 1,
     });
@@ -110,9 +112,9 @@ describe("analyseExperiment", () => {
     const control = analysis.arms.find((a) => a.arm === "control")!;
     expect(revise.hoursPractised).toBeCloseTo(1, 1);
     expect(revise.marksEarned).toBe(4);
-    expect(revise.marksPerHour).toBe(4);
-    expect(control.marksPerHour).toBe(1);
-    expect(analysis.marksPerHourEffect).toBe(3);
+    expect(revise.practiceMarksPerHour).toBe(4);
+    expect(control.practiceMarksPerHour).toBe(1);
+    expect(analysis.marksGainedPerHourEffect).toBeNull(); // efficacy gate requires all four arms populated
   });
 
   it("measures completion, rejection and time-to-begin from paired events", () => {
@@ -129,6 +131,8 @@ describe("analyseExperiment", () => {
       attempts: [],
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 1,
     });
@@ -145,12 +149,14 @@ describe("analyseExperiment", () => {
       attempts: [attempt({})],
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 5,
     });
     expect(analysis.sufficientData).toBe(false);
-    expect(analysis.marksPerHourEffect).toBeNull();
-    expect(analysis.note).toContain("No efficacy claim");
+    expect(analysis.marksGainedPerHourEffect).toBeNull();
+    expect(analysis.note).toContain("enrolling");
   });
 
   it("computes transfer share against pre-assignment exposure", () => {
@@ -165,10 +171,12 @@ describe("analyseExperiment", () => {
       attempts,
       reviews: [],
       masteryByTopic: new Map(),
+      baselineAssessments: [],
+      finalAssessments: [],
       now: new Date(hoursAgo(48)),
       minParticipantsPerArm: 1,
     });
     const revise = analysis.arms.find((a) => a.arm === "revise")!;
-    expect(revise.transferShare).toBeCloseTo(1); // both post-assignment questions unseen before
+    expect(revise.unseenExposureShare).toBeCloseTo(1); // both post-assignment questions unseen before
   });
 });

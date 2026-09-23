@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createCard } from "@/domain/scheduling";
 import {
   buildHistoricalSnapshots,
-  evaluateFutureOutcomes,
-  buildMasteryCalibrationReport,
   evaluateMasteryCalibration,
 } from "@/domain/mastery-calibration";
-import type { Attempt, Card, Mistake, ReviewLog, Topic } from "@/domain/types";
+import type { Attempt, Card, Topic } from "@/domain/types";
 
 const TOPIC = (id: string): Topic => ({
   id,

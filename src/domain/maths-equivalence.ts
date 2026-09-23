@@ -137,6 +137,7 @@ type Token =
 export function preprocessMath(text: string): string {
   let t = text.replace(/\s+/g, " ");
   t = t.replace(/×|·|⋅|∗|∙/g, "*");
+  t = t.replace(/÷|∕/g, "/");
   t = t.replace(/−|–|—/g, "-");
   t = t.replace(/²/g, "^2").replace(/³/g, "^3").replace(/⁴/g, "^4").replace(/⁵/g, "^5");
   t = t
@@ -170,14 +171,14 @@ function tokenise(input: string): Token[] | null {
   const tokens: Token[] = [];
   let i = 0;
   while (i < s.length) {
-    const ch = s[i];
+    const ch = s[i] ?? "";
     if (ch === " ") {
       i++;
       continue;
     }
     if (/[0-9.]/.test(ch)) {
       const m = s.slice(i).match(/^\d+(?:\.\d+)?(?:e[+-]?\d+)?/i);
-      if (!m) return null;
+      if (!m?.[0]) return null;
       const f = decimalToFrac(m[0]);
       if (!f) return null;
       tokens.push({ t: "num", v: f });
@@ -188,7 +189,7 @@ function tokenise(input: string): Token[] | null {
       // A contiguous letter run is ONE symbol. Runs longer than one letter are
       // units/prose ("mol", "dm") — reject so `n=cV` never parses as n·c·V.
       const m = s.slice(i).match(/^[a-z]+/i);
-      if (!m) return null;
+      if (!m?.[0]) return null;
       if (m[0].length > 1) return null;
       tokens.push({ t: "var", name: m[0].toLowerCase() });
       i += m[0].length;
@@ -297,9 +298,13 @@ function parseFactor(st: ParseState): Polynomial {
   if (t && t.t === "op" && t.v === "^") {
     next(st);
     const exp = parseAtom(st);
-    // Exponent must be a constant.
-    if (exp.size !== 1 || !exp.has(0)) throw new ParseError("variable exponent");
-    const n = fracToNum(exp.get(0)!);
+    // Exponent must be a constant. A zero exponent parses to an empty
+    // polynomial (no non-zero terms), so check for stray variables instead of
+    // demanding a present constant — that is what made `10^0` (valid standard
+    // form) unparseable and sent correct answers to review.
+    if ([...exp.keys()].some((degree) => degree !== 0)) throw new ParseError("variable exponent");
+    const zero = exp.get(0);
+    const n = zero ? fracToNum(zero) : 0;
     const raised = polyPow(base, n);
     if (!raised) throw new ParseError("unsupported power");
     return raised;

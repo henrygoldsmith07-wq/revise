@@ -1,3 +1,4 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 import type {
   Id,
   IsoDate,
@@ -149,6 +150,14 @@ export function validateQuestion(
   if (!question.lastChecked) addIssue(issues, "missing-last-checked", `${question.id}: lastChecked is required`);
   if (question.source === "licensed" && !question.licensedSource?.citation?.trim()) {
     addIssue(issues, "missing-licence", `${question.id}: licensed questions need a citation`);
+  }
+  if (requiresWjecContentReview(question.subjectId) && question.source === "past-paper") {
+    const paper = question.paperProvenance;
+    const validPaper = Boolean(paper && paper.status === "verified" && paper.board.toLowerCase() === "wjec" &&
+      paper.paperId === question.paperId && paper.questionNumber === question.paperQuestionNumber &&
+      paper.specification.trim() && /^https:\/\//i.test(paper.sourceUrl) && paper.sourceDigest.trim() &&
+      paper.verifiedBy && paper.verifiedAt && Number.isFinite(Date.parse(paper.verifiedAt)));
+    if (!validPaper) addIssue(issues, "missing-paper-provenance", `${question.id}: WJEC Physics past-paper questions need a verified source manifest, digest and reviewer`);
   }
   if (question.lastChecked) {
     const age = daysBetween(question.lastChecked, today);

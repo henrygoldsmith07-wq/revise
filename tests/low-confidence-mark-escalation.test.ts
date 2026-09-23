@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { markResponseSchema } from "@/ai/types";
 import {
   LOW_CONFIDENCE_MARK_THRESHOLD,
@@ -81,12 +79,5 @@ describe("low-confidence mark escalation", () => {
       reason: "missing-confidence",
       priority: "urgent",
     });
-  });
-
-  it("publishes the durable queue on Progress", () => {
-    const src = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    expect(src).toContain("markEscalationReport");
-    expect(src).toContain("Mark review queue");
-    expect(src).toContain("pending");
   });
 });

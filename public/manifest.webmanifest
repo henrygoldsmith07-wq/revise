@@ -2,6 +2,7 @@
   "name": "Revise — exam revision that knows what to do next",
   "short_name": "Revise",
   "description": "Evidence-based revision: spaced repetition, exam-style practice, AI marking and an adaptive plan that rebuilds itself.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -16,6 +17,6 @@
   "shortcuts": [
     { "name": "Review due cards", "url": "/review" },
     { "name": "Practise questions", "url": "/practice" },
-    { "name": "Today's plan", "url": "/planner" }
+    { "name": "Today's plan", "url": "/schedule" }
   ]
 }

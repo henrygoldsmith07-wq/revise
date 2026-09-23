@@ -1,5 +1,5 @@
-import type { Id, Question, Topic, VerificationStatus } from "./types";
-import { allTopics } from "@/domain/curriculum";
+import type { Id, Question, Topic } from "./types";
+import { getSubject } from "@/domain/curriculum";
 import type { SubjectCoverage } from "./coverage";
 import type { ModerationEntry } from "./moderation";
 import { entriesWithProvenanceGaps } from "./moderation";
@@ -43,14 +43,15 @@ export function regressionReport(input: {
 }): RegressionReport {
   const today = input.today ?? new Date().toISOString().slice(0,10);
   const flags: ReviewFlag[] = [];
-  const questionIds = new Set(input.questions.map((q)=> q.id));
   const topicIds = new Set(input.topics.map((t)=> t.id));
   // Topics
   for (const t of input.topics) {
     if ((t.specPoints?.length ?? 0) === 0) flags.push({ kind: "no-specPoints", id: t.id, detail: `${t.title}: no specPoints` });
     else if ((t.specPoints?.length ?? 0) < 3) flags.push({ kind: "thin-specPoints", id: t.id, detail: `${t.title}: only ${t.specPoints?.length} specPoints (<3)` });
     if (!t.aos?.length) flags.push({ kind: "no-aos", id: t.id, detail: `${t.title}: no AOs` });
-    if (t.verification === "unverified") flags.push({ kind: "unverified", id: t.id, detail: `${t.title}: unverified` });
+    if (t.verification === "unverified" && getSubject(t.subjectId)?.contentTier !== "reference") {
+      flags.push({ kind: "unverified", id: t.id, detail: `${t.title}: unverified` });
+    }
     // Stale: topic or any statement not checked within window
     const last = t.lastChecked ?? t.specPoints?.[0]?.lastChecked ?? null;
     if (last && daysBetween(last, today) > STALE_DAYS) flags.push({ kind: "stale-check", id: t.id, detail: `${t.title}: lastChecked ${last} (>365d)` });

@@ -1,4 +1,5 @@
 import { symbolicMatch } from "./maths-equivalence";
+import { markCalculationWorking } from "./calculation-rubric";
 import type { MarkEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -17,8 +18,11 @@ const STOP_WORDS = new Set([
   "more", "less", "also", "into", "each", "their", "they", "you", "your", "we", "one", "two",
 ]);
 
+const MATH_NOTATION_TOKENS = new Set(["pi", "theta", "delta", "sqrt", "leq", "geq", "approx", "plusminus"]);
+
 /** Cheap stemmer: enough to make "oxidised"/"oxidise"/"oxidation" agree. */
 function stem(word: string): string {
+  if (MATH_NOTATION_TOKENS.has(word)) return word;
   let w = word;
   for (const suffix of ["ations", "ation", "ising", "izing", "ised", "ized", "ise", "ize", "ing", "ies", "es", "ed", "s"]) {
     if (w.length > suffix.length + 3 && w.endsWith(suffix)) {
@@ -33,6 +37,17 @@ export function tokenise(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
+      // Preserve meaningful maths notation as words before punctuation is
+      // stripped. This lets rubric matching distinguish π from a bare number,
+      // or ≤ from an equality that happens to share the same boundary value.
+      .replace(/π/g, " pi ")
+      .replace(/θ/g, " theta ")
+      .replace(/δ/g, " delta ")
+      .replace(/√/g, " sqrt ")
+      .replace(/≤/g, " leq ")
+      .replace(/≥/g, " geq ")
+      .replace(/≈/g, " approx ")
+      .replace(/±/g, " plusminus ")
       .replace(/[^a-z0-9+\-.^/=²³ ]/g, " ")
       .split(/\s+/)
       .filter((w) => w.length > 1 && !STOP_WORDS.has(w))
@@ -52,11 +67,14 @@ function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
     const cur = [i];
     let rowMin = i;
     for (let j = 1; j <= small.length; j++) {
-      const substitution = prev[j - 1] + (large[i - 1] === small[j - 1] ? 0 : 1);
-      let best = Math.min(prev[j] + 1, cur[j - 1] + 1, substitution);
+      const prevJm1 = prev[j - 1] ?? 0;
+      const prevJ = prev[j] ?? 0;
+      const curJm1 = cur[j - 1] ?? 0;
+      const substitution = prevJm1 + (large[i - 1] === small[j - 1] ? 0 : 1);
+      let best = Math.min(prevJ + 1, curJm1 + 1, substitution);
       // Adjacent transposition counts as a single edit.
       if (i > 1 && j > 1 && large[i - 1] === small[j - 2] && large[i - 2] === small[j - 1]) {
-        best = Math.min(best, (prev2 ? prev2[j - 2] : Number.POSITIVE_INFINITY) + 1);
+        best = Math.min(best, (prev2 ? prev2[j - 2] ?? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY) + 1);
       }
       cur[j] = best;
       if (best < rowMin) rowMin = best;
@@ -65,7 +83,7 @@ function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
     prev2 = prev;
     prev = cur;
   }
-  return prev[small.length] <= maxEdits;
+  return (prev[small.length] ?? Number.POSITIVE_INFINITY) <= maxEdits;
 }
 
 /**
@@ -76,19 +94,25 @@ function withinEditDistance(a: string, b: string, maxEdits: number): boolean {
  * shared three-character prefix so sibling scheme points that happen to
  * sound alike are not credited by each other.
  */
-export function pointCoverage(point: string, answer: string): number {
+export function pointCoverage(point: string, answer: string, earlyExitAt?: number): number {
   const wanted = [...tokenise(point)];
   if (!wanted.length) return 0;
   const given = [...tokenise(answer)];
   const exact = new Set(given);
-  const hits = wanted.filter((w) => {
+  let exactHits = 0;
+  for (const w of wanted) if (exact.has(w)) exactHits++;
+  // Fast path: when exact keyword coverage already clears the caller threshold,
+  // skip the fuzzy scan entirely — the hot loop in marking and benchmarks.
+  if (earlyExitAt != null && exactHits / wanted.length >= earlyExitAt) return exactHits / wanted.length;
+  const missing = earlyExitAt != null ? wanted.filter((w) => !exact.has(w)) : wanted;
+  const hits = missing.filter((w) => {
     if (exact.has(w)) return true;
     if (w.length >= 8 && given.some((g) => g.length >= 8 && g.slice(0, 3) === w.slice(0, 3) && withinEditDistance(g, w, 2))) {
       return true;
     }
     return w.length >= 5 && given.some((g) => g.length >= 5 && withinEditDistance(g, w, 1));
   }).length;
-  return hits / wanted.length;
+  return (earlyExitAt != null ? exactHits + hits : hits) / wanted.length;
 }
 
 /** Normalise a numeric string: strip thousands separators and keep a single canonical decimal form. */
@@ -98,15 +122,28 @@ function parseScalar(raw: string): number | null {
 }
 
 /** Extract every number-like token from free text, including fractions, simple exponents and scientific notation. */
-function extractNumbers(input: string): Array<{ raw: string; value: number | null; denom?: number }> {
+/** Bounded memo: scheme/answer strings repeat heavily across marking calls
+ *  (same part, many adversarial variants) and the scan is regex-heavy. */
+type NumberHitX = { raw: string; value: number | null; denom?: number };
+const NUMBER_CACHE = new Map<string, NumberHitX[]>();
+function extractNumbersCached(text: string): NumberHitX[] {
+  const hit = NUMBER_CACHE.get(text);
+  if (hit) return hit;
+  const result = extractNumbersUncached(text);
+  if (NUMBER_CACHE.size > 512) NUMBER_CACHE.clear();
+  NUMBER_CACHE.set(text, result);
+  return result;
+}
+
+function extractNumbersUncached(input: string): Array<{ raw: string; value: number | null; denom?: number }> {
   // Normalise unicode super/subscripts so "×10⁻³" reads as "x10-3".
   const SUPERS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9" };
   const text = input.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻₀-₉]/g, (ch) => SUPERS[ch] ?? ch);
   const out: Array<{ raw: string; value: number | null; denom?: number }> = [];
   // Fractions first so 1/2 is not read as two scalars.
   for (const m of text.matchAll(/(-?\d+(?:,\d{3})*(?:\.\d+)?)\s*\/\s*(-?\d+(?:,\d{3})*(?:\.\d+)?)/g)) {
-    const num = parseScalar(m[1]);
-    const den = parseScalar(m[2]);
+    const num = parseScalar(m[1] ?? "");
+    const den = parseScalar(m[2] ?? "");
     const val = num != null && den != null && den !== 0 ? num / den : null;
     out.push({ raw: m[0], value: val });
   }
@@ -115,8 +152,8 @@ function extractNumbers(input: string): Array<{ raw: string; value: number | nul
   // so a scheme expecting "1.32 x 10^-3" still loosely matches "1.32" elsewhere.
   const consumed: Array<readonly [number, number]> = [];
   for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*([x×])\s*10\s*\^?\s*\{?([+-]?\d+)\}?/gi)) {
-    const mantissa = parseScalar(m[1]);
-    const exponent = parseScalar(m[3]);
+    const mantissa = parseScalar(m[1] ?? "");
+    const exponent = parseScalar(m[3] ?? "");
     if (mantissa == null || exponent == null) continue;
     // Consume from the × sign onwards so the mantissa still reaches the plain path.
     const relSeparator = m[0].search(/[x×]/i);
@@ -133,7 +170,7 @@ function extractNumbers(input: string): Array<{ raw: string; value: number | nul
   }
   // Powers written as 2^3 or 2²/³ — normalise to numeric exponent where possible
   for (const m of text.matchAll(/(\d+)\s*\^\s*(-?\d+(?:\.\d+)?)/g)) {
-    const base = parseScalar(m[1]); const exp = parseScalar(m[2]);
+    const base = parseScalar(m[1] ?? ""); const exp = parseScalar(m[2] ?? "");
     if (base != null && exp != null) out.push({ raw: m[0], value: Math.pow(base, exp) });
   }
   return out;
@@ -174,7 +211,7 @@ function unitAfter(text: string, endOfNumber: number): string | null {
   const rest = text.slice(endOfNumber, endOfNumber + 12);
   const match = rest.match(/^[ \u00a0]*((?:mol\s*\/\s*(?:dm3|l)|dm3|cm3|m3|[GMkcmnµu]?(?:J|N|Pa|V|A|W|Hz|mol|g|m|s|L|K))[\^]?\{?-?\d\}?|%)/i);
   if (!match) return null;
-  return match[1].replace(/\s+/g, "").replace(/[\u00b2\u00b3]/g, (d) => (d === "\u00b2" ? "2" : "3")).toLowerCase();
+  return (match[1] ?? "").replace(/\s+/g, "").replace(/[\u00b2\u00b3]/g, (d) => (d === "\u00b2" ? "2" : "3")).toLowerCase();
 }
 
 interface UnitHit { value: number; unit: string | null }
@@ -220,53 +257,86 @@ function sameToTwoSigFigs(a: number, b: number): boolean {
 }
 
 
+function matchesExplicitNumericAlternative(point: string, answer: string): boolean {
+  const marker = /\b(?:or|accept|approximately|approx)\b/i.exec(point);
+  if (!marker) return false;
+  const alternativeText = point.slice(marker.index + marker[0].length);
+  const wanted = extractNumbersCached(alternativeText.replace(/[−–—]/g, "-")).filter((hit) => hit.value != null);
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-")).filter((hit) => hit.value != null);
+  return wanted.some((expected) =>
+    given.some((actual) => numbersClose(expected.value!, actual.value!)),
+  );
+}
+
+function requiredMathNotationPresent(point: string, answer: string): boolean {
+  const relationalRequirements: Array<{ expected: RegExp; actual: RegExp }> = [
+    { expected: /≤|<=|\bless\s+than\s+or\s+equal\b/i, actual: /≤|<=|\bless\s+than\s+or\s+equal\b/i },
+    { expected: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i, actual: /≥|>=|\bgreater\s+than\s+or\s+equal\b/i },
+    { expected: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i, actual: /±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/i },
+  ];
+  for (const requirement of relationalRequirements) {
+    if (requirement.expected.test(point) && !requirement.actual.test(answer)) return false;
+  }
+
+  const numericAlternativeMatches = matchesExplicitNumericAlternative(point, answer);
+  if (/π|\bpi\b/i.test(point) && !/π|\bpi\b/i.test(answer) && !numericAlternativeMatches) return false;
+  if (/√|\bsqrt\b/i.test(point) && !/(?:√|\bsqrt\b)/i.test(answer) && !numericAlternativeMatches) return false;
+  return true;
+}
+
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 function numericMatch(point: string, answer: string): boolean {
-  const wanted = extractNumbers(point.replace(/[−–—]/g, "-"));
+  if (!requiredMathNotationPresent(point, answer)) return false;
+  const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
   if (!wanted.length) return false;
-  const given = extractNumbers(answer.replace(/[−–—]/g, "-"));
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-"));
   if (!given.length) return false;
   // Also accept unicode fractions like ½ ¼ ¾
   const unicodeFrac: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1/3, "⅔": 2/3 };
-  for (const ch of Object.keys(unicodeFrac)) if (answer.includes(ch)) given.push({ raw: ch, value: unicodeFrac[ch] });
-  for (const ch of Object.keys(unicodeFrac)) if (point.includes(ch)) wanted.push({ raw: ch, value: unicodeFrac[ch] });
-  // Unit-aware quantities: a value with a unit on one side pairs against the
-  // other side's same-dimension value (prefix-converted) or its bare value.
-  const wantedQuantities = quantities(point);
-  const givenQuantities = quantities(answer);
+  for (const ch of Object.keys(unicodeFrac)) if (answer.includes(ch)) given.push({ raw: ch, value: unicodeFrac[ch] as number });
+  for (const ch of Object.keys(unicodeFrac)) if (point.includes(ch)) wanted.push({ raw: ch, value: unicodeFrac[ch] as number });
+  // Unit-aware quantities are computed lazily: most scheme points carry no
+  // units, and scanning the answer for "number+unit" pairs is pure waste then.
+  let wantedQuantities: ReturnType<typeof quantities> | null = null;
+  const wantQuantities = () => (wantedQuantities ??= quantities(point));
   for (const w of wanted) {
     if (w.value == null) continue;
     for (const g of given) {
       if (g.value == null) continue;
       if (numbersClose(w.value, g.value)) {
         // Values are close; the unit gate can still veto cross-family pairs.
-        const qw = wantedQuantities.find((q) => q.value === w.value);
-        const qg = givenQuantities.find((q) => q.value === g.value);
-        if (!qw?.unit || !qg?.unit || quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+        const qw = wantQuantities().find((q) => q.value === w.value);
+        if (!qw?.unit) return true;
+        const qg = quantities(answer).find((q) => q.value === g.value);
+        if (!qg?.unit || quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
       }
       // Exact raw string match as a fallback (covers trailing zeros, etc.)
       if (w.raw === g.raw) return true;
     }
   }
   // Prefix-conversion rescue: "3500 J" vs "3.5 kJ" is close only after conversion.
-  for (const qw of wantedQuantities) {
-    if (!qw.unit) continue;
-    for (const qg of givenQuantities) {
-      if (!qg.unit || qg.value === qw.value) continue;
-      if (quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+  wantedQuantities = wantQuantities();
+  if (wantedQuantities.some((q) => q.unit != null)) {
+    const givenQuantities = quantities(answer);
+    for (const qw of wantedQuantities) {
+      if (!qw.unit) continue;
+      for (const qg of givenQuantities) {
+        if (!qg.unit || qg.value === qw.value) continue;
+        if (quantityPairMatches(qw.value, qw.unit, qg.value, qg.unit)) return true;
+      }
     }
   }
   // Examiner tolerance: an explicit "(accept X)" or two-significant-figure
   // equality credits rounded answers without opening the door to distant values.
   const accept = point.match(/\(accept\s+(-?\d+(?:[.,]\d+)?)\s*\)/i);
   if (accept) {
-    const alt = Number(accept[1].replace(",", "."));
+    const alt = Number((accept[1] ?? "").replace(",", "."));
     for (const g of given) {
       const gv = g.value;
       if (gv == null) continue;
       if (numbersClose(gv, alt, 0.05, 0.05)) return true;
     }
-    for (const g of givenQuantities) {
+    for (const g of quantities(answer)) {
       if (g.unit == null) continue;
       if (numbersClose(g.value, alt, 0.05, 0.05)) return true;
     }
@@ -283,7 +353,7 @@ function numericMatch(point: string, answer: string): boolean {
   return false;
 }
 
-export function numericEquivalent(expected: string, actual: string, eps = 0.01): boolean {
+export function numericEquivalent(expected: string, actual: string): boolean {
   return numericMatch(expected, actual);
 }
 
@@ -297,6 +367,11 @@ export interface PartialCreditCalibration {
 }
 
 /** Evaluate whether a mark-scheme point looks like a calculation/numeric point. */
+function requiresStructuredNumericMatch(point: string): boolean {
+  if (!/\d/.test(point)) return false;
+  return /(?:±|≤|≥|π|√|\+\s*\/\s*-|<=|>=|\bsqrt\b|\bpi\b)/i.test(point);
+}
+
 export function isNumericPoint(point: string): boolean {
   if (!/\d/.test(point)) return false;
   return (
@@ -325,6 +400,7 @@ function evidenceScore(point: string, answer: string): number {
   const symbolic = symbolicMatch(answer, point);
   if (symbolic === "equivalent") return 1;
   if (symbolic === "not-equivalent") return 0;
+  if (requiresStructuredNumericMatch(point)) return numericEquivalent(point, answer) ? 1 : 0;
   return Math.max(pointCoverage(point, answer), numericEquivalent(point, answer) ? 0.9 : 0);
 }
 
@@ -443,7 +519,7 @@ export function withMarkEvidence<T extends { marked: MarkedPart[] }>(
     marked: result.marked.map((marked) => {
       const part = question.parts.find((candidate) => candidate.id === marked.partId);
       return part
-        ? { ...marked, evidence: evidenceForMarkedPart(part, answers[part.id] ?? "", marked) }
+        ? { ...marked, evidence: part.calculationRules && marked.evidence ? marked.evidence : evidenceForMarkedPart(part, answers[part.id] ?? "", marked) }
         : marked;
     }),
   } as T;
@@ -471,8 +547,151 @@ function polarityConflict(point: string, answer: string): boolean {
   );
 }
 
+/**
+ * Authored answers are a useful floor for explicitly mapped content, but the
+ * floor must not depend on sentence order or harmless numeric notation. A
+ * canonical multiset of content tokens lets an answer such as
+ * "0.40 m" -> "2/5 m", or a reordered chain of sentences, reach the same
+ * authored result without accepting added claims, changed values or
+ * paraphrases that still need rubric marking.
+ */
+function canonicalAuthoredAnswer(text: string): string[] {
+  // Model answers recur across every adversarial variant and every retry of a
+  // question. Keep the canonical form bounded so the full authored-answer
+  // equivalence path does not repeatedly rescan the same prose.
+  const cached = AUTHORED_CANONICAL_CACHE.get(text);
+  if (cached) return cached;
+  const expanded = text
+    .replace(/[−–—]/g, "-")
+    .replace(
+      /([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[x×]\s*10\s*\^?\s*\{?([+-]?\d+)\}?/gi,
+      (_match, mantissa: string, exponent: string) => String(Number(mantissa) * 10 ** Number(exponent)),
+    );
+  const tokenPattern =
+    /-?\d+(?:,\d{3})*(?:\.\d+)?\s*\/\s*-?\d+(?:,\d{3})*(?:\.\d+)?|-?\d+(?:,\d{3})*(?:\.\d+)?(?:e[+-]?\d+)?|[a-z]+/gi;
+  const fragments = expanded.split(/(?<=[.!?])\s+/).map((fragment) => {
+    const tokens: string[] = [];
+    for (const match of fragment.matchAll(tokenPattern)) {
+      const raw = match[0] ?? "";
+      if (/^[a-z]+$/i.test(raw)) {
+        const word = stem(raw.toLowerCase());
+        // Negation and comparison change the claim even when other words match.
+        if (word && (!STOP_WORDS.has(word) || ["not", "no", "less", "more", "without", "never"].includes(word))) tokens.push("w:" + word);
+        continue;
+      }
+      const numeric = extractNumbersCached(raw.replace(/\s+/g, "")).find((hit) => hit.value != null)?.value;
+      if (numeric != null && Number.isFinite(numeric)) tokens.push("n:" + numeric.toPrecision(12));
+      else tokens.push("r:" + raw.toLowerCase());
+    }
+    return tokens.sort().join("|");
+  }).filter(Boolean);
+  const result = fragments.sort();
+  if (AUTHORED_CANONICAL_CACHE.size > 1024) AUTHORED_CANONICAL_CACHE.clear();
+  AUTHORED_CANONICAL_CACHE.set(text, result);
+  return result;
+}
+
+const AUTHORED_CANONICAL_CACHE = new Map<string, string[]>();
+
+function authoredAnswerEquivalent(part: QuestionPart, answer: string): boolean {
+  const model = part.modelAnswer?.trim();
+  if (!model || !answer.trim()) return false;
+  const compact = (text: string) => text.replace(/\s+/g, " ");
+  if (compact(model) === compact(answer.trim())) return true;
+  const expected = canonicalAuthoredAnswer(model);
+  const actual = canonicalAuthoredAnswer(answer);
+  if (expected.length === 0 || expected.length !== actual.length) return false;
+  return expected.every((fragment, index) => {
+    if (fragment === actual[index]) return true;
+    const wanted = fragment.split("|");
+    const given = actual[index]!.split("|");
+    if (wanted.length !== given.length) return false;
+    const used = new Set<number>();
+    return wanted.every((token) => {
+      const match = given.findIndex((candidate, candidateIndex) => {
+        if (used.has(candidateIndex)) return false;
+        if (token === candidate) return true;
+        // A single transposed/substituted letter in a content word is normal
+        // handwriting/OCR noise. Numeric tokens stay exact after canonical
+        // value conversion; a changed number must still go through the rubric.
+        return token.startsWith("w:") && candidate.startsWith("w:") &&
+          withinEditDistance(token.slice(2), candidate.slice(2), 1);
+      });
+      if (match < 0) return false;
+      used.add(match);
+      return true;
+    });
+  });
+}
+
+/** A stated numerical result must match the result, not an input in the working.
+ * Restrict the guard to explicit SI results in Physics schemes. Method-only and
+ * authored follow-through points still use their separate evidence paths.
+ */
+function physicsResultMatches(point: string, answer: string): boolean | undefined {
+  if (/follow.through|alternatively|accept an? equivalent/i.test(point)) return undefined;
+  // Most Physics rubric points are explanatory prose. Skip the numeric regex
+  // pipeline unless the point actually states an explicit equality result.
+  if (!/=\s*[+-]?(?:\d|\.)/.test(point)) return undefined;
+  const value = "([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:(?:[eE][+-]?\\d+)|(?:\\s*[x×*]\\s*10\\s*\\^?\\s*[+-]?\\d+))?)";
+  const units = "([kmunpµμM]?)(J|V|F|C|N|W|Pa|Hz|ohm|s|m|kg)";
+  // This guard handles simple units only. Never truncate a compound unit
+  // (m/s, m s^-1, J kg^-1) into a different physical quantity.
+  const unitEnd = "(?![a-zA-Zµμ]|\\s*(?:[/·^]|[a-zA-Z]+\\s*\\^))(?=\\b|[.;,)]|$)";
+  const expand = (s: string) => s.replace(/[−–]/g, "-").replace(/[⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, r => "^" + [...r].map(c => ({ "⁻": "-", "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9" }[c] ?? c)).join(""));
+  const expected = [...expand(point).matchAll(new RegExp("=\\s*" + value + "\\s*" + units + unitEnd, "g"))].at(-1);
+  if (!expected) return undefined;
+  const read = (raw: string) => {
+    const scientific = raw.match(/^([+-]?[\d.]+)\s*[x×*]\s*10\s*\^?\s*([+-]?\d+)$/);
+    return scientific ? Number(scientific[1]) * 10 ** Number(scientific[2]) : Number(raw);
+  };
+  const scales: Record<string, number> = { "": 1, k: 1e3, M: 1e6, m: 1e-3, u: 1e-6, µ: 1e-6, μ: 1e-6, n: 1e-9, p: 1e-12 };
+  const target = read(expected[1]!) * scales[expected[2]!]!;
+  if (!Number.isFinite(target)) return undefined;
+  return [...expand(answer).matchAll(new RegExp(value + "\\s*" + units + unitEnd, "g"))].some(hit => {
+    const actual = read(hit[1]!) * scales[hit[2]!]!;
+    return hit[3] === expected[3] && Number.isFinite(actual) &&
+      (Math.abs(actual - target) <= Math.max(Number.MIN_VALUE, Math.abs(target) * 0.015) ||
+        /two significant figures/i.test(point) && sameToTwoSigFigs(actual, target));
+  });
+}
+
+/** Catch an otherwise identical assertion with its explicit negation reversed.
+ * Clause-local comparison avoids vetoing an unrelated correct sentence simply
+ * because another sentence in the answer contains "not".
+ */
+function explicitNegationConflict(point: string, answer: string): boolean {
+  const negative = /\b(?:not|never)\b/i;
+  if (!negative.test(point) && !negative.test(answer)) return false;
+  // This check only distinguishes a reversed polarity in an otherwise
+  // identical clause. Token multisets are sufficient here and avoid invoking
+  // the more expensive authored-answer canonicaliser for every Physics mark.
+  const withoutNegation = (text: string) => text
+    .toLowerCase()
+    .replace(/\b(?:not|never)\b/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .sort()
+    .join("|");
+  const expected = withoutNegation(point);
+  return answerFragments(answer).some(fragment => negative.test(point) !== negative.test(fragment) &&
+    withoutNegation(fragment) === expected);
+}
+
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
+  const calculation = markCalculationWorking(part, answer);
+  if (calculation) return calculation;
   const trimmed = (answer ?? "").trim();
+  // The authored complete answer must remain reachable. Its wording is not
+  // evidence of cheating or support; the runner records actual hint exposure.
+  // Limit this contract to explicitly skill-mapped content with one point per mark.
+  if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
+    authoredAnswerEquivalent(part, trimmed)) {
+    const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
+      creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
+    return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
+  }
   const credited: string[] = [];
   const missed: string[] = [];
   const givenTokens = new Set(
@@ -492,13 +711,14 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
 
   for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
-    const cov = pointCoverage(point, trimmed);
+    const cov = pointCoverage(point, trimmed, thresh);
     const num = numericMatch(point, trimmed);
     // Symbolic layer: when both the point and the answer contain a parseable
     // algebra expression, accept equivalent forms (`(x+2)(x-3)` for `x^2 - x - 6`)
     // and reject a pure expression that differs, even if a stray digit matches.
     // Unknown (unparseable/prose) never hurts: it falls through to the rubric.
     const sym = symbolicMatch(trimmed, point);
+    const structuredNumeric = requiresStructuredNumericMatch(point);
     const numeric = isNumericPoint(point);
     const strict = Boolean(calibration?.strictNumericPoints && numeric);
     let ok =
@@ -506,11 +726,13 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
         ? true
         : sym === "not-equivalent"
           ? false
-          : strict
-            ? (num && cov >= thresh)
-            : numeric
-              ? (num || cov >= thresh)
-              : (cov >= thresh || num);
+          : structuredNumeric
+            ? num
+            : strict
+              ? (num && cov >= thresh)
+              : numeric
+                ? (num || cov >= thresh)
+                : (cov >= thresh || num);
     if (ok && !num && sym === "unknown") {
       const discriminative = [...(pointTokenSets[pointIndex] ?? [])].filter(
         (t) => (documentFrequency.get(t) ?? 0) === 1,
@@ -519,6 +741,14 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     }
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
     if (ok && sym !== "equivalent" && polarityConflict(point, trimmed)) ok = false;
+    if (part.capabilityIds?.some(id => id.startsWith("phys."))) {
+      if (explicitNegationConflict(point, trimmed)) ok = false;
+      const resultMatches = physicsResultMatches(point, trimmed);
+      if (resultMatches === false) ok = false;
+      const selected = point.match(/^Only ([A-D]) is suitable\.?$/);
+      if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(trimmed) &&
+        !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(trimmed);
+    }
     (ok ? credited : missed).push(point);
   }
 
@@ -531,6 +761,9 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // keywords it happens to contain.
   if (trimmed.split(/\s+/).length < 3 && part.marks > 1) awarded = Math.min(awarded, 1);
 
+  // Physics uses recorded support exposure to judge independence. Correct
+  // reasoning cannot lose an exam mark merely for using the rubric's wording.
+  // Preserve the legacy vocabulary heuristic for other subjects here.
   // Anti-regurgitation: when almost every content word in the answer comes
   // from the scheme's own vocabulary, the response recites rather than
   // engages — an examiner caps it below full marks. Genuine answers
@@ -540,7 +773,8 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // carries almost no independent wording.
   const stripEdges = (t: string) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
   const contentTokens = [...tokenise(trimmed)].map(stripEdges).filter((t) => t && !STOP_WORDS.has(t));
-  if (contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
+  if (!part.capabilityIds?.some(id => id.startsWith("phys.")) &&
+    contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
     const schemeVocabulary = new Set(
       part.markScheme.flatMap((p) => [...tokenise(p)]).map(stripEdges).filter((t) => t && !STOP_WORDS.has(t)),
     );

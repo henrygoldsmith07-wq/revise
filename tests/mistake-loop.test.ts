@@ -100,7 +100,7 @@ describe("mistake → remediation → retest loop", () => {
     });
   });
 
-  it("resolves only when the affected part is complete and the lost point is credited", () => {
+  it("keeps a full same-question retest open until independent transfer and retention evidence exist", () => {
     const retest = attempt([
       {
         partId: "p1",
@@ -113,11 +113,10 @@ describe("mistake → remediation → retest loop", () => {
     ]);
 
     const evaluation = evaluateMistakeRetest(mistake, question, retest);
-    expect(evaluation.status).toBe("resolved");
+    expect(evaluation.status).toBe("still-open");
     expect(evaluation.feedback).toContain("2/2");
     expect(applyRetestToMistake(mistake, evaluation, retest)).toMatchObject({
-      resolved: true,
-      resolvedAt: retest.createdAt,
+      resolved: false,
       retestCount: 1,
     });
   });

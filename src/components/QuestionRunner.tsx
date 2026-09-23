@@ -1,23 +1,41 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { aiMark } from "@/ai/client";
+import { aiDiagnoseError, aiMark } from "@/lib/optional-ai";
+import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { misconceptionsForTopic } from "@/content";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
-import { getTopic } from "@/domain/curriculum";
+import { getSubject, getTopic } from "@/domain/curriculum";
+import {
+  buildHintLadder,
+  formatHint,
+  HINT_TIERS,
+  hintEvidenceSource,
+  nextHint,
+  type HintTier,
+} from "@/domain/hints";
 import {
   completeDelayedFarTransfer,
   scheduleDelayedFarTransfer,
   type DelayedFarTransferRetest,
 } from "@/domain/delayed-far-transfer";
 import { markMcq, rubricConfidence } from "@/domain/marking";
+import { shouldOfferMathInput } from "@/domain/math-input";
+import { answerLooksCopied } from "@/domain/learning-evidence";
+import { analyseAttemptWorking } from "@/domain/working-analysis";
+import { EditorialBadge } from "./EditorialBadge";
+import { humanVerifiedPhysicsQuestion } from "@/domain/physics-content-review";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
 import type { RetestEvaluation } from "@/domain/mistakes";
 import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
 import type { LowConfidenceMarkDecision } from "@/domain/mark-escalation";
 import { planRemediation, type RemediationAction } from "@/domain/remediation";
 import type { RemediationPlan } from "@/domain/remediation";
-import type { Attempt, Id, MarkedPart, Mistake, Question } from "@/domain/types";
+import { diagnoseAttemptErrors, isActionable } from "@/domain/error-diagnosis-plan";
+import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
+import { isErrorCategory } from "@/domain/error-taxonomy";
+import type { ErrorCategory } from "@/domain/error-taxonomy";
+import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { AnswerInput } from "./AnswerInput";
 import { RichText } from "./RichText";
@@ -28,11 +46,73 @@ import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 // points were earned → dropped marks become mistakes and mistake cards without
 // the student having to do anything. That last step is the whole point; a
 // mistake you have to file manually is a mistake you never revisit.
+/**
+ * Post-marking refinement of the error diagnosis via classifier.dev.
+ *
+ * Contract: the marks passed in are already final and are passed back out
+ * unchanged. Only the error *type* can change, only for parts the local read
+ * could not act on, and only when the remote verdict clears the confidence
+ * threshold. Any failure — offline, no provider, timeout, gated reply —
+ * returns null and the deterministic diagnosis stays on screen.
+ */
+async function refineErrorDiagnosis(
+  question: Question,
+  marked: MarkedPart[],
+  answers: Record<string, string>,
+  current: AttemptErrorDiagnosis,
+): Promise<AttemptErrorDiagnosis | null> {
+  const uncertain = current.parts.filter((part) => !isActionable(part));
+  if (!uncertain.length) return null;
+  const bySignal = new Map<string, ReturnType<typeof verdictFromEnvelope>>();
+  await Promise.all(
+    uncertain.map(async (part) => {
+      const envelope = await aiDiagnoseError({
+        prompt: `${question.stem}\n${question.parts.find((candidate) => candidate.id === part.partId)?.prompt ?? ""}`,
+        point: marked.find((entry) => entry.partId === part.partId)?.missedPoints[0] ?? "",
+        answer: answers[part.partId] ?? "",
+        awarded: part.awarded,
+        maxMarks: part.max,
+      });
+      if (envelope.source !== "ai") return;
+      bySignal.set(part.partId, verdictFromEnvelope(envelope.data));
+    }),
+  );
+  if (!bySignal.size) return null;
+  // Re-run the diagnosis with the refined verdicts. Only a part that produced
+  // a confident remote answer changes; the rest keep the local read.
+  return diagnoseAttemptErrors({
+    question,
+    marked,
+    answers,
+    classify: (signal) => bySignal.get(signal.partId) ?? null,
+  });
+}
+
+/** Narrow the wire shape onto the domain verdict, refusing impossible labels. */
+function verdictFromEnvelope(data: { category: string; confidence: number; reasons: string[]; provenance?: string; gated?: boolean; rawLabel?: string }) {
+  return {
+    category: (isErrorCategory(data.category) ? data.category : "other") as ErrorCategory,
+    confidence: data.confidence,
+    reasons: data.reasons,
+    provenance: (data.provenance === "classifier-dev" ? "classifier-dev" : "local-fallback") as "classifier-dev" | "local-fallback",
+    gated: Boolean(data.gated),
+    ...(data.rawLabel ? { rawLabel: data.rawLabel } : {}),
+  };
+}
+
+
 
 export interface QuestionDraft {
   answers: Record<string, string>;
   choice: number | null;
 }
+
+const TIER_HINT_CTA: Record<HintTier, string> = {
+  cue: "Reveal a small cue",
+  prompt: "Reveal what to think about",
+  scaffold: "Reveal the answer structure",
+  "worked-solution": "Reveal a worked solution",
+};
 
 export function QuestionRunner({
   question,
@@ -45,6 +125,10 @@ export function QuestionRunner({
   draft,
   onDraftChange,
   onFinished,
+  hintBudget,
+  externalHintTier,
+  repairTeachingSeen = false,
+  intervention,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -56,6 +140,14 @@ export function QuestionRunner({
   draft?: QuestionDraft;
   onDraftChange?: (draft: QuestionDraft) => void;
   onFinished?: (attempt: Attempt) => void;
+  /**
+   * Hint tiers available for this question. Defaults to the full ladder;
+   * the independent rung passes 0 so the evidence stays unaided.
+   */
+  hintBudget?: number;
+  externalHintTier?: HintTier | null;
+  repairTeachingSeen?: boolean;
+  intervention?: InterventionAttemptContext;
 }) {
   const store = useStore();
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
@@ -66,11 +158,17 @@ export function QuestionRunner({
     feedback: string;
     source: "ai" | "fallback";
     note?: string;
+    withheld?: string;
     retest?: RetestEvaluation;
     remediation: RemediationPlan;
     confidence: number | null;
+    copiedAnswer?: boolean;
+    workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
+    /** Post-marking error diagnosis; never changes the marks above. */
+    errorDiagnosis?: AttemptErrorDiagnosis;
+    nextAction: { label: string; href: null; why: string };
   } | null>(null);
   // Stamped after mount: reading the clock during render makes the render
   // impure and would restart the timer on every re-render.
@@ -80,9 +178,60 @@ export function QuestionRunner({
   }, []);
   const isMcq = question.kind === "mcq";
   const topic = getTopic(question.topicIds[0] ?? "");
+  // The hint ladder is deterministic content from the question and topic —
+  // no model call — and every tier used is recorded on the attempt so the
+  // tutor's evidence stays honest about assisted wins.
+  const ladder = useMemo(
+    () => buildHintLadder(question, topic ? { keyPoints: topic.keyPoints, commonErrors: topic.commonErrors } : undefined),
+    [question, topic],
+  );
+  const allowedTiers: HintTier[] = useMemo(
+    () => HINT_TIERS.slice(0, Math.max(0, Math.min(HINT_TIERS.length, hintBudget ?? HINT_TIERS.length))),
+    [hintBudget],
+  );
+  const [usedTiers, setUsedTiers] = useState<HintTier[]>([]);
+  const [hintsOpen, setHintsOpen] = useState(false);
+  const visibleHints = useMemo(() => ladder.filter((h) => usedTiers.includes(h.tier)), [ladder, usedTiers]);
+  const upcoming = useMemo(
+    () => ladder.filter((h) => allowedTiers.includes(h.tier)).find((h) => !usedTiers.includes(h.tier)) ?? null,
+    [ladder, allowedTiers, usedTiers],
+  );
+  const highestUsedTier = HINT_TIERS.filter((tier) => usedTiers.includes(tier) || tier === externalHintTier ||
+    (repairTeachingSeen && tier === "scaffold")).at(-1) ?? null;
+  const evidenceSource = hintEvidenceSource(highestUsedTier);
+
+  // When the DLQ later re-grades this question with AI, refresh an open
+  // result view in place so the student sees the AI mark land without
+  // doing anything. Scope: this question, and only while still mounted.
+  const dlqResolvedRef = useRef(false);
+  useEffect(() => {
+    if (!result) return; // nothing to upgrade until a mark exists
+    function onResolved(event: Event) {
+      const detail = (event as CustomEvent<AiDlqResolvedDetail>).detail;
+      if (!detail || detail.questionId !== question.id || dlqResolvedRef.current) return;
+      dlqResolvedRef.current = true;
+      const upgraded = detail.attempt;
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              marked: upgraded.marked,
+              feedback: upgraded.feedback,
+              source: "ai",
+              confidence: upgraded.markConfidence ?? null,
+              escalation: undefined,
+            }
+          : prev,
+      );
+    }
+    window.addEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+    return () => window.removeEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
+  }, [result, question.id]);
 
   const awarded = useMemo(() => result?.marked.reduce((a, m) => a + m.awarded, 0) ?? 0, [result]);
 
+  const funnelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (funnelTimer.current) clearTimeout(funnelTimer.current); }, []);
   async function submit() {
     setMarking(true);
     try {
@@ -104,7 +253,9 @@ export function QuestionRunner({
     let feedback: string;
     let source: "ai" | "fallback" = "fallback";
     let note: string | undefined;
+    let markTier: string | undefined;
     let markConfidence: number | null = null;
+    let withheld: string | undefined;
 
     if (isMcq) {
       const single = markMcq(question, choice ?? -1);
@@ -114,17 +265,26 @@ export function QuestionRunner({
           ? `Correct. ${question.parts[0]?.modelAnswer ?? ""}`
           : `${single.comment} ${question.parts[0]?.modelAnswer ?? ""}`;
     } else {
-      const envelope = await aiMark(question, answers);
+      const envelope = await aiMark(question, answers, { useLocalModel: Boolean(store.settings?.localAiMarking) });
       marked = envelope.data.marked;
       feedback = envelope.data.feedback;
       source = envelope.source;
       note = envelope.note;
+      markTier = envelope.tier;
       markConfidence = source === "ai" && typeof envelope.data.confidence === "number" ? envelope.data.confidence : null;
+      withheld = envelope.withheld ?? undefined;
     }
 
     const submittedAnswers = isMcq ? { [question.parts[0]?.id ?? question.id]: String(choice) } : answers;
+    const copiedAnswer = answerLooksCopied(question, submittedAnswers);
+    const workingAnalysis = analyseAttemptWorking(question, submittedAnswers, marked);
     const markedBy: Attempt["markedBy"] = source === "ai" ? "ai" : "rubric";
     const attemptId = crypto.randomUUID();
+    // Feedback-read telemetry: fires once the result view has been on screen
+    // for a moment; unmount before that means it was never read.
+    funnelTimer.current = setTimeout(() => {
+      void store.recordFunnel("feedback_read", attemptId);
+    }, 2500);
     const createdAt = new Date().toISOString();
     // Rubric marks carry evidence-derived confidence too, so genuinely
     // ambiguous offline marking reaches the same review queue as AI marks.
@@ -134,6 +294,8 @@ export function QuestionRunner({
       confidence: source === "ai" ? markConfidence : rubricConf,
     });
     const markEscalation = createMarkEscalationRecord(escalationDecision, createdAt);
+    const awarded = marked.reduce((a, m) => a + m.awarded, 0);
+    const max = marked.reduce((a, m) => a + m.max, 0);
     const attempt: Attempt = {
       id: attemptId,
       userId: store.userId,
@@ -142,35 +304,106 @@ export function QuestionRunner({
       topicIds: question.topicIds,
       answers: submittedAnswers,
       marked,
-      awarded: marked.reduce((a, m) => a + m.awarded, 0),
-      max: marked.reduce((a, m) => a + m.max, 0),
+      awarded,
+      max,
       feedback,
       markedBy,
       markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
       markEscalation,
+      ...(copiedAnswer ? { copiedAnswer: true } : {}),
+      ...(workingAnalysis.length ? { workingAnalysis } : {}),
+      ...(intervention ? { intervention } : {}),
+
       elapsedMs,
       mode,
+      ...(highestUsedTier ? { hintTier: highestUsedTier } : {}),
+      ...(repairTeachingSeen ? { repairTeachingSeen: true } : {}),
       ...(paperId ? { paperId } : {}),
       ...(paperSpecId ? { paperSpecId } : {}),
       ...(paperRunId ? { paperRunId } : {}),
+      ...(mode === "paper" ? { paperMarking: { status: "unreviewed" as const } } : {}),
       ...(retestMistake ? { retestMistakeId: retestMistake.id } : {}),
       createdAt,
     };
 
-    const retest = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt) : undefined;
+    const retest = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, store.attempts, store.questions) : undefined;
     const remediation = planRemediation(question, submittedAnswers, marked, topic, misconceptionsForTopic(question.topicIds[0] ?? ""));
+    // Post-marking error diagnosis. The marks above are already final; this
+    // only decides *why* each dropped mark was lost so the next action is the
+    // right one. It is computed from the deterministic local classifier first,
+    // so the result view renders immediately and offline; a confident
+    // classifier.dev verdict may refine it below, and can never change a mark.
+    const errorDiagnosis = diagnoseAttemptErrors({ question, marked, answers: submittedAnswers });
 
     const farTransferLink = farTransfer
-      ? completeDelayedFarTransfer(farTransfer, attempt)
+      ? completeDelayedFarTransfer(farTransfer, attempt, {
+          question,
+          questions: store.questions,
+          history: store.attempts,
+        })
       : scheduleDelayedFarTransfer({
           attempt,
           question,
           questions: store.questions,
           attemptedQuestionIds: store.attempts.map((existing) => existing.questionId),
+          history: store.attempts,
         });
     const persistedAttempt = farTransferLink ? { ...attempt, farTransfer: farTransferLink } : attempt;
 
     await store.recordAttempt(persistedAttempt, question);
+    // The score heading above answers "what did this attempt teach us": an
+    // independent full-mark answer is mastery evidence at full weight, while
+    // hint-supported or partial answers say which capability still needs work.
+    // The next action stays inside this flow — micro-practice, an unaided
+    // retry, or a transfer check — never a redirect to another page.
+    const supportUsed = Boolean(highestUsedTier) || repairTeachingSeen || copiedAnswer;
+    const retestOpen = Boolean(retestMistake && retest?.status !== "resolved");
+    const nextAction: { label: string; href: null; why: string } =
+      awarded < max
+        ? {
+            label: "Micro-practice the missed point",
+            href: null,
+            why: `You dropped ${max - awarded} of ${max} marks here — two targeted items on exactly this point, then an unaided retry.`,
+          }
+        : supportUsed
+          ? {
+              label: "Retry unaided for full evidence",
+              href: null,
+              why: "Full marks with support count at reduced weight — one clean unaided answer proves the capability.",
+            }
+          : question.difficulty < 4
+            ? {
+                label: "Prove it in a new context",
+                href: null,
+                why: "Independent success on familiar ground — transfer to unfamiliar clothing is the exam test.",
+              }
+            : retestOpen
+              ? {
+                  label: "Continue the repair",
+                  href: null,
+                  why: "The missed point stays open until fresh independent, transfer and delayed checks demonstrate the repair.",
+                }
+              : {
+                  label: "Bank it — next best action",
+                  href: null,
+                  why: "Strong unaided evidence. The tutor loop moves on to the next weakest capability.",
+                };
+    // When the diagnosis names one error, the next action says so in those
+    // words. The error type is what makes "micro-practice the missed point"
+    // concrete: a misconception gets an explanation, a slip gets a check.
+    const diagnosisHeadline = errorDiagnosis.headline;
+    if (diagnosisHeadline && awarded < max) {
+      nextAction.label = diagnosisHeadline.intervention.action;
+      nextAction.why = `${diagnosisHeadline.intervention.action} (${diagnosisHeadline.label}, ${diagnosisHeadline.awarded}/${diagnosisHeadline.max} — diagnosed as ${diagnosisHeadline.category}${diagnosisHeadline.provenance === "classifier-dev" ? "" : " on-device"}).`;
+    }
+    // A rubric fallback grade (the AI never ran, or the provider failed) gets a
+    // second chance: queue the persisted attempt for an AI re-grade. The drain
+    // pass retries with exponential backoff + jitter and upgrades this attempt
+    // in place when the provider recovers. Cache/local tiers already carry a
+    // genuine model grade, so they are not re-queued.
+    if (markTier === "fallback") {
+      void enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" });
+    }
     setResult({
       marked,
       feedback,
@@ -178,10 +411,25 @@ export function QuestionRunner({
       note,
       retest,
       remediation,
+      errorDiagnosis,
       confidence: markConfidence,
+      copiedAnswer,
+      workingAnalysis,
       escalation: escalationDecision.escalate ? escalationDecision : undefined,
       farTransfer: persistedAttempt.farTransfer,
+      withheld,
+      nextAction,
     });
+    // Refinement pass: classifier.dev may sharpen the error type on the parts
+    // the local read was unsure about. It runs after the mark is persisted and
+    // can only replace the diagnosis, never the marks — and if it fails or is
+    // disabled, the deterministic diagnosis above is already on screen.
+    if (!errorDiagnosis.clean) {
+      void refineErrorDiagnosis(question, marked, submittedAnswers, errorDiagnosis).then((refined) => {
+        if (!refined) return;
+        setResult((current) => (current ? { ...current, errorDiagnosis: refined } : current));
+      });
+    }
     return persistedAttempt;
   }
 
@@ -193,7 +441,11 @@ export function QuestionRunner({
           <Pill>{topic?.title ?? question.subjectId}</Pill>
           {retestMistake ? <Pill tone="review">Retest</Pill> : null}
           {question.origin === "past-paper" ? <Pill tone="review">Past paper</Pill> : null}
-          {question.origin === "ai" ? <Pill tone="speak">AI generated</Pill> : null}
+          <EditorialBadge source={question.source ?? null}
+            verification={question.subjectId === "wjec-alevel-physics" && !humanVerifiedPhysicsQuestion(question) ? "unverified" : question.verification ?? null}
+            origin={question.origin} reviewer={question.reviewer ?? null} contentTier={getSubject(question.subjectId)?.contentTier} />
+          {question.subjectId === "wjec-alevel-physics" && !humanVerifiedPhysicsQuestion(question) ?
+            <span className="text-xs text-muted-foreground">Needs human review · practice evidence only</span> : null}
           {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
           {farTransfer ? <Pill tone="accent">Delayed far-transfer</Pill> : null}
         </div>
@@ -271,6 +523,12 @@ export function QuestionRunner({
                       onDraftChange?.({ answers: nextAnswers, choice });
                     }}
                     rows={Math.min(10, Math.max(3, part.marks + 1))}
+                    mathMode={shouldOfferMathInput({
+                      questionKind: question.kind,
+                      subjectName: getSubject(question.subjectId)?.name,
+                      stem: question.stem,
+                      prompt: part.prompt,
+                    })}
                   />
                 )}
               </div>
@@ -280,6 +538,38 @@ export function QuestionRunner({
 
         {!result && retestMistake?.resolved ? (
           <p className="text-xs text-success mt-5">This mistake is already resolved. Return to Progress to choose another repair.</p>
+        ) : null}
+        {!result && upcoming ? (
+          <div className="mt-5">
+            <Button
+              variant="secondary"
+              className="w-full min-h-11"
+              aria-expanded={hintsOpen}
+              onClick={() => {
+                const next = nextHint(ladder, usedTiers);
+                if (next) {
+                  setHintsOpen(true);
+                  setUsedTiers((prev) => (prev.includes(next.tier) ? prev : [...prev, next.tier]));
+                }
+              }}
+            >
+              {TIER_HINT_CTA[upcoming.tier]}
+            </Button>
+          </div>
+        ) : null}
+        {hintsOpen && visibleHints.length ? (
+          <div className="mt-2 space-y-2" aria-live="polite">
+            {visibleHints.map((hint) => (
+              <p key={hint.tier} className="card card-2 p-3 text-sm text-ink2">
+                {formatHint(hint)}
+              </p>
+            ))}
+            {evidenceSource !== "independent" ? (
+              <p className="text-[11px] text-ink3">
+                Hint used — evidence: {evidenceSource}. The mark is kept, but mastery counts it at reduced weight.
+              </p>
+            ) : null}
+          </div>
         ) : null}
         {!result && !retestMistake?.resolved ? (
           <Button
@@ -324,11 +614,15 @@ function MarkedResult({
     feedback: string;
     source: "ai" | "fallback";
     note?: string;
+    withheld?: string;
     retest?: RetestEvaluation;
     remediation: RemediationPlan;
     confidence: number | null;
+    copiedAnswer?: boolean;
+    workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
     farTransfer?: Attempt["farTransfer"];
+    nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
   answers: Record<string, string>;
@@ -366,6 +660,24 @@ function MarkedResult({
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <SourceBadge source={result.source} note={result.note} />
+          {result.withheld ? (
+            <span className="inline-flex items-center gap-1 text-[11px] text-ink2 border border-line rounded-full px-2 py-0.5">
+              <svg
+                viewBox="0 0 12 12"
+                aria-hidden="true"
+                className="w-3 h-3 shrink-0 text-ink3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 1l4.2 1.6v2.6c0 2.6-1.7 4.5-4.2 5.4-2.5-.9-4.2-2.8-4.2-5.4V2.6L6 1z" />
+                <path d="M4.4 6l1.1 1.1 2.2-2.4" />
+              </svg>
+              {result.withheld} withheld before sending
+            </span>
+          ) : null}
           {result.farTransfer ? (
             <Pill
               tone={
@@ -386,6 +698,7 @@ function MarkedResult({
               {result.confidence === null ? "AI confidence unavailable" : `AI confidence ${Math.round(result.confidence * 100)}%`}
             </Pill>
           ) : null}
+          {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}
         </div>
       </div>
       {result.escalation ? (
@@ -435,7 +748,7 @@ function MarkedResult({
           {result.retest.status === "resolved" ? (
             <p className="text-[11px] text-success mt-2">The mistake has been removed from your open repair queue.</p>
           ) : result.retest.status === "still-open" ? (
-            <p className="text-[11px] text-ink2 mt-2">Repeat the remediation above, then retest this question again.</p>
+            <p className="text-[11px] text-ink2 mt-2">Continue your adaptive session for the next evidence check.</p>
           ) : null}
         </div>
       ) : null}
@@ -453,6 +766,18 @@ function MarkedResult({
               Restudy: {result.remediation.headline.targetKeyPoint}
             </p>
           ) : null}
+        </div>
+      ) : null}
+
+      {result.workingAnalysis?.some((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0) ? (
+        <div className="mt-4 card card-2 p-3 bg-surface2" role="status">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Working check</p>
+          {result.workingAnalysis.filter((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0).map((row) => (
+            <p key={row.partId} className="text-xs text-ink2 mt-1">
+              {row.firstIncorrectStep != null ? `First divergence at step ${row.firstIncorrectStep + 1}: ${row.firstErrorKind.replace(/-/g, " ")}. ` : "Working is consistent. "}
+              {[row.methodMarksAwarded ? `${row.methodMarksAwarded} method` : "", row.followThroughMarksAwarded ? `${row.followThroughMarksAwarded} follow-through` : "", row.errorCarriedForward ? "error carried forward" : "", row.unitMarksAwarded ? `${row.unitMarksAwarded} unit` : "", row.precisionMarksAwarded ? `${row.precisionMarksAwarded} precision` : ""].filter(Boolean).join(", ")}
+            </p>
+          ))}
         </div>
       ) : null}
 
@@ -556,6 +881,11 @@ function MarkedResult({
 
       <div className="mt-4 pt-4 border-t border-line space-y-3">
         <RichText className="text-sm">{result.feedback}</RichText>
+        <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
+          <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
+          <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
+        </div>
         {/* Ask: what did this one attempt teach us? */}
         {result.marked.some((m) => m.missedPoints.length) ? (
           <div className="flex flex-wrap gap-1.5">

@@ -1,0 +1,242 @@
+import type { Attempt, Id, LearningDemand, PaperMarkingReview, Question, QuestionPart } from "./types";
+import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
+import { isReasoningTransfer, reasoningNovelty } from "./reasoning-signature";
+
+function normaliseAnswer(text: string): string {
+  return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function tokenSimilarity(a: string, b: string): number {
+  const left = new Set(normaliseAnswer(a).split(" ").filter(Boolean));
+  const right = new Set(normaliseAnswer(b).split(" ").filter(Boolean));
+  if (!left.size || !right.size) return 0;
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared++;
+  return shared / Math.max(left.size, right.size);
+}
+
+/**
+ * Detect an answer that is effectively a pasted/copied model answer. Short
+ * numerical or vocabulary responses are deliberately exempt: matching `2 N`
+ * or `mitosis` is evidence of recall, not evidence that the model was copied.
+ */
+export function answerLooksCopied(question: Question, answers: Record<string, string>): boolean {
+  if (question.kind === "mcq") return false;
+  return question.parts.some((part) => {
+    const answer = normaliseAnswer(answers[part.id] ?? "");
+    const model = normaliseAnswer(part.modelAnswer ?? "");
+    const tokens = answer.split(" ").filter(Boolean);
+    if (!answer || tokens.length < 5 || model.split(" ").filter(Boolean).length < 5) return false;
+    return answer === model || (answer.length >= 32 && tokenSimilarity(answer, model) >= 0.92);
+  });
+}
+
+/** A mark under review cannot establish mastery, even when it is full marks. */
+export function trustworthyAttempt(attempt: Attempt): boolean {
+  return attempt.markedBy !== "self" && attempt.markEscalation?.status !== "pending" &&
+    (attempt.markConfidence === undefined || (Number.isFinite(attempt.markConfidence) && attempt.markConfidence >= 0.6)) &&
+    Number.isFinite(attempt.max) && attempt.max > 0 &&
+    Number.isFinite(attempt.awarded) && attempt.awarded >= 0 && attempt.awarded <= attempt.max &&
+    Number.isFinite(Date.parse(attempt.createdAt));
+}
+
+export function independentAttempt(attempt: Attempt): boolean {
+  return trustworthyAttempt(attempt) && !attempt.hintTier && !attempt.repairTeachingSeen && !attempt.copiedAnswer && attempt.mode !== "recall";
+}
+
+/**
+ * Fingerprint the exact response and marks a human reviewer saw. This is an
+ * optional forward-compatible field on persisted attempts: older reviewed
+ * rows can still be trusted, while a supplied fingerprint invalidates the
+ * attestation if the response or awarded marks are edited later.
+ */
+export function paperMarkingFingerprint(attempt: Pick<Attempt, "id" | "questionId" | "answers" | "marked" | "awarded" | "max">): string {
+  const text = JSON.stringify([attempt.id, attempt.questionId, attempt.answers, attempt.marked, attempt.awarded, attempt.max]);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  return `paper-mark-v1:${(hash >>> 0).toString(16)}`;
+}
+
+/** A paper response is trusted only after a named human has reviewed its mark. */
+export function humanReviewedPaperAttempt(attempt: Attempt): boolean {
+  if (attempt.mode !== "paper") return false;
+  const review: PaperMarkingReview | undefined = attempt.paperMarking;
+  if (!review || !["human-reviewed", "adjudicated"].includes(review.status) ||
+    !review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) return false;
+  const markerCount = review.markerCount;
+  if (review.status === "adjudicated" && (typeof markerCount !== "number" || !Number.isInteger(markerCount) || markerCount < 2)) return false;
+  if (review.status === "human-reviewed" && markerCount !== undefined &&
+    (typeof markerCount !== "number" || !Number.isInteger(markerCount) || markerCount < 1)) return false;
+  return !review.markingFingerprint || review.markingFingerprint === paperMarkingFingerprint(attempt);
+}
+
+/**
+ * Shared gate for answer evidence. A question must be the same subject as
+ * the attempt, the content must be trusted, and Physics paper attempts must
+ * additionally pass the authenticated provenance + human-marking check. This
+ * keeps planners and analytics from inventing their own weaker trust rules.
+ */
+export function trustedAssessmentAttempt(
+  attempt: Attempt,
+  question: Question | undefined,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+): boolean {
+  if (!question || !trustworthyAttempt(attempt) || question.subjectId !== attempt.subjectId || !trustedAssessmentContent(question)) return false;
+  return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
+    authenticPaperEvidence(attempt, question, history, questions);
+}
+
+export function questionFamily(question: Question): string {
+  return question.learning?.familyId ?? question.parts.map((part) => part.learning?.familyId).find(Boolean) ?? question.id;
+}
+
+/** Part-level family/demand, falling back to legacy question metadata. */
+export function partLearningMetadata(question: Question, part: QuestionPart) {
+  return part.learning ?? (question.learning ? {
+    familyId: question.learning.familyId,
+    contextId: question.learning.contextId,
+    demand: question.learning.demand,
+    reasoningMoves: question.learning.reasoningMoves ?? [],
+  } : undefined);
+}
+
+export function partFamily(question: Question, part: QuestionPart): string {
+  return partLearningMetadata(question, part)?.familyId ?? questionFamily(question);
+}
+
+/** All authored families represented by a question, including mixed structured parts. */
+export function questionFamilies(question: Question): string[] {
+  // A question-level family is an explicit author override for legacy or
+  // cloned structured items. Otherwise preserve every part-level family.
+  if (question.learning?.familyId) return [question.learning.familyId];
+  return [...new Set(question.parts.map((part) => partFamily(question, part)).filter(Boolean))];
+}
+
+/** All authored contexts represented by a question, including mixed structured parts. */
+export function questionContexts(question: Question): string[] {
+  return [...new Set([question.learning?.contextId, ...question.parts.map((part) => partLearningMetadata(question, part)?.contextId)].filter((id): id is string => Boolean(id)))];
+}
+
+/** Exposure is retained even for supported or unreviewed attempts: seeing a
+ * solution makes its reasoning familiar without establishing mastery.
+ */
+export function questionReasoningMoves(question: Question): string[] {
+  return [...new Set([...(question.learning?.reasoningMoves ?? []),
+    ...question.parts.flatMap(part => partLearningMetadata(question, part)?.reasoningMoves ?? [])]
+    .map(move => move.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()).filter(Boolean))];
+}
+
+export function questionFreshness(question: Question, previous: readonly Question[]) {
+  const sameSubject = previous.filter(prior => prior.subjectId === question.subjectId);
+  const families = new Set(sameSubject.flatMap(questionFamilies));
+  const contexts = new Set(sameSubject.flatMap(questionContexts));
+  const capabilities = questionCapabilities(question);
+  const specPoints = (q: Question) => [...(q.specPointIds ?? []), ...q.parts.flatMap(p => p.specPointIds ?? [])];
+  const targetPoints = new Set(specPoints(question));
+  // Preserve exposure when an editorial split replaces a broad capability id.
+  const priorMoves = sameSubject.filter(prior => questionCapabilities(prior).some(id => capabilities.includes(id)) ||
+    specPoints(prior).some(id => targetPoints.has(id)))
+    .flatMap(questionReasoningMoves);
+  const moves = questionReasoningMoves(question);
+  const similar = (a: string, b: string) => {
+    if (a === b) return true;
+    const tokens = (s: string) => new Set(s.split(" ").filter(w => w.length > 2 && !["the", "and", "with", "from", "then", "using"].includes(w)));
+    const left = tokens(a), right = tokens(b);
+    return left.size > 0 && right.size > 0 &&
+      [...left].filter(word => right.has(word)).length / Math.max(left.size, right.size) >= 0.8;
+  };
+  return {
+    newFamily: questionFamilies(question).every(family => !families.has(family)),
+    newContext: questionContexts(question).length > 0 && questionContexts(question).every(context => !contexts.has(context)),
+    newReasoning: moves.length > 0 && moves.some(move => !priorMoves.some(prior => similar(move, prior))),
+  };
+}
+
+/** Demands represented by a question, used by the planner when parts are mixed. */
+export function questionDemands(question: Question): LearningDemand[] {
+  return [...new Set(question.parts.map((part) => partLearningMetadata(question, part)?.demand ?? question.learning?.demand).filter((demand): demand is LearningDemand => Boolean(demand)))];
+}
+
+export function questionCapabilities(question: Question): string[] {
+  return [...new Set(question.parts.flatMap((part) => part.capabilityIds ?? []))];
+}
+
+/** Transfer is an authored demand and a different context, never a difficulty label. */
+export function isTransferQuestion(question: Question, source?: Question): boolean {
+  if (!trustedAssessmentContent(question)) return false;
+  // A trusted target cannot turn an unreviewed source into trusted transfer
+  // evidence. Drafts can be practised, but the whole chain must start from a
+  // reviewed Physics item before transfer or delayed repair is attachable.
+  if (source && !trustedAssessmentContent(source)) return false;
+  const metas = question.parts.map((part) => partLearningMetadata(question, part)).filter(Boolean);
+  if (!metas.length || !metas.some((meta) => ["transfer", "synoptic"].includes(meta!.demand))) return false;
+  if (!source) return true;
+  const sourceMetas = source.parts.map((part) => partLearningMetadata(source, part)).filter(Boolean);
+  const sourceFamilies = new Set(sourceMetas.map((meta) => meta!.familyId));
+  const sourceContexts = new Set(sourceMetas.map((meta) => meta!.contextId));
+  const sharedCapability = questionCapabilities(question).some((id) => questionCapabilities(source).includes(id));
+  // A different wrapper is not enough: the candidate must still exercise the
+  // shared capability through a genuinely different solution path. New props or
+  // extra algebra that re-run the *same* operations are unfamiliarity without
+  // transfer value, and a number-swapped reskin repeats the same reasoning.
+  const reasoningNovel = sharedCapability && isReasoningTransfer(source, question, transferTargetCapability(question, source));
+  const reasoningFresh = question.subjectId !== "wjec-alevel-physics" || questionFreshness(question, [source]).newReasoning;
+  return reasoningFresh && question.subjectId === source.subjectId &&
+    metas.some((meta) => !sourceFamilies.has(meta!.familyId) && !sourceContexts.has(meta!.contextId)) &&
+    sharedCapability && reasoningNovel;
+}
+
+/** The capability a transfer item is meant to move: the one shared with the source. */
+function transferTargetCapability(question: Question, source: Question): string {
+  const shared = questionCapabilities(question).find((id) => questionCapabilities(source).includes(id));
+  return shared ?? questionCapabilities(question)[0] ?? "";
+}
+
+/**
+ * Reasoning-aware freshness for selection. A question is unseen in the family
+ * sense but may repeat solution paths already drilled; this prefers candidates
+ * whose reasoning overlaps least with what the learner has attempted. Returns
+ * 0–1 novelty (1 = no reasoning shared with any practised item).
+ */
+export function reasoningNoveltyFor(
+  question: Question,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+): number {
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const practised = new Map<Id, Question>();
+  for (const attempt of history) {
+    const prior = byId.get(attempt.questionId);
+    if (prior && prior.subjectId === question.subjectId) practised.set(prior.id, prior);
+  }
+  if (!practised.size) return 1;
+  return reasoningNovelty(question, [...practised.values()]);
+}
+
+/** A renamed or renumbered variant is still familiar evidence. */
+export function unseenQuestion(question: Question, history: readonly Attempt[], questions: readonly Question[]): boolean {
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const families = new Set(questionFamilies(question));
+  const previous = history.flatMap(a => byId.has(a.questionId) ? [byId.get(a.questionId)!] : []);
+  return !history.some((a) => a.questionId === question.id ||
+    (byId.has(a.questionId) && questionFamilies(byId.get(a.questionId)!).some((family) => families.has(family)))) &&
+    (question.subjectId !== "wjec-alevel-physics" || !questionReasoningMoves(question).length ||
+      questionFreshness(question, previous).newReasoning);
+}
+
+/** A paper-mode flag alone cannot authenticate an unseen exam performance. */
+export function authenticPaperEvidence(attempt: Attempt, question: Question | undefined,
+  history: readonly Attempt[], questions: readonly Question[]): boolean {
+  const provenance = question?.paperProvenance;
+  if (!question || question.source !== "past-paper" || !trustedAssessmentContent(question) ||
+    !verifiedWjecPaperProvenance(question) || !provenance ||
+    !independentAttempt(attempt) || !humanReviewedPaperAttempt(attempt) || attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId ||
+    attempt.subjectId !== question.subjectId || attempt.paperId !== question.paperId ||
+    attempt.paperId !== provenance.paperId ||
+    (attempt.paperSpecId !== undefined && !attempt.paperSpecId.trim()) ||
+    attempt.max !== question.totalMarks ||
+    !Number.isFinite(attempt.elapsedMs) || attempt.elapsedMs <= 0) return false;
+  return unseenQuestion(question, history.filter((row) => row.userId === attempt.userId &&
+    row.id !== attempt.id && row.createdAt <= attempt.createdAt), questions);
+}

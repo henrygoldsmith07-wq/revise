@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Unlabelled Venn diagram</title>
+  <desc id="desc">A sample space containing two overlapping events and sample points.</desc>
+  <rect width="720" height="420" fill="#fafafa"/>
+  <rect x="70" y="50" width="580" height="320" rx="12" fill="#f2f2f2" stroke="#202020" stroke-width="5"/>
+  <circle cx="300" cy="210" r="118" fill="#dedede" fill-opacity=".8" stroke="#202020" stroke-width="5"/>
+  <circle cx="420" cy="210" r="118" fill="#c8c8c8" fill-opacity=".65" stroke="#202020" stroke-width="5"/>
+  <g fill="#202020">
+    <circle cx="190" cy="165" r="7"/><circle cx="250" cy="270" r="7"/><circle cx="358" cy="210" r="7"/>
+    <circle cx="485" cy="158" r="7"/><circle cx="520" cy="260" r="7"/><circle cx="125" cy="105" r="7"/><circle cx="592" cy="310" r="7"/>
+  </g>
+</svg>

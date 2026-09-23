@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { computeApplicationMastery } from "@/domain/application-mastery";
 import type { Attempt, Question, Topic } from "@/domain/types";
 
@@ -118,14 +116,19 @@ describe("application mastery", () => {
     expect(rows[1].marksAvailable).toBe(50);
   });
 
-  it("wires the Progress view to application evidence", () => {
-    const progress = readFileSync(join(process.cwd(), "src/app/progress/page.tsx"), "utf8");
-    const panels = readFileSync(join(process.cwd(), "src/components/AssessmentPanels.tsx"), "utf8");
-    const store = readFileSync(join(process.cwd(), "src/state/store.tsx"), "utf8");
-
-    expect(progress).toContain("ApplicationMasteryCard");
-    expect(panels).toContain("Application mastery");
-    expect(panels).toContain("applicationMastery");
-    expect(store).toContain("computeApplicationMastery");
+  it("counts hint-assisted marks at reduced evidence weight", () => {
+    const rows = computeApplicationMastery({
+      topics: [topic("a")],
+      questions: [question("q1", ["a"]), question("q2", ["a"])],
+      attempts: [
+        attempt("a1", "q1", ["a"], 10),
+        attempt("a2", "q2", ["a"], 10, "practice", { hintTier: "worked-solution" }),
+      ],
+    });
+    const row = rows.find((r) => r.topicId === "a");
+    // Independent 10 + worked-solution 10×0.15 over 20 available.
+    expect(row?.marksAwarded).toBeCloseTo(11.5, 5);
+    expect(row?.marksAvailable).toBe(20);
+    expect(row?.mastery).toBeCloseTo(0.575, 5);
   });
 });

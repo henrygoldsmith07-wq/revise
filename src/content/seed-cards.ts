@@ -1,5 +1,8 @@
 import { createCard } from "@/domain/scheduling";
+import { buildCloze, type BuiltCloze } from "@/domain/cloze";
+import { serialiseDiagram } from "@/domain/diagrams";
 import type { Card, Id, Topic } from "@/domain/types";
+import { diagramForTopic } from "./diagram-cards";
 
 // ---------------------------------------------------------------------------
 // Every topic ships with revision content on day one. Cards are derived from
@@ -7,12 +10,14 @@ import type { Card, Id, Topic } from "@/domain/types";
 // curriculum and content can never drift apart: add a topic and its deck
 // exists immediately, in every subject, with no AI call and no network.
 //
-// Card ids are deterministic (`seed:<topicId>:<kind>:<index>`) so re-seeding
-// an existing user is idempotent — their FSRS history survives.
+// Card ids are deterministic (`cnt:card:<topicId>:<kind>:<index>`, namespaced
+// — see src/data/content-ids.ts) so re-seeding an existing user is idempotent
+// — their FSRS history survives — and so operator tooling purging `seed-*`
+// fixtures can never take the bank with it.
 // ---------------------------------------------------------------------------
 
 export function seedCardId(topicId: Id, kind: string, index: number): Id {
-  return `seed:${topicId}:${kind}:${index}`;
+  return `cnt:card:${topicId}:${kind}:${index}`;
 }
 
 /** Turn a key point into a question. Statements make poor prompts. */
@@ -36,15 +41,14 @@ function firstClause(point: string): string {
  * cards test production rather than recognition, which is what an exam asks
  * for; blanking a stop word would test nothing.
  */
-export function makeCloze(sentence: string): { front: string; back: string } | null {
+export function makeCloze(sentence: string): BuiltCloze | null {
   const candidates = [...sentence.matchAll(/\b[A-Za-z][A-Za-z-]{5,}\b/g)]
     .map((m) => ({ word: m[0], index: m.index ?? 0 }))
     .filter((c) => !/^(because|through|between|against|another|instead|however)$/i.test(c.word));
   if (!candidates.length) return null;
   // The longest word is a decent proxy for the most technical one.
   const pick = candidates.reduce((a, b) => (b.word.length > a.word.length ? b : a));
-  const front = sentence.slice(0, pick.index) + "[…]" + sentence.slice(pick.index + pick.word.length);
-  return { front, back: pick.word };
+  return buildCloze(sentence, pick.word);
 }
 
 export function seedCardsForTopic(topic: Topic, userId: Id, now: Date = new Date()): Card[] {
@@ -93,7 +97,7 @@ export function seedCardsForTopic(topic: Topic, userId: Id, now: Date = new Date
             topicId: topic.id,
             front: cloze.front,
             back: cloze.back,
-            clozeSource: point,
+            clozeSource: cloze.clozeSource,
             kind: "cloze",
             origin: "seed",
             specPointIds: linkedSp,
@@ -110,6 +114,40 @@ export function seedCardsForTopic(topic: Topic, userId: Id, now: Date = new Date
       );
     }
   });
+
+  // Diagram cards are authored alongside the topic rather than generated at
+  // runtime. Their image and hotspot payload stay deterministic, so every
+  // exam-board variant gets the same offline labelling exercise without an AI
+  // call, while the card still participates in the normal review deck.
+  const diagram = diagramForTopic(topic);
+  if (diagram) {
+    const linkedSp = topic.specPoints?.slice(0, 2).map((sp) => sp.id);
+    cards.push(
+      createCard(
+        {
+          id: seedCardId(topic.id, "diagram", 0),
+          userId,
+          subjectId: topic.subjectId,
+          topicId: topic.id,
+          front: diagram.front,
+          back: serialiseDiagram(diagram.spec),
+          kind: "image",
+          imageUrl: diagram.spec.imageUrl,
+          note: "Active recall: choose each label from memory, then tap the hotspot it belongs to.",
+          origin: "seed",
+          specPointIds: linkedSp,
+          source: topic.source ?? "authored",
+          licensedSource: topic.licensedSource ?? null,
+          verification: topic.verification,
+          reviewer: topic.reviewer ?? null,
+          lastChecked: topic.lastChecked ?? null,
+          specVersion: topic.specVersion,
+          tags: ["seed", ...diagram.tags, topic.id.split(".").pop() ?? ""],
+        } as Parameters<typeof createCard>[0],
+        now,
+      ),
+    );
+  }
 
   // Common errors become "what is wrong with this?" cards — pre-emptive
   // mistake cards, before the student has had to make the mistake themselves.

@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "include": [
+    "src/domain/types.ts",
+    "src/domain/scheduling.ts",
+    "src/domain/fatigue.ts",
+    "src/domain/lamport.ts",
+    "src/domain/sync-crdt.ts",
+    "src/domain/mastery.ts",
+    "src/domain/mastery-uncertainty.ts",
+    "src/domain/recall-mastery.ts",
+    "src/domain/application-mastery.ts",
+    "src/domain/card-stats.ts",
+    "src/domain/mistakes.ts",
+    "src/domain/grades.ts",
+    "src/domain/grade-loop.ts",
+    "src/domain/funnel.ts"
+  ],
+  "exclude": ["node_modules", "e2e", "tests", ".next"]
+}

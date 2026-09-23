@@ -45,7 +45,7 @@ function fromCard(card: Card): FsrsCard {
     reps: card.reps,
     lapses: card.lapses,
     state: card.state as State,
-    last_review: card.lastReviewedAt ? new Date(card.lastReviewedAt) : undefined,
+    ...(card.lastReviewedAt ? { last_review: new Date(card.lastReviewedAt) } : {}),
   };
 }
 
@@ -95,20 +95,20 @@ export function createCard(input: NewCardInput, now: Date = new Date()): Card {
     kind: input.kind ?? "basic",
     front: input.front,
     back: input.back,
-    clozeSource: input.clozeSource,
-    imageUrl: input.imageUrl,
-    sourceMistakeId: input.sourceMistakeId,
+    ...(input.clozeSource ? { clozeSource: input.clozeSource } : {}),
+    ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
+    ...(input.sourceMistakeId ? { sourceMistakeId: input.sourceMistakeId } : {}),
     tags: normaliseTags(input.tags ?? []),
-    note: input.note,
-    audioUrl: input.audioUrl,
+    ...(input.note ? { note: input.note } : {}),
+    ...(input.audioUrl ? { audioUrl: input.audioUrl } : {}),
     origin: input.origin ?? "manual",
-    specPointIds: input.specPointIds,
-    source: input.source,
-    licensedSource: input.licensedSource,
-    verification: input.verification,
-    reviewer: input.reviewer,
-    lastChecked: input.lastChecked,
-    specVersion: input.specVersion,
+    ...(input.specPointIds ? { specPointIds: input.specPointIds } : {}),
+    ...(input.source ? { source: input.source } : {}),
+    ...(input.licensedSource != null ? { licensedSource: input.licensedSource } : {}),
+    ...(input.verification ? { verification: input.verification } : {}),
+    ...(input.reviewer ? { reviewer: input.reviewer } : {}),
+    ...(input.lastChecked ? { lastChecked: input.lastChecked } : {}),
+    ...(input.specVersion ? { specVersion: input.specVersion } : {}),
     due: toDateOnly(empty.due),
     stability: empty.stability,
     difficulty: empty.difficulty,
@@ -121,10 +121,26 @@ export function createCard(input: NewCardInput, now: Date = new Date()): Card {
   };
 }
 
-/** Apply a grade and return the rescheduled card. Pure: never mutates input. */
-export function gradeCard(card: Card, grade: RecallGrade, now: Date = new Date()): Card {
+/**
+ * Apply a grade and return the rescheduled card. Pure: never mutates input.
+ *
+ * Every grade is also appended to the card's CRDT op log (`log`) with the
+ * minting device's Lamport stamp, so the sync layer can replay concurrent
+ * histories deterministically instead of letting one device's write erase
+ * another's (see domain/sync-crdt.ts and data/sync.ts).
+ */
+export function gradeCard(card: Card, grade: RecallGrade, now: Date = new Date(), stamp?: { deviceId: string; lamport: number }): Card {
   const result = scheduler.next(fromCard(card), now, GRADE_TO_RATING[grade]);
   const next = result.card;
+  // First stamped grade on this card: capture the immutable pre-logging base
+  // so base + log always describe the card's full scheduling history exactly.
+  const base = stamp && !(card.log?.length)
+    ? { due: card.due, stability: card.stability, difficulty: card.difficulty, reps: card.reps, lapses: card.lapses, state: card.state }
+    : undefined;
+  const event = stamp
+    ? { grade, reviewedAt: now.toISOString(), deviceId: stamp.deviceId, lamport: stamp.lamport, ...(base ? { base } : {}) }
+    : null;
+  const log = event ? [...(card.log ?? []), event] : card.log;
   return {
     ...card,
     due: toDateOnly(next.due),
@@ -135,16 +151,23 @@ export function gradeCard(card: Card, grade: RecallGrade, now: Date = new Date()
     state: next.state,
     lastReviewedAt: now.toISOString(),
     updatedAt: now.toISOString(),
+    ...(log ? { log } : {}),
   };
 }
 
 /** Interval in days each grade would produce — shown on the review buttons. */
 export function previewIntervals(card: Card, now: Date = new Date()): Record<RecallGrade, number> {
   const grades: RecallGrade[] = ["again", "hard", "good", "easy"];
+  // A review timestamped in the future relative to this clock (another device
+  // ahead, or clock skew) would make ts-fsrs's delta_t negative and throw.
+  // Preview from the last review instead — intervals read as "today", honest
+  // for a card whose schedule is momentarily ahead of the local clock.
+  const lastReview = card.lastReviewedAt ? new Date(card.lastReviewedAt) : null;
+  const effectiveNow = lastReview && now < lastReview ? lastReview : now;
   const out = {} as Record<RecallGrade, number>;
   for (const g of grades) {
-    const next = scheduler.next(fromCard(card), now, GRADE_TO_RATING[g]).card;
-    const days = Math.round((next.due.getTime() - now.getTime()) / 86_400_000);
+    const next = scheduler.next(fromCard(card), effectiveNow, GRADE_TO_RATING[g]).card;
+    const days = Math.round((next.due.getTime() - effectiveNow.getTime()) / 86_400_000);
     out[g] = Math.max(0, days);
   }
   return out;
@@ -234,9 +257,16 @@ export function buildReviewQueue(cards: Card[], limit: number, on: IsoDate = tod
   let f = 0;
   due.forEach((card, i) => {
     out.push(card);
-    if (everyNth && (i + 1) % everyNth === 0 && f < fresh.length) out.push(fresh[f++]);
+    if (everyNth && (i + 1) % everyNth === 0 && f < fresh.length) {
+      const card = fresh[f++];
+      if (card) out.push(card);
+    }
   });
-  while (f < fresh.length) out.push(fresh[f++]);
+  while (f < fresh.length) {
+    const card = fresh[f++];
+    if (!card) break;
+    out.push(card);
+  }
   return out.slice(0, limit);
 }
 

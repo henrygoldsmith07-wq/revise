@@ -67,7 +67,7 @@ export default function SharedDeckPage() {
       <EmptyState
         title="Nothing to import"
         body="This link does not carry a deck. Ask whoever sent it to share the file instead — links have a size limit, so larger decks travel as files."
-        action={<Button onClick={() => router.push("/cards")}>Go to my cards</Button>}
+        action={<Button onClick={() => router.push("/review")}>Go to my cards</Button>}
       />
     );
   }
@@ -86,7 +86,7 @@ export default function SharedDeckPage() {
           <Button variant="primary" className="flex-1" onClick={() => router.push("/review")}>
             Start reviewing
           </Button>
-          <Button className="flex-1" onClick={() => router.push("/cards?q=tag%3Ashared")}>
+          <Button className="flex-1" onClick={() => router.push("/review")}>
             See them
           </Button>
         </div>

@@ -1,8 +1,8 @@
+import { requiresWjecContentReview } from "./physics-content-review";
 // Assessment depth — the five assessment-specific slices that make revision feel
 // like exam prep rather than flashcard completion.
 // Pure functions: no React, no I/O.
-import type {
-  AoCode,
+import type {
   AssessmentInsight,
   Attempt,
   Calibration,
@@ -11,14 +11,15 @@ import type {
   MisconceptionTag,
   Mistake,
   PaperSimulation,
-  Question,
-  Topic,
+  Question,
   TopicMastery,
 } from "./types";
 import { gradeForPercent } from "./grades";
 import type { Subject } from "./types";
 import { measureQuestionBankDiscrimination } from "./question-discrimination";
 import { techniqueVsKnowledge } from "./retention-analytics";
+import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentContent } from "./physics-content-review";
 
 export const COMMAND_WORDS: CommandWord[] = [
   "state","describe","explain","calculate","show that","suggest","compare","evaluate","discuss","justify","deduce","predict","outline","other",
@@ -83,11 +84,24 @@ export function buildAssessmentInsight(input: {
   mastery: TopicMastery[];
   questionsById: Map<Id, Question>;
 }): AssessmentInsight {
+  const questions = [...input.questionsById.values()];
+  const trustedAttempts = input.attempts.filter((attempt) => {
+    if (!trustworthyAttempt(attempt)) return false;
+    const question = input.questionsById.get(attempt.questionId);
+    if (!question || !trustedAssessmentContent(question)) return false;
+    return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
+      authenticPaperEvidence(attempt, question, input.attempts, questions);
+  });
+  const trustedAttemptIds = new Set(trustedAttempts.map((attempt) => attempt.id));
+  const trustedMistakes = input.mistakes.filter((mistake) => {
+    if (!requiresWjecContentReview(mistake.subjectId)) return true;
+    return Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId));
+  });
   const byCommand = Object.fromEntries(COMMAND_WORDS.map((c) => [c, 0])) as Record<CommandWord, number>;
   const byMisconception = Object.fromEntries(MISCONCEPTIONS.map((m) => [m, 0])) as Record<MisconceptionTag, number>;
   const byAo: Record<string, number> = { AO1: 0, AO2: 0, AO3: 0 };
   const lostByTopic = new Map<string, { subjectId: Id; lost: number }>();
-  for (const m of input.mistakes) {
+  for (const m of trustedMistakes) {
     if (m.command) byCommand[m.command] = (byCommand[m.command] ?? 0) + m.marksLost;
     if (m.misconception) byMisconception[m.misconception] = (byMisconception[m.misconception] ?? 0) + m.marksLost;
     if (m.ao) byAo[m.ao] = (byAo[m.ao] ?? 0) + m.marksLost;
@@ -107,7 +121,7 @@ export function buildAssessmentInsight(input: {
   const marksLostByAo = byAo;
   // Repeated weak: topic appears 3+ times and is still weak.
   const countByTopic = new Map<string, number>();
-  for (const m of input.mistakes) countByTopic.set(m.topicId, (countByTopic.get(m.topicId) ?? 0) + 1);
+  for (const m of trustedMistakes) countByTopic.set(m.topicId, (countByTopic.get(m.topicId) ?? 0) + 1);
   const repeatedWeakSubtopics = [...countByTopic.entries()].filter(([, n]) => n >= 3).map(([id]) => id)
     .filter((id) => (masteryById.get(id)?.mastery ?? 1) < 0.65);
 
@@ -125,8 +139,8 @@ export function buildAssessmentInsight(input: {
   expectedMarksPerHour.sort((a, b) => b.value - a.value);
 
   const questionDiscrimination = measureQuestionBankDiscrimination({
-    questions: [...input.questionsById.values()],
-    attempts: input.attempts,
+    questions: questions.filter(trustedAssessmentContent),
+    attempts: trustedAttempts,
   });
 
   return {
@@ -136,7 +150,7 @@ export function buildAssessmentInsight(input: {
     marksLostByAo,
     repeatedWeakSubtopics,
     expectedMarksPerHour,
-    techniqueVsKnowledge: techniqueVsKnowledge(input.mistakes),
+    techniqueVsKnowledge: techniqueVsKnowledge(trustedMistakes),
     questionDiscrimination,
   };
 }

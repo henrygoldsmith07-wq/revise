@@ -1,16 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildKTSnapshots, evaluateKTFuture, buildKnowledgeTracingValidationReport } from "@/domain/knowledge-tracing-validation";
 import type { Attempt, Card, Topic } from "@/domain/types";
-import { createCard } from "@/domain/scheduling";
 
 function topic(id: string): Topic {
   return { id, subjectId: "subj", unitId: "unit", title: id, order: 0, intrinsicDifficulty: 3, summary: "s", keyPoints: ["k"], commonErrors: [] };
 }
 function attempt(topicId: string, awarded: number, max: number, at: string): Attempt {
   return { id: `a-${at}-${topicId}-${awarded}`, userId: "u", questionId: "q", subjectId: "subj", topicIds: [topicId], answers: {}, marked: [], awarded, max, feedback: "", markedBy: "rubric", elapsedMs: 1000, mode: "practice", createdAt: at };
-}
-function card(topicId: string, id: string, at: string): Card {
-  return { ...createCard({ id, userId: "u", subjectId: "subj", topicId, front: "f", back: "b" }, new Date(at)), stability: 5, reps: 2, lastReviewedAt: at };
 }
 
 describe("knowledge-tracing validation", () => {

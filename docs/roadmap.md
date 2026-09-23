@@ -59,15 +59,14 @@ These exist today and are the foundation the roadmap builds on:
 - Teacher-marking comparison (measure the marker against a human teacher, not
   only against the rubric).
 - Explanation library for common misconceptions *(shipped — `src/content/misconceptions/`)*.
-- Video/visual explanations.
+- Rich written explanations with diagrams, process steps and active-recall checks *(shipped — roadmap lessons)*.
 
 ## 4. Input & accessibility
 
 - Handwriting input *(extend — OCR exists; make it first-class for working-out)*.
 - Better OCR (maths notation, poor photos, small handwriting).
-- Mathematical expression input.
-- Better equation equivalence (two algebraically-equal answers should be marked
-  equal, not string-compared).
+- Mathematical expression input *(extend — contextual caret-aware maths palette now covers operators, powers, roots, fractions, Greek symbols, inequalities and scientific notation; richer 2D typesetting remains).*
+- Better equation equivalence *(extend — deterministic single-variable polynomial equivalence is shipped, including factored/expanded forms, rational coefficients and unicode ×/÷/powers; extend to roots, trig and multivariable expressions).*
 
 ## 5. Languages & subjects
 
@@ -103,7 +102,7 @@ These exist today and are the foundation the roadmap builds on:
   richer card types below)*.
 - Better flashcard creation.
 - Image occlusion.
-- Cloze cards.
+- Cloze cards *(shipped — complete-sentence authoring, deterministic blank generation, legacy reconstruction, review reveal and deck round-trip validation).*
 - More flexible notes.
 
 ## 10. Planning & prediction
@@ -115,7 +114,7 @@ These exist today and are the foundation the roadmap builds on:
 - Better predicted grades.
 - Confidence ranges around predicted grades *(extend — bands exist; tighten them
   as data grows)*.
-- Actual grade-vs-prediction tracking (close the loop: did the prediction hold?).
+- Actual grade-vs-prediction tracking *(shipped — weekly forecast snapshots, dated mock/paper/final outcomes, strict as-of pairing, MAE/bias/interval coverage and per-subject history on Readiness).*
 
 ## 11. Personalisation
 
@@ -132,6 +131,8 @@ These exist today and are the foundation the roadmap builds on:
 
 - Proper native-quality mobile/PWA UX.
 - Notifications.
+- Sync grade-prediction calibration history across devices *(the portable export includes it today; the calibration metadata itself is currently device-local).*
+- Full portable-snapshot restore with id-safe reconstruction of cards, review logs, attempts and calibration history *(export exists; deck import exists; complete archive restore does not yet).* 
 - Reliable offline exam packs.
 
 ## 13. Evidence & efficacy

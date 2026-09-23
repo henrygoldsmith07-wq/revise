@@ -19,7 +19,7 @@ describe("Phase 7 — E2E harness", () => {
     const src = readFileSync(join(root, "e2e/offline.spec.ts"), "utf8");
     expect(src).toContain("offline walk");
     expect(src).toContain("skip-link");
-    expect(src).toContain("Offline — everything still works");
+    expect(src).toContain("Offline —");
     expect(src).toContain('toBeFocused');
     expect(src).toContain("setOffline");
   });

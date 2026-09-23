@@ -28,10 +28,13 @@ import {
   Clock,
   FileText,
   Flame,
+  GraduationCap,
   LayoutGrid,
   Layers,
   Library,
   Mic,
+  Pause,
+  Play,
   Shapes,
   Share2,
   Sparkle,
@@ -83,6 +86,7 @@ export const SettingsIcon = Settings;
 export const TeacherIcon = UsersRound;
 /** Study modes other than plain review. */
 export const ModesIcon = Shapes;
+export const LessonsIcon = GraduationCap;
 /** One-click generation from notes. */
 export const GenerateIcon = Sparkle;
 export const BenchmarkIcon = BarChart3;
@@ -111,6 +115,8 @@ export const SyncIcon = RefreshCw;
 export const DeleteIcon = Trash2;
 export const WarningIcon = TriangleAlert;
 export const HelpIcon = CircleHelp;
+export const PlayIcon = Play;
+export const PauseIcon = Pause;
 
 /** Sizes used across the app. Anything outside these is a design mistake. */
 export const ICON_SIZE = {

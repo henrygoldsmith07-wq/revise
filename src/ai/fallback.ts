@@ -14,6 +14,10 @@ import type {
   SummariseResponse,
 } from "./types";
 
+function firstClause(point: string): string {
+  const cut = point.search(/[:;—]| because | which /);
+  return (cut > 12 ? point.slice(0, cut) : point).replace(/\.$/, "").trim();
+}
 // ---------------------------------------------------------------------------
 // The offline half of every AI feature. These are not stubs: they are the
 // product's guarantee that a student on a train with no signal, or with no API
@@ -166,9 +170,4 @@ export function diagnoseFallback(weak: Topic[], mistakes: Mistake[]): DiagnoseRe
     findings,
     actions,
   };
-}
-
-function firstClause(point: string): string {
-  const cut = point.search(/[:;—]| because | which /);
-  return (cut > 12 ? point.slice(0, cut) : point).replace(/\.$/, "").trim();
 }

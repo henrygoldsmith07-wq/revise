@@ -1,5 +1,59 @@
 # Benchmarks
 
+## Editorial review pipeline
+
+The trust chain between Revise and a content generator: Draft,
+Structural validation, Subject review, Mark-scheme review, Exam-style
+review, Verified, Published, then periodic re-review on a fixed clock.
+
+Rules enforced by src/domain/editorial-pipeline.ts: stages cannot be
+skipped; the author can never pass their own human review; a failed
+review returns content to Draft with full history; retiring requires a
+stated reason and records who decided; published items return for
+re-review when their interval elapses; an unresolved MAJOR user issue
+quarantines published content back into subject review.
+
+editorialConfidence() distils lineage into one number (source prior,
++passed gates, -open issues, -stale re-review) with named reasons. UI
+badges visibly separate Verified from Generated / unreviewed.
+
+## Past-paper import benchmark
+
+Import becomes trustworthy when it is measured and confidence-aware.
+Gold protocol: 100 papers (Phase 1) then 400+ with mark schemes, hand-
+annotated across nine dimensions - question boundaries, subparts, mark
+values, figures, tables, scheme alignment, spec points, topics and
+command words - blind, adjudicated.
+
+Metrics per importer: segmentation F1, subpart detection F1, mark-
+extraction accuracy, scheme-pairing accuracy, topic mapping top-1/top-3,
+spec-point precision/recall and diagram association. Schema in
+src/domain/paper-import-benchmark.ts, pinned by tests.
+
+Every imported question carries importConfidence() from documented
+signals (marks parsed, scheme paired, topic margin, spec coverage...).
+Below the 70% review threshold the question routes to a human review
+queue instead of silently joining the bank: "Question 4b - 94%
+confident" ships; "Question 7c - 48%" waits for a person.
+
+## Recommender tournament
+
+Ten selection policies - Random, Weakest topic, Highest exam weighting,
+Most overdue, Lowest predicted marks, Mistake-first, FSRS-only, the Revise
+heuristic, a LinUCB contextual bandit and a logistic learned ranker - are
+replayed over learner trajectories in src/domain/recommender-tournament.ts.
+
+Leakage rule: at decision i the policy context folds events[0..i) only;
+the realised event at i is the outcome. A maxEvents probe slices the
+window so tests can flip future outcomes and prove earlier decisions are
+untouched (static policies) while online learners legitimately adapt.
+
+Reported: completion rate and immediate score per decision; 7-day delayed
+retention; unseen final-assessment marks per invested hour as the ranking
+metric. The deterministic Revise heuristic stays in production unless a
+challenger beats it on real learner replays. Demo table on /benchmarks is
+synthetic and labelled as such.
+
 ## Examiner benchmark (the real gate)
 
 Synthetic marker tests are exhausted; the credibility gate is now genuine
