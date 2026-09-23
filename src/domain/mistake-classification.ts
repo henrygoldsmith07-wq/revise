@@ -260,7 +260,24 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 3. Calculation — numbers/units/working were the point of the loss.
+  // 3. Timing — time pressure is causal evidence, not a content guess.
+  // Check it before calculation so a student who clearly knew most of a
+  // quantitative method but rushed the final step gets a timing repair rather
+  // than being sent back to relearn arithmetic they already demonstrated.
+  if (mistake.timing === "rushed" && earnedShare >= 0.5) {
+    return {
+      klass: "timing",
+      confidence: earnedShare >= 0.75 ? "high" : "medium",
+      reasons: [
+        "the attempt was rushed and most of this part was still earned",
+        mistake.secondsSpent != null
+          ? `only ${mistake.secondsSpent}s was spent on the part where the mark dropped`
+          : "the timing record marks this as rushed",
+      ],
+    };
+  }
+
+  // 4. Calculation — numbers/units/working were the point of the loss.
   if (isCalculationCommand || looksNumeric) {
     const digits = /\d/.test(ctx.point) || /\d/.test(ctx.markScheme.join(" "));
     return {
@@ -271,20 +288,6 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
           ? "the command demanded working with numbers (calculate / show that)"
           : "the lost point is about a number, unit or equation",
         digits ? "numeric content is present in the mark-scheme point" : "quantitative context marks this as a working loss",
-      ],
-    };
-  }
-
-  // 4. Timing — the loss happened under time pressure on an otherwise known part.
-  if (mistake.timing === "rushed" && earnedShare >= 0.5) {
-    return {
-      klass: "timing",
-      confidence: earnedShare >= 0.75 ? "high" : "medium",
-      reasons: [
-        "the attempt was rushed and most of this part was still earned",
-        mistake.secondsSpent != null
-          ? `only ${mistake.secondsSpent}s was spent on the part where the mark dropped`
-          : "the timing record marks this as rushed",
       ],
     };
   }
