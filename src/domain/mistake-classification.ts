@@ -28,7 +28,7 @@
 // Pure domain: no React, no storage.
 // ---------------------------------------------------------------------------
 
-import type { AoCode, Attempt, Mistake, Question, QuestionPart } from "./types";
+import type { AoCode, Attempt, Mistake, Question, QuestionPart, WorkingErrorKind } from "./types";
 
 export const MISTAKE_CLASSES = [
   "knowledge gap",
@@ -78,7 +78,7 @@ const LEGACY_TO_CLASS: Record<Mistake["category"], MistakeClass> = {
 export interface ClassificationInput {
   mistake: Pick<
     Mistake,
-    "category" | "timing" | "secondsSpent" | "marksLost" | "command" | "misconception" | "ao" | "partId" | "point"
+    "category" | "timing" | "secondsSpent" | "marksLost" | "command" | "misconception" | "ao" | "partId" | "point" | "workingErrorKind" | "firstIncorrectStep"
   >;
   question?: Question | null;
   part?: QuestionPart | null;
@@ -151,6 +151,16 @@ const STANCE_NEED =
 
 const CONTEXT_MARKERS =
   /\b(in this (experiment|investigation|patient|plant|organism|context|solution|reaction|sample)|applied to|when applied|for this case|given the|on the chromosome|in the cell)\b/i;
+
+const WORKING_ERROR_LABEL: Record<Exclude<WorkingErrorKind, "none">, string> = {
+  "rounding-error": "rounding error",
+  "unit-error": "unit error",
+  "arithmetic-slip": "arithmetic slip",
+  "incorrect-rearrangement": "incorrect rearrangement",
+  "substitution-error": "substitution error",
+  "method-error": "method error",
+  "contradictory-working": "contradictory working",
+};
 
 const AO_OF = (aos: AoCode[] | undefined): AoCode[] => aos ?? [];
 
@@ -260,10 +270,27 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 3. Timing — time pressure is causal evidence, not a content guess.
-  // Check it before calculation so a student who clearly knew most of a
-  // quantitative method but rushed the final step gets a timing repair rather
-  // than being sent back to relearn arithmetic they already demonstrated.
+  // 3. Diagnosed working error — direct step-level evidence outranks a timing
+  //    guess. A rushed student who demonstrably made a unit, substitution,
+  //    rearrangement or arithmetic error needs that specific repair first.
+  if (mistake.workingErrorKind && mistake.workingErrorKind !== "none") {
+    const label = WORKING_ERROR_LABEL[mistake.workingErrorKind];
+    return {
+      klass: "calculation",
+      confidence: "high",
+      reasons: [
+        `the working analysis identified a ${label}`,
+        mistake.firstIncorrectStep != null
+          ? `the first incorrect working step was step ${mistake.firstIncorrectStep + 1}`
+          : "step-level working evidence identifies the calculation failure directly",
+      ],
+    };
+  }
+
+  // 4. Timing — time pressure is causal evidence, not a content guess.
+  // Check it before generic calculation heuristics so a student who clearly
+  // knew most of a quantitative method but rushed the final step gets a timing
+  // repair, unless step-level working evidence already identified the loss.
   if (mistake.timing === "rushed" && earnedShare >= 0.5) {
     return {
       klass: "timing",
@@ -277,7 +304,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 4. Calculation — numbers/units/working were the point of the loss.
+  // 5. Calculation — numbers/units/working were the point of the loss.
   if (isCalculationCommand || looksNumeric) {
     const digits = /\d/.test(ctx.point) || /\d/.test(ctx.markScheme.join(" "));
     return {
@@ -292,7 +319,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 5. Application — the answer engaged the demanded content (shared
+  // 6. Application — the answer engaged the demanded content (shared
   //    vocabulary — the fact was known) but the transfer to the context or
   //    the AO2/AO3 step failed. AO2/AO3, an application command or an
   //    explicit context outranks a terminology nuance: when the question
@@ -317,7 +344,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 6. Terminology — the answer engaged the point's idea but avoided the
+  // 7. Terminology — the answer engaged the point's idea but avoided the
   //    specific term the mark scheme demands. With no shared vocabulary at
   //    all the answer never reached the idea, which is a knowledge gap, not
   //    a wording problem.
@@ -334,7 +361,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 7. Structure — a multi-point part where several points were lost together
+  // 8. Structure — a multi-point part where several points were lost together
   //    despite content being present: the answer did not separate/signpost.
   if (ctx.markScheme.length >= 3 && ctx.missedPoints.length >= 2 && earnedShare > 0 && earnedShare < 0.9 && answerReached) {
     return {
@@ -347,7 +374,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 8. Careless — a small slip on an otherwise strong answer.
+  // 9. Careless — a small slip on an otherwise strong answer.
   if (answerReached && earnedShare >= 0.6 && lostOneOrTwo && mistake.timing !== "rushed") {
     return {
       klass: "careless error",
@@ -359,7 +386,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 9. Knowledge gap — nothing reached the point. Only claimable when the
+  // 10. Knowledge gap — nothing reached the point. Only claimable when the
   //    attempt is present: without it there is no way to know what was
   //    written, and an older row falls through to the legacy mapping instead
   //    of being guessed at.
