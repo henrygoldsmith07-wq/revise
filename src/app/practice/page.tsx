@@ -272,6 +272,11 @@ function Practice() {
     awarded: sessionAwarded,
     available: sessionAvailable,
     elapsedMs: sessionElapsedMs,
+    recommended: returnHref
+      ? { href: returnHref, label: "Continue session", reason: "Your answer has updated the next tutor step." }
+      : store.adaptiveSession
+        ? { href: store.adaptiveSession.startHref, label: "Start next session", reason: store.adaptiveSession.reason }
+        : undefined,
   });
   const answered = queue.map((question) => sessionAttempts.some((attempt) => attempt.questionId === question.id));
   const drafted = queue.map((question) => {

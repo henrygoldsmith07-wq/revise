@@ -75,11 +75,12 @@ export function deriveCapabilityProfiles(input: CapabilitySourceInput): TopicCap
         score: row.mastery,
       }))).recall;
       const retention = row.trueRetention ?? row.currentRetention;
-      profile.retention = recordAttemptObservations(profile, [{
-        capability: "retention",
-        source: "independent",
-        score: retention,
-      }]).retention;
+      profile.retention = recordAttemptObservations(profile,
+        Array.from({ length: Math.min(row.reviews, 4) }, () => ({
+          capability: "retention" as const,
+          source: "independent" as const,
+          score: retention,
+        }))).retention;
     }
   }
 

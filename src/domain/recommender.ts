@@ -1,4 +1,5 @@
 import { requiresWjecContentReview } from "./physics-content-review";
+import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
 import { buildRecommendationNarrative } from "./explainability";
@@ -697,7 +698,47 @@ export function recommend(input: RecommendInput): Recommendation[] {
     }
   }
 
-  return dedupe(out).sort((a, b) => b.score - a.score);
+  // All activity types now pass through the same comparison as Today and the
+  // planner. The older formulas above still estimate action-specific inputs;
+  // their raw scores no longer compete on incompatible scales.
+  const ranked = dedupe(out);
+  for (const rec of ranked) {
+    const row = rec.topicId ? masteryById.get(rec.topicId) : undefined;
+    const factors = rec.factors;
+    const confidence = row ? Math.min(1, row.attempts / 5) :
+      rec.activity === "flashcards" || rec.activity === "mistakes" ? 0.8 : 0;
+    const kind: Record<ActivityKind, NextActionKind> = {
+      learn: "relearn", flashcards: "review-due", recall: "delayed-retrieval",
+      practice: rec.techniqueQuickMinutes ? "timed-questions" : "practice-topic",
+      paper: "past-paper", mistakes: "repair-mistake",
+    };
+    const value = valueNextAction({
+      id: `${rec.activity}:${rec.subjectId}:${rec.topicId ?? "all"}`,
+      kind: kind[rec.activity], subjectId: rec.subjectId,
+      ...(rec.topicId ? { topicId: rec.topicId } : {}), minutes: rec.minutes,
+      signals: {
+        weakness: row && row.attempts > 0 ? 1 - row.mastery : Math.min(1, factors?.weakness ?? 0.35),
+        forgettingRisk: Math.max(0, Math.min(1, (factors?.forgetting ?? 1) - 0.7)),
+        retrievalPressure: rec.activity === "flashcards" ? Math.min(1, (rec.explanation?.count ?? 0) / 8) : 0,
+        mistakePressure: rec.activity === "mistakes" ? Math.min(1, (rec.explanation?.count ?? 0) / 3) : 0,
+        examUrgency: Math.max(0, Math.min(1, (factors?.urgency ?? 1) - 1)),
+        examWeighting: 1,
+        learningBenefit: Math.max(0, factors?.examGain ?? 0) /
+          (Math.max(0, factors?.examGain ?? 0) + 5),
+        retentionBenefit: rec.activity === "flashcards" || rec.activity === "recall" ? 0.8 : 0.2,
+        diagnosticValue: confidence < 0.35 && (rec.activity === "learn" || rec.activity === "practice") ? 1 : 0,
+        transferNeed: rec.activity === "paper" ? 0.7 :
+          rec.activity === "practice" ? Math.max(0, 1 - (factors?.applicationGap ?? 1)) : 0,
+        evidenceConfidence: confidence,
+      },
+    });
+    rec.score = value.score * 100 * (factors?.fatigue ?? 1) * (factors?.techniqueSteer ?? 1) +
+      (rec.plannedSessionId ? 1 : 0);
+    rec.policy = { evidenceLevel: value.evidenceLevel, reason: value.reason,
+      observedMarksPerHour: value.observedMarksPerHour, factors: value.factors };
+  }
+  return ranked.sort((a, b) => b.score - a.score ||
+    a.activity.localeCompare(b.activity) || (a.topicId ?? "").localeCompare(b.topicId ?? ""));
 }
 
 // ---------------------------------------------------------------------------

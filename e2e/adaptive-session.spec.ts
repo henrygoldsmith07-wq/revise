@@ -17,3 +17,20 @@ test("Today presents one adaptive 20-minute sequence and starts its runner", asy
   await expect(page.locator("main#main")).toContainText("Adaptive session");
   await expect(page.locator("main#main")).toContainText(/Step 1 of/);
 });
+
+test("the next session remains usable on a phone viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  if ((await todayOrOnboarding(page)) === "onboarding") {
+    await completeOnboarding(page, { skipExamDates: true });
+  }
+
+  const start = page.locator("main#main").getByRole("link", { name: "Start session", exact: true });
+  await expect(start).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await start.click();
+
+  await expect(page.locator("main#main")).toContainText("Adaptive session");
+  await expect(page.locator("main#main")).toContainText(/Step 1 of/);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

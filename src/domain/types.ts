@@ -1369,6 +1369,18 @@ export interface Recommendation {
   explanation?: RecommendationExplanation;
   /** Alias for tests that want the factors without unwrapping explanation. */
   factors?: RecommendationFactors;
+  /** Auditable shared-policy result. Score is relative, never predicted marks. */
+  policy?: {
+    evidenceLevel: "limited" | "developing" | "strong";
+    reason: string;
+    observedMarksPerHour: number | null;
+    factors: {
+      weakness: number; forgettingRisk: number; retrievalPressure: number;
+      mistakePressure: number; examUrgency: number; examWeighting: number;
+      learningBenefit: number; retentionBenefit: number; diagnosticValue: number;
+      transferNeed: number; evidenceConfidence: number; estimatedMinutes: number;
+    };
+  };
 }
 
 export interface StreakState {

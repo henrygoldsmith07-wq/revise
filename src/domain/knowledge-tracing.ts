@@ -1,5 +1,6 @@
 import type { Attempt, Card, Id, ReviewLog, Topic, Question } from "./types";
 import { retrievability } from "./scheduling";
+import { independentAttempt, trustworthyAttempt } from "./learning-evidence";
 
 // ---------------------------------------------------------------------------
 // Knowledge tracing — topic and question level, plus empirical difficulty.
@@ -85,20 +86,20 @@ function wilson(successes: number, trials: number): { lower: number; upper: numb
   return { lower: Math.max(0, (centre - spread) / denom), upper: Math.min(1, (centre + spread) / denom) };
 }
 
-/** BKT update for one piece of evidence. correctness ∈ [0,1] → treated as correct if ≥ 0.6. */
-function bktStep(pKnown: number, correct: boolean): number {
-  let posterior: number;
-  if (correct) {
-    const num = pKnown * (1 - P_SLIP);
-    const den = num + (1 - pKnown) * P_GUESS;
-    posterior = den === 0 ? pKnown : num / den;
-  } else {
-    const num = pKnown * P_SLIP;
-    const den = num + (1 - pKnown) * (1 - P_GUESS);
-    posterior = den === 0 ? pKnown : num / den;
-  }
-  // Opportunity to learn after the evidence
-  return posterior + (1 - posterior) * P_TRANSIT;
+function attemptWeight(attempt: Attempt): number {
+  if (attempt.copiedAnswer || attempt.repairTeachingSeen || attempt.hintTier === "worked-solution") return 0.15;
+  return attempt.hintTier ? 0.5 : 1;
+}
+
+/** Fractional marks and support used contribute graded evidence. */
+function bktStep(pKnown: number, correctness: number, weight: number): number {
+  const credit = 0.5 + (clamp01(correctness) - 0.5) * weight;
+  const knownLikelihood = credit * (1 - P_SLIP) + (1 - credit) * P_SLIP;
+  const unknownLikelihood = credit * P_GUESS + (1 - credit) * (1 - P_GUESS);
+  const num = pKnown * knownLikelihood;
+  const den = num + (1 - pKnown) * unknownLikelihood;
+  const posterior = den === 0 ? pKnown : num / den;
+  return posterior + (1 - posterior) * P_TRANSIT * weight;
 }
 
 export function traceTopic(input: {
@@ -107,32 +108,35 @@ export function traceTopic(input: {
   cards: Card[];
   reviewLogs?: ReviewLog[];
   now?: Date;
+  /** Pooled subject estimate, already shrunk toward the global prior. */
+  subjectPrior?: number;
 }): TopicTrace {
   const now = input.now ?? new Date();
-  const atts = [...input.attempts].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  let p = P_INIT;
-  for (const a of atts) {
-    const correctness = a.max ? a.awarded / a.max : 0;
-    // Partial-credit aware: ≥0.6 counts as correct, otherwise incorrect. 0.4–0.6 is noisy but we bin it.
-    const correct = correctness >= 0.6;
-    p = bktStep(p, correct);
-    // Retention as a gentle prior: high retention nudges up slightly
-    if (input.cards.length) {
-      const ret = input.cards.reduce((acc, c) => acc + retrievability(c, now), 0) / input.cards.length;
-      p = p * 0.96 + ret * 0.04;
-    }
+  const atts = input.attempts.filter(trustworthyAttempt)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const subjectPrior = input.subjectPrior == null ? P_INIT : clamp01(input.subjectPrior);
+  const topicPrior = clamp01(subjectPrior + (3 - input.topic.intrinsicDifficulty) * 0.04);
+  let p = topicPrior;
+  for (const a of atts) p = bktStep(p, a.awarded / a.max, attemptWeight(a));
+  const effectiveN = atts.reduce((sum, attempt) => sum + attemptWeight(attempt), 0);
+  // One answer should not overwhelm the hierarchy of priors.
+  p = topicPrior + (p - topicPrior) * (effectiveN / (effectiveN + 1));
+  if (input.cards.some((card) => card.reps > 0)) {
+    const reviewed = input.cards.filter((card) => card.reps > 0);
+    const ret = reviewed.reduce((acc, card) => acc + retrievability(card, now), 0) / reviewed.length;
+    p = p * 0.96 + ret * 0.04;
   }
   p = clamp01(p);
-  const trials = atts.length + Math.floor(input.cards.length / 3);
-  const successes = Math.round(p * Math.max(1, trials));
-  const { lower, upper } = wilson(successes, Math.max(1, trials));
+  const credits = atts.map((a) => clamp01(a.awarded / a.max) * attemptWeight(a));
+  const { lower, upper } = wilson(p * effectiveN, effectiveN);
   const retentionAvg =
     input.cards.length >= 2 ? input.cards.reduce((a, c) => a + retrievability(c, now), 0) / input.cards.length : null;
-  const reliable = atts.length >= 5 || (atts.length >= 3 && input.cards.length >= 6);
+  const observed = wilson(credits.reduce((sum, credit) => sum + credit, 0), effectiveN);
+  const reliable = effectiveN >= 5 && observed.upper - observed.lower <= 0.6;
   const narrative = !atts.length
     ? "No attempts yet — knowledge estimate is the prior. Answer a few questions to make it personal."
     : !reliable
-      ? `Early estimate (${Math.round(p * 100)}%) — answer ${5 - atts.length} more questions on this topic to make it reliable.`
+      ? `Early estimate (${Math.round(p * 100)}%) — more independent answers will narrow uncertainty.`
       : p > 0.75
         ? `Strong knowledge (${Math.round(p * 100)}%) — keep it warm with spaced reviews.`
         : p < 0.45
@@ -159,16 +163,27 @@ export function traceTopics(input: {
   cardsByTopic: Map<Id, Card[]>;
   now?: Date;
 }): TopicTrace[] {
-  return input.topics
-    .map((t) =>
-      traceTopic({
-        topic: t,
-        attempts: input.attemptsByTopic.get(t.id) ?? [],
-        cards: input.cardsByTopic.get(t.id) ?? [],
-        now: input.now,
-      }),
-    )
-    .sort((a, b) => a.pKnown - b.pKnown);
+  const bySubject = new Map<Id, { credit: number; attempts: number }>();
+  for (const topic of input.topics) {
+    const attempts = (input.attemptsByTopic.get(topic.id) ?? []).filter(trustworthyAttempt);
+    const row = bySubject.get(topic.subjectId) ?? { credit: 0, attempts: 0 };
+    row.credit += attempts.reduce((sum, attempt) => sum +
+      clamp01(attempt.awarded / attempt.max) * attemptWeight(attempt), 0);
+    row.attempts += attempts.reduce((sum, attempt) => sum + attemptWeight(attempt), 0);
+    bySubject.set(topic.subjectId, row);
+  }
+  return input.topics.map((topic) => {
+    const attempts = (input.attemptsByTopic.get(topic.id) ?? []).filter(trustworthyAttempt);
+    const ownCredit = attempts.reduce((sum, attempt) => sum +
+      clamp01(attempt.awarded / attempt.max) * attemptWeight(attempt), 0);
+    const ownN = attempts.reduce((sum, attempt) => sum + attemptWeight(attempt), 0);
+    const pooled = bySubject.get(topic.subjectId) ?? { credit: 0, attempts: 0 };
+    // Leave this topic out of its subject prior to avoid counting an answer twice.
+    const otherN = Math.max(0, pooled.attempts - ownN);
+    const subjectPrior = (P_INIT * 12 + pooled.credit - ownCredit) / (12 + otherN);
+    return traceTopic({ topic, attempts, cards: input.cardsByTopic.get(topic.id) ?? [],
+      now: input.now, subjectPrior });
+  }).sort((a, b) => a.pKnown - b.pKnown);
 }
 
 /** P(correct) on next attempt given current pKnown — the prediction. */
@@ -182,17 +197,15 @@ export function traceQuestion(input: {
   question: Question;
   attempts: Attempt[];
 }): QuestionTrace {
-  const atts = input.attempts;
+  const atts = input.attempts.filter(independentAttempt);
   const n = atts.length;
   const successRate = n >= 1 ? atts.reduce((a, x) => a + (x.max ? x.awarded / x.max : 0), 0) / n : null;
-  const reliable = n >= QUESTION_DIFFICULTY_MIN_SAMPLES;
-  let empiricalDifficulty = input.question.difficulty;
-  if (successRate != null && reliable) {
-    // Map success 0→1 to difficulty 5→1
-    const mapped = 5 - successRate * 4;
-    const weight = Math.min(1, n / 12);
-    empiricalDifficulty = mapped * weight + input.question.difficulty * (1 - weight);
-  }
+  const interval = wilson((successRate ?? 0) * n, n);
+  const reliable = n >= QUESTION_DIFFICULTY_MIN_SAMPLES && interval.upper - interval.lower <= 0.6;
+  // Eight authored pseudo-observations let even sparse real outcomes contribute
+  // gradually, without an abrupt jump on attempt number five.
+  const mapped = successRate == null ? input.question.difficulty : 5 - successRate * 4;
+  const empiricalDifficulty = (input.question.difficulty * 8 + mapped * n) / (8 + n);
   const ed = clamp15(empiricalDifficulty);
   const gap = ed - input.question.difficulty;
   const narrative =

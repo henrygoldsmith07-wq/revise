@@ -75,7 +75,7 @@ export const DEVELOPING_THRESHOLD = 0.7;
 export function capabilityState(evidence: CapabilityEvidence): CapabilityState {
   if (evidence.evidence <= 0 || evidence.score === null) return "unknown";
   if (evidence.evidence < 1 || evidence.score < EMERGING_THRESHOLD) return "emerging";
-  if (evidence.score < DEVELOPING_THRESHOLD) return "developing";
+  if (evidence.score < DEVELOPING_THRESHOLD || evidence.evidence < CAPABILITY_FULL_EVIDENCE) return "developing";
   return "secure";
 }
 
@@ -142,21 +142,24 @@ export function capabilitySentence(profile: CapabilityProfile): string | null {
   const weakest = measurable[0];
   const strongest = measurable[measurable.length - 1];
   if (strongest.capability === weakest.capability) return null;
-  const strongLabel = strongest.score !== null && strongest.score >= DEVELOPING_THRESHOLD ? "strong" : "solid";
-  return `Your ${CAPABILITY_LABELS[strongest.capability]} is ${strongLabel} but ${CAPABILITY_LABELS[weakest.capability]} is weak.`;
+  const strongLabel = capabilityState(profile[strongest.capability]) === "secure" ? "strong" : "developing";
+  const weakLabel = weakest.score !== null && weakest.score < DEVELOPING_THRESHOLD ? "needs work" : "still developing";
+  return `Your ${CAPABILITY_LABELS[strongest.capability]} is ${strongLabel} but ${CAPABILITY_LABELS[weakest.capability]} ${weakLabel}.`;
 }
 
-/** The one capability the next session should move: the weakest measured one
- * that is still below developing; when everything measured is healthy, the
- * strongest measured one (it is transfer-ready); only with no evidence at all
- * does the session start by diagnosing. */
+/** The one capability the next session should move: repair a measured weakness
+ * first, then diagnose an unmeasured capability, then develop thin evidence.
+ * Transfer is the focus only when the full profile is secure. */
 export function focusCapability(profile: CapabilityProfile): Capability {
   const needs = developmentNeeds(profile);
   const measurable = needs.filter((n) => n.state !== "unknown");
   const weak = measurable.find((n) => (n.score ?? 0) < DEVELOPING_THRESHOLD);
   if (weak) return weak.capability;
-  if (measurable.length) return measurable[measurable.length - 1].capability;
-  return CAPABILITIES[0];
+  const unknown = needs.find((n) => n.state === "unknown");
+  if (unknown) return unknown.capability;
+  const developing = measurable.find((n) => n.state !== "secure");
+  if (developing) return developing.capability;
+  return "transfer";
 }
 
 /** Aggregate one capability across topics — for whole-subject reads. */

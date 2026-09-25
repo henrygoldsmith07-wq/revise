@@ -68,13 +68,25 @@ export function NextGradeView() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{subject.name}</p>
                     <p className="text-xs text-ink3 mt-0.5">
-                      Predicted {prediction.grade} at {prediction.percent}% · confidence {confidence}%
+                      {prediction.worstCase === prediction.bestCase
+                        ? `Estimated grade ${prediction.grade}`
+                        : `Estimated range ${prediction.worstCase}–${prediction.bestCase}`} · {prediction.evidenceLevel ?? "limited"} evidence
                     </p>
                   </div>
                   <p className="text-lg font-semibold tabular-nums shrink-0">
                     {target.nextGrade ? `→ ${target.nextGrade.grade}` : "Highest"}
                   </p>
                 </div>
+
+                {prediction.uncertaintySources?.length ? (
+                  <details className="mt-2 text-xs text-ink3">
+                    <summary className="cursor-pointer">What makes this estimate uncertain?</summary>
+                    <ul className="mt-1 list-disc pl-4 space-y-1">
+                      {prediction.uncertaintySources.map((reason) => <li key={reason}>{reason}</li>)}
+                    </ul>
+                    <p className="mt-1">Model centre: about {prediction.percent}% · confidence {confidence}%.</p>
+                  </details>
+                ) : null}
 
                 {target.nextGrade ? (
                   <>

@@ -32,6 +32,10 @@ export function AdaptiveSessionHero({
         </h2>
         <p className="mt-2 text-base font-medium text-ink sm:text-lg">{subject?.name ?? session.subjectId} · {session.topicTitle}</p>
 
+        {session.evidence.factors.uncertainty >= 0.65 ? (
+          <p className="mt-2 text-sm text-ink2">Evidence is still limited. This session will help find the right level.</p>
+        ) : null}
+
         {session.stoppedEarly ? (
           <p className="mt-2 text-sm text-ink2" role="note">{session.stoppedEarly.reason}</p>
         ) : null}

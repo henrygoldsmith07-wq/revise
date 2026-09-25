@@ -1,5 +1,6 @@
 import { countdownGuidance } from "./exam-countdown";
 import { daysToExam, examUrgency } from "./recommender";
+import { valueNextAction } from "./next-best-action";
 import { toDateOnly } from "./scheduling";
 import { REVIEW_CAP, allocateDay, reviewBlocksNeeded, type AllocOpportunity, type SubjectEvidence } from "./subject-allocation";
 import type {
@@ -99,6 +100,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
   // Working copy of mastery so the planner can "spend" attention within one
   // build: a topic scheduled on Monday looks less urgent by Wednesday.
   const projected = new Map(input.mastery.map((m) => [m.topicId, m.mastery]));
+  const evidenceByTopic = new Map(input.mastery.map((m) => [m.topicId, m.attempts] as const));
   const lastScheduled = new Map<Id, IsoDate>();
 
   // Working copy of the due backlog so a review block planned for Monday stops
@@ -242,6 +244,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
           dueReviewBlocks: reviewSlots,
           topics: input.topics,
           projected,
+          evidenceByTopic,
           lastScheduled,
           exams: input.exams,
           topicById,
@@ -472,6 +475,7 @@ interface ChooseInput {
   dueReviewBlocks: number;
   topics: Topic[];
   projected: Map<Id, number>;
+  evidenceByTopic: Map<Id, number>;
   lastScheduled: Map<Id, IsoDate>;
   exams: ExamDate[];
   topicById: Map<Id, Topic>;
@@ -510,7 +514,18 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
       // Spacing penalty: revisiting a topic the very next day wastes the
       // spacing effect, so push it back unless nothing else needs the slot.
       const spacing = last === input.date ? 0.5 : last ? 0.85 : 1;
-      return { topic: t, score: (1 - mastery) * spacing * (1 + (t.intrinsicDifficulty - 3) * 0.05) };
+      const evidenceConfidence = Math.min(1, (input.evidenceByTopic.get(t.id) ?? 0) / 4);
+      const value = valueNextAction({
+        id: t.id, kind: evidenceConfidence === 0 ? "diagnose" : "practice-topic",
+        subjectId: t.subjectId, topicId: t.id, minutes: 20,
+        signals: {
+          weakness: 1 - mastery, learningBenefit: (1 - mastery) * (0.9 + t.intrinsicDifficulty * 0.02),
+          examUrgency: Math.max(0, Math.min(1, examUrgency(days) - 1)),
+          examWeighting: 1, diagnosticValue: evidenceConfidence === 0 ? 1 : 0,
+          evidenceConfidence,
+        },
+      });
+      return { topic: t, score: value.score * spacing };
     })
     .sort((a, b) => b.score - a.score);
 

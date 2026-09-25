@@ -1,4 +1,5 @@
 import { requiresWjecContentReview } from "./physics-content-review";
+import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
 import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
@@ -24,6 +25,8 @@ export interface LearningAction {
   calibrated: boolean;
   calibrationSampleSize: number;
   contentTrust: "human-verified" | "needs-human-review";
+  /** Shared policy value, separate from the intervention's gain prior. */
+  policy?: { score: number; evidenceLevel: "limited" | "developing" | "strong" };
 }
 
 export function selectLearningAction(input: {
@@ -138,8 +141,33 @@ export function selectLearningAction(input: {
       break;
     }
   }
+  const policyKinds: Record<LearningAction["kind"], NextActionKind> = {
+    diagnose: "diagnose", guided: "relearn", independent: "practice-capability",
+    transfer: "transfer", retention: "delayed-retrieval",
+  };
+  for (const action of candidates) {
+    const skill = evidence.get(action.capabilityId);
+    const confidence = Math.min(1, (skill?.independentFamilies ?? 0) / 4);
+    const value = valueNextAction({
+      id: `${action.kind}:${action.capabilityId}:${action.question.id}`,
+      kind: policyKinds[action.kind],
+      subjectId: action.question.subjectId, topicId: action.topicId,
+      minutes: action.minutes,
+      signals: {
+        weakness: action.priorAccuracy == null ? 0.35 : 1 - action.priorAccuracy,
+        mistakePressure: action.mistakeId ? Math.min(1, (skill?.lostMarks ?? 1) / 4) : 0,
+        learningBenefit: Math.min(1, action.expectedGainPerMinute / 0.08) *
+          (action.contentTrust === "human-verified" ? 1 : 0.7),
+        retentionBenefit: action.kind === "retention" ? 1 : 0,
+        diagnosticValue: action.priorState === "unknown" ? 1 : 0,
+        transferNeed: action.kind === "transfer" ? 1 : 0,
+        evidenceConfidence: confidence,
+      },
+    });
+    action.policy = { score: value.score, evidenceLevel: value.evidenceLevel };
+  }
   return candidates.sort((a, b) =>
-    b.expectedGainPerMinute - a.expectedGainPerMinute ||
+    (b.policy?.score ?? 0) - (a.policy?.score ?? 0) ||
     Number(freshReasoning(b.question).newReasoning) - Number(freshReasoning(a.question).newReasoning) ||
     Number(b.kind === "retention") - Number(a.kind === "retention") ||
     // Between equal-value actions, take the smallest intervention likely to

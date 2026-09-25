@@ -596,6 +596,11 @@ function SessionSummary({
     total: reviewed,
     retryCount: again,
     elapsedMs: minutes * 60_000,
+    recommended: returnHref
+      ? { href: returnHref, label: "Continue session", reason: "Your retrieval grades have updated the next tutor step." }
+      : store.adaptiveSession
+        ? { href: store.adaptiveSession.startHref, label: "Start next session", reason: store.adaptiveSession.reason }
+        : undefined,
   });
   return (
     <PostSessionClosure
