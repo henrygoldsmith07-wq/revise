@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { allQualifications, allSubjects, availableBoards, gradesFor } from "@/domain/curriculum";
+import { isOptionalExamDateValid } from "@/domain/onboarding";
 
 const src = (p: string) => resolve(process.cwd(), p);
 
 // ---------------------------------------------------------------------------
-// First screen: pick board + subjects + optional exam dates. Everything else waits.
+// First screen: pick board + subject + optional exam date. Everything else waits.
 //
 // The app hard-gates on onboarding (AppShell renders only Onboarding until
 // repo.markOnboarded), so the funnel IS the product for a new student. It
 // must offer only boards with real content, collect subjects on one board,
 // allow a known exam date or a clear date-later path, default the rest (time
 // budget, target grade) and never offer a global Skip that leaves a hollow
-// profile. The date step itself is optional; there is no redundant fourth
-// confirmation step before the first study plan is built.
+// profile.
 // ---------------------------------------------------------------------------
 
 describe("availableBoards: only boards with content are offered", () => {
@@ -59,7 +59,7 @@ describe("first screen collects board → subjects → optional exam dates", () 
     expect(srcText).toContain("setExamDates({})");
   });
 
-  it("accepts future dates and lets students continue when dates are unknown", () => {
+  it("accepts future dates and lets students skip dates they do not know yet", () => {
     expect(srcText).toContain("When are the exams?");
     expect(srcText).toContain("(optional)");
     expect(srcText).not.toContain("required");
@@ -67,20 +67,21 @@ describe("first screen collects board → subjects → optional exam dates", () 
     expect(srcText).toContain("missingDates");
     expect(srcText).toContain("invalidDates");
     expect(srcText).toContain("enteredDatesValid");
-    expect(srcText).toContain('min={today}');
+    expect(srcText).toContain("isOptionalExamDateValid(date, today)");
+    expect(srcText).toContain("canContinue");
     expect(srcText).toContain("Build my plan without all dates");
     expect(srcText).toContain("add dates later in Settings");
     expect(srcText).toContain("if (!date) continue");
   });
 
-  it("defaults time budget and target grade instead of adding a redundant confirmation step", () => {
+  it("defaults time budget and target grade instead of asking; board → subjects → dates → quick check", () => {
     expect(srcText).toContain("STEADY_MINUTES");
     expect(srcText).toContain("gradesFor(id)[0]");
+    // The old wizard's extra asks are gone.
     expect(srcText).not.toContain("What should we call you?");
     expect(srcText).not.toContain("How much time do you have?");
     expect(srcText).not.toContain("TIME_PRESETS");
     expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates"]');
-    expect(srcText).not.toContain('"Quick check"');
   });
 
   it("does not offer a global Skip that leaves a hollow profile", () => {
@@ -97,5 +98,17 @@ describe("everything else waits until onboarding completes", () => {
     const store = readFileSync(src("src/state/store.tsx"), "utf8");
     expect(store).toContain("repo.hasOnboarded(");
     expect(store).toContain("repo.markOnboarded(");
+  });
+});
+
+describe("optional onboarding exam-date behavior", () => {
+  const today = "2026-09-25";
+
+  it("allows no date or a current/future date and rejects a past date", () => {
+    expect(isOptionalExamDateValid(undefined, today)).toBe(true);
+    expect(isOptionalExamDateValid("", today)).toBe(true);
+    expect(isOptionalExamDateValid(today, today)).toBe(true);
+    expect(isOptionalExamDateValid("2026-10-01", today)).toBe(true);
+    expect(isOptionalExamDateValid("2026-09-24", today)).toBe(false);
   });
 });

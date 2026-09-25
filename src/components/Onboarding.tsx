@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { allQualifications, allSubjects, availableBoards, getBoard, gradesFor } from "@/domain/curriculum";
 import { todayIso } from "@/domain/scheduling";
+import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, ProgressBar, cx } from "./ui";
@@ -85,7 +86,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const missingDates = chosenSubjects.filter((s) => !examDates[s.id]);
   const invalidDates = chosenSubjects.filter((s) => {
     const date = examDates[s.id];
-    return Boolean(date && date < today);
+    return !isOptionalExamDateValid(date, today);
   });
   const enteredDatesValid = invalidDates.length === 0;
   const onDatesPhase = phase === PHASES.length - 1;

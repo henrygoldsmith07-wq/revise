@@ -100,12 +100,6 @@ test("a 0-confidence AI mark is escalated to the human-review queue", async ({ p
   await page.getByRole("button", { name: "Submit for marking" }).click();
 
   const main = page.locator("main#main");
-  // The mark came from "AI", so the escalation banner — not a crash — is the
-  // contract for a zero-confidence grade. Scope the queue assertion to that
-  // banner: the runner can legitimately render other live status regions
-  // (for example the working-analysis result) at the same time. Assert the
-  // student-facing sentence rather than an implementation shorthand so copy
-  // and accessibility stay covered together.
   const reviewStatus = main.getByRole("status").filter({ hasText: "Human review requested" });
   await expect(reviewStatus).toBeVisible({ timeout: 20_000 });
   await expect(reviewStatus).toContainText("AI mark confidence is 0%, below the 60% threshold");

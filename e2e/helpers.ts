@@ -40,15 +40,11 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise
 }
 
 /**
- * Completes the current three-step first-run funnel: board → subjects →
- * optional exam dates. The funnel is the only thing rendered until it is done,
- * so every spec that needs Today goes through this helper. Defaults to AQA and
- * its first subject with an exam ~3 months out. Set skipExamDates to exercise
- * the date-later path.
- *
- * Keep this helper tied to the product contract rather than old button copy:
- * the former fourth "quick check" step was deliberately removed to reduce
- * time-to-first-plan, and optional dates are completed by the same final CTA.
+ * Completes onboarding (board → subjects → optional exam dates) for a fresh
+ * profile. The funnel is the *only* thing rendered until it is done, so
+ * every spec that needs a Today screen funnels through here.
+ * Defaults to AQA and its first subject with an exam ~3 months out. Set
+ * skipExamDates to exercise the date-later path.
  */
 export async function completeOnboarding(
   page: Page,
@@ -58,7 +54,6 @@ export async function completeOnboarding(
   // Phase 1 — exam board.
   await page.getByRole("button", { name: new RegExp(board, "i") }).first().click();
   await page.getByRole("button", { name: /Continue/i }).click();
-
   // Phase 2 — subjects of that board (multi-select). Default: first card.
   if (opts.subjectNames?.length) {
     for (const name of opts.subjectNames) {
@@ -68,7 +63,6 @@ export async function completeOnboarding(
     await page.locator("button.card").first().click();
   }
   await page.getByRole("button", { name: /Continue/i }).click();
-
   // Phase 3 — dates are optional. Blank inputs exercise the "I don't know yet"
   // path; filled inputs exercise normal dated planning. Both finish through the
   // current final CTA, with no obsolete quick-check interaction afterwards.
@@ -84,15 +78,26 @@ export async function completeOnboarding(
 }
 
 /**
- * Waits until the PWA worker is installed, activated and ready for the warm
- * reload used by offline specs.
+ * Waits until the PWA worker is installed, activated and *controlling* the
+ * page, so a reload can be served from the precache with no network.
+ *
+ * Why this exists: the offline spec used to sleep 500ms before cutting the
+ * network, which is nowhere near enough for register → precache (the ~22-route
+ * app shell) → activate → clients.claim(). The reload then went to the network
+ * with no controller and failed outright with ERR_INTERNET_DISCONNECTED.
+ *
+ * `navigator.serviceWorker.controller` is set by the clients.claim() call in
+ * sw.js's activate handler, which runs only after install's precache has
+ * settled — so it is exactly the "ready to serve offline" signal, and waiting
+ * on it is deterministic rather than a timing guess.
  */
 export async function serviceWorkerReady(page: Page, timeoutMs = 30_000): Promise<void> {
   // Readiness = a registered worker with an active install, not a
   // `controller`. A controller only attaches on the navigation *after*
   // registration, so waiting on it before the specs' warm reload can never
-  // settle on a fresh profile. The worker precaches the shell at install, so
-  // an active registration means the follow-up reload is servable offline.
+  // settle on a fresh profile — the exact 30s timeout failing in CI. The
+  // worker precaches the shell at install, so an active registration means
+  // the follow-up reload is servable offline.
   await page.waitForFunction(async () => {
     try {
       const regs = await navigator.serviceWorker?.getRegistrations() ?? [];

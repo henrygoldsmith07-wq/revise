@@ -308,6 +308,46 @@ describe("timing", () => {
   });
 });
 
+describe("working-evidence priority", () => {
+  function rushedCalculationResult(workingErrorKind?: "unit-error", firstIncorrectStep?: number) {
+    const p = part({
+      prompt: "Calculate the force acting on the object.",
+      marks: 4,
+      markScheme: ["force = 6 N"],
+    });
+    const q = question(p);
+    const submitted = attempt(
+      { p1: "force = 6" },
+      marked({ awarded: 3, max: 4, missedPoints: ["force = 6 N"] }),
+      3,
+      4,
+    );
+    return run(
+      { question: q, part: p, attempt: submitted },
+      {
+        timing: "rushed",
+        secondsSpent: 14,
+        marksLost: 1,
+        ...(workingErrorKind ? { workingErrorKind } : {}),
+        ...(firstIncorrectStep != null ? { firstIncorrectStep } : {}),
+      },
+    );
+  }
+
+  it("keeps specific unit evidence ahead of rushed and numeric heuristics", () => {
+    const result = rushedCalculationResult("unit-error", 1);
+    expect(result.klass).toBe("calculation");
+    expect(result.confidence).toBe("high");
+    expect(result.reasons).toContain("the working analysis identified a unit error");
+    expect(result.reasons).toContain("the first incorrect working step was step 2");
+  });
+
+  it("uses timing ahead of a generic calculation guess when there is no step diagnosis", () => {
+    const result = rushedCalculationResult();
+    expect(result.klass).toBe("timing");
+    expect(result.confidence).toBe("high");
+  });
+});
 describe("terminology", () => {
   it("is called when the point demands a term the answer talked around", () => {
     const p = part({

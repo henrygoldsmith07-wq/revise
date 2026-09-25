@@ -270,27 +270,24 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
     };
   }
 
-  // 3. Diagnosed working error — direct step-level evidence outranks a timing
-  //    guess. A rushed student who demonstrably made a unit, substitution,
-  //    rearrangement or arithmetic error needs that specific repair first.
+  // 3. Specific working evidence — a diagnosed step outranks broad timing or
+  //    numeric heuristics. Only persisted, non-none diagnoses reach this rule.
   if (mistake.workingErrorKind && mistake.workingErrorKind !== "none") {
     const label = WORKING_ERROR_LABEL[mistake.workingErrorKind];
     return {
       klass: "calculation",
       confidence: "high",
       reasons: [
-        `the working analysis identified a ${label}`,
+        "the working analysis identified a " + label,
         mistake.firstIncorrectStep != null
-          ? `the first incorrect working step was step ${mistake.firstIncorrectStep + 1}`
+          ? "the first incorrect working step was step " + (mistake.firstIncorrectStep + 1)
           : "step-level working evidence identifies the calculation failure directly",
       ],
     };
   }
 
-  // 4. Timing — time pressure is causal evidence, not a content guess.
-  // Check it before generic calculation heuristics so a student who clearly
-  // knew most of a quantitative method but rushed the final step gets a timing
-  // repair, unless step-level working evidence already identified the loss.
+  // 4. Timing is causal evidence for a mostly-correct attempt. Check it before
+  //    generic numeric heuristics, which otherwise misread a rushed final slip.
   if (mistake.timing === "rushed" && earnedShare >= 0.5) {
     return {
       klass: "timing",
@@ -298,7 +295,7 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
       reasons: [
         "the attempt was rushed and most of this part was still earned",
         mistake.secondsSpent != null
-          ? `only ${mistake.secondsSpent}s was spent on the part where the mark dropped`
+          ? "only " + mistake.secondsSpent + "s was spent on the part where the mark dropped"
           : "the timing record marks this as rushed",
       ],
     };
@@ -318,7 +315,6 @@ export function classifyMistake(input: ClassificationInput): MistakeClassResult 
       ],
     };
   }
-
   // 6. Application — the answer engaged the demanded content (shared
   //    vocabulary — the fact was known) but the transfer to the context or
   //    the AO2/AO3 step failed. AO2/AO3, an application command or an
