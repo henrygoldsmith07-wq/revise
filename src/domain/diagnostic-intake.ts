@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Diagnostic intake — a short adaptive diagnostic after onboarding.
 //
-// Topic mastery starts from a cohort prior, which is honest but coarse. This
+// Topic mastery starts from a handcrafted default prior. This
 // optional diagnostic gives Revise *initial capability evidence*: a handful of
 // branching questions, at most two per topic, stopping as soon as a topic's
 // capability is placed. Unknown topics stay unknown — the diagnostic never

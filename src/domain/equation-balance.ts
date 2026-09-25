@@ -27,7 +27,9 @@ function elementCounts(formula: string, multiplier = 1): Record<string, number> 
   for (const match of formula.matchAll(ELEMENT_RE)) {
     consumed += match[0];
     const element = match[1];
-    const n = match[2] ? parseInt(match[2], 10) : 1;
+    if (!element) return null;
+    const digits = match[2] ?? "";
+    const n = digits ? parseInt(digits, 10) : 1;
     counts[element] = (counts[element] ?? 0) + n * multiplier;
   }
   // Every character must have been an element-count pair — brackets, charges,
@@ -56,7 +58,9 @@ export function checkEquationBalance(equation: string): BalanceResult | null {
       const match = token.match(SPECIES_RE);
       if (!match) return null;
       const coefficient = match[1] ? parseInt(match[1], 10) : 1;
-      const counts = elementCounts(match[2], coefficient);
+      const formula = match[2];
+      if (!formula) return null;
+      const counts = elementCounts(formula, coefficient);
       if (!counts) return null;
       for (const [element, n] of Object.entries(counts)) {
         totals[element] = (totals[element] ?? 0) + n;
@@ -77,7 +81,8 @@ export function findUnbalancedEquations(text: string): string[] {
   const out: string[] = [];
   // Species-like tokens on both sides of an arrow, ending at punctuation or end.
   for (const match of text.matchAll(/([A-Za-z0-9][A-Za-z0-9\s+]*?(?:->|→|⟶|==>)[A-Za-z0-9+\s]+?[A-Za-z0-9])(?=$|[.,;)])/gm)) {
-    const equation = match[1].trim();
+    const equation = match[1]?.trim();
+    if (!equation) continue;
     const result = checkEquationBalance(equation);
     if (result && !result.ok) out.push(equation);
   }

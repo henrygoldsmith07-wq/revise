@@ -63,16 +63,18 @@ export async function completeOnboarding(
     await page.locator("button.card").first().click();
   }
   await page.getByRole("button", { name: /Continue/i }).click();
-  // Phase 3 — add future exam dates when known, or leave them blank for now.
-  if (opts.skipExamDates) {
-    await page.getByRole("button", { name: /Build my plan without all dates/i }).click();
-    return;
+  // Phase 3 — dates are optional. Blank inputs exercise the "I don't know yet"
+  // path; filled inputs exercise normal dated planning. Both finish through the
+  // current final CTA, with no obsolete quick-check interaction afterwards.
+  if (!opts.skipExamDates) {
+    const date = opts.examDate ?? new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+    const inputs = page.locator('input[type="date"]');
+    const count = await inputs.count();
+    for (let i = 0; i < count; i++) await inputs.nth(i).fill(date);
   }
-  const date = opts.examDate ?? new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
-  const inputs = page.locator('input[type="date"]');
-  const count = await inputs.count();
-  for (let i = 0; i < count; i++) await inputs.nth(i).fill(date);
-  await page.getByRole("button", { name: /^Build my plan$/i }).click();
+
+  await page.getByRole("button", { name: /Build my plan|Start revising|Finish|Continue/i }).click();
+  await expect(page.locator("main#main")).toBeVisible({ timeout: 60_000 });
 }
 
 /**

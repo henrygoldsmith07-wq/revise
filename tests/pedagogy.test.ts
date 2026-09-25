@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeTopicMastery, bayesianMastery, priorRemaining, COHORT_PRIOR_MEAN, COHORT_PRIOR_STRENGTH } from "@/domain/mastery";
+import { computeTopicMastery, bayesianMastery, priorRemaining, DEFAULT_PRIOR_MEAN, DEFAULT_PRIOR_STRENGTH, MASTERY_PRIOR_METADATA } from "@/domain/mastery";
 import {
   circadianFatigue,
   fatigueFactor,
@@ -54,12 +54,28 @@ function attempt(id: string, awarded: number, max: number, topicIds: string[] = 
 }
 
 describe("Bayesian cold-start prior", () => {
-  it("the prior mean is the cohort average and the strength is the pseudo-count", () => {
-    expect(COHORT_PRIOR_MEAN).toBeGreaterThan(0.3);
-    expect(COHORT_PRIOR_MEAN).toBeLessThan(0.6);
-    expect(COHORT_PRIOR_STRENGTH).toBeGreaterThan(0);
+  it("labels the handcrafted prior as a product default, not cohort data", () => {
+    expect(DEFAULT_PRIOR_MEAN).toBeGreaterThan(0.3);
+    expect(DEFAULT_PRIOR_MEAN).toBeLessThan(0.6);
+    expect(DEFAULT_PRIOR_STRENGTH).toBeGreaterThan(0);
+    expect(MASTERY_PRIOR_METADATA.mean).toMatchObject({
+      value: DEFAULT_PRIOR_MEAN,
+      origin: "product/theory default",
+      calibratedFromData: false,
+      sampleSize: null,
+      lastCalibrated: null,
+    });
+    expect(MASTERY_PRIOR_METADATA.mean.reason).not.toBe("");
+    expect(MASTERY_PRIOR_METADATA.strength).toMatchObject({
+      value: DEFAULT_PRIOR_STRENGTH,
+      origin: "product/theory default",
+      calibratedFromData: false,
+      sampleSize: null,
+      lastCalibrated: null,
+    });
+    expect(MASTERY_PRIOR_METADATA.strength.reason).not.toBe("");
     // At zero evidence the posterior IS the prior mean.
-    expect(bayesianMastery(0, 0)).toBeCloseTo(COHORT_PRIOR_MEAN, 10);
+    expect(bayesianMastery(0, 0)).toBeCloseTo(DEFAULT_PRIOR_MEAN, 10);
   });
 
   it("converges on the evidence as observations accumulate", () => {
@@ -69,7 +85,7 @@ describe("Bayesian cold-start prior", () => {
     // Two observations of the same performance stay much closer to the prior.
     const thin = bayesianMastery(0.9, 4);
     expect(thin).toBeLessThan(withStrongEvidence);
-    expect(thin).toBeGreaterThan(COHORT_PRIOR_MEAN); // but still pulled up
+    expect(thin).toBeGreaterThan(DEFAULT_PRIOR_MEAN); // but still pulled up
   });
 
   it("priorRemaining decays monotonically toward zero", () => {
@@ -92,8 +108,8 @@ describe("Bayesian cold-start prior", () => {
     // prediction never inflate.
     expect(row.mastery).toBe(0);
     expect(row.weak).toBe(false);
-    // Student-facing: a prediction near the cohort prior, purely prior-driven.
-    expect(row.predictedMastery).toBeCloseTo(COHORT_PRIOR_MEAN, 2);
+    // Student-facing: a prediction near the default prior, purely prior-driven.
+    expect(row.predictedMastery).toBeCloseTo(DEFAULT_PRIOR_MEAN, 2);
     expect(row.priorRemaining).toBe(1);
   });
 
@@ -107,9 +123,9 @@ describe("Bayesian cold-start prior", () => {
       mistakes: [],
       now: NOW,
     });
-    // A strong performer sits above the cohort prior but below their own raw
+    // A strong performer sits above the default prior but below their own raw
     // estimate while the prior still carries weight — the honest in-between.
-    expect(row.predictedMastery!).toBeGreaterThan(COHORT_PRIOR_MEAN);
+    expect(row.predictedMastery!).toBeGreaterThan(DEFAULT_PRIOR_MEAN);
     expect(row.predictedMastery!).toBeLessThan(row.mastery);
     expect(row.priorRemaining!).toBeLessThan(0.5);
   });

@@ -84,7 +84,7 @@ export default function TodayPage() {
     void recordExperimentEvent("shown", { taskId, activity: "adaptive", topicId: adaptiveSession.topicId });
   }, [adaptiveSession, experimentArm, recordExperimentEvent, recordFunnel]);
 
-  if (!adaptiveSession) return <EmptyToday name={settings.displayName} greeting={greetingLabel} />;
+  if (!adaptiveSession) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} />;
 
   return (
     <div className="mx-auto w-full space-y-5">
@@ -288,7 +288,7 @@ function TodayWelcome({ name, greeting, hasSession = true }: { name: string; gre
   );
 }
 
-function EmptyToday({ name, greeting }: { name: string; greeting: string }) {
+function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; pace: ReturnType<typeof forecastUntouched> }) {
   return (
     <div className="mx-auto w-full space-y-5">
       <TodayWelcome name={name} greeting={greeting} hasSession={false} />
@@ -306,6 +306,8 @@ function EmptyToday({ name, greeting }: { name: string; greeting: string }) {
       </div>
       <TodayOverview />
       <TodayRoadmap />
+      {pace ? <PaceForecastLine forecast={pace} /> : null}
+      <ExamOutlook />
     </div>
   );
 }

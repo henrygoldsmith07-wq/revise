@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button, Panel, Pill, SectionHeading } from "./ui";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -29,6 +29,25 @@ function iosNow(): boolean {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
+function subscribeInstallState(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const displayMode = window.matchMedia("(display-mode: standalone)");
+  displayMode.addEventListener?.("change", onChange);
+  window.addEventListener("appinstalled", onChange);
+  return () => {
+    displayMode.removeEventListener?.("change", onChange);
+    window.removeEventListener("appinstalled", onChange);
+  };
+}
+
+function subscribeNever(): () => void {
+  return () => {};
+}
+
+function serverBrowserState(): false {
+  return false;
+}
+
 /**
  * Captures Chromium's one-shot install event at app startup so Settings can
  * still offer installation even when the browser fired the event before the
@@ -36,32 +55,24 @@ function iosNow(): boolean {
  */
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [ios, setIos] = useState(false);
+  // Browser-only state uses an external-store subscription so server and
+  // hydration snapshots agree, then React reads the actual browser state.
+  const installed = useSyncExternalStore(subscribeInstallState, standaloneNow, serverBrowserState);
+  const ios = useSyncExternalStore(subscribeNever, iosNow, serverBrowserState);
 
   useEffect(() => {
-    setInstalled(standaloneNow());
-    setIos(iosNow());
-
-    const displayMode = window.matchMedia("(display-mode: standalone)");
-    const refreshInstalled = () => setInstalled(standaloneNow());
     const capturePrompt = (event: Event) => {
       event.preventDefault();
       setInstallEvent(event as BeforeInstallPromptEvent);
     };
-    const markInstalled = () => {
-      setInstalled(true);
-      setInstallEvent(null);
-    };
+    const markInstalled = () => setInstallEvent(null);
 
     window.addEventListener("beforeinstallprompt", capturePrompt);
     window.addEventListener("appinstalled", markInstalled);
-    displayMode.addEventListener?.("change", refreshInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", capturePrompt);
       window.removeEventListener("appinstalled", markInstalled);
-      displayMode.removeEventListener?.("change", refreshInstalled);
     };
   }, []);
 

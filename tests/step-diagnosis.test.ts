@@ -32,6 +32,10 @@ describe("diagnoseStep", () => {
     expect(d.kind).toBe("incorrect-rearrangement");
   });
 
+  it("distinguishes a changed substituted value from an arithmetic slip", () => {
+    const d = diagnoseStep("F = 5 x 4 = 20", "F = 5 x 3 = 15");
+    expect(d.kind).toBe("substitution-error");
+  });
   it("classifies correct substitution with a slipped result as arithmetic slip", () => {
     // Same formula and inputs, wrong final value — arithmetic slip.
     const d = diagnoseStep("F = 5 x 3 = 12", "F = 5 x 3 = 15");
