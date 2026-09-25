@@ -10,8 +10,8 @@ describe("Today adaptive session", () => {
     const hero = read("src/components/AdaptiveSessionHero.tsx");
     expect(source).toContain("adaptiveSession");
     expect(source).toContain("AdaptiveSessionHero");
-    expect(hero).toContain("Best use of the next {session.totalMinutes} minutes");
-    expect(hero).toContain("Start");
+    expect(hero).toContain("Your next session is ready");
+    expect(hero).toContain("Start session");
   });
 
   it("has a resumable sequence runner with active recall and delayed scheduling", () => {

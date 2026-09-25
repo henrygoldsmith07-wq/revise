@@ -53,15 +53,15 @@
   }
 }
 
-/* Today keeps the focused session first, with a lighter home-style overview. */
+/* Today offers one clear next step inside a warm, easy-to-scan home. */
 .today-welcome {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 1.4rem 1.6rem;
+  padding: 1.65rem 1.8rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(110deg, #d8f7f8 0%, #f4fdff 48%, #f4efff 100%);
+  background: linear-gradient(115deg, #d7f4f8 0%, #f0fbfc 54%, #fff1e4 100%);
 }
 .today-welcome::before,
 .today-welcome::after {
@@ -83,24 +83,61 @@
   height: 12rem;
   right: 15%;
   bottom: -10rem;
-  background: rgba(166, 137, 238, 0.12);
+  background: rgba(255, 186, 124, 0.2);
 }
 .today-focus {
-  background: radial-gradient(circle at 100% 0%, rgba(89, 201, 211, 0.11), transparent 38%),
+  background: radial-gradient(circle at 100% 0%, rgba(89, 201, 211, 0.12), transparent 42%),
+    var(--surface);
+  border-color: #c9e3e8;
+}
+.today-focus-icon {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  background: var(--speak-soft);
+  color: var(--speak);
+}
+.today-sequence {
+  max-width: 34rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+.today-session-steps {
+  align-self: stretch;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--speak-soft);
+}
+.today-sequence summary:focus-visible,
+.today-subject-card:focus-visible,
+.today-step-link:focus-visible {
+  outline: 3px solid var(--speak);
+  outline-offset: 3px;
+}
+.today-planner {
+  background: radial-gradient(circle at 100% 0%, rgba(89, 201, 211, 0.08), transparent 54%),
     var(--surface);
 }
 .dark .today-welcome,
 :root[data-theme="dark"] .today-welcome {
-  background: linear-gradient(110deg, #17383d 0%, #192329 55%, #302441 100%);
+  background: linear-gradient(110deg, #17373e 0%, #18272d 55%, #403020 100%);
+}
+.dark .today-focus,
+:root[data-theme="dark"] .today-focus {
+  border-color: #315057;
 }
 .today-subject-card {
   position: relative;
   isolation: isolate;
   display: flex;
-  min-height: 9.25rem;
+  min-height: 11.5rem;
   flex-direction: column;
   overflow: hidden;
-  padding: 1.05rem;
+  padding: 1.15rem;
   border-radius: var(--radius-lg);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }

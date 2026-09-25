@@ -8,8 +8,8 @@ test("Today presents one adaptive 20-minute sequence and starts its runner", asy
   }
 
   const main = page.locator("main#main");
-  await expect(main).toContainText("Best use of the next 20 minutes");
-  const start = main.getByRole("link", { name: "Start", exact: true });
+  await expect(main).toContainText("Your next session is ready");
+  const start = main.getByRole("link", { name: "Start session", exact: true });
   await expect(start).toHaveAttribute("href", /\/adaptive-session\?topic=/);
   await start.click();
 

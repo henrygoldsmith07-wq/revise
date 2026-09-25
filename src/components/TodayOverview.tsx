@@ -5,7 +5,7 @@ import { getBoard, getQualification, getSubject } from "@/domain/curriculum";
 import type { ActivityKind, ExamDate, PlannedSession, Subject } from "@/domain/types";
 import { useStore } from "@/state/store";
 import { ButtonLink } from "./ui";
-import { ForwardIcon, LessonsIcon, PlanIcon, PracticeIcon, ReviewIcon } from "./icons";
+import { CreditedIcon, ForwardIcon, LessonsIcon, LibraryIcon, PlanIcon, PracticeIcon, ReviewIcon } from "./icons";
 
 const SUBJECT_COLOURS = ["green", "purple", "pink", "blue"] as const;
 
@@ -40,44 +40,43 @@ function RevisionPlanner({ exam, nextBlock, today }: { exam?: ExamDate; nextBloc
   const blockSubject = nextBlock ? getSubject(nextBlock.subjectId) : undefined;
 
   return (
-    <section aria-label="Revision planner" className="card p-4 sm:p-5">
-      <div className="flex items-center gap-2 text-ink2">
-        <PlanIcon size={18} aria-hidden />
+    <section aria-label="Revision planner" className="today-planner card p-5 sm:p-6">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-speaksoft text-speak" aria-hidden="true">
+          <PlanIcon size={20} />
+        </span>
         <h2 className="text-base font-semibold text-ink">Revision planner</h2>
       </div>
 
       {exam ? (
         <div className="mt-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink3">Next exam</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink3">Next exam</p>
           <p className="mt-1 text-lg font-semibold text-ink">{examSubject?.name ?? exam.label}</p>
           <p className="mt-1 text-sm text-ink2">
-            {humanDate(exam.date)} · {days === 0 ? "today" : days === 1 ? "tomorrow" : "in " + days + " days"}
+            {humanDate(exam.date)} · {days === 0 ? "Today" : days === 1 ? "Tomorrow" : "In " + days + " days"}
           </p>
           {nextBlock ? (
-            <div className="mt-4 rounded-xl bg-surface2 px-3.5 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink3">Next planned block</p>
+            <div className="mt-4 rounded-xl bg-surface2 px-4 py-3">
+              <p className="text-xs font-semibold text-ink2">Up next in your plan</p>
               <p className="mt-1 text-sm font-semibold text-ink">
                 {blockSubject?.name ?? nextBlock.subjectId} · {ACTIVITY_LABEL[nextBlock.activity]}
               </p>
-              <p className="mt-0.5 text-xs text-ink3">
+              <p className="mt-1 text-sm text-ink2">
                 {nextBlock.date === today ? "Today" : humanDate(nextBlock.date)} · {nextBlock.minutes} min
               </p>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-ink3">Your exam date is set. Open your schedule to map out the study blocks.</p>
+            <p className="mt-4 text-sm leading-6 text-ink2">Your exam date is saved. Add study time to see a manageable plan.</p>
           )}
-          <ButtonLink href="/schedule" variant="primary" size="sm" className="mt-4 w-full">
-            View revision plan <ForwardIcon size={15} aria-hidden />
+          <ButtonLink href="/schedule" variant="primary" size="sm" className="mt-5 w-full">
+            View my plan <ForwardIcon size={15} aria-hidden />
           </ButtonLink>
         </div>
       ) : (
-        <div className="mt-5 flex flex-col items-center text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-speaksoft text-speak" aria-hidden="true">
-            <PlanIcon size={23} />
-          </span>
-          <p className="mt-3 text-base font-semibold text-ink">Plan your way to exam day</p>
-          <p className="mt-1 text-sm text-ink3">Add your exam dates and study time to build a day-by-day plan.</p>
-          <ButtonLink href="/settings" variant="primary" size="sm" className="mt-4 w-full">
+        <div className="mt-5">
+          <h3 className="text-lg font-semibold text-ink">Make a plan that fits your week</h3>
+          <p className="mt-2 text-sm leading-6 text-ink2">Add an exam date and the time you can study. We&apos;ll help break it into smaller steps.</p>
+          <ButtonLink href="/settings" variant="primary" size="sm" className="mt-5 w-full">
             Set up my plan <ForwardIcon size={15} aria-hidden />
           </ButtonLink>
         </div>
@@ -102,21 +101,21 @@ export function TodayOverview() {
     {
       href: "/lesson",
       title: "Explore a lesson",
-      detail: "Build the idea, then check it.",
+      detail: "Learn an idea and check it as you go.",
       done: Object.values(lessonProgress.completed).some(Boolean),
       Icon: LessonsIcon,
     },
     {
       href: "/review",
       title: "Review your cards",
-      detail: "Bring back what you have learned.",
+      detail: "See what you can remember.",
       done: reviewLogs.length > 0,
       Icon: ReviewIcon,
     },
     {
       href: "/practice",
       title: "Try an exam question",
-      detail: "Get marked feedback on an answer.",
+      detail: "Get feedback on your answer.",
       done: attempts.length > 0,
       Icon: PracticeIcon,
     },
@@ -124,11 +123,11 @@ export function TodayOverview() {
   const completed = steps.filter((step) => step.done).length;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_19rem] xl:items-start">
       <section aria-label="My subjects" className="min-w-0">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-ink">My subjects</h2>
-          <Link href="/settings" className="text-xs font-medium text-ink2 underline-offset-4 hover:text-ink hover:underline">
+          <h2 className="text-lg font-semibold text-ink">My subjects</h2>
+          <Link href="/settings" className="text-sm font-medium text-ink2 underline-offset-4 hover:text-ink hover:underline">
             Change subjects
           </Link>
         </div>
@@ -139,42 +138,52 @@ export function TodayOverview() {
                 key={subject.id}
                 href={"/library?subject=" + encodeURIComponent(subject.id)}
                 className={"today-subject-card today-subject-card--" + SUBJECT_COLOURS[index % SUBJECT_COLOURS.length]}
-                aria-label={"Open " + subject.name}
+                aria-label={"Explore " + subject.name + " topics"}
               >
-                <span className="relative z-10 text-[11px] font-semibold text-white/80">{subjectLabel(subject)}</span>
-                <strong className="relative z-10 mt-1 block text-lg font-semibold leading-tight text-white">{subject.name}</strong>
-                <span className="relative z-10 mt-auto inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-ink">
-                  Open <ForwardIcon size={14} aria-hidden />
+                <span className="relative z-10 flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 text-white" aria-hidden="true">
+                  <LibraryIcon size={19} />
+                </span>
+                <span className="relative z-10 mt-3 text-xs font-semibold text-white/85">{subjectLabel(subject)}</span>
+                <strong className="relative z-10 mt-1 block text-xl font-semibold leading-tight text-white">{subject.name}</strong>
+                <span className="relative z-10 mt-auto inline-flex w-fit items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-ink">
+                  Explore topics <ForwardIcon size={15} aria-hidden />
                 </span>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="card p-5 text-sm text-ink3">
-            Choose your subjects in Settings to keep them within easy reach here.
+          <div className="card p-5">
+            <p className="text-sm leading-6 text-ink2">Choose your subjects to keep them within easy reach here.</p>
+            <Link href="/settings" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-speak underline-offset-4 hover:underline">
+              Choose subjects <ForwardIcon size={15} aria-hidden />
+            </Link>
           </div>
         )}
       </section>
 
-      <div className="space-y-5">
+      <div className="space-y-6">
         <RevisionPlanner exam={exam} nextBlock={nextBlock} today={today} />
-        <section aria-label="Getting started">
+        <section aria-label="Ways to get started">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-ink">Getting started</h2>
-            <span className="text-xs tabular-nums text-ink3">{completed}/3 done</span>
+            <h2 className="text-lg font-semibold text-ink">Ways to get started</h2>
+            <span className="text-sm tabular-nums text-ink2">{completed} of 3 tried</span>
           </div>
           <ol className="card divide-y divide-line overflow-hidden">
             {steps.map(({ href, title, detail, done, Icon }) => (
               <li key={href}>
-                <Link href={href} className="flex items-center gap-3 px-3.5 py-3.5 transition-colors hover:bg-surface2">
-                  <Icon size={18} aria-hidden className="shrink-0 text-ink3" />
+                <Link href={href} className="today-step-link flex items-center gap-3 px-4 py-4 transition-colors hover:bg-surface2">
+                  <span className={"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl " + (done ? "bg-successsoft text-success" : "bg-surface2 text-ink2")} aria-hidden="true">
+                    {done ? <CreditedIcon size={18} /> : <Icon size={18} />}
+                  </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-ink">{title}</span>
-                    <span className="block text-xs text-ink3">{detail}</span>
+                    <span className="block text-sm font-semibold text-ink">{title}</span>
+                    <span className="mt-0.5 block text-sm leading-5 text-ink2">{detail}</span>
                   </span>
-                  <span className={"shrink-0 text-xs font-semibold " + (done ? "text-success" : "text-ink3")}>
-                    {done ? "Done" : "0/1"}
-                  </span>
+                  {done ? (
+                    <span className="shrink-0 text-xs font-semibold text-success">Tried</span>
+                  ) : (
+                    <ForwardIcon size={17} aria-hidden className="shrink-0 text-ink3" />
+                  )}
                 </Link>
               </li>
             ))}
