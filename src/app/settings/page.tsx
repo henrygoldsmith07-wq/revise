@@ -22,7 +22,7 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 
 export default function SettingsPage() {
   const store = useStore();
-  const { settings } = store;
+  const { settings, updateSettings } = store;
   const [ai, setAi] = useState<{ available: boolean; name: string | null } | null>(null);
   const [keyRevealed, setKeyRevealed] = useState(false);
   const [keyInput, setKeyInput] = useState("");
@@ -52,6 +52,16 @@ export default function SettingsPage() {
   useEffect(() => {
     void aiStatus().then(setAi);
   }, []);
+
+  // U can describe an outcome, but it is not a useful target. Clear any
+  // previously saved U target when the student opens these settings.
+  useEffect(() => {
+    if (!Object.values(settings.targetGrades).includes("U")) return;
+    const targetGrades = Object.fromEntries(
+      Object.entries(settings.targetGrades).filter(([, grade]) => grade !== "U"),
+    );
+    void updateSettings({ targetGrades });
+  }, [settings.targetGrades, updateSettings]);
 
   const totalWeeklyMinutes = settings.availability.reduce((a, row) => a + row.minutes, 0);
 
@@ -137,7 +147,7 @@ export default function SettingsPage() {
               <ul className="space-y-2">
                 {group.list.map((subject) => {
                   const on = settings.subjectIds.includes(subject.id);
-                  const grades = gradesFor(subject.id);
+                  const grades = gradesFor(subject.id).filter((grade) => grade !== "U");
                   return (
                     <li key={subject.id} className="flex items-center justify-between gap-3">
                       <div className="min-w-0">

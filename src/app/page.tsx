@@ -94,7 +94,7 @@ export default function TodayPage() {
       {revisionCheckpoint ? (
         <ResumeRevisionCard />
       ) : (
-        <div className="today-focus card p-5 sm:p-6">
+        <div className="today-focus card p-5 sm:p-7">
           <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" />
         </div>
       )}
@@ -273,14 +273,17 @@ function NextBestAction({
 // Empty state — nothing due, no next task (fresh profile pre-plan).
 // ---------------------------------------------------------------------------
 
-function TodayWelcome({ name, greeting }: { name: string; greeting: string }) {
+function TodayWelcome({ name, greeting, hasSession = true }: { name: string; greeting: string; hasSession?: boolean }) {
   const salutation = greeting ? "Good " + greeting.toLowerCase() : "Welcome back";
   return (
     <header className="today-welcome">
-      <span className="relative z-10 text-[11px] font-bold uppercase tracking-[0.16em] text-ink2">Today</span>
+      <span className="relative z-10 text-xs font-bold uppercase tracking-[0.13em] text-ink2">Today</span>
       <h1 className="relative z-10 mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
         {salutation}{name ? ", " + name : ""}
       </h1>
+      <p className="relative z-10 mt-2 max-w-xl text-sm leading-6 text-ink2 sm:text-base">
+        {hasSession ? "Start with a short session, or choose a subject you feel like exploring." : "Choose a lesson that interests you, or make a plan for your exams."}
+      </p>
     </header>
   );
 }
@@ -288,14 +291,12 @@ function TodayWelcome({ name, greeting }: { name: string; greeting: string }) {
 function EmptyToday({ name, greeting }: { name: string; greeting: string }) {
   return (
     <div className="mx-auto w-full space-y-5">
-      <TodayWelcome name={name} greeting={greeting} />
+      <TodayWelcome name={name} greeting={greeting} hasSession={false} />
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
-      <div className="today-focus card p-5 sm:p-6">
-        <h2 className="text-xl font-semibold text-ink">Ready when you are.</h2>
-        <p className="mt-2 text-sm text-ink3">
-          Start with a lesson, or add exam dates and study time to build a plan.
-        </p>
+      <div className="today-focus card p-5 sm:p-7">
+        <h2 className="text-xl font-semibold text-ink">A lesson is a good place to begin</h2>
+        <p className="mt-2 text-sm leading-6 text-ink2">Browse a topic that interests you, or add exam dates to make a plan.</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <ButtonLink href="/lesson" variant="primary" size="md">Browse lessons</ButtonLink>
           <Link href="/settings" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink">
