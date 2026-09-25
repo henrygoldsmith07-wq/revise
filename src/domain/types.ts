@@ -924,11 +924,27 @@ export type WorkingErrorKind =
   | "method-error"
   | "contradictory-working";
 
+export type WorkingAnalysisConsistency = "model-match" | "alternative-valid" | "inconsistent" | "uncertain";
+export type WorkingAnalysisConfidence = "high" | "medium" | "low";
+export type WorkingAnalysisReason =
+  | "content-mismatch"
+  | "missing-expected-step"
+  | "unrecognised-step"
+  | "contradictory-working"
+  | "working-runs-out"
+  | "diagnosed-working-error";
+
 export interface AttemptWorkingEvidence {
   partId: Id;
   firstIncorrectStep: number | null;
   firstErrorKind: WorkingErrorKind;
   consistentWithModel: boolean;
+  /** Optional for persisted records written before confidence-aware analysis. */
+  consistency?: WorkingAnalysisConsistency;
+  confidence?: WorkingAnalysisConfidence;
+  firstIncorrectReason?: WorkingAnalysisReason | null;
+  firstIncorrectExpected?: string | null;
+  diagnosisNote?: string;
   methodMarksAwarded: number;
   accuracyMarksAwarded: number;
   followThroughMarksAwarded: number;
@@ -1273,7 +1289,7 @@ export interface TopicMastery {
   /** 0–1. Blends recall stability, question accuracy and recency. */
   mastery: number;
   /**
-   * 0–1 Bayesian posterior blending the cohort prior with this student's
+   * 0–1 posterior blending a handcrafted product default with this student's
    * evidence — what a cold-start topic shows as "Predicted mastery". Converges
    * onto `mastery` as evidence accumulates (see `priorRemaining`).
    */

@@ -65,6 +65,33 @@ function sameNumbers(a: string, b: string): boolean {
   return na.length > 0 && na.length === nb.length && na.every((v, i) => v === nb[i]);
 }
 
+function calculationOperands(text: string): number[] {
+  const segments = text.split("=");
+  if (segments.length < 3) return [];
+  return numbers(segments.slice(1, -1).join("="));
+}
+
+function changedSubstitution(student: string, expected: string): boolean {
+  const studentOperands = calculationOperands(student);
+  const expectedOperands = calculationOperands(expected);
+  if (expectedOperands.length < 2 || studentOperands.length !== expectedOperands.length) return false;
+
+  const studentResult = numbers(student.split("=").at(-1) ?? "");
+  const expectedResult = numbers(expected.split("=").at(-1) ?? "");
+  if (sameNumbers(studentResult.join(" "), expectedResult.join(" "))) return false;
+
+  const used = new Set<number>();
+  let shared = 0;
+  for (const expectedValue of expectedOperands) {
+    const index = studentOperands.findIndex((value, candidate) => value === expectedValue && !used.has(candidate));
+    if (index >= 0) {
+      used.add(index);
+      shared++;
+    }
+  }
+  return shared >= expectedOperands.length - 1 && shared < expectedOperands.length;
+}
+
 function digitDrift(a: string, b: string): boolean {
   const da = numbers(a).join("");
   const db = numbers(b).join("");
@@ -100,11 +127,14 @@ function looksLikeRearrangementFlip(student: string, expected: string): boolean 
   const eqS = student.split("=");
   const eqE = expected.split("=");
   if (eqS.length !== 2 || eqE.length !== 2) return false;
+  const [studentLeft, studentRight] = eqS;
+  const [expectedLeft, expectedRight] = eqE;
+  if (!studentLeft || !studentRight || !expectedLeft || !expectedRight) return false;
   const norm = (t: string): string => t.replace(/\s+/g, "").toLowerCase();
   return (
-    (norm(eqS[0]) === norm(eqE[1].replace(/[+\-]/g, "")) ||
-      norm(eqS[1]) === norm(eqE[0].replace(/[+\-]/g, ""))) &&
-    norm(eqS[1]) !== norm(eqE[1])
+    (norm(studentLeft) === norm(expectedRight.replace(/[+\-]/g, "")) ||
+      norm(studentRight) === norm(expectedLeft.replace(/[+\-]/g, ""))) &&
+    norm(studentRight) !== norm(expectedRight)
   );
 }
 
@@ -142,7 +172,10 @@ export function diagnoseStep(
 
   // 1. Rounding: same value at coarser precision.
   if (sn.length && en.length && sn.length === en.length) {
-    const paired = sn.every((v, i) => i >= en.length || isRoundingOf(v, en[i]));
+    const paired = sn.every((v, i) => {
+      const expectedNumber = en[i];
+      return expectedNumber !== undefined && isRoundingOf(v, expectedNumber);
+    });
     if (paired && !sameNumbers(trimmed, expectedStep))
       return { kind: "rounding-error", note: "Right value, rounded differently.", similarity };
   }
@@ -155,14 +188,19 @@ export function diagnoseStep(
   if (looksLikeRearrangementFlip(trimmed, expectedStep))
     return { kind: "incorrect-rearrangement", note: "Equation rearranged the wrong way round.", similarity };
 
-  // 4. Substitution slip: given values present but arithmetic diverges.
+  // 4. Substitution: the worked equation changes one of the values inserted
+  //    into the model calculation while the result also changes.
+  if (changedSubstitution(trimmed, expectedStep))
+    return { kind: "substitution-error", note: "A value was substituted incorrectly.", similarity };
+
+  // 5. Arithmetic: the same inputs are present but the evaluated result differs.
   if (en.length >= 2 && sn.length >= 2) {
     const present = en.filter((v) => sn.includes(v)).length;
     if (present >= en.length - 1 && !sameNumbers(trimmed, expectedStep))
       return { kind: "arithmetic-slip", note: "Correct substitution, slipped in the calculation.", similarity };
   }
 
-  // 5. Digit drift fallback: near-same digits with a different result.
+  // 6. Digit drift fallback: near-same digits with a different result.
   if (digitDrift(trimmed, expectedStep) && similarity < 0.6)
     return { kind: "arithmetic-slip", note: "Small calculation slip detected.", similarity };
 
@@ -191,6 +229,7 @@ export function diagnoseWorking(input: DiagnoseWorkingInput): WorkingDiagnosis {
 
   for (let i = 0; i < studentSteps.length; i++) {
     const stepText = studentSteps[i];
+    if (stepText === undefined) continue;
     let bestIdx = -1;
     let bestSim = 0;
     const searchTo = Math.min(modelSteps.length, cursor + 2);

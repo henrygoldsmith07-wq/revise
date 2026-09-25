@@ -7,14 +7,16 @@ const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 describe("PhaseEntryNotice — Today wiring", () => {
   const page = () => src("src/app/page.tsx");
 
-  it("sits above the countdown banner in every Today content path", () => {
+  it("leads both Today content paths before their countdown banner", () => {
     const source = page();
     expect(source).toContain('import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";');
-    const mounts = source.split("<PhaseEntryNotice />").length - 1;
-    expect(mounts).toBeGreaterThanOrEqual(3);
-    // The notice must lead, never trail, the countdown banner it announces.
-    const banner = source.split("<CountdownPhaseBanner />").length - 1;
-    expect(mounts).toBeGreaterThanOrEqual(banner);
+    const noticePositions = [...source.matchAll(/<PhaseEntryNotice \/>/g)].map((match) => match.index ?? -1);
+    const bannerPositions = [...source.matchAll(/<CountdownPhaseBanner \/>/g)].map((match) => match.index ?? -1);
+    expect(noticePositions).toHaveLength(2);
+    expect(bannerPositions).toHaveLength(2);
+    for (let index = 0; index < noticePositions.length; index++) {
+      expect(noticePositions[index]).toBeLessThan(bannerPositions[index] ?? -1);
+    }
   });
 
   it("re-evaluates phase entries when the store is ready and after snapshot changes", () => {

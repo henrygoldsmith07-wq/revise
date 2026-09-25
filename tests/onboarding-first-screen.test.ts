@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { allQualifications, allSubjects, availableBoards, gradesFor } from "@/domain/curriculum";
+import { isOptionalExamDateValid } from "@/domain/onboarding";
 
 const src = (p: string) => resolve(process.cwd(), p);
 
@@ -45,7 +46,7 @@ describe("availableBoards: only boards with content are offered", () => {
   });
 });
 
-describe("first screen collects board → subjects → exam dates → quick check", () => {
+describe("first screen collects board → subjects → optional exam dates", () => {
   const srcText = readFileSync(src("src/components/Onboarding.tsx"), "utf8");
 
   it("starts with the exam board, then subjects of that board", () => {
@@ -65,9 +66,10 @@ describe("first screen collects board → subjects → exam dates → quick chec
     expect(srcText).toContain('aria-label={`${subject.name} exam date`}');
     expect(srcText).toContain("missingDates");
     expect(srcText).toContain("invalidDates");
-    expect(srcText).toContain("datesValid");
-    expect(srcText).toContain("canSkipExamDates");
-    expect(srcText).toContain("Skip dates for now");
+    expect(srcText).toContain("enteredDatesValid");
+    expect(srcText).toContain("isOptionalExamDateValid(date, today)");
+    expect(srcText).toContain("canContinue");
+    expect(srcText).toContain("Build my plan without all dates");
     expect(srcText).toContain("add dates later in Settings");
     expect(srcText).toContain("if (!date) continue");
   });
@@ -79,7 +81,7 @@ describe("first screen collects board → subjects → exam dates → quick chec
     expect(srcText).not.toContain("What should we call you?");
     expect(srcText).not.toContain("How much time do you have?");
     expect(srcText).not.toContain("TIME_PRESETS");
-    expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates", "Quick check"]');
+    expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates"]');
   });
 
   it("does not offer a global Skip that leaves a hollow profile", () => {
@@ -96,5 +98,17 @@ describe("everything else waits until onboarding completes", () => {
     const store = readFileSync(src("src/state/store.tsx"), "utf8");
     expect(store).toContain("repo.hasOnboarded(");
     expect(store).toContain("repo.markOnboarded(");
+  });
+});
+
+describe("optional onboarding exam-date behavior", () => {
+  const today = "2026-09-25";
+
+  it("allows no date or a current/future date and rejects a past date", () => {
+    expect(isOptionalExamDateValid(undefined, today)).toBe(true);
+    expect(isOptionalExamDateValid("", today)).toBe(true);
+    expect(isOptionalExamDateValid(today, today)).toBe(true);
+    expect(isOptionalExamDateValid("2026-10-01", today)).toBe(true);
+    expect(isOptionalExamDateValid("2026-09-24", today)).toBe(false);
   });
 });

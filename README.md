@@ -1,11 +1,11 @@
 # Revise
 
-A revision-first study platform. Not a note-taking app: every screen exists to
-raise a grade, and the product's core claim is that it always knows the single
-highest-value thing you should do next.
+A revision-first study platform designed to help students choose and complete
+their next useful revision task. Today uses available study history and exam
+dates; when evidence is sparse, suggestions are provisional.
 
-Open the app → get a recommended task → complete it → get marked instantly →
-progress updates → next task.
+Open Today → choose a recommended task → practise → receive feedback or a
+human-review status → use the result to guide the next step.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
@@ -26,11 +26,10 @@ npm test             # unit + domain suite (tests/) — see docs/benchmark.md fo
 npm run build        # production build
 ```
 
-No configuration is required. With no environment variables at all the app runs
-as a single local profile against IndexedDB, with every feature working — cards,
-marking, planning, analytics, search — and only cross-device sync and
-model-written prose unavailable. See [`.env.example`](.env.example) for the
-optional Supabase and AI provider settings.
+No environment variables are required for a local IndexedDB profile and the core
+revision flow. Cross-device sync requires Supabase settings; provider-backed AI
+marking requires AI provider settings. See [.env.example](.env.example) for
+the optional Supabase and AI provider configuration.
 
 ## Pulse connection
 

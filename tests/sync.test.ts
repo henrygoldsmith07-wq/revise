@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createCard, gradeCard, isDue, todayIso } from "@/domain/scheduling";
+import { mistakesFromAttempt } from "@/domain/mistakes";
+import type { Attempt, Question } from "@/domain/types";
 
 // Offline + cross-device conflict invariants — pure helpers extracted from sync.ts
 // These mirror the prod logic so the invariants are enforceable without Supabase.
@@ -43,23 +46,54 @@ describe("cross-device conflict resolution", () => {
   });
 });
 
-describe("E2E smoke (no browser)", () => {
-  it("onboarding → seed → due queue → grade → mistake loop is end-to-end", async () => {
-    const { createCard, gradeCard, isDue, todayIso } = await import("@/domain/scheduling");
-    const { mistakesFromAttempt } = await import("@/domain/mistakes");
-    const { allTopics } = await import("@/domain/curriculum");
-    const { seedQuestions } = await import("@/content");
-    const topic = allTopics()[0];
-    const card = createCard({ id: "e2e-card", userId: "u", subjectId: topic.subjectId, topicId: topic.id, front: "What is enthalpy?", back: "Heat at constant pressure" });
+describe("mistake repair core loop", () => {
+  it("turns a due review and a missed mark into a linked repair card", () => {
+    const topicId = "chemistry-energetics";
+    const subjectId = "aqa-alevel-chemistry";
+    const card = createCard({ id: "e2e-card", userId: "u", subjectId, topicId, front: "What is enthalpy?", back: "Heat at constant pressure" });
     expect(isDue(card, todayIso())).toBe(true);
     const graded = gradeCard(card, "again");
-    // FSRS may not increment lapses on a brand-new card; accept either rep model
-    expect(graded.lapses >= 0).toBe(true);
-    const question = seedQuestions[0];
-    const part = question.parts[0];
-    const attempt = { id: "a", userId: "u", questionId: question.id, subjectId: question.subjectId, topicIds: question.topicIds, answers: { [part.id]: "no idea" }, marked: [{ partId: part.id, awarded: 0, max: part.marks, creditedPoints: [], missedPoints: part.markScheme.slice(0,2), comment: "0" }], awarded: 0, max: part.marks, feedback: "0/"+part.marks+"", markedBy: "rubric", elapsedMs: 3000, mode: "practice", createdAt: new Date().toISOString() } as never;
-    const drafts = mistakesFromAttempt(attempt, question);
-    expect(drafts.length >= 1).toBe(true);
-    expect(drafts[0].mistake.cardId).toBe(drafts[0].card.id);
+    expect(graded.lapses).toBeGreaterThanOrEqual(0);
+
+    const question: Question = {
+      id: "e2e-question",
+      subjectId,
+      topicIds: [topicId],
+      kind: "structured",
+      stem: "What is enthalpy?",
+      parts: [{
+        id: "e2e-part",
+        label: "(a)",
+        prompt: "State what enthalpy measures.",
+        marks: 2,
+        markScheme: ["Heat at constant pressure", "Energy change in a system"],
+        modelAnswer: "Enthalpy is the heat content of a system at constant pressure.",
+      }],
+      totalMarks: 2,
+      calculatorAllowed: false,
+      difficulty: 2,
+      origin: "seed",
+      createdAt: "2026-09-25T00:00:00.000Z",
+    };
+    const attempt: Attempt = {
+      id: "e2e-attempt",
+      userId: "u",
+      questionId: question.id,
+      subjectId,
+      topicIds: [topicId],
+      answers: { "e2e-part": "no idea" },
+      marked: [{ partId: "e2e-part", awarded: 0, max: 2, creditedPoints: [], missedPoints: ["Heat at constant pressure"], comment: "0" }],
+      awarded: 0,
+      max: 2,
+      feedback: "0/2",
+      markedBy: "rubric",
+      elapsedMs: 3000,
+      mode: "practice",
+      createdAt: "2026-09-25T00:00:00.000Z",
+    };
+    const [draft] = mistakesFromAttempt(attempt, question, () => "e2e-mistake", new Date("2026-09-25T00:00:00.000Z"));
+    expect(draft).toBeDefined();
+    expect(draft?.mistake.cardId).toBe(draft?.card.id);
+    expect(draft?.mistake.topicId).toBe(topicId);
   });
 });
