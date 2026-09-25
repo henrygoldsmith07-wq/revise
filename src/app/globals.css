@@ -52,3 +52,92 @@
     box-shadow: none !important;
   }
 }
+
+/* Today keeps the focused session first, with a lighter home-style overview. */
+.today-welcome {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1.4rem 1.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(110deg, #d8f7f8 0%, #f4fdff 48%, #f4efff 100%);
+}
+.today-welcome::before,
+.today-welcome::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+}
+.today-welcome::before {
+  width: 18rem;
+  height: 18rem;
+  right: -5rem;
+  top: -13rem;
+  border: 2.5rem solid rgba(99, 218, 219, 0.22);
+}
+.today-welcome::after {
+  width: 12rem;
+  height: 12rem;
+  right: 15%;
+  bottom: -10rem;
+  background: rgba(166, 137, 238, 0.12);
+}
+.today-focus {
+  background: radial-gradient(circle at 100% 0%, rgba(89, 201, 211, 0.11), transparent 38%),
+    var(--surface);
+}
+.dark .today-welcome,
+:root[data-theme="dark"] .today-welcome {
+  background: linear-gradient(110deg, #17383d 0%, #192329 55%, #302441 100%);
+}
+.today-subject-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 9.25rem;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1.05rem;
+  border-radius: var(--radius-lg);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.today-subject-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.today-subject-card::before,
+.today-subject-card::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+.today-subject-card::before {
+  width: 10rem;
+  height: 10rem;
+  right: -2.5rem;
+  top: -3.5rem;
+  border: 1.5rem solid rgba(255, 255, 255, 0.13);
+  border-radius: 50%;
+}
+.today-subject-card::after {
+  width: 7.5rem;
+  height: 7.5rem;
+  right: 1rem;
+  bottom: -4.75rem;
+  border-radius: 2rem;
+  transform: rotate(36deg);
+  background: rgba(255, 255, 255, 0.1);
+}
+.today-subject-card--green { background: linear-gradient(115deg, #08764d, #0d8a61); }
+.today-subject-card--purple { background: linear-gradient(115deg, #60328d, #7542a6); }
+.today-subject-card--pink { background: linear-gradient(115deg, #a72453, #bb3167); }
+.today-subject-card--blue { background: linear-gradient(115deg, #2b56a5, #3966ba); }
+.today-subject-card > span:last-child { color: #17202a; }
+@media (prefers-reduced-motion: reduce) {
+  .today-subject-card { transition: none; }
+  .today-subject-card:hover { transform: none; }
+}

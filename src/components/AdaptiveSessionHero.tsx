@@ -5,9 +5,8 @@ import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import { ButtonLink, Pill } from "./ui";
 
 /**
- * The only decision Today asks the student to make. The detailed sequence is
- * available on demand, but the default view is deliberately just a subject,
- * topic, and one Start button.
+ * Today's lead action. The detailed sequence is available on demand, while
+ * the default view stays focused on a subject, topic, and Start button.
  */
 export function AdaptiveSessionHero({
   session,
@@ -25,7 +24,7 @@ export function AdaptiveSessionHero({
       {greeting ? <p className="text-[11px] text-ink3 mb-0.5">{greeting}, {displayName}</p> : null}
 
       <p className="text-2xl sm:text-3xl font-semibold tracking-tight text-ink mt-1">
-        Best use of the next {session.totalMinutes} minutes
+        Best use of the next {Math.ceil(session.totalMinutes)} minutes
       </p>
 
       <p className="text-lg text-ink mt-2 font-medium">
@@ -62,4 +61,3 @@ export function AdaptiveSessionHero({
     </section>
   );
 }
-

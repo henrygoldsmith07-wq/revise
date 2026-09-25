@@ -16,6 +16,7 @@ import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
 import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
+import { TodayOverview } from "@/components/TodayOverview";
 
 // The roadmap derives lessons from the authored curriculum, which is a much
 // larger client chunk than Today needs for its bounded review action. Load it
@@ -26,12 +27,10 @@ const TodayRoadmap = dynamic(() => import("@/components/TodayRoadmap"), {
   loading: () => <TodayRoadmapLoading />,
 });
 
-// Today answers one question first: "what is the best use of the next 20
-// minutes?" The adaptive optimiser has already made the trade-off between
-// FSRS pressure, mastery, mistakes, exam timing, and capability evidence. The
-// home screen only presents that one decision; the compact roadmap remains
-// secondary context below it. If a session was interrupted, resuming it still
-// takes precedence so the student never loses their place.
+// Today still leads with one recommended session. The subject tiles and planner
+// below make it easier to find a course or see the exam run-up without competing
+// with that lead action. If a session was interrupted, resuming it takes
+// precedence so the student never loses their place.
 
 export default function TodayPage() {
   const store = useStore();
@@ -85,29 +84,24 @@ export default function TodayPage() {
     void recordExperimentEvent("shown", { taskId, activity: "adaptive", topicId: adaptiveSession.topicId });
   }, [adaptiveSession, experimentArm, recordExperimentEvent, recordFunnel]);
 
-  if (!adaptiveSession) return <EmptyToday name={settings.displayName} />;
+  if (!adaptiveSession) return <EmptyToday name={settings.displayName} greeting={greetingLabel} />;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="mx-auto w-full space-y-5">
+      <TodayWelcome name={settings.displayName} greeting={greetingLabel} />
+      <PhaseEntryNotice />
+      <CountdownPhaseBanner />
       {revisionCheckpoint ? (
-        <>
-          <PhaseEntryNotice />
-          <CountdownPhaseBanner />
-          <ResumeRevisionCard />
-          <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
-          {pace ? <PaceForecastLine forecast={pace} /> : null}
-          <ExamOutlook />
-        </>
+        <ResumeRevisionCard />
       ) : (
-        <>
-          <PhaseEntryNotice />
-          <CountdownPhaseBanner />
-          <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting={greetingLabel} />
-          <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
-          {pace ? <PaceForecastLine forecast={pace} /> : null}
-          <ExamOutlook />
-        </>
+        <div className="today-focus card p-5 sm:p-6">
+          <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" />
+        </div>
       )}
+      <TodayOverview />
+      <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
+      {pace ? <PaceForecastLine forecast={pace} /> : null}
+      <ExamOutlook />
     </div>
   );
 }
@@ -279,24 +273,37 @@ function NextBestAction({
 // Empty state — nothing due, no next task (fresh profile pre-plan).
 // ---------------------------------------------------------------------------
 
-function EmptyToday({ name }: { name: string }) {
+function TodayWelcome({ name, greeting }: { name: string; greeting: string }) {
+  const salutation = greeting ? "Good " + greeting.toLowerCase() : "Welcome back";
   return (
-    <div className="max-w-2xl mx-auto space-y-4 py-12">
+    <header className="today-welcome">
+      <span className="relative z-10 text-[11px] font-bold uppercase tracking-[0.16em] text-ink2">Today</span>
+      <h1 className="relative z-10 mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        {salutation}{name ? ", " + name : ""}
+      </h1>
+    </header>
+  );
+}
+
+function EmptyToday({ name, greeting }: { name: string; greeting: string }) {
+  return (
+    <div className="mx-auto w-full space-y-5">
+      <TodayWelcome name={name} greeting={greeting} />
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
-      <p className="text-2xl font-semibold tracking-tight text-ink">Ready when you are{name ? `, ${name}` : ""}.</p>
-      <p className="text-sm text-ink3">
-        Nothing is due and there is no next task yet — start with a lesson, or set an exam date and study time to get a
-        plan.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <ButtonLink href="/lesson" variant="primary" size="md" className="mt-2">
-          Browse lessons
-        </ButtonLink>
-        <Link href="/settings" className="text-sm text-ink3 hover:text-ink underline mt-3.5">
-          Set up exams
-        </Link>
+      <div className="today-focus card p-5 sm:p-6">
+        <h2 className="text-xl font-semibold text-ink">Ready when you are.</h2>
+        <p className="mt-2 text-sm text-ink3">
+          Start with a lesson, or add exam dates and study time to build a plan.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <ButtonLink href="/lesson" variant="primary" size="md">Browse lessons</ButtonLink>
+          <Link href="/settings" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink">
+            Set up exams
+          </Link>
+        </div>
       </div>
+      <TodayOverview />
       <TodayRoadmap />
     </div>
   );
