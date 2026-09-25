@@ -226,7 +226,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main id="main" className="lg:pl-56 pb-24 lg:pb-10">
-        <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 py-5 sm:py-7 app-enter">{children}</div>
+        <div className={cx("mx-auto w-full px-4 sm:px-6 py-5 sm:py-7 app-enter", pathname === "/" ? "max-w-6xl" : "max-w-5xl")}>{children}</div>
       </main>
 
       {/* Mobile bottom bar — duplicate navigation for thumb reach; a distinct
