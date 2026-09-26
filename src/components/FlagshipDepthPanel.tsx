@@ -1,6 +1,7 @@
 import { allTopics, getSubject } from "@/domain/curriculum";
 import { seedCardsForTopic, seedQuestions } from "@/content";
 import { buildSubjectDepth, FLAGSHIP_SUBJECTS } from "@/domain/flagship";
+import { flagshipTrustReadiness } from "@/domain/flagship-trust";
 import { Panel, SectionHeading } from "./ui";
 
 // Flagship depth ledger: for the four WJEC A-level flagships, how far is each
@@ -13,7 +14,8 @@ export function FlagshipDepthPanel() {
     const topics = allTopics().filter((t) => t.id.startsWith(`${flagship.subjectId}.`));
     const cardCounts = new Map(topics.map((t) => [t.id, seedCardsForTopic(t, "benchmarks-flagship").length] as const));
     const depth = buildSubjectDepth({ topics, questions: seedQuestions, cardCountByTopic: cardCounts });
-    return { flagship, depth };
+    const trust = flagshipTrustReadiness({ subjectId: flagship.subjectId, topics, questions: seedQuestions });
+    return { flagship, depth, trust };
   });
 
   return (
@@ -23,7 +25,7 @@ export function FlagshipDepthPanel() {
         hint="Assets per specification statement — depth over breadth"
       />
       <div className="grid sm:grid-cols-2 gap-3">
-        {rows.map(({ flagship, depth }) => {
+        {rows.map(({ flagship, depth, trust }) => {
           const zeroQ = depth.specPoints.filter((sp) => sp.distinctQuestions === 0).length;
           const withFour = depth.specPoints.filter((sp) => sp.distinctQuestions >= 4).length;
           const topGap = depth.gaps[0];
@@ -32,6 +34,8 @@ export function FlagshipDepthPanel() {
               <h3 className="text-sm font-semibold">{getSubject(flagship.subjectId)?.name ?? flagship.label}</h3>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                 <Stat label="Gold statements" value={`${depth.goldStatements}/${depth.statementsTotal}`} hint="≥4 questions spanning recall+application+transfer" />
+                <Stat label="Trusted core" value={`${trust.statementsMeetingCoreTrustBar}/${trust.statementsTotal}`} hint="≥4 human-approved questions spanning recall+application+transfer" />
+                <Stat label="Approved questions" value={`${trust.trustedQuestions}/${trust.questionsTotal}`} hint="Exact current question version passed the WJEC human trust gate" />
                 <Stat label="Questions / statement" value={depth.questionsPerStatement.toFixed(2)} hint="target ≥ 4" />
                 <Stat label="Statements with 0 questions" value={String(zeroQ)} hint="authoring queue" />
                 <Stat label="Statements with ≥4 questions" value={`${withFour}`} hint="independent coverage" />
@@ -50,6 +54,7 @@ export function FlagshipDepthPanel() {
       <p className="text-xs text-ink3">
         Goal per flagship: every specification statement carries retrieval cards plus simple, application,
         unfamiliar-context, misconception and harder/synoptic questions with worked solutions and verified provenance.
+        Authored depth and trusted depth are shown separately: draft volume never counts as approved assessment evidence.
         Source: <code className="font-mono">src/domain/flagship.ts</code>, pinned by{" "}
         <code className="font-mono">tests/flagship-depth.test.ts</code>.
       </p>

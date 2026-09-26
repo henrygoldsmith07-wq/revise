@@ -11,6 +11,7 @@ const bundle = await build({ stdin: { contents: `
   export { wjecCapabilities as nodes } from './src/content/capabilities';
   export { wjecDepthCurricula as curricula } from './src/content/wjec-subject-capabilities';
   export { humanVerifiedWjecQuestion as trusted } from './src/domain/physics-content-review';
+  export { flagshipTrustReadiness as trustReadiness } from './src/domain/flagship-trust';
   export { buildPhysicsReviewPacketTemplate as packet, importPhysicsReviewPacket as importPacket,
     buildPhysicsPrerequisiteReviewTemplate as edges, importPhysicsPrerequisiteReviews as importEdges } from './src/domain/physics-validation-intake';
   export { auditPhysicsAssessmentQuality as audit, physicsQualityQueue as queue, physicsAuthoringBriefs as briefs } from './src/domain/physics-assessment-quality';
@@ -66,24 +67,31 @@ for (const curriculum of data.curricula) {
     await json("checked-prerequisites.json", nodes);
   }
   const audit = data.audit({ subjectId, topics: curriculum.topics, questions, nodes, trustedQuestion: data.trusted });
+  const trust = data.trustReadiness({ subjectId, topics: curriculum.topics, questions });
+  const qualityQueue = data.queue(audit);
+  const authoringBriefs = data.briefs(audit);
   const markingChecks = questions.flatMap(q => q.parts.map(p => ({ questionId: q.id, partId: p.id,
     awarded: data.markPart(p, p.modelAnswer).awarded, available: p.marks })));
   await json("quality-audit.json", audit);
-  await json("quality-queue.json", data.queue(audit));
-  await json("authoring-briefs.json", data.briefs(audit));
+  await json("quality-queue.json", qualityQueue);
+  await json("authoring-briefs.json", authoringBriefs);
   await json("model-answer-self-check.json", markingChecks);
   report.push({ subjectId, questions: questions.length, capabilities: nodes.length,
     internalStatements: curriculum.topics.reduce((n, t) => n + (t.specPoints?.length ?? 0), 0),
     draftCompleteStatements: audit.capabilityCoverage.filter(row => row.complete).length,
     approvedQuestions: questions.filter(data.trusted).length,
+    trustedStatements: trust.statementsWithTrustedQuestions,
+    trustedCoreStatements: trust.statementsMeetingCoreTrustBar,
+    trustedCoreShare: trust.coreTrustShare,
+    reviewQueue: trust.reviewQueue,
     modelAnswerDisagreements: markingChecks.filter(row => row.awarded !== row.available).length,
-    remainingAuthoringBriefs: data.briefs(audit).length, errors, warnings,
+    remainingAuthoringBriefs: authoringBriefs.length, errors, warnings,
     note: "Structural counts and authored-answer checks are not human validation or evidence of efficacy." });
 }
 await writeFile(resolve(out, "review-report.json"), JSON.stringify(report, null, 2));
 if (mode === "export") await writeFile(resolve(out, "README.md"), [
   "# WJEC Maths, Biology and Chemistry review pack", "",
-  "Each subject has 28 new drafts across two capabilities. Start with its student.md; independently solve before opening reviewer.md.", "",
+  "This packet covers WJEC A-level Mathematics, Biology and Chemistry. Start with each subject's student.md and independently solve before opening reviewer.md. Physics uses the deeper dedicated physics:evidence:init / physics:evidence:check workflow.", "",
   "Record six qualified review checks against exact fingerprints in new-draft-review.json, then merge those rows into content-review.json. Review prerequisite rationales separately. Never mark an AI review as human approval.", "",
   `Check returned files from the repository: node scripts/wjec-content-review.mjs check "${out.replaceAll("\\", "/")}"`, "",
   "The check writes proposed checked-content and checked-prerequisites files for inspection. It does not publish approvals or modify the app. Fix flagged content in source, export to a new folder and review the new fingerprint.", "",

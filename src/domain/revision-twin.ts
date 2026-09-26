@@ -252,9 +252,38 @@ function comparableTwinQuestions(baselineQuestionId: Id, observedQuestionId: Id,
   const left = questionCapabilities(baseline);
   const right = new Set(questionCapabilities(observed));
   // Capability metadata is the strongest available like-for-like comparison.
-  // Legacy/reference-tier content without capability ids falls back to the
-  // already-enforced subject/topic target rather than fabricating a mapping.
-  return !left.length || !right.size || left.some((id) => right.has(id));
+  // When both questions have it, conflicting capabilities are an explicit
+  // reason not to infer a learning gain even if the broad topic is identical.
+  if (left.length && right.size) return left.some((id) => right.has(id));
+
+  const leftPoints = questionSpecPoints(baseline);
+  const rightPoints = new Set(questionSpecPoints(observed));
+  if (leftPoints.length && rightPoints.size) return leftPoints.some((id) => rightPoints.has(id));
+
+  const leftClaims = questionLearningClaims(baseline);
+  const rightClaims = new Set(questionLearningClaims(observed));
+  if (leftClaims.length && rightClaims.size) return leftClaims.some((claim) => rightClaims.has(claim));
+
+  // A broad subject/topic match is not enough to call two assessments
+  // comparable. Without mapped capability/specification/claim evidence the
+  // session remains history-only and cannot calibrate the Twin.
+  return false;
+}
+
+function questionSpecPoints(question: Question): Id[] {
+  return [...new Set([
+    ...(question.specPointIds ?? []),
+    ...question.parts.flatMap((part) => part.specPointIds ?? []),
+  ])];
+}
+
+function questionLearningClaims(question: Question): string[] {
+  return [...new Set(
+    question.parts
+      .flatMap((part) => part.learningClaims ?? [])
+      .map((claim) => claim.toLowerCase().replace(/\s+/g, " ").trim())
+      .filter(Boolean),
+  )];
 }
 
 export function eligibleRevisionTwinProofAttempts(

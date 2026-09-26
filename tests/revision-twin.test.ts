@@ -205,5 +205,96 @@ describe("Revision Digital Twin", () => {
       [question("baseline-q", "cells-structure"), question("observed-q", "cell-division")],
     )).toBeNull();
   });
+
+  it("falls back to shared specification points when capability metadata is absent", () => {
+    const base = buildRevisionTwinChoices({ recommendations: [recommendation("biology", "cells", 2)] })[0];
+    const session = { ...activeSession(base, "spec-point"), startedAt: "2026-08-20T10:00:00.000Z" };
+    const question = (id: string) => ({
+      id,
+      subjectId: "biology",
+      topicIds: ["cells"],
+      parts: [{
+        id: "p1",
+        marks: 4,
+        markScheme: ["a"],
+        modelAnswer: "a",
+        specPointIds: ["cells.sp-01"],
+        learningClaims: ["Explain the role of the cell membrane"],
+      }],
+      totalMarks: 4,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    } as unknown as Question);
+    const prior = {
+      id: "before-spec",
+      userId: "u",
+      questionId: "baseline-spec",
+      subjectId: "biology",
+      topicIds: ["cells"],
+      answers: { p1: "a" },
+      marked: [],
+      awarded: 1,
+      max: 4,
+      feedback: "",
+      markedBy: "rubric",
+      elapsedMs: 60_000,
+      mode: "practice",
+      createdAt: "2026-08-19T10:00:00.000Z",
+    } as Attempt;
+    const post = {
+      ...prior,
+      id: "after-spec",
+      questionId: "observed-spec",
+      awarded: 3,
+      createdAt: "2026-08-20T10:25:00.000Z",
+    };
+    expect(revisionTwinProofForAttempt(
+      session,
+      post,
+      [prior, post],
+      [question("baseline-spec"), question("observed-spec")],
+    )?.observedGainMarks).toBe(2);
+  });
+
+  it("does not calibrate from broad topic matching when both questions lack mapping evidence", () => {
+    const base = buildRevisionTwinChoices({ recommendations: [recommendation("biology", "cells", 2)] })[0];
+    const session = { ...activeSession(base, "unmapped"), startedAt: "2026-08-20T10:00:00.000Z" };
+    const question = (id: string) => ({
+      id,
+      subjectId: "biology",
+      topicIds: ["cells"],
+      parts: [{ id: "p1", marks: 4, markScheme: ["a"], modelAnswer: "a" }],
+      totalMarks: 4,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    } as unknown as Question);
+    const prior = {
+      id: "before-unmapped",
+      userId: "u",
+      questionId: "baseline-unmapped",
+      subjectId: "biology",
+      topicIds: ["cells"],
+      answers: { p1: "a" },
+      marked: [],
+      awarded: 1,
+      max: 4,
+      feedback: "",
+      markedBy: "rubric",
+      elapsedMs: 60_000,
+      mode: "practice",
+      createdAt: "2026-08-19T10:00:00.000Z",
+    } as Attempt;
+    const post = {
+      ...prior,
+      id: "after-unmapped",
+      questionId: "observed-unmapped",
+      awarded: 3,
+      createdAt: "2026-08-20T10:25:00.000Z",
+    };
+    expect(revisionTwinProofForAttempt(
+      session,
+      post,
+      [prior, post],
+      [question("baseline-unmapped"), question("observed-unmapped")],
+    )).toBeNull();
+  });
 });
 

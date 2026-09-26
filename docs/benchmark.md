@@ -17,6 +17,32 @@ editorialConfidence() distils lineage into one number (source prior,
 +passed gates, -open issues, -stale re-review) with named reasons. UI
 badges visibly separate Verified from Generated / unreviewed.
 
+For WJEC A-level Mathematics, Biology and Chemistry,
+`scripts/wjec-content-review.mjs` exports fingerprinted human-review packets
+for the exact current bank and checks returned packets without mutating source
+content. Run:
+
+`npm run wjec:review:export -- <new-directory>`
+
+then, after qualified reviewers return the completed packet:
+
+`npm run wjec:review:check -- <directory>`
+
+The generated `review-report.json` keeps authored depth separate from trusted
+depth. It reports approved questions, statements with any trusted question,
+statements meeting the trusted core bar (at least four approved questions
+spanning recall, application and transfer), and the remaining review queue.
+No structural check or generated packet creates a human approval.
+
+For a fast read-only status check across all four flagships, run
+`npm run wjec:trust:report`. This uses the same trust predicate as mastery
+and readiness, so a draft question cannot inflate the headline.
+Physics keeps its deeper evidence workflow because it also packages marking
+corpora, paper provenance, prerequisite review, intervention outcomes and the
+prospective experiment: `npm run physics:evidence:init -- <directory>` and
+`npm run physics:evidence:check -- <directory> --strict`. The trusted-depth
+ledger in the app covers all four flagships.
+
 ## Past-paper import benchmark
 
 Import becomes trustworthy when it is measured and confidence-aware.
