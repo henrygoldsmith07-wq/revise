@@ -1,7 +1,7 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { daysToExam } from "./recommender";
 import { hintEvidenceMultiplier } from "./hint-tiers";
-import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { questionFamily, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, ExamDate, Id, IsoDate, Question, Subject, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,10 @@ export interface GradePrediction {
   trend: number;
   /** Marks-per-topic view of where the next grade actually comes from. */
   headroom: { topicId: Id; potentialPercent: number }[];
+  /** Why this range may still move; absent on older saved predictions. */
+  uncertaintySources?: string[];
+  evidenceLevel?: "limited" | "developing" | "strong";
+  assessmentEvidence?: { timedPapers: number; independentQuestions: number; assistedQuestions: number; effectiveSamples: number };
 }
 
 export interface NextGradeRoute {
@@ -42,7 +46,7 @@ export interface NextGradeTarget {
   route: NextGradeRoute[];
 }
 
-const MIN_ATTEMPTS_FOR_TRUST = 10;
+const ASSESSMENT_PRIOR_SAMPLES = 8;
 
 export function gradeForPercent(subject: Subject, percent: number): string {
   const sorted = [...subject.gradeBoundaries].sort((a, b) => b.percent - a.percent);
@@ -87,20 +91,40 @@ export function predictGrade(
     return trustedAssessmentAttempt(attempt, question, attempts, questions);
   });
 
-  const coverage = rows.length ? rows.reduce((a, m) => a + m.mastery, 0) / rows.length : 0;
-  const marksMax = subjectAttempts.reduce((a, x) => a + x.max, 0);
-  const measured = marksMax ? subjectAttempts.reduce((a, x) => a + x.awarded * hintEvidenceMultiplier(x.hintTier ?? null), 0) / marksMax : 0;
+  const coverage = rows.length ? rows.reduce((a, m) => a + m.mastery, 0) / rows.length : 0.5;
+  // Mastery is a weak proxy for an exam mark. With no assessment, it can move
+  // the forecast, but only partway away from a neutral prior.
+  const coveragePrior = 0.5 + (coverage - 0.5) * 0.4;
+  const familySeen = new Map<string, number>();
+  let weightedAwarded = 0;
+  let weightedAvailable = 0;
+  let effectiveSamples = 0;
+  const timedPaperRuns = new Set<Id>();
+  let independentQuestions = 0;
+  let assistedQuestions = 0;
+  for (const attempt of subjectAttempts) {
+    const question = questionById.get(attempt.questionId);
+    const family = question ? questionFamily(question) : `${attempt.id}:unmapped`;
+    const repeated = familySeen.get(family) ?? 0;
+    familySeen.set(family, repeated + 1);
+    const support = attempt.copiedAnswer || attempt.repairTeachingSeen ||
+      attempt.hintTier === "worked-solution" ? 0.15 : attempt.hintTier ? 0.5 : 1;
+    const timed = attempt.mode === "paper" && Boolean(attempt.paperRunId);
+    const condition = timed ? 3 : attempt.mode === "recall" ? 0.3 : 1.5;
+    const weight = support * condition / Math.sqrt(repeated + 1);
+    weightedAwarded += attempt.awarded * weight;
+    weightedAvailable += attempt.max * weight;
+    effectiveSamples += weight * Math.sqrt(Math.min(25, attempt.max) / 4);
+    if (timed && attempt.paperRunId) timedPaperRuns.add(attempt.paperRunId);
+    else if (support === 1) independentQuestions++;
+    else assistedQuestions++;
+  }
+  const timedPapers = timedPaperRuns.size;
+  const measured = weightedAvailable > 0 ? weightedAwarded / weightedAvailable : coveragePrior;
+  const trust = effectiveSamples / (effectiveSamples + ASSESSMENT_PRIOR_SAMPLES);
+  const percent = Math.round(clamp((measured * trust + coveragePrior * (1 - trust)) * 100, 0, 100));
 
-  const independentEvidence = subjectAttempts.reduce((sum, attempt) => sum + hintEvidenceMultiplier(attempt.hintTier ?? null), 0);
-  const trust = Math.min(1, independentEvidence / MIN_ATTEMPTS_FOR_TRUST);
-  // Exam-question accuracy is the better predictor once there is enough of it.
-  const blended = measured * trust + coverage * (1 - trust);
-
-  // Mastery is not a mark: a student at 100% topic mastery does not score
-  // 100%. Compress into a realistic attainment range before banding.
-  const percent = Math.round(clamp(blended * 92 + 4, 0, 100));
-
-  const spread = 6 + (1 - trust) * 12;
+  const spread = 6 + (1 - trust) * 18;
   const grade = gradeForPercent(subject, percent);
   const bestCase = gradeForPercent(subject, clamp(percent + spread, 0, 100));
   const worstCase = gradeForPercent(subject, clamp(percent - spread, 0, 100));
@@ -129,7 +153,14 @@ export function predictGrade(
 
   // Honest confidence calibration by evidence bucket — used by confidenceCalibration()
   // below and surfaced as calibrationCurve for "is 70% really 70%?" disclosure.
-  const confidence = clamp(trust * 0.75 * horizonPenalty + Math.min(1, rows.length / 12) * 0.25, 0, 1);
+  const assessedTopics = rows.filter((row) => row.attempts > 0).length;
+  const assessedShare = rows.length ? assessedTopics / rows.length : 0;
+  const confidence = clamp(trust * 0.85 * horizonPenalty + assessedShare * 0.1, 0, 1);
+  const uncertaintySources = [
+    ...(timedPapers === 0 ? ["No timed paper evidence yet."] : []),
+    ...(effectiveSamples < ASSESSMENT_PRIOR_SAMPLES ? ["Few independently marked exam answers."] : []),
+    ...(assessedShare < 0.5 ? ["Much of the specification has limited assessment evidence."] : []),
+  ];
 
   return {
     subjectId: subject.id,
@@ -140,6 +171,10 @@ export function predictGrade(
     confidence,
     trend,
     headroom,
+    uncertaintySources,
+    evidenceLevel: confidence < 0.35 ? "limited" : confidence < 0.7 ? "developing" : "strong",
+    assessmentEvidence: { timedPapers, independentQuestions, assistedQuestions,
+      effectiveSamples: Math.round(effectiveSamples * 10) / 10 },
   };
 }
 

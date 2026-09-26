@@ -63,7 +63,7 @@ describe("capability mastery", () => {
     expect(p.recall.score).toBe(0.9);
     expect(p.application.score).toBe(0.4);
     expect(p.transfer.score).toBeNull();
-    expect(capabilitySentence(p)).toBe("Your recall is strong but application is weak.");
+    expect(capabilitySentence(p)).toBe("Your recall is developing but application needs work.");
   });
 
   it("counts assisted success as weaker evidence than independent", () => {
@@ -192,8 +192,13 @@ describe("session orchestrator", () => {
     const weak = profile();
     weak.recall = evidence(0.55);
     expect(buildTutorSession(input(weak)).phases.some((p) => p.kind === "transfer")).toBe(false);
+    const partlyKnown = profile();
+    partlyKnown.recall = evidence(0.75);
+    expect(buildTutorSession(input(partlyKnown)).phases[0].kind).toBe("diagnose");
     const strong = profile();
-    strong.recall = evidence(0.75);
+    for (const capability of CAPABILITIES) {
+      strong[capability] = { capability, evidence: 4, score: 0.75, seconds: 60 };
+    }
     expect(buildTutorSession(input(strong)).phases.some((p) => p.kind === "transfer")).toBe(true);
   });
 

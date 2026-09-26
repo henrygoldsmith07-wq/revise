@@ -24,7 +24,9 @@ export function PostSessionClosure({
   extra?: ReactNode;
   actions?: ReactNode;
 }) {
-  const next = NEXT_ACTIONS[closure.nextAction];
+  const next = closure.recommended
+    ? { ...closure.recommended, tone: "accent" as const }
+    : NEXT_ACTIONS[closure.nextAction];
   const scoreTone = closure.scorePercent == null ? undefined : closure.scorePercent >= 85 ? "success" : closure.scorePercent >= 70 ? "review" : "danger";
 
   return (
@@ -42,7 +44,7 @@ export function PostSessionClosure({
           ) : (
             <StatTile label="Score" value={`${closure.scorePercent}%`} sub={`${closure.awardedMarks}/${closure.availableMarks} marks`} tone={scoreTone} />
           )}
-          <StatTile label="Next" value={next.label} sub={closure.missedMarks ? `${closure.missedMarks} marks to repair` : "keep the gain"} />
+          <StatTile label="Next" value={next.label} sub={closure.recommended ? "Based on latest evidence" : closure.missedMarks ? `${closure.missedMarks} marks to repair` : "keep the gain"} />
         </div>
 
         <ProgressBar value={closure.completionPercent / 100} label="Session completion" tone={closure.completionPercent === 100 ? "success" : "review"} />
@@ -50,6 +52,7 @@ export function PostSessionClosure({
         <div className="rounded-[10px] bg-accentsoft border border-accent/15 px-3.5 py-3">
           <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Close the loop</p>
           <p className="text-sm text-ink2 mt-1">{closure.detail}</p>
+          {closure.recommended ? <p className="text-sm text-ink2 mt-2">Next: {closure.recommended.reason}</p> : null}
         </div>
       </Panel>
 

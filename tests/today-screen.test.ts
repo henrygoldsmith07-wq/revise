@@ -12,7 +12,7 @@ describe("Today screen — one dominant next action (decision engine)", () => {
     const source = page();
     expect(source).toContain("adaptiveSession");
     expect(source).toContain("AdaptiveSessionHero");
-    expect(source).toContain("best use of the next 20");
+    expect(source).toContain("one recommended session");
     // No competing decision branches: the optimiser already traded off
     // FSRS pressure, mastery, mistakes, exam timing and capability gaps.
     expect(source).not.toContain("dueCount > 0");
@@ -23,11 +23,11 @@ describe("Today screen — one dominant next action (decision engine)", () => {
 
   it("the hero states what to do, why, and starts within one tap", () => {
     const source = hero();
-    expect(source).toContain("Best use of the next {session.totalMinutes} minutes");
+    expect(source).toContain("Your next session is ready");
     expect(source).toContain("session.reason");
     expect(source).toContain("session.startHref");
-    expect(source).toContain("Start");
-    expect(source).toContain("See the sequence");
+    expect(source).toContain("Start session");
+    expect(source).toContain("Why this session?");
   });
 
   it("the session never shows spec-point scale or an after-this queue", () => {

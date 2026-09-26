@@ -151,6 +151,29 @@ describe("matchesWritten", () => {
   });
 });
 
+describe("cloze across active study modes", () => {
+  const cloze = card("cloze", "ATP is produced by […].", "aerobic respiration");
+  cloze.kind = "cloze";
+  cloze.clozeSource = "ATP is produced by aerobic respiration.";
+
+  it("tests the missing fragment rather than the completed sentence", () => {
+    const choices = buildChoices(cloze, [cloze, ...deck], 4, 3);
+    expect(choices).toContain("aerobic respiration");
+
+    const [written] = buildTest(
+      [cloze],
+      { multipleChoice: false, written: true, trueFalse: false, limit: 1 },
+      1,
+    );
+    expect(written.prompt).toBe("ATP is produced by […].");
+    expect(written.answer).toBe("aerobic respiration");
+
+    const board = buildMatchBoard([cloze, ...deck], 2, 1);
+    expect(board.some((tile) => tile.text === "ATP is produced by […].")).toBe(true);
+    expect(board.some((tile) => tile.text === "aerobic respiration")).toBe(true);
+  });
+});
+
 describe("test mode", () => {
   it("builds only the requested question kinds", () => {
     const mcqOnly = buildTest(deck, { multipleChoice: true, written: false, trueFalse: false, limit: 5 }, 1);

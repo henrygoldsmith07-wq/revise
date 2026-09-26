@@ -1,11 +1,11 @@
 # Revise
 
-A revision-first study platform. Not a note-taking app: every screen exists to
-raise a grade, and the product's core claim is that it always knows the single
-highest-value thing you should do next.
+A revision-first study platform designed to help students choose and complete
+their next useful revision task. Today uses available study history and exam
+dates; when evidence is sparse, suggestions are provisional.
 
-Open the app → get a recommended task → complete it → get marked instantly →
-progress updates → next task.
+Open Today → choose a recommended task → practise → receive feedback or a
+human-review status → use the result to guide the next step.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
@@ -26,11 +26,10 @@ npm test             # unit + domain suite (tests/) — see docs/benchmark.md fo
 npm run build        # production build
 ```
 
-No configuration is required. With no environment variables at all the app runs
-as a single local profile against IndexedDB, with every feature working — cards,
-marking, planning, analytics, search — and only cross-device sync and
-model-written prose unavailable. See [`.env.example`](.env.example) for the
-optional Supabase and AI provider settings.
+No environment variables are required for a local IndexedDB profile and the core
+revision flow. Cross-device sync requires Supabase settings; provider-backed AI
+marking requires AI provider settings. See [.env.example](.env.example) for
+the optional Supabase and AI provider configuration.
 
 ## Pulse connection
 
@@ -53,13 +52,14 @@ The app is one loop — **board → topic → card → exam question** — and n
 | **Onboarding** | First screen only: board → subjects → required exam dates. Nothing renders until it is complete. |
 | **Topic status** | Every topic reads in plain language — covered, shaky, untouched — with a what-to-do-next sentence, never a raw score pretending to be a grade. |
 | **Lessons** | Every authored topic follows a written, step-by-step lesson: clear objectives, process explanations, active recall, worked application, exam technique and check questions; a lesson streak rewards finishing. |
-| **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, and failed cards reinserted within the same session. Today sizes one bounded review session (15–25 minutes) and stops — the loop, not a dashboard. |
+| **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, failed cards reinserted within the same session, and real cloze cards built from a complete sentence + hidden answer. Today sizes one bounded review session (15–25 minutes) and stops — the loop, not a dashboard. |
 | **Study modes** | The same card pool worked five ways — including Learn (recognition → typed production), Match (timed pairing), hands-free Listen and Diagram labelling. |
 | **Exam questions after cards** | Right after each reviewed card, an official-style exam question on that same spec point appears when one exists — revision turns into exam practice in place. |
-| **Exam practice** | Structured questions marked point-by-point against the mark scheme, with examiner-style feedback, model answers, safe draft-preserving navigation, five- or ten-minute sprints and a weak-topic exam built from the last seven days of misses. |
+| **Exam practice** | Structured questions marked point-by-point against the mark scheme, with examiner-style feedback, model answers, safe draft-preserving navigation, contextual maths-symbol entry, five- or ten-minute sprints and a weak-topic exam built from the last seven days of misses. |
 | **Mistake tracking** | Every dropped mark becomes a classified mistake that is retested until it closes; unresolved recent mistakes surface for the student to fix. |
 | **Past papers** | Upload or photograph a paper and mark scheme, extract questions, map them to topics, practise them question-by-question or sit them in full exam conditions with a fixed clock, no in-paper aids, auto-submit and marking after the paper, then close with full-denominator scoring and a repair route. |
 | **Honest pace forecast** | At this pace, N topics stay untouched before the exam date — a real projection from the last seven days of reviews, never a fake pass percentage. |
+| **Prediction reality check** | Weekly grade forecasts are frozen before the outcome, then dated mocks, timed papers and final results are joined only to forecasts that already existed. Readiness shows error, bias and interval coverage instead of letting later predictions rewrite history. |
 | **Keyboard** | Shortcuts throughout, with a `?` sheet generated from the live bindings. |
 | **Offline** | IndexedDB-first with a durable outbox; installable PWA; the complete written lesson, recall and practice loop works without a connection. |
 
@@ -238,6 +238,7 @@ searchable. No other file changes. Add the subject to `src/domain/spec.ts:SPEC_M
 - [`docs/revision-engine.md`](docs/revision-engine.md) — the algorithms and the evidence behind them
 - [`docs/benchmark.md`](docs/benchmark.md) — harnesses and outcome benchmarks
 - [`docs/roadmap.md`](docs/roadmap.md) — competitor-gap backlog and the path to "what should I revise next?" intelligence
+- [`docs/error-diagnosis.md`](docs/error-diagnosis.md) — post-marking error diagnosis (classifier.dev): versioned taxonomy, interventions, routing and evaluation
 
 ## Content accuracy — statement-level provenance
 

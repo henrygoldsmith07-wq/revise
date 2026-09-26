@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyseGradeLoop,
   gradeConfidenceNarrative,
+  gradePredictionSnapshotId,
   pairPredictionsWithActuals,
   type ActualResultRecord,
   type GradePredictionRecord,
@@ -43,6 +44,13 @@ function actual(over: Partial<ActualResultRecord>): ActualResultRecord {
   };
 }
 
+describe("gradePredictionSnapshotId", () => {
+  it("names weekly snapshots per account as well as subject", () => {
+    expect(gradePredictionSnapshotId("p1", SUBJECT, 42)).not.toBe(gradePredictionSnapshotId("p2", SUBJECT, 42));
+    expect(gradePredictionSnapshotId("p1", SUBJECT, 42)).toContain("p1");
+  });
+});
+
 describe("pairPredictionsWithActuals", () => {
   it("pairs each actual with the latest prediction made before it", () => {
     const predictions = [
@@ -68,6 +76,20 @@ describe("pairPredictionsWithActuals", () => {
       [actual({ takenAt: "2026-03-15T00:00:00.000Z" })],
     );
     expect(pairs).toHaveLength(0);
+  });
+
+  it("never pairs an outcome with another user's forecast", () => {
+    const predictions = [
+      prediction({ id: "other-user", anonId: "p2", createdAt: "2026-03-10T00:00:00.000Z", predictedPercent: 74 }),
+      prediction({ id: "own-user", anonId: "p1", createdAt: "2026-03-01T00:00:00.000Z", predictedPercent: 68 }),
+    ];
+    const pairs = pairPredictionsWithActuals(
+      predictions,
+      [actual({ id: "own-result", anonId: "p1", takenAt: "2026-03-15T00:00:00.000Z", percent: 70 })],
+    );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]?.predictionId).toBe("own-user");
+    expect(pairs[0]?.error).toBe(2);
   });
 
   it("computes days before exam from the paired prediction's exam date", () => {

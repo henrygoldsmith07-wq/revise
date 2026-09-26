@@ -113,7 +113,7 @@ import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
 import { attachDelayedRetentionOutcome, attachTransferOutcome, calibrateInterventions, createInterventionOutcome } from "@/domain/intervention-calibration";
 import type { InterventionCalibration } from "@/domain/intervention-calibration";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
-import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
+import { gradePredictionSnapshotId, type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
 import { assignArm as assignExperimentArm, policyTaskFor,
   type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { isSupabaseConfigured } from "@/data/supabase";
@@ -236,7 +236,8 @@ interface StoreValue extends Snapshot {
   gradeActuals: ActualResultRecord[];
   paperOutcomeLog: PaperOutcomeRecord[];
   paperOutcomeGains: Map<Id, number>;
-  recordGradeActual(subjectId: Id, percent: number, kind: "mock" | "paper" | "final"): Promise<void>;
+  recordGradeActual(input: { subjectId: Id; percent: number; kind: "mock" | "paper" | "final"; takenAt?: string; label?: string }): Promise<void>;
+  removeGradeActual(id: Id): Promise<void>;
   beginPaperOutcome(input: { subjectId: Id; paperId: Id; paperRunId?: Id; predictedMarks: number; totalMarks: number }): Promise<void>;
   closePaperOutcome(paperRunId: Id, actualMarks: number, markingReview?: PaperOutcomeReview): Promise<void>;
   /** Immediate → transfer → delayed-retention intervention evidence. */
@@ -1105,12 +1106,12 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       const week = Math.floor(Date.now() / (7 * 86_400_000));
       let appended = false;
       for (const p of predictions) {
-        const weekKey = `${p.subjectId}:${week}`;
-        if (existing.some((r) => r.id === `gp-${weekKey}`)) continue;
+        const snapshotId = gradePredictionSnapshotId(userId, p.subjectId, week);
+        if (existing.some((r) => r.id === snapshotId)) continue;
         const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId &&
           trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)).length;
         const record: GradePredictionRecord = {
-          id: `gp-${weekKey}`,
+          id: snapshotId,
           anonId: userId,
           subjectId: p.subjectId,
           predictedPercent: p.percent,
@@ -1241,11 +1242,37 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     await writeReviseMeta("experimentEvents", next);
   }, [experimentArm]);
 
-  const recordGradeActual = useCallback(async (subjectId: Id, percent: number, kind: "mock" | "paper" | "final") => {
-    const record: ActualResultRecord = { id: crypto.randomUUID(), anonId: userId, subjectId, percent, kind, takenAt: new Date().toISOString() };
+  const recordGradeActual = useCallback<StoreValue["recordGradeActual"]>(async (input) => {
+    if (!Number.isFinite(input.percent) || input.percent < 0 || input.percent > 100) {
+      throw new Error("Result percentage must be between 0 and 100.");
+    }
+    const takenAt = input.takenAt ?? new Date().toISOString();
+    const takenAtMs = new Date(takenAt).getTime();
+    if (!Number.isFinite(takenAtMs)) throw new Error("Result date is invalid.");
+    if (takenAtMs > Date.now() + 5 * 60_000) throw new Error("Result date cannot be in the future.");
+
+    const record: ActualResultRecord = {
+      id: crypto.randomUUID(),
+      anonId: userId,
+      subjectId: input.subjectId,
+      percent: input.percent,
+      kind: input.kind,
+      takenAt: new Date(takenAtMs).toISOString(),
+      label: input.label?.trim() || undefined,
+    };
     const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
-    await writeReviseMeta("gradeActuals", [...log.slice(-500), record]);
-    setGradeActuals([...log.slice(-500), record]);
+    const next = [...log.slice(-500), record];
+    await writeReviseMeta("gradeActuals", next);
+    setGradeActuals(next);
+  }, [userId]);
+
+  const removeGradeActual = useCallback<StoreValue["removeGradeActual"]>(async (id) => {
+    const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
+    const target = log.find((row) => row.id === id);
+    if (!target || target.anonId !== userId) return;
+    const next = log.filter((row) => row.id !== id);
+    await writeReviseMeta("gradeActuals", next);
+    setGradeActuals(next);
   }, [userId]);
 
   // Paper-outcome loop, part 1: freeze the prediction the moment a recommended
@@ -1735,6 +1762,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       paperOutcomeLog,
       paperOutcomeGains,
       recordGradeActual,
+      removeGradeActual,
       beginPaperOutcome,
       closePaperOutcome: closePaperOutcomeRecord,
       interventionOutcomes,
@@ -1815,6 +1843,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     paperOutcomeLog,
     paperOutcomeGains,
     recordGradeActual,
+    removeGradeActual,
     beginPaperOutcome,
     closePaperOutcomeRecord,
     interventionOutcomes,

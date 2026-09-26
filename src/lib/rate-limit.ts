@@ -192,6 +192,8 @@ export const AI_TASK_COSTS: Record<AiTask, number> = {
   "cards-from-notes": 2,
   ocr: 3,
   "extract-questions": 3,
+  "diagnose-error": 1,
+  "route-spec": 1,
 };
 
 export function aiTaskCost(task: AiTask): number {

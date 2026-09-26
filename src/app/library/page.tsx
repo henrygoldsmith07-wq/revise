@@ -9,6 +9,7 @@ import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";
 import { knowledgeVsAnswering } from "@/domain/exam-technique";
 import { buildSubjectGraph } from "@/domain/knowledge-graph";
 import { createCard } from "@/domain/scheduling";
+import { buildCloze, normaliseCloze } from "@/domain/cloze";
 import { classifyTopic } from "@/domain/topic-status";
 import type { Card, Topic } from "@/domain/types";
 import { useStore, useSubjects } from "@/state/store";
@@ -210,7 +211,7 @@ function Library() {
             <EmptyState title="No subject selected" body="Choose your subjects in settings to see their curriculum here." />
           ) : null}
 
-          <ManualCard subjectId={subjectId} />
+          <ManualCard key={subjectId} subjectId={subjectId} />
         </>
       )}
     </div>
@@ -287,18 +288,20 @@ function TopicDetail({
     const existing = new Set(cards.map((c) => c.front.trim()));
     const fresh: Card[] = result.data.cards
       .filter((generated) => !existing.has(generated.front.trim()))
-      .map((generated) =>
-        createCard({
+      .map((generated) => {
+        const cloze = generated.kind === "cloze" ? normaliseCloze(generated.front, generated.back) : null;
+        return createCard({
           id: crypto.randomUUID(),
           userId: store.userId,
           subjectId: topic.subjectId,
           topicId: topic.id,
-          front: generated.front,
-          back: generated.back,
-          kind: generated.kind,
+          front: cloze?.front ?? generated.front,
+          back: cloze?.back ?? generated.back,
+          kind: generated.kind === "cloze" && !cloze ? "basic" : generated.kind,
+          ...(cloze ? { clozeSource: cloze.clozeSource } : {}),
           origin: result.source === "ai" ? "ai" : "seed",
-        }),
-      );
+        });
+      });
     await store.addCards(fresh);
     setStatus(
       fresh.length
@@ -517,20 +520,28 @@ function ManualCard({ subjectId }: { subjectId: string }) {
   const store = useStore();
   const topics = subjectId ? topicsFor(subjectId) : [];
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
+  const [kind, setKind] = useState<"basic" | "cloze">("basic");
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [saved, setSaved] = useState(false);
 
+  const cloze = kind === "cloze" ? buildCloze(front, back) : null;
+  const canSave =
+    Boolean(topicId) &&
+    (kind === "cloze" ? Boolean(cloze) : Boolean(front.trim() && back.trim()));
+
   async function save() {
-    if (!front.trim() || !back.trim() || !topicId) return;
+    if (!canSave) return;
     await store.addCards([
       createCard({
         id: crypto.randomUUID(),
         userId: store.userId,
         subjectId,
         topicId,
-        front: front.trim(),
-        back: back.trim(),
+        front: cloze?.front ?? front.trim(),
+        back: cloze?.back ?? back.trim(),
+        kind,
+        ...(cloze ? { clozeSource: cloze.clozeSource } : {}),
         origin: "manual",
       }),
     ]);
@@ -543,8 +554,25 @@ function ManualCard({ subjectId }: { subjectId: string }) {
 
   return (
     <section>
-      <SectionHeading title="Write a card" hint="Cloze deletions: wrap the answer in [ ] and it becomes a blank." />
+      <SectionHeading
+        title="Write a card"
+        hint={kind === "cloze" ? "Cloze hides one exact answer inside a complete sentence." : "Write a prompt and the answer you want to retrieve."}
+      />
       <Panel className="space-y-3">
+        <div className="max-w-xs">
+          <Segmented
+            ariaLabel="Card type"
+            value={kind}
+            onChange={(value) => {
+              setKind(value as "basic" | "cloze");
+              setSaved(false);
+            }}
+            options={[
+              { value: "basic", label: "Basic" },
+              { value: "cloze", label: "Cloze" },
+            ]}
+          />
+        </div>
         <Field label="Topic">
           <select value={topicId} onChange={(e) => setTopicId(e.target.value)} className="field text-sm">
             {topics.map((topic) => (
@@ -554,17 +582,55 @@ function ManualCard({ subjectId }: { subjectId: string }) {
             ))}
           </select>
         </Field>
-        <Field label="Front" hint="A question, not a heading. LaTeX between $ works.">
-          <textarea value={front} onChange={(e) => setFront(e.target.value)} rows={2} className="field" />
+        <Field
+          label={kind === "cloze" ? "Complete sentence" : "Front"}
+          hint={kind === "cloze"
+            ? "Write the full sentence with the answer visible."
+            : "A question, not a heading. LaTeX between $ works."}
+        >
+          <textarea
+            value={front}
+            onChange={(e) => {
+              setFront(e.target.value);
+              setSaved(false);
+            }}
+            rows={2}
+            className="field"
+            placeholder={kind === "cloze" ? "Mitochondria release energy by aerobic respiration." : undefined}
+          />
         </Field>
-        <Field label="Back">
-          <textarea value={back} onChange={(e) => setBack(e.target.value)} rows={3} className="field" />
+        <Field
+          label={kind === "cloze" ? "Hidden answer" : "Back"}
+          hint={kind === "cloze" ? "This exact text must occur in the complete sentence." : undefined}
+        >
+          <textarea
+            value={back}
+            onChange={(e) => {
+              setBack(e.target.value);
+              setSaved(false);
+            }}
+            rows={kind === "cloze" ? 2 : 3}
+            className="field"
+            placeholder={kind === "cloze" ? "aerobic respiration" : undefined}
+          />
         </Field>
+        {kind === "cloze" && front.trim() && back.trim() ? (
+          <div className="rounded-[9px] bg-surface2 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Review prompt</p>
+            <RichText className="text-sm text-ink mt-1">
+              {cloze?.front ?? "The hidden answer does not appear in the complete sentence yet."}
+            </RichText>
+          </div>
+        ) : null}
         <div className="flex items-center gap-3">
-          <Button variant="primary" onClick={() => void save()} disabled={!front.trim() || !back.trim()}>
+          <Button variant="primary" onClick={() => void save()} disabled={!canSave}>
             Add card
           </Button>
-          {saved ? <span className="text-xs text-success">Saved — it is due in your next review.</span> : null}
+          {kind === "cloze" && front.trim() && back.trim() && !cloze ? (
+            <span className="text-xs text-ink3">The hidden answer must appear in the sentence.</span>
+          ) : saved ? (
+            <span className="text-xs text-success">Saved — it is due in your next review.</span>
+          ) : null}
         </div>
       </Panel>
     </section>

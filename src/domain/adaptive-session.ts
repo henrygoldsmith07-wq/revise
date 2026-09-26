@@ -14,6 +14,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 
 import { daysToExam, examUrgency } from "./recommender";
+import { valueNextAction } from "./next-best-action";
 import { isDue, retrievability, todayIso } from "./scheduling";
 import {
   capabilityState,
@@ -437,7 +438,9 @@ function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
       overduePressure * 0.25 +
       (input.cards.length ? (1 - clamp01(retention)) * 0.15 : 0),
   );
-  const masteryPressure = 1 - mastery;
+  const measured = input.attempts.length > 0 || (input.mastery?.attempts ?? 0) > 0 ||
+    input.reviewLogs.length > 0 || input.cards.some((card) => card.reps > 0);
+  const masteryPressure = measured ? 1 - mastery : 0.35;
   const mistakePressure = clamp01(
     Math.min(1, marksLost / 6) * 0.7 + Math.min(1, openMistakes.length / 3) * 0.3,
   );
@@ -449,8 +452,10 @@ function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
         ? 0.25
         : Math.min(1, daysSinceStudy / 30),
   );
-  const capabilityGap = focusEvidence.score == null ? 0.8 : 1 - clamp01(focusEvidence.score);
-  const evidence = input.cards.length + input.attempts.length * 2;
+  const capabilityGap = focusEvidence.score == null ? 0 : 1 - clamp01(focusEvidence.score);
+  const evidence = input.reviewLogs.length +
+    Math.max(input.attempts.length, input.mastery?.attempts ?? 0) * 2 +
+    input.cards.filter((card) => card.reps > 0).length;
   const uncertainty = clamp01(1 - evidence / 8);
   const factors: AdaptiveScoreFactors = {
     fsrs,
@@ -461,14 +466,20 @@ function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
     capabilityGap,
     uncertainty,
   };
-  const score =
-    fsrs * 0.24 +
-    masteryPressure * 0.22 +
-    mistakePressure * 0.2 +
-    examProximity * 0.16 +
-    forgetting * 0.1 +
-    capabilityGap * 0.05 +
-    uncertainty * 0.03;
+  const policy = valueNextAction({
+    id: topic.id, kind: "adaptive-session", subjectId: topic.subjectId,
+    topicId: topic.id, minutes: ADAPTIVE_SESSION_MINUTES,
+    signals: {
+      weakness: Math.max(masteryPressure, capabilityGap),
+      forgettingRisk: forgetting, retrievalPressure: fsrs,
+      mistakePressure, examUrgency: examProximity,
+      examWeighting: 1, learningBenefit: Math.max(masteryPressure, capabilityGap),
+      retentionBenefit: fsrs, diagnosticValue: focusState === "unknown" ? 1 : uncertainty,
+      transferNeed: focusState === "secure" ? 0.8 : 0,
+      evidenceConfidence: 1 - uncertainty,
+    },
+  });
+  const score = policy.score;
 
   return {
     topicId: topic.id,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getSubject } from "@/domain/curriculum";
 import { useStore } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
+import { GradePredictionRealityPanel } from "@/components/GradePredictionRealityPanel";
 import {
   ApplicationMasteryCard,
   MarksLostByCause,
@@ -29,6 +30,8 @@ export default function ReadinessPage() {
       </header>
 
       <ExamReadinessCard />
+
+      <GradePredictionRealityPanel />
 
       <section aria-labelledby="evidence-split-heading" className="space-y-4">
         <h2 id="evidence-split-heading" className="text-base font-semibold text-ink">The evidence behind the score</h2>

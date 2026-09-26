@@ -1,12 +1,5 @@
 // ---------------------------------------------------------------------------
-// Multi-step working analysis.
-//
-// Exam questions reward working, not just answers. When the rubric has
-// already marked a part, this module digs into the working itself: it splits
-// the student's response into steps, checks each against the model working
-// (or the mark scheme / learning claims when the model answer is a single
-// line), and pinpoints the FIRST step where the student goes wrong. That is
-// what an examiner's marginal note does — "here is where the marks stop".
+// Multi-step working analysis and authored worked-solution validation.
 // ---------------------------------------------------------------------------
 
 import { isNumericPoint, numericEquivalent, perPointThreshold, pointCoverage } from "./marking";
@@ -14,72 +7,39 @@ import { findUnbalancedEquations } from "./equation-balance";
 import { mathsEquivalent } from "./maths-equivalence";
 import { diagnoseWorking } from "./step-diagnosis";
 import { contradictoryWorkingStep } from "./calculation-rubric";
-import type { AttemptWorkingEvidence, MarkedPart, Question, QuestionPart } from "./types";
+import type { AttemptWorkingEvidence, MarkedPart, Question, QuestionPart, WorkingAnalysisConfidence, WorkingAnalysisConsistency, WorkingAnalysisReason, WorkingErrorKind } from "./types";
 
-export interface StudentStep {
-  index: number;
-  text: string;
-}
-
+export interface StudentStep { index: number; text: string }
 export interface FirstIncorrect {
-  /** 0-based index into the student's steps. */
   stepIndex: number;
   studentStep: string;
-  /** The model step this one should have matched (best guess). */
   expected: string;
-  /** 0–1 similarity of this step to its best model match. */
   similarity: number;
-  reason:
-    | "content-mismatch"
-    | "missing-expected-step"
-    | "unrecognised-step"
-    | "contradictory-working"
-    | "working-runs-out";
+  reason: WorkingAnalysisReason;
+  confidence: WorkingAnalysisConfidence;
 }
-
 export interface WorkingAnalysis {
   modelSteps: string[];
   steps: StudentStep[];
-  /** First step that diverges, or null when all steps match the model. */
   firstIncorrect: FirstIncorrect | null;
-  /** True when every student step matched and no model step was skipped. */
+  /** True when the work matches the model or reaches an equivalent result by another route. */
   consistentWithModel: boolean;
+  consistency: WorkingAnalysisConsistency;
+  confidence: WorkingAnalysisConfidence;
 }
-
-export type WorkedSolutionIssueKind =
-  | "missing-model-answer"
-  | "missing-mark-scheme"
-  | "mark-scheme-gap"
-  | "numeric-mismatch"
-  | "unbalanced-equation";
-
+export type WorkedSolutionIssueKind = "missing-model-answer" | "missing-mark-scheme" | "mark-scheme-gap" | "numeric-mismatch" | "unbalanced-equation";
 export type WorkedSolutionIssueSeverity = "warning" | "error";
-
-export interface WorkedSolutionIssue {
-  kind: WorkedSolutionIssueKind;
-  severity: WorkedSolutionIssueSeverity;
-  /** 0-based index into the authored mark scheme, where applicable. */
-  pointIndex?: number;
-  detail: string;
-}
-
+export interface WorkedSolutionIssue { kind: WorkedSolutionIssueKind; severity: WorkedSolutionIssueSeverity; pointIndex?: number; detail: string }
 export type WorkedSolutionValidationStatus = "pass" | "review" | "fail";
-
 export interface WorkedSolutionValidation {
   status: WorkedSolutionValidationStatus;
   modelSteps: string[];
   markSchemePoints: number;
   coveredMarkSchemePoints: number;
-  /** Whole-number percentage of mark-scheme points represented in the answer. */
   markSchemeCoverage: number;
   issues: WorkedSolutionIssue[];
 }
-
-export interface WorkedSolutionAuditIssue extends WorkedSolutionIssue {
-  questionId: string;
-  partId: string;
-}
-
+export interface WorkedSolutionAuditIssue extends WorkedSolutionIssue { questionId: string; partId: string }
 export interface WorkedSolutionAudit {
   status: WorkedSolutionValidationStatus;
   questionCount: number;
@@ -90,22 +50,10 @@ export interface WorkedSolutionAudit {
   issues: WorkedSolutionAuditIssue[];
 }
 
-/** Split working into discrete steps: one per line, or on `=>`, `;`, or "then". */
 export function splitSteps(text: string): string[] {
-  // Non-capturing group: a capturing alternative would insert `undefined`
-  // entries when another branch (\n, =>, ;) wins the split.
-  const raw = (text ?? "")
-    .split(/\n|=>|;|\b(?:then|therefore|so)\b/i)
-    .map((s) => (s ?? "").trim())
-    .filter(Boolean);
-  return raw.length ? raw : [];
+  return (text ?? "").split(/\n|=>|;|\b(?:then|therefore|so)\b/i).map((s) => (s ?? "").trim()).filter(Boolean);
 }
 
-/**
- * Model steps for a part: prefer the model answer's own line structure; when
- * the model answer is a single line but the part declares learning claims,
- * use those (they are written 1:1 with the mark scheme).
- */
 export function modelStepsForPart(part: QuestionPart): string[] {
   const fromModel = splitSteps(part.modelAnswer);
   if (fromModel.length > 1) return fromModel;
@@ -113,12 +61,9 @@ export function modelStepsForPart(part: QuestionPart): string[] {
   return claims.length ? claims : fromModel;
 }
 
-/** 0–1 similarity of one step to one model step (symbolic > numeric > keyword). */
 export function stepSimilarity(studentStep: string, modelStep: string): number {
   const sym = mathsEquivalent(studentStep, modelStep);
   if (sym === "equivalent") return 1;
-  // A proven-different expression is a strong mismatch signal; do not let a
-  // shared digit (both contain "2" or "6") disguise it as a near-match.
   if (sym === "not-equivalent") return 0.15;
   if (numericEquivalent(modelStep, studentStep)) return 0.8;
   return pointCoverage(modelStep, studentStep);
@@ -127,87 +72,84 @@ export function stepSimilarity(studentStep: string, modelStep: string): number {
 const STEP_THRESHOLD = 0.6;
 
 function bestWorkedSolutionScore(point: string, modelAnswer: string, modelSteps: string[]): number {
-  return Math.max(
-    pointCoverage(point, modelAnswer),
-    ...modelSteps.map((step) => stepSimilarity(step, point)),
-  );
+  const threshold = perPointThreshold(point);
+  const answerScore = pointCoverage(point, modelAnswer);
+  if (answerScore >= threshold) return answerScore;
+
+  let best = answerScore;
+  for (const step of modelSteps) {
+    best = Math.max(best, stepSimilarity(step, point));
+    if (best >= threshold) return best;
+  }
+  return best;
 }
 
 /**
- * Validate an authored model answer against the points it is meant to award.
- *
- * This is deliberately separate from student marking: it audits the answer
- * key itself, using the same deterministic matching primitives as marking so
- * that a numerical contradiction cannot be hidden by shared wording.
+ * Canonicalise exact-form notation only for authored answer-key validation.
+ * Student marking deliberately remains strict about requiring π, √, ± and
+ * inequality notation when the mark scheme requires it. The content audit has
+ * a different job: establish whether two authored numeric results contradict
+ * one another, even when one is exact-form and the other decimal-form.
  */
+function canonicaliseAuthoredNumericNotation(text: string): string {
+  let out = text.replace(/[−–—]/g, "-");
+  // A symbolic radical is a formula, not another authored numerical result.
+  // Remove common bracketed symbolic radicands before numeric comparison so
+  // exponents such as the 2 in √⟨c²⟩ / √(x²+y²) cannot be mistaken for an
+  // expected answer. Numeric radicands are intentionally left for evaluation.
+  out = out.replace(/(?:√|\bsqrt\s*)\s*([⟨(\[])([^⟩)\]]+)[⟩)\]]/gi, (match, _open: string, radicand: string) =>
+    /[a-z]/i.test(radicand) ? " " : match,
+  );
+  // Handle an explicit coefficient before a numeric radical as multiplication
+  // before replacing standalone radicals. Otherwise `2√2` would become
+  // `21.414...` and look like a contradiction instead of the value 2.828....
+  out = out.replace(/(-?\d+(?:\.\d+)?)\s*(?:√|\bsqrt\s*)\s*\(?\s*(-?\d+(?:\.\d+)?)\s*\)?/gi, (_match, coefficient: string, radicand: string) => {
+    const value = Number(coefficient) * Math.sqrt(Number(radicand));
+    return Number.isFinite(value) ? String(value) : _match;
+  });
+  out = out.replace(/(?:√|\bsqrt\s*)\s*\(?\s*(-?\d+(?:\.\d+)?)\s*\)?/gi, (_match, raw: string) => {
+    const value = Math.sqrt(Number(raw));
+    return Number.isFinite(value) ? String(value) : _match;
+  });
+  out = out.replace(/(-?\d+(?:\.\d+)?)\s*(?:π|\bpi\b)/gi, (_match, raw: string) => String(Number(raw) * Math.PI));
+  out = out.replace(/(?:π|\bpi\b)/gi, String(Math.PI));
+  out = out.replace(/±|\+\s*\/\s*-|\bplus\s+or\s+minus\b/gi, " ");
+  out = out.replace(/≤|≥|<=|>=|\bless\s+than\s+or\s+equal(?:\s+to)?\b|\bgreater\s+than\s+or\s+equal(?:\s+to)?\b/gi, " = ");
+  return out;
+}
+
+function authoredNumericEquivalent(expected: string, actual: string): boolean {
+  if (numericEquivalent(expected, actual)) return true;
+  return numericEquivalent(canonicaliseAuthoredNumericNotation(expected), canonicaliseAuthoredNumericNotation(actual));
+}
+
 export function validateWorkedSolution(part: QuestionPart): WorkedSolutionValidation {
   const modelAnswer = (part.modelAnswer ?? "").trim();
   const markScheme = (part.markScheme ?? []).map((point) => point.trim()).filter(Boolean);
   const modelSteps = modelAnswer ? modelStepsForPart(part) : [];
   const issues: WorkedSolutionIssue[] = [];
-
-  if (!modelAnswer) {
-    issues.push({
-      kind: "missing-model-answer",
-      severity: "error",
-      detail: "The part has no authored model answer.",
-    });
-  }
-  if (!markScheme.length) {
-    issues.push({
-      kind: "missing-mark-scheme",
-      severity: "error",
-      detail: "The part has no mark-scheme points to validate against.",
-    });
-  }
+  if (!modelAnswer) issues.push({ kind: "missing-model-answer", severity: "error", detail: "The part has no authored model answer." });
+  if (!markScheme.length) issues.push({ kind: "missing-mark-scheme", severity: "error", detail: "The part has no mark-scheme points to validate against." });
 
   let coveredMarkSchemePoints = 0;
   for (const [pointIndex, point] of markScheme.entries()) {
     const numericExpected = isNumericPoint(point);
-    const numericMatches = !numericExpected || numericEquivalent(point, modelAnswer);
+    const numericMatches = !numericExpected || authoredNumericEquivalent(point, modelAnswer);
     const score = modelAnswer ? bestWorkedSolutionScore(point, modelAnswer, modelSteps) : 0;
-
-    // Chemistry sanity: an embedded equation whose elements do not balance is
-    // a content-quality warning, not a hard error — the parser only verifies
-    // simple bracket-free equations.
     for (const bad of findUnbalancedEquations(`${point} ${modelAnswer}`)) {
-      issues.push({
-        kind: "unbalanced-equation",
-        severity: "warning",
-        pointIndex,
-        detail: `Equation does not balance: ${bad}`,
-      });
+      issues.push({ kind: "unbalanced-equation", severity: "warning", pointIndex, detail: `Equation does not balance: ${bad}` });
     }
-
     if (numericExpected && !numericMatches) {
-      issues.push({
-        kind: "numeric-mismatch",
-        severity: "error",
-        pointIndex,
-        detail: `Mark-scheme point ${pointIndex + 1} expects a numerical result that is not present in the model answer: ${point}`,
-      });
+      issues.push({ kind: "numeric-mismatch", severity: "error", pointIndex, detail: `Mark-scheme point ${pointIndex + 1} expects a numerical result that is not present in the model answer: ${point}` });
       continue;
     }
-
-    if (score >= perPointThreshold(point)) {
-      coveredMarkSchemePoints++;
-      continue;
-    }
-
-    issues.push({
-      kind: "mark-scheme-gap",
-      severity: "warning",
-      pointIndex,
-      detail: `Mark-scheme point ${pointIndex + 1} is not represented clearly in the model answer: ${point}`,
-    });
+    if (score >= perPointThreshold(point)) { coveredMarkSchemePoints++; continue; }
+    issues.push({ kind: "mark-scheme-gap", severity: "warning", pointIndex, detail: `Mark-scheme point ${pointIndex + 1} is not represented clearly in the model answer: ${point}` });
   }
-
   const errors = issues.filter((issue) => issue.severity === "error").length;
   const warnings = issues.filter((issue) => issue.severity === "warning").length;
-  const status: WorkedSolutionValidationStatus = errors ? "fail" : warnings ? "review" : "pass";
-
   return {
-    status,
+    status: errors ? "fail" : warnings ? "review" : "pass",
     modelSteps,
     markSchemePoints: markScheme.length,
     coveredMarkSchemePoints,
@@ -216,212 +158,255 @@ export function validateWorkedSolution(part: QuestionPart): WorkedSolutionValida
   };
 }
 
-/** Validate every authored part and retain question/part context for review UI. */
 export function validateWorkedSolutions(questions: readonly Question[]): WorkedSolutionAudit {
   const issues: WorkedSolutionAuditIssue[] = [];
   let partCount = 0;
   let passedParts = 0;
-
-  for (const question of questions) {
-    for (const part of question.parts ?? []) {
-      partCount++;
-      const validation = validateWorkedSolution(part);
-      if (validation.status === "pass") passedParts++;
-      for (const issue of validation.issues) {
-        issues.push({ ...issue, questionId: question.id, partId: part.id });
-      }
-    }
+  for (const question of questions) for (const part of question.parts ?? []) {
+    partCount++;
+    const validation = validateWorkedSolution(part);
+    if (validation.status === "pass") passedParts++;
+    for (const issue of validation.issues) issues.push({ ...issue, questionId: question.id, partId: part.id });
   }
-
   const errors = issues.filter((issue) => issue.severity === "error").length;
   const warnings = issues.filter((issue) => issue.severity === "warning").length;
-  const status: WorkedSolutionValidationStatus = errors ? "fail" : warnings ? "review" : "pass";
+  return { status: errors ? "fail" : warnings ? "review" : "pass", questionCount: questions.length, partCount, passedParts, errors, warnings, issues };
+}
 
+function finalResultMatches(modelSteps: string[], steps: StudentStep[]): boolean {
+  const expected = modelSteps[modelSteps.length - 1];
+  const actual = steps[steps.length - 1]?.text;
+  if (!expected || !actual) return false;
+  const normalise = (text: string) => text.replace(/^\s*=+\s*/, "").replace(/\s+/g, "").toLowerCase();
+  if (normalise(actual) === normalise(expected)) return true;
+  const symbolic = mathsEquivalent(actual, expected);
+  if (symbolic === "equivalent") return true;
+  if (symbolic === "not-equivalent") return false;
+  // Numeric fallback is only safe for scalar answers. Comparing extracted
+  // digits in symbolic expressions can mistake different algebra for equality.
+  if (/[a-z]/i.test(actual) || /[a-z]/i.test(expected)) return false;
+  return numericEquivalent(expected, actual);
+}
+
+function workingResult(
+  modelSteps: string[],
+  steps: StudentStep[],
+  firstIncorrect: FirstIncorrect | null,
+  consistency: WorkingAnalysisConsistency,
+  confidence: WorkingAnalysisConfidence,
+): WorkingAnalysis {
   return {
-    status,
-    questionCount: questions.length,
-    partCount,
-    passedParts,
-    errors,
-    warnings,
-    issues,
+    modelSteps,
+    steps,
+    firstIncorrect,
+    consistentWithModel: consistency === "model-match" || consistency === "alternative-valid",
+    consistency,
+    confidence,
   };
 }
 
 /**
- * Find the first incorrect step in the student's working.
- *
- * Alignment: for each student step, take its best similarity to ANY model
- * step. The first student step below threshold is the first incorrect step.
- * If every written step passes but a model step is never covered, that
- * omission is reported (working runs out before the answer).
+ * Compare student work with the authored route without treating that route as
+ * the only valid one. A proven equivalent final result with a different path
+ * is reported as alternative-valid; an unrecognised path stays uncertain.
  */
 export function firstIncorrectStep(part: QuestionPart, answer: string): WorkingAnalysis {
   const modelSteps = modelStepsForPart(part);
   const steps = splitSteps(answer).map((text, index) => ({ index, text }));
   const contradiction = contradictoryWorkingStep(answer);
 
+  if (!modelSteps.length) return workingResult(modelSteps, steps, null, "uncertain", "low");
   if (!steps.length) {
-    return {
+    return workingResult(
       modelSteps,
       steps,
-      firstIncorrect: modelSteps.length
-        ? {
-            stepIndex: 0,
-            studentStep: "",
-            expected: modelSteps[modelSteps.length - 1]!, // the final answer they never reached
-            similarity: 0,
-            reason: "working-runs-out",
-          }
-        : null,
-      consistentWithModel: false,
-    };
+      {
+        stepIndex: 0,
+        studentStep: "",
+        expected: modelSteps[0]!,
+        similarity: 0,
+        reason: "working-runs-out",
+        confidence: "low",
+      },
+      "uncertain",
+      "low",
+    );
+  }
+
+  if (contradiction !== null) {
+    return workingResult(
+      modelSteps,
+      steps,
+      {
+        stepIndex: contradiction,
+        studentStep: steps[contradiction]?.text ?? answer,
+        expected: modelSteps[contradiction] ?? "Keep numerical statements consistent; identify any corrected or abandoned working.",
+        similarity: 0,
+        reason: "contradictory-working",
+        confidence: "high",
+      },
+      "inconsistent",
+      "high",
+    );
   }
 
   const covered = new Array<boolean>(modelSteps.length).fill(false);
-  let nextModel = 0;
+  let cursor = 0;
+  let firstUnmatched: { step: StudentStep; expected: string; similarity: number } | null = null;
+  let firstMissing: { stepIndex: number; modelIndex: number } | null = null;
 
-  // An examiner reads working line by line, so alignment is sequential: each
-  // student step is expected to match the NEXT model step first. (Symbolic
-  // equality alone cannot order algebra steps — every line of an expansion is
-  // the same polynomial — so order is what disambiguates them.)
   for (const step of steps) {
-    if (nextModel >= modelSteps.length) {
-      if (contradiction !== null) return {
-        modelSteps, steps, consistentWithModel: false,
-        firstIncorrect: { stepIndex: contradiction, studentStep: steps[contradiction]?.text ?? answer,
-          expected: "Keep numerical statements consistent; identify any corrected or abandoned working.",
-          similarity: 0, reason: "contradictory-working" },
-      };
-      continue;
-    }
-    const forward = stepSimilarity(step.text, modelSteps[nextModel]!);
-    if (forward >= STEP_THRESHOLD) {
-      covered[nextModel] = true;
-      nextModel++;
-      continue;
-    }
-
-    // Does this step match a LATER model step instead? Then the student
-    // skipped an expected step before it.
-    let laterIndex = -1;
-    let laterScore = 0;
-    for (let mi = nextModel + 1; mi < modelSteps.length; mi++) {
-      const s = stepSimilarity(step.text, modelSteps[mi]!);
-      if (s > laterScore) {
-        laterScore = s;
-        laterIndex = mi;
+    let bestIndex = -1;
+    let bestSimilarity = 0;
+    for (let index = cursor; index < modelSteps.length; index++) {
+      const similarity = stepSimilarity(step.text, modelSteps[index]!);
+      if (similarity > bestSimilarity) {
+        bestIndex = index;
+        bestSimilarity = similarity;
       }
     }
-    if (laterIndex >= 0 && laterScore >= STEP_THRESHOLD) {
-      return {
-        modelSteps,
-        steps,
-        firstIncorrect: {
-          stepIndex: step.index,
-          studentStep: step.text,
-          expected: modelSteps[nextModel]!,
-          similarity: 0,
-          reason: "missing-expected-step",
-        },
-        consistentWithModel: false,
-      };
+
+    if (bestIndex >= 0 && bestSimilarity >= STEP_THRESHOLD) {
+      if (bestIndex > cursor && firstMissing === null) {
+        firstMissing = { stepIndex: step.index, modelIndex: cursor };
+      }
+      covered[bestIndex] = true;
+      cursor = bestIndex + 1;
+      continue;
     }
 
-    // This step matches nothing in the model — it is where the marks stop.
-    return {
-      modelSteps,
-      steps,
-      firstIncorrect: {
-        stepIndex: step.index,
-        studentStep: step.text,
-        expected: modelSteps[nextModel]!,
-        similarity: forward,
-        reason: "content-mismatch",
-      },
-      consistentWithModel: false,
-    };
+    if (firstUnmatched === null) {
+      firstUnmatched = {
+        step,
+        expected: modelSteps[cursor] ?? modelSteps[modelSteps.length - 1]!,
+        similarity: bestSimilarity,
+      };
+    }
   }
 
-  // All written steps passed; look for the first skipped model step.
-  const skipped = covered.findIndex((c) => !c);
-  if (skipped >= 0) {
-    return {
+  if (covered.every(Boolean) && firstUnmatched === null) {
+    return workingResult(modelSteps, steps, null, "model-match", "high");
+  }
+
+  // If the worked route differs but its final expression/result is equivalent,
+  // do not label the route as an error merely because the model used another path.
+  if (finalResultMatches(modelSteps, steps)) {
+    return workingResult(modelSteps, steps, null, "alternative-valid", "medium");
+  }
+
+  if (firstUnmatched !== null) {
+    const relation = mathsEquivalent(firstUnmatched.step.text, firstUnmatched.expected);
+    const reason: WorkingAnalysisReason = relation === "not-equivalent" ? "content-mismatch" : "unrecognised-step";
+    const confidence: WorkingAnalysisConfidence = relation === "not-equivalent" ? "medium" : "low";
+    return workingResult(
       modelSteps,
       steps,
-      firstIncorrect: {
-        stepIndex: steps[steps.length - 1]?.index ?? 0,
-        studentStep: steps[steps.length - 1]?.text ?? "",
-        expected: modelSteps[skipped],
+      {
+        stepIndex: firstUnmatched.step.index,
+        studentStep: firstUnmatched.step.text,
+        expected: firstUnmatched.expected,
+        similarity: firstUnmatched.similarity,
+        reason,
+        confidence,
+      },
+      "uncertain",
+      confidence,
+    );
+  }
+
+  const missingIndex = covered.findIndex((value) => !value);
+  if (missingIndex >= 0) {
+    const stepIndex = firstMissing?.stepIndex ?? steps.length;
+    const modelIndex = firstMissing?.modelIndex ?? missingIndex;
+    return workingResult(
+      modelSteps,
+      steps,
+      {
+        stepIndex,
+        studentStep: steps[stepIndex]?.text ?? "",
+        expected: modelSteps[modelIndex]!,
         similarity: 0,
         reason: "missing-expected-step",
+        confidence: "low",
       },
-      consistentWithModel: false,
-    };
+      "uncertain",
+      "low",
+    );
   }
 
-  return { modelSteps, steps, firstIncorrect: null, consistentWithModel: true };
+  return workingResult(modelSteps, steps, null, "uncertain", "low");
 }
 
-/** Convenience: does this response's working match the model throughout? */
 export function consistentWithModel(part: QuestionPart, answer: string): boolean {
   return firstIncorrectStep(part, answer).consistentWithModel;
 }
 
-/**
- * Persist the examiner-useful part of working analysis alongside an attempt.
- * This is deliberately small: the full text remains the student's answer,
- * while the first divergence and mark components make the next intervention
- * explainable and allow method/units/precision trends to be measured.
- */
-export function analyseAttemptWorking(
-  question: Question,
-  answers: Record<string, string>,
-  marked: readonly MarkedPart[],
-): AttemptWorkingEvidence[] {
-  // Working diagnosis is meaningful only when the authored item declares a
-  // calculation rubric (or is explicitly a calculation). Running the prose
-  // matcher over explanation answers creates false "method errors" and then
-  // sends the learner down an irrelevant arithmetic repair path.
-  if (question.kind !== "calculation" && !question.parts.some((part) => (part.calculationRules?.length ?? 0) > 0)) return [];
-  return question.parts.flatMap((part) => {
-    // A structured item can contain a prose part beside a calculation. Only
-    // analyse the parts whose authored rubric can support working diagnosis;
-    // treating prose as arithmetic would create a false method error.
-    if (question.kind !== "calculation" && !(part.calculationRules?.length ?? 0)) return [];
-    const answer = answers[part.id] ?? "";
-    const analysis = firstIncorrectStep(part, answer);
-    const diagnosis = diagnoseWorking({ modelSteps: analysis.modelSteps, answer, similarityFn: stepSimilarity });
-    const firstIncorrectIndex = analysis.firstIncorrect?.stepIndex ?? (diagnosis.firstErrorIndex ?? null);
-    const firstErrorKind = analysis.firstIncorrect?.reason === "contradictory-working"
+function markKindCounts(part: QuestionPart, marked: MarkedPart): Pick<AttemptWorkingEvidence, "methodMarksAwarded" | "accuracyMarksAwarded" | "followThroughMarksAwarded" | "unitMarksAwarded" | "precisionMarksAwarded"> {
+  const rules = part.calculationRules ?? [];
+  const credited = new Set(marked.creditedPoints);
+  const count = (kind: string) =>
+    rules.reduce((total, rule, index) => total + (rule.kind === kind && credited.has(part.markScheme[index] ?? "") ? 1 : 0), 0);
+  return {
+    methodMarksAwarded: count("method"),
+    accuracyMarksAwarded: count("accuracy"),
+    followThroughMarksAwarded: count("follow-through"),
+    unitMarksAwarded: count("unit"),
+    precisionMarksAwarded: count("precision"),
+  };
+}
+
+export function buildWorkingEvidence(part: QuestionPart, marked: MarkedPart, answer: string): AttemptWorkingEvidence {
+  const analysis = firstIncorrectStep(part, answer);
+  const diagnosis = diagnoseWorking({ modelSteps: analysis.modelSteps, answer, similarityFn: stepSimilarity });
+  const contradiction = contradictoryWorkingStep(answer);
+  const specificDiagnosis =
+    diagnosis.kind !== "none" &&
+    diagnosis.kind !== "method-error" &&
+    analysis.consistency !== "alternative-valid";
+  const firstErrorKind: WorkingErrorKind =
+    contradiction !== null
       ? "contradictory-working"
-      : diagnosis.firstErrorIndex != null
+      : specificDiagnosis
         ? diagnosis.kind
-        : analysis.firstIncorrect
-          ? "method-error"
-          : "none";
-    const result = marked.find((candidate) => candidate.partId === part.id);
-    const evidence = result?.evidence ?? [];
-    const count = (kind: NonNullable<QuestionPart["calculationRules"]>[number]["kind"]): number => {
-      const rules = part.calculationRules?.filter((rule) => rule.kind === kind) ?? [];
-      return rules.filter((rule) => evidence.find((point) => point.point === part.markScheme[part.calculationRules?.indexOf(rule) ?? -1])?.status === "credited").length;
-    };
-    const methodMarksAwarded = count("method");
-    const accuracyMarksAwarded = count("accuracy");
-    const followThroughMarksAwarded = count("follow-through");
-    const carriedForward = evidence.some((point) => point.status === "credited" &&
-      /error carried forward/i.test(point.explanation));
-    return [{
-      partId: part.id,
-      firstIncorrectStep: firstIncorrectIndex,
-      firstErrorKind,
-      consistentWithModel: analysis.consistentWithModel,
-      methodMarksAwarded,
-      accuracyMarksAwarded,
-      followThroughMarksAwarded,
-      ...(carriedForward ? { errorCarriedForward: true } : {}),
-      unitMarksAwarded: count("unit"),
-      precisionMarksAwarded: count("precision"),
-    }];
+        : "none";
+  const consistency: WorkingAnalysisConsistency =
+    contradiction !== null || specificDiagnosis ? "inconsistent" : analysis.consistency;
+  const confidence: WorkingAnalysisConfidence =
+    contradiction !== null ? "high" : specificDiagnosis ? "high" : analysis.confidence;
+  const diagnosedStep = diagnosis.firstErrorIndex === null ? null : diagnosis.steps[diagnosis.firstErrorIndex] ?? null;
+  const firstIncorrectStepIndex =
+    contradiction ??
+    (specificDiagnosis ? diagnosis.firstErrorIndex : null);
+  const firstIncorrectReason =
+    contradiction !== null
+      ? "contradictory-working"
+      : specificDiagnosis
+        ? "diagnosed-working-error"
+        : analysis.firstIncorrect?.reason ?? null;
+  const firstIncorrectExpected =
+    diagnosedStep?.matchedModelStep ?? analysis.firstIncorrect?.expected ?? null;
+  const counts = markKindCounts(part, marked);
+
+  return {
+    partId: part.id,
+    firstIncorrectStep: firstIncorrectStepIndex,
+    firstErrorKind,
+    consistentWithModel: consistency === "model-match" || consistency === "alternative-valid",
+    consistency,
+    confidence,
+    firstIncorrectReason,
+    firstIncorrectExpected,
+    ...(specificDiagnosis && diagnosedStep?.note ? { diagnosisNote: diagnosedStep.note } : {}),
+    ...counts,
+    errorCarriedForward: counts.followThroughMarksAwarded > 0 && counts.accuracyMarksAwarded === 0,
+  };
+}
+
+export function analyseAttemptWorking(question: Question, answers: Record<string, string>, marked: MarkedPart[]): AttemptWorkingEvidence[] {
+  return question.parts.flatMap((part) => {
+    const mark = marked.find((row) => row.partId === part.id);
+    const answer = answers[part.id] ?? "";
+    if (!mark || (!answer.trim() && !part.calculationRules?.length)) return [];
+    return [buildWorkingEvidence(part, mark, answer)];
   });
 }

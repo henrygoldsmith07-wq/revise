@@ -10,6 +10,8 @@ import {
 import { resilientMark } from "./marking-resilience";
 import { maskChatHistory, maskPii, maskStudentText, maskSummaryMany } from "./pii";
 import { getTopic } from "@/domain/curriculum";
+import { localClassifyError } from "@/domain/error-local-classifier";
+import { ERROR_TAXONOMY_VERSION } from "@/domain/error-taxonomy";
 import { withMarkEvidence } from "@/domain/marking";
 import type { Mistake, Question, Topic } from "@/domain/types";
 import { RESPONSE_SCHEMAS } from "./types";
@@ -125,6 +127,20 @@ export function aiSummarise(topicId: string) {
 export function aiDiagnose(topicIds: string[], mistakes: Mistake[]) {
   const topics = topicIds.map((id) => getTopic(id)).filter((t): t is Topic => Boolean(t));
   return call<DiagnoseResponse>("diagnose", { topicIds, mistakes }, () => diagnoseFallback(topics, mistakes));
+}
+
+export function aiDiagnoseError(input: { prompt: string; point: string; answer: string; awarded: number; maxMarks: number; command?: string | null }) {
+  // Post-marking only: caller must have fixed awarded/max via marking first.
+  const fallback = () => {
+    const local = localClassifyError({ prompt: input.prompt, point: input.point, answer: input.answer, awarded: input.awarded, maxMarks: input.maxMarks, command: input.command ?? null });
+    return { category: local.category, confidence: local.confidence, reasons: local.reasons, taxonomyVersion: ERROR_TAXONOMY_VERSION, provenance: "local-fallback", gated: local.confidence < 0.7 };
+  };
+  return call("diagnose-error", { ...input, answer: maskStudentText(input.answer), prompt: maskStudentText(input.prompt), point: maskStudentText(input.point) }, fallback);
+}
+
+export function aiRouteSpec(subjectId: string, text: string) {
+  const syncFallback = () => ({ topics: [] as string[], candidates: [] as { specPointId: string; topicId: string; ref: string; text: string }[] });
+  return call("route-spec", { subjectId, text: maskStudentText(text) }, syncFallback);
 }
 
 export function aiExtractQuestions(subjectId: string, text: string) {

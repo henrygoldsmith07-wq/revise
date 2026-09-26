@@ -5,11 +5,8 @@ import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidenc
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
-// Mastery is the number every other engine reads: the planner sizes sessions
-// by it, the recommender ranks by it, grade prediction integrates it. It has
-// to be honest about *uncertainty* — a topic with two easy cards answered once
-// is not mastered, it is unmeasured — so evidence weight damps the estimate
-// toward a neutral prior instead of letting one lucky answer read as 100%.
+// Mastery informs planning, recommendations, and grade prediction. Sparse
+// evidence must not look like proven knowledge.
 // ---------------------------------------------------------------------------
 
 /** Below this a topic is a candidate for "weak" classification. */
@@ -20,35 +17,44 @@ const NEUTRAL_PRIOR = 0.4;
 
 // --- Bayesian cold-start prior ----------------------------------------------
 //
-// "Unmeasured = 0%" is honest but demoralising: a new student sees a wall of
-// zeros before they have done anything. A Beta-Binomial prior fixes the
-// psychology without lying: start from the cohort's average performance and
-// narrow toward the student's own evidence as it accumulates.
-//
-//   predictedMastery = (evidence·raw + α) / (evidence + α + β)
-//
-// with α/β chosen so the prior mean is COHORT_PRIOR_MEAN at strength
-// COHORT_PRIOR_STRENGTH pseudo-observations. With no evidence the estimate IS
-// the prior; each real observation shrinks the prior's share n₀/(n₀+n), so
-// "Predicted mastery" converges onto "Proven mastery" as variance collapses.
+// Sparse evidence is shrunk toward a handcrafted default prior, not a learner
+// cohort statistic. Engines use proven mastery for routing.
 // The engines (planner, recommender, grade prediction) keep reading `mastery`
 // — the proven estimate — so a never-opened topic still routes to "learn".
 
-/** Cohort average performance the prior starts from. */
-export const COHORT_PRIOR_MEAN = 0.45;
-/** Pseudo-observations the prior carries; higher = slower to move off the prior. */
-export const COHORT_PRIOR_STRENGTH = 6;
+/** Handcrafted cold-start mean; not a cohort statistic. */
+export const DEFAULT_PRIOR_MEAN = 0.45;
+/** Product-default pseudo-count; higher = slower to move off the prior. */
+export const DEFAULT_PRIOR_STRENGTH = 6;
+export const MASTERY_PRIOR_METADATA = Object.freeze({
+  mean: {
+    value: DEFAULT_PRIOR_MEAN,
+    origin: "product/theory default",
+    reason: "Handcrafted cold-start estimate; not calibrated from learner data.",
+    calibratedFromData: false,
+    sampleSize: null,
+    lastCalibrated: null,
+  },
+  strength: {
+    value: DEFAULT_PRIOR_STRENGTH,
+    origin: "product/theory default",
+    reason: "Small shrinkage weight chosen as a product default.",
+    calibratedFromData: false,
+    sampleSize: null,
+    lastCalibrated: null,
+  },
+} as const);
 
-/** Beta-Binomial posterior mean blending raw performance with the cohort prior. */
+/** Beta-Binomial posterior mean blending raw performance with the default prior. */
 export function bayesianMastery(raw: number, evidence: number): number {
-  const alpha = COHORT_PRIOR_MEAN * COHORT_PRIOR_STRENGTH;
-  const beta = (1 - COHORT_PRIOR_MEAN) * COHORT_PRIOR_STRENGTH;
+  const alpha = DEFAULT_PRIOR_MEAN * DEFAULT_PRIOR_STRENGTH;
+  const beta = (1 - DEFAULT_PRIOR_MEAN) * DEFAULT_PRIOR_STRENGTH;
   return (raw * evidence + alpha) / (evidence + alpha + beta);
 }
 
 /** Share of the predicted mastery still carried by the prior (1 = pure prior). */
 export function priorRemaining(evidence: number): number {
-  return COHORT_PRIOR_STRENGTH / (COHORT_PRIOR_STRENGTH + Math.max(0, evidence));
+  return DEFAULT_PRIOR_STRENGTH / (DEFAULT_PRIOR_STRENGTH + Math.max(0, evidence));
 }
 
 export interface MasteryInput {
@@ -133,9 +139,9 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     // would inflate the predicted grade and hide the topic from the planner.
     let mastery = evidence === 0 ? 0 : NEUTRAL_PRIOR * (1 - weight) + raw * weight;
 
-    // Bayesian view for the student: the cohort prior predicts where a new
+    // Bayesian view for the student: the default prior predicts where a new
     // topic probably sits, and narrows onto the proven estimate with evidence.
-    const predicted = evidence === 0 ? COHORT_PRIOR_MEAN : bayesianMastery(raw, evidence);
+    const predicted = evidence === 0 ? DEFAULT_PRIOR_MEAN : bayesianMastery(raw, evidence);
     const priorShare = priorRemaining(evidence);
 
     // Unresolved mistakes are direct evidence of an unrepaired gap.
@@ -160,7 +166,7 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
       topicId: topic.id,
       subjectId: topic.subjectId,
       mastery,
-      /** Cohort-prior posterior — what a cold-start topic displays. */
+      /** Default-prior posterior — what a cold-start topic displays. */
       predictedMastery: Math.round(predicted * 1000) / 1000,
       /** Fraction of the prediction still carried by the prior (0–1). */
       priorRemaining: Math.round(priorShare * 1000) / 1000,

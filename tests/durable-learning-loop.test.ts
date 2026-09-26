@@ -153,6 +153,7 @@ describe("smallest skill diagnosis and live action choice", () => {
     const action = selectLearningAction({ topicId: m3.topicId, nodes: wjecCapabilities, questions: bank, attempts, mistakes: [m3], now: new Date(START + 180_000 + REPAIR_RETENTION_DELAY_MS) });
     expect(action?.kind).toBe("retention");
     expect(action?.calibrated).toBe(false);
+    expect(action?.policy?.score).toBeGreaterThan(0);
     expect(action?.teaching).toBe(false);
   });
   it("does not bring a retention check forward to fill a session", () => {

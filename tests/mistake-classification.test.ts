@@ -250,6 +250,49 @@ describe("interpretation", () => {
 });
 
 describe("timing", () => {
+  it("beats calculation when a quantitative answer was mostly correct but rushed", () => {
+    const p = part({
+      prompt: "Calculate the kinetic energy of the object.",
+      marks: 4,
+      markScheme: ["substitutes into E = 1/2 mv²", "answer = 25 J"],
+    });
+    const q = question(p, { calculatorAllowed: true });
+    const result = run(
+      {
+        question: q,
+        part: p,
+        attempt: attempt(
+          { p1: "E = 1/2 × 2 × 5² = 25" },
+          marked({ awarded: 3, max: 4, missedPoints: ["unit J"] }),
+          3,
+          4,
+        ),
+      },
+      { timing: "rushed", secondsSpent: 12, marksLost: 1 },
+    );
+    expect(result.klass).toBe("timing");
+    expect(result.confidence).toBe("high");
+    expect(result.reasons.some((r) => r.includes("12s"))).toBe(true);
+  });
+
+  it("keeps calculation for rushed attempts that did not demonstrate most of the method", () => {
+    const p = part({
+      prompt: "Calculate the kinetic energy of the object.",
+      marks: 4,
+      markScheme: ["substitutes into E = 1/2 mv²", "answer = 25 J"],
+    });
+    const q = question(p, { calculatorAllowed: true });
+    const result = run(
+      {
+        question: q,
+        part: p,
+        attempt: attempt({ p1: "E = mv" }, marked({ awarded: 1, max: 4, missedPoints: ["answer = 25 J"] }), 1, 4),
+      },
+      { timing: "rushed", secondsSpent: 8, marksLost: 3 },
+    );
+    expect(result.klass).toBe("calculation");
+  });
+
   it("is called when the run was rushed on a part that was mostly earned", () => {
     const p = part({ prompt: "Describe the cardiac cycle.", marks: 6, markScheme: ["atria contract", "ventricles contract"] });
     const q = question(p);
@@ -265,6 +308,46 @@ describe("timing", () => {
   });
 });
 
+describe("working-evidence priority", () => {
+  function rushedCalculationResult(workingErrorKind?: "unit-error", firstIncorrectStep?: number) {
+    const p = part({
+      prompt: "Calculate the force acting on the object.",
+      marks: 4,
+      markScheme: ["force = 6 N"],
+    });
+    const q = question(p);
+    const submitted = attempt(
+      { p1: "force = 6" },
+      marked({ awarded: 3, max: 4, missedPoints: ["force = 6 N"] }),
+      3,
+      4,
+    );
+    return run(
+      { question: q, part: p, attempt: submitted },
+      {
+        timing: "rushed",
+        secondsSpent: 14,
+        marksLost: 1,
+        ...(workingErrorKind ? { workingErrorKind } : {}),
+        ...(firstIncorrectStep != null ? { firstIncorrectStep } : {}),
+      },
+    );
+  }
+
+  it("keeps specific unit evidence ahead of rushed and numeric heuristics", () => {
+    const result = rushedCalculationResult("unit-error", 1);
+    expect(result.klass).toBe("calculation");
+    expect(result.confidence).toBe("high");
+    expect(result.reasons).toContain("the working analysis identified a unit error");
+    expect(result.reasons).toContain("the first incorrect working step was step 2");
+  });
+
+  it("uses timing ahead of a generic calculation guess when there is no step diagnosis", () => {
+    const result = rushedCalculationResult();
+    expect(result.klass).toBe("timing");
+    expect(result.confidence).toBe("high");
+  });
+});
 describe("terminology", () => {
   it("is called when the point demands a term the answer talked around", () => {
     const p = part({

@@ -585,6 +585,9 @@ function PaperSession({
       awarded: totalAwarded,
       available: availableMarks,
       elapsedMs,
+      recommended: store.adaptiveSession
+        ? { href: store.adaptiveSession.startHref, label: "Start next session", reason: store.adaptiveSession.reason }
+        : undefined,
     });
     const predictedBefore = (() => {
       const subject = getSubject(paper.subjectId);
@@ -613,9 +616,9 @@ function PaperSession({
               variant="primary"
               className="flex-1"
               disabled={finishing}
-              onClick={() => void finish(closure.nextAction === "mistakes" ? "/review?mode=mistakes" : undefined)}
+              onClick={() => void finish(closure.recommended?.href ?? (closure.nextAction === "mistakes" ? "/review?mode=mistakes" : undefined))}
             >
-              {finishing ? "Saving…" : closure.nextAction === "mistakes" ? "Finish and review mistakes" : "Finish paper"}
+              {finishing ? "Saving…" : closure.recommended ? "Finish and continue" : closure.nextAction === "mistakes" ? "Finish and review mistakes" : "Finish paper"}
             </Button>
             <Button className="flex-1" disabled={finishing} onClick={() => void finish()}>
               Back to papers

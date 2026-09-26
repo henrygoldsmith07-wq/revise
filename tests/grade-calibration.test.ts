@@ -144,7 +144,9 @@ describe("simulatePaper + calibrateFromHistory — predicted vs later timed pape
     const supported = predictGrade(S, mastery, attempts.map((attempt) => ({ ...attempt, hintTier })), [], "2025-06-01");
     expect(supported.percent).toBeLessThan(independent.percent);
     expect(supported.confidence).toBeLessThan(independent.confidence);
-    expect(supported.percent).toBeLessThan(60);
+    // The discount must be material, not rounding noise: assisted perfect
+    // practice forecasts at least 5 points below the independent equivalent.
+    expect(independent.percent - supported.percent).toBeGreaterThanOrEqual(5);
   });
 
   it("does not report a positive trend from switching to worked solutions", () => {

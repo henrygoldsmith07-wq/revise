@@ -9,6 +9,8 @@ export interface PostSessionClosureInput {
   available?: number;
   retryCount?: number;
   elapsedMs: number;
+  /** Fresh post-answer plan from the shared next-action policy. */
+  recommended?: { href: string; label: string; reason: string };
 }
 
 export interface PostSessionClosure {
@@ -24,6 +26,7 @@ export interface PostSessionClosure {
   headline: string;
   detail: string;
   nextAction: PostSessionNextAction;
+  recommended: { href: string; label: string; reason: string } | null;
 }
 
 function roundedPercent(value: number): number {
@@ -78,6 +81,7 @@ export function buildPostSessionClosure(input: PostSessionClosureInput): PostSes
     headline,
     detail,
     nextAction,
+    recommended: input.recommended ?? null,
   };
 }
 

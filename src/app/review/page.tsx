@@ -16,6 +16,7 @@ import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
 import { RichText } from "@/components/RichText";
+import { clozeReveal } from "@/domain/cloze";
 
 // The review session. One card, one decision, no chrome competing for
 // attention. Confidence is captured *before* the answer is revealed, because
@@ -365,7 +366,7 @@ function ReviewSession() {
           <Pill>{cardKindLabel(current)}</Pill>
           {current.lapses > 2 ? <Pill tone="danger">Leech · {current.lapses} lapses</Pill> : null}
           <span className="ml-auto">
-            <SpeakButton text={revealed ? current.back : current.front} audioUrl={current.audioUrl} />
+            <SpeakButton text={revealed && current.kind === "cloze" ? clozeReveal(current) : revealed ? current.back : current.front} audioUrl={current.audioUrl} />
           </span>
         </div>
 
@@ -406,8 +407,17 @@ function ReviewSession() {
 
           {revealed ? (
             <div className="mt-5 pt-4 border-t border-line fade-in">
-              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">Answer</p>
-              <RichText className="text-base">{current.back}</RichText>
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">
+                {current.kind === "cloze" ? "Completed sentence" : "Answer"}
+              </p>
+              <RichText className="text-base">
+                {current.kind === "cloze" ? clozeReveal(current) : current.back}
+              </RichText>
+              {current.kind === "cloze" ? (
+                <p className="text-xs text-ink3 mt-2">
+                  Hidden answer: <span className="font-semibold text-ink2">{current.back}</span>
+                </p>
+              ) : null}
               {current.note ? <p className="text-xs text-ink3 mt-2 italic">{current.note}</p> : null}
             </div>
           ) : null}
@@ -586,6 +596,11 @@ function SessionSummary({
     total: reviewed,
     retryCount: again,
     elapsedMs: minutes * 60_000,
+    recommended: returnHref
+      ? { href: returnHref, label: "Continue session", reason: "Your retrieval grades have updated the next tutor step." }
+      : store.adaptiveSession
+        ? { href: store.adaptiveSession.startHref, label: "Start next session", reason: store.adaptiveSession.reason }
+        : undefined,
   });
   return (
     <PostSessionClosure

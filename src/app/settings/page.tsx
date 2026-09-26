@@ -16,12 +16,13 @@ import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
+import { PwaInstallSettings } from "@/components/PwaInstall";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function SettingsPage() {
   const store = useStore();
-  const { settings } = store;
+  const { settings, updateSettings } = store;
   const [ai, setAi] = useState<{ available: boolean; name: string | null } | null>(null);
   const [keyRevealed, setKeyRevealed] = useState(false);
   const [keyInput, setKeyInput] = useState("");
@@ -51,6 +52,16 @@ export default function SettingsPage() {
   useEffect(() => {
     void aiStatus().then(setAi);
   }, []);
+
+  // U can describe an outcome, but it is not a useful target. Clear any
+  // previously saved U target when the student opens these settings.
+  useEffect(() => {
+    if (!Object.values(settings.targetGrades).includes("U")) return;
+    const targetGrades = Object.fromEntries(
+      Object.entries(settings.targetGrades).filter(([, grade]) => grade !== "U"),
+    );
+    void updateSettings({ targetGrades });
+  }, [settings.targetGrades, updateSettings]);
 
   const totalWeeklyMinutes = settings.availability.reduce((a, row) => a + row.minutes, 0);
 
@@ -136,7 +147,7 @@ export default function SettingsPage() {
               <ul className="space-y-2">
                 {group.list.map((subject) => {
                   const on = settings.subjectIds.includes(subject.id);
-                  const grades = gradesFor(subject.id);
+                  const grades = gradesFor(subject.id).filter((grade) => grade !== "U");
                   return (
                     <li key={subject.id} className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -226,6 +237,8 @@ export default function SettingsPage() {
           </Button>
         </Panel>
       </section>
+
+      <PwaInstallSettings />
 
       <section>
         <SectionHeading title="Appearance and accessibility" />
@@ -559,6 +572,8 @@ function DataControls() {
       { store: "mistakes", count: store.mistakes.length },
       { store: "plannedSessions", count: store.plannedSessions.length },
       { store: "examDates", count: store.examDates.length },
+      { store: "gradePredictions", count: store.gradePredictionLog.filter((row) => row.anonId === store.userId).length },
+      { store: "gradeActuals", count: store.gradeActuals.filter((row) => row.anonId === store.userId).length },
       { store: "papers", count: store.papers.length },
       { store: "questions", count: store.questions.length },
     ],
@@ -605,6 +620,8 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     mistakes: store.mistakes,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    gradePredictions: store.gradePredictionLog.filter((row) => row.anonId === store.userId),
+    gradeActuals: store.gradeActuals.filter((row) => row.anonId === store.userId),
     interventionOutcomes: store.interventionOutcomes,
     settings: store.settings,
     streak: store.streak,
@@ -631,6 +648,8 @@ function exportDataLegacy(store: ReturnType<typeof useStore>) {
     papers: store.papers,
     plannedSessions: store.plannedSessions,
     examDates: store.examDates,
+    gradePredictions: store.gradePredictionLog.filter((row) => row.anonId === store.userId),
+    gradeActuals: store.gradeActuals.filter((row) => row.anonId === store.userId),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);

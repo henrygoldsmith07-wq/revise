@@ -11,8 +11,8 @@ describe("Countdown phase banner — Today wiring", () => {
     const source = page();
     expect(source).toContain('import { CountdownPhaseBanner } from "@/components/CountdownPhaseBanner";');
     const uses = source.split("<CountdownPhaseBanner />").length - 1;
-    // Due-review path, next-best-task path and the empty state all lead with it.
-    expect(uses).toBeGreaterThanOrEqual(3);
+    // Today has a unified adaptive session and one no-session fallback.
+    expect(uses).toBe(2);
   });
 });
 
