@@ -209,7 +209,8 @@ interface StoreValue extends Snapshot {
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
   clearRevisionCheckpoint(): Promise<void>;
   startRevisionTwinSession(choice: RevisionTwinChoice, title?: string): Promise<RevisionTwinSession>;
-  completeRevisionTwinSession(id: Id, actualMarks: number, actualMinutes?: number): Promise<void>;
+  completeRevisionTwinSessionFromAttempt(id: Id, attemptId: Id, actualMinutes?: number): Promise<void>;
+  finishRevisionTwinSession(id: Id, actualMinutes?: number): Promise<void>;
   abandonRevisionTwinSession(id: Id): Promise<void>;
   syncNow(): Promise<void>;
   experimentArm: ExperimentAssignment | null;
@@ -769,7 +770,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     startRevisionTwinSession,
-    completeRevisionTwinSession,
+    completeRevisionTwinSessionFromAttempt,
+    finishRevisionTwinSession,
     abandonRevisionTwinSession: abandonTwinSession,
   } = useRevisionSessions({
     userId,
@@ -1124,7 +1126,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
       startRevisionTwinSession,
-      completeRevisionTwinSession,
+      completeRevisionTwinSessionFromAttempt,
+      finishRevisionTwinSession,
       abandonRevisionTwinSession: abandonTwinSession,
       syncNow,
       experimentArm,
@@ -1205,7 +1208,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     startRevisionTwinSession,
-    completeRevisionTwinSession,
+    completeRevisionTwinSessionFromAttempt,
+    finishRevisionTwinSession,
     abandonTwinSession,
     syncNow,
     experimentArm,

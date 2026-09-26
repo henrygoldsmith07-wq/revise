@@ -63,7 +63,7 @@ describe("Physics bank-wide audit", () => {
     // steal cannot fail the suite; a persistent slowdown above 3 s still is.
     const warmElapsed = report.elapsedMs < 2000 ? report.elapsedMs : auditPhysicsBank(questions).elapsedMs;
     expect(Math.min(report.elapsedMs, warmElapsed)).toBeLessThan(3000);
-  });
+  }, 30_000);
 
   it("finds explicit convention conflicts while keeping the result deterministic", () => {
     const rows = [

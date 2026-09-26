@@ -213,7 +213,7 @@ interactive speed.
 
 - Every topic has `specPoints` on every unit; every `specPointIds` is paired with `learningClaims`; stale topics (>365d) and unverified statements are surfaced by `regressionReport`.
 - Spec-change diff tooling (`curriculum-diff.ts`): diff two snapshots of a subject's topics (old spec version vs new) and get added/removed/reworded spec points, key-point and common-error changes, plus the questions pinned to affected points — so a board revision is triaged instead of re-read. `recordedSpecVersionChanges` lists subjects whose manifest history spans multiple spec versions.
-- CI gate: `node scripts/validate-curriculum.mjs` — 440 topics / 577 authored question templates today; the runtime bank materialises 1,595 GCSE, Edexcel A-level, data-question, unfamiliar-context and authentic-source expansion entries (8 boards×levels, tree-shakable modules).
+- CI gate: `node scripts/validate-curriculum.mjs` prints the live topic/question totals and fails when README's advertised totals drift. Keep that validator as the inventory source of truth rather than copying another fast-staling count into benchmark prose.
 - Visual regression: `e2e/visual.spec.ts` guards the Today shell (2% tolerance, `e2e/__screenshots__/`); update with `--update-snapshots`.
 
 

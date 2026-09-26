@@ -1,4 +1,5 @@
-import type { ActivityKind, Id, IsoInstant, Recommendation } from "./types";
+import { independentAttempt, questionCapabilities, trustedAssessmentAttempt } from "./learning-evidence";
+import type { ActivityKind, Attempt, Id, IsoInstant, Question, Recommendation } from "./types";
 
 // ---------------------------------------------------------------------------
 // Revision Digital Twin
@@ -11,7 +12,7 @@ import type { ActivityKind, Id, IsoInstant, Recommendation } from "./types";
 // ---------------------------------------------------------------------------
 
 export const REVISION_TWIN_VERSION = 1 as const;
-export const REVISION_TWIN_MINUTES = 45;
+export const REVISION_TWIN_MINUTES = 20;
 const REVISION_TWIN_ACTIVITIES: readonly ActivityKind[] = [
   "learn",
   "flashcards",
@@ -23,6 +24,7 @@ const REVISION_TWIN_ACTIVITIES: readonly ActivityKind[] = [
 
 export type RevisionTwinSessionStatus = "active" | "completed" | "abandoned";
 export type RevisionTwinConfidence = "new" | "learning" | "calibrated";
+export type RevisionTwinOutcomeSource = "trusted-attempt" | "self-reported" | "unverified";
 
 export interface RevisionTwinSession {
   id: Id;
@@ -41,6 +43,17 @@ export interface RevisionTwinSession {
   completedAt?: IsoInstant;
   /** Marks earned in the end-of-session check, not a confidence rating. */
   actualMarks?: number;
+  /** Denominator for the trusted marked check. */
+  actualMax?: number;
+  /** Observed mark gain against a trusted pre-block baseline on the same topic. */
+  observedGainMarks?: number;
+  /** Accuracy before and after the block, retained so calibration is auditable. */
+  baselineAccuracy?: number;
+  observedAccuracy?: number;
+  /** Canonical attempt that supplied the trusted post-block result. */
+  proofAttemptId?: Id;
+  /** Only trusted-attempt outcomes are allowed to change future forecasts. */
+  outcomeSource?: RevisionTwinOutcomeSource;
   /** Real time spent; useful when a student stops early. */
   actualMinutes?: number;
   status: RevisionTwinSessionStatus;
@@ -76,6 +89,8 @@ export interface RevisionTwinChoice {
   baselineMarks: number;
   /** Return after the conservative empirical multiplier is applied. */
   predictedMarks: number;
+  /** Fixed comparison window. The Twin follows Today's learning window. */
+  plannedMinutes: number;
   marksPerHour: number;
   sampleSize: number;
   confidence: RevisionTwinConfidence;
@@ -90,6 +105,17 @@ export interface RevisionTwinReport {
   meanAbsoluteError: number | null;
   bias: number | null;
   hitRate: number | null;
+  /** Completed blocks that are retained in history but excluded from calibration. */
+  unverifiedCompleted: number;
+}
+
+export interface RevisionTwinProof {
+  attemptId: Id;
+  actualMarks: number;
+  actualMax: number;
+  baselineAccuracy: number;
+  observedAccuracy: number;
+  observedGainMarks: number;
 }
 
 export function revisionTwinKey(activity: ActivityKind, subjectId: Id, topicId?: Id): string {
@@ -113,7 +139,7 @@ export function createRevisionTwinSession(input: {
   now?: IsoInstant;
   plannedMinutes?: number;
 }): RevisionTwinSession {
-  const plannedMinutes = clampMinutes(input.plannedMinutes ?? REVISION_TWIN_MINUTES);
+  const plannedMinutes = clampMinutes(input.plannedMinutes ?? input.choice.plannedMinutes ?? REVISION_TWIN_MINUTES);
   return {
     id: input.id,
     userId: input.userId,
@@ -144,6 +170,126 @@ export function completeRevisionTwinSession(
     completedAt: input.now ?? new Date().toISOString(),
     actualMarks: roundMarks(Math.max(0, finiteOr(input.actualMarks, 0))),
     actualMinutes: clampMinutes(input.actualMinutes ?? session.plannedMinutes),
+    outcomeSource: "self-reported",
+  };
+}
+
+/** Close a block without inventing an outcome. It remains history, not calibration evidence. */
+export function finishRevisionTwinSession(
+  session: RevisionTwinSession,
+  input: { actualMinutes?: number; now?: IsoInstant } = {},
+): RevisionTwinSession {
+  return {
+    ...session,
+    status: "completed",
+    completedAt: input.now ?? new Date().toISOString(),
+    actualMinutes: clampMinutes(input.actualMinutes ?? session.plannedMinutes),
+    outcomeSource: "unverified",
+  };
+}
+
+function validAttemptScore(attempt: Attempt): number | null {
+  if (!Number.isFinite(attempt.awarded) || !Number.isFinite(attempt.max) || attempt.max <= 0 ||
+    attempt.awarded < 0 || attempt.awarded > attempt.max) return null;
+  return attempt.awarded / attempt.max;
+}
+
+function matchesTwinTarget(session: RevisionTwinSession, attempt: Attempt): boolean {
+  return attempt.userId === session.userId &&
+    attempt.subjectId === session.subjectId &&
+    (!session.topicId || attempt.topicIds.includes(session.topicId));
+}
+
+function trustedTwinAttempt(attempt: Attempt, history: readonly Attempt[], questions: readonly Question[]): boolean {
+  const question = questions.find((row) => row.id === attempt.questionId);
+  return Boolean(question && independentAttempt(attempt) && trustedAssessmentAttempt(attempt, question, history, questions));
+}
+
+/**
+ * Turn one canonical post-block attempt into a directional gain observation.
+ *
+ * A trusted post score alone is not "marks gained". The Twin therefore also
+ * requires the latest trusted independent pre-block attempt on the same target.
+ * The before/after accuracy delta is expressed on the post-check denominator.
+ * This remains noisy evidence, so the calibration layer keeps its shrinkage
+ * prior and never accepts manually typed scores.
+ */
+export function revisionTwinProofForAttempt(
+  session: RevisionTwinSession,
+  attempt: Attempt,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+): RevisionTwinProof | null {
+  const observedAccuracy = validAttemptScore(attempt);
+  if (session.status !== "active" || observedAccuracy == null || !matchesTwinTarget(session, attempt) ||
+    Date.parse(attempt.createdAt) <= Date.parse(session.startedAt) ||
+    !trustedTwinAttempt(attempt, history, questions)) return null;
+
+  const baseline = history
+    .filter((row) => row.id !== attempt.id && row.questionId !== attempt.questionId && matchesTwinTarget(session, row) &&
+      Date.parse(row.createdAt) < Date.parse(session.startedAt) &&
+      validAttemptScore(row) != null && trustedTwinAttempt(row, history, questions) &&
+      comparableTwinQuestions(row.questionId, attempt.questionId, questions))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!baseline) return null;
+  const baselineAccuracy = validAttemptScore(baseline);
+  if (baselineAccuracy == null) return null;
+
+  return {
+    attemptId: attempt.id,
+    actualMarks: roundMarks(attempt.awarded),
+    actualMax: roundMarks(attempt.max),
+    baselineAccuracy: round01(baselineAccuracy),
+    observedAccuracy: round01(observedAccuracy),
+    observedGainMarks: roundMarks((observedAccuracy - baselineAccuracy) * attempt.max),
+  };
+}
+
+function comparableTwinQuestions(baselineQuestionId: Id, observedQuestionId: Id, questions: readonly Question[]): boolean {
+  const baseline = questions.find((row) => row.id === baselineQuestionId);
+  const observed = questions.find((row) => row.id === observedQuestionId);
+  if (!baseline || !observed) return false;
+  const left = questionCapabilities(baseline);
+  const right = new Set(questionCapabilities(observed));
+  // Capability metadata is the strongest available like-for-like comparison.
+  // Legacy/reference-tier content without capability ids falls back to the
+  // already-enforced subject/topic target rather than fabricating a mapping.
+  return !left.length || !right.size || left.some((id) => right.has(id));
+}
+
+export function eligibleRevisionTwinProofAttempts(
+  session: RevisionTwinSession,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+): Array<{ attempt: Attempt; proof: RevisionTwinProof }> {
+  return history
+    .filter((attempt) => Date.parse(attempt.createdAt) > Date.parse(session.startedAt))
+    .map((attempt) => ({ attempt, proof: revisionTwinProofForAttempt(session, attempt, history, questions) }))
+    .filter((row): row is { attempt: Attempt; proof: RevisionTwinProof } => Boolean(row.proof))
+    .sort((a, b) => b.attempt.createdAt.localeCompare(a.attempt.createdAt));
+}
+
+export function completeRevisionTwinSessionFromAttempt(
+  session: RevisionTwinSession,
+  attempt: Attempt,
+  history: readonly Attempt[],
+  questions: readonly Question[],
+  input: { actualMinutes?: number; now?: IsoInstant } = {},
+): RevisionTwinSession {
+  const proof = revisionTwinProofForAttempt(session, attempt, history, questions);
+  if (!proof) throw new Error("This attempt is not eligible trusted Twin evidence.");
+  return {
+    ...session,
+    status: "completed",
+    completedAt: input.now ?? new Date().toISOString(),
+    actualMarks: proof.actualMarks,
+    actualMax: proof.actualMax,
+    observedGainMarks: proof.observedGainMarks,
+    baselineAccuracy: proof.baselineAccuracy,
+    observedAccuracy: proof.observedAccuracy,
+    proofAttemptId: proof.attemptId,
+    actualMinutes: clampMinutes(input.actualMinutes ?? session.plannedMinutes),
+    outcomeSource: "trusted-attempt",
   };
 }
 
@@ -162,6 +308,14 @@ export function actualMarksForWindow(session: RevisionTwinSession): number | nul
   return roundMarks(Math.max(0, session.actualMarks) * (session.plannedMinutes / minutes));
 }
 
+/** Trusted observed gain normalised to the same time window as the forecast. */
+export function observedGainForWindow(session: RevisionTwinSession): number | null {
+  if (session.outcomeSource !== "trusted-attempt" || session.observedGainMarks == null ||
+    !Number.isFinite(session.observedGainMarks)) return null;
+  const minutes = Math.max(1, session.actualMinutes ?? session.plannedMinutes);
+  return roundMarks(session.observedGainMarks * (session.plannedMinutes / minutes));
+}
+
 /**
  * Build empirical calibration per activity/topic. A three-session prior keeps
  * the first observation useful without allowing a single lucky or poor check
@@ -171,8 +325,9 @@ export function calibrateRevisionTwin(sessions: RevisionTwinSession[]): Map<stri
   const completed = sessions.filter(
     (session) =>
       session.status === "completed" &&
-      session.actualMarks != null &&
-      Number.isFinite(session.actualMarks) &&
+      session.outcomeSource === "trusted-attempt" &&
+      session.observedGainMarks != null &&
+      Number.isFinite(session.observedGainMarks) &&
       Number.isFinite(session.predictedMarks),
   );
   const grouped = new Map<string, RevisionTwinSession[]>();
@@ -191,7 +346,7 @@ export function calibrateRevisionTwin(sessions: RevisionTwinSession[]): Map<stri
     let maeSum = 0;
     for (const row of rows) {
       const baseline = Math.max(0.1, row.baselineMarks ?? row.predictedMarks);
-      const actual = actualMarksForWindow(row) ?? 0;
+      const actual = observedGainForWindow(row) ?? 0;
       ratioSum += actual / baseline;
       biasSum += actual - row.predictedMarks;
       maeSum += Math.abs(actual - row.predictedMarks);
@@ -216,7 +371,7 @@ export function calibrateRevisionTwin(sessions: RevisionTwinSession[]): Map<stri
 }
 
 /**
- * Convert the recommender's mixed-duration candidates into a common 45-minute
+ * Convert the recommender's mixed-duration candidates into one common bounded
  * comparison. One candidate per subject is preferred before filling any spare
  * rows, which makes the choice set genuinely useful when several subjects are
  * enrolled and one subject currently has a deep queue.
@@ -253,6 +408,7 @@ export function buildRevisionTwinChoices(input: {
       topicId: recommendation.topicId,
       baselineMarks,
       predictedMarks,
+      plannedMinutes: budgetMinutes,
       marksPerHour: roundMarks((predictedMarks / budgetMinutes) * 60),
       sampleSize: calibration?.sampleSize ?? 0,
       confidence: calibration?.confidence ?? "new",
@@ -283,11 +439,10 @@ export function buildRevisionTwinChoices(input: {
 
 export function revisionTwinReport(state: RevisionTwinState | null | undefined): RevisionTwinReport {
   const sessions = [...(state?.sessions ?? [])].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-  const completedSessions = sessions.filter(
-    (session) => session.status === "completed" && session.actualMarks != null && Number.isFinite(session.actualMarks),
-  );
+  const completedSessions = sessions.filter((session) => session.status === "completed");
+  const trustedCompleted = completedSessions.filter((session) => observedGainForWindow(session) != null);
   const calibrations = [...calibrateRevisionTwin(sessions).values()].sort((a, b) => b.sampleSize - a.sampleSize || a.key.localeCompare(b.key));
-  if (!completedSessions.length) {
+  if (!trustedCompleted.length) {
     return {
       sessions,
       activeSession: sessions.find((session) => session.status === "active") ?? null,
@@ -297,18 +452,20 @@ export function revisionTwinReport(state: RevisionTwinState | null | undefined):
       meanAbsoluteError: null,
       bias: null,
       hitRate: null,
+      unverifiedCompleted: completedSessions.length,
     };
   }
-  const errors = completedSessions.map((session) => (actualMarksForWindow(session) ?? 0) - session.predictedMarks);
+  const errors = trustedCompleted.map((session) => (observedGainForWindow(session) ?? 0) - session.predictedMarks);
   return {
     sessions,
     activeSession: sessions.find((session) => session.status === "active") ?? null,
     completedSessions,
     calibrations,
-    checks: completedSessions.length,
+    checks: trustedCompleted.length,
     meanAbsoluteError: roundMarks(errors.reduce((sum, error) => sum + Math.abs(error), 0) / errors.length),
     bias: roundMarks(errors.reduce((sum, error) => sum + error, 0) / errors.length),
     hitRate: Math.round((errors.filter((error) => Math.abs(error) <= 0.5).length / errors.length) * 100) / 100,
+    unverifiedCompleted: completedSessions.length - trustedCompleted.length,
   };
 }
 
@@ -339,6 +496,12 @@ function isRevisionTwinSession(value: unknown): value is RevisionTwinSession {
     typeof candidate.startedAt === "string" &&
     (candidate.status === "active" || candidate.status === "completed" || candidate.status === "abandoned") &&
     (candidate.actualMarks == null || Number.isFinite(candidate.actualMarks)) &&
+    (candidate.actualMax == null || Number.isFinite(candidate.actualMax)) &&
+    (candidate.observedGainMarks == null || Number.isFinite(candidate.observedGainMarks)) &&
+    (candidate.baselineAccuracy == null || Number.isFinite(candidate.baselineAccuracy)) &&
+    (candidate.observedAccuracy == null || Number.isFinite(candidate.observedAccuracy)) &&
+    (candidate.proofAttemptId == null || typeof candidate.proofAttemptId === "string") &&
+    (candidate.outcomeSource == null || ["trusted-attempt", "self-reported", "unverified"].includes(candidate.outcomeSource)) &&
     (candidate.actualMinutes == null || Number.isFinite(candidate.actualMinutes))
   );
 }
@@ -350,6 +513,10 @@ function normaliseSession(session: RevisionTwinSession): RevisionTwinSession {
     baselineMarks: session.baselineMarks == null ? undefined : roundMarks(Math.max(0, finiteOr(session.baselineMarks, 0))),
     predictedMarks: roundMarks(Math.max(0, finiteOr(session.predictedMarks, 0))),
     actualMarks: session.actualMarks == null ? undefined : roundMarks(Math.max(0, finiteOr(session.actualMarks, 0))),
+    actualMax: session.actualMax == null ? undefined : roundMarks(Math.max(0, finiteOr(session.actualMax, 0))),
+    observedGainMarks: session.observedGainMarks == null ? undefined : roundMarks(finiteOr(session.observedGainMarks, 0)),
+    baselineAccuracy: session.baselineAccuracy == null ? undefined : round01(session.baselineAccuracy),
+    observedAccuracy: session.observedAccuracy == null ? undefined : round01(session.observedAccuracy),
     actualMinutes: session.actualMinutes == null ? undefined : clampMinutes(session.actualMinutes),
   };
 }
@@ -372,5 +539,9 @@ function roundMarks(value: number): number {
 
 function roundMultiplier(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function round01(value: number): number {
+  return Math.round(clamp(value, 0, 1) * 1000) / 1000;
 }
 

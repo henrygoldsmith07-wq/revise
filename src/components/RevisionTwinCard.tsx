@@ -84,7 +84,7 @@ function ChoiceList({ compact }: { compact: boolean }) {
         <span>Predicted benefit</span>
         <span className="sr-only">Action</span>
       </div>
-      <ol className="space-y-2" aria-label={`${REVISION_TWIN_MINUTES}-minute revision choices`}>
+      <ol className="space-y-2" aria-label={`${choices[0]?.plannedMinutes ?? REVISION_TWIN_MINUTES}-minute revision choices`}>
         {choices.map((choice, index) => {
           const confidence = confidenceCopy(choice.sampleSize);
           const title = revisionChoiceTitle(choice);
@@ -112,7 +112,7 @@ function ChoiceList({ compact }: { compact: boolean }) {
                   variant={index === 0 ? "primary" : "secondary"}
                   onClick={() => void start(choice)}
                   disabled={disabled}
-                  aria-label={`Start ${title} for ${REVISION_TWIN_MINUTES} minutes`}
+                  aria-label={`Start ${title} for ${choice.plannedMinutes} minutes`}
                   className="w-full sm:w-auto"
                 >
                   {starting === choice.key ? "Starting…" : active ? "Block active" : "Start"}
@@ -138,19 +138,20 @@ export function RevisionTwinCard({ compact = false }: { compact?: boolean }) {
   const store = useStore();
   const active = store.revisionTwinReport.activeSession;
   const checks = store.revisionTwinReport.checks;
+  const minutes = active?.plannedMinutes ?? store.revisionTwinChoices[0]?.plannedMinutes ?? REVISION_TWIN_MINUTES;
 
   return (
     <Panel className={cx("relative overflow-hidden", compact && "border-ink3")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <Pill tone="accent">Decision system</Pill>
-            <Pill>{REVISION_TWIN_MINUTES} min</Pill>
-            {checks ? <Pill tone="success">{checks} check{checks === 1 ? "" : "s"} logged</Pill> : null}
+            <Pill tone="accent">Calibration layer</Pill>
+            <Pill>{minutes} min</Pill>
+            {checks ? <Pill tone="success">{checks} trusted check{checks === 1 ? "" : "s"}</Pill> : null}
           </div>
           <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-ink">Revision Digital Twin</h2>
           <p className="text-sm text-ink3 mt-0.5 max-w-2xl">
-            You have {REVISION_TWIN_MINUTES} minutes. Spend them where the model expects the most assessment marks back.
+            Today has already selected the highest-value topic. The Twin compares ways to use that same {minutes}-minute window and tests the forecast against trusted marked evidence.
           </p>
         </div>
         <Link href="/twin" className="text-xs font-semibold text-ink2 hover:text-ink hover:underline shrink-0">
@@ -163,7 +164,7 @@ export function RevisionTwinCard({ compact = false }: { compact?: boolean }) {
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-wide text-speak font-semibold">Block in progress</p>
             <p className="text-sm font-semibold text-ink truncate mt-0.5">{revisionSessionTitle(active)}</p>
-            <p className="text-[11px] text-ink3 mt-0.5">Predicted +{formatMarks(active.predictedMarks)} marks · log the check when you finish.</p>
+            <p className="text-[11px] text-ink3 mt-0.5">Predicted +{formatMarks(active.predictedMarks)} marks · only a trusted before/after check can calibrate it.</p>
           </div>
           <ButtonLink href="/twin" size="sm" variant="secondary">Finish block</ButtonLink>
         </div>
@@ -175,7 +176,7 @@ export function RevisionTwinCard({ compact = false }: { compact?: boolean }) {
 
       <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-ink3">
-          {checks ? "Each check tightens the next ranking." : "After revision, record the check score so the twin can learn."}
+          {checks ? "Only canonical trusted checks tighten the forecast." : "Manual scores never change the forecast; use marked Revise attempts as proof."}
         </p>
         <Link href="/twin" className="text-[11px] font-semibold text-ink2 hover:text-ink hover:underline">
           See prediction history →

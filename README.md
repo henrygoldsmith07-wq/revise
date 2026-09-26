@@ -70,7 +70,7 @@ Chemistry, Physics - are being built to per-statement depth: for every
 specification point, retrieval cards plus simple, application,
 unfamiliar-context, misconception and harder/synoptic questions, each with
 a worked solution and verified provenance. The headline the depth ledger
-makes computable is not "440 topics" but:
+makes computable is not "475 topics" but:
 
 > N% of WJEC A-level Physics specification statements have at least four
 > independently reviewed exam questions covering recall, application and
@@ -84,7 +84,7 @@ and honestly labelled, but not where authoring effort goes.
 ```
 src/domain/      Pure revision engine — no React, no I/O, fully unit-tested
   types.ts         The board-agnostic domain model
-  curriculum/      Registry + 32 WJEC/AQA/Edexcel/OCR × A-level/GCSE subjects (440 topics)
+  curriculum/      Registry + 32 WJEC/AQA/Edexcel/OCR × A-level/GCSE subjects (475 topics)
   scheduling.ts    FSRS wrapper: grading, queues, forgetting curve
   mastery.ts       Topic mastery with explicit evidence weighting
   recommender.ts   "What should I do right now?" (+ recommender-enhancements: cold-start, ties, exploration, gain)
@@ -250,8 +250,8 @@ provenance record (`source` / `verification` / `reviewer` / `lastChecked` /
 `specVersion`). Coverage on Progress is measured **per statement**: how many have
 retrieval cards, how many have an exam question (*which* parts test *which*
 statements), which are verified, and — per `SPEC_MANIFEST` — which unit/paper
-(duration, marks, weighting) each belongs to. The statement model now covers all **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE): 440 topics,
-718 seed questions**, every topic with `specPoints` and every seed question part
+(duration, marks, weighting) each belongs to. The statement model now covers all **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE): 475 topics,
+869 seed questions**, every topic with `specPoints` and every seed question part
 mapped with `specPointIds + learningClaims` (explicit per-mark allocation via
 `claimMap` where needed).
 Topic lists and grade boundaries remain approximate and labelled as such; always

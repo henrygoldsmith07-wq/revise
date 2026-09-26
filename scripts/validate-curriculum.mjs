@@ -48,6 +48,7 @@ function parseQuestions() {
 const topics = parseTopics();
 const q = parseQuestions();
 const totalTopics = topics.reduce((a, x) => a + x.topicCount, 0);
+const readme = readFileSync(join(ROOT, "README.md"), "utf8");
 
 console.log("Revise curriculum audit -", new Date().toISOString().slice(0, 10));
 console.log("");
@@ -58,6 +59,22 @@ console.log(`  seed questions: ${q.total}  (${q.withVerification} with verificat
 const errors = [];
 if (totalTopics < 200) errors.push(`too few topics: ${totalTopics} - expected >=200 across boards/levels (WJEC+AQA+Edexcel+OCR x GCSE/A-level)`);
 if (q.total < 20) errors.push(`too few questions: ${q.total} - seed bank looks pruned`);
+
+// Public inventory claims must move with the measured bank. Revise presents
+// provenance/auditability as a product property, so stale README totals are a
+// release defect rather than harmless prose drift.
+const advertised = readme.match(/statement model now covers all[\s\S]{0,180}?:\s*(\d+) topics,\s*(\d+) seed questions/i);
+if (!advertised) {
+  errors.push("README.md: missing live curriculum inventory claim");
+} else {
+  const advertisedTopics = Number(advertised[1]);
+  const advertisedQuestions = Number(advertised[2]);
+  if (advertisedTopics !== totalTopics || advertisedQuestions !== q.total) {
+    errors.push(
+      `README.md: advertised curriculum inventory is stale (${advertisedTopics} topics / ${advertisedQuestions} questions; measured ${totalTopics} / ${q.total})`,
+    );
+  }
+}
 
 for (const t of topics) {
   const text = readFileSync(join(ROOT, `src/domain/curriculum/${t.file}`), "utf8");

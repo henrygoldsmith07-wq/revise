@@ -55,7 +55,7 @@ export default function ReadinessPage() {
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Close the loop</p>
             <h2 className="text-base font-semibold text-ink mt-1">Use the passport to choose the next proof, not just the next topic.</h2>
             <p className="text-sm text-ink3 mt-1 max-w-2xl">
-              The Digital Twin allocates your next 45 minutes. This passport tells you which kind of evidence that block needs to create before you trust the result.
+              Today selects the next bounded learning window; the Digital Twin audits that same decision. This passport tells you which kind of evidence the block needs to create before you trust the result.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">

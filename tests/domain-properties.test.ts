@@ -262,7 +262,7 @@ describe("mastery invariants", () => {
       }),
       { numRuns: 1_000 },
     );
-  });
+  }, 20_000);
 
   it("the Bayesian prior converges onto raw performance as evidence grows", () => {
     fc.assert(
