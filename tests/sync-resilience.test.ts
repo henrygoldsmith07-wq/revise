@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { clearAll, getDb } from "@/data/db";
 import { authIdentity, collapseOutboxItems, sync } from "@/data/sync";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
-import { encryptPayload, importEncryptionKey } from "@/data/e2ee";
+import { decryptPayload, encryptPayload, importEncryptionKey } from "@/data/e2ee";
 import { createCard } from "@/domain/scheduling";
 import type { OutboxItem } from "@/domain/types";
 
@@ -114,6 +114,48 @@ describe("sync disaster contracts", () => {
   it("rejects a session whose auth identity does not match the local queue", async () => {
     const client = fakeClient();
     await expect(authIdentity(client, "22222222-2222-4222-8222-222222222222")).resolves.toBe("account-mismatch");
+  });
+});
+
+describe("pull-path resilience", () => {
+  it("pulls a remote card into IndexedDB and advances the pull cursor", async () => {
+    const remote = remoteCard("card-remote-1", USER, "2026-09-02T00:00:00.000Z");
+    const result = await sync(USER, { client: pullClient(USER, { cards: [remote] }), online: true });
+    expect(result.failed).toBe(0);
+    expect(result.pulled).toBe(1);
+    expect(await (await getDb()).get("cards", "card-remote-1")).toBeDefined();
+    expect(await readReviseUserMeta<string>("lastPullAt", USER)).toBe("2026-09-02T00:00:00.000Z");
+  });
+
+  it("only pulls rows newer than the stored cursor", async () => {
+    await writeReviseUserMeta("lastPullAt", USER, "2026-09-02T00:00:00.000Z");
+    const rows = {
+      cards: [
+        remoteCard("card-old", USER, "2026-09-01T00:00:00.000Z"),
+        remoteCard("card-new", USER, "2026-09-03T00:00:00.000Z"),
+      ],
+    };
+    const result = await sync(USER, { client: pullClient(USER, rows), online: true });
+    expect(result.failed).toBe(0);
+    expect(result.pulled).toBe(1);
+    expect(await (await getDb()).get("cards", "card-new")).toBeDefined();
+    expect(await (await getDb()).get("cards", "card-old")).toBeUndefined();
+    expect(await readReviseUserMeta<string>("lastPullAt", USER)).toBe("2026-09-03T00:00:00.000Z");
+  });
+
+  it("keeps the old cursor when a table pull fails so a retry re-fetches", async () => {
+    await writeReviseUserMeta("lastPullAt", USER, "2026-09-02T00:00:00.000Z");
+    const rows = { cards: [remoteCard("card-x", USER, "2026-09-04T00:00:00.000Z")] };
+    const result = await sync(USER, { client: pullClient(USER, rows, "cards"), online: true });
+    expect(result.pulled).toBe(0);
+    expect(result.failed).toBeGreaterThan(0);
+    expect(await readReviseUserMeta<string>("lastPullAt", USER)).toBe("2026-09-02T00:00:00.000Z");
+  });
+
+  it("rejects a bad recovery key without corrupting device encryption", async () => {
+    const blob = await encryptPayload({ answer: "my essay" });
+    expect(await importEncryptionKey("not-json")).toBe(false);
+    await expect(decryptPayload<{ answer: string }>(blob)).resolves.toEqual({ answer: "my essay" });
   });
 });
 

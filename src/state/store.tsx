@@ -17,13 +17,9 @@ import { trustedAssessmentContent } from "@/domain/physics-content-review";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
-import { buildPlan, rescheduleMissed, summarizePlanChange } from "@/domain/planner";
-import { buildSubjectEvidence } from "@/domain/subject-allocation";
-import { currentPhaseBuckets, techniqueEntryNotices } from "@/domain/phase-notice";
-import type { PhaseBucket, PhaseNotice, PhaseSubject } from "@/domain/phase-notice";
-import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
-import { daysToExam, recommend } from "@/domain/recommender";
-import { buildAdaptiveSession } from "@/domain/adaptive-session";
+import { rescheduleMissed } from "@/domain/planner";
+import type { PhaseNotice } from "@/domain/phase-notice";
+import { recommend } from "@/domain/recommender";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import { reviewedWjecTopicEdges } from "@/content/capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
@@ -33,23 +29,10 @@ import {
   type KnowledgeAnsweringReport,
 } from "@/domain/exam-technique";
 import {
-  buildPaperOutcomeRecord,
-  closePaperOutcome,
-  paperOutcomeGainMultiplier,
   type PaperOutcomeReview,
   type PaperOutcomeRecord,
 } from "@/domain/paper-outcome";
-import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
-import { buildExamReadiness, summariseExamReadiness } from "@/domain/exam-readiness";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
-import {
-  abandonRevisionTwinSession,
-  buildRevisionTwinChoices,
-  completeRevisionTwinSession as completeTwinSession,
-  createRevisionTwinSession,
-  createRevisionTwinState,
-  revisionTwinReport,
-} from "@/domain/revision-twin";
 import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
 import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
 import { getDeviceIdentity, nextLamport } from "@/data/device";
@@ -107,30 +90,33 @@ import * as repo from "@/data/repository";
 import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { domainEngine } from "@/data/domain-engine";
-import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
-import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
-import { attachDelayedRetentionOutcome, attachTransferOutcome, calibrateInterventions, createInterventionOutcome } from "@/domain/intervention-calibration";
+import { attachDelayedRetentionOutcome, attachTransferOutcome, createInterventionOutcome } from "@/domain/intervention-calibration";
 import type { InterventionCalibration } from "@/domain/intervention-calibration";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
-import { gradePredictionSnapshotId, type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
-import { assignArm as assignExperimentArm, policyTaskFor,
-  type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
-import { isSupabaseConfigured } from "@/data/supabase";
+import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/grade-loop";
+import { policyTaskFor,
+  type ExperimentAssignment, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { StorageRecovery } from "@/components/StorageRecovery";
 import { estimateStorageQuota } from "@/data/storage-quota";
 import type { StorageQuota } from "@/data/storage-quota";
-import {
-  createRevisionCheckpoint,
-  type RevisionCheckpoint,
-  type RevisionCheckpointInput,
+import type {
+  RevisionCheckpoint,
+  RevisionCheckpointInput,
 } from "@/domain/revision-checkpoint";
 // Domain-separated concerns (no behaviour change — pure moves out of the monolith):
 import { currentActiveMinutes, touchSessionClock } from "./session-clock";
 import { legacyLessonProgress, localDayKey, nextLessonStreak } from "./lesson-streak";
 import { trustedSnapshotAttempt } from "./trusted-evidence";
-import { initialSyncStatus, type SyncStatus } from "./sync-status";
+import type { SyncStatus } from "./sync-status";
 import { subjectsForSettings } from "./selectors";
+// Responsibility modules: each owns its state, persistence and actions; the
+// provider below only composes them with the derived learner model.
+import { useSyncEngine } from "./sync-engine";
+import { useExperiments } from "./experiments";
+import { useOutcomes } from "./outcomes";
+import { useRevisionSessions } from "./sessions";
+import { usePlanning } from "./planning";
 
 // ---------------------------------------------------------------------------
 // Store composition. Revision data is small (thousands of rows at most), so
@@ -254,22 +240,12 @@ export function useStore(): StoreValue {
   return value;
 }
 
-let syncInFlight = false;
-// Module-scoped like syncInFlight: counts background-hydration runs so a
-// superseded stream can detect it was replaced. Deliberately not a ref — the
-// epoch is coordination state for background work, never render input.
-let hydrationEpoch = 0;
-// Session clock, lesson streak, and evidence trust now live in
-// ./session-clock, ./lesson-streak, and ./trusted-evidence (pure moves).
+// Session clock, lesson streak, evidence trust, and sync coordination now
+// live in ./session-clock, ./lesson-streak, ./trusted-evidence and
+// ./sync-engine (pure moves + responsibility modules).
 
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
-  const [experimentArm, setExperimentArm] = useState<ExperimentAssignment | null>(null);
-  const [funnelEvents, setFunnelEvents] = useState<FunnelEvent[]>([]);
-  const [gradePredictionLog, setGradePredictionLog] = useState<GradePredictionRecord[]>([]);
-  const [gradeActuals, setGradeActuals] = useState<ActualResultRecord[]>([]);
-  const [revisionTwin, setRevisionTwin] = useState<RevisionTwinState | null>(null);
   const [storageQuota, setStorageQuota] = useState<StorageQuota>(() => ({
     usageBytes: null,
     quotaBytes: null,
@@ -277,21 +253,14 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     status: "unavailable",
     checkedAt: new Date().toISOString(),
   }));
-  // Sat papers with their sit-time prediction frozen in — the reality check
-  // that feeds the recommender's paper gain factor back from evidence.
-  const [paperOutcomeLog, setPaperOutcomeLog] = useState<PaperOutcomeRecord[]>([]);
-  const [interventionOutcomes, setInterventionOutcomes] = useState<InterventionOutcomeRecord[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => initialSyncStatus());
   const bootstrapped = useRef(false);
   // Boot must never fail silently. If IndexedDB or a migration rejects, keep
   // the reason visible so the student can retry instead of staring at a
   // spinner forever.
   const [bootError, setBootError] = useState<string | null>(null);
   const [bootAttempt, setBootAttempt] = useState(0);
-  const [replanSummary, setReplanSummary] = useState<string | null>(null);
-  const [planChangelog, setPlanChangelog] = useState<string[]>([]);
-  const [examPhaseNotice, setExamPhaseNotice] = useState<PhaseNotice | null>(null);
+  // Plan/phase state lives in usePlanning (composed below, after mastery).
   // Heavy analytics run off-thread (Comlink worker) and land here when ready;
   // small histories compute synchronously inside the same effect. Until the
   // first compute lands these hold the same defaults the sync path returned.
@@ -299,68 +268,18 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [questionTraces, setQuestionTraces] = useState<QuestionTrace[]>([]);
   const [difficultyCalibration, setDifficultyCalibration] = useState<DifficultyCalibrationReport>(() => calibrateDifficulty([]));
   const [forgettingCalibration, setForgettingCalibration] = useState<FsrsValidation>(() => validateFsrs({ cards: [], logs: [] }));
-  const lastFingerprint = useRef<ReplanFingerprint | null>(null);
-
-  // --- progressive history hydration ---------------------------------------
-  //
-  // Boot loads only the newest HISTORY_FIRST_PAGE review logs / attempts so
-  // first paint never waits on a 5,000-row history. This streams the rest in
-  // background chunks (IndexedDB cursor, oldest-first) and merges each chunk
-  // exactly once, keyed by row id so a row that arrived via a newer functional
-  // update is never clobbered by its older streamed copy. A sync-pull reload
-  // calls startHydration() again, superseding any stream still running.
-  const hydrateHistory = useCallback(async (epoch: number) => {
-    for await (const chunk of repo.streamHistory(repo.HISTORY_CHUNK, userId)) {
-      if (epoch !== hydrationEpoch) return; // superseded by a reload
-      const { reviewLogs, attempts } = chunk;
-      if (!reviewLogs?.length && !attempts?.length) continue;
-      setSnapshot((prev) => {
-        if (!prev) return prev;
-        let nextLogs = prev.reviewLogs;
-        if (reviewLogs?.length) {
-          const known = new Set(prev.reviewLogs.map((l) => l.id));
-          const fresh = reviewLogs.filter((l) => !known.has(l.id));
-          if (fresh.length) nextLogs = [...fresh, ...prev.reviewLogs];
-        }
-        let nextAttempts = prev.attempts;
-        if (attempts?.length) {
-          const known = new Set(prev.attempts.map((a) => a.id));
-          const fresh = attempts.filter((a) => !known.has(a.id));
-          if (fresh.length) nextAttempts = [...fresh, ...prev.attempts];
-        }
-        if (nextLogs === prev.reviewLogs && nextAttempts === prev.attempts) return prev;
-        return { ...prev, reviewLogs: nextLogs, attempts: nextAttempts };
-      });
-    }
-  }, [userId]);
-  /** Start (or restart, superseding any prior run) background history hydration. */
-  const startHydration = useCallback(() => {
-    hydrationEpoch += 1;
-    void hydrateHistory(hydrationEpoch).catch((error) => {
-      // A stream can fail after the first page has rendered (for example when
-      // a later IndexedDB row is malformed). Route it through the same
-      // recovery UI as boot failures instead of leaving a rejected promise.
-      setBootError(error instanceof Error ? error.message : String(error));
-    });
-  }, [hydrateHistory]);
-
-  const recordFunnel = useCallback(async (type: FunnelEventType, detail?: string) => {
-    const now = Date.now();
-    const windows: Record<FunnelEventType, number> = { app_opened: 3_600_000, recommendation_displayed: 6 * 3_600_000, recommendation_accepted: 0, feedback_read: 0 };
-    const existing = ((await readReviseMeta<Array<{ anonId: string; type: FunnelEventType; at: string; detail?: string }>>("funnelEvents")) ?? []);
-    let last: number | null = null;
-    for (let i = existing.length - 1; i >= 0; i--) {
-      const e = existing[i];
-      if (e.type !== type || (detail != null && e.detail !== detail)) continue;
-      last = new Date(e.at).getTime();
-      break;
-    }
-    if (type !== "recommendation_accepted" && type !== "feedback_read" && last != null && now - last < windows[type]) return;
-    const log = existing;
-    const nextFunnel = [...log.slice(-2000), { anonId: userId, type, at: new Date(now).toISOString(), detail }];
-    await writeReviseMeta("funnelEvents", nextFunnel);
-    setFunnelEvents(nextFunnel);
-  }, [userId]);
+  // Responsibility modules: sync/hydration, experiments/funnel. Outcome,
+  // session and planning modules compose later, after the model they read.
+  const { syncStatus, syncNow, startHydration } = useSyncEngine({ userId, snapshot, setSnapshot, setBootError });
+  const {
+    experimentArm,
+    funnelEvents,
+    loaded: experimentsLoaded,
+    recordFunnel,
+    joinExperiment,
+    leaveExperiment,
+    recordExperimentEvent,
+  } = useExperiments(userId);
 
   useEffect(() => {
     if (bootstrapped.current) return;
@@ -368,28 +287,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
       try {
-        const [loaded, checkpoint, assignment, funnel, gradePreds, gradeActs, twin, paperOutcomes, savedInterventions] = await Promise.all([
-          repo.loadSnapshot(userId),
-          repo.loadRevisionCheckpoint(userId),
-          readReviseMeta<ExperimentAssignment>("experimentAssignment"),
-          readReviseMeta<FunnelEvent[]>("funnelEvents"),
-          readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
-          readReviseMeta<ActualResultRecord[]>("gradeActuals"),
-          repo.loadRevisionTwin(userId),
-          readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes"),
-          readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes"),
-        ]);
-        setRevisionCheckpoint(checkpoint ?? null);
-        setExperimentArm(assignment ?? null);
-        setFunnelEvents(funnel ?? []);
-        setGradePredictionLog(gradePreds ?? []);
-        setGradeActuals(gradeActs ?? []);
-        setRevisionTwin(twin ?? createRevisionTwinState(userId));
-        setPaperOutcomeLog(paperOutcomes ?? []);
-        // The metadata key predates account-scoped storage, so keep other
-        // learners' rows on disk but never let them influence this learner's
-        // calibration or appear in the adaptive planner.
-        setInterventionOutcomes((savedInterventions ?? []).filter((row) => row.userId === userId));
+        const loaded = await repo.loadSnapshot(userId);
         setSnapshot(loaded);
         // First page is on screen; stream the rest of history in the background.
         startHydration();
@@ -406,13 +304,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           await repo.saveLessonProgress(migrated);
           setSnapshot((prev) => (prev ? { ...prev, lessonProgress: migrated } : prev));
         }
-        lastFingerprint.current = computeFingerprint({
-          exams: loaded.examDates,
-          targetGrades: loaded.settings.targetGrades,
-          availability: loaded.settings.availability,
-          sessionLengthMinutes: loaded.settings.sessionLengthMinutes,
-          subjectIds: loaded.settings.subjectIds,
-        });
         setNeedsOnboarding(!(await repo.hasOnboarded(userId)));
         setBootError(null);
         // A plan that has drifted into the past is worse than no plan: fold
@@ -451,134 +342,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     };
   }, [refreshStorageQuota]);
 
-  // Network status drives the offline banner and gates sync attempts.
-  useEffect(() => {
-    const update = () => {
-      const online = navigator.onLine;
-      setSyncStatus((s) => ({ ...s, online, lastSyncError: online ? s.lastSyncError : null }));
-    };
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-
-  // Local writes enqueue after IndexedDB succeeds. Reflect that immediately so
-  // offline work is visibly safe instead of waiting for the next retry timer.
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    const refreshPending = () => {
-      void outboxSize(userId).then((pending) => setSyncStatus((s) => ({ ...s, pending })));
-    };
-    refreshPending();
-    window.addEventListener(SYNC_QUEUE_EVENT, refreshPending);
-    return () => window.removeEventListener(SYNC_QUEUE_EVENT, refreshPending);
-  }, [userId]);
-
-  // --- AI marking resilience: DLQ drain + in-place mark upgrades -----------
-  //
-  // Marks that fell back to the rubric (offline, 429, provider down) sit in
-  // the dead-letter queue. When the tab is online we drain a small batch on a
-  // slow timer — backoff+jitter inside the drain keeps the free-tier endpoint
-  // safe — and when a retry succeeds the stored attempt is upgraded, so the
-  // student's history ends up AI-graded without them doing anything.
-  useEffect(() => {
-    if (!syncStatus.online) return;
-    let cancelled = false;
-    const drain = () => {
-      if (!cancelled) void drainDeadMarks();
-    };
-    drain(); // catch up on backlog as soon as we're online
-    const timer = setInterval(drain, 90_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [syncStatus.online]);
-
-  // A successful DLQ re-grade already wrote through the repository; reflect
-  // it in the in-memory snapshot so open views re-render without a reload.
-  useEffect(() => {
-    function onResolved(event: Event) {
-      const detail = (event as CustomEvent<AiDlqResolvedDetail>).detail;
-      if (!detail?.attempt) return;
-      setSnapshot((prev) =>
-        prev
-          ? {
-              ...prev,
-              attempts: prev.attempts.some((a) => a.id === detail.attempt.id)
-                ? prev.attempts.map((a) => (a.id === detail.attempt.id ? detail.attempt : a))
-                : [detail.attempt, ...prev.attempts],
-            }
-          : prev,
-      );
-    }
-    window.addEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
-    return () => window.removeEventListener(AI_DLQ_RESOLVED_EVENT, onResolved);
-  }, []);
-
   const completeOnboarding = useCallback(async () => {
     await repo.markOnboarded(userId);
     setNeedsOnboarding(false);
   }, [userId]);
-
-  const syncNow = useCallback(async () => {
-    if (!isSupabaseConfigured || syncInFlight) return;
-    syncInFlight = true;
-    setSyncStatus((s) => ({ ...s, syncing: true }));
-    try {
-      const result = await sync(userId);
-      const pending = await outboxSize(userId);
-      const error =
-        result.failed > 0
-          ? "Some changes are still waiting to sync. We’ll keep trying."
-          : result.skipped === "signed-out"
-            ? "Sign in to sync across devices. Your data is still saved here."
-            : null;
-      setSyncStatus((s) => ({
-        ...s,
-        syncing: false,
-        pending,
-        lastSyncedAt: result.skipped || result.failed > 0 ? s.lastSyncedAt : new Date().toISOString(),
-        lastSyncError: error,
-      }));
-      if (result.pulled > 0) {
-        setSnapshot(await repo.loadSnapshot(userId));
-        // History changed server-side; restart hydration from the fresh
-        // baseline, superseding any stream still running.
-        startHydration();
-      }
-    } catch (caught) {
-      // Keep a diagnostic trail instead of swallowing the failure: without it,
-      // a permanently broken sync looks identical to a slow one.
-      console.warn("[sync] failed", caught);
-      const pending = await outboxSize(userId);
-      setSyncStatus((s) => ({
-        ...s,
-        syncing: false,
-        pending,
-        lastSyncError: "Sync is unavailable right now. Your data is still saved on this device.",
-      }));
-    } finally {
-      syncInFlight = false;
-    }
-  }, [userId, startHydration]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured || !snapshot || !syncStatus.online) return;
-    // Debounced rather than per-write: snapshot changes on every graded card,
-    // and a full drain+pull cycle per keystroke would hammer the network while
-    // a session runs. The interval covers quiet periods.
-    const first = setTimeout(() => void syncNow(), 5_000);
-    const timer = setInterval(() => void syncNow(), 120_000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(timer);
-    };
-  }, [snapshot, syncNow, syncStatus.online]);
 
   const patch = useCallback((updater: (prev: Snapshot) => Snapshot) => {
     setSnapshot((prev) => (prev ? updater(prev) : prev));
@@ -809,49 +576,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [snapshot],
   );
 
-  // Dynamic replanning: when an input the plan depends on changes (exam date,
-  // target grade, availability, session length or subject set), rebuild the
-  // pending future sessions automatically and say why. The fingerprint lives
-  // in a ref so replanning never triggers an extra render.
-  useEffect(() => {
-    if (!snapshot) return;
-    const current = computeFingerprint({
-      exams: snapshot.examDates,
-      targetGrades: snapshot.settings.targetGrades,
-      availability: snapshot.settings.availability,
-      sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
-      subjectIds: snapshot.settings.subjectIds,
-    });
-    if (lastFingerprint.current === null) {
-      lastFingerprint.current = current;
-      return;
-    }
-    if (fingerprintKey(current) === fingerprintKey(lastFingerprint.current)) return;
-    const previous = lastFingerprint.current;
-    lastFingerprint.current = current;
-    void (async () => {
-      const result = replanDynamically({
-        userId,
-        topics,
-        subjects: allSubjects().filter((s) => snapshot.settings.subjectIds.includes(s.id)),
-        mastery,
-        exams: snapshot.examDates,
-        availability: snapshot.settings.availability,
-        sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
-        subjectIds: snapshot.settings.subjectIds,
-        targetGrades: snapshot.settings.targetGrades,
-        evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
-        existing: snapshot.plannedSessions,
-        previous,
-      });
-      if (result.changed) {
-        await repo.replacePlan(userId, result.plan);
-        setSnapshot((prev) => (prev ? { ...prev, plannedSessions: result.plan } : prev));
-      }
-      setReplanSummary(result.summary);
-    })();
-  }, [snapshot, userId, topics, mastery]);
-
   // Calibration per subject from paper-mode attempts: predicted vs actual.
   // Paper attempts are the only ones with a stable "total marks" denominator.
   const calibrations = useMemo(() => {
@@ -879,18 +603,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     for (const sid of subjectIds) if (!out.has(sid)) out.set(sid, { subjectId: sid, bias: 0, slope: 1, sampleSize: 0, mae: 0 });
     return out;
   }, [snapshot, mastery, subjectIds]);
-
-  const responseTimeCalibration = useMemo(
-    () =>
-      buildResponseTimeCalibration({
-        attempts: snapshot?.attempts ?? [],
-        questions: snapshot?.questions ?? [],
-        papers: snapshot?.papers ?? [],
-        subjects: allSubjects().filter((subject) => subjectIds.includes(subject.id)),
-        trustedQuestion: trustedAssessmentContent,
-      }),
-    [snapshot, subjectIds],
-  );
 
   // --- session fatigue tracking ---------------------------------------------
   // The recommender needs time-on-task, but a ref read inside a render-path
@@ -927,17 +639,53 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return { bySubject, byTopic };
   }, [snapshot, subjectIds]);
 
-  // Per-subject multiplier for paper recommendations: >1 when sat papers keep
-  // beating their frozen predictions (more headroom than the model sees), <1
-  // when they fall short. 1.0 with fewer than two recorded outcomes.
-  const paperOutcomeGains = useMemo(() => {
-    const out = new Map<Id, number>();
-    if (!snapshot) return out;
-    for (const subjectId of subjectIds) {
-      out.set(subjectId, paperOutcomeGainMultiplier(paperOutcomeLog, subjectId));
-    }
-    return out;
-  }, [snapshot, subjectIds, paperOutcomeLog]);
+  const predictions = useMemo(() => {
+    if (!snapshot) return [];
+    return subjectIds
+      .map((id) => getSubject(id))
+      .filter((s): s is NonNullable<typeof s> => Boolean(s))
+      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates, undefined, snapshot.questions));
+  }, [snapshot, mastery, subjectIds]);
+
+  const responseTimeCalibration = useMemo(
+    () =>
+      buildResponseTimeCalibration({
+        attempts: snapshot?.attempts ?? [],
+        questions: snapshot?.questions ?? [],
+        papers: snapshot?.papers ?? [],
+        subjects: allSubjects().filter((subject) => subjectIds.includes(subject.id)),
+        trustedQuestion: trustedAssessmentContent,
+      }),
+    [snapshot, subjectIds],
+  );
+
+  // Assessment outcomes (grade/paper/intervention history) compose here so the
+  // ranked recommendations below can read the paper gain factor back.
+  const {
+    loaded: outcomesLoaded,
+    examReadiness,
+    examReadinessSummary,
+    gradePredictionLog,
+    gradeActuals,
+    paperOutcomeLog,
+    paperOutcomeGains,
+    interventionOutcomes,
+    interventionCalibrations,
+    setInterventionOutcomes,
+    recordGradeActual,
+    removeGradeActual,
+    beginPaperOutcome,
+    closePaperOutcome,
+    recordInterventionOutcome,
+  } = useOutcomes({
+    userId,
+    snapshot,
+    predictions,
+    subjectIds,
+    mastery,
+    recallMastery,
+    responseTimeCalibration,
+  });
 
   const recommendations = useMemo(() => {
     if (!snapshot) return [];
@@ -1008,131 +756,38 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return [{ ...fallback, topicId: pick.topicId, reason: pick.reason }];
   }, [experimentArm, recommendations, mastery, snapshot]);
 
-  const predictions = useMemo(() => {
-    if (!snapshot) return [];
-    return subjectIds
-      .map((id) => getSubject(id))
-      .filter((s): s is NonNullable<typeof s> => Boolean(s))
-      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates, undefined, snapshot.questions));
-  }, [snapshot, mastery, subjectIds]);
-
-  const farTransferRetests = useMemo(
-    () => delayedFarTransferRetests({ attempts: snapshot?.attempts ?? [], questions: snapshot?.questions ?? [], today: todayIso() }),
-    [snapshot],
-  );
-
-  const twinState = useMemo(() => revisionTwin ?? createRevisionTwinState(userId), [revisionTwin, userId]);
-  const twinReport = useMemo(() => revisionTwinReport(twinState), [twinState]);
-  const revisionTwinChoices = useMemo(
-    () => buildRevisionTwinChoices({ recommendations: experimentRecs, sessions: twinState.sessions }),
-    [experimentRecs, twinState.sessions],
-  );
-
-  const examReadiness = useMemo(() => {
-    if (!snapshot) return [];
-    const predictionBySubject = new Map(predictions.map((prediction) => [prediction.subjectId, prediction] as const));
-    return allSubjects()
-      .filter((subject) => subjectIds.includes(subject.id))
-      .flatMap((subject) => {
-        const prediction = predictionBySubject.get(subject.id);
-        if (!prediction) return [];
-        const topicRows = mastery.filter((row) => row.subjectId === subject.id);
-        const evidencedTopics = topicRows.filter((row) => row.cardsTotal > 0 || row.attempts > 0).length;
-        const coverageAverage = topicRows.length ? topicRows.reduce((sum, row) => sum + row.mastery, 0) / topicRows.length : 0;
-        const recallRows = recallMastery.filter((row) => row.subjectId === subject.id);
-        const recallCards = recallRows.reduce((sum, row) => sum + row.cardsTotal, 0);
-        const recallReviews = recallRows.reduce((sum, row) => sum + row.reviews, 0);
-        const retained = recallRows.filter((row) => row.cardsTotal > 0);
-        const retentionAverage = retained.length ? retained.reduce((sum, row) => sum + row.currentRetention, 0) / retained.length : null;
-        const timed = snapshot.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0 &&
-          trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
-        const available = timed.reduce((sum, attempt) => sum + attempt.max, 0);
-        const awarded = timed.reduce((sum, attempt) => sum + Math.max(0, Math.min(attempt.max, attempt.awarded)), 0);
-        const pace = responseTimeCalibration.rows.find((row) => row.subjectId === subject.id);
-        const transfers = farTransferRetests.filter((retest) => retest.subjectId === subject.id);
-        const completedTransfers = transfers.filter((retest) => retest.status === "completed");
-        const passedTransfers = completedTransfers.filter((retest) => retest.outcome?.passed).length;
-        return [buildExamReadiness({
-          subject,
-          prediction,
-          targetGrade: snapshot.settings.targetGrades[subject.id] ?? null,
-          examDays: daysToExam(snapshot.examDates, subject.id, todayIso()),
-          coverage: { average: coverageAverage, topics: topicRows.length, evidencedTopics },
-          retention: { average: retentionAverage, cards: recallCards, reviews: recallReviews },
-          timed: { accuracy: available ? awarded / available : null, attempts: timed.length, marks: available },
-          pace: { ratio: pace?.ratio ?? null, attempts: pace?.attempts ?? 0 },
-          transfer: {
-            passRate: completedTransfers.length ? passedTransfers / completedTransfers.length : null,
-            completed: completedTransfers.length,
-            due: transfers.filter((retest) => retest.status === "due").length,
-          },
-        })];
-      });
-  }, [snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
-
-  const examReadinessSummary = useMemo(() => summariseExamReadiness(examReadiness), [examReadiness]);
-
-  // Unlike `recommendations`, this is not a list of competing activity
-  // queues. It is one optimiser pass over the same snapshot, then one
-  // sequence for the winning topic. Today and /adaptive-session consume this
-  // exact value so the hero cannot drift from the route it opens. Declared
-  // after `examReadiness`: readiness gates adaptive stopping, so the
-  // optimiser reads the computed rows rather than preceding them.
-  const adaptiveSession = useMemo(() => {
-    if (!snapshot) return null;
-    return buildAdaptiveSession({
-      topics,
-      cards: snapshot.cards,
-      reviewLogs: snapshot.reviewLogs,
-      questions: snapshot.questions,
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
-      mastery,
-      exams: snapshot.examDates,
-      subjectIds,
-      recallMastery,
-      applicationMastery,
-      readiness: examReadiness,
-      interventionOutcomes,
-      targetMinutes: 20,
-    });
-  }, [snapshot, topics, mastery, subjectIds, recallMastery, applicationMastery, examReadiness, interventionOutcomes]);
-  // Close the grade loop: snapshot predictions weekly so later mocks can be
-  // paired against what Revise believed at the time - not retro-fitted.
-  useEffect(() => {
-    if (!snapshot || !predictions.length) return;
-    void (async () => {
-      const existing = (await readReviseMeta<GradePredictionRecord[]>("gradePredictions")) ?? [];
-      const week = Math.floor(Date.now() / (7 * 86_400_000));
-      let appended = false;
-      for (const p of predictions) {
-        const snapshotId = gradePredictionSnapshotId(userId, p.subjectId, week);
-        if (existing.some((r) => r.id === snapshotId)) continue;
-        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId &&
-          trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)).length;
-        const record: GradePredictionRecord = {
-          id: snapshotId,
-          anonId: userId,
-          subjectId: p.subjectId,
-          predictedPercent: p.percent,
-          lowerPercent: Math.max(0, p.percent - (100 - p.confidence * 100) / 2),
-          upperPercent: Math.min(100, p.percent + (100 - p.confidence * 100) / 2),
-          gradeLabel: p.grade,
-          confidence: p.confidence,
-          evidenceShare: Math.min(1, marked / 40),
-          createdAt: new Date().toISOString(),
-          examDate: snapshot.examDates.find((e) => e.subjectId === p.subjectId)?.date ?? null,
-        };
-        existing.push(record);
-        appended = true;
-      }
-      if (appended) {
-        await writeReviseMeta("gradePredictions", existing.slice(-500));
-        setGradePredictionLog(existing.slice(-500));
-      }
-    })();
-  }, [predictions, snapshot, userId]);
-
+  // Revision session lifecycle (checkpoint + twin + the one adaptive plan)
+  // composes here so twin choices and the plan read the ranked
+  // recommendations and readiness above.
+  const {
+    loaded: sessionsLoaded,
+    adaptiveSession,
+    revisionCheckpoint,
+    revisionTwin: twinState,
+    revisionTwinChoices,
+    revisionTwinReport: twinReport,
+    saveRevisionCheckpoint,
+    clearRevisionCheckpoint,
+    startRevisionTwinSession,
+    completeRevisionTwinSession,
+    abandonRevisionTwinSession: abandonTwinSession,
+  } = useRevisionSessions({
+    userId,
+    recommendations: experimentRecs,
+    topics,
+    cards: snapshot?.cards ?? [],
+    reviewLogs: snapshot?.reviewLogs ?? [],
+    questions: snapshot?.questions ?? [],
+    attempts: snapshot?.attempts ?? [],
+    mistakes: snapshot?.mistakes ?? [],
+    mastery,
+    exams: snapshot?.examDates ?? [],
+    subjectIds,
+    recallMastery,
+    applicationMastery,
+    readiness: examReadiness,
+    interventionOutcomes,
+  });
   const previewPaper = useCallback(
     (subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null => {
       if (!snapshot) return null;
@@ -1218,113 +873,6 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     },
     [userId, snapshot, bumpGamification, patch],
   );
-
-  const joinExperiment = useCallback(async () => {
-    const assignment = assignExperimentArm(userId);
-    await writeReviseMeta("experimentAssignment", assignment);
-    setExperimentArm(assignment);
-  }, [userId]);
-
-  const leaveExperiment = useCallback(async () => {
-    await writeReviseMeta("experimentAssignment", { anonId: userId, arm: "control", assignedAt: new Date().toISOString(), optedOut: true });
-    setExperimentArm(null);
-  }, [userId]);
-
-  const recordExperimentEvent = useCallback(async (type: ExperimentEventType, task: { taskId: string; activity: string; topicId?: Id | null }, at?: string) => {
-    const arm = experimentArm;
-    if (!arm) return;
-    const events = (await readReviseMeta<ExperimentEvent[]>("experimentEvents")) ?? [];
-    const atIso = at ?? new Date().toISOString();
-    const day = atIso.slice(0, 10);
-    const duplicate = events.some((e) => e.type === type && e.taskId === task.taskId && e.at.slice(0, 10) === day);
-    if (duplicate) return;
-    const next = [...events.slice(-2000), { anonId: arm.anonId, taskId: task.taskId, activity: task.activity, topicId: task.topicId ?? null, type, at: atIso }];
-    await writeReviseMeta("experimentEvents", next);
-  }, [experimentArm]);
-
-  const recordGradeActual = useCallback<StoreValue["recordGradeActual"]>(async (input) => {
-    if (!Number.isFinite(input.percent) || input.percent < 0 || input.percent > 100) {
-      throw new Error("Result percentage must be between 0 and 100.");
-    }
-    const takenAt = input.takenAt ?? new Date().toISOString();
-    const takenAtMs = new Date(takenAt).getTime();
-    if (!Number.isFinite(takenAtMs)) throw new Error("Result date is invalid.");
-    if (takenAtMs > Date.now() + 5 * 60_000) throw new Error("Result date cannot be in the future.");
-
-    const record: ActualResultRecord = {
-      id: crypto.randomUUID(),
-      anonId: userId,
-      subjectId: input.subjectId,
-      percent: input.percent,
-      kind: input.kind,
-      takenAt: new Date(takenAtMs).toISOString(),
-      label: input.label?.trim() || undefined,
-    };
-    const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
-    const next = [...log.slice(-500), record];
-    await writeReviseMeta("gradeActuals", next);
-    setGradeActuals(next);
-  }, [userId]);
-
-  const removeGradeActual = useCallback<StoreValue["removeGradeActual"]>(async (id) => {
-    const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
-    const target = log.find((row) => row.id === id);
-    if (!target || target.anonId !== userId) return;
-    const next = log.filter((row) => row.id !== id);
-    await writeReviseMeta("gradeActuals", next);
-    setGradeActuals(next);
-  }, [userId]);
-
-  // Paper-outcome loop, part 1: freeze the prediction the moment a recommended
-  // paper is started, BEFORE any question is answered. Called with the
-  // calibration-adjusted simulation for this exact paper.
-  const beginPaperOutcome = useCallback<StoreValue["beginPaperOutcome"]>(
-    async (input) => {
-      const record = buildPaperOutcomeRecord({
-        userId,
-        subjectId: input.subjectId,
-        paperId: input.paperId,
-        paperRunId: input.paperRunId,
-        predictedMarks: input.predictedMarks,
-        totalMarks: input.totalMarks,
-        satAt: new Date().toISOString(),
-      });
-      const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
-      const next = [...log.filter((o) => o.id !== record.id), record].slice(-200);
-      await writeReviseMeta("paperOutcomes", next);
-      setPaperOutcomeLog(next);
-    },
-    [userId],
-  );
-
-  // Paper-outcome loop, part 2: close the record with the actual awarded
-  // marks once marking completes. The (predicted, actual) pair then feeds
-  // paperOutcomeGainMultiplier on the next recommend() pass.
-  const closePaperOutcomeRecord = useCallback<StoreValue["closePaperOutcome"]>(
-    async (paperRunId, actualMarks, markingReview) => {
-      const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
-      const target = log.find((o) => o.paperRunId === paperRunId);
-      if (!target) return; // no frozen prediction (untimed path or legacy run) — nothing to learn
-      const next = [...log.filter((o) => o.id !== target.id), closePaperOutcome(target, actualMarks, markingReview)].slice(-200);
-      await writeReviseMeta("paperOutcomes", next);
-      setPaperOutcomeLog(next);
-    },
-    [],
-  );
-
-  const recordInterventionOutcome = useCallback<StoreValue["recordInterventionOutcome"]>(
-    async (outcome) => {
-      if (outcome.userId !== userId) throw new Error("Cannot record intervention evidence for another user.");
-      const all = (await readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes")) ?? [];
-      const own = all.filter((row) => row.userId === userId);
-      const nextOwn = [...own.filter((row) => row.id !== outcome.id), outcome];
-      const nextAll = [...all.filter((row) => row.userId !== userId), ...nextOwn].slice(-2000);
-      await writeReviseMeta("interventionOutcomes", nextAll);
-      setInterventionOutcomes(nextOwn);
-    },
-    [userId],
-  );
-
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
     async (attempt, question) => {
@@ -1416,7 +964,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       });
       return [...updatedMistakes, ...drafts.map((d) => d.mistake)];
     },
-    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent, userId],
+    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent, setInterventionOutcomes, userId],
   );
 
   const addCards = useCallback<StoreValue["addCards"]>(
@@ -1476,142 +1024,22 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [patch],
   );
 
-  const regeneratePlan = useCallback<StoreValue["regeneratePlan"]>(async () => {
-    if (!snapshot) return;
-    const subjects = allSubjects().filter((s) => snapshot.settings.subjectIds.includes(s.id));
-    const plan = buildPlan({
-      userId,
-      topics,
-      mastery,
-      exams: snapshot.examDates,
-      availability: snapshot.settings.availability,
-      sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
-      subjectIds: snapshot.settings.subjectIds,
-      subjects,
-      targetGrades: snapshot.settings.targetGrades,
-      evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
-      existing: snapshot.plannedSessions,
-    });
-    const changelog = summarizePlanChange({
-      previous: snapshot.plannedSessions,
-      next: plan,
-      exams: snapshot.examDates,
-      subjectNames: Object.fromEntries(subjects.map((s) => [s.id, s.name])),
-      today: todayIso(),
-    });
-    await repo.replacePlan(userId, plan);
-    setPlanChangelog(changelog);
-    patch((prev) => ({ ...prev, plannedSessions: plan }));
-  }, [snapshot, userId, topics, mastery, patch, setPlanChangelog]);
-
-  const rescheduleMissedSessions = useCallback<StoreValue["rescheduleMissedSessions"]>(async () => {
-    if (!snapshot) return;
-    const healed = rescheduleMissed(snapshot.plannedSessions, todayIso(), 6);
-    await repo.replacePlan(userId, healed);
-    patch((prev) => ({ ...prev, plannedSessions: healed }));
-  }, [snapshot, userId, patch]);
-
-  const completeSession = useCallback<StoreValue["completeSession"]>(
-    async (sessionId, status = "done") => {
-      const session = snapshot?.plannedSessions.find((s) => s.id === sessionId);
-      if (!session) return;
-      const updated: PlannedSession = {
-        ...session,
-        status,
-        completedAt: status === "done" ? new Date().toISOString() : undefined,
-      };
-      await repo.savePlan([updated]);
-      setSnapshot((prev) => {
-        if (!prev) return prev;
-        const next: Snapshot = {
-          ...prev,
-          plannedSessions: prev.plannedSessions.map((s) => (s.id === sessionId ? updated : s)),
-        };
-        if (status === "done") {
-          void bumpGamification(prev.streak, XP.sessionCompleted, {}, next).then((streak) =>
-            patch((p) => ({ ...p, streak })),
-          );
-        }
-        return next;
-      });
-    },
-    [snapshot, bumpGamification, patch],
-  );
-
-  const upsertExamDate = useCallback<StoreValue["upsertExamDate"]>(
-    async (exam) => {
-      await repo.saveExamDate(exam);
-      patch((prev) => ({
-        ...prev,
-        examDates: [...prev.examDates.filter((e) => e.id !== exam.id), exam],
-      }));
-    },
-    [patch],
-  );
-
-  const removeExamDate = useCallback<StoreValue["removeExamDate"]>(
-    async (id) => {
-      await repo.deleteExamDate(id, userId);
-      patch((prev) => ({ ...prev, examDates: prev.examDates.filter((e) => e.id !== id) }));
-    },
-    [patch, userId],
-  );
-
-  const updateSettings = useCallback<StoreValue["updateSettings"]>(
-    async (patchValue) => {
-      if (!snapshot) return;
-      const next: UserSettings = { ...snapshot.settings, ...patchValue, updatedAt: new Date().toISOString() };
-      await repo.saveSettings(next);
-      patch((prev) => ({ ...prev, settings: next }));
-    },
-    [snapshot, patch],
-  );
-
-  const refreshPhaseNotices = useCallback<StoreValue["refreshPhaseNotices"]>(async () => {
-    if (!snapshot) return;
-    const subjects: PhaseSubject[] = snapshot.settings.subjectIds.map((subjectId) => {
-      const subject = getSubject(subjectId);
-      return {
-        subjectId,
-        name: subject?.name ?? subjectId,
-        days: daysToExam(snapshot.examDates, subjectId, todayIso()),
-      };
-    });
-    const previous = (snapshot.settings.examNotices ?? {}) as Record<string, PhaseBucket | null | undefined>;
-    const notices = techniqueEntryNotices(subjects, previous);
-    // Record every subject's current bucket so a transition is announced
-    // exactly once — and a subject pushed back out of the window can be
-    // re-announced when it later re-enters.
-    const buckets = currentPhaseBuckets(subjects);
-    const examNotices: Record<string, string> = {};
-    for (const [subjectId, bucket] of Object.entries(buckets)) {
-      if (bucket) examNotices[subjectId] = bucket;
-    }
-    const changed =
-      Object.keys(examNotices).length !== Object.keys(previous).length ||
-      Object.entries(examNotices).some(([subjectId, bucket]) => previous[subjectId] !== bucket);
-    if (changed) await updateSettings({ examNotices });
-    const notice = notices[0] ?? null;
-    if (notice) setExamPhaseNotice(notice);
-    if (
-      notice &&
-      snapshot.settings.examNotifications &&
-      typeof window !== "undefined" &&
-      "Notification" in window &&
-      window.Notification.permission === "granted"
-    ) {
-      try {
-        new window.Notification(notice.title, { body: notice.body });
-      } catch {
-        // Some environments throw on construction (private browsing, iframes);
-        // the in-app banner still shows, so the notice is not lost.
-      }
-    }
-  }, [snapshot, updateSettings]);
-
-  const dismissExamPhaseNotice = useCallback<StoreValue["dismissExamPhaseNotice"]>(() => {
-    setExamPhaseNotice(null);
-  }, []);
+  // Adaptive timetable (plan rebuilds, session completion, exam dates,
+  // settings, phase notices) composes here; it reads the snapshot and the
+  // derived model above.
+  const {
+    replanSummary,
+    planChangelog,
+    examPhaseNotice,
+    regeneratePlan,
+    rescheduleMissedSessions,
+    completeSession,
+    upsertExamDate,
+    removeExamDate,
+    updateSettings,
+    refreshPhaseNotices,
+    dismissExamPhaseNotice,
+  } = usePlanning({ userId, snapshot, setSnapshot, patch, topics, mastery, bumpGamification });
 
   const completeLesson = useCallback<StoreValue["completeLesson"]>(
     async (lessonId) => {
@@ -1631,62 +1059,10 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     [patch, snapshot, userId],
   );
 
-  const saveRevisionCheckpoint = useCallback<StoreValue["saveRevisionCheckpoint"]>(
-    async (input) => {
-      const checkpoint = createRevisionCheckpoint(userId, input);
-      await repo.saveRevisionCheckpoint(checkpoint);
-      setRevisionCheckpoint(checkpoint);
-    },
-    [userId],
-  );
-
-
-  const clearRevisionCheckpoint = useCallback<StoreValue["clearRevisionCheckpoint"]>(async () => {
-    await repo.clearRevisionCheckpoint(userId);
-    setRevisionCheckpoint(null);
-  }, [userId]);
-
-  const startRevisionTwinSession = useCallback<StoreValue["startRevisionTwinSession"]>(
-    async (choice, title) => {
-      const state = revisionTwin ?? createRevisionTwinState(userId);
-      if (state.sessions.some((session) => session.status === "active")) throw new Error("A revision block is already active.");
-      const session = createRevisionTwinSession({ id: crypto.randomUUID(), userId, choice, title });
-      const next: RevisionTwinState = { ...state, sessions: [session, ...state.sessions], updatedAt: new Date().toISOString() };
-      await repo.saveRevisionTwin(next);
-      setRevisionTwin(next);
-      return session;
-    },
-    [revisionTwin, userId],
-  );
-
-  const completeRevisionTwinSession = useCallback<StoreValue["completeRevisionTwinSession"]>(
-    async (id, actualMarks, actualMinutes) => {
-      const state = revisionTwin;
-      const session = state?.sessions.find((row) => row.id === id && row.status === "active");
-      if (!state || !session) return;
-      const updated = completeTwinSession(session, { actualMarks, actualMinutes });
-      const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
-      await repo.saveRevisionTwin(next);
-      setRevisionTwin(next);
-    },
-    [revisionTwin],
-  );
-
-  const abandonTwinSession = useCallback<StoreValue["abandonRevisionTwinSession"]>(
-    async (id) => {
-      const state = revisionTwin;
-      const session = state?.sessions.find((row) => row.id === id && row.status === "active");
-      if (!state || !session) return;
-      const updated = abandonRevisionTwinSession(session);
-      const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
-      await repo.saveRevisionTwin(next);
-      setRevisionTwin(next);
-    },
-    [revisionTwin],
-  );
-
   const value: StoreValue | null = useMemo(() => {
-    if (!snapshot) return null;
+    // First paint waits for the snapshot AND every module's mount load, which
+    // is exactly what boot's single Promise.all guaranteed before the split.
+    if (!snapshot || !experimentsLoaded || !outcomesLoaded || !sessionsLoaded) return null;
     return {
       ...snapshot,
       ready: true,
@@ -1764,9 +1140,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       recordGradeActual,
       removeGradeActual,
       beginPaperOutcome,
-      closePaperOutcome: closePaperOutcomeRecord,
+      closePaperOutcome,
       interventionOutcomes,
-      interventionCalibrations: calibrateInterventions(interventionOutcomes),
+      interventionCalibrations,
       recordInterventionOutcome,
     };
   }, [
@@ -1845,9 +1221,13 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     recordGradeActual,
     removeGradeActual,
     beginPaperOutcome,
-    closePaperOutcomeRecord,
+    closePaperOutcome,
     interventionOutcomes,
+    interventionCalibrations,
     recordInterventionOutcome,
+    experimentsLoaded,
+    outcomesLoaded,
+    sessionsLoaded,
   ]);
 
   if (bootError) {

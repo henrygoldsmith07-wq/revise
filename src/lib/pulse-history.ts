@@ -86,12 +86,68 @@ export function paginatePulseRows<T extends PulseSortable>(input: {
 }
 
 /**
- * Per-table Supabase filter for a cursor page. Because ordering spans two
- * tables, each table is queried with `updated_at >= cursor.ts` (or `> since`
- * on the first page) and the exact tie-break happens in memory via
- * isAfterPulseCursor. Fetching `limit + 1` per table guarantees the merged
- * page can be filled and hasMore detected without missing interleaved rows.
+ * Lexicographic tail of ONE table for a cursor page.
+ *
+ * The global order is (updated_at, kind, id), but each table holds a single
+ * kind — so each table's query must represent exactly the part of that order
+ * still relevant to it. A coarse `updated_at >= cursor.ts … LIMIT n` prefix is
+ * NOT sufficient: when more rows share the cursor timestamp than the limit
+ * allows, the database returns the tie's earliest rows, the in-memory cursor
+ * filter discards every one of them, and the tie's later rows are never
+ * fetched. Each table therefore queries its own exact continuation:
+ *
+ * - same kind as the cursor: `updated_at > ts OR (updated_at = ts AND id > id)`
+ * - a kind sorting after the cursor kind: `updated_at >= ts` (the whole
+ *   tie-block of this table is still ahead)
+ * - a kind sorting before the cursor kind: `updated_at > ts` (this table's
+ *   tie-block is entirely behind)
+ * - first page: `updated_at > since`
  */
-export function pulseTableFloorTs(input: { cursor: PulseCursor | null; since: string }): string {
-  return input.cursor ? input.cursor.ts : input.since;
+export type PulseTableQuery =
+  | { mode: "gt"; ts: string }
+  | { mode: "gte"; ts: string }
+  | { mode: "or"; ts: string; id: string };
+
+export function pulseTableQuery(
+  kind: PulseKind,
+  cursor: PulseCursor | null,
+  since: string,
+): PulseTableQuery {
+  if (!cursor) return { mode: "gt", ts: since };
+  if (kind === cursor.kind) return { mode: "or", ts: cursor.ts, id: cursor.id };
+  if (kind > cursor.kind) return { mode: "gte", ts: cursor.ts };
+  return { mode: "gt", ts: cursor.ts };
+}
+
+/** PostgREST `.or()` condition string for an `{ mode: "or" }` scope. */
+export function pulseOrCondition(query: Extract<PulseTableQuery, { mode: "or" }>): string {
+  return `updated_at.gt.${query.ts},and(updated_at.eq.${query.ts},id.gt.${query.id})`;
+}
+
+/**
+ * In-memory mirror of one table's SQL tail: the rows a
+ * `WHERE <scope> ORDER BY updated_at, id LIMIT n` query returns. The route's
+ * Supabase queries implement this exact predicate; tests simulate the
+ * database (filter + order + limit per table) through it so pagination is
+ * verified against what the database actually returns, not a full-array
+ * in-memory paginator.
+ */
+export function queryTableTail<T extends PulseSortable>(input: {
+  rows: T[];
+  kind: PulseKind;
+  cursor: PulseCursor | null;
+  since: string;
+  limit: number;
+}): T[] {
+  const scope = pulseTableQuery(input.kind, input.cursor, input.since);
+  const tail = input.rows.filter((row) => {
+    if (row.kind !== input.kind) return false;
+    if (scope.mode === "gt") return row.updatedAt > scope.ts;
+    if (scope.mode === "gte") return row.updatedAt >= scope.ts;
+    return row.updatedAt > scope.ts || (row.updatedAt === scope.ts && row.id > scope.id);
+  });
+  tail.sort((a, b) =>
+    a.updatedAt !== b.updatedAt ? (a.updatedAt < b.updatedAt ? -1 : 1) : a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  return tail.slice(0, input.limit);
 }

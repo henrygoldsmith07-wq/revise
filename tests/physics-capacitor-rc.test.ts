@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { physicsCapacitorRcQuestions as questions } from "@/content/questions/physics-capacitor-rc";
-import { physicsCapacitorEnergyQuestions } from "@/content/questions/physics-capacitor-energy";
+import {
+  physicsCapacitorEnergyQuestions,
+  physicsCapacitorRcQuestions as questions,
+} from "@/content/questions/physics-capacitors.generated";
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 import { wjecPhysicsCapabilities } from "@/content/capabilities";
 import { auditPhysicsAssessmentQuality } from "@/domain/physics-assessment-quality";

@@ -184,7 +184,7 @@ describe("specificationCoverageAudit", () => {
         markScheme: ["one", "two"],
         modelAnswer: "A complete answer.",
         specPointIds: ["unknown"],
-        learningClaims: ["only one claim"],
+        learningClaims: [],
       }],
       totalMarks: 2,
     });

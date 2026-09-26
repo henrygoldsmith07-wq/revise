@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { physicsCapacitorEnergyQuestions as questions } from "@/content/questions/physics-capacitor-energy";
+import { physicsCapacitorEnergyQuestions as questions } from "@/content/questions/physics-capacitors.generated";
 import { wjecCapabilities as wjecPhysicsCapabilities } from "@/content/capabilities";
 import { humanVerifiedPhysicsQuestion } from "@/domain/physics-content-review";
 import { capabilityEdgeFingerprint } from "@/domain/capability-graph";

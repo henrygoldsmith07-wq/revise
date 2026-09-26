@@ -8,14 +8,9 @@
 // composes these pure helpers with useMemo).
 
 import { allSubjects } from "@/domain/curriculum";
-import type { Id, UserSettings } from "@/domain/types";
+import type { UserSettings } from "@/domain/types";
 
 /** Subjects the student is taking, in curriculum order (pure). */
 export function subjectsForSettings(settings: Pick<UserSettings, "subjectIds">) {
   return allSubjects().filter((s) => settings.subjectIds.includes(s.id));
-}
-
-/** True when the snapshot has at least one enrolled subject. */
-export function hasEnrolledSubjects(subjectIds: readonly Id[]): boolean {
-  return subjectIds.length > 0;
 }

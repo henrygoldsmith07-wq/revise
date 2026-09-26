@@ -90,6 +90,14 @@ describe("Today screen — one dominant next action (decision engine)", () => {
     expect(source).toContain('import("@/components/TodayRoadmap")');
     expect(source).toContain("TodayRoadmapLoading");
   });
+
+  it("keeps secondary context collapsed so the hero dominates", () => {
+    const source = page();
+    expect(source).toContain("Plan, pace and outlook");
+    expect(source).toContain("<details");
+    // The hero (or resume) renders before the collapsed section.
+    expect(source.indexOf("AdaptiveSessionHero")).toBeLessThan(source.indexOf("Plan, pace and outlook"));
+  });
 });
 
 describe("Today recommendation fallback details", () => {

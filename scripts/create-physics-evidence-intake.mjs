@@ -12,7 +12,7 @@ if (!destinationArg || destinationArg === "--help" || destinationArg === "-h") {
 const bundle = await build({
   stdin: { contents: `
     export { seedQuestions as questions } from "./src/content";
-    export { physicsCapacitorEnergyQuestions as pilotQuestions } from "./src/content/questions/physics-capacitor-energy";
+    export { physicsCapacitorEnergyQuestions as pilotQuestions } from "./src/content/questions/physics-capacitors.generated";
     export { humanVerifiedPhysicsQuestion } from "./src/domain/physics-content-review";
     export { wjecCapabilities as capabilities } from "./src/content/capabilities";
     export { wjecPhysics } from "./src/domain/curriculum/wjec-physics";

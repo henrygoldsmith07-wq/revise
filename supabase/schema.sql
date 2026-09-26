@@ -202,6 +202,104 @@ create table if not exists public.sync_writes (
 );
 create index if not exists sync_writes_user_created_idx on public.sync_writes (user_id, created_at);
 
+-- --- AI rate-limit quota ------------------------------------------------------
+-- Shared limiter state for the /api/ai route so per-user quotas hold across
+-- server instances. One row per authenticated user; the token-bucket
+-- arithmetic runs atomically inside consume_ai_quota (row lock), so
+-- concurrent requests cannot overspend the same bucket. Clients never touch
+-- this table directly — RLS is enabled with no policies, and only the
+-- SECURITY DEFINER function below reads and writes it.
+create table if not exists public.ai_rate_quota (
+  key text primary key,
+  tokens double precision not null default 0,
+  updated_at timestamptz not null default now(),
+  day date not null default CURRENT_DATE,
+  used_day integer not null default 0
+);
+alter table public.ai_rate_quota enable row level security;
+
+-- Atomic quota consumption: per-minute token bucket (burst + sustained rate)
+-- plus a UTC-day allowance, checked longest-window first. Returns one row:
+-- (ok, remaining, retry_after_seconds, limited_by). Throws unless the key
+-- matches the caller's auth.uid(), so one student can never spend another's
+-- quota even though the function bypasses RLS.
+create or replace function public.consume_ai_quota(
+  p_key text,
+  p_cost integer,
+  p_rate_per_min double precision,
+  p_burst integer,
+  p_daily_limit integer
+)
+returns table(ok boolean, remaining integer, retry_after_seconds integer, limited_by text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := now();
+  v_today date := CURRENT_DATE;
+  v_row public.ai_rate_quota%ROWTYPE;
+  v_tokens double precision;
+  v_used_day integer;
+begin
+  if auth.uid() is null or p_key <> 'user:' || auth.uid()::text then
+    raise exception 'ai quota key must match the authenticated user';
+  end if;
+  if p_cost is null or p_cost < 1 then
+    p_cost := 1;
+  end if;
+  if p_burst is null or p_burst < 1 then
+    p_burst := 1;
+  end if;
+  if p_rate_per_min is null or p_rate_per_min <= 0 then
+    p_rate_per_min := p_burst::double precision;
+  end if;
+  -- Seed the row, then lock it. ON CONFLICT DO NOTHING makes two simultaneous
+  -- first requests serialise on the primary key: the second waits for the first
+  -- transaction to commit and then locks the committed row. A bare SELECT ...
+  -- FOR UPDATE would report "not found" to both, and their final upserts would
+  -- then overwrite each other and overspend the opening burst.
+  insert into public.ai_rate_quota(key, tokens, updated_at, day, used_day)
+    values (p_key, p_burst::double precision, v_now, v_today, 0)
+    on conflict (key) do nothing;
+  select * into v_row from public.ai_rate_quota where key = p_key for update;
+  v_tokens := least(
+    p_burst::double precision,
+    v_row.tokens + extract(epoch from (v_now - v_row.updated_at)) * p_rate_per_min / 60.0
+  );
+  v_used_day := case when v_row.day < v_today then 0 else v_row.used_day end;
+  if p_daily_limit is not null and v_used_day + p_cost > p_daily_limit then
+    update public.ai_rate_quota
+       set tokens = v_tokens, updated_at = v_now, day = v_today, used_day = v_used_day
+     where key = p_key;
+    return query select false, 0,
+      greatest(1, ceil(extract(epoch from ((v_today + 1)::timestamptz - v_now))))::integer,
+      'daily'::text;
+    return;
+  end if;
+  if v_tokens < p_cost then
+    update public.ai_rate_quota
+       set tokens = v_tokens, updated_at = v_now, day = v_today, used_day = v_used_day
+     where key = p_key;
+    return query select false, 0,
+      greatest(1, ceil((p_cost - v_tokens) / (p_rate_per_min / 60.0)))::integer,
+      'minute'::text;
+    return;
+  end if;
+  update public.ai_rate_quota
+     set tokens = v_tokens - p_cost, updated_at = v_now, day = v_today,
+         used_day = v_used_day + p_cost
+   where key = p_key;
+  return query select true, greatest(0, floor(v_tokens - p_cost))::integer, 0, null::text;
+end;
+$$;
+
+-- Only the signed-in student who owns the row may spend it. Revoking the
+-- implicit public execute grant keeps the bucket unreachable by anon traffic
+-- and by any other RPC caller.
+revoke all on function public.consume_ai_quota(text, integer, double precision, integer, integer) from public, anon;
+grant execute on function public.consume_ai_quota(text, integer, double precision, integer, integer) to authenticated;
+
 -- --- row-level security -----------------------------------------------------
 -- One policy per table, covering all four verbs. `with check` on insert and
 -- update stops a client rewriting user_id to another account's id.

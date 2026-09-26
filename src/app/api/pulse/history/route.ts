@@ -7,7 +7,8 @@ import {
   encodePulseCursor,
   isAfterPulseCursor,
   comparePulseRow,
-  pulseTableFloorTs,
+  pulseOrCondition,
+  pulseTableQuery,
   type PulseKind,
 } from "@/lib/pulse-history";
 
@@ -144,17 +145,34 @@ export async function GET(request: Request) {
     );
   }
 
-  // Deterministic continuation: each table is read with a stable order
-  // (updated_at ASC, id ASC) from the cursor floor, fetching limit+1 rows so
-  // the merged page can be filled and hasMore detected without a count query.
-  // The exact (updated_at, kind, id) tie-break happens in memory, so
-  // interleaved rows, identical timestamps, and arrivals between requests can
-  // neither skip nor duplicate.
-  const floorTs = pulseTableFloorTs({ cursor, since });
+  // Deterministic continuation: each table queries its own exact
+  // lexicographic tail of the global (updated_at, kind, id) order —
+  // `updated_at > ts`, or the `= ts AND id > id` tie-block when the table's
+  // kind can still hold rows after the cursor. A coarse `>= ts` prefix would
+  // skip records whenever a timestamp tie exceeds the SQL limit (the database
+  // returns the tie's earliest rows and the in-memory cursor filter discards
+  // them all). Fetching limit+1 per table fills the merged page and detects
+  // hasMore without a count query.
   const pageSize = limit + 1;
+  const reviewsScope = pulseTableQuery("review", cursor, since);
+  const attemptsScope = pulseTableQuery("attempt", cursor, since);
+  const baseReviews = supabase.from("review_logs").select("id, updated_at, data").eq("user_id", auth.user.id);
+  const baseAttempts = supabase.from("attempts").select("id, updated_at, data").eq("user_id", auth.user.id);
+  const scopedReviews =
+    reviewsScope.mode === "or"
+      ? baseReviews.or(pulseOrCondition(reviewsScope))
+      : reviewsScope.mode === "gte"
+        ? baseReviews.gte("updated_at", reviewsScope.ts)
+        : baseReviews.gt("updated_at", reviewsScope.ts);
+  const scopedAttempts =
+    attemptsScope.mode === "or"
+      ? baseAttempts.or(pulseOrCondition(attemptsScope))
+      : attemptsScope.mode === "gte"
+        ? baseAttempts.gte("updated_at", attemptsScope.ts)
+        : baseAttempts.gt("updated_at", attemptsScope.ts);
   const [reviews, attempts] = await Promise.all([
-    supabase.from("review_logs").select("id, updated_at, data").eq("user_id", auth.user.id).gte("updated_at", floorTs).order("updated_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize),
-    supabase.from("attempts").select("id, updated_at, data").eq("user_id", auth.user.id).gte("updated_at", floorTs).order("updated_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize),
+    scopedReviews.order("updated_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize),
+    scopedAttempts.order("updated_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize),
   ]);
   const error = reviews.error ?? attempts.error;
   if (error) return NextResponse.json({ error: "Revise history could not be read." }, { status: 502 });

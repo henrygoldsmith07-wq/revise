@@ -37,8 +37,10 @@ import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion"
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
-import { physicsCapacitorEnergyQuestions } from "./questions/physics-capacitor-energy";
-import { physicsCapacitorRcQuestions } from "./questions/physics-capacitor-rc";
+import {
+  physicsCapacitorEnergyQuestions,
+  physicsCapacitorRcQuestions,
+} from "./questions/physics-capacitors.generated";
 import { physicsMotionGraphQuestions } from "./questions/physics-motion-graphs";
 import { physicsDepth50MechanicsQuestions } from "./questions/physics-depth-50-mechanics";
 import { physicsDepth50CircuitsFieldsQuestions } from "./questions/physics-depth-50-circuits-fields";

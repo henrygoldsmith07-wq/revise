@@ -16,6 +16,13 @@ export interface PartSpec {
   aos?: AoCode[];
   specPointIds?: string[];
   learningClaims?: string[];
+  /**
+   * One entry per `scheme` point, holding the index of the claim in
+   * `learningClaims` that the point evidences. Optional: when absent, every
+   * listed claim supports the whole part. Use it when one claim earns several
+   * marks so the mark scheme and the claims stay separately auditable.
+   */
+  claimMap?: number[];
   capabilityIds?: string[];
   /** Part-level demand/family metadata for structured quality questions. */
   learning?: LearningPartMetadata;
@@ -62,6 +69,7 @@ export function defineQuestion(spec: QuestionSpec): Question {
     learningClaims: part.learningClaims?.length
       ? part.learningClaims
       : [part.prompt.replace(/^\([a-z]\)\s*/i, "").replace(/\.+$/, "").trim()].filter(Boolean),
+    ...(part.claimMap ? { claimMap: part.claimMap } : {}),
     ...(part.capabilityIds ? { capabilityIds: part.capabilityIds } : {}),
     ...(part.learning ? { learning: part.learning } : {}),
     ...(part.calculationRules ? { calculationRules: part.calculationRules } : {}),

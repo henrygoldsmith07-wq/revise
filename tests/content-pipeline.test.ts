@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { allTopics } from "@/domain/curriculum";
 import { seedQuestions } from "@/content";
+import { defineQuestion } from "@/content/questions/authoring";
 import {
   pipelineQuestion,
   pipelineTopic,
@@ -42,7 +43,7 @@ describe("content pipeline", () => {
     expect(issues).toContainEqual(expect.objectContaining({ code: "stale-provenance" }));
   });
 
-  it("requires learningClaims 1:1 with markScheme when specPointIds are present", () => {
+  it("requires learningClaims on mapped parts; claimMap allocates marks explicitly", () => {
     const q = seedQuestions.find((qq) => qq.parts.some((p) => (p.specPointIds ?? []).length > 0));
     if (q) {
       expect(validateSpecMapping(q)).toEqual([]);
@@ -56,12 +57,37 @@ describe("content pipeline", () => {
       expect(issues.length).toBeGreaterThan(0);
       expect(issues[0]?.code).toBe("missing-learning-claims");
     }
-    // More claims than mark-scheme points fails (one claim may cover several marks).
-    const mismatch = {
+    // One claim may earn several marks — no positional rule on the list itself.
+    expect(
+      validateSpecMapping({
+        id: "q",
+        parts: [{ id: "p", markScheme: ["a", "b", "c"], specPointIds: ["sp-1"], learningClaims: ["one claim"] }],
+      } as never),
+    ).toEqual([]);
+    // More claims than marks fails: each claim must earn at least one mark.
+    expect(
+      validateSpecMapping({
+        id: "q",
+        parts: [{ id: "p", markScheme: ["a"], specPointIds: ["sp-1"], learningClaims: ["one", "two"] }],
+      } as never)[0]?.code,
+    ).toBe("missing-learning-claims");
+    // A present claimMap must allocate every mark point to a valid claim index.
+    expect(
+      validateSpecMapping({
+        id: "q",
+        parts: [{ id: "p", markScheme: ["a", "b"], specPointIds: ["sp-1"], learningClaims: ["one"], claimMap: [0, 0] }],
+      } as never),
+    ).toEqual([]);
+    const badMap = validateSpecMapping({
       id: "q",
-      parts: [{ id: "p", markScheme: ["a"], specPointIds: ["sp-1"], learningClaims: ["one", "two"] }],
-    };
-    expect(validateSpecMapping(mismatch as never)[0]?.code).toBe("claims-mismatch-markscheme");
+      parts: [{ id: "p", markScheme: ["a", "b"], specPointIds: ["sp-1"], learningClaims: ["one"], claimMap: [0, 3] }],
+    } as never);
+    expect(badMap[0]?.code).toBe("invalid-claim-map");
+    const shortMap = validateSpecMapping({
+      id: "q",
+      parts: [{ id: "p", markScheme: ["a", "b"], specPointIds: ["sp-1"], learningClaims: ["one"], claimMap: [0] }],
+    } as never);
+    expect(shortMap[0]?.code).toBe("invalid-claim-map");
   });
 
   it("pipelineQuestion keeps type safety (mark schemes + worked solutions preserved)", () => {
@@ -72,5 +98,61 @@ describe("content pipeline", () => {
     expect(result.data?.parts.every((p) => p.modelAnswer.trim().length > 0)).toBe(true);
     // Stable ids preserved.
     expect(result.data?.id).toBe(q.id);
+  });
+
+  it("compact authoring carries an explicit claimMap into the pipeline", () => {
+    const question = defineQuestion({
+      slug: "claim-map-authoring",
+      subjectId: "physics",
+      topics: ["capacitors"],
+      stem: "Explain how a capacitor stores charge.",
+      parts: [
+        {
+          prompt: "Describe the effect on the stored charge and justify it.",
+          marks: 2,
+          scheme: ["identifies the stored charge", "justifies with Q = CV"],
+          answer: "Q increases; Q = CV is linear in C.",
+          learningClaims: ["stored charge rises with capacitance"],
+          claimMap: [0, 0],
+        },
+      ],
+    });
+    expect(question.parts[0]?.claimMap).toEqual([0, 0]);
+    const result = pipelineQuestion(question);
+    expect(result.schemaIssues).toEqual([]);
+    expect(result.mappingIssues).toEqual([]);
+  });
+
+  it("omits claimMap entirely when the author does not supply one", () => {
+    const question = defineQuestion({
+      slug: "claim-map-absent",
+      subjectId: "physics",
+      topics: ["capacitors"],
+      stem: "What does a capacitor do?",
+      parts: [{ prompt: "State the function.", marks: 1, scheme: ["stores charge"], answer: "Stores charge." }],
+    });
+    expect(question.parts[0]?.claimMap).toBeUndefined();
+    expect("claimMap" in (question.parts[0] as object)).toBe(false);
+  });
+
+  it("a claimMap that does not match the mark scheme is rejected by the pipeline", () => {
+    const question = defineQuestion({
+      slug: "claim-map-invalid",
+      subjectId: "physics",
+      topics: ["capacitors"],
+      stem: "Explain the discharge.",
+      parts: [
+        {
+          prompt: "Explain.",
+          marks: 2,
+          scheme: ["a", "b"],
+          answer: "Because.",
+          learningClaims: ["one claim"],
+          claimMap: [0, 0, 0],
+        },
+      ],
+    });
+    const result = pipelineQuestion(question);
+    expect(result.schemaIssues.length).toBeGreaterThan(0);
   });
 });

@@ -23,8 +23,3 @@ export function currentActiveMinutes(now = Date.now()): number {
   const elapsed = (now - sessionStartedAt) / 60_000;
   return elapsed > SESSION_IDLE_RESET_MS / 60_000 ? 0 : elapsed;
 }
-
-/** Test-only reset. */
-export function resetSessionClockForTests(): void {
-  sessionStartedAt = null;
-}

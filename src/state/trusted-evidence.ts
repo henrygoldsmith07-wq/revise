@@ -6,7 +6,6 @@
 // scoring.
 
 import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
-import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import type { Attempt, Question } from "@/domain/types";
 
 export function trustedSnapshotAttempt(
@@ -17,17 +16,4 @@ export function trustedSnapshotAttempt(
   const question = questions.find((row) => row.id === attempt.questionId);
   if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
   return trustedAssessmentAttempt(attempt, question, history, questions);
-}
-
-export function trustedSnapshotAttempts(
-  attempts: readonly Attempt[],
-  questions: readonly Question[],
-): Attempt[] {
-  return attempts.filter((attempt) =>
-    trustedSnapshotAttempt(attempt, questions, attempts),
-  );
-}
-
-export function requiresEvidenceReview(subjectId: string): boolean {
-  return requiresWjecContentReview(subjectId);
 }

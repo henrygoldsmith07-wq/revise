@@ -7,7 +7,11 @@ import {
   encodePulseCursor,
   isAfterPulseCursor,
   paginatePulseRows,
+  pulseOrCondition,
+  pulseTableQuery,
+  queryTableTail,
   type PulseCursor,
+  type PulseKind,
   type PulseSortable,
 } from "@/lib/pulse-history";
 import { pulseHistoryAllowed } from "@/data/pulse-consent";
@@ -18,54 +22,47 @@ function row(kind: "attempt" | "review", id: string, updatedAt: string): Row {
   return { kind, id, updatedAt, payload: `${kind}:${id}` };
 }
 
-// Simulate the route: two tables, each query returns limit+1 rows >= floor,
-// merged + filtered + sorted + sliced. Walk pages with a small limit.
-function walkPages(all: Row[], limit: number): Row[][] {
-  let cursor: PulseCursor | null = null as PulseCursor | null;
+const SINCE = "1970-01-01T00:00:00.000Z";
+
+// Faithful route simulation: each table applies its own lexicographic SQL
+// tail (WHERE scope ORDER BY updated_at, id LIMIT limit+1) — exactly what the
+// database returns — then the route merges, applies the exact cursor filter,
+// sorts globally and slices one page. Any skip/duplicate the real queries
+// would cause shows up here.
+function sqlWalkPages(all: Row[], limit: number, startCursor: PulseCursor | null = null): Row[][] {
+  let cursor: PulseCursor | null = startCursor;
   const pages: Row[][] = [];
-  const sortedAll = [...all].sort(comparePulseRow);
-  for (let guard = 0; guard < 50; guard++) {
-    // Per-table fetch simulation: limit+1 per table from floor.
-    const floor = cursor ? cursor.ts : "1970-01-01T00:00:00.000Z";
-    const perTable = limit + 1;
-    // Split by kind to mimic two tables.
-    const fetched: Row[] = [];
-    for (const kind of ["attempt", "review"] as const) {
-      const tableRows = sortedAll
-        .filter((r) => r.kind === kind && r.updatedAt >= floor)
-        .slice(0, perTable);
-      fetched.push(...tableRows);
-    }
+  for (let guard = 0; guard < 5000; guard++) {
+    const fetched = [
+      ...queryTableTail({ rows: all, kind: "attempt", cursor, since: SINCE, limit: limit + 1 }),
+      ...queryTableTail({ rows: all, kind: "review", cursor, since: SINCE, limit: limit + 1 }),
+    ];
     const after = fetched
-      .filter((r) => (cursor ? isAfterPulseCursor(r, cursor!) : r.updatedAt > floor))
+      .filter((r) => (cursor ? isAfterPulseCursor(r, cursor) : r.updatedAt > SINCE))
       .sort(comparePulseRow);
-    // Note: real route may under-fetch when a table has > limit+1 rows past
-    // the page boundary interleaved with the other table. Fetching limit+1 per
-    // table is still sufficient for correctness of hasMore detection on the
-    // merged prefix because any truncated tail sorts after the page when both
-    // tables are ordered. For the walk we use the full filtered set to assert
-    // the ideal pagination; per-table truncation is covered in a dedicated test.
-    void after;
-    const result: { page: Row[]; nextCursor: PulseCursor | null; hasMore: boolean } = paginatePulseRows({
-      rows: cursor
-        ? sortedAll.filter((r) => isAfterPulseCursor(r, cursor as PulseCursor))
-        : sortedAll.filter((r) => r.updatedAt > floor),
-      cursor,
-      limit,
-    });
-    const page = result.page;
-    const hasMore = result.hasMore;
-    const nextCursor: PulseCursor | null = result.nextCursor;
-    void fetched;
+    const page = after.slice(0, limit);
+    const hasMore = after.length > limit;
     pages.push(page);
-    if (!hasMore) {
-      expect(nextCursor).toBeNull();
-      break;
-    }
-    expect(nextCursor).not.toBeNull();
-    if (nextCursor) cursor = nextCursor;
+    if (!hasMore) break;
+    const last = page[page.length - 1]!;
+    cursor = { ts: last.updatedAt, kind: last.kind, id: last.id };
   }
   return pages;
+}
+
+/** Walk every page and assert the full history arrives exactly once, in order. */
+function expectCompleteWalk(all: Row[], limit: number): void {
+  const pages = sqlWalkPages(all, limit);
+  const flat = pages.flat();
+  const expected = [...all].sort(comparePulseRow);
+  expect(flat.map((r) => `${r.kind}:${r.id}:${r.updatedAt}`)).toEqual(
+    expected.map((r) => `${r.kind}:${r.id}:${r.updatedAt}`),
+  );
+  expect(new Set(flat.map((r) => `${r.kind}:${r.id}`)).size).toBe(all.length);
+}
+
+function tieRows(kind: PulseKind, count: number, ts: string, prefix: string): Row[] {
+  return Array.from({ length: count }, (_, i) => row(kind, `${prefix}-${String(i).padStart(4, "0")}`, ts));
 }
 
 describe("pulse history deterministic pagination", () => {
@@ -120,27 +117,20 @@ describe("pulse history deterministic pagination", () => {
       const day = String(1 + (i % 20)).padStart(2, "0");
       rows.push(row(i % 2 === 0 ? "attempt" : "review", `id-${String(i).padStart(3, "0")}`, `2026-01-${day}T12:00:00.000Z`));
     }
-    const pages = walkPages(rows, 4);
-    const flat = pages.flat();
-    expect(flat).toHaveLength(25);
-    expect(new Set(flat.map((r) => `${r.kind}:${r.id}`)).size).toBe(25);
-    // Global order matches the stable sort.
-    const expected = [...rows].sort(comparePulseRow).map((r) => `${r.kind}:${r.id}`);
-    expect(flat.map((r) => `${r.kind}:${r.id}`)).toEqual(expected);
-    // hasMore/cursor invariant: every non-final page had a cursor.
-    expect(pages.length).toBeGreaterThan(3);
+    expectCompleteWalk(rows, 4);
+    expect(sqlWalkPages(rows, 4).length).toBeGreaterThan(3);
   });
 
   it("handles only reviews", () => {
     const rows = [1, 2, 3, 4, 5].map((i) => row("review", `r${i}`, `2026-02-0${i}T00:00:00.000Z`));
-    const pages = walkPages(rows, 2);
+    const pages = sqlWalkPages(rows, 2);
     expect(pages.flat()).toHaveLength(5);
     expect(pages).toHaveLength(3);
   });
 
   it("handles only attempts", () => {
     const rows = [1, 2, 3, 4, 5].map((i) => row("attempt", `a${i}`, `2026-02-0${i}T00:00:00.000Z`));
-    const pages = walkPages(rows, 2);
+    const pages = sqlWalkPages(rows, 2);
     expect(pages.flat()).toHaveLength(5);
     expect(pages).toHaveLength(3);
   });
@@ -166,10 +156,124 @@ describe("pulse history deterministic pagination", () => {
       row("attempt", "a-a", ts),
       row("review", "r-c", ts),
     ];
-    const pages = walkPages(rows, 2);
+    const pages = sqlWalkPages(rows, 2);
     const flat = pages.flat().map((r) => `${r.kind}:${r.id}`);
     expect(flat).toEqual(["attempt:a-a", "attempt:a-b", "review:r-a", "review:r-b", "review:r-c"]);
     expect(new Set(flat).size).toBe(5);
+  });
+
+  it("each table queries its exact lexicographic tail (no coarse >= prefix)", () => {
+    const ts = "2026-04-01T00:00:00.000Z";
+    // Same-kind cursor continues inside the tie via id.
+    expect(pulseTableQuery("attempt", { ts, kind: "attempt", id: "a-0500" }, SINCE)).toEqual({
+      mode: "or", ts, id: "a-0500",
+    });
+    expect(pulseOrCondition({ mode: "or", ts, id: "a-0500" })).toBe(
+      `updated_at.gt.${ts},and(updated_at.eq.${ts},id.gt.a-0500)`,
+    );
+    // A table whose kind sorts after the cursor kind takes the whole tie-block.
+    expect(pulseTableQuery("review", { ts, kind: "attempt", id: "a-0500" }, SINCE)).toEqual({
+      mode: "gte", ts,
+    });
+    // A table whose kind sorts before the cursor kind is already exhausted at ts.
+    expect(pulseTableQuery("attempt", { ts, kind: "review", id: "r-0001" }, SINCE)).toEqual({
+      mode: "gt", ts,
+    });
+    expect(pulseTableQuery("review", null, SINCE)).toEqual({ mode: "gt", ts: SINCE });
+  });
+
+  it("1000 attempts sharing one timestamp survive small page sizes", () => {
+    const ts = "2026-06-01T00:00:00.000Z";
+    const rows = tieRows("attempt", 1000, ts, "a");
+    for (const limit of [1, 10, 100]) expectCompleteWalk(rows, limit);
+  });
+
+  it("1000 reviews sharing one timestamp survive small page sizes", () => {
+    const ts = "2026-06-01T00:00:00.000Z";
+    const rows = tieRows("review", 1000, ts, "r");
+    for (const limit of [1, 10, 100]) expectCompleteWalk(rows, limit);
+  });
+
+  it("mixed reviews+attempts sharing one timestamp survive small page sizes", () => {
+    const ts = "2026-06-01T00:00:00.000Z";
+    const rows = [...tieRows("attempt", 500, ts, "a"), ...tieRows("review", 500, ts, "r")];
+    for (const limit of [1, 10, 100]) expectCompleteWalk(rows, limit);
+  });
+
+  it("a cursor inside a timestamp tie continues inside the tie", () => {
+    const ts = "2026-06-01T00:00:00.000Z";
+    const rows = tieRows("attempt", 200, ts, "a");
+    // First two pages at limit 10, then continue from that cursor.
+    const first = sqlWalkPages(rows, 10);
+    expect(first[0]).toHaveLength(10);
+    expect(first[1]).toHaveLength(10);
+    const midCursor: PulseCursor = (() => {
+      let cursor: PulseCursor | null = null;
+      for (let i = 0; i < 2; i++) {
+        const current: PulseCursor | null = cursor;
+        const fetched: Row[] = [
+          ...queryTableTail({ rows, kind: "attempt", cursor: current, since: SINCE, limit: 11 }),
+          ...queryTableTail({ rows, kind: "review", cursor: current, since: SINCE, limit: 11 }),
+        ];
+        const after: Row[] = fetched
+          .filter((r: Row) => (current ? isAfterPulseCursor(r, current) : r.updatedAt > SINCE))
+          .sort(comparePulseRow);
+        const page: Row[] = after.slice(0, 10);
+        const last: Row = page[page.length - 1]!;
+        cursor = { ts: last.updatedAt, kind: last.kind, id: last.id };
+      }
+      return cursor!;
+    })();
+    expect(midCursor.ts).toBe(ts);
+    const rest = sqlWalkPages(rows, 10, midCursor);
+    expect(rest.flat()).toHaveLength(180);
+    expect(rest.flat()[0]?.id).toBe("a-0020");
+  });
+
+  it("a cursor on the final attempt before reviews continues with reviews", () => {
+    const ts = "2026-06-01T00:00:00.000Z";
+    const rows = [
+      ...tieRows("attempt", 3, ts, "a"),
+      ...tieRows("review", 2, ts, "r"),
+    ];
+    const cursor: PulseCursor = { ts, kind: "attempt", id: "a-0002" };
+    // The attempts table is exhausted at ts; the reviews table takes its tie-block.
+    expect(queryTableTail({ rows, kind: "attempt", cursor, since: SINCE, limit: 11 })).toEqual([]);
+    expect(
+      queryTableTail({ rows, kind: "review", cursor, since: SINCE, limit: 11 }).map((r) => r.id),
+    ).toEqual(["r-0000", "r-0001"]);
+    expectCompleteWalk(rows, 1);
+  });
+
+  it("a cursor on the final review at a timestamp moves past the timestamp", () => {
+    const ts = "2026-06-01T00:00:00.000Z";
+    const rows = [
+      row("attempt", "a-0000", ts),
+      row("review", "r-0000", ts),
+      row("attempt", "a-0001", "2026-06-02T00:00:00.000Z"),
+    ];
+    const cursor: PulseCursor = { ts, kind: "review", id: "r-0000" };
+    expect(queryTableTail({ rows, kind: "attempt", cursor, since: SINCE, limit: 11 }).map((r) => r.id)).toEqual(["a-0001"]);
+    expect(queryTableTail({ rows, kind: "review", cursor, since: SINCE, limit: 11 })).toEqual([]);
+  });
+
+  it("seeded interleaved histories with heavy ties walk completely at sizes 1/10/100", () => {
+    for (const seed of [7, 42, 1337]) {
+      let s = seed >>> 0;
+      const rnd = () => {
+        s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+        return ((s >>> 0) / 0xffffffff);
+      };
+      const stamps = ["2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z", "2026-02-14T00:00:00.000Z", "2026-03-03T12:00:00.000Z"];
+      const rows: Row[] = Array.from({ length: 300 }, (_, i) =>
+        row(rnd() > 0.5 ? "review" : "attempt", `id-${String(i).padStart(4, "0")}`, stamps[Math.floor(rnd() * stamps.length)]!),
+      );
+      for (const limit of [1, 10, 100]) expectCompleteWalk(rows, limit);
+      // Deterministic: the same input always yields the same pages.
+      expect(sqlWalkPages(rows, 10).flat().map((r) => r.id)).toEqual(
+        sqlWalkPages(rows, 10).flat().map((r) => r.id),
+      );
+    }
   });
 
   it("new rows arriving between requests do not duplicate or skip", () => {
@@ -217,6 +321,10 @@ describe("pulse history deterministic pagination", () => {
     expect(source).toContain("status: 400");
     expect(source).toContain("decodePulseCursor");
     expect(source).toContain("encodePulseCursor");
+    // Continuation is lexicographic at the query level, not a coarse >= prefix.
+    expect(source).toContain("pulseTableQuery");
+    expect(source).toContain(".or(");
+    expect(source).not.toContain("pulseTableFloorTs");
     // No legacy `cursor: null` + unchecked hasMore path remains.
     expect(source).not.toMatch(/cursor:\s*null,\s*\n\s*hasMore:\s*records\.length\s*>\s*limit/);
   });

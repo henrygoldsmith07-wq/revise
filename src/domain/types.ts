@@ -581,8 +581,20 @@ export interface QuestionPart {
   aos?: AoCode[];
   /** Which spec statements this part tests (stable specPoint ids). */
   specPointIds?: Id[];
-  /** Which learning claims earn the marks for this part (paraphrased, 1:1 with markScheme when present). */
+  /**
+   * The distinct spec-statement claims this part examines (paraphrased).
+   * One claim routinely earns several mark-scheme points — e.g. a single
+   * "apply pV=nRT" claim behind a 3-point calculation — so this list is NOT
+   * positional with markScheme. Required whenever specPointIds is present.
+   */
   learningClaims?: string[];
+  /**
+   * Explicit per-mark allocation: claimMap[i] is the index into
+   * learningClaims that markScheme[i] rewards. Optional; when absent, every
+   * mark point draws on all listed claims. When present it must have exactly
+   * markScheme.length entries, each a valid learningClaims index.
+   */
+  claimMap?: number[];
   /** Explicit, reviewed skill mapping; never inferred from a whole-topic score. */
   capabilityIds?: Id[];
   /** Demand and family for this part when a structured question mixes skills. */

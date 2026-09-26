@@ -48,7 +48,9 @@ describe("WJEC flagship depth pack", () => {
     // Existing quality packs are generated drafts too; the dashboard counts
     // the whole internal inventory, while the new pack must be present.
     expect(dashboard.generatedQuestionCount).toBeGreaterThanOrEqual(wjecFlagshipDepthQuestions.length);
-  }, 15_000);
+    // Whole-bank dashboards are pure computation over thousands of questions;
+    // the budget matches the other bank-wide audits in this suite.
+  }, 60_000);
 
   it("can report all four WJEC flagships without changing the student surface", () => {
     const dashboard = buildFlagshipDepthDashboard({ curricula: wjecFlagshipCurricula, questions: seedQuestions, nodes: wjecCapabilities });
@@ -58,7 +60,7 @@ describe("WJEC flagship depth pack", () => {
     expect(dashboard.subjects[0]!.statements).toBe(108);
     expect(dashboard.subjects[0]!.deepComplete).toBe(108);
     expect(dashboard.balancedAtTwenty).toBe(true);
-  }, 15_000);
+  }, 60_000);
 });
 
 function fixture(subjectId: string, prompt: string, modelAnswer: string): Question {

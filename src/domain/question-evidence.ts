@@ -49,6 +49,7 @@ export interface QuestionEvidencePart {
   marks: number;
   markScheme: string[];
   learningClaims: string[];
+  claimMap: number[];
   modelAnswer: string;
   specPointIds: Id[];
 }
@@ -231,6 +232,7 @@ function questionEvidencePart(part: QuestionPart): QuestionEvidencePart {
     marks: part.marks,
     markScheme: [...part.markScheme],
     learningClaims: [...(part.learningClaims ?? [])],
+    claimMap: [...(part.claimMap ?? [])],
     modelAnswer: part.modelAnswer,
     specPointIds: [...(part.specPointIds ?? [])],
   };
@@ -251,7 +253,13 @@ function flagsFor(
   if (!question.lastChecked) flags.push("not-checked");
   else if (today && daysBetween(question.lastChecked, today) > STALE_DAYS) flags.push("stale");
   if (parts.some((part) => part.markScheme.length < part.marks)) flags.push("incomplete-mark-scheme");
-  if (parts.some((part) => part.specPointIds.length > 0 && part.learningClaims.length < part.markScheme.length)) {
+  if (parts.some((part) =>
+    (part.specPointIds.length > 0 && part.learningClaims.length === 0) ||
+    (part.claimMap.length > 0 && (
+      part.claimMap.length !== part.markScheme.length ||
+      part.claimMap.some((index) => !Number.isInteger(index) || index < 0 || index >= part.learningClaims.length)
+    )),
+  )) {
     flags.push("missing-learning-claims");
   }
   return flags;

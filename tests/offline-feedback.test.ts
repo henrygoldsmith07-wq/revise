@@ -20,13 +20,15 @@ describe("offline feedback contracts", () => {
 
   it("keeps queue status current after local writes", () => {
     const sync = read("src/data/sync.ts");
+    const engine = read("src/state/sync-engine.ts");
     const store = read("src/state/store.tsx");
 
     expect(sync).toContain("SYNC_QUEUE_EVENT");
     expect(sync).toContain("dispatchEvent(new Event(SYNC_QUEUE_EVENT))");
-    expect(store).toContain("lastSyncError");
-    expect(store).toContain("window.addEventListener(SYNC_QUEUE_EVENT");
-    expect(store).toContain("Some changes are still waiting to sync");
+    expect(engine).toContain("window.addEventListener(SYNC_QUEUE_EVENT");
+    expect(engine).toContain("Some changes are still waiting to sync");
+    // The central store still exposes the status the banner reads.
+    expect(store).toContain("syncStatus");
   });
 
   it("retries the pull cursor after a failed table read", () => {
@@ -35,6 +37,7 @@ describe("offline feedback contracts", () => {
     expect(sync).toContain("Promise<{ pulled: number; failed: number; skipped?: SyncSkip }>");
     // The cursor only advances on a fully successful pass, and it advances to
     // the newest server-authored timestamp observed — never the local clock.
-    expect(sync).toContain('if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseMeta("lastPullAt", maxObservedUpdatedAt);');
+    // The cursor is account-scoped so one device cannot skip another's rows.
+    expect(sync).toContain('if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseUserMeta("lastPullAt", userId, maxObservedUpdatedAt);');
   });
 });

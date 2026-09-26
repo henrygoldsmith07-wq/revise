@@ -43,6 +43,8 @@ export interface RateLimitResult {
 export interface RateLimiterBackend {
   name: "memory" | "distributed";
   check(key: string, cost: number, options: RateLimitOptions, now?: number): RateLimitResult;
+  /** Async consumption for network-backed limiters; absent on memory. */
+  checkAsync?(key: string, cost: number, options: RateLimitOptions): Promise<RateLimitResult>;
 }
 
 function utcDay(now: number): string {
@@ -132,16 +134,10 @@ export function setRateLimiterBackend(backend: RateLimiterBackend | null): void 
 }
 
 export function getRateLimiterBackend(): RateLimiterBackend {
-  // Explicit env switch documents the production wiring without adding an
-  // infrastructure dependency: when RATE_LIMIT_BACKEND=distributed but no
-  // backend was injected, stay on memory and warn once so the deployment is
-  // visibly degraded rather than silently unlimited.
-  if (process.env.RATE_LIMIT_BACKEND === "distributed" && activeBackend.name !== "distributed") {
-    if (process.env.NODE_ENV !== "test" && !(getRateLimiterBackend as { warned?: boolean }).warned) {
-      (getRateLimiterBackend as { warned?: boolean }).warned = true;
-      console.warn("[rate-limit] RATE_LIMIT_BACKEND=distributed but no shared backend injected — using in-memory fallback.");
-    }
-  }
+  // Sync in-memory singleton (local dev, tests, and explicit injection).
+  // Production AI traffic goes through enforceAiRateLimit() in
+  // ./rate-limit-supabase.ts, which selects the shared Supabase backend when
+  // RATE_LIMIT_BACKEND=supabase and fails closed otherwise.
   return activeBackend;
 }
 

@@ -82,6 +82,9 @@ export default function TodayPage() {
 
   if (!adaptiveSession) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} />;
 
+  // Hierarchy: the next session (or resume) dominates the first viewport.
+  // Everything else — overview, roadmap, pace, outlook — sits one tap away
+  // inside a collapsed section so secondary data never competes with starting.
   return (
     <div className="mx-auto w-full space-y-5">
       <TodayWelcome name={settings.displayName} greeting={greetingLabel} />
@@ -94,10 +97,17 @@ export default function TodayPage() {
           <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" />
         </div>
       )}
-      <TodayOverview />
-      <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
-      {pace ? <PaceForecastLine forecast={pace} /> : null}
-      <ExamOutlook />
+      <details className="card p-4 sm:p-5">
+        <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
+          Plan, pace and outlook
+        </summary>
+        <div className="mt-4 space-y-5">
+          <TodayOverview />
+          <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
+          {pace ? <PaceForecastLine forecast={pace} /> : null}
+          <ExamOutlook />
+        </div>
+      </details>
     </div>
   );
 }

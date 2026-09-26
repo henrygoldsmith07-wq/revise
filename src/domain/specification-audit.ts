@@ -535,14 +535,22 @@ export function specificationCoverageAudit(
     }
 
     for (const part of question.parts) {
-      if ((part.specPointIds?.length ?? 0) > 0 && (part.learningClaims?.length ?? 0) !== part.markScheme.length) {
+      const claims = part.learningClaims ?? [];
+      const map = part.claimMap;
+      const missingClaims = (part.specPointIds?.length ?? 0) > 0 && claims.length === 0;
+      const excessClaims = (part.specPointIds?.length ?? 0) > 0 && claims.length > part.markScheme.length;
+      const invalidMap = map !== undefined && (
+        map.length !== part.markScheme.length ||
+        map.some((index) => !Number.isInteger(index) || index < 0 || index >= claims.length)
+      );
+      if (missingClaims || excessClaims || invalidMap) {
         addIssue({
           kind: "question-claim-alignment",
           severity: "error",
           scope: "question",
           subjectId: subject.id,
           id: question.id,
-          detail: `${question.id} part ${part.id}: learningClaims must align one-to-one with markScheme points`,
+          detail: `${question.id} part ${part.id}: mapped parts need learningClaims (one claim may earn several marks) and a valid claimMap when present`,
         });
       }
     }

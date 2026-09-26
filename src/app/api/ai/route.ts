@@ -8,12 +8,10 @@ import { AI_TASKS } from "@/ai/types";
 import type { AiTask } from "@/ai/types";
 import type { Question } from "@/domain/types";
 import {
-  AI_RATE_LIMIT,
-  aiDailyLimit,
   aiTaskCost,
-  rateLimitWithCost,
   resolveRateLimitKey,
 } from "@/lib/rate-limit";
+import { enforceAiRateLimit, RateLimiterUnavailableError, type QuotaRpcCaller } from "@/lib/rate-limit-supabase";
 import { captureServerTelemetry } from "@/lib/observability";
 
 // The single AI entry point. Keys never leave this process; the browser only
@@ -27,7 +25,7 @@ export const runtime = "nodejs";
 export const MAX_BODY_CHARS = 1_500_000;
 export const MAX_OCR_CHARS = 1_200_000;
 
-type AiAuth = { error: NextResponse } | { userId: string | null };
+type AiAuth = { error: NextResponse } | { userId: string | null; rpc: QuotaRpcCaller | null };
 
 function providerCredentialsPresent(): boolean {
   // Mirrors src/ai/provider.ts selection without importing keys: any provider
@@ -58,7 +56,7 @@ async function requireAiUser(): Promise<AiAuth> {
         ),
       };
     }
-    return { userId: null };
+    return { userId: null, rpc: null };
   }
 
   const cookieStore = await cookies();
@@ -78,7 +76,21 @@ async function requireAiUser(): Promise<AiAuth> {
   if (!auth.user) {
     return { error: NextResponse.json({ error: "Sign in to use AI features." }, { status: 401 }) };
   }
-  return { userId: auth.user.id };
+  // The same authenticated client enforces the shared quota: its JWT scopes
+  // the consume_ai_quota RPC to this user via auth.uid().
+  const rpc: QuotaRpcCaller = {
+    rpc: async (fn, args) => {
+      const res = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>)(
+        fn,
+        args as Record<string, unknown>,
+      );
+      return res;
+    },
+  };
+  return { userId: auth.user.id, rpc };
 }
 
 export async function GET() {
@@ -128,12 +140,23 @@ export async function POST(request: Request) {
   }
 
   // Enforce quota by authenticated user where possible (else IP), with
-  // per-minute + burst + daily allowance and per-task cost accounting.
+  // per-minute + burst + daily allowance and per-task cost accounting. The
+  // shared Supabase backend holds the quota across instances; the in-memory
+  // bucket is local development only.
   const cost = aiTaskCost(task);
-  const limit = rateLimitWithCost(rateKey, cost, {
-    ...AI_RATE_LIMIT,
-    dailyLimit: aiDailyLimit(),
-  });
+  let limit;
+  try {
+    limit = await enforceAiRateLimit({ key: rateKey, cost, userId: auth.userId, rpc: auth.rpc });
+  } catch (error) {
+    if (error instanceof RateLimiterUnavailableError) {
+      captureServerTelemetry("ai.degraded", { status: "degraded", task, provider: null });
+      return NextResponse.json(
+        { error: "AI rate limiting is unavailable right now. The rest of the app keeps working — try again shortly." },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
   if (!limit.ok) {
     return NextResponse.json(
       {

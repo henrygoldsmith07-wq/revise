@@ -52,8 +52,10 @@ describe("AI API hardening", () => {
     const src = aiRoute();
     expect(src).toContain("resolveRateLimitKey");
     expect(src).toContain("aiTaskCost");
-    expect(src).toContain("aiDailyLimit");
+    expect(src).toContain("enforceAiRateLimit");
+    expect(src).toContain("RateLimiterUnavailableError");
     expect(src).toContain("status: 429");
+    expect(src).toContain("status: 503");
     expect(src).toContain("retry-after");
     const limiter = rateLimitSrc();
     expect(limiter).toContain("RateLimiterBackend");
@@ -61,6 +63,10 @@ describe("AI API hardening", () => {
     expect(limiter).toContain("dailyLimit");
     expect(limiter).toContain("AI_TASK_COSTS");
     expect(limiter).toContain("resolveRateLimitKey");
+    const shared = readFileSync(join(process.cwd(), "src/lib/rate-limit-supabase.ts"), "utf8");
+    expect(shared).toContain("consume_ai_quota");
+    expect(shared).toContain("aiDailyLimit");
+    expect(shared).toContain("RateLimiterUnavailableError");
   });
 
   it("keeps AI optional: task failures degrade to fallback, never 500 the study loop", () => {

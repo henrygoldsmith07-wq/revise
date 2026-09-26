@@ -6,7 +6,7 @@
 //
 //   source JSON → contentQuestionSchema/contentTopicSchema (shape)
 //     → provenance validation (source/verification/reviewer/lastChecked/specVersion)
-//     → spec-mapping validation (specPointIds + learningClaims 1:1 with markScheme)
+//     → spec-mapping validation (specPointIds + learningClaims + optional claimMap)
 //     → typed runtime (Question/Topic, stable ids preserved)
 //
 // Existing TS modules stay supported: they are validated through the same
@@ -95,14 +95,17 @@ export function validateProvenance(input: {
 export interface SpecMappingIssue {
   questionId: string;
   partId: string;
-  code: "missing-spec-points" | "missing-learning-claims" | "claims-mismatch-markscheme";
+  code: "missing-spec-points" | "missing-learning-claims" | "invalid-claim-map";
   message: string;
 }
 
 /**
- * Spec-mapping validation: any part that declares specPointIds must also
- * declare learningClaims 1:1 with its markScheme points, so coverage can name
- * which statement each mark tests.
+ * Spec-mapping validation. A part that declares specPointIds must name the
+ * distinct spec-statement claims it examines in learningClaims (one claim
+ * routinely earns several mark points, so no positional rule applies to that
+ * list). The per-mark allocation is explicit and separate: claimMap, when
+ * present, has one learningClaims index per markScheme point. This keeps the
+ * relationship unambiguous without forcing padded one-claim-per-mark lists.
  */
 export function validateSpecMapping(question: Pick<Question, "id" | "parts">): SpecMappingIssue[] {
   const issues: SpecMappingIssue[] = [];
@@ -123,9 +126,22 @@ export function validateSpecMapping(question: Pick<Question, "id" | "parts">): S
       issues.push({
         questionId: question.id,
         partId: part.id,
-        code: "claims-mismatch-markscheme",
-        message: `learningClaims (${claims.length}) must not exceed markScheme points (${part.markScheme.length})`,
+        code: "missing-learning-claims",
+        message: `learningClaims (${claims.length}) exceed markScheme points (${part.markScheme.length}): each claim must earn at least one mark`,
       });
+    }
+    const map = part.claimMap;
+    if (map !== undefined) {
+      const badLength = map.length !== part.markScheme.length;
+      const badIndex = map.some((index) => !Number.isInteger(index) || index < 0 || index >= claims.length);
+      if (badLength || badIndex) {
+        issues.push({
+          questionId: question.id,
+          partId: part.id,
+          code: "invalid-claim-map",
+          message: `claimMap must hold exactly one learningClaims index per markScheme point (${part.markScheme.length})`,
+        });
+      }
     }
   }
   return issues;

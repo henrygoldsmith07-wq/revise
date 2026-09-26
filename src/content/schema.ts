@@ -147,10 +147,29 @@ export const contentQuestionPartSchema = z.object({
   aos: z.array(ao).optional(),
   specPointIds: z.array(id).optional(),
   learningClaims: z.array(nonEmpty).optional(),
+  claimMap: z.array(z.number().int().min(0)).optional(),
   capabilityIds: z.array(id).min(1).optional(),
   learning: learningPartSchema.optional(),
   calculationRules: z.array(calculationRuleSchema).optional(),
-}).passthrough();
+}).passthrough().superRefine((part, ctx) => {
+  if (part.claimMap !== undefined) {
+    if (part.claimMap.length !== part.markScheme.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["claimMap"],
+        message: `claimMap (${part.claimMap.length}) must allocate every markScheme point (${part.markScheme.length})`,
+      });
+    }
+    const claims = part.learningClaims?.length ?? 0;
+    if (part.claimMap.some((index) => index >= claims)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["claimMap"],
+        message: "claimMap entries must index into learningClaims",
+      });
+    }
+  }
+});
 
 export const contentQuestionSchema = z.object({
   id,

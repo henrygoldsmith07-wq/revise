@@ -134,9 +134,9 @@ describe("resilience chain wiring (structural contracts)", () => {
     const dlq = read("src/ai/mark-dlq.ts");
     expect(dlq).toMatch(/import \{ saveAttempt \} from "@\/data\/repository"/);
     expect(dlq).toMatch(/await saveAttempt\(upgraded\)/);
-    const store = read("src/state/store.tsx");
-    expect(store).toMatch(/drainDeadMarks/);
-    expect(store).toMatch(/AI_DLQ_RESOLVED_EVENT/);
+    const engine = read("src/state/sync-engine.ts");
+    expect(engine).toMatch(/drainDeadMarks/);
+    expect(engine).toMatch(/AI_DLQ_RESOLVED_EVENT/);
   });
 
   it("the local-model tier is opt-in through UserSettings.localAiMarking", () => {

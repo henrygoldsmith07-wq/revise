@@ -181,7 +181,8 @@ ids when omitted and threads per-statement provenance from the topic. Cards
 auto-link to the nearest statement(s); all four subjects now have specPoints on
 every topic (Physics 76, Chemistry 76, Biology 70, Maths 55) with `paperBreakdown`
 for unit·duration·marks·weighting on every paper. Every seed question maps to
-statements with `learningClaims` (1:1 with markScheme), including the new OCR
+statements with `learningClaims` (one claim may earn several marks; per-mark
+allocation is explicit via `claimMap`), including the new OCR
 A-Level and extended-response question sets — the `no-spec-points`
 gaps in Progress now only fire on regressions. Run `node scripts/validate-curriculum.mjs`
 in CI — it now enforces that every subject has specPoints on every topic and that any `specPointIds` are paired with `learningClaims`. See
@@ -251,7 +252,8 @@ retrieval cards, how many have an exam question (*which* parts test *which*
 statements), which are verified, and — per `SPEC_MANIFEST` — which unit/paper
 (duration, marks, weighting) each belongs to. The statement model now covers all **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE): 440 topics,
 718 seed questions**, every topic with `specPoints` and every seed question part
-mapped with `specPointIds + learningClaims` aligned 1:1 with mark-scheme points.
+mapped with `specPointIds + learningClaims` (explicit per-mark allocation via
+`claimMap` where needed).
 Topic lists and grade boundaries remain approximate and labelled as such; always
 check the current board specification for exact assessment objectives and
 weightings.
