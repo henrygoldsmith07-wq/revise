@@ -115,6 +115,14 @@ describe("client wiring: masking precedes every outbound AI call", () => {
     expect(runner).toContain("withheld before sending");
     expect(runner).toContain("result.withheld");
   });
+
+  it("QuestionRunner applies the human-review warning to every review-gated WJEC flagship", () => {
+    const runner = readFileSync(src("src/components/QuestionRunner.tsx"), "utf8");
+    expect(runner).toContain("requiresWjecContentReview(question.subjectId)");
+    expect(runner).toContain("!humanVerifiedWjecQuestion(question)");
+    expect(runner).toContain("Needs human review · practice evidence only");
+    expect(runner).not.toContain('question.subjectId === "wjec-alevel-physics" && !humanVerified');
+  });
 });
 
 describe("E2EE for the sync outbox", () => {

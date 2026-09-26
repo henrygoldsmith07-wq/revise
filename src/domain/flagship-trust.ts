@@ -1,4 +1,4 @@
-import { classifyDepth, type DepthCategory, FLAGSHIP_SUBJECTS } from "./flagship";
+import { classifyDepth, type DepthCategory, FLAGSHIP_SUBJECTS, questionDepthBySpecPoint } from "./flagship";
 import { humanVerifiedWjecQuestion, verifiedWjecPaperProvenance } from "./physics-content-review";
 import type { Id, Question, Topic } from "./types";
 
@@ -39,6 +39,7 @@ export interface FlagshipReviewPlanItem {
   questionId: Id;
   subjectId: Id;
   category: DepthCategory;
+  depthCategories: DepthCategory[];
   specPointIds: Id[];
   score: number;
   newStatementCoverage: number;
@@ -67,13 +68,18 @@ export function flagshipTrustReadiness(input: {
   const trusted = questions.filter(trustedQuestion);
   const releaseQuestions = questions.filter(releaseQuestion);
   const trustedReleaseQuestions = releaseQuestions.filter(trustedQuestion);
+  const depthByQuestion = new Map(
+    questions.map((question) => [question.id, questionDepthBySpecPoint(question)] as const),
+  );
 
   const statementTrust = (trustedQuestions: readonly Question[]): FlagshipStatementTrust[] => topics.flatMap((topic) =>
     (topic.specPoints ?? []).map((point) => {
       const mapped = trustedQuestions.filter((question) =>
-        question.parts.some((part) => (part.specPointIds ?? []).includes(point.id)),
+        depthByQuestion.get(question.id)?.has(point.id),
       );
-      const categories = [...new Set(mapped.map(classifyDepth))];
+      const categories = [...new Set(mapped.flatMap((question) =>
+        [...(depthByQuestion.get(question.id)?.get(point.id) ?? [])],
+      ))];
       const missing = [
         ...(mapped.length >= CORE_TRUST_QUESTION_COUNT ? [] : [`${CORE_TRUST_QUESTION_COUNT}-trusted-questions`]),
         ...CORE_TRUST_CATEGORIES.filter((category) => !categories.includes(category)),
@@ -140,13 +146,6 @@ export function flagshipTrustReadinessSet(input: {
   );
 }
 
-function mappedSpecPoints(question: Question): Id[] {
-  return [...new Set([
-    ...(question.specPointIds ?? []),
-    ...question.parts.flatMap((part) => part.specPointIds ?? []),
-  ])];
-}
-
 /**
  * Greedy reviewer queue that maximises trusted statement coverage first, then
  * missing recall/application/transfer categories, then progress toward the
@@ -169,23 +168,26 @@ export function buildFlagshipReviewPlan(input: {
       .flatMap((topic) => (topic.specPoints ?? []).map((point) => point.id)),
   );
   const subjectQuestions = input.questions.filter((question) => question.subjectId === input.subjectId);
+  const depthByQuestion = new Map(
+    subjectQuestions.map((question) => [question.id, questionDepthBySpecPoint(question)] as const),
+  );
   const trusted = subjectQuestions.filter(trustedQuestion);
   const candidates = subjectQuestions.filter((question) => {
     if (trustedQuestion(question)) return false;
     if (question.source === "past-paper" && !verifiedWjecPaperProvenance(question)) return false;
     if (["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "")) return false;
-    return mappedSpecPoints(question).some((id) => subjectPoints.has(id));
+    return [...(depthByQuestion.get(question.id)?.keys() ?? [])].some((id) => subjectPoints.has(id));
   });
 
   const state = new Map<Id, { count: number; categories: Set<DepthCategory> }>();
   for (const pointId of subjectPoints) state.set(pointId, { count: 0, categories: new Set() });
   for (const question of trusted) {
-    const category = classifyDepth(question);
-    for (const pointId of mappedSpecPoints(question)) {
+    const depthByPoint = depthByQuestion.get(question.id) ?? new Map();
+    for (const [pointId, categories] of depthByPoint) {
       const row = state.get(pointId);
       if (!row) continue;
       row.count++;
-      row.categories.add(category);
+      for (const category of categories) row.categories.add(category);
     }
   }
 
@@ -197,14 +199,22 @@ export function buildFlagshipReviewPlan(input: {
     let best: { question: Question; item: FlagshipReviewPlanItem } | null = null;
     for (const question of remaining.values()) {
       const category = classifyDepth(question);
-      const specPointIds = mappedSpecPoints(question).filter((id) => state.has(id));
+      const depthByPoint = depthByQuestion.get(question.id) ?? new Map();
+      const specPointIds = [...depthByPoint.keys()].filter((id) => state.has(id));
+      const depthCategories = [...new Set(
+        specPointIds.flatMap((pointId) => [...(depthByPoint.get(pointId) ?? [])]),
+      )];
       let newStatementCoverage = 0;
       let newCoreCategories = 0;
       let progressTowardCoreCount = 0;
       for (const pointId of specPointIds) {
         const row = state.get(pointId)!;
         if (row.count === 0) newStatementCoverage++;
-        if (CORE_TRUST_CATEGORIES.includes(category) && !row.categories.has(category)) newCoreCategories++;
+        for (const pointCategory of depthByPoint.get(pointId) ?? []) {
+          if (CORE_TRUST_CATEGORIES.includes(pointCategory) && !row.categories.has(pointCategory)) {
+            newCoreCategories++;
+          }
+        }
         if (row.count < CORE_TRUST_QUESTION_COUNT) progressTowardCoreCount++;
       }
       const score =
@@ -217,6 +227,7 @@ export function buildFlagshipReviewPlan(input: {
         questionId: question.id,
         subjectId: question.subjectId,
         category,
+        depthCategories,
         specPointIds,
         score,
         newStatementCoverage,
@@ -231,11 +242,12 @@ export function buildFlagshipReviewPlan(input: {
     if (!best) break;
     plan.push(best.item);
     remaining.delete(best.question.id);
+    const bestDepthByPoint = depthByQuestion.get(best.question.id) ?? new Map();
     for (const pointId of best.item.specPointIds) {
       const row = state.get(pointId);
       if (!row) continue;
       row.count++;
-      row.categories.add(best.item.category);
+      for (const category of bestDepthByPoint.get(pointId) ?? []) row.categories.add(category);
     }
   }
   return plan;

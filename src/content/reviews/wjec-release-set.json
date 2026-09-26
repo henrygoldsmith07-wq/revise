@@ -38,16 +38,16 @@
       "cnt:question:chem-organic-isomerism"
     ],
     "wjec-alevel-physics": [
-      "cnt:question:physics-quality-alternating-grid-filter",
-      "cnt:question:physics-quality-capacitance-clinical-defibrillator",
-      "cnt:question:physics-quality-energy-storage-claim",
-      "cnt:question:physics-quality-induction-wind-turbine",
-      "cnt:question:physics-quality-medical-ultrasound-dose",
-      "cnt:question:physics-quality-orbit-redshift",
-      "cnt:question:physics-quality-sports-impact",
+      "cnt:question:wjec-alevel-expansion-physics-capacitance",
+      "cnt:question:wjec-alevel-expansion-physics-electromagnetic-induction",
+      "cnt:question:wjec-alevel-expansion-physics-sports-physics",
+      "cnt:question:wjec-alevel-expansion-physics-alternating-currents",
+      "cnt:question:wjec-alevel-expansion-physics-energy-environment",
+      "cnt:question:wjec-alevel-expansion-physics-medical-physics",
+      "cnt:question:wjec-alevel-expansion-physics-orbits-universe",
       "cnt:question:wjec-alevel-expansion-physics-practical-investigations",
-      "cnt:question:depth-circular-banked",
-      "cnt:question:depth-energy-fx-graph"
+      "cnt:question:depth-circuits-internal-r",
+      "cnt:question:depth-circular-banked"
     ]
   }
 }

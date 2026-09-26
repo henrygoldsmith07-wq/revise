@@ -101,6 +101,14 @@ describe("canonical WJEC human-verification contract", () => {
     expect(validHumanVerification(q, malformed)).toBe(false);
     expect(humanVerificationIssues(q, malformed)).toContain("missing-reviewer-id");
   });
+
+  it("rejects date-only and future review timestamps", () => {
+    const q = question();
+    const valid = review(q);
+    expect(humanVerificationIssues(q, { ...valid, reviewedAt: "2026-09-26" })).toContain("invalid-reviewed-at");
+    expect(humanVerificationIssues(q, { ...valid, reviewedAt: "2099-01-01T00:00:00Z" })).toContain("invalid-reviewed-at");
+    expect(humanVerificationIssues(q, { ...valid, reviewedAt: "2026-09-26T18:00:00.1234567Z" })).not.toContain("invalid-reviewed-at");
+  });
 });
 
 describe("repository human-verification ledger", () => {

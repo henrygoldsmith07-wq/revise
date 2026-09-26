@@ -70,3 +70,11 @@ Recheck on 2026-09-11: strict TypeScript and zero-warning lint passed again; cur
 ## Local main integration
 
 The subject upgrade was isolated from the separate uncommitted Physics work before integration. Its staged snapshot passed strict TypeScript and all 164 targeted tests across content, subject quality, the durable learning loop, prerequisite diagnosis, paper selection and grade calibration. The broader benchmark figures above describe the earlier combined working tree, not this isolated snapshot.
+
+## WJEC part-level trust update (2026-09-26)
+
+WJEC flagship trust and authored depth are credited per mapped question part rather than by assigning one depth label to an entire structured question. A question can therefore contribute recall, application and transfer evidence through different parts, but still counts as only one independent question toward the four-question threshold for a specification statement.
+
+Human review attestations now require a full timezone-bearing ISO instant and reject date-only or materially future-dated review times. The exact authored-content ceiling is tracked in `src/content/reviews/wjec-authoring-backlog.json`; `npm run wjec:authoring:gaps` reports the gaps and `npm run wjec:authoring:check` verifies that the source-controlled backlog matches the live bank.
+
+Focused review batches emit `release-set-proposal.json`. `npm run wjec:release:check -- <proposal>` validates a proposal without writing; `npm run wjec:release:apply -- <proposal>` atomically updates only the editorial release-candidate manifest. Release selection never creates or changes human approvals.

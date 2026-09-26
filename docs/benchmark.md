@@ -315,3 +315,11 @@ The product ships with synthetic longitudinal histories checked by CI harnesses.
 
 - Cohort: n, weeks, board, grade movement, MAE/bias/correlation before and after each engine change.
 - The method will be the same harnesses above; numbers will be from observed `(predicted, actual)` rather than synthetic — same functions, real pairs.
+
+## WJEC part-level trust update (2026-09-26)
+
+WJEC flagship trust and authored depth are credited per mapped question part rather than by assigning one depth label to an entire structured question. A question can therefore contribute recall, application and transfer evidence through different parts, but still counts as only one independent question toward the four-question threshold for a specification statement.
+
+Human review attestations now require a full timezone-bearing ISO instant and reject date-only or materially future-dated review times. The exact authored-content ceiling is tracked in `src/content/reviews/wjec-authoring-backlog.json`; `npm run wjec:authoring:gaps` reports the gaps and `npm run wjec:authoring:check` verifies that the source-controlled backlog matches the live bank.
+
+Focused review batches emit `release-set-proposal.json`. `npm run wjec:release:check -- <proposal>` validates a proposal without writing; `npm run wjec:release:apply -- <proposal>` atomically updates only the editorial release-candidate manifest. Release selection never creates or changes human approvals.

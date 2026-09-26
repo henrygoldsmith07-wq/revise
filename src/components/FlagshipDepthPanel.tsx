@@ -20,7 +20,14 @@ export function FlagshipDepthPanel() {
       questions: seedQuestions,
       releaseQuestion: isSeedWjecReleaseQuestion,
     });
-    return { flagship, depth, trust };
+    const ceiling = flagshipTrustReadiness({
+      subjectId: flagship.subjectId,
+      topics,
+      questions: seedQuestions,
+      trustedQuestion: () => true,
+      releaseQuestion: () => true,
+    });
+    return { flagship, depth, trust, ceiling };
   });
 
   return (
@@ -30,7 +37,7 @@ export function FlagshipDepthPanel() {
         hint="Assets per specification statement — depth over breadth"
       />
       <div className="grid sm:grid-cols-2 gap-3">
-        {rows.map(({ flagship, depth, trust }) => {
+        {rows.map(({ flagship, depth, trust, ceiling }) => {
           const zeroQ = depth.specPoints.filter((sp) => sp.distinctQuestions === 0).length;
           const withFour = depth.specPoints.filter((sp) => sp.distinctQuestions >= 4).length;
           const topGap = depth.gaps[0];
@@ -39,6 +46,8 @@ export function FlagshipDepthPanel() {
               <h3 className="text-sm font-semibold">{getSubject(flagship.subjectId)?.name ?? flagship.label}</h3>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                 <Stat label="Gold statements" value={`${depth.goldStatements}/${depth.statementsTotal}`} hint="≥4 questions spanning recall+application+transfer" />
+                <Stat label="Authored ceiling" value={`${ceiling.statementsMeetingCoreTrustBar}/${ceiling.statementsTotal}`} hint="Core depth if every currently eligible bank question were human-approved" />
+                <Stat label="Authoring blockers" value={String(ceiling.statements.filter((row) => !row.meetsCoreTrustBar).length)} hint="Statements that still cannot meet core even if every current question were approved" />
                 <Stat label="Trusted core" value={`${trust.statementsMeetingCoreTrustBar}/${trust.statementsTotal}`} hint="≥4 human-approved questions spanning recall+application+transfer" />
                 <Stat label="Approved questions" value={`${trust.trustedQuestions}/${trust.questionsTotal}`} hint="Exact current question version passed the WJEC human trust gate" />
                 <Stat label="Release set" value={`${trust.trustedReleaseQuestions}/${trust.releaseQuestionsTotal}`} hint="Operator-selected release candidates that have passed the human trust gate" />

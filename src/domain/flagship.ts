@@ -14,7 +14,7 @@
 // Pure domain: classification and aggregation only; callers supply content.
 // ---------------------------------------------------------------------------
 
-import type { Id, Question, Topic } from "./types";
+import type { Id, LearningDemand, Question, QuestionPart, Topic } from "./types";
 
 export interface FlagshipSubject {
   subjectId: Id;
@@ -37,6 +37,19 @@ export function isFlagship(subjectId: Id): boolean {
 // --- question depth classification -------------------------------------------
 
 export type DepthCategory = "recall" | "application" | "transfer" | "misconception" | "synoptic";
+
+function categoryForDemand(demand: LearningDemand | undefined): DepthCategory | null {
+  switch (demand) {
+    case "recall": return "recall";
+    case "misconception": return "misconception";
+    case "transfer": return "transfer";
+    case "synoptic": return "synoptic";
+    case "application":
+    case "explanation":
+    case "calculation": return "application";
+    default: return null;
+  }
+}
 
 /**
  * One primary depth category per question, derived from authored signals:
@@ -73,6 +86,87 @@ export function classifyDepth(question: Question): DepthCategory {
   if (ao3 > 0 && ao3 >= ao2) return "transfer";
   if (question.totalMarks >= 3 || ao2 > 0) return "application";
   return "recall";
+}
+
+/**
+ * Classify one authored part instead of flattening a structured question into
+ * one depth bucket. A single exam question can legitimately mix recall,
+ * application and transfer across separate specification statements.
+ */
+export function classifyPartDepth(question: Question, part: QuestionPart): DepthCategory {
+  const explicit = categoryForDemand(
+    part.learning?.demand ?? (question.parts.length === 1 ? question.learning?.demand : undefined),
+  );
+  if (explicit) return explicit;
+
+  const slug = question.id.toLowerCase();
+  if (/unfamiliar/.test(slug)) return "transfer";
+  if (/misconception/.test(slug)) return "misconception";
+
+  if (part.marks >= 6) return "synoptic";
+  const aos = part.aos ?? [];
+  const ao3 = aos.filter((ao) => ao === "AO3").length;
+  const ao2 = aos.filter((ao) => ao === "AO2").length;
+  if (ao3 > 0 && ao3 >= ao2) return "transfer";
+  if (part.marks >= 3 || ao2 > 0) return "application";
+  return "recall";
+}
+
+/** Depth categories contributed by one question to each mapped spec point. */
+export function questionDepthBySpecPoint(question: Question): Map<Id, Set<DepthCategory>> {
+  const out = new Map<Id, Set<DepthCategory>>();
+  let mappedPart = false;
+
+  for (const part of question.parts) {
+    const pointIds = part.specPointIds ?? [];
+    if (!pointIds.length) continue;
+    mappedPart = true;
+    const category = classifyPartDepth(question, part);
+    for (const pointId of pointIds) {
+      const categories = out.get(pointId) ?? new Set<DepthCategory>();
+      categories.add(category);
+      out.set(pointId, categories);
+    }
+  }
+
+  // Older/single-item content can carry only a question-level mapping.
+  if (!mappedPart) {
+    const category = classifyDepth(question);
+    for (const pointId of question.specPointIds ?? []) {
+      const categories = out.get(pointId) ?? new Set<DepthCategory>();
+      categories.add(category);
+      out.set(pointId, categories);
+    }
+  }
+  return out;
+}
+
+function aggregateQuestionDepth(
+  questions: readonly Question[],
+  subjectId: Id,
+): Map<Id, { categoryQuestionIds: Map<DepthCategory, Set<Id>>; questionIds: Set<Id> }> {
+  const bySpecPoint = new Map<
+    Id,
+    { categoryQuestionIds: Map<DepthCategory, Set<Id>>; questionIds: Set<Id> }
+  >();
+
+  for (const question of questions) {
+    if (question.subjectId !== subjectId) continue;
+    for (const [spId, categories] of questionDepthBySpecPoint(question)) {
+      const entry = bySpecPoint.get(spId) ?? {
+        categoryQuestionIds: new Map<DepthCategory, Set<Id>>(),
+        questionIds: new Set<Id>(),
+      };
+      entry.questionIds.add(question.id);
+      for (const category of categories) {
+        const ids = entry.categoryQuestionIds.get(category) ?? new Set<Id>();
+        ids.add(question.id);
+        entry.categoryQuestionIds.set(category, ids);
+      }
+      bySpecPoint.set(spId, entry);
+    }
+  }
+  return bySpecPoint;
 }
 
 // --- per-statement aggregation -----------------------------------------------
@@ -135,22 +229,7 @@ function hasWorkedSolutions(question: Question): boolean {
 
 export function buildSubjectDepth(input: DepthInput): SubjectDepth {
   const subjectId = input.topics[0]?.id.split(".").slice(0, -1).join(".") ?? "";
-  // Bucket questions by the spec points their parts declare.
-  const bySpecPoint = new Map<Id, { categories: Map<DepthCategory, number>; questionIds: Set<Id> }>();
-  for (const question of input.questions) {
-    if (question.subjectId !== subjectId) continue;
-    const category = classifyDepth(question);
-    const touched = new Set<Id>();
-    for (const part of question.parts) {
-      for (const spId of part.specPointIds ?? []) {
-        touched.add(spId);
-        const entry = bySpecPoint.get(spId) ?? { categories: new Map(), questionIds: new Set() };
-        entry.categories.set(category, (entry.categories.get(category) ?? 0) + 1);
-        entry.questionIds.add(question.id);
-        bySpecPoint.set(spId, entry);
-      }
-    }
-  }
+  const bySpecPoint = aggregateQuestionDepth(input.questions, subjectId);
 
   const specPoints: SpecPointDepth[] = [];
   for (const topic of input.topics) {
@@ -161,7 +240,7 @@ export function buildSubjectDepth(input: DepthInput): SubjectDepth {
       const categories: Partial<Record<DepthCategory, number>> = {};
       let distinct = 0;
       if (entry) {
-        for (const [category, count] of entry.categories) categories[category] = count;
+        for (const [category, ids] of entry.categoryQuestionIds) categories[category] = ids.size;
         distinct = entry.questionIds.size;
       }
       specPoints.push({
@@ -296,19 +375,7 @@ export function deepStatementCoverage(input: DepthInput): DeepStatement[] {
 /** buildSubjectDepth without the deep pass (breaks the recursion). */
 function buildSubjectDepthWithoutDeep(input: DepthInput): SpecPointDepth[] {
   const subjectId = input.topics[0]?.id.split(".").slice(0, -1).join(".") ?? "";
-  const bySpecPoint = new Map<Id, { categories: Map<DepthCategory, number>; questionIds: Set<Id> }>();
-  for (const question of input.questions) {
-    if (question.subjectId !== subjectId) continue;
-    const category = classifyDepth(question);
-    for (const part of question.parts) {
-      for (const spId of part.specPointIds ?? []) {
-        const entry = bySpecPoint.get(spId) ?? { categories: new Map(), questionIds: new Set() };
-        entry.categories.set(category, (entry.categories.get(category) ?? 0) + 1);
-        entry.questionIds.add(question.id);
-        bySpecPoint.set(spId, entry);
-      }
-    }
-  }
+  const bySpecPoint = aggregateQuestionDepth(input.questions, subjectId);
   const specPoints: SpecPointDepth[] = [];
   for (const topic of input.topics) {
     const retrievalCards = input.cardCountByTopic.get(topic.id) ?? 0;
@@ -318,7 +385,7 @@ function buildSubjectDepthWithoutDeep(input: DepthInput): SpecPointDepth[] {
       const categories: Partial<Record<DepthCategory, number>> = {};
       let distinct = 0;
       if (entry) {
-        for (const [category, count] of entry.categories) categories[category] = count;
+        for (const [category, ids] of entry.categoryQuestionIds) categories[category] = ids.size;
         distinct = entry.questionIds.size;
       }
       specPoints.push({

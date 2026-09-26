@@ -4,6 +4,7 @@ import { seedQuestions, seedCardsForTopic } from "@/content";
 import {
   buildSubjectDepth,
   classifyDepth,
+  classifyPartDepth,
   FLAGSHIP_SUBJECTS,
   isFlagship,
   type DepthInput,
@@ -71,6 +72,23 @@ describe("classifyDepth", () => {
       expect(["recall", "application", "transfer", "misconception", "synoptic"]).toContain(classifyDepth(q));
     }
   });
+
+  it("classifies structured parts independently instead of flattening the whole question", () => {
+    const topicId = "wjec-alevel-chemistry.atomic-structure";
+    const question = {
+      ...miniQuestion({ id: "mixed-structured", topicId }),
+      totalMarks: 8,
+      parts: [
+        { id: "r", label: "(a)", prompt: "State", marks: 1, markScheme: ["x"], modelAnswer: "x", aos: ["AO1"], specPointIds: [`${topicId}.sp-01`] },
+        { id: "a", label: "(b)", prompt: "Apply", marks: 3, markScheme: ["x"], modelAnswer: "x", aos: ["AO2"], specPointIds: [`${topicId}.sp-01`] },
+        { id: "t", label: "(c)", prompt: "Evaluate", marks: 2, markScheme: ["x"], modelAnswer: "x", aos: ["AO3"], specPointIds: [`${topicId}.sp-01`] },
+      ],
+    } as unknown as Question;
+    expect(classifyDepth(question)).toBe("synoptic");
+    expect(question.parts.map((part) => classifyPartDepth(question, part))).toEqual([
+      "recall", "application", "transfer",
+    ]);
+  });
 });
 
 describe("buildSubjectDepth (synthetic fixture)", () => {
@@ -120,6 +138,31 @@ describe("buildSubjectDepth (synthetic fixture)", () => {
     const sp1 = depth.specPoints.find((s) => s.specPointId.endsWith("sp-01"))!;
     expect(sp1.distinctQuestions).toBeGreaterThanOrEqual(4);
     expect(sp1.workedSolutionsComplete).toBe(true);
+    expect(depth.goldStatements).toBe(1);
+  });
+
+  it("lets one mixed structured question supply several categories but only one independent-question count", () => {
+    const point = `${topicId}.sp-01`;
+    const mixed = {
+      ...miniQuestion({ id: "mixed", topicId }),
+      parts: [
+        { id: "mixed-r", label: "(a)", prompt: "State", marks: 1, markScheme: ["r"], modelAnswer: "r", aos: ["AO1"], specPointIds: [point] },
+        { id: "mixed-a", label: "(b)", prompt: "Apply", marks: 3, markScheme: ["a"], modelAnswer: "a", aos: ["AO2"], specPointIds: [point] },
+        { id: "mixed-t", label: "(c)", prompt: "Evaluate", marks: 2, markScheme: ["t"], modelAnswer: "t", aos: ["AO3"], specPointIds: [point] },
+      ],
+      totalMarks: 6,
+    } as unknown as Question;
+    const input: DepthInput = {
+      topics,
+      questions: [mixed, q("second", 1), q("third", 1), q("fourth", 1)],
+      cardCountByTopic: cardCounts,
+    };
+    const depth = buildSubjectDepth(input);
+    const row = depth.specPoints.find((item) => item.specPointId === point)!;
+    expect(row.distinctQuestions).toBe(4);
+    expect(row.categories.recall).toBe(1);
+    expect(row.categories.application).toBeGreaterThanOrEqual(1);
+    expect(row.categories.transfer).toBe(1);
     expect(depth.goldStatements).toBe(1);
   });
 

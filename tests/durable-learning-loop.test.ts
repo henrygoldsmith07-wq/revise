@@ -156,6 +156,7 @@ describe("smallest skill diagnosis and live action choice", () => {
     expect(action?.calibrated).toBe(false);
     expect(action?.policy?.score).toBeGreaterThan(0);
     expect(action?.teaching).toBe(false);
+    expect(action?.contentTrust).toBe("trusted-assessment");
   });
   it("does not bring a retention check forward to fill a session", () => {
     const { m3, history } = progressed();

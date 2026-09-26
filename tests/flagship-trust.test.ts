@@ -94,6 +94,42 @@ describe("flagship trusted-depth ledger", () => {
     expect(report.statements[0]?.missing).toContain("transfer");
   });
 
+  it("uses part-level categories while counting a structured question only once", () => {
+    const topicId = "wjec-test.topic";
+    const specPointId = `${topicId}.sp-01`;
+    const topic = {
+      id: topicId,
+      subjectId: "wjec-test",
+      specPoints: [{ id: specPointId, ref: "1(a)", text: "claim", aos: ["AO2"] }],
+    } as unknown as Topic;
+    const base = (id: string): Question => ({
+      id,
+      subjectId: "wjec-test",
+      topicIds: [topicId],
+      kind: "structured",
+      stem: id,
+      parts: [{ id: id + ":0", label: "", prompt: "apply", marks: 3, markScheme: ["x"], modelAnswer: "x", aos: ["AO2"], specPointIds: [specPointId] }],
+      totalMarks: 3,
+    } as unknown as Question);
+    const mixed = {
+      ...base("mixed"),
+      parts: [
+        { id: "mixed:r", label: "(a)", prompt: "state", marks: 1, markScheme: ["r"], modelAnswer: "r", aos: ["AO1"], specPointIds: [specPointId] },
+        { id: "mixed:t", label: "(b)", prompt: "evaluate", marks: 2, markScheme: ["t"], modelAnswer: "t", aos: ["AO3"], specPointIds: [specPointId] },
+      ],
+      totalMarks: 3,
+    } as unknown as Question;
+    const report = flagshipTrustReadiness({
+      subjectId: "wjec-test",
+      topics: [topic],
+      questions: [mixed, base("a"), base("b"), base("c")],
+      trustedQuestion: () => true,
+    });
+    expect(report.statements[0]?.trustedQuestionIds).toHaveLength(4);
+    expect(new Set(report.statements[0]?.categories)).toEqual(new Set(["recall", "application", "transfer"]));
+    expect(report.statementsMeetingCoreTrustBar).toBe(1);
+  });
+
   it("does not make unrelated draft extras block an explicit trusted release set", () => {
     const topicId = "wjec-test.topic";
     const specPointId = `${topicId}.sp-01`;

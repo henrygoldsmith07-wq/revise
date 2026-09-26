@@ -31,6 +31,7 @@ import {
   humanVerifiedWjecQuestion,
   physicsContentFingerprint,
   REQUIRED_HUMAN_CHECKS,
+  validHumanReviewInstant,
   WJEC_REVIEWER_ROLES,
   type PhysicsReviewQueueRow,
 } from "./physics-content-review";
@@ -83,6 +84,10 @@ function text(value: unknown): value is string {
 
 function instant(value: unknown): value is IsoInstant {
   return text(value) && Number.isFinite(Date.parse(value));
+}
+
+function reviewInstant(value: unknown): value is IsoInstant {
+  return validHumanReviewInstant(value);
 }
 
 function integer(value: unknown): value is number {
@@ -141,9 +146,9 @@ function reviewRecord(value: unknown, prefix: string, expectedFingerprint: strin
     errors.push(`${prefix}.reviewerRole must be examiner, teacher or subject-expert`);
   }
   if (value.reviewerQualification !== undefined && !text(value.reviewerQualification)) errors.push(`${prefix}.reviewerQualification must be a non-empty string`);
-  if (value.reviewedAt !== undefined && !instant(value.reviewedAt)) errors.push(`${prefix}.reviewedAt must be an ISO instant`);
+  if (value.reviewedAt !== undefined && !reviewInstant(value.reviewedAt)) errors.push(`${prefix}.reviewedAt must be a non-future ISO instant with timezone`);
   if (status === "approved") {
-    if (!text(value.reviewerId) || !instant(value.reviewedAt)) errors.push(`${prefix}: an approved decision needs a named reviewer and review time`);
+    if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) errors.push(`${prefix}: an approved decision needs a named reviewer and valid review time`);
     if (!text(value.reviewerRole) || !WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) {
       errors.push(`${prefix}: an approved WJEC decision needs reviewerRole and reviewerQualification`);
     }
@@ -152,7 +157,7 @@ function reviewRecord(value: unknown, prefix: string, expectedFingerprint: strin
     }
   } else if (status === "pending") {
     warnings.push(`${prefix}: pending review remains practice-only`);
-  } else if (!text(value.reviewerId) || !instant(value.reviewedAt)) {
+  } else if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) {
     warnings.push(`${prefix}: changes-requested row has no complete reviewer attestation`);
   }
   if (errors.length || !checksResult.checks || !text(status)) return { errors, warnings };
@@ -162,7 +167,7 @@ function reviewRecord(value: unknown, prefix: string, expectedFingerprint: strin
       reviewerId: text(value.reviewerId) ? value.reviewerId : undefined,
       reviewerRole: value.reviewerRole as PhysicsReviewerRole | undefined,
       reviewerQualification: text(value.reviewerQualification) ? value.reviewerQualification : undefined,
-      reviewedAt: instant(value.reviewedAt) ? value.reviewedAt : undefined,
+      reviewedAt: reviewInstant(value.reviewedAt) ? value.reviewedAt : undefined,
       contentFingerprint: expectedFingerprint,
       checks: checksResult.checks,
       notes: typeof value.notes === "string" ? value.notes : undefined,
@@ -353,21 +358,21 @@ function dependencyReview(value: unknown, prefix: string, expectedFingerprint: s
   const status = value.status;
   if (status !== "unreviewed" && status !== "approved" && status !== "rejected") errors.push(`${prefix}.review.status is invalid`);
   if (value.reviewerId !== undefined && !text(value.reviewerId)) errors.push(`${prefix}.review.reviewerId must be a non-empty string`);
-  if (value.reviewedAt !== undefined && !instant(value.reviewedAt)) errors.push(`${prefix}.review.reviewedAt must be an ISO instant`);
+  if (value.reviewedAt !== undefined && !reviewInstant(value.reviewedAt)) errors.push(`${prefix}.review.reviewedAt must be a non-future ISO instant with timezone`);
   if (value.edgeFingerprint !== undefined && value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}.review.edgeFingerprint is stale`);
   if (status === "approved") {
-    if (!text(value.reviewerId) || !instant(value.reviewedAt)) errors.push(`${prefix}: an approved edge needs a named reviewer and review time`);
+    if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) errors.push(`${prefix}: an approved edge needs a named reviewer and valid review time`);
     if (value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}: an approved edge needs the current edge fingerprint`);
     if (!WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: an approved edge needs reviewerRole and reviewerQualification`);
   } else if (status === "unreviewed") warnings.push(`${prefix}: edge remains a diagnosis hypothesis`);
-  if (errors.length || (status !== "unreviewed" && (!text(value.reviewerId) || !instant(value.reviewedAt)))) return { errors, warnings };
+  if (errors.length || (status !== "unreviewed" && (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)))) return { errors, warnings };
   return {
     review: {
       status: status as CapabilityDependencyReview["status"],
       reviewerId: text(value.reviewerId) ? value.reviewerId : undefined,
       reviewerRole: value.reviewerRole as CapabilityDependencyReview["reviewerRole"] | undefined,
       reviewerQualification: text(value.reviewerQualification) ? value.reviewerQualification : undefined,
-      reviewedAt: instant(value.reviewedAt) ? value.reviewedAt : undefined,
+      reviewedAt: reviewInstant(value.reviewedAt) ? value.reviewedAt : undefined,
       edgeFingerprint: expectedFingerprint,
     },
     errors,

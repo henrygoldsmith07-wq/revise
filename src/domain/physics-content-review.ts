@@ -8,8 +8,16 @@ import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 export const REVIEWED_WJEC_SUBJECT_IDS = [PHYSICS_SUBJECT_ID, "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry"] as const;
 export const WJEC_REVIEWER_ROLES = ["examiner", "teacher", "subject-expert"] as const;
+const ISO_INSTANT_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+const REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000;
 function nonBlank(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+export function validHumanReviewInstant(value: unknown, nowMs = Date.now()): value is string {
+  if (!nonBlank(value) || !ISO_INSTANT_PATTERN.test(value)) return false;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && parsed <= nowMs + REVIEW_CLOCK_SKEW_MS;
 }
 export function requiresWjecContentReview(subjectId: string | undefined): boolean {
   return REVIEWED_WJEC_SUBJECT_IDS.some((id) => id === subjectId);
@@ -68,7 +76,7 @@ export function humanVerificationIssues(
   if (!nonBlank(record?.reviewerId)) issues.push("missing-reviewer-id");
   if (!record?.reviewerRole || !WJEC_REVIEWER_ROLES.includes(record.reviewerRole)) issues.push("missing-reviewer-role");
   if (!nonBlank(record?.reviewerQualification)) issues.push("missing-reviewer-qualification");
-  if (!nonBlank(record?.reviewedAt) || !Number.isFinite(Date.parse(record.reviewedAt))) issues.push("invalid-reviewed-at");
+  if (!validHumanReviewInstant(record?.reviewedAt)) issues.push("invalid-reviewed-at");
   if (!record || REQUIRED_HUMAN_CHECKS.some((check) => record.checks?.[check] !== true)) issues.push("missing-human-check");
   if (record?.contentFingerprint !== physicsContentFingerprint(question)) issues.push("stale-content-fingerprint");
   if (question.source === "past-paper" && !verifiedWjecPaperProvenance(question)) issues.push("invalid-paper-provenance");

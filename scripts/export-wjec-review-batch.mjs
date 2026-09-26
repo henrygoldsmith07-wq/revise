@@ -107,6 +107,7 @@ const selections = selected.map((question) => {
     questionId: question.id,
     fingerprint: data.fingerprint(question),
     category: data.classifyDepth(question),
+    depthCategories: item?.depthCategories ?? [data.classifyDepth(question)],
     alreadyInReleaseSet: data.releaseQuestion(question),
     selectionReason: data.releaseQuestion(question) ? "pending-release-candidate" : "marginal-trusted-coverage",
     newStatementCoverage: item?.newStatementCoverage ?? null,
