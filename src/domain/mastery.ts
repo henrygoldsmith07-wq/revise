@@ -1,4 +1,5 @@
 import { requiresWjecContentReview } from "./physics-content-review";
+import { hintEvidenceMultiplier } from "./hint-tiers";
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
 import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
@@ -111,9 +112,11 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     const retention = cards.length ? mean(cards.map((c) => retrievability(c, now))) : 0;
     // Exam performance: marks earned as a share of marks available.
     const marksMax = attempts.reduce((a, x) => a + x.max, 0);
-    const accuracy = marksMax ? attempts.reduce((a, x) => a + x.awarded, 0) / marksMax : 0;
+    const accuracy = marksMax ? attempts.reduce((a, x) => a + x.awarded * hintEvidenceMultiplier(x.hintTier ?? null), 0) / marksMax : 0;
 
-    const evidence = cards.length + attempts.length * 2;
+    const reviewedCardIds = new Set(logs.map((log) => log.cardId));
+    const reviewedCards = cards.filter((card) => card.reps > 0 || reviewedCardIds.has(card.id));
+    const evidence = reviewedCards.length + attempts.length * 2;
     const weight = Math.min(1, evidence / FULL_EVIDENCE);
 
     // Weighted blend — questions are the closest proxy to the real exam, so

@@ -122,11 +122,30 @@ describe("forecastUntouched — honest pace projection", () => {
     });
     expect(fc).not.toBeNull();
     expect(fc!.activeDays).toBe(7);
-    expect(fc!.topicsPerDay).toBeCloseTo(16 / REVIEW_PACE_WINDOW_DAYS);
-    // projectedCovered = floor(16/7 * 21) = 48, more than any enrolled deck
-    // has untouched -> the honest reading is "on track".
-    expect(fc!.projectedCovered).toBe(48);
-    expect(fc!.projectedUntouched).toBe(Math.max(0, fc!.untouchedNow - 48));
+    // Pace counts newly-reached topics, not review events: 3 distinct topics
+    // touched across 7 days is 3/7 per day, and re-reviews never inflate it.
+    expect(fc!.topicsPerDay).toBeCloseTo(3 / REVIEW_PACE_WINDOW_DAYS);
+    // projectedCovered = floor(3/7 * 21) = 9 newly-started topics; the rest
+    // stay untouched, so the forecast stays below the honest "on track" bar.
+    expect(fc!.projectedCovered).toBe(9);
+    expect(fc!.projectedUntouched).toBe(fc!.untouchedNow - 9);
+    expect(fc!.sentence).toContain(`${fc!.untouchedNow - 9} of ${fc!.untouchedNow} untouched topics`);
+  });
+
+  it("never counts repeated re-reviews of known topics as new coverage", () => {
+    const [t1, t2, t3] = [topic(0), topic(1), topic(2)];
+    const mastered = [t1, t2, t3].map((t) => mastery(t, 12));
+    const churn = [log(6, t1), log(5, t1), log(4, t1), log(3, t2), log(2, t2), log(1, t3), log(0, t3)];
+    const fc = forecastUntouched({
+      now: NOW,
+      subjectIds: [SUBJECT],
+      mastery: mastered,
+      reviewLogs: churn,
+      examDates: [exam(SUBJECT, "2026-06-22")], // 21 days
+    });
+    expect(fc).not.toBeNull();
+    expect(fc!.projectedCovered).toBe(0);
+    expect(fc!.projectedUntouched).toBe(fc!.untouchedNow);
   });
 
   it("clamps the projection at zero and says on-track, never a percentage", () => {

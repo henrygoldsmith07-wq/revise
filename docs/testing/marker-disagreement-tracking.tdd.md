@@ -23,8 +23,8 @@
 
 ## Publication and verification
 
-- `/benchmarks` renders pairwise rows/parts, agreement, MAE, bias and AI coverage.
-- `tests/phase8-public.test.ts` pins the public wiring and `tests/marker-disagreement.test.ts` covers the domain contract.
+- Benchmark harnesses report pairwise rows/parts, agreement, MAE, bias and AI coverage in CI (`tests/marker-disagreement.test.ts`); there is no live page.
+- `tests/marker-disagreement.test.ts` covers the domain contract.
 - `npm.cmd run type-check` passed.
 - `npm.cmd run lint:check` passed with 0 errors and the repository’s existing 40 warnings.
 - `npm.cmd run build` passed; only existing Turbopack-root and custom cache-control warnings were emitted.

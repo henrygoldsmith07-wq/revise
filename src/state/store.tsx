@@ -14,7 +14,6 @@ import {
 import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
 import { computeApplicationMastery } from "@/domain/application-mastery";
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
-import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
 import { computeRecallMastery } from "@/domain/recall-mastery";
 import { masteryIntervals } from "@/domain/mastery-uncertainty";
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
@@ -126,23 +125,30 @@ import {
   type RevisionCheckpoint,
   type RevisionCheckpointInput,
 } from "@/domain/revision-checkpoint";
+// Domain-separated concerns (no behaviour change — pure moves out of the monolith):
+import { currentActiveMinutes, touchSessionClock } from "./session-clock";
+import { legacyLessonProgress, localDayKey, nextLessonStreak } from "./lesson-streak";
+import { trustedSnapshotAttempt } from "./trusted-evidence";
+import { initialSyncStatus, type SyncStatus } from "./sync-status";
+import { subjectsForSettings } from "./selectors";
 
 // ---------------------------------------------------------------------------
-// One store for the whole app. Revision data is small (thousands of rows at
-// most), so it is held in memory and recomputed on change — that keeps every
-// derived number (mastery, recommendations, predicted grade) consistent by
-// construction instead of by cache invalidation. Writes go to IndexedDB first
-// and the outbox second; the UI never awaits the network.
+// Store composition. Revision data is small (thousands of rows at most), so
+// the snapshot is held in memory and every derived value (mastery,
+// recommendations, predicted grade) is recomputed on change — consistent by
+// construction instead of by cache invalidation.
+//
+// What is persisted: Snapshot rows in IndexedDB (cards, logs, attempts,
+// mistakes, plan, settings, lesson progress) + local meta (funnel, grade
+// logs, twin, paper outcomes, interventions) via storage-namespace.
+// What is derived: everything in useMemo below (mastery, dueCards,
+// recommendations, adaptiveSession, readiness, calibrations).
+// What causes writes: actions (reviewCard, recordAttempt, …) → repository.
+// What causes synchronisation: syncNow() drain+pull (outbox → Supabase).
 // ---------------------------------------------------------------------------
 
-export interface SyncStatus {
-  online: boolean;
-  pending: number;
-  lastSyncedAt: string | null;
-  lastSyncError: string | null;
-  enabled: boolean;
-  syncing: boolean;
-}
+export type { SyncStatus };
+export { nextLessonStreak };
 
 interface StoreValue extends Snapshot {
   ready: boolean;
@@ -252,77 +258,8 @@ let syncInFlight = false;
 // superseded stream can detect it was replaced. Deliberately not a ref — the
 // epoch is coordination state for background work, never render input.
 let hydrationEpoch = 0;
-
-// --- session fatigue clock (module-scoped, like syncInFlight) ---------------
-// Timestamp of the first graded action of the current study session, or null
-// when no session is running. The recommender derives time-on-task from it to
-// apply fatigue penalties; 30 idle minutes ends the session.
-let sessionStartedAt: number | null = null;
-const SESSION_IDLE_RESET_MS = 30 * 60_000;
-
-/** Record a graded action as session activity; called from review/record paths. */
-function touchSessionClock(): void {
-  const now = Date.now();
-  if (sessionStartedAt == null || now - sessionStartedAt > SESSION_IDLE_RESET_MS) sessionStartedAt = now;
-}
-
-/** Minutes of continuous study in the current session (0 when none/idle-ended). */
-function currentActiveMinutes(): number {
-  if (sessionStartedAt == null) return 0;
-  const elapsed = (Date.now() - sessionStartedAt) / 60_000;
-  return elapsed > SESSION_IDLE_RESET_MS / 60_000 ? 0 : elapsed;
-}
-
-/** Shared evidence gate for store-level summaries and readiness signals. */
-function trustedSnapshotAttempt(attempt: Attempt, questions: readonly Question[], history: readonly Attempt[]): boolean {
-  const question = questions.find((row) => row.id === attempt.questionId);
-  if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
-  return trustedAssessmentAttempt(attempt, question, history, questions);
-}
-
-/**
- * One-time migration: before lesson progress moved into the synced store it
- * lived in localStorage (revise.lessons.*). Returns the legacy values when
- * they exist, so existing students keep their progress across the switch.
- */
-function legacyLessonProgress(): { completed: Record<string, boolean>; streak: { count: number; lastDay: string } } | null {
-  try {
-    if (typeof localStorage === "undefined") return null;
-    const completedRaw = localStorage.getItem("revise.lessons.completed");
-    if (!completedRaw) return null;
-    const completed = JSON.parse(completedRaw) as Record<string, boolean>;
-    const streakRaw = localStorage.getItem("revise.lessons.streak");
-    const streak = streakRaw ? (JSON.parse(streakRaw) as { count: number; lastDay: string }) : { count: 0, lastDay: "" };
-    return Object.keys(completed).length ? { completed, streak } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Local-time YYYY-MM-DD for lesson streaks (a day flips at midnight, not UTC). */
-function localDayKey(offsetDays = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/**
- * Pure streak roll used by completeLesson. Several lessons finished the same
- * day count as one streak day; a lesson on the day after the last one extends
- * the streak; any longer gap restarts it.
- */
-export function nextLessonStreak(
-  current: { count: number; lastDay: string },
-  today: string,
-  yesterday: string,
-): { count: number; lastDay: string } {
-  if (current.lastDay === today) return current;
-  if (current.lastDay === yesterday) return { count: current.count + 1, lastDay: today };
-  return { count: 1, lastDay: today };
-}
+// Session clock, lesson streak, and evidence trust now live in
+// ./session-clock, ./lesson-streak, and ./trusted-evidence (pure moves).
 
 export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -344,14 +281,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const [paperOutcomeLog, setPaperOutcomeLog] = useState<PaperOutcomeRecord[]>([]);
   const [interventionOutcomes, setInterventionOutcomes] = useState<InterventionOutcomeRecord[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    online: true,
-    pending: 0,
-    lastSyncedAt: null,
-    lastSyncError: null,
-    enabled: isSupabaseConfigured,
-    syncing: false,
-  });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => initialSyncStatus());
   const bootstrapped = useRef(false);
   // Boot must never fail silently. If IndexedDB or a migration rejects, keep
   // the reason visible so the student can retry instead of staring at a
@@ -1934,11 +1864,8 @@ function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () =>
   );
 }
 
-/** Subjects the student is taking, in curriculum order. */
+/** Subjects the student is taking, in curriculum order (derived, not stored). */
 export function useSubjects() {
   const { settings } = useStore();
-  return useMemo(
-    () => allSubjects().filter((s) => settings.subjectIds.includes(s.id)),
-    [settings.subjectIds],
-  );
+  return useMemo(() => subjectsForSettings(settings), [settings]);
 }

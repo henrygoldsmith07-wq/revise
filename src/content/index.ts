@@ -62,6 +62,7 @@ import { seedMisconceptions } from "./misconceptions";
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
 export { authoredDiagrams, diagramForTopic } from "./diagram-cards";
 export { CONTENT_SCHEMAS, contentCardSchema, contentQuestionPartSchema, contentQuestionSchema, contentTopicSchema } from "./schema";
+export { pipelineQuestion, pipelineTopic, validateProvenance, validateSpecMapping } from "./pipeline";
 
 /** The authored question bank. Uploaded and AI-generated questions live in
  *  IndexedDB alongside these and are treated identically everywhere else. */

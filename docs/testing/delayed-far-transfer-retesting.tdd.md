@@ -6,7 +6,7 @@
 - The retest is scheduled seven days after the source attempt and is stored as a link on the durable source attempt.
 - Candidate selection excludes the source prompt, already-attempted questions and questions from another subject; mapped spec points and learning claims outrank topic-only matches, with lexical/context novelty breaking ties.
 - The retest has its own attempt and outcome. A score of 60% passes, while 80% is reported as secure; it never overwrites the source score.
-- `/progress` reports due, upcoming, completed and pass-rate evidence. `/practice?retest=…` opens the candidate with the transfer framing and records completion against the source.
+- `/readiness` reports due, upcoming, completed and pass-rate evidence. `/practice?retest=…` opens the candidate with the transfer framing and records completion against the source.
 
 ## RED checkpoint
 

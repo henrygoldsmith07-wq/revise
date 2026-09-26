@@ -51,7 +51,7 @@ untouched (static policies) while online learners legitimately adapt.
 Reported: completion rate and immediate score per decision; 7-day delayed
 retention; unseen final-assessment marks per invested hour as the ranking
 metric. The deterministic Revise heuristic stays in production unless a
-challenger beats it on real learner replays. Demo table on /benchmarks is
+challenger beats it on real learner replays. Demo tables in CI are
 synthetic and labelled as such.
 
 ## Examiner benchmark (the real gate)
@@ -76,8 +76,8 @@ and quality band, and confidence calibration of the AI/rubric markers.
 Headline criterion: Revise's disagreement with an examiner should be
 COMPARABLE TO examiner-vs-examiner disagreement - a disagreement ratio
 (MAE ratio vs the human ceiling) at or below 1.00. Humans do not agree
-with each other 100%; that is the bar, not perfection. Status renders on
-/benchmarks; schema in src/domain/examiner-benchmark.ts, pinned by
+with each other 100%; that is the bar, not perfection. Status is reported
+by CI harnesses; schema in src/domain/examiner-benchmark.ts, pinned by
 tests/examiner-benchmark.test.ts with hand-computed kappa values.
 
 ## Prospective recommendation experiment
@@ -90,16 +90,15 @@ Shown / started / completed / rejected events accumulate locally; attempts and r
 supply hours, marks, transfer and calibration. analyseExperiment() emits all ten
 preregistered metrics per arm plus the headline marks-per-hour effect versus control,
 and refuses any efficacy claim until every arm has real participants and delayed
-unseen assessments. Enrol in Settings; live contribution renders on Progress.
+unseen assessments. Enrol in Settings.
  — recommendation quality, marking and grades
 
 Revise owns its claims with numbers. This doc records the harnesses, the invariants and the honest limits.
 
-> **Live ledger:** the same harnesses run in the browser at [/benchmarks](/benchmarks) —
-> `syntheticOutcomePairs` → `benchmarkRecommendationQuality` and
-> `syntheticCalibrationOutcomes` → `calibrationReport`, with seed/n controls,
-> so the page can never drift from the code. The [/case-study](/case-study) narrates
-> the 6-engine design and links back here. See `src/app/benchmarks/page.tsx`.
+> **Benchmark harnesses:** `syntheticOutcomePairs` → `benchmarkRecommendationQuality` and
+> `syntheticCalibrationOutcomes` → `calibrationReport` run in CI with seed/n controls.
+> There is no live benchmarks page and no case-study page; `docs/revision-engine.md`
+> narrates the engine design.
 
 
 ## Recommendation quality (synthetic → real)
@@ -123,35 +122,35 @@ Revise owns its claims with numbers. This doc records the harnesses, the invaria
 - Human marking corpus: version `2026.08.v1`, 12 teacher/examiner-labelled regression rows across chemistry and maths. `validateHumanMarkingCorpus` checks row IDs, part alignment and award ranges; no learner-identifying data is included.
 - Benchmark harness: `scoreHumanMarkingCorpus` reports `exact-match accuracy`, `per-part MAE` and total MAE, with floors of exact-match ≥ 0.5 and MAE ≤ 0.8. The same rows will carry `aiAward` columns once provider marking exists.
 - Marker disagreement tracking: `scoreMarkerDisagreement(corpus, { rubric, ai })` and the generic `trackMarkerDisagreement(samples)` compare marker award arrays per question part. Every pair (`human ↔ rubric`, `human ↔ ai`, `rubric ↔ ai`) reports compared rows/parts, total agreement, part agreement, MAE, disagreement count and signed bias (`right − left`). Missing marker arrays are `null`/unmeasured, never silently treated as zero.
-- Low-confidence mark escalation: AI mark responses carry a validated `confidence` in `[0,1]`; below `0.60` the attempt stores a pending `human-review` escalation, with missing confidence treated as urgent. Rubric and offline fallback marks remain deterministic and are not escalated. `/progress` shows the durable pending queue and its AI-mark escalation rate.
-- Delayed far-transfer retesting: `delayed-far-transfer.ts` only schedules a seven-day novel-context check after a non-provisional source mark reaches `0.80`; candidate selection prefers shared spec points/learning claims and excludes the original or already-attempted question. The retest has independent outcome evidence (`0.60` pass, `0.80` secure), persisted on the attempt link and surfaced in `/progress`.
-- Exam technique vs knowledge separation: `techniqueVsKnowledge(mistakes)` reports the estimated lost-mark split, driver tags and a reliability flag (`≥8` mistakes and `≥10` lost marks). `/progress` turns it into a repair choice between timed paper practice and knowledge-gap review.
-- Recall mastery: `computeRecallMastery` keeps card stability/current retrievability separate from exam marks, and reports observed recall, due pressure and evidence level per topic. `/progress` surfaces the overall recall score and weakest retrieval topics.
-- Application mastery: `computeApplicationMastery` reports mark-weighted question performance while excluding active-recall and pending provisional attempts; ten eligible attempts make a topic reliable and `/progress` surfaces the weakest application topics.
-- Mastery uncertainty: `masteryIntervals` reports a conservative Wilson 95% band from cards and weighted attempts, flags topics below eight weighted trials and widens conflicting card/mastery signals; `/progress` surfaces the six widest intervals.
+- Low-confidence mark escalation: AI mark responses carry a validated `confidence` in `[0,1]`; below `0.60` the attempt stores a pending `human-review` escalation, with missing confidence treated as urgent. Rubric and offline fallback marks remain deterministic and are not escalated. `/readiness` shows the durable pending queue and its AI-mark escalation rate.
+- Delayed far-transfer retesting: `delayed-far-transfer.ts` only schedules a seven-day novel-context check after a non-provisional source mark reaches `0.80`; candidate selection prefers shared spec points/learning claims and excludes the original or already-attempted question. The retest has independent outcome evidence (`0.60` pass, `0.80` secure), persisted on the attempt link and surfaced in `/readiness`.
+- Exam technique vs knowledge separation: `techniqueVsKnowledge(mistakes)` reports the estimated lost-mark split, driver tags and a reliability flag (`≥8` mistakes and `≥10` lost marks). `/readiness` turns it into a repair choice between timed paper practice and knowledge-gap review.
+- Recall mastery: `computeRecallMastery` keeps card stability/current retrievability separate from exam marks, and reports observed recall, due pressure and evidence level per topic. `/readiness` surfaces the overall recall score and weakest retrieval topics.
+- Application mastery: `computeApplicationMastery` reports mark-weighted question performance while excluding active-recall and pending provisional attempts; ten eligible attempts make a topic reliable and `/readiness` surfaces the weakest application topics.
+- Mastery uncertainty: `masteryIntervals` reports a conservative Wilson 95% band from cards and weighted attempts, flags topics below eight weighted trials and widens conflicting card/mastery signals; `/readiness` surfaces the six widest intervals.
 - GCSE question expansion: `gcseExpansionQuestions` materialises 55 original checked templates into 220 board-specific questions, one for every GCSE topic across WJEC, AQA, Edexcel and OCR, with full mark schemes, model answers and spec-point anchors.
 - Edexcel A-level content expansion: `edexcelExpansionQuestions` adds 55 original checked questions, one for every Edexcel A-level topic across biology, chemistry, mathematics and physics, with Edexcel topic/spec-point anchors.
 - Data-question expansion: `dataExpansionQuestions` materialises 55 checked dataset-driven templates into 440 questions across all 32 board/qualification subjects, covering table reading, calculations, trends and experimental interpretation.
 - Unfamiliar-context expansion: `unfamiliarContextQuestions` materialises 55 checked transfer templates into 440 questions across all 32 board/qualification subjects, covering novel biological, chemical, mathematical and physical scenarios.
 - Authentic source-material expansion: `authenticSourceQuestions` materialises 55 checked original field-note, report, archive and technical-brief extracts into 440 questions across all 32 board/qualification subjects.
-- `/benchmarks` renders the live corpus version, row-level human vs rubric totals and the same floor status used by CI.
-- `/benchmarks` also renders the current pairwise disagreement matrix keyed by `questionId`; the internal corpus currently measures human ↔ rubric and leaves AI coverage explicitly unmeasured until provider-marked gold exists.
+- CI reports the live corpus version, row-level human vs rubric totals and the same floor status used by gates.
+- CI also reports the current pairwise disagreement matrix keyed by `questionId`; the internal corpus currently measures human ↔ rubric and leaves AI coverage explicitly unmeasured until provider-marked gold exists.
 - UI labels every answer `rubric` vs `ai` so the student is never misled.
 
 ## Double-marked answer corpus
 
 *Source:* `src/domain/double-marked-corpus.ts`, `src/components/DoubleMarkedCorpus.tsx`,
-`src/app/answer-corpus/page.tsx`.
+`tests/double-marked-corpus.test.ts`.
 
 - `DoubleMarkedAnswer` stores the prompt, answer, maximum marks, two independent
   marker scores, provenance and an optional adjudicated score.
 - `buildDoubleMarkedCorpusReport` reports exact agreement, within-one-mark
   agreement, mean absolute gap, normalised gap, marker bias and the pending
   adjudication count. Adjudication never overwrites the original pair.
-- `/answer-corpus` accepts version-1 JSON exports, keeps invalid rows visible as
-  import warnings, exposes a disagreement queue, and exports decisions again.
-- The built-in rows are explicitly synthetic demonstrations. They are a UI and
-  metric fixture, not teacher evidence; imported rows carry `provenance: imported`.
+- The corpus module accepts version-1 JSON exports, keeps invalid rows visible as
+  import warnings, exposes a disagreement queue, and exports decisions again (no live page).
+- The built-in rows are explicitly synthetic demonstrations. They are a metric
+  fixture, not teacher evidence; imported rows carry `provenance: imported`.
 
 ## Adversarial marking fence (synthetic, deterministic)
 
@@ -168,7 +167,7 @@ retractions never score full, typos cost at most one mark (single-edit token
 matching), equivalent fractions/decimals/×10^n forms are credited via
 maths-equivalence and numeric parsing, formatting-only rewrites (bullets,
 grammar, reordered working) mark identically. Pinned by
-`tests/marking-adversarial.test.ts` and rendered live on /benchmarks.
+`tests/marking-adversarial.test.ts` (CI harness, no live page).
 
 Scheduler calibration also reports a leakage-free holdout view:
 `validateFsrsHoldout()` splits each card's history chronologically, scores only
@@ -226,13 +225,12 @@ interactive speed.
 - Outbox batches per entity; last-write-wins per row on `updatedAt`; FSRS state resolves to the later review row.
 - E2E smoke in `tests/sync.test.ts` covers onboarding → seed → due queue → grade → mistake loop without a browser; full Playwright offline harness in `e2e/offline.spec.ts` covers the same walk with a browser plus offline banner + keyboard (skip-link) + search overlay. CI runs it conditionally (see `.github/workflows/revise.yml`); the node smoke remains the gate when Playwright is not installed.
 
-## Public ledger & portability
+## Benchmark harnesses & portability
 
-*Source:* `src/app/benchmarks/page.tsx` (`/benchmarks`), `src/app/case-study/page.tsx` (`/case-study`), `src/components/AppShell.tsx`, `src/domain/portability.ts`, `tests/phase8-public.test.ts`.
+*Source:* `src/components/AppShell.tsx`, `src/domain/portability.ts`, `tests/phase6-platform.test.ts`.
 
-- `/benchmarks` recomputes the recommendation-quality + calibration reports live from CI's deterministic harnesses; real `(predicted, actual)` replaces synthetic with no page change.
-- `/case-study` is a static narrative (scoring, FSRS, mastery, marking, mistake loop, grades) with the reproduce block so a reader can verify locally.
-- `Settings → Data` offers `buildPortabilitySnapshot` (GDPR Art. 20, single JSON, scheduling intact) and `deletionPreview` + `privacyDisclosure` (Art. 17, local-only privacy). Pinned by 8 tests.
+- Benchmark harnesses recompute the recommendation-quality + calibration reports in CI from deterministic harnesses; real `(predicted, actual)` replaces synthetic with no harness change.
+- `Settings → Data` offers `buildPortabilitySnapshot` (GDPR Art. 20, single JSON, scheduling intact) and `deletionPreview` + `privacyDisclosure` (Art. 17, local-only privacy).
 
 ## Performance & security floors
 
@@ -244,7 +242,7 @@ interactive speed.
 
 ## Case studies (synthetic now, real cohorts later)
 
-The product ships with synthetic longitudinal histories *and* a live ledger that makes them checkable at `/benchmarks`. Once timetabled-paper → later-paper outcomes exist, this section (and that page) will carry:
+The product ships with synthetic longitudinal histories checked by CI harnesses. Once timetabled-paper → later-paper outcomes exist, this section will carry:
 
 - Cohort: n, weeks, board, grade movement, MAE/bias/correlation before and after each engine change.
 - The method will be the same harnesses above; numbers will be from observed `(predicted, actual)` rather than synthetic — same functions, real pairs.

@@ -6,7 +6,7 @@
 - Evidence is weighted as `cards + 2 × attempts`; fewer than eight weighted trials sets `needsMoreEvidence`.
 - The domain reports a conservative Wilson 95% lower/upper band, a width and `low`/`medium`/`high` uncertainty label.
 - Conflicting card retrievability widens the interval rather than silently increasing confidence.
-- `/progress` sorts by widest interval, shows the six widest bands and links directly to practice for more evidence.
+- `/readiness` sorts by widest interval, shows the six widest bands and links directly to practice for more evidence.
 
 ## RED checkpoint
 
@@ -19,7 +19,7 @@
 - Commit: `599e0da feat(revise): surface mastery uncertainty`
 - Command: `npm.cmd test -- --run tests/mastery-uncertainty.test.ts`
 - Result: 2/2 tests passed.
-- The feature projects per-topic intervals through the store and renders the evidence summary and interval bands in `/progress`.
+- The feature projects per-topic intervals through the store and renders the evidence summary and interval bands in `/readiness`.
 
 ## Publication and verification
 

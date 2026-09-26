@@ -27,7 +27,7 @@ recovery copy.
 2. Keep the provider enabled if the fallback is correct; Revise labels every
    fallback result and continues with authored marking/spec content.
 3. If latency or error rates are high, disable the provider at the edge and
-   verify that `/practice`, `/review` and `/cards` still work offline.
+   verify that `/practice`, `/review` and `/library` still work offline.
 4. Re-enable only after a structured-output smoke test passes. Never replay a
    student's answer into logs while diagnosing a provider incident.
 

@@ -73,7 +73,16 @@ export function forecastUntouched(input: PaceForecastInput): PaceForecast | null
   // --- untouched topics (zero evidence) ------------------------------------
   const masteryByTopic = new Map(mastery.map((m) => [m.topicId, m]));
   const topics = allTopics(subjectIds);
-  const untouchedIds = topics.filter((t) => (masteryByTopic.get(t.id)?.attempts ?? 0) <= 0);
+  const topicIds = new Set(topics.map((topic) => topic.id));
+  const firstReviewByTopic = new Map<Id, string>();
+  for (const log of reviewLogs) {
+    if (!topicIds.has(log.topicId) || !Number.isFinite(Date.parse(log.reviewedAt)) || Date.parse(log.reviewedAt) > now.getTime()) continue;
+    const key = dateKey(log.reviewedAt);
+    const previous = firstReviewByTopic.get(log.topicId);
+    if (!previous || key < previous) firstReviewByTopic.set(log.topicId, key);
+  }
+  const untouchedIds = topics.filter((t) => !firstReviewByTopic.has(t.id) &&
+    (masteryByTopic.get(t.id)?.attempts ?? 0) <= 0 && !masteryByTopic.get(t.id)?.lastStudiedAt);
   const untouchedNow = untouchedIds.length;
   if (untouchedNow === 0) return null; // nothing left to forecast about
 
@@ -94,6 +103,7 @@ export function forecastUntouched(input: PaceForecastInput): PaceForecast | null
   const startKey = dateKey(windowStart.toISOString());
   const todayKey = dateKey(now.toISOString());
 
+  const firstTouched = new Set([...firstReviewByTopic].filter(([id, day]) => day >= startKey && day <= todayKey && (masteryByTopic.get(id)?.attempts ?? 0) === 0).map(([id]) => id));
   const touchedByDay = new Map<string, Set<Id>>();
   for (const log of reviewLogs) {
     const key = dateKey(log.reviewedAt);
@@ -107,10 +117,9 @@ export function forecastUntouched(input: PaceForecastInput): PaceForecast | null
   }
 
   const activeDays = touchedByDay.size;
-  // Sustained pace: total topic-touches ÷ window length, so idle days count.
-  let touches = 0;
-  for (const set of touchedByDay.values()) touches += set.size;
-  const topicsPerDay = activeDays === 0 ? 0 : touches / REVIEW_PACE_WINDOW_DAYS;
+  // Distinct newly-reached topics ÷ window length, so idle days count and
+  // re-reviews of already-touched topics never inflate the projection.
+  const topicsPerDay = activeDays === 0 ? 0 : firstTouched.size / REVIEW_PACE_WINDOW_DAYS;
 
   const projectedCovered = Math.floor(topicsPerDay * daysUntilExam);
   const projectedUntouched = Math.max(0, untouchedNow - projectedCovered);

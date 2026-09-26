@@ -5,7 +5,7 @@ import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { remapContentIds } from "./content-ids";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
-import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
+import { readReviseUserMeta, writeReviseUserMeta } from "./storage-namespace";
 import { getDeviceIdentity, nextLamport, observeRemoteLamport } from "./device";
 import { captureTelemetry, errorClass } from "@/lib/observability";
 
@@ -160,9 +160,10 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
   // Batch by entity so a 200-card session is one request, not 200.
   // Items past the attempt cap are skipped (kept, never silently dropped)
   // so one poison payload cannot block every newer change forever.
+  const collapsedItems = collapseOutboxItems(items);
   const upserts = new Map<SyncEntity, OutboxItem[]>();
   const deletes = new Map<SyncEntity, OutboxItem[]>();
-  for (const item of items) {
+  for (const item of collapsedItems) {
     if (item.attempts >= MAX_OUTBOX_ATTEMPTS) continue;
     const bucket = item.op === "delete" ? deletes : upserts;
     const list = bucket.get(item.entity) ?? [];
@@ -182,7 +183,7 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
       const rows = await Promise.all([...byId.values()].map((i) => toRow(entity, i.payload, userId, { e2ee })));
       const { error } = await supabase.from(TABLES[entity]).upsert(rows, { onConflict: pkFor(entity) });
       const batchIds = new Set(batch.map((item) => item.id));
-      const originalEntries = list.filter((item) => batchIds.has(item.id) || batch.some((latest) => rowId(latest.payload) === rowId(item.payload)));
+      const originalEntries = items.filter((item) => item.entity === entity && (batchIds.has(item.id) || batch.some((latest) => rowId(latest.payload) === rowId(item.payload))));
       if (error) {
         failed += originalEntries.length;
         for (const item of originalEntries) {
@@ -231,7 +232,7 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
 
 async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: number; failed: number; skipped?: SyncSkip }> {
   const db = await getDb();
-  const since = (await readReviseMeta<string>("lastPullAt")) ?? "1970-01-01T00:00:00.000Z";
+  const since = (await readReviseUserMeta<string>("lastPullAt", userId)) ?? "1970-01-01T00:00:00.000Z";
   let pulled = 0;
   let failed = 0;
   // Advance the cursor to the newest server-authored timestamp actually
@@ -254,22 +255,32 @@ async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: num
     if (!data?.length) continue;
 
     const store = STORE_FOR[entity];
-    const tx = db.transaction(store, "readwrite");
     try {
-      for (const row of data) {
-        const incoming = await fromRow(entity, row);
-        const existing = await tx.store.get(keyFor(entity, incoming));
-        const merged = mergeForEntity(entity, existing as never, incoming as never);
-        if (merged) await tx.store.put(merged as never);
-        pulled++;
-        // Fold the remote row's Lamport stamp into the local clock so future
-        // local events sort after remote history they causally follow.
-        const remoteLamport = Number((row.data as Record<string, unknown> | null)?.lamport);
+      const incomingRows = await Promise.all(data.map((row) => fromRow(entity, row)));
+      const identity = await authIdentity(supabase, userId);
+      if (identity !== "ok") return { pulled, failed, skipped: identity };
+      for (const incoming of incomingRows) {
+        const remoteLamport = Number(incoming.lamport);
         if (Number.isFinite(remoteLamport)) await observeRemoteLamport(remoteLamport);
+      }
+      const tx = db.transaction(store, "readwrite");
+      try {
+        for (const incoming of incomingRows) {
+          const existing = await tx.store.get(keyFor(entity, incoming));
+          const merged = mergeForEntity(entity, existing as never, incoming as never);
+          if (merged) await tx.store.put(merged as never);
+        }
+        await tx.done;
+      } catch (error) {
+        try { tx.abort(); } catch {}
+        await tx.done.catch(() => undefined);
+        throw error;
+      }
+      pulled += incomingRows.length;
+      for (const row of data) {
         const rowUpdatedAt = String(row.updated_at ?? "");
         if (rowUpdatedAt > maxObservedUpdatedAt) maxObservedUpdatedAt = rowUpdatedAt;
       }
-      await tx.done;
     } catch {
       // A single unreadable row (E2EE key mismatch) fails the table's
       // transaction; counting it keeps the cursor conservative so a future
@@ -280,7 +291,7 @@ async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: num
 
   // Keep the old cursor when a table failed so reconnecting retries that
   // table instead of silently skipping rows that were never pulled.
-  if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseMeta("lastPullAt", maxObservedUpdatedAt);
+  if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseUserMeta("lastPullAt", userId, maxObservedUpdatedAt);
   return { pulled, failed };
 }
 

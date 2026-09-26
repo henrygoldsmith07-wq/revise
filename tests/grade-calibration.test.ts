@@ -135,6 +135,27 @@ describe("simulatePaper + calibrateFromHistory — predicted vs later timed pape
     expect(gradeForPercent(S, highPred.percent) !== "U" || gradeForPercent(S, lowPred.percent) === "U").toBe(true);
   });
 
+  it.each(["cue", "prompt", "scaffold", "worked-solution"] as const)("does not treat %s-assisted practice as independent grade evidence", (hintTier) => {
+    const topicId = TOPICS[0].id;
+    const mastery = masteryFor(0.4, [topicId]);
+    const attempts = Array.from({ length: 10 }, (_, i) =>
+      attemptFor(10, 10, `2025-05-${String(10 + i).padStart(2, "0")}T09:00:00.000Z`, topicId));
+    const independent = predictGrade(S, mastery, attempts, [], "2025-06-01");
+    const supported = predictGrade(S, mastery, attempts.map((attempt) => ({ ...attempt, hintTier })), [], "2025-06-01");
+    expect(supported.percent).toBeLessThan(independent.percent);
+    expect(supported.confidence).toBeLessThan(independent.confidence);
+    expect(supported.percent).toBeLessThan(60);
+  });
+
+  it("does not report a positive trend from switching to worked solutions", () => {
+    const topicId = TOPICS[0].id;
+    const attempts: Attempt[] = [
+      attemptFor(5, 10, "2025-04-15T09:00:00.000Z", topicId),
+      { ...attemptFor(10, 10, "2025-05-15T09:00:00.000Z", topicId), hintTier: "worked-solution" },
+    ];
+    expect(predictGrade(S, masteryFor(0.4, [topicId]), attempts, [], "2025-06-01").trend).toBe(-35);
+  });
+
   it("full timed-paper flow: simulate several papers, calibrate, then apply calibration to a new simulation", () => {
     const questions = seedQuestions.filter((q) => q.subjectId === S.id).slice(0, 8);
     const mk = (val: number) => new Map(TOPICS.map((t) => [t.id, val]));

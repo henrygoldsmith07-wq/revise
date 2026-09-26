@@ -1,5 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { daysToExam } from "./recommender";
+import { hintEvidenceMultiplier } from "./hint-tiers";
 import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, ExamDate, Id, IsoDate, Question, Subject, TopicMastery } from "./types";
 
@@ -88,9 +89,10 @@ export function predictGrade(
 
   const coverage = rows.length ? rows.reduce((a, m) => a + m.mastery, 0) / rows.length : 0;
   const marksMax = subjectAttempts.reduce((a, x) => a + x.max, 0);
-  const measured = marksMax ? subjectAttempts.reduce((a, x) => a + x.awarded, 0) / marksMax : 0;
+  const measured = marksMax ? subjectAttempts.reduce((a, x) => a + x.awarded * hintEvidenceMultiplier(x.hintTier ?? null), 0) / marksMax : 0;
 
-  const trust = Math.min(1, subjectAttempts.length / MIN_ATTEMPTS_FOR_TRUST);
+  const independentEvidence = subjectAttempts.reduce((sum, attempt) => sum + hintEvidenceMultiplier(attempt.hintTier ?? null), 0);
+  const trust = Math.min(1, independentEvidence / MIN_ATTEMPTS_FOR_TRUST);
   // Exam-question accuracy is the better predictor once there is enough of it.
   const blended = measured * trust + coverage * (1 - trust);
 
@@ -227,7 +229,7 @@ export function syntheticCalibrationOutcomes(seed: number, n: number): Array<{ p
 
 function rate(attempts: Attempt[]): number {
   const max = attempts.reduce((a, x) => a + x.max, 0);
-  return max ? attempts.reduce((a, x) => a + x.awarded, 0) / max : 0;
+  return max ? attempts.reduce((a, x) => a + x.awarded * hintEvidenceMultiplier(x.hintTier ?? null), 0) / max : 0;
 }
 
 function daysAgo(today: IsoDate, days: number): IsoDate {

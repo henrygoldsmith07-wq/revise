@@ -11,9 +11,9 @@ import {
 import type { Question } from "@/domain/types";
 
 // ---------------------------------------------------------------------------
-// Flagship depth programme â€” per-statement asset-tree classification and
-// aggregation. The real bank is asserted against so the headline numbers on
-// /benchmarks cannot silently rot.
+// Flagship depth programme — per-statement asset-tree classification and
+// aggregation. The real bank is asserted against so the headline depth numbers
+// cannot silently rot (CI harness, no live page).
 // ---------------------------------------------------------------------------
 
 function miniQuestion(over: Partial<Question> & { id: string; topicId: string }): Question {

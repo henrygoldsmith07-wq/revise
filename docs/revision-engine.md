@@ -71,7 +71,7 @@ recall mastery = stability score · 0.6 + current FSRS retrievability · 0.4
 
 The same row also reports observed true retention (`again` vs every other
 grade), due cards, review count and evidence level (`unmeasured`, `emerging`,
-`reliable` at 20 reviews). `/progress` shows the weighted overall score and
+`reliable` at 20 reviews). `/readiness` shows the weighted overall score and
 the topics that need retrieval, while keeping modelled mastery separate from
 observed recall.
 
@@ -92,7 +92,7 @@ It uses eligible marked practice and paper attempts only:
 The score is mark-weighted application accuracy. Each row also exposes recent
 accuracy over the last five topic attempts, average question difficulty,
 question/attempt counts and an evidence level (`unmeasured`, `emerging`,
-`reliable` at ten eligible attempts). `/progress` uses the score to rank topics
+`reliable` at ten eligible attempts). `/readiness` uses the score to rank topics
 for more exam-question practice without allowing recall or provisional marks to
 inflate the result.
 
@@ -113,7 +113,7 @@ The interval uses at least one denominator for a stable small-sample estimate,
 then widens when card retrievability conflicts with the mastery point estimate.
 Evidence below eight weighted trials is marked `needsMoreEvidence`; interval
 width is labelled `low` below 0.20, `medium` below 0.50 and `high` otherwise.
-`masteryIntervals` sorts topics by widest interval first. `/progress` shows the
+`masteryIntervals` sorts topics by widest interval first. `/readiness` shows the
 six widest bands, their evidence state and a direct practice action, so a high
 mastery score is not mistaken for a measured one.
 
@@ -314,7 +314,7 @@ technique evidence; method losses remain a mixed signal. The result is attached
 to `AssessmentInsight`, including mark totals, shares, reliability and driver
 tags, so every consumer uses the same diagnosis.
 
-`/progress` renders the split as a small stacked bar with the narrative and a
+`/readiness` renders the split as a small stacked bar with the narrative and a
 next action. The split is labelled preliminary until there are at least eight
 mistakes and ten lost marks; it is a prioritisation signal, not a claim that a
 single mistake has one perfectly observable cause.

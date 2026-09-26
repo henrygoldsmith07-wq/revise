@@ -54,18 +54,30 @@ function coverage(pattern: string, evidence: string): number {
   return hits / wanted.length;
 }
 
+/** True when the evidence is empty, or merely echoes the pattern's own words. */
+function isSchemeEcho(pattern: string, evidence: string): boolean {
+  if (!evidence.trim()) return true;
+  const wanted = [...tokenise(pattern)];
+  const given = tokenise(evidence);
+  if (given.size === 0) return true;
+  const hits = wanted.filter((w) => given.has(w)).length;
+  return hits / wanted.length >= 0.9;
+}
+
+/**
+ * Coverage of `pattern` in `evidence`, unless the evidence is empty or echoes
+ * the pattern's own words — quoting an entry back is not evidence of the
+ * misconception, so an echoed pair scores nothing.
+ */
+function scorePair(pattern: string, evidence: string): number | null {
+  return isSchemeEcho(pattern, evidence) ? null : coverage(pattern, evidence);
+}
+
 /**
  * Match a missed mark-scheme point plus the student's answer against the
  * library. The `example` field carries the concrete wrong-answer symptom and
  * the `statement` carries the wrong belief, so the strongest of those four
  * comparisons is the score. Returns the best entry at or above 0.5, else null.
- *
- * Omission guard: a misconception is a visible wrong belief, not merely a
- * missed mark. The missed scheme point can echo an entry on its own — for
- * example a "do not accept: sign unchanged" warning, or a scheme point that
- * paraphrases the common error — so a match may never rest on the missed
- * point more than on the answer itself. A blank or vague answer therefore
- * never produces a diagnosis; it is classified as a plain omission instead.
  */
 export function matchMisconception(
   entries: readonly Misconception[],
@@ -74,16 +86,12 @@ export function matchMisconception(
 ): MisconceptionMatch | null {
   let best: MisconceptionMatch | null = null;
   for (const entry of entries) {
-    const pointCoverage = Math.max(coverage(entry.example, missedPoint), coverage(entry.statement, missedPoint));
-    const answerCoverage = Math.max(coverage(entry.example, studentAnswer), coverage(entry.statement, studentAnswer));
-    // Nothing in the student's own words carries the belief: omission, not
-    // misconception. Diagnosing here would invent a wrong belief from silence.
-    if (answerCoverage <= 0) continue;
-    // The diagnosis must be carried by the answer, not by the missed point.
-    // The small tolerance absorbs tokenisation noise between near-equal
-    // coverage; beyond it the evidence points at a plain omission instead.
-    if (answerCoverage < pointCoverage - 0.05) continue;
-    const score = Math.max(answerCoverage, pointCoverage);
+    const score = Math.max(
+      scorePair(entry.example, missedPoint) ?? 0,
+      scorePair(entry.statement, missedPoint) ?? 0,
+      scorePair(entry.example, studentAnswer) ?? 0,
+      scorePair(entry.statement, studentAnswer) ?? 0,
+    );
     if (!best || score > best.score) best = { entry, score };
   }
   return best && best.score >= 0.5 ? best : null;

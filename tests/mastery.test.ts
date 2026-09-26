@@ -61,6 +61,19 @@ describe("computeTopicMastery", () => {
     expect(row.weak).toBe(false);
   });
 
+  it("does not count seeded never-reviewed cards as mastery evidence", () => {
+    const cards = Array.from({ length: 8 }, (_, index) =>
+      createCard({ id: `seed-${index}`, userId: "u", subjectId: "subject", topicId: "a", front: "f", back: "b" }, NOW));
+    const [row] = computeTopicMastery({
+      topics: [topic("a")], cards, reviewLogs: [], attempts: [], mistakes: [], now: NOW,
+    });
+    expect(row.mastery).toBe(0);
+    expect(row.weak).toBe(false);
+    expect(row.lastStudiedAt).toBeNull();
+    expect(row.cardsTotal).toBe(8);
+    expect(row.cardsDue).toBe(8);
+  });
+
   it("stays cautious when evidence is thin, even if that evidence is perfect", () => {
     const [row] = computeTopicMastery({
       topics: [topic("a")],
@@ -100,6 +113,16 @@ describe("computeTopicMastery", () => {
     expect(weak.weak).toBe(true);
     expect(strong.weak).toBe(false);
     expect(strong.accuracy).toBeCloseTo(0.85, 2);
+  });
+
+  it.each(["cue", "prompt", "scaffold", "worked-solution"] as const)("discounts %s-assisted success without rewriting awarded marks", (hintTier) => {
+    const attempts = Array.from({ length: 4 }, () => attempt("a", 10, 10));
+    const input = { topics: [topic("a")], cards: [], reviewLogs: [], mistakes: [], now: NOW };
+    const independent = computeTopicMastery({ ...input, attempts })[0];
+    const supported = computeTopicMastery({ ...input, attempts: attempts.map((row) => ({ ...row, hintTier })) })[0];
+    expect(supported.accuracy).toBe(hintTier === "cue" || hintTier === "prompt" ? 0.5 : 0.15);
+    expect(supported.mastery).toBeLessThan(independent.mastery);
+    expect(attempts.every((row) => row.awarded === 10)).toBe(true);
   });
 
   it("penalises unresolved mistakes", () => {

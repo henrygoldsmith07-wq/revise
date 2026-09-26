@@ -44,10 +44,10 @@ lives:
   the student has never opened must not inflate a predicted grade.
 - `recall-mastery.ts` keeps a recall-only score separate from exam performance,
   combining card stability and current FSRS retrievability, while exposing
-  observed review outcomes and due-card pressure for `/progress`.
+  observed review outcomes and due-card pressure for `/readiness`.
 - `application-mastery.ts` keeps marked-question application accuracy separate
   from recall, excluding active-recall and pending provisional attempts and
-  allocating multi-topic marks fairly for `/progress`.
+  allocating multi-topic marks fairly for `/readiness`.
 - `recommender.ts` scores every candidate activity on a single scale so they can
   be compared, and attaches a human-readable reason to each.
 - `planner.ts` builds the timetable and folds missed sessions forward.
@@ -63,7 +63,7 @@ lives:
 - `onboarding.ts` — funnel measurement: completion/drop-off, time-to-activation and `isActivated` derived from real review/attempt/session signals (local-only, no PII shipped).
 - `retention-analytics.ts`, `fsrs-tuning.ts`, `mastery-uncertainty.ts`, `knowledge-tracing.ts`, `recommender-enhancements.ts`, `sync-conflicts.ts`, `portability.ts`, `moderation.ts` — Phase 3–6 learning-science and platform hardening; `mastery-uncertainty.ts` exposes pure Wilson intervals and empirical difficulty signals (including the shared exam-technique vs knowledge diagnosis; covered in `docs/revision-engine.md`).
 - `post-session-closure.ts` — pure session-end metrics and next-action rules shared by review, question practice and timed papers.
-- `src/app/benchmarks` + `src/app/case-study` — live ledger and case-study routes that compute from the same harnesses as CI (Phase 8).
+- Benchmark harnesses (`src/domain/recommender.ts`, `tests/recommender.benchmark.test.ts`) run in CI with no live page; the app routes are Today, review, practice, readiness and library.
 
 ### `src/content` — authored revision material
 
@@ -249,13 +249,13 @@ Beyond unit tests, Revise now pins these so regressions are caught before review
 - **Localisation scaffolding** (`src/domain/i18n.ts`): `detectLocale` + `t()` + per-locale dictionaries (en-GB core, cy/fr ready), key-set parity checked (`missingKeys`/`extraKeys`), date/number formatting via `Intl` with ISO fallback.
 - **Onboarding funnel** (`src/domain/onboarding.ts`): `OnboardingProgress` → `completionRate`/`dropOffStep`, `deriveActivation` → `timeToActivationMs` + `isActivated`, aggregate `summariseFunnel`. Wired as local-only domain helpers so the UI can emit real completion/activation data without shipping PII.
 
-## Public benchmarks & case study (Phase 8)
+## Benchmark harnesses & data controls
 
-The harnesses above are also published live so the numbers cannot drift from the code:
+The harnesses run in CI so the numbers cannot drift from the code (there is no
+live benchmarks or case-study page):
 
-- **Benchmarks page** (`src/app/benchmarks/page.tsx`, route `/benchmarks`) — live ledger that recomputes `benchmarkRecommendationQuality` + `calibrationReport` in the browser from the same deterministic synthetic harnesses CI runs (`syntheticOutcomePairs`, `syntheticCalibrationOutcomes`). Seed/n controls, provenance row, and the 40-row outcome table; real `(predicted, actual)` pairs drop in with no page change once provider-marked gold exists.
-- **Case study** (`src/app/case-study/page.tsx`, route `/case-study`) — the 6-engine narrative (scoring, FSRS, mastery, marking, mistake loop, grades) with a reproduce block; links back to `/benchmarks` and `docs/benchmark.md`.
-- **Navigation + data controls** — `AppShell` exposes `/benchmarks` + `/case-study` with `BenchmarkIcon`/`CaseStudyIcon`; `Settings → Data` wires `buildPortabilitySnapshot` / `deletionPreview` / `privacyDisclosure` for GDPR Art. 20/17 portability and local-only privacy. Pinned in `tests/phase8-public.test.ts` (8 tests).
+- **Benchmark harnesses** — `benchmarkRecommendationQuality` + `calibrationReport` run from the same deterministic synthetic harnesses CI runs (`syntheticOutcomePairs`, `syntheticCalibrationOutcomes`). Real `(predicted, actual)` pairs drop in with no harness change once provider-marked gold exists. See `docs/benchmark.md`.
+- **Data controls** — `Settings → Data` wires `buildPortabilitySnapshot` / `deletionPreview` / `privacyDisclosure` for GDPR Art. 20/17 portability and local-only privacy. Pinned in `tests/phase6-platform.test.ts`.
 
 ## Testing
 
@@ -297,7 +297,7 @@ the test.
 
 ## Known limits
 
-- Rate limiting is per-process (see above).
+- Rate limiting uses an in-memory fallback by default with a pluggable shared backend (see `src/lib/rate-limit.ts`).
 - Past-paper extraction requires a model; the paper is stored either way and can
   be extracted later.
 - Topic mapping for extracted questions is term-overlap, not semantic. It is

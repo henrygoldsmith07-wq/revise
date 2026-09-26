@@ -7,23 +7,59 @@ import { payloadSchemas } from "@/ai/tasks";
 import { AI_TASKS } from "@/ai/types";
 import type { AiTask } from "@/ai/types";
 import type { Question } from "@/domain/types";
-import { clientKey, rateLimit } from "@/lib/rate-limit";
+import {
+  AI_RATE_LIMIT,
+  aiDailyLimit,
+  aiTaskCost,
+  rateLimitWithCost,
+  resolveRateLimitKey,
+} from "@/lib/rate-limit";
 import { captureServerTelemetry } from "@/lib/observability";
 
 // The single AI entry point. Keys never leave this process; the browser only
 // ever sees a task name and a validated payload going out, and an envelope
 // coming back that states whether a model or the offline fallback answered.
+// Provider credentials are read only inside src/ai/provider.ts (server-only);
+// this route never references a key and never serialises one.
 
 export const runtime = "nodejs";
 
-const LIMIT = { ratePerMinute: 20, burst: 10 };
-const MAX_BODY_CHARS = 1_500_000;
-const MAX_OCR_CHARS = 1_200_000;
+export const MAX_BODY_CHARS = 1_500_000;
+export const MAX_OCR_CHARS = 1_200_000;
 
-async function requireAiUser(): Promise<NextResponse | null> {
+type AiAuth = { error: NextResponse } | { userId: string | null };
+
+function providerCredentialsPresent(): boolean {
+  // Mirrors src/ai/provider.ts selection without importing keys: any provider
+  // env means a deployment intends to call a model.
+  if (process.env.ANTHROPIC_API_KEY) return true;
+  if (process.env.AI_PROVIDER === "none") return false;
+  if (process.env.OPENAI_COMPATIBLE_BASE_URL && process.env.OPENAI_COMPATIBLE_MODEL) return true;
+  if (process.env.AI_PROVIDER && process.env.AI_PROVIDER !== "none") return true;
+  return false;
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+async function requireAiUser(): Promise<AiAuth> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) return null;
+  if (!supabaseUrl || !supabaseKey) {
+    // Fail closed in production: a deployment with provider credentials but
+    // missing auth config must not expose AI endpoints without authentication.
+    // Local development keeps intentional offline mode (no auth, local user).
+    if (isProduction() && providerCredentialsPresent()) {
+      return {
+        error: NextResponse.json(
+          { error: "AI authentication is not configured. Set Supabase auth before enabling AI providers." },
+          { status: 503 },
+        ),
+      };
+    }
+    return { userId: null };
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -40,9 +76,9 @@ async function requireAiUser(): Promise<NextResponse | null> {
   });
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
-    return NextResponse.json({ error: "Sign in to use AI features." }, { status: 401 });
+    return { error: NextResponse.json({ error: "Sign in to use AI features." }, { status: 401 }) };
   }
-  return null;
+  return { userId: auth.user.id };
 }
 
 export async function GET() {
@@ -50,16 +86,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const unauth = await requireAiUser();
-  if (unauth) return unauth;
-
-  const limit = rateLimit(clientKey(request), LIMIT);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "Too many AI requests. The rest of the app keeps working — try again shortly." },
-      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
-    );
-  }
+  const auth = await requireAiUser();
+  if ("error" in auth) return auth.error;
+  const rateKey = resolveRateLimitKey(request, auth.userId);
 
   let raw: string;
   try {
@@ -96,6 +125,25 @@ export async function POST(request: Request) {
     if (image.length > MAX_OCR_CHARS) {
       return NextResponse.json({ error: "Image payload is too large." }, { status: 413 });
     }
+  }
+
+  // Enforce quota by authenticated user where possible (else IP), with
+  // per-minute + burst + daily allowance and per-task cost accounting.
+  const cost = aiTaskCost(task);
+  const limit = rateLimitWithCost(rateKey, cost, {
+    ...AI_RATE_LIMIT,
+    dailyLimit: aiDailyLimit(),
+  });
+  if (!limit.ok) {
+    return NextResponse.json(
+      {
+        error:
+          limit.limitedBy === "daily"
+            ? "Daily AI allowance used up. The rest of the app keeps working — try again tomorrow."
+            : "Too many AI requests. The rest of the app keeps working — try again shortly.",
+      },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
+    );
   }
 
   try {

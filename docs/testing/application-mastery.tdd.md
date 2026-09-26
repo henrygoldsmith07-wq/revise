@@ -7,7 +7,7 @@
 - Awarded and available marks are split evenly when a question maps to multiple topics.
 - The score is mark-weighted accuracy, with recent accuracy, average difficulty, attempt counts and evidence level also reported.
 - Evidence is `unmeasured` with no eligible attempts, `emerging` below ten and `reliable` at ten eligible attempts.
-- `/progress` reports overall application accuracy and links the weakest topics to question practice.
+- `/readiness` reports overall application accuracy and links the weakest topics to question practice.
 
 ## RED checkpoint
 
@@ -20,7 +20,7 @@
 - Commit: `599c444 feat(revise): add application mastery`
 - Command: `npm.cmd test -- --run tests/application-mastery.test.ts`
 - Result: 3/3 tests passed.
-- The feature adds the application-only domain calculation, store projection and accessible `/progress` card with recent and reliable evidence.
+- The feature adds the application-only domain calculation, store projection and accessible `/readiness` card with recent and reliable evidence.
 
 ## Publication and verification
 

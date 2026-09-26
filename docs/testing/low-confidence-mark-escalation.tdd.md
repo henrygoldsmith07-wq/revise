@@ -6,7 +6,7 @@
 - Confidence below `0.60` creates a durable `human-review` escalation on the `Attempt`.
 - Missing AI confidence is treated as urgent; it is never silently treated as a confident mark.
 - Rubric and offline fallback marks do not escalate because they are deterministic.
-- `/progress` reports pending queue size, AI-mark coverage, escalation rate and queued questions.
+- `/readiness` reports pending queue size, AI-mark coverage, escalation rate and queued questions.
 
 ## RED checkpoint
 
@@ -24,7 +24,7 @@
 ## Publication and verification
 
 - `tests/low-confidence-mark-escalation.test.ts` covers threshold, missing confidence, priority, report aggregation, provider defaults and Progress wiring.
-- `npm.cmd test -- --run tests/low-confidence-mark-escalation.test.ts tests/marker-disagreement.test.ts tests/phase8-public.test.ts --testTimeout=15000` passed (16/16).
+- `npm.cmd test -- --run tests/low-confidence-mark-escalation.test.ts tests/marker-disagreement.test.ts --testTimeout=15000` passed.
 - `npm.cmd run type-check` passed.
 - `npm.cmd run lint:check` passed with 0 errors and the repository’s existing 40 warnings.
 - `npm.cmd run build` passed; only existing Turbopack-root and custom cache-control warnings were emitted.

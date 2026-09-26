@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { clearAll, getDb } from "@/data/db";
 import { authIdentity, collapseOutboxItems, sync } from "@/data/sync";
+import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
+import { encryptPayload, importEncryptionKey } from "@/data/e2ee";
+import { createCard } from "@/domain/scheduling";
 import type { OutboxItem } from "@/domain/types";
 
 const USER = "11111111-1111-4111-8111-111111111111";
@@ -53,6 +56,27 @@ function fakeClient(options: { failAfter?: number; signOutAfter?: number } = {})
     },
   };
   return client as unknown as SupabaseClient;
+}
+
+function pullClient(userId: string, rows: Record<string, Record<string, unknown>[]>, failTable?: string): SupabaseClient {
+  return {
+    auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
+    from: (table: string) => ({
+      select: () => ({ eq: (_column: string, owner: string) => ({
+        gt: async (_timestamp: string, since: string) => ({
+          data: (rows[table] ?? []).filter((row) => row.user_id === owner && Date.parse(String(row.updated_at)) > Date.parse(since)),
+          error: table === failTable ? { message: "offline" } : null,
+        }),
+      }) }),
+    }),
+  } as unknown as SupabaseClient;
+}
+
+function remoteCard(id: string, userId: string, updatedAt: string) {
+  return {
+    id, user_id: userId, updated_at: updatedAt,
+    data: createCard({ id, userId, subjectId: "subject", topicId: "topic", front: "question", back: "answer" }, new Date(updatedAt)),
+  };
 }
 
 beforeEach(async () => {

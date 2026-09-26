@@ -6,7 +6,7 @@
 - AO1 and recall evidence is attributed to knowledge; timing, communication, interpretation, arithmetic and explicit command-word slips are attributed to exam technique; method losses remain mixed.
 - The result includes lost-mark totals, 0–1 shares, driver tags, a narrative and a reliability flag.
 - The diagnosis is preliminary until there are at least eight mistakes and ten lost marks.
-- `/progress` renders the split with an accessible stacked bar, reliability cue and an action link to timed papers or mistake review.
+- `/readiness` renders the split with an accessible stacked bar, reliability cue and an action link to timed papers or mistake review.
 
 ## RED checkpoint
 
@@ -19,7 +19,7 @@
 - Commit: `83286f3 feat(revise): surface exam technique knowledge separation`
 - Command: `npm.cmd test -- --run tests/exam-technique-knowledge.test.ts`
 - Result: 2/2 tests passed.
-- The existing classifier is now part of the central assessment snapshot, and `/progress` exposes it as an actionable card.
+- The existing classifier is now part of the central assessment snapshot, and `/readiness` exposes it as an actionable card.
 
 ## Publication and verification
 

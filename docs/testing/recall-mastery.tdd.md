@@ -6,7 +6,7 @@
 - The score combines card stability (60%) with current FSRS retrievability (40%).
 - Each row reports observed true retention, reviews, recalled reviews, due cards, last retrieval and evidence level.
 - Evidence is `unmeasured` without review logs, `emerging` below 20 reviews and `reliable` at 20 reviews.
-- `/progress` reports weighted overall recall mastery and links the weakest studied topics directly to card review.
+- `/readiness` reports weighted overall recall mastery and links the weakest studied topics directly to card review.
 
 ## RED checkpoint
 
@@ -19,7 +19,7 @@
 - Commit: `67ad13e feat(revise): add recall mastery`
 - Command: `npm.cmd test -- --run tests/recall-mastery.test.ts`
 - Result: 3/3 tests passed.
-- The feature adds the recall-only domain calculation, store projection and accessible `/progress` card with observed recall and due-card actions.
+- The feature adds the recall-only domain calculation, store projection and accessible `/readiness` card with observed recall and due-card actions.
 
 ## Publication and verification
 

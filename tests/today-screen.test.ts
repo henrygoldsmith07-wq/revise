@@ -4,16 +4,30 @@ import { join } from "path";
 import { REVIEW_SECONDS_PER_CARD, sizeDueSession } from "@/domain/session-structure";
 
 const page = () => readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
+const hero = () => readFileSync(join(process.cwd(), "src/components/AdaptiveSessionHero.tsx"), "utf8");
 const recommendation = () => readFileSync(join(process.cwd(), "src/components/RecommendationCard.tsx"), "utf8");
 
-describe("Today screen — 15–25 minutes of due cards, then stop", () => {
-  it("leads with a bounded due-card review session, not a curriculum dashboard", () => {
+describe("Today screen — one dominant next action (decision engine)", () => {
+  it("leads with the single adaptive plan, not a dashboard or due fork", () => {
     const source = page();
-    expect(source).toContain("TodayReviewSession");
-    expect(source).toContain("Today&apos;s review");
-    expect(source).toContain("sizeDueSession");
-    expect(source).toContain("Start review →");
-    expect(source).toContain("the queue will still be here tomorrow");
+    expect(source).toContain("adaptiveSession");
+    expect(source).toContain("AdaptiveSessionHero");
+    expect(source).toContain("best use of the next 20");
+    // No competing decision branches: the optimiser already traded off
+    // FSRS pressure, mastery, mistakes, exam timing and capability gaps.
+    expect(source).not.toContain("dueCount > 0");
+    expect(source).not.toContain("TodayReviewSession");
+    expect(source).not.toContain("NextBestAction");
+    expect(source).not.toContain("legacyTodayBranch");
+  });
+
+  it("the hero states what to do, why, and starts within one tap", () => {
+    const source = hero();
+    expect(source).toContain("Best use of the next {session.totalMinutes} minutes");
+    expect(source).toContain("session.reason");
+    expect(source).toContain("session.startHref");
+    expect(source).toContain("Start");
+    expect(source).toContain("See the sequence");
   });
 
   it("the session never shows spec-point scale or an after-this queue", () => {
@@ -21,9 +35,6 @@ describe("Today screen — 15–25 minutes of due cards, then stop", () => {
     expect(source).not.toContain("After this:");
     expect(source).not.toContain("Then:");
     expect(source).not.toContain("Quick stats");
-    // A single call to action on the due path — a dashboard has many.
-    const startButtons = source.match(/Start review →/g) ?? [];
-    expect(startButtons.length).toBe(1);
   });
 
   it("sizes the session from the due count, capped to the session-length target", () => {
@@ -58,25 +69,11 @@ describe("Today screen — 15–25 minutes of due cards, then stop", () => {
     }
   });
 
-  it("falls back to the next best task only when nothing is due", () => {
-    const source = page();
-    expect(source).toContain("Nothing due right now");
-    expect(source).toContain("NextBestAction");
-    expect(source).toContain("Your next");
-    // The recommendation path is the fallback, not the hero.
-    const dueBranch = source.indexOf("dueCount > 0");
-    const recBranch = source.indexOf("Nothing due right now");
-    expect(dueBranch).toBeGreaterThan(-1);
-    expect(recBranch).toBeGreaterThan(dueBranch);
-  });
-
   it("shows the resume card instead of a fresh session when one was interrupted", () => {
     const source = page();
-    // The due branch renders the resume card when a checkpoint exists and a
-    // fresh TodayReviewSession otherwise — exactly one call to action either way.
     expect(source).toContain("revisionCheckpoint ? (");
     expect(source).toContain("ResumeRevisionCard");
-    expect(source).toContain("TodayReviewSession");
+    expect(source).toContain("AdaptiveSessionHero");
   });
 
   it("does not compete with secondary cards or scoring detail on Today", () => {
