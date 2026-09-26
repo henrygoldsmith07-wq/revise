@@ -28,6 +28,18 @@ then, after qualified reviewers return the completed packet:
 
 `npm run wjec:review:check -- <directory>`
 
+To persist only validated approvals into the repository-backed attestation
+ledger, run:
+
+`npm run wjec:review:apply -- <returned-review-directory>`
+
+The apply step re-runs the canonical trust contract against the live bank,
+requires reviewer identity, role, qualification, review time, all six checks
+and the exact current content fingerprint, then atomically appends the
+attestation to `src/content/reviews/wjec-human-verification.json`. Ledger keys
+are `questionId + contentFingerprint`: when content changes, the old record is
+kept as audit history but no longer applies.
+
 The generated `review-report.json` keeps authored depth separate from trusted
 depth. It reports approved questions, statements with any trusted question,
 statements meeting the trusted core bar (at least four approved questions
@@ -36,7 +48,9 @@ No structural check or generated packet creates a human approval.
 
 For a fast read-only status check across all four flagships, run
 `npm run wjec:trust:report`. This uses the same trust predicate as mastery
-and readiness, so a draft question cannot inflate the headline.
+and readiness, so a draft question cannot inflate the headline. It also emits
+a greedy ten-item reviewer batch per flagship, prioritising new trusted
+specification coverage before missing recall/application/transfer categories.
 Physics keeps its deeper evidence workflow because it also packages marking
 corpora, paper provenance, prerequisite review, intervention outcomes and the
 prospective experiment: `npm run physics:evidence:init -- <directory>` and

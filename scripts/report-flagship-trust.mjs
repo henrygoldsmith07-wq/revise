@@ -5,7 +5,8 @@ const bundle = await build({
     contents: `
       export { seedQuestions as questions } from "./src/content";
       export { allTopics } from "./src/domain/curriculum";
-      export { flagshipTrustReadinessSet as report } from "./src/domain/flagship-trust";
+      export { FLAGSHIP_SUBJECTS as flagships } from "./src/domain/flagship";
+      export { flagshipTrustReadinessSet as report, buildFlagshipReviewPlan as plan } from "./src/domain/flagship-trust";
     `,
     resolveDir: process.cwd(),
     loader: "ts",
@@ -20,10 +21,14 @@ const data = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );
 const rows = data.report({ topics: data.allTopics(), questions: data.questions });
+const plans = Object.fromEntries(data.flagships.map((flagship) => [
+  flagship.subjectId,
+  data.plan({ subjectId: flagship.subjectId, topics: data.allTopics(), questions: data.questions, limit: 10 }),
+]));
 const json = process.argv.includes("--json");
 
 if (json) {
-  console.log(JSON.stringify(rows, null, 2));
+  console.log(JSON.stringify({ rows, plans }, null, 2));
 } else {
   console.log("WJEC flagship trusted assessment depth");
   console.log("");
@@ -41,10 +46,16 @@ if (json) {
         `statements with trusted evidence ${row.statementsWithTrustedQuestions}/${row.statementsTotal} (${trustedShare}%)`,
         `trusted core ${row.statementsMeetingCoreTrustBar}/${row.statementsTotal} (${coreShare}%)`,
         `review queue ${row.reviewQueue}`,
+        `release ${row.releaseReady ? "ready" : "blocked"}`,
       ].join(" | "),
     );
+    const next = plans[row.subjectId] ?? [];
+    if (next.length) {
+      console.log(`  next review batch: ${next.map((item) => item.questionId).join(", ")}`);
+    }
   }
   console.log("");
   console.log("Trusted core = at least four approved questions spanning recall, application and transfer.");
+  console.log("Release ready = every bank question approved and every statement meets trusted core.");
   console.log("Draft/authored question volume is intentionally excluded.");
 }

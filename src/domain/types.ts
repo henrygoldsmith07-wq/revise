@@ -73,7 +73,7 @@ export type ContentSource = "authored" | "licensed" | "generated" | "past-paper"
 export interface HumanVerificationRecord {
   status: "pending" | "approved" | "changes-requested";
   reviewerId?: Id;
-  /** Role of the qualified Physics reviewer who made the decision. */
+  /** Role of the qualified WJEC reviewer who made the decision. */
   reviewerRole?: "examiner" | "teacher" | "subject-expert";
   /** Free-text qualification evidence, e.g. "WJEC A-level Physics examiner". */
   reviewerQualification?: string;

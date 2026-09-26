@@ -13,7 +13,8 @@ import type { Attempt, Question, QuestionPart } from "@/domain/types";
 // Test-only human attestations; no production content is approved here.
 function approve(question: Question): Question {
   return applyHumanVerification(question, {
-    status: "approved", reviewerId: "test-only", reviewedAt: "2026-09-08T00:00:00Z",
+    status: "approved", reviewerId: "test-only", reviewerRole: "teacher",
+    reviewerQualification: "Test fixture only", reviewedAt: "2026-09-08T00:00:00Z",
     contentFingerprint: physicsContentFingerprint(question),
     checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
   });

@@ -250,8 +250,13 @@ provenance record (`source` / `verification` / `reviewer` / `lastChecked` /
 `specVersion`). Coverage on Progress is measured **per statement**: how many have
 retrieval cards, how many have an exam question (*which* parts test *which*
 statements), which are verified, and — per `SPEC_MANIFEST` — which unit/paper
-(duration, marks, weighting) each belongs to. The statement model now covers all **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE): 475 topics,
-869 seed questions**, every topic with `specPoints` and every seed question part
+(duration, marks, weighting) each belongs to. The statement model now covers all
+**32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
+
+Runtime inventory: **475 topics, 3923 materialised seed questions, 2238 WJEC flagship questions**.
+The static source audit currently sees 869 authoring/catalogue records before
+runtime expansion; CI treats the materialised bank above as the authoritative
+question inventory. Every topic carries `specPoints` and every seed question part
 mapped with `specPointIds + learningClaims` (explicit per-mark allocation via
 `claimMap` where needed).
 Topic lists and grade boundaries remain approximate and labelled as such; always

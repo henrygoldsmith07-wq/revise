@@ -36,6 +36,7 @@ export function FlagshipDepthPanel() {
                 <Stat label="Gold statements" value={`${depth.goldStatements}/${depth.statementsTotal}`} hint="≥4 questions spanning recall+application+transfer" />
                 <Stat label="Trusted core" value={`${trust.statementsMeetingCoreTrustBar}/${trust.statementsTotal}`} hint="≥4 human-approved questions spanning recall+application+transfer" />
                 <Stat label="Approved questions" value={`${trust.trustedQuestions}/${trust.questionsTotal}`} hint="Exact current question version passed the WJEC human trust gate" />
+                <Stat label="Release gate" value={trust.releaseReady ? "Ready" : "Blocked"} hint="All questions approved and every statement meets the trusted core bar" />
                 <Stat label="Questions / statement" value={depth.questionsPerStatement.toFixed(2)} hint="target ≥ 4" />
                 <Stat label="Statements with 0 questions" value={String(zeroQ)} hint="authoring queue" />
                 <Stat label="Statements with ≥4 questions" value={`${withFour}`} hint="independent coverage" />

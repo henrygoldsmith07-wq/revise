@@ -20,6 +20,7 @@
     "physics:evidence:check": "node scripts/validate-physics-evidence.mjs",
     "wjec:review:export": "node scripts/wjec-content-review.mjs export",
     "wjec:review:check": "node scripts/wjec-content-review.mjs check",
+    "wjec:review:apply": "node scripts/apply-wjec-review-ledger.mjs",
     "wjec:trust:report": "node scripts/report-flagship-trust.mjs",
     "prebuild": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",
     "predev": "node scripts/copy-pdf-worker.mjs && node scripts/build-domain-worker.mjs",

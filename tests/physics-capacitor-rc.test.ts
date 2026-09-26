@@ -60,7 +60,8 @@ describe("RC content drafts", () => {
     const question = questions[0]!;
     // A test fixture only; these attestations are never written to the bank.
     const reviewed = applyHumanVerification(question, {
-      status: "approved", reviewerId: "test-only", reviewedAt: "2026-09-10T00:00:00Z",
+      status: "approved", reviewerId: "test-only", reviewerRole: "teacher",
+      reviewerQualification: "Test fixture only", reviewedAt: "2026-09-10T00:00:00Z",
       contentFingerprint: physicsContentFingerprint(question),
       checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
     });

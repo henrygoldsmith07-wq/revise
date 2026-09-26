@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allTopics } from "@/domain/curriculum";
 import { seedQuestions } from "@/content";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
-import { flagshipTrustReadiness } from "@/domain/flagship-trust";
+import { buildFlagshipReviewPlan, flagshipTrustReadiness } from "@/domain/flagship-trust";
 import type { Question, Topic } from "@/domain/types";
 
 describe("flagship trusted-depth ledger", () => {
@@ -107,5 +107,52 @@ describe("flagship trusted-depth ledger", () => {
       expect(report.coreTrustShare).toBeGreaterThanOrEqual(0);
       expect(report.coreTrustShare).toBeLessThanOrEqual(1);
     }
+  });
+
+  it("prioritises new statement coverage before a second question on the same statement", () => {
+    const topicId = "wjec-test.topic";
+    const topic = {
+      id: topicId,
+      subjectId: "wjec-test",
+      specPoints: [
+        { id: `${topicId}.sp-01`, ref: "1(a)", text: "claim one", aos: ["AO1"] },
+        { id: `${topicId}.sp-02`, ref: "1(b)", text: "claim two", aos: ["AO1"] },
+      ],
+    } as unknown as Topic;
+    const make = (id: string, specPointId: string): Question => ({
+      id,
+      subjectId: "wjec-test",
+      topicIds: [topicId],
+      kind: "short",
+      stem: id,
+      parts: [{
+        id: `${id}:0`,
+        label: "",
+        prompt: id,
+        marks: 1,
+        markScheme: ["point"],
+        modelAnswer: "answer",
+        aos: ["AO1"],
+        specPointIds: [specPointId],
+      }],
+      totalMarks: 1,
+      source: "authored",
+    } as unknown as Question);
+    const plan = buildFlagshipReviewPlan({
+      subjectId: "wjec-test",
+      topics: [topic],
+      questions: [
+        make("a-first", `${topicId}.sp-01`),
+        make("b-second-same", `${topicId}.sp-01`),
+        make("c-other-statement", `${topicId}.sp-02`),
+      ],
+      trustedQuestion: () => false,
+      limit: 2,
+    });
+    expect(plan).toHaveLength(2);
+    expect(new Set(plan.flatMap((item) => item.specPointIds))).toEqual(
+      new Set([`${topicId}.sp-01`, `${topicId}.sp-02`]),
+    );
+    expect(plan.every((item) => item.newStatementCoverage === 1)).toBe(true);
   });
 });

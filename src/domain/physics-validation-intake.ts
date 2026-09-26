@@ -27,9 +27,11 @@ import {
 import {
   applyHumanVerification,
   buildPhysicsReviewQueue,
+  humanVerificationIssues,
   humanVerifiedWjecQuestion,
   physicsContentFingerprint,
   REQUIRED_HUMAN_CHECKS,
+  WJEC_REVIEWER_ROLES,
   type PhysicsReviewQueueRow,
 } from "./physics-content-review";
 import {
@@ -69,8 +71,6 @@ export const PHYSICS_INTERVENTION_PACKET_VERSION = 1 as const;
 export const PHYSICS_EXPERIMENT_PACKET_VERSION = 1 as const;
 
 type PhysicsReviewerRole = NonNullable<HumanVerificationRecord["reviewerRole"]>;
-
-const REVIEWER_ROLES: readonly PhysicsReviewerRole[] = ["examiner", "teacher", "subject-expert"];
 const ANSWER_SOURCES: readonly AnswerCorpusProvenance[] = ["official/past-paper", "examiner-reviewed", "teacher-reviewed"];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -137,15 +137,15 @@ function reviewRecord(value: unknown, prefix: string, expectedFingerprint: strin
     errors.push(`${prefix}.contentFingerprint does not match the current question fingerprint`);
   }
   if (value.reviewerId !== undefined && !text(value.reviewerId)) errors.push(`${prefix}.reviewerId must be a non-empty string`);
-  if (value.reviewerRole !== undefined && (!text(value.reviewerRole) || !REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole))) {
+  if (value.reviewerRole !== undefined && (!text(value.reviewerRole) || !WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole))) {
     errors.push(`${prefix}.reviewerRole must be examiner, teacher or subject-expert`);
   }
   if (value.reviewerQualification !== undefined && !text(value.reviewerQualification)) errors.push(`${prefix}.reviewerQualification must be a non-empty string`);
   if (value.reviewedAt !== undefined && !instant(value.reviewedAt)) errors.push(`${prefix}.reviewedAt must be an ISO instant`);
   if (status === "approved") {
     if (!text(value.reviewerId) || !instant(value.reviewedAt)) errors.push(`${prefix}: an approved decision needs a named reviewer and review time`);
-    if (!text(value.reviewerRole) || !REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) {
-      errors.push(`${prefix}: an approved Physics decision needs reviewerRole and reviewerQualification`);
+    if (!text(value.reviewerRole) || !WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) {
+      errors.push(`${prefix}: an approved WJEC decision needs reviewerRole and reviewerQualification`);
     }
     if (checksResult.checks && REQUIRED_HUMAN_CHECKS.some((check) => checksResult.checks?.[check] !== true)) {
       errors.push(`${prefix}: all six human checks must be true before approval`);
@@ -265,6 +265,13 @@ export function importPhysicsReviewPacket(raw: string, questions: readonly Quest
     errors.push(...result.errors);
     warnings.push(...result.warnings);
     if (!result.review) continue;
+    if (result.review.status === "approved") {
+      const trustIssues = humanVerificationIssues(current, result.review);
+      if (trustIssues.length) {
+        errors.push(`${prefix}: approval failed the canonical WJEC trust contract (${trustIssues.join(", ")})`);
+        continue;
+      }
+    }
     const next = applyHumanVerification(current, result.review);
     if (result.review.status === "approved") {
       if (!humanVerifiedWjecQuestion(next)) {
@@ -344,7 +351,7 @@ function dependencyReview(value: unknown, prefix: string, expectedFingerprint: s
   if (status === "approved") {
     if (!text(value.reviewerId) || !instant(value.reviewedAt)) errors.push(`${prefix}: an approved edge needs a named reviewer and review time`);
     if (value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}: an approved edge needs the current edge fingerprint`);
-    if (!REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: an approved edge needs reviewerRole and reviewerQualification`);
+    if (!WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: an approved edge needs reviewerRole and reviewerQualification`);
   } else if (status === "unreviewed") warnings.push(`${prefix}: edge remains a diagnosis hypothesis`);
   if (errors.length || (status !== "unreviewed" && (!text(value.reviewerId) || !instant(value.reviewedAt)))) return { errors, warnings };
   return {
