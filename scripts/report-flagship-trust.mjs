@@ -3,7 +3,12 @@ import { build } from "esbuild";
 const bundle = await build({
   stdin: {
     contents: `
-      export { seedQuestions as questions } from "./src/content";
+      export {
+        seedQuestions as questions,
+        isSeedWjecReleaseQuestion as releaseQuestion,
+        seedHumanVerificationLedgerIssues as ledgerIssues,
+        seedWjecReleaseSetIssues as releaseSetIssues
+      } from "./src/content";
       export { allTopics } from "./src/domain/curriculum";
       export { FLAGSHIP_SUBJECTS as flagships } from "./src/domain/flagship";
       export { flagshipTrustReadinessSet as report, buildFlagshipReviewPlan as plan } from "./src/domain/flagship-trust";
@@ -20,15 +25,46 @@ const bundle = await build({
 const data = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );
-const rows = data.report({ topics: data.allTopics(), questions: data.questions });
+const topics = data.allTopics();
+const rows = data.report({
+  topics,
+  questions: data.questions,
+  releaseQuestion: data.releaseQuestion,
+});
 const plans = Object.fromEntries(data.flagships.map((flagship) => [
   flagship.subjectId,
-  data.plan({ subjectId: flagship.subjectId, topics: data.allTopics(), questions: data.questions, limit: 10 }),
+  data.plan({
+    subjectId: flagship.subjectId,
+    topics,
+    questions: data.questions,
+    limit: 10,
+    preferredQuestion: data.releaseQuestion,
+  }),
 ]));
+const staleApprovals = data.ledgerIssues.filter((issue) =>
+  issue.kind === "historical-fingerprint" || issue.kind === "unknown-question").length;
+const ledgerBlockers = data.ledgerIssues.filter((issue) => issue.blocking);
+const releaseSetBlockers = data.releaseSetIssues.filter((issue) => issue.blocking);
+const now = Date.now();
+const reviewVelocity = Object.fromEntries(data.flagships.map((flagship) => {
+  const approved = data.questions.filter((question) =>
+    question.subjectId === flagship.subjectId && question.humanVerification?.status === "approved");
+  const recent = (days) => approved.filter((question) => {
+    const at = Date.parse(question.humanVerification?.reviewedAt ?? "");
+    return Number.isFinite(at) && at >= now - days * 86_400_000;
+  }).length;
+  return [flagship.subjectId, { approved7d: recent(7), approved30d: recent(30) }];
+}));
 const json = process.argv.includes("--json");
 
 if (json) {
-  console.log(JSON.stringify({ rows, plans }, null, 2));
+  console.log(JSON.stringify({
+    rows,
+    plans,
+    ledger: { staleApprovals, blockers: ledgerBlockers },
+    releaseSet: { blockers: releaseSetBlockers },
+    reviewVelocity,
+  }, null, 2));
 } else {
   console.log("WJEC flagship trusted assessment depth");
   console.log("");
@@ -45,10 +81,16 @@ if (json) {
         `approved questions ${row.trustedQuestions}/${row.questionsTotal}`,
         `statements with trusted evidence ${row.statementsWithTrustedQuestions}/${row.statementsTotal} (${trustedShare}%)`,
         `trusted core ${row.statementsMeetingCoreTrustBar}/${row.statementsTotal} (${coreShare}%)`,
+        `statement slots remaining ${row.statementReviewSlotDeficit}`,
         `review queue ${row.reviewQueue}`,
+        `release approved ${row.trustedReleaseQuestions}/${row.releaseQuestionsTotal}`,
+        `release core ${row.releaseStatementsMeetingCoreTrustBar}/${row.statementsTotal}`,
+        `release slots remaining ${row.releaseStatementReviewSlotDeficit}`,
         `release ${row.releaseReady ? "ready" : "blocked"}`,
       ].join(" | "),
     );
+    const velocity = reviewVelocity[row.subjectId];
+    console.log(`  approval throughput: ${velocity.approved7d} in 7d / ${velocity.approved30d} in 30d`);
     const next = plans[row.subjectId] ?? [];
     if (next.length) {
       console.log(`  next review batch: ${next.map((item) => item.questionId).join(", ")}`);
@@ -56,6 +98,8 @@ if (json) {
   }
   console.log("");
   console.log("Trusted core = at least four approved questions spanning recall, application and transfer.");
-  console.log("Release ready = every bank question approved and every statement meets trusted core.");
+  console.log("Statement slots remaining is a statement-level deficit, not a claim about the minimum number of human reviews; one question may cover multiple statements.");
+  console.log("Release ready = every explicit release-set question approved and every statement meets trusted core within that set.");
+  console.log(`Historical/stale ledger attestations: ${staleApprovals}; ledger blockers: ${ledgerBlockers.length}; release-set blockers: ${releaseSetBlockers.length}.`);
   console.log("Draft/authored question volume is intentionally excluded.");
 }

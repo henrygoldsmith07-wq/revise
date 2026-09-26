@@ -93,6 +93,14 @@ describe("canonical WJEC human-verification contract", () => {
       expect(humanVerifiedWjecQuestion({ ...q, verification: "verified", humanVerification: row })).toBe(false);
     }
   });
+
+  it("fails closed instead of throwing on malformed runtime reviewer values", () => {
+    const q = question();
+    const malformed = { ...review(q), reviewerId: 123 } as unknown as HumanVerificationRecord;
+    expect(() => humanVerificationIssues(q, malformed)).not.toThrow();
+    expect(validHumanVerification(q, malformed)).toBe(false);
+    expect(humanVerificationIssues(q, malformed)).toContain("missing-reviewer-id");
+  });
 });
 
 describe("repository human-verification ledger", () => {
@@ -154,5 +162,59 @@ describe("repository human-verification ledger", () => {
     const entry = buildHumanVerificationLedgerEntry(applyHumanVerification(q, review(q)));
     const parsed = parseHumanVerificationLedger({ formatVersion: 1, entries: [entry, entry] });
     expect(parsed.issues.some((issue) => issue.kind === "duplicate-entry" && issue.blocking)).toBe(true);
+  });
+
+  it("turns malformed reviewer primitive types into a blocking diagnostic instead of throwing", () => {
+    const q = question();
+    const fingerprint = physicsContentFingerprint(q);
+    const malformed = {
+      formatVersion: 1,
+      entries: [{
+        questionId: q.id,
+        subjectId: q.subjectId,
+        contentFingerprint: fingerprint,
+        review: {
+          ...review(q),
+          reviewerId: 123,
+        },
+      }],
+    };
+    expect(() => applyHumanVerificationLedger([q], malformed)).not.toThrow();
+    const result = applyHumanVerificationLedger([q], malformed);
+    expect(result.appliedKeys).toEqual([]);
+    expect(result.issues.some((issue) => issue.kind === "invalid-entry" && issue.blocking)).toBe(true);
+  });
+
+  it("keeps legacy v2 attestations as history and never upgrades them silently", () => {
+    const q = question();
+    const oldFingerprint = "physics-review-v2:deadbeef";
+    const oldReview = { ...review(q), contentFingerprint: oldFingerprint };
+    const result = applyHumanVerificationLedger([q], {
+      formatVersion: 1,
+      entries: [{
+        questionId: q.id,
+        subjectId: q.subjectId,
+        contentFingerprint: oldFingerprint,
+        review: oldReview,
+      }],
+    });
+    expect(result.appliedKeys).toEqual([]);
+    expect(result.historicalKeys).toEqual([humanVerificationLedgerKey(q.id, oldFingerprint)]);
+    expect(result.issues.some((issue) => issue.kind === "historical-fingerprint" && !issue.blocking)).toBe(true);
+  });
+
+  it("rejects a historical row when its embedded review fingerprint disagrees with the ledger key", () => {
+    const q = question();
+    const result = applyHumanVerificationLedger([q], {
+      formatVersion: 1,
+      entries: [{
+        questionId: q.id,
+        subjectId: q.subjectId,
+        contentFingerprint: "physics-review-v2:aaaa",
+        review: { ...review(q), contentFingerprint: "physics-review-v2:bbbb" },
+      }],
+    });
+    expect(result.historicalKeys).toEqual([]);
+    expect(result.issues.some((issue) => issue.kind === "invalid-entry" && issue.blocking)).toBe(true);
   });
 });

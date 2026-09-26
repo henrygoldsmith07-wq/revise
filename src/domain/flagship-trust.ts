@@ -24,6 +24,13 @@ export interface FlagshipTrustReadiness {
   statementsMeetingCoreTrustBar: number;
   trustedStatementShare: number;
   coreTrustShare: number;
+  statementReviewSlotDeficit: number;
+  releaseQuestionsTotal: number;
+  trustedReleaseQuestions: number;
+  releaseReviewQueue: number;
+  releaseStatementsMeetingCoreTrustBar: number;
+  releaseCoreTrustShare: number;
+  releaseStatementReviewSlotDeficit: number;
   releaseReady: boolean;
   statements: FlagshipStatementTrust[];
 }
@@ -51,15 +58,19 @@ export function flagshipTrustReadiness(input: {
   topics: readonly Topic[];
   questions: readonly Question[];
   trustedQuestion?: (question: Question) => boolean;
+  releaseQuestion?: (question: Question) => boolean;
 }): FlagshipTrustReadiness {
   const trustedQuestion = input.trustedQuestion ?? humanVerifiedWjecQuestion;
+  const releaseQuestion = input.releaseQuestion ?? (() => true);
   const topics = input.topics.filter((topic) => topic.subjectId === input.subjectId);
   const questions = input.questions.filter((question) => question.subjectId === input.subjectId);
   const trusted = questions.filter(trustedQuestion);
+  const releaseQuestions = questions.filter(releaseQuestion);
+  const trustedReleaseQuestions = releaseQuestions.filter(trustedQuestion);
 
-  const statements: FlagshipStatementTrust[] = topics.flatMap((topic) =>
+  const statementTrust = (trustedQuestions: readonly Question[]): FlagshipStatementTrust[] => topics.flatMap((topic) =>
     (topic.specPoints ?? []).map((point) => {
-      const mapped = trusted.filter((question) =>
+      const mapped = trustedQuestions.filter((question) =>
         question.parts.some((part) => (part.specPointIds ?? []).includes(point.id)),
       );
       const categories = [...new Set(mapped.map(classifyDepth))];
@@ -77,10 +88,18 @@ export function flagshipTrustReadiness(input: {
       };
     }),
   );
+  const statements = statementTrust(trusted);
+  const releaseStatements = statementTrust(trustedReleaseQuestions);
 
   const statementsWithTrustedQuestions = statements.filter((row) => row.trustedQuestionIds.length > 0).length;
   const statementsMeetingCoreTrustBar = statements.filter((row) => row.meetsCoreTrustBar).length;
+  const releaseStatementsMeetingCoreTrustBar = releaseStatements.filter((row) => row.meetsCoreTrustBar).length;
   const statementsTotal = statements.length;
+  const slotDeficit = (rows: readonly FlagshipStatementTrust[]) => rows.reduce((total, row) => {
+    const countDeficit = Math.max(0, CORE_TRUST_QUESTION_COUNT - row.trustedQuestionIds.length);
+    const categoryDeficit = CORE_TRUST_CATEGORIES.filter((category) => !row.categories.includes(category)).length;
+    return total + Math.max(countDeficit, categoryDeficit);
+  }, 0);
   return {
     subjectId: input.subjectId,
     questionsTotal: questions.length,
@@ -91,8 +110,15 @@ export function flagshipTrustReadiness(input: {
     statementsMeetingCoreTrustBar,
     trustedStatementShare: ratio(statementsWithTrustedQuestions, statementsTotal),
     coreTrustShare: ratio(statementsMeetingCoreTrustBar, statementsTotal),
-    releaseReady: statementsTotal > 0 && statementsMeetingCoreTrustBar === statementsTotal &&
-      trusted.length === questions.length,
+    statementReviewSlotDeficit: slotDeficit(statements),
+    releaseQuestionsTotal: releaseQuestions.length,
+    trustedReleaseQuestions: trustedReleaseQuestions.length,
+    releaseReviewQueue: releaseQuestions.length - trustedReleaseQuestions.length,
+    releaseStatementsMeetingCoreTrustBar,
+    releaseCoreTrustShare: ratio(releaseStatementsMeetingCoreTrustBar, statementsTotal),
+    releaseStatementReviewSlotDeficit: slotDeficit(releaseStatements),
+    releaseReady: releaseQuestions.length > 0 && trustedReleaseQuestions.length === releaseQuestions.length &&
+      releaseStatementsMeetingCoreTrustBar === statementsTotal,
     statements,
   };
 }
@@ -101,6 +127,7 @@ export function flagshipTrustReadinessSet(input: {
   topics: readonly Topic[];
   questions: readonly Question[];
   trustedQuestion?: (question: Question) => boolean;
+  releaseQuestion?: (question: Question) => boolean;
 }): FlagshipTrustReadiness[] {
   return FLAGSHIP_SUBJECTS.map((flagship) =>
     flagshipTrustReadiness({
@@ -108,6 +135,7 @@ export function flagshipTrustReadinessSet(input: {
       topics: input.topics,
       questions: input.questions,
       trustedQuestion: input.trustedQuestion,
+      releaseQuestion: input.releaseQuestion,
     }),
   );
 }
@@ -131,8 +159,10 @@ export function buildFlagshipReviewPlan(input: {
   questions: readonly Question[];
   limit?: number;
   trustedQuestion?: (question: Question) => boolean;
+  preferredQuestion?: (question: Question) => boolean;
 }): FlagshipReviewPlanItem[] {
   const trustedQuestion = input.trustedQuestion ?? humanVerifiedWjecQuestion;
+  const preferredQuestion = input.preferredQuestion ?? (() => false);
   const subjectPoints = new Set(
     input.topics
       .filter((topic) => topic.subjectId === input.subjectId)
@@ -178,6 +208,7 @@ export function buildFlagshipReviewPlan(input: {
         if (row.count < CORE_TRUST_QUESTION_COUNT) progressTowardCoreCount++;
       }
       const score =
+        (preferredQuestion(question) ? 1_000_000 : 0) +
         newStatementCoverage * 1000 +
         newCoreCategories * 100 +
         progressTowardCoreCount * 10 +

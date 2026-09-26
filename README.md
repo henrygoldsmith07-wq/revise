@@ -263,6 +263,14 @@ Topic lists and grade boundaries remain approximate and labelled as such; always
 check the current board specification for exact assessment objectives and
 weightings.
 
+WJEC flagship human review is deliberately separate from authored volume.
+`npm run wjec:review:batch -- <subject> <new-directory> --limit=10` exports a
+small prioritized reviewer packet. Exact approvals use canonical SHA-256
+fingerprints and persist to a separate attestation ledger; the source-controlled
+release set identifies candidate assessment content but does not itself confer
+trust. `npm run wjec:trust:report` shows trusted depth, release depth, stale
+attestations and remaining statement-level review workload.
+
 ## Specification Coverage Audit
 
 The Progress screen also runs `specificationCoverageAudit()` over the authored

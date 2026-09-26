@@ -94,6 +94,55 @@ describe("flagship trusted-depth ledger", () => {
     expect(report.statements[0]?.missing).toContain("transfer");
   });
 
+  it("does not make unrelated draft extras block an explicit trusted release set", () => {
+    const topicId = "wjec-test.topic";
+    const specPointId = `${topicId}.sp-01`;
+    const topic = {
+      id: topicId,
+      subjectId: "wjec-test",
+      specPoints: [{ id: specPointId, ref: "1(a)", text: "claim", aos: ["AO2"] }],
+    } as unknown as Topic;
+    const make = (id: string, demand: "recall" | "application" | "transfer"): Question => ({
+      id,
+      subjectId: "wjec-test",
+      topicIds: [topicId],
+      kind: "structured",
+      stem: id,
+      parts: [{
+        id: `${id}:0`,
+        label: "",
+        prompt: id,
+        marks: demand === "recall" ? 1 : 3,
+        markScheme: ["point"],
+        modelAnswer: "answer",
+        aos: demand === "recall" ? ["AO1"] : ["AO2"],
+        specPointIds: [specPointId],
+      }],
+      totalMarks: demand === "recall" ? 1 : 3,
+      learning: { familyId: id, contextId: id, demand, expectedMinutes: 2 },
+    } as unknown as Question);
+    const releaseIds = new Set(["r", "a1", "a2", "t"]);
+    const questions = [
+      make("r", "recall"),
+      make("a1", "application"),
+      make("a2", "application"),
+      make("t", "transfer"),
+      make("draft-extra", "transfer"),
+    ];
+    const report = flagshipTrustReadiness({
+      subjectId: "wjec-test",
+      topics: [topic],
+      questions,
+      trustedQuestion: (question) => releaseIds.has(question.id),
+      releaseQuestion: (question) => releaseIds.has(question.id),
+    });
+    expect(report.trustedReleaseQuestions).toBe(4);
+    expect(report.releaseQuestionsTotal).toBe(4);
+    expect(report.releaseStatementsMeetingCoreTrustBar).toBe(1);
+    expect(report.releaseReady).toBe(true);
+    expect(report.reviewQueue).toBe(1);
+  });
+
   it("reports every live flagship without treating draft questions as approved", () => {
     for (const flagship of FLAGSHIP_SUBJECTS) {
       const report = flagshipTrustReadiness({
@@ -154,5 +203,34 @@ describe("flagship trusted-depth ledger", () => {
       new Set([`${topicId}.sp-01`, `${topicId}.sp-02`]),
     );
     expect(plan.every((item) => item.newStatementCoverage === 1)).toBe(true);
+  });
+
+  it("keeps explicit pending release candidates ahead of non-release backlog", () => {
+    const topicId = "wjec-test.topic";
+    const point = `${topicId}.sp-01`;
+    const topic = {
+      id: topicId,
+      subjectId: "wjec-test",
+      specPoints: [{ id: point, ref: "1(a)", text: "claim", aos: ["AO1"] }],
+    } as unknown as Topic;
+    const make = (id: string): Question => ({
+      id,
+      subjectId: "wjec-test",
+      topicIds: [topicId],
+      kind: "short",
+      stem: id,
+      parts: [{ id: `${id}:0`, label: "", prompt: id, marks: 1, markScheme: ["point"], modelAnswer: "answer", aos: ["AO1"], specPointIds: [point] }],
+      totalMarks: 1,
+      source: "authored",
+    } as unknown as Question);
+    const plan = buildFlagshipReviewPlan({
+      subjectId: "wjec-test",
+      topics: [topic],
+      questions: [make("normal-a"), make("release-z")],
+      trustedQuestion: () => false,
+      preferredQuestion: (question) => question.id === "release-z",
+      limit: 1,
+    });
+    expect(plan[0]?.questionId).toBe("release-z");
   });
 });

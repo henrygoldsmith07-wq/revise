@@ -43,15 +43,17 @@ This may reduce previously displayed evidence, mastery or readiness for these su
 From the repository:
 
 ```text
-node scripts/wjec-content-review.mjs export <new-directory>
-node scripts/wjec-content-review.mjs check <returned-directory>
+npm run wjec:review:batch -- maths <new-directory> --limit=10
+npm run wjec:review:batch -- biology <new-directory> --limit=10
+npm run wjec:review:batch -- chemistry <new-directory> --limit=10
+npm run wjec:review:apply -- <returned-directory> --dry-run
 ```
 
-Export refuses an existing directory. Each subject folder contains a student booklet, a separate marking booklet for the 28 new drafts, an exact-fingerprint draft packet, the full content and prerequisite packets, a quality audit, authoring briefs and model-answer self-checks. A reviewer should solve the student version before opening the marking version.
+Focused batch export refuses an existing directory. Each subject folder contains a student booklet, a separate reviewer key, an exact-fingerprint review packet, a simulated coverage-gain report and a release-set proposal. A reviewer should solve the student version before opening the marking version. The whole-bank export/check workflow remains available for audit/backfill, but is no longer the default reviewer workflow.
 
 Review returned rows in `new-draft-review.json`, then merge them into the matching rows in `content-review.json`. The check command requires qualified reviewer details for approval, detects edits, rejects mismatched subjects and produces proposed checked records. Once the packet passes, `npm run wjec:review:apply -- <returned-review-directory>` atomically persists only canonical approvals into the fingerprint-keyed repository ledger. It never edits the authored question bank. Source changes require a fresh export and a new review of the changed fingerprint; the previous ledger entry remains audit history but stops contributing trusted evidence.
 
-The underlying Physics-named APIs and `physics-review-v2` fingerprint prefix remain for backward compatibility. A subject parameter selects the Maths, Biology or Chemistry packet. This reuses the existing contract instead of creating a parallel trust system. Physics's separate marking-corpus, paper-source acquisition and experiment intake files remain Physics-specific; they are not evidence for these three subjects.
+The underlying Physics-named APIs remain for compatibility, but exact review fingerprints now use canonical SHA-256 under `wjec-review-v3:sha256:`. Historical `physics-review-v2:` attestations are retained only as audit history and cannot make current content trusted. A subject parameter selects the Maths, Biology or Chemistry packet. This reuses the existing contract instead of creating a parallel trust system. Physics's separate marking-corpus, paper-source acquisition and experiment intake files remain Physics-specific; they are not evidence for these three subjects.
 
 ## Remaining validation work
 

@@ -17,16 +17,21 @@ editorialConfidence() distils lineage into one number (source prior,
 +passed gates, -open issues, -stale re-review) with named reasons. UI
 badges visibly separate Verified from Generated / unreviewed.
 
-For WJEC A-level Mathematics, Biology and Chemistry,
-`scripts/wjec-content-review.mjs` exports fingerprinted human-review packets
-for the exact current bank and checks returned packets without mutating source
-content. Run:
+For routine WJEC human review, use focused batches rather than handing reviewers
+the whole bank. The planner selects pending explicit release candidates first,
+then fills the batch with questions that maximise marginal trusted
+specification coverage:
 
-`npm run wjec:review:export -- <new-directory>`
+`npm run wjec:review:batch -- <maths|biology|chemistry|physics> <new-directory> --limit=10`
 
-then, after qualified reviewers return the completed packet:
+Each batch contains a student sheet, separate reviewer key, exact review JSON,
+a coverage-gain simulation and a release-set proposal. The simulation is
+planning data only. Reviewer approval still requires independently solving the
+item and completing all six qualified checks.
 
-`npm run wjec:review:check -- <directory>`
+Validate the returned batch without changing the repository:
+
+`npm run wjec:review:apply -- <directory> --dry-run`
 
 To persist only validated approvals into the repository-backed attestation
 ledger, run:
@@ -40,6 +45,26 @@ attestation to `src/content/reviews/wjec-human-verification.json`. Ledger keys
 are `questionId + contentFingerprint`: when content changes, the old record is
 kept as audit history but no longer applies.
 
+Review fingerprints are canonical SHA-256 values with the prefix
+`wjec-review-v3:sha256:`. The previous 32-bit `physics-review-v2:` format is
+historical only; v2 attestations never upgrade themselves and require a fresh
+review of the v3 fingerprint.
+
+The explicit release-candidate set lives in
+`src/content/reviews/wjec-release-set.json`. Inclusion there is **not**
+approval. Release readiness requires every selected question to pass the human
+trust gate and the trusted questions inside that release set to meet the
+four-question recall/application/transfer core bar for every specification
+statement. Draft questions outside the release set stay practice-only and do
+not block release just because they exist.
+
+For complete-bank auditing/backfill, the older full export/check workflow
+remains available:
+
+`npm run wjec:review:export -- <new-directory>`
+
+`npm run wjec:review:check -- <directory>`
+
 The generated `review-report.json` keeps authored depth separate from trusted
 depth. It reports approved questions, statements with any trusted question,
 statements meeting the trusted core bar (at least four approved questions
@@ -50,7 +75,11 @@ For a fast read-only status check across all four flagships, run
 `npm run wjec:trust:report`. This uses the same trust predicate as mastery
 and readiness, so a draft question cannot inflate the headline. It also emits
 a greedy ten-item reviewer batch per flagship, prioritising new trusted
-specification coverage before missing recall/application/transfer categories.
+specification coverage before missing recall/application/transfer categories,
+plus release-set progress, statement-level review-slot deficit, stale
+attestations and 7/30-day approval throughput. Review-slot deficit is not a
+minimum number of human reviews because one question can map to several
+statements.
 Physics keeps its deeper evidence workflow because it also packages marking
 corpora, paper provenance, prerequisite review, intervention outcomes and the
 prospective experiment: `npm run physics:evidence:init -- <directory>` and

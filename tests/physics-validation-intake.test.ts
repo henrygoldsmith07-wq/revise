@@ -46,6 +46,14 @@ describe("Physics evidence collection boundary", () => {
     expect(importPhysicsReviewPacket(JSON.stringify([row, row]), questions).errors.some((error) => error.includes("duplicate"))).toBe(true);
   });
 
+  it("accepts an intentional partial review batch without a whole-bank missing warning", () => {
+    const row = buildPhysicsReviewPacketTemplate(questions)[0]!;
+    const result = importPhysicsReviewPacket(JSON.stringify([row]), questions, "wjec-alevel-physics", { allowPartial: true });
+    expect(result.errors).toEqual([]);
+    expect(result.missingQuestionIds.length).toBe(questions.length - 1);
+    expect(result.warnings.some((warning) => warning.includes("were not present in the packet"))).toBe(false);
+  });
+
   it("approves only a current existing edge with a rationale and subject reviewer", () => {
     const rows = buildPhysicsPrerequisiteReviewTemplate(wjecPhysicsCapabilities);
     const pending = importPhysicsPrerequisiteReviews(JSON.stringify(rows), wjecPhysicsCapabilities);

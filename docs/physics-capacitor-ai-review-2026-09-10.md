@@ -21,7 +21,7 @@ The energy pilot includes geometry, combinations, exponentials and mechanical en
 
 ## Energy pilot checks and repairs
 
-Question IDs below have prefix `cnt:question:physics-energy-`. Fingerprints have prefix `physics-review-v2:`. These are the post-repair versions. A reviewer must independently solve the prompt before inspecting the key. The calculations below are AI checks, not an independent human solution.
+Question IDs below have prefix `cnt:question:physics-energy-`. The `physics-review-v2:` fingerprints recorded in this dated note are historical snapshots; the current review system uses canonical SHA-256 `wjec-review-v3:sha256:` fingerprints and requires a fresh export/review before approval. A reviewer must independently solve the prompt before inspecting the key. The calculations below are AI checks, not an independent human solution.
 
 | ID suffix | Fingerprint | Calculation or physical check | Action / review focus |
 | --- | --- | --- | --- |

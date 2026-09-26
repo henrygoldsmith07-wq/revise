@@ -91,6 +91,7 @@ for (const curriculum of data.curricula) {
 await writeFile(resolve(out, "review-report.json"), JSON.stringify(report, null, 2));
 if (mode === "export") await writeFile(resolve(out, "README.md"), [
   "# WJEC Maths, Biology and Chemistry review pack", "",
+  "This is the complete-bank audit/backfill export. For routine human review prefer: npm run wjec:review:batch -- <subject> <new-directory> --limit=10.", "",
   "This packet covers WJEC A-level Mathematics, Biology and Chemistry. Start with each subject's student.md and independently solve before opening reviewer.md. Physics uses the deeper dedicated physics:evidence:init / physics:evidence:check workflow.", "",
   "Record six qualified review checks against exact fingerprints in new-draft-review.json, then merge those rows into content-review.json. Review prerequisite rationales separately. Never mark an AI review as human approval.", "",
   `Check returned files from the repository: node scripts/wjec-content-review.mjs check "${out.replaceAll("\\", "/")}"`, "",

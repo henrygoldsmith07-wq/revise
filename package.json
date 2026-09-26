@@ -19,6 +19,7 @@
     "physics:evidence:init": "node scripts/create-physics-evidence-intake.mjs",
     "physics:evidence:check": "node scripts/validate-physics-evidence.mjs",
     "wjec:review:export": "node scripts/wjec-content-review.mjs export",
+    "wjec:review:batch": "node scripts/export-wjec-review-batch.mjs",
     "wjec:review:check": "node scripts/wjec-content-review.mjs check",
     "wjec:review:apply": "node scripts/apply-wjec-review-ledger.mjs",
     "wjec:trust:report": "node scripts/report-flagship-trust.mjs",

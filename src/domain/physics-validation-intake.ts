@@ -221,7 +221,12 @@ export function buildPhysicsReviewPacketTemplate(questions: readonly Question[],
 }
 
 /** Import completed packet rows against the current live bank. */
-export function importPhysicsReviewPacket(raw: string, questions: readonly Question[], subjectId: Id = "wjec-alevel-physics"): PhysicsReviewImportResult {
+export function importPhysicsReviewPacket(
+  raw: string,
+  questions: readonly Question[],
+  subjectId: Id = "wjec-alevel-physics",
+  options: { allowPartial?: boolean } = {},
+): PhysicsReviewImportResult {
   const parsed = jsonRows(raw, "rows");
   const errors = [...parsed.errors];
   const warnings: string[] = [];
@@ -285,7 +290,9 @@ export function importPhysicsReviewPacket(raw: string, questions: readonly Quest
     updated.set(questionId, next);
   }
   const missingQuestionIds = [...byId.keys()].filter((id) => !seen.has(id));
-  if (missingQuestionIds.length) warnings.push(`${missingQuestionIds.length} live Physics questions were not present in the packet`);
+  if (missingQuestionIds.length && !options.allowPartial) {
+    warnings.push(`${missingQuestionIds.length} live ${subjectId} questions were not present in the packet`);
+  }
   const merged = questions.map((question) => updated.get(question.id) ?? question);
   return {
     updatedQuestions: merged,

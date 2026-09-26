@@ -1,5 +1,5 @@
 import { allTopics, getSubject } from "@/domain/curriculum";
-import { seedCardsForTopic, seedQuestions } from "@/content";
+import { isSeedWjecReleaseQuestion, seedCardsForTopic, seedQuestions } from "@/content";
 import { buildSubjectDepth, FLAGSHIP_SUBJECTS } from "@/domain/flagship";
 import { flagshipTrustReadiness } from "@/domain/flagship-trust";
 import { Panel, SectionHeading } from "./ui";
@@ -14,7 +14,12 @@ export function FlagshipDepthPanel() {
     const topics = allTopics().filter((t) => t.id.startsWith(`${flagship.subjectId}.`));
     const cardCounts = new Map(topics.map((t) => [t.id, seedCardsForTopic(t, "benchmarks-flagship").length] as const));
     const depth = buildSubjectDepth({ topics, questions: seedQuestions, cardCountByTopic: cardCounts });
-    const trust = flagshipTrustReadiness({ subjectId: flagship.subjectId, topics, questions: seedQuestions });
+    const trust = flagshipTrustReadiness({
+      subjectId: flagship.subjectId,
+      topics,
+      questions: seedQuestions,
+      releaseQuestion: isSeedWjecReleaseQuestion,
+    });
     return { flagship, depth, trust };
   });
 
@@ -36,7 +41,9 @@ export function FlagshipDepthPanel() {
                 <Stat label="Gold statements" value={`${depth.goldStatements}/${depth.statementsTotal}`} hint="≥4 questions spanning recall+application+transfer" />
                 <Stat label="Trusted core" value={`${trust.statementsMeetingCoreTrustBar}/${trust.statementsTotal}`} hint="≥4 human-approved questions spanning recall+application+transfer" />
                 <Stat label="Approved questions" value={`${trust.trustedQuestions}/${trust.questionsTotal}`} hint="Exact current question version passed the WJEC human trust gate" />
-                <Stat label="Release gate" value={trust.releaseReady ? "Ready" : "Blocked"} hint="All questions approved and every statement meets the trusted core bar" />
+                <Stat label="Release set" value={`${trust.trustedReleaseQuestions}/${trust.releaseQuestionsTotal}`} hint="Operator-selected release candidates that have passed the human trust gate" />
+                <Stat label="Release core" value={`${trust.releaseStatementsMeetingCoreTrustBar}/${trust.statementsTotal}`} hint="Specification statements meeting the trusted core bar using release-set questions only" />
+                <Stat label="Release gate" value={trust.releaseReady ? "Ready" : "Blocked"} hint="Every release-set question approved and every statement meets trusted core inside the release set" />
                 <Stat label="Questions / statement" value={depth.questionsPerStatement.toFixed(2)} hint="target ≥ 4" />
                 <Stat label="Statements with 0 questions" value={String(zeroQ)} hint="authoring queue" />
                 <Stat label="Statements with ≥4 questions" value={`${withFour}`} hint="independent coverage" />

@@ -2,26 +2,33 @@ import { auditLearningDepth } from "./learning-depth";
 import { auditPhysicsAssessmentQuality, type PhysicsAssessmentQualityAudit } from "./physics-assessment-quality";
 import type { CapabilityNode } from "./capability-graph";
 import { validatePrerequisiteReviews } from "./capability-graph";
+import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 export const REVIEWED_WJEC_SUBJECT_IDS = [PHYSICS_SUBJECT_ID, "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry"] as const;
 export const WJEC_REVIEWER_ROLES = ["examiner", "teacher", "subject-expert"] as const;
+function nonBlank(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
 export function requiresWjecContentReview(subjectId: string | undefined): boolean {
   return REVIEWED_WJEC_SUBJECT_IDS.some((id) => id === subjectId);
 }
 export const REQUIRED_HUMAN_CHECKS = ["question", "marking", "workedSolution", "capabilityMapping", "specificationMapping", "examRealism"] as const;
 
-/** Change detector, not a signature: reviewer identity still needs human attestation. */
+/**
+ * Exact-content change detector for review attestations.
+ *
+ * This is not an identity signature: reviewer identity is still a separate
+ * human attestation. v3 replaces the old 32-bit v2 hash with canonical SHA-256.
+ */
 export function physicsContentFingerprint(question: Question): string {
-  const text = JSON.stringify([question.id, question.subjectId, question.topicIds,
+  const reviewPayload = [question.id, question.subjectId, question.topicIds,
     question.specPointIds, question.stem, question.parts, question.totalMarks,
     question.learning, question.options, question.correctIndex, question.calculatorAllowed,
     question.source, question.origin, question.licensedSource, question.paperId, question.paperQuestionNumber,
-    question.paperProvenance, question.specVersion]);
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return `physics-review-v2:${(hash >>> 0).toString(16)}`;
+    question.paperProvenance, question.specVersion];
+  return `wjec-review-v3:sha256:${sha256Hex(canonicalJson(reviewPayload))}`;
 }
 
 export type PhysicsReviewQueueRow = {
@@ -58,10 +65,10 @@ export function humanVerificationIssues(
   const issues: HumanVerificationIssue[] = [];
   if (!requiresWjecContentReview(question.subjectId)) issues.push("subject-not-review-gated");
   if (record?.status !== "approved") issues.push("not-approved");
-  if (!record?.reviewerId?.trim()) issues.push("missing-reviewer-id");
+  if (!nonBlank(record?.reviewerId)) issues.push("missing-reviewer-id");
   if (!record?.reviewerRole || !WJEC_REVIEWER_ROLES.includes(record.reviewerRole)) issues.push("missing-reviewer-role");
-  if (!record?.reviewerQualification?.trim()) issues.push("missing-reviewer-qualification");
-  if (!record?.reviewedAt || !Number.isFinite(Date.parse(record.reviewedAt))) issues.push("invalid-reviewed-at");
+  if (!nonBlank(record?.reviewerQualification)) issues.push("missing-reviewer-qualification");
+  if (!nonBlank(record?.reviewedAt) || !Number.isFinite(Date.parse(record.reviewedAt))) issues.push("invalid-reviewed-at");
   if (!record || REQUIRED_HUMAN_CHECKS.some((check) => record.checks?.[check] !== true)) issues.push("missing-human-check");
   if (record?.contentFingerprint !== physicsContentFingerprint(question)) issues.push("stale-content-fingerprint");
   if (question.source === "past-paper" && !verifiedWjecPaperProvenance(question)) issues.push("invalid-paper-provenance");
@@ -102,11 +109,12 @@ export function verifiedPhysicsPaperProvenance(question: Question): boolean {
 export function verifiedWjecPaperProvenance(question: Question): boolean {
   const provenance = question.paperProvenance;
   return requiresWjecContentReview(question.subjectId) && question.source === "past-paper" &&
-    Boolean(question.paperId && question.paperQuestionNumber?.trim() && provenance &&
-      provenance.status === "verified" && provenance.board.toLowerCase() === "wjec" &&
+    Boolean(nonBlank(question.paperId) && nonBlank(question.paperQuestionNumber) && provenance &&
+      provenance.status === "verified" && nonBlank(provenance.board) && provenance.board.toLowerCase() === "wjec" &&
       provenance.paperId === question.paperId && provenance.questionNumber === question.paperQuestionNumber &&
-      provenance.specification.trim() && /^https:\/\//i.test(provenance.sourceUrl) && provenance.sourceDigest.trim() &&
-      provenance.verifiedBy?.trim() && provenance.verifiedAt && Number.isFinite(Date.parse(provenance.verifiedAt)) &&
+      nonBlank(provenance.specification) && nonBlank(provenance.sourceUrl) && /^https:\/\//i.test(provenance.sourceUrl) &&
+      nonBlank(provenance.sourceDigest) && nonBlank(provenance.verifiedBy) && nonBlank(provenance.verifiedAt) &&
+      Number.isFinite(Date.parse(provenance.verifiedAt)) &&
       (!provenance.specificationVersion || !question.specVersion || provenance.specificationVersion === question.specVersion));
 }
 

@@ -65,7 +65,7 @@ for (const candidate of packetCandidates) {
   const packetPath = await firstExisting(candidate.paths);
   if (!packetPath) continue;
   const raw = await readFile(packetPath, "utf8");
-  const imported = data.importPacket(raw, data.questions, candidate.subjectId);
+  const imported = data.importPacket(raw, data.questions, candidate.subjectId, { allowPartial: true });
   reports.push({
     subjectId: candidate.subjectId,
     packetPath,

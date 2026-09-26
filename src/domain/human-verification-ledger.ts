@@ -2,7 +2,9 @@ import {
   applyHumanVerification,
   humanVerificationIssues,
   physicsContentFingerprint,
+  REQUIRED_HUMAN_CHECKS,
   requiresWjecContentReview,
+  WJEC_REVIEWER_ROLES,
 } from "./physics-content-review";
 import type { HumanVerificationRecord, Id, Question } from "./types";
 
@@ -52,9 +54,29 @@ function nonEmptyText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function isReview(value: unknown): value is HumanVerificationRecord {
-  if (!isObject(value) || !isObject(value.checks)) return false;
-  return value.status === "pending" || value.status === "approved" || value.status === "changes-requested";
+function parseReview(value: unknown): HumanVerificationRecord | null {
+  if (!isObject(value) || !isObject(value.checks)) return null;
+  const checks = value.checks;
+  if (value.status !== "pending" && value.status !== "approved" && value.status !== "changes-requested") return null;
+  for (const field of ["reviewerId", "reviewerQualification", "reviewedAt", "contentFingerprint", "notes"] as const) {
+    if (value[field] !== undefined && typeof value[field] !== "string") return null;
+  }
+  if (value.reviewerRole !== undefined &&
+      (typeof value.reviewerRole !== "string" ||
+       !WJEC_REVIEWER_ROLES.includes(value.reviewerRole as (typeof WJEC_REVIEWER_ROLES)[number]))) return null;
+  for (const check of REQUIRED_HUMAN_CHECKS) {
+    if (typeof checks[check] !== "boolean") return null;
+  }
+  return {
+    status: value.status,
+    reviewerId: value.reviewerId as string | undefined,
+    reviewerRole: value.reviewerRole as HumanVerificationRecord["reviewerRole"],
+    reviewerQualification: value.reviewerQualification as string | undefined,
+    reviewedAt: value.reviewedAt as string | undefined,
+    contentFingerprint: value.contentFingerprint as string | undefined,
+    checks: Object.fromEntries(REQUIRED_HUMAN_CHECKS.map((check) => [check, checks[check]])) as HumanVerificationRecord["checks"],
+    notes: value.notes as string | undefined,
+  };
 }
 
 export function parseHumanVerificationLedger(value: unknown): {
@@ -78,8 +100,9 @@ export function parseHumanVerificationLedger(value: unknown): {
   const seen = new Set<string>();
   for (const [index, row] of value.entries.entries()) {
     const fallbackKey = `row-${index + 1}`;
+    const review = isObject(row) ? parseReview(row.review) : null;
     if (!isObject(row) || !nonEmptyText(row.questionId) || !nonEmptyText(row.subjectId) ||
-      !nonEmptyText(row.contentFingerprint) || !isReview(row.review)) {
+      !nonEmptyText(row.contentFingerprint) || !review) {
       issues.push({
         key: fallbackKey,
         kind: "invalid-entry",
@@ -92,8 +115,17 @@ export function parseHumanVerificationLedger(value: unknown): {
       questionId: row.questionId,
       subjectId: row.subjectId,
       contentFingerprint: row.contentFingerprint,
-      review: row.review,
+      review,
     } satisfies HumanVerificationLedgerEntry;
+    if (!nonEmptyText(review.contentFingerprint) || review.contentFingerprint !== entry.contentFingerprint) {
+      issues.push({
+        key: fallbackKey,
+        kind: "invalid-entry",
+        detail: "Ledger entry fingerprint and review fingerprint must match.",
+        blocking: true,
+      });
+      continue;
+    }
     const key = humanVerificationLedgerKey(entry.questionId, entry.contentFingerprint);
     if (seen.has(key)) {
       issues.push({
@@ -177,15 +209,6 @@ export function applyHumanVerificationLedger(
         key,
         kind: "invalid-current-approval",
         detail: `Current approval fails the canonical trust contract: ${trustIssues.join(", ")}.`,
-        blocking: true,
-      });
-      continue;
-    }
-    if (entry.review.contentFingerprint !== entry.contentFingerprint) {
-      issues.push({
-        key,
-        kind: "invalid-current-approval",
-        detail: "Review fingerprint and ledger key fingerprint disagree.",
         blocking: true,
       });
       continue;
