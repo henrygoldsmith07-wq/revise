@@ -1,4 +1,3 @@
-import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // Knowledge vs answering — exam-technique modelling.
 //
@@ -36,8 +35,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 
 import { classifyMistake, type MistakeClass } from "./mistake-classification";
 import { quickSessionQuestionLimit } from "./quick-session";
-import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
-import { trustedAssessmentContent } from "./physics-content-review";
+import { trustedAssessmentMistake } from "./learning-evidence";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
 /** Fraction of a class's lost marks attributed to missing knowledge (rest = answering). */
@@ -161,16 +159,12 @@ export interface TopicTechniqueReport {
   report: KnowledgeAnsweringReport;
 }
 
-function physicsMistakeHasTrustedContext(
+function mistakeHasTrustedContext(
   mistake: Mistake,
   questions: readonly Question[] | undefined,
   attempts: readonly Attempt[] | undefined,
 ): boolean {
-  if (!requiresWjecContentReview(mistake.subjectId)) return true;
-  const question = questions?.find((row) => row.id === mistake.questionId);
-  const attempt = attempts?.find((row) => row.id === mistake.attemptId);
-  if (!question || !attempt || !trustedAssessmentContent(question) || !trustworthyAttempt(attempt)) return false;
-  return attempt.mode !== "paper" || authenticPaperEvidence(attempt, question, attempts ?? [], questions ?? []);
+  return trustedAssessmentMistake(mistake, questions ?? [], attempts ?? []);
 }
 
 /**
@@ -184,7 +178,7 @@ export function knowledgeVsAnsweringByTopic(
   const byTopic = new Map<Id, Mistake[]>();
   for (const m of input.mistakes) {
     if (m.subjectId !== input.subjectId) continue;
-    if (!physicsMistakeHasTrustedContext(m, input.questions, input.attempts)) continue;
+    if (!mistakeHasTrustedContext(m, input.questions, input.attempts)) continue;
     const list = byTopic.get(m.topicId) ?? [];
     list.push(m);
     byTopic.set(m.topicId, list);
@@ -235,7 +229,7 @@ export function knowledgeVsAnswering(input: KnowledgeAnsweringInput): KnowledgeA
   const attemptsById = input.attempts ? new Map(input.attempts.map((a) => [a.id, a] as const)) : undefined;
   const rows = mistakes.filter(
     (m) => m.subjectId === subjectId && (input.topicId == null || m.topicId === input.topicId) &&
-      physicsMistakeHasTrustedContext(m, input.questions, input.attempts),
+      mistakeHasTrustedContext(m, input.questions, input.attempts),
   );
 
   let knowledgeMarks = 0;

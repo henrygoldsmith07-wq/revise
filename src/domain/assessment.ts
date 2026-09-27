@@ -1,4 +1,3 @@
-import { requiresWjecContentReview } from "./physics-content-review";
 // Assessment depth — the five assessment-specific slices that make revision feel
 // like exam prep rather than flashcard completion.
 // Pure functions: no React, no I/O.
@@ -18,7 +17,7 @@ import { gradeForPercent } from "./grades";
 import type { Subject } from "./types";
 import { measureQuestionBankDiscrimination } from "./question-discrimination";
 import { techniqueVsKnowledge } from "./retention-analytics";
-import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentAttempt, trustedAssessmentMistake } from "./learning-evidence";
 import { trustedAssessmentContent } from "./physics-content-review";
 
 export const COMMAND_WORDS: CommandWord[] = [
@@ -85,18 +84,9 @@ export function buildAssessmentInsight(input: {
   questionsById: Map<Id, Question>;
 }): AssessmentInsight {
   const questions = [...input.questionsById.values()];
-  const trustedAttempts = input.attempts.filter((attempt) => {
-    if (!trustworthyAttempt(attempt)) return false;
-    const question = input.questionsById.get(attempt.questionId);
-    if (!question || !trustedAssessmentContent(question)) return false;
-    return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
-      authenticPaperEvidence(attempt, question, input.attempts, questions);
-  });
-  const trustedAttemptIds = new Set(trustedAttempts.map((attempt) => attempt.id));
-  const trustedMistakes = input.mistakes.filter((mistake) => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    return Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId));
-  });
+  const trustedAttempts = input.attempts.filter((attempt) =>
+    trustedAssessmentAttempt(attempt, input.questionsById.get(attempt.questionId), input.attempts, questions));
+  const trustedMistakes = input.mistakes.filter((mistake) => trustedAssessmentMistake(mistake, questions, input.attempts));
   const byCommand = Object.fromEntries(COMMAND_WORDS.map((c) => [c, 0])) as Record<CommandWord, number>;
   const byMisconception = Object.fromEntries(MISCONCEPTIONS.map((m) => [m, 0])) as Record<MisconceptionTag, number>;
   const byAo: Record<string, number> = { AO1: 0, AO2: 0, AO3: 0 };

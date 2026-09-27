@@ -875,10 +875,12 @@ export type PaperMarkingReviewStatus = "unreviewed" | "human-reviewed" | "adjudi
 export interface PaperMarkingReview {
   status: PaperMarkingReviewStatus;
   reviewerId?: Id;
+  reviewerRole?: "examiner" | "teacher" | "subject-expert";
+  reviewerQualification?: string;
   reviewedAt?: IsoInstant;
   /** Number of qualified human markers whose marks contributed to this row. */
   markerCount?: number;
-  /** Optional fingerprint of the exact answer/marking reviewed. */
+  /** Exact answer/marking fingerprint; mandatory for review-gated WJEC paper evidence. */
   markingFingerprint?: string;
 }
 

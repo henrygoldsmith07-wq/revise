@@ -1,7 +1,6 @@
-import { requiresWjecContentReview } from "./physics-content-review";
 import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
-import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentMistake, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
 import { trustedAssessmentContent } from "./physics-content-review";
@@ -39,7 +38,6 @@ export function selectLearningAction(input: {
   const evidence = deriveSkillEvidence(nodes, trustedQuestions, attempts);
   const baselineEvidence = evidence;
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
-  const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
   const exposedQuestions = attempts.flatMap(attempt => questionById.has(attempt.questionId) ? [questionById.get(attempt.questionId)!] : []);
   const freshness = new Map<Question, ReturnType<typeof questionFreshness>>();
   const freshReasoning = (question: Question) => {
@@ -48,11 +46,7 @@ export function selectLearningAction(input: {
     return result;
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
-    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
-    if (!attempt || !question) return false;
-    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+    return trustedAssessmentMistake(mistake, questions, attempts);
   };
   const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
   const candidates: LearningAction[] = [];

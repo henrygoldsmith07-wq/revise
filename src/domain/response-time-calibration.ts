@@ -1,4 +1,4 @@
-import { requiresWjecContentReview } from "./physics-content-review";
+import { trustedAssessmentContent } from "./physics-content-review";
 import { trustedAssessmentAttempt } from "./learning-evidence";
 import type { Attempt, Id, Paper, Question, Subject } from "./types";
 
@@ -72,7 +72,7 @@ export interface ResponseTimeCalibrationInput {
   questions: Question[];
   papers: Paper[];
   subjects: Subject[];
-  /** Physics drafts and unauthenticated paper marks are excluded from pace evidence. */
+  /** Review-gated WJEC drafts and unauthenticated paper marks are excluded from pace evidence. */
   trustedQuestion?: (question: Question) => boolean;
 }
 
@@ -191,7 +191,7 @@ export function buildResponseTimeCalibration(input: ResponseTimeCalibrationInput
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
   const papersById = new Map(input.papers.map((paper) => [paper.id, paper] as const));
   const subjectsById = new Map(input.subjects.map((subject) => [subject.id, subject] as const));
-  const trustedQuestion = input.trustedQuestion ?? ((question: Question) => !requiresWjecContentReview(question.subjectId));
+  const trustedQuestion = input.trustedQuestion ?? trustedAssessmentContent;
   const observations: ResponseTimeObservation[] = [];
 
   for (const attempt of input.attempts) {
@@ -240,6 +240,8 @@ export function buildResponseTimeCalibration(input: ResponseTimeCalibrationInput
     observations,
     rows,
     overall: aggregate(observations, DEFAULT_SECONDS_PER_MARK),
-    totalAttempts: input.attempts.length,
+    // Evidence volume must reflect only attempts that survived the trust and
+    // timing-quality gates above; raw inputs can contain draft WJEC practice.
+    totalAttempts: observations.length,
   };
 }

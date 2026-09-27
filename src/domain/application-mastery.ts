@@ -25,7 +25,7 @@ export interface ApplicationMasteryInput {
   topics: Topic[];
   questions: Question[];
   attempts: Attempt[];
-  /** Physics drafts can be practised, but their marks are not mastery evidence. */
+  /** Review-gated WJEC drafts can be practised, but their marks are not mastery evidence. */
   trustedQuestion?: (question: Question) => boolean;
 }
 

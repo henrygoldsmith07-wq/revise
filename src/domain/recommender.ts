@@ -1,4 +1,3 @@
-import { requiresWjecContentReview } from "./physics-content-review";
 import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
@@ -8,7 +7,7 @@ import type { ApplicationMasteryRow } from "./application-mastery";
 import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
 import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
 import { paperOutcomeGainMultiplier } from "./paper-outcome";
-import { trustedAssessmentAttempt } from "./learning-evidence";
+import { trustedAssessmentMistake } from "./learning-evidence";
 import type {
   ActivityKind,
   Card,
@@ -378,12 +377,8 @@ export function recommend(input: RecommendInput): Recommendation[] {
   }
 
   // --- 2. Unrepaired mistakes. Direct marks you have already dropped.
-  const questionById = new Map((input.questions ?? []).map((question) => [question.id, question] as const));
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    const attempt = mistake.attemptId ? input.attempts?.find((row) => row.id === mistake.attemptId) : undefined;
-    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
-    return Boolean(attempt && question && trustedAssessmentAttempt(attempt, question, input.attempts ?? [], input.questions ?? []));
+    return trustedAssessmentMistake(mistake, input.questions ?? [], input.attempts ?? []);
   };
   const openMistakes = input.mistakes.filter((m) => !m.resolved && trustedMistake(m));
   const mistakesBySubject = new Map<Id, Mistake[]>();

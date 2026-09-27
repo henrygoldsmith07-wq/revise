@@ -45,8 +45,8 @@ function sameArray(left, right) {
 }
 
 if (!proposal || typeof proposal !== "object" || proposal.formatVersion !== 1 ||
-    !nonBlank(proposal.subjectId) || !stringArray(proposal.addQuestionIds)) {
-  throw new Error("Proposal must be version 1 with subjectId and addQuestionIds.");
+    !nonBlank(proposal.subjectId) || !stringArray(proposal.addQuestionIds) || !stringArray(proposal.resultingQuestionIds)) {
+  throw new Error("Proposal must be version 1 with subjectId, addQuestionIds and resultingQuestionIds stale-state protection.");
 }
 if (!current?.subjects || !Array.isArray(current.subjects[proposal.subjectId])) {
   throw new Error("Proposal subject is not present in the current WJEC release manifest.");
@@ -57,10 +57,8 @@ if (new Set(proposal.addQuestionIds).size !== proposal.addQuestionIds.length) {
 
 const currentIds = current.subjects[proposal.subjectId];
 const resultingIds = [...new Set([...currentIds, ...proposal.addQuestionIds])];
-if (proposal.resultingQuestionIds !== undefined) {
-  if (!stringArray(proposal.resultingQuestionIds) || !sameArray(proposal.resultingQuestionIds, resultingIds)) {
-    throw new Error("Proposal is stale: resultingQuestionIds no longer matches the current release set plus additions.");
-  }
+if (!sameArray(proposal.resultingQuestionIds, resultingIds)) {
+  throw new Error("Proposal is stale: resultingQuestionIds no longer matches the current release set plus additions.");
 }
 
 const next = {

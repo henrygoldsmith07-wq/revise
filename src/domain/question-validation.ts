@@ -1,4 +1,5 @@
 import { requiresWjecContentReview } from "./physics-content-review";
+import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest } from "./trust-attestation";
 import type {
   Id,
   IsoDate,
@@ -155,9 +156,9 @@ export function validateQuestion(
     const paper = question.paperProvenance;
     const validPaper = Boolean(paper && paper.status === "verified" && paper.board.toLowerCase() === "wjec" &&
       paper.paperId === question.paperId && paper.questionNumber === question.paperQuestionNumber &&
-      paper.specification.trim() && /^https:\/\//i.test(paper.sourceUrl) && paper.sourceDigest.trim() &&
-      paper.verifiedBy && paper.verifiedAt && Number.isFinite(Date.parse(paper.verifiedAt)));
-    if (!validPaper) addIssue(issues, "missing-paper-provenance", `${question.id}: WJEC Physics past-paper questions need a verified source manifest, digest and reviewer`);
+      paper.specification.trim() && validOfficialWjecUrl(paper.sourceUrl) && validSha256Digest(paper.sourceDigest) &&
+      paper.verifiedBy && validAttestationInstant(paper.verifiedAt));
+    if (!validPaper) addIssue(issues, "missing-paper-provenance", `${question.id}: WJEC past-paper questions need a verified official source manifest, digest and reviewer`);
   }
   if (question.lastChecked) {
     const age = daysBetween(question.lastChecked, today);

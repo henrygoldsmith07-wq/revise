@@ -10,6 +10,7 @@ const bundle = await build({
         seedWjecReleaseSetIssues as releaseSetIssues
       } from "./src/content";
       export { allTopics } from "./src/domain/curriculum";
+      export { wjecCapabilities as capabilities, wjecPrerequisiteReviewLedgerIssues as prerequisiteLedgerIssues } from "./src/content/capabilities";
       export { FLAGSHIP_SUBJECTS as flagships } from "./src/domain/flagship";
       export {
         flagshipTrustReadinessSet as report,
@@ -65,6 +66,20 @@ const staleApprovals = data.ledgerIssues.filter((issue) =>
   issue.kind === "historical-fingerprint" || issue.kind === "unknown-question").length;
 const ledgerBlockers = data.ledgerIssues.filter((issue) => issue.blocking);
 const releaseSetBlockers = data.releaseSetIssues.filter((issue) => issue.blocking);
+const prerequisiteLedgerBlockers = data.prerequisiteLedgerIssues.filter((issue) => issue.blocking);
+const prerequisiteTrust = Object.fromEntries(data.flagships.map((flagship) => {
+  let total = 0, approved = 0, rejected = 0, missingRationale = 0;
+  for (const node of data.capabilities.filter((candidate) => candidate.subjectId === flagship.subjectId)) {
+    for (const prerequisiteId of node.prerequisites) {
+      total += 1;
+      const status = node.prerequisiteReviews?.[prerequisiteId]?.status;
+      if (status === "approved") approved += 1;
+      if (status === "rejected") rejected += 1;
+      if (!node.prerequisiteRationales?.[prerequisiteId]?.trim()) missingRationale += 1;
+    }
+  }
+  return [flagship.subjectId, { total, approved, rejected, pending: total - approved - rejected, missingRationale }];
+}));
 const now = Date.now();
 const reviewVelocity = Object.fromEntries(data.flagships.map((flagship) => {
   const approved = data.questions.filter((question) =>
@@ -76,6 +91,8 @@ const reviewVelocity = Object.fromEntries(data.flagships.map((flagship) => {
   return [flagship.subjectId, { approved7d: recent(7), approved30d: recent(30) }];
 }));
 const json = process.argv.includes("--json");
+const check = process.argv.includes("--check");
+const trustBlockers = [...ledgerBlockers, ...prerequisiteLedgerBlockers, ...releaseSetBlockers];
 
 if (json) {
   console.log(JSON.stringify({
@@ -83,6 +100,7 @@ if (json) {
     plans,
     ledger: { staleApprovals, blockers: ledgerBlockers },
     releaseSet: { blockers: releaseSetBlockers },
+    prerequisites: { bySubject: prerequisiteTrust, blockers: prerequisiteLedgerBlockers },
     reviewVelocity,
     authoringCeilings,
   }, null, 2));
@@ -112,11 +130,13 @@ if (json) {
     );
     const velocity = reviewVelocity[row.subjectId];
     const ceiling = authoringCeilings[row.subjectId];
+    const prerequisites = prerequisiteTrust[row.subjectId];
     console.log(`  approval throughput: ${velocity.approved7d} in 7d / ${velocity.approved30d} in 30d`);
     console.log(
       `  authored ceiling: ${ceiling.coreStatements}/${ceiling.statementsTotal} core; ` +
       `${ceiling.gapStatements} statements still need authored depth; ${ceiling.statementSlotDeficit} slots missing`,
     );
+    console.log(`  prerequisite graph: ${prerequisites.approved}/${prerequisites.total} approved; ${prerequisites.rejected} rejected; ${prerequisites.pending} pending; ${prerequisites.missingRationale} blocked on missing rationale`);
     const next = plans[row.subjectId] ?? [];
     if (next.length) {
       console.log(`  next review batch: ${next.map((item) => item.questionId).join(", ")}`);
@@ -127,6 +147,15 @@ if (json) {
   console.log("Statement slots remaining is a statement-level deficit, not a claim about the minimum number of human reviews; one question may cover multiple statements.");
   console.log("Release ready = every explicit release-set question approved and every statement meets trusted core within that set.");
   console.log("Authored ceiling = release/core depth if every currently eligible bank question were approved; it separates authoring blockers from review blockers.");
-  console.log(`Historical/stale ledger attestations: ${staleApprovals}; ledger blockers: ${ledgerBlockers.length}; release-set blockers: ${releaseSetBlockers.length}.`);
+  console.log(`Historical/stale ledger attestations: ${staleApprovals}; question-ledger blockers: ${ledgerBlockers.length}; prerequisite-ledger blockers: ${prerequisiteLedgerBlockers.length}; release-set blockers: ${releaseSetBlockers.length}.`);
   console.log("Draft/authored question volume is intentionally excluded.");
+}
+
+if (check) {
+  if (trustBlockers.length) {
+    console.error(`WJEC trust configuration has ${trustBlockers.length} blocking issue(s).`);
+    process.exitCode = 1;
+  } else if (!json) {
+    console.log("WJEC trust configuration: no blocking ledger or release-set issues.");
+  }
 }

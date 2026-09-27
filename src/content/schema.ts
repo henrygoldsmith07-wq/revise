@@ -108,7 +108,7 @@ const paperProvenanceSchema = z.object({
   series: nonEmpty.optional(),
   questionNumber: nonEmpty,
   sourceUrl: z.string().url(),
-  sourceDigest: nonEmpty,
+  sourceDigest: z.string().regex(/^(?:sha256:)?[a-f0-9]{64}$/i),
   status: z.enum(["pending", "verified", "rejected"]),
   verifiedBy: id.optional(),
   verifiedAt: isoInstant.optional(),

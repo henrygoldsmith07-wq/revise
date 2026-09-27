@@ -1,7 +1,6 @@
-import { requiresWjecContentReview } from "./physics-content-review";
-import { independentAttempt, isTransferQuestion, questionFamilies, questionFreshness, partLearningMetadata, trustedAssessmentAttempt, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
+import { requiresWjecContentReview, trustedAssessmentContent } from "./physics-content-review";
+import { independentAttempt, isTransferQuestion, questionFamilies, questionFreshness, partLearningMetadata, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Card, Mistake, MistakeRepairStage, MistakeRepairState, Question, ReviewLog } from "./types";
-import { trustedAssessmentContent } from "./physics-content-review";
 
 export const REPAIR_RETENTION_DELAY_MS = 7 * 86_400_000;
 
@@ -34,16 +33,15 @@ export function repairTargetParts(mistake: Mistake, question: Question): string[
 export function advanceMistakeRepair(mistake: Mistake, question: Question, attempt: Attempt,
   history: readonly Attempt[] = [], questions: readonly Question[] = [question]): Mistake {
   const targetParts = repairTargetParts(mistake, question);
+  const source = questions.find((candidate) => candidate.id === mistake.questionId);
   if (!targetParts.length || attempt.questionId !== question.id || attempt.userId !== mistake.userId ||
     attempt.subjectId !== mistake.subjectId || attempt.id === mistake.attemptId ||
     !Number.isFinite(Date.parse(attempt.createdAt)) ||
     Date.parse(attempt.createdAt) <= Date.parse(mistake.createdAt)) return mistake;
-  const source = questions.find((q) => q.id === mistake.questionId);
-  // A draft Physics item may be answered for practice, but it must never move
-  // a repair chain through a trusted success rung. Require both the captured
-  // source and the retest item to retain their human content approval.
+  // Review-gated mistakes may be practised, but they cannot advance a repair
+  // chain unless the exact original mistake source and the retest are trusted.
   if (!trustworthyAttempt(attempt) || (requiresWjecContentReview(mistake.subjectId) &&
-    (!source || !trustedAssessmentContent(source) || !trustedAssessmentContent(question) ||
+    (!trustedAssessmentMistake(mistake, questions, history) ||
       !trustedAssessmentAttempt(attempt, question, history, questions)))) {
     // Draft practice still exposes the skill. It cannot earn a repair rung,
     // but it must restart the unpractised retention interval.

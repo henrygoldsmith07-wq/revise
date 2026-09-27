@@ -31,10 +31,10 @@ import {
   humanVerifiedWjecQuestion,
   physicsContentFingerprint,
   REQUIRED_HUMAN_CHECKS,
-  validHumanReviewInstant,
   WJEC_REVIEWER_ROLES,
   type PhysicsReviewQueueRow,
 } from "./physics-content-review";
+import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest } from "./trust-attestation";
 import {
   capabilityEdgeFingerprint,
   type CapabilityDependencyReview,
@@ -87,7 +87,7 @@ function instant(value: unknown): value is IsoInstant {
 }
 
 function reviewInstant(value: unknown): value is IsoInstant {
-  return validHumanReviewInstant(value);
+  return validAttestationInstant(value);
 }
 
 function integer(value: unknown): value is number {
@@ -338,15 +338,16 @@ export function buildPhysicsPrerequisiteReviewTemplate(nodes: readonly Capabilit
   const byId = new Map(physics.map((node) => [node.id, node]));
   return physics.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
     const prerequisite = byId.get(prerequisiteId) ?? nodes.find((candidate) => candidate.id === prerequisiteId);
+    const edgeFingerprint = capabilityEdgeFingerprint(node, prerequisite ?? prerequisiteId);
     return {
       targetId: node.id,
       targetLabel: node.label,
       prerequisiteId,
       prerequisiteLabel: prerequisite?.label ?? null,
       rationale: node.prerequisiteRationales?.[prerequisiteId] ?? null,
-      edgeFingerprint: capabilityEdgeFingerprint(node, prerequisite ?? prerequisiteId),
-      review: { status: "unreviewed" as const },
-      reviewerInstructions: "Approve only when the rationale is a real conceptual dependency and the fingerprint matches this graph version.",
+      edgeFingerprint,
+      review: { status: "unreviewed" as const, edgeFingerprint },
+      reviewerInstructions: "Approve only when the rationale is a real conceptual dependency. Reject false dependencies. Fill reviewer identity/qualification/time and keep both fingerprint fields unchanged.",
     };
   }));
 }
@@ -360,12 +361,12 @@ function dependencyReview(value: unknown, prefix: string, expectedFingerprint: s
   if (value.reviewerId !== undefined && !text(value.reviewerId)) errors.push(`${prefix}.review.reviewerId must be a non-empty string`);
   if (value.reviewedAt !== undefined && !reviewInstant(value.reviewedAt)) errors.push(`${prefix}.review.reviewedAt must be a non-future ISO instant with timezone`);
   if (value.edgeFingerprint !== undefined && value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}.review.edgeFingerprint is stale`);
-  if (status === "approved") {
-    if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) errors.push(`${prefix}: an approved edge needs a named reviewer and valid review time`);
-    if (value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}: an approved edge needs the current edge fingerprint`);
-    if (!WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: an approved edge needs reviewerRole and reviewerQualification`);
+  if (status === "approved" || status === "rejected") {
+    if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) errors.push(`${prefix}: a final edge decision needs a named reviewer and valid review time`);
+    if (value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}: a final edge decision needs the current edge fingerprint`);
+    if (!WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: a final edge decision needs reviewerRole and reviewerQualification`);
   } else if (status === "unreviewed") warnings.push(`${prefix}: edge remains a diagnosis hypothesis`);
-  if (errors.length || (status !== "unreviewed" && (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)))) return { errors, warnings };
+  if (errors.length) return { errors, warnings };
   return {
     review: {
       status: status as CapabilityDependencyReview["status"],
@@ -406,7 +407,7 @@ export function importPhysicsPrerequisiteReviews(raw: string, nodes: readonly Ca
     const target = byId.get(rawRow.targetId);
     const prerequisite = byId.get(rawRow.prerequisiteId);
     if (!target || !prerequisite || target.subjectId !== subjectId || prerequisite.subjectId !== subjectId) {
-      errors.push(`${prefix}: unknown or non-Physics edge ${key}`);
+      errors.push(`${prefix}: unknown or out-of-subject edge ${key}`);
       continue;
     }
     if (!expected.has(key)) {
@@ -567,27 +568,21 @@ export function validatePhysicsPaperManifest(value: unknown, prefix = "Manifest"
   if (value.subjectId !== "wjec-alevel-physics") errors.push(`${prefix}.subjectId must be wjec-alevel-physics`);
   if (value.qualificationLevel !== "alevel") errors.push(`${prefix}.qualificationLevel must be alevel`);
   if (!integer(value.year) || value.year < 2015 || value.year > 2100) errors.push(`${prefix}.year must be an exam year`);
-  try {
-    const url = new URL(String(value.sourceUrl));
-    if (url.protocol !== "https:" || url.username || url.password || !(url.hostname === "wjec.co.uk" || url.hostname.endsWith(".wjec.co.uk"))) throw new Error("not official");
-  } catch { errors.push(`${prefix}.sourceUrl must be an official WJEC https URL`); }
-  if (!text(value.sourceDigest) || !/^(sha256:)?[a-f0-9]{64}$/i.test(value.sourceDigest)) errors.push(`${prefix}.sourceDigest must be a SHA-256 file digest`);
-  if (value.markSchemeDigest !== undefined && (!text(value.markSchemeDigest) || !/^(sha256:)?[a-f0-9]{64}$/i.test(value.markSchemeDigest))) errors.push(`${prefix}.markSchemeDigest must be a SHA-256 file digest`);
+  if (!validOfficialWjecUrl(value.sourceUrl)) errors.push(`${prefix}.sourceUrl must be an official WJEC https URL`);
+  if (!validSha256Digest(value.sourceDigest)) errors.push(`${prefix}.sourceDigest must be a SHA-256 file digest`);
+  if (value.markSchemeDigest !== undefined && !validSha256Digest(value.markSchemeDigest)) errors.push(`${prefix}.markSchemeDigest must be a SHA-256 file digest`);
   for (const key of ["markSchemeUrl", "dataBookletUrl"] as const) {
     if (value[key] === undefined) continue;
-    try {
-      const url = new URL(String(value[key]));
-      if (url.protocol !== "https:" || url.username || url.password || !(url.hostname === "wjec.co.uk" || url.hostname.endsWith(".wjec.co.uk"))) throw new Error("not official");
-    } catch { errors.push(`${prefix}.${key} must be an official WJEC https URL`); }
+    if (!validOfficialWjecUrl(value[key])) errors.push(`${prefix}.${key} must be an official WJEC https URL`);
   }
-  if (value.dataBookletDigest !== undefined && (!text(value.dataBookletDigest) || !/^(sha256:)?[a-f0-9]{64}$/i.test(value.dataBookletDigest))) errors.push(`${prefix}.dataBookletDigest must be a SHA-256 file digest`);
+  if (value.dataBookletDigest !== undefined && !validSha256Digest(value.dataBookletDigest)) errors.push(`${prefix}.dataBookletDigest must be a SHA-256 file digest`);
   for (const key of ["durationMinutes", "maximumMarks"] as const) {
     if (value[key] !== undefined && (!integer(value[key]) || value[key] <= 0)) errors.push(`${prefix}.${key} must be a positive integer`);
   }
   if (value.questionCount !== undefined && (!integer(value.questionCount) || value.questionCount < 1)) errors.push(`${prefix}.questionCount must be a positive integer when supplied`);
   if (!["pending", "verified", "rejected"].includes(String(value.status))) errors.push(`${prefix}.status is invalid`);
   if (value.status === "verified") {
-    if (!text(value.verifiedBy) || !instant(value.verifiedAt)) errors.push(`${prefix}: verified manifests need verifiedBy and verifiedAt`);
+    if (!text(value.verifiedBy) || !reviewInstant(value.verifiedAt)) errors.push(`${prefix}: verified manifests need verifiedBy and a non-future ISO instant with timezone`);
   } else if (value.status === "pending") {
     warnings.push(`${prefix}: pending provenance cannot create trusted paper questions`);
   } else {
@@ -615,7 +610,7 @@ export function validatePhysicsPaperManifest(value: unknown, prefix = "Manifest"
     ...(integer(value.questionCount) ? { questionCount: value.questionCount as number } : {}),
     status: value.status as PhysicsPaperManifest["status"],
     ...(text(value.verifiedBy) ? { verifiedBy: value.verifiedBy as Id } : {}),
-    ...(instant(value.verifiedAt) ? { verifiedAt: value.verifiedAt as IsoInstant } : {}),
+    ...(reviewInstant(value.verifiedAt) ? { verifiedAt: value.verifiedAt as IsoInstant } : {}),
     ...(typeof value.notes === "string" ? { notes: value.notes } : {}),
   } satisfies PhysicsPaperManifest;
   return { manifest, trusted: manifest.status === "verified", errors, warnings };

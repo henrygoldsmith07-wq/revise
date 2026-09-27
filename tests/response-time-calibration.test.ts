@@ -4,6 +4,7 @@ import {
   DEFAULT_SECONDS_PER_MARK,
   buildResponseTimeCalibration,
 } from "@/domain/response-time-calibration";
+import { applyHumanVerification, physicsContentFingerprint } from "@/domain/physics-content-review";
 
 const subject = {
   id: "maths",
@@ -58,6 +59,31 @@ function attempt(id: string, elapsedMs: number, awarded: number, questionId = qu
 }
 
 describe("Response-Time Calibration", () => {
+  it("uses the shared WJEC trust predicate by default", () => {
+    const wjecSubject = { ...subject, id: "wjec-alevel-maths", papers: [] } as Subject;
+    const draft = {
+      ...question,
+      id: "wjec-q1",
+      subjectId: wjecSubject.id,
+      topicIds: ["wjec-alevel-maths.algebra"],
+      source: "authored" as const,
+      origin: "seed" as const,
+      paperId: undefined,
+    } as Question;
+    const approved = applyHumanVerification(draft, {
+      status: "approved",
+      reviewerId: "test-only",
+      reviewerRole: "teacher",
+      reviewerQualification: "Test fixture only",
+      reviewedAt: "2026-09-26T12:00:00Z",
+      contentFingerprint: physicsContentFingerprint(draft),
+      checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
+    });
+    const evidence = { ...attempt("w1", 180_000, 3, approved.id), subjectId: approved.subjectId, topicIds: approved.topicIds, max: approved.totalMarks };
+    expect(buildResponseTimeCalibration({ subjects: [wjecSubject], papers: [], questions: [draft], attempts: [evidence] }).totalAttempts).toBe(0);
+    expect(buildResponseTimeCalibration({ subjects: [wjecSubject], papers: [], questions: [approved], attempts: [evidence] }).totalAttempts).toBe(1);
+  });
+
   it("uses paper duration and marks to classify pace without changing the attempts", () => {
     const report = buildResponseTimeCalibration({
       subjects: [subject],

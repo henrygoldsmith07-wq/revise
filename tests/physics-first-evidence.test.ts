@@ -93,6 +93,7 @@ describe("Physics-first coverage and evidence", () => {
     expect(smallestUnprovenCapability([target.id], [target, prerequisite], evidence, { trustedOnly: true })).toBeUndefined();
     const reviewed = { ...target, prerequisiteReviews: { [prerequisite.id]: {
       status: "approved" as const, reviewerId: "physics-expert", reviewedAt: "2026-09-08T00:00:00Z",
+      reviewerRole: "subject-expert" as const, reviewerQualification: "Qualified Physics subject expert",
       edgeFingerprint: capabilityEdgeFingerprint(target, prerequisite),
     } } };
     expect(validatePrerequisiteReviews([reviewed, prerequisite], "wjec-alevel-physics")).toEqual([]);

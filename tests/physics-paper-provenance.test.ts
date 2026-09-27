@@ -16,7 +16,7 @@ describe("authenticated WJEC Physics paper ingestion", () => {
       subjectId: "wjec-alevel-physics",
       paperProvenance: {
         board: "WJEC", specification: "A200QS", paperId: "paper-2026-1", sourceUrl: "https://www.wjec.co.uk/test-only/paper.pdf",
-        sourceDigest: "sha256:test-only", status: "verified", verifiedBy: "teacher-1", verifiedAt: "2026-09-08T00:00:00Z",
+        sourceDigest: "a".repeat(64), status: "verified", verifiedBy: "teacher-1", verifiedAt: "2026-09-08T00:00:00Z",
       },
       questions: [{ ...base, paperQuestionNumber: "1(a)" }],
     })[0]!;
@@ -30,7 +30,32 @@ describe("authenticated WJEC Physics paper ingestion", () => {
       subjectId: "wjec-alevel-physics",
       paperProvenance: {
         board: "WJEC", specification: "A200QS", paperId: "paper", sourceUrl: "https://example.com/paper.pdf",
-        sourceDigest: "sha256:test", status: "pending", verifiedBy: "teacher", verifiedAt: "2026-09-08T00:00:00Z",
+        sourceDigest: "a".repeat(64), status: "pending", verifiedBy: "teacher", verifiedAt: "2026-09-08T00:00:00Z",
+      },
+      questions: [base],
+    })).toThrow(/provenance must be verified/);
+  });
+
+  it("rejects weak source URLs and invalid attestation times", () => {
+    const make = (sourceUrl: string, verifiedAt: string) => () => ingestAuthenticatedPhysicsPaper({
+      subjectId: "wjec-alevel-physics",
+      paperProvenance: {
+        board: "WJEC", specification: "A200QS", paperId: "paper", sourceUrl,
+        sourceDigest: "a".repeat(64), status: "verified", verifiedBy: "teacher", verifiedAt,
+      },
+      questions: [base],
+    });
+    expect(make("https://wjec.co.uk.evil.example/paper.pdf", "2026-09-08T00:00:00Z")).toThrow(/provenance must be verified/);
+    expect(make("https://www.wjec.co.uk/paper.pdf", "2026-09-08")).toThrow(/provenance must be verified/);
+    expect(make("https://www.wjec.co.uk/paper.pdf", "2099-01-01T00:00:00Z")).toThrow(/provenance must be verified/);
+  });
+
+  it("rejects a verified manifest with a non-SHA digest", () => {
+    expect(() => ingestAuthenticatedPhysicsPaper({
+      subjectId: "wjec-alevel-physics",
+      paperProvenance: {
+        board: "WJEC", specification: "A200QS", paperId: "paper", sourceUrl: "https://www.wjec.co.uk/paper.pdf",
+        sourceDigest: "sha256:test-only", status: "verified", verifiedBy: "teacher", verifiedAt: "2026-09-08T00:00:00Z",
       },
       questions: [base],
     })).toThrow(/provenance must be verified/);

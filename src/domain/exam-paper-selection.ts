@@ -26,8 +26,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // Pure domain: no React, no storage; `now` is passed in.
 // ---------------------------------------------------------------------------
 
-import { authenticPaperEvidence, questionFamilies, trustworthyAttempt } from "./learning-evidence";
-import { trustedAssessmentContent } from "./physics-content-review";
+import { questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake } from "./learning-evidence";
 import type { Attempt, Id, IsoInstant, Mistake, Paper, Question, Topic, TopicMastery } from "./types";
 
 /** Losses older than this count as history, not as "what is wrong now". */
@@ -200,20 +199,13 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
   const questionById = new Map(input.questions.map((q) => [q.id, q] as const));
   const topicById = new Map(input.topics.map((t) => [t.id, t] as const));
   const masteryById = new Map(input.mastery.map((m) => [m.topicId, m] as const));
-  const attemptById = new Map(input.attempts.map((attempt) => [attempt.id, attempt] as const));
 
   const trustedPhysicsAttempt = (attempt: Attempt): boolean => {
     const question = questionById.get(attempt.questionId);
-    if (!question || !trustworthyAttempt(attempt) || !trustedAssessmentContent(question)) return false;
-    if (requiresWjecContentReview(question.subjectId) && attempt.mode === "paper") {
-      return authenticPaperEvidence(attempt, question, input.attempts, input.questions);
-    }
-    return true;
+    return trustedAssessmentAttempt(attempt, question, input.attempts, input.questions);
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (!requiresWjecContentReview(input.subjectId)) return true;
-    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
-    return Boolean(attempt && trustedPhysicsAttempt(attempt));
+    return trustedAssessmentMistake(mistake, input.questions, input.attempts);
   };
 
   const subjectPapers = input.papers.filter(

@@ -150,7 +150,7 @@ describe("authentic Physics papers and prospective outcomes", () => {
       paperQuestionNumber: number,
       paperProvenance: {
         board: "WJEC", specification: "A200QS", paperId, questionNumber: number,
-        sourceUrl: "https://www.wjec.co.uk/test-only/paper.pdf", sourceDigest: "sha256:test-only",
+        sourceUrl: "https://www.wjec.co.uk/test-only/paper.pdf", sourceDigest: "a".repeat(64),
         status: "verified", verifiedBy: "test-only", verifiedAt: "2026-09-08T00:00:00Z",
       },
     });
@@ -158,7 +158,8 @@ describe("authentic Physics papers and prospective outcomes", () => {
     const q2 = makePaperQuestion(transfer, "2");
     const paperAttempt = (question: Question, id: string): Attempt => {
       const base = { ...attempt(question, id, 2), mode: "paper" as const, paperId, paperRunId: "complete-run",
-        paperMarking: { status: "adjudicated" as const, reviewerId: "test-marker", reviewedAt: "2026-09-08T00:00:00Z", markerCount: 2 } };
+        paperMarking: { status: "adjudicated" as const, reviewerId: "test-marker", reviewerRole: "teacher" as const,
+          reviewerQualification: "Qualified test marker", reviewedAt: "2026-09-08T00:00:00Z", markerCount: 2 } };
       return { ...base, paperMarking: { ...base.paperMarking, markingFingerprint: paperMarkingFingerprint(base) } };
     };
     const one = paperAttempt(q1, "paper-q1");
@@ -170,19 +171,22 @@ describe("authentic Physics papers and prospective outcomes", () => {
   it("requires reviewed first-exposure paper evidence and excludes mixed-trust sittings", () => {
     const paperQuestion = approve({ ...transfer, source: "past-paper", paperId: "original-paper", paperQuestionNumber: "3(a)", paperProvenance: {
       board: "WJEC", specification: "A200QS", paperId: "original-paper", questionNumber: "3(a)",
-      sourceUrl: "https://www.wjec.co.uk/test-only/original-paper.pdf", sourceDigest: "sha256:test-only",
+      sourceUrl: "https://www.wjec.co.uk/test-only/original-paper.pdf", sourceDigest: "b".repeat(64),
       status: "verified", verifiedBy: "test-only", verifiedAt: "2026-09-08T00:00:00Z",
     } });
     expect(verifiedPhysicsPaperProvenance(paperQuestion)).toBe(true);
     const response = { ...attempt(paperQuestion, "paper", 2), mode: "paper" as const, paperRunId: "sitting", paperId: "original-paper", paperSpecId: "wjec-alevel-physics.u3",
-      paperMarking: { status: "adjudicated" as const, reviewerId: "test-marker", reviewedAt: "2026-09-08T00:00:00Z", markerCount: 2 } };
+      paperMarking: { status: "adjudicated" as const, reviewerId: "test-marker", reviewerRole: "teacher" as const,
+        reviewerQualification: "Qualified test marker", reviewedAt: "2026-09-08T00:00:00Z", markerCount: 2 } };
     expect(humanReviewedPaperAttempt({ ...response, paperMarking: { status: "unreviewed" } })).toBe(false);
     const fingerprinted = { ...response, paperMarking: { ...response.paperMarking, markingFingerprint: paperMarkingFingerprint(response) } };
     expect(humanReviewedPaperAttempt(fingerprinted)).toBe(true);
+    expect(humanReviewedPaperAttempt({ ...fingerprinted, paperMarking: { ...fingerprinted.paperMarking, reviewerQualification: undefined } })).toBe(false);
     expect(humanReviewedPaperAttempt({ ...fingerprinted, awarded: response.awarded - 1,
       marked: response.marked.map((part) => ({ ...part, awarded: Math.max(0, part.awarded - 1) })) })).toBe(false);
     expect(humanReviewedPaperAttempt({ ...response, paperMarking: { ...response.paperMarking, markingFingerprint: "paper-mark-v1:stale" } })).toBe(false);
-    expect(authenticPaperEvidence(response, paperQuestion, [], [paperQuestion])).toBe(true);
+    expect(authenticPaperEvidence(response, paperQuestion, [], [paperQuestion])).toBe(false);
+    expect(authenticPaperEvidence(fingerprinted, paperQuestion, [], [paperQuestion])).toBe(true);
     expect(authenticPaperEvidence(response, transfer, [], [transfer])).toBe(false);
     expect(humanVerifiedPhysicsQuestion({ ...paperQuestion, paperProvenance: undefined })).toBe(false);
     expect(authenticPaperEvidence(response, paperQuestion, [{ ...response, id: "prior", createdAt: attempt(source, "old", 1).createdAt }], [paperQuestion])).toBe(false);

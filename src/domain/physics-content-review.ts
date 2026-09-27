@@ -3,21 +3,17 @@ import { auditPhysicsAssessmentQuality, type PhysicsAssessmentQualityAudit } fro
 import type { CapabilityNode } from "./capability-graph";
 import { validatePrerequisiteReviews } from "./capability-graph";
 import { canonicalJson, sha256Hex } from "./content-fingerprint";
+import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 export const REVIEWED_WJEC_SUBJECT_IDS = [PHYSICS_SUBJECT_ID, "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry"] as const;
-export const WJEC_REVIEWER_ROLES = ["examiner", "teacher", "subject-expert"] as const;
-const ISO_INSTANT_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
-const REVIEW_CLOCK_SKEW_MS = 5 * 60 * 1000;
+export const WJEC_REVIEWER_ROLES = WJEC_ATTESTATION_ROLES;
 function nonBlank(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 export function validHumanReviewInstant(value: unknown, nowMs = Date.now()): value is string {
-  if (!nonBlank(value) || !ISO_INSTANT_PATTERN.test(value)) return false;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) && parsed <= nowMs + REVIEW_CLOCK_SKEW_MS;
+  return validAttestationInstant(value, nowMs);
 }
 export function requiresWjecContentReview(subjectId: string | undefined): boolean {
   return REVIEWED_WJEC_SUBJECT_IDS.some((id) => id === subjectId);
@@ -120,9 +116,9 @@ export function verifiedWjecPaperProvenance(question: Question): boolean {
     Boolean(nonBlank(question.paperId) && nonBlank(question.paperQuestionNumber) && provenance &&
       provenance.status === "verified" && nonBlank(provenance.board) && provenance.board.toLowerCase() === "wjec" &&
       provenance.paperId === question.paperId && provenance.questionNumber === question.paperQuestionNumber &&
-      nonBlank(provenance.specification) && nonBlank(provenance.sourceUrl) && /^https:\/\//i.test(provenance.sourceUrl) &&
-      nonBlank(provenance.sourceDigest) && nonBlank(provenance.verifiedBy) && nonBlank(provenance.verifiedAt) &&
-      Number.isFinite(Date.parse(provenance.verifiedAt)) &&
+      nonBlank(provenance.specification) && validOfficialWjecUrl(provenance.sourceUrl) &&
+      validSha256Digest(provenance.sourceDigest) && nonBlank(provenance.verifiedBy) && nonBlank(provenance.verifiedAt) &&
+      validAttestationInstant(provenance.verifiedAt) &&
       (!provenance.specificationVersion || !question.specVersion || provenance.specificationVersion === question.specVersion));
 }
 
