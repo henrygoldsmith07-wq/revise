@@ -10,8 +10,17 @@ const ARM_LABELS: Record<string, string> = {
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/lib/optional-ai";
 import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
-import { buildPortabilitySnapshot, deletionPreview, portabilityFilename, privacyDisclosure } from "@/domain/portability";
+import {
+  buildPortabilitySnapshot,
+  deletionPreview,
+  parsePortabilitySnapshot,
+  portabilityFilename,
+  portabilityRestorePreview,
+  privacyDisclosure,
+  type PortabilitySnapshot,
+} from "@/domain/portability";
 import { clearAll } from "@/data/db";
+import { restorePortableSnapshot } from "@/data/portable-restore";
 import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import { useStore } from "@/state/store";
@@ -564,6 +573,9 @@ function Account() {
 function DataControls() {
   const store = useStore();
   const filename = portabilityFilename(store.userId);
+  const [pendingRestore, setPendingRestore] = useState<PortabilitySnapshot | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const restorePreview = pendingRestore ? portabilityRestorePreview(pendingRestore) : null;
   const preview = deletionPreview(
     [
       { store: "cards", count: store.cards.length },
@@ -587,6 +599,37 @@ function DataControls() {
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => exportDataPortable(store, filename)}>Export portable snapshot</Button>
           <Button onClick={() => exportDataLegacy(store)}>Export legacy JSON</Button>
+          <label className="inline-flex min-h-9 cursor-pointer items-center rounded-[10px] border border-line px-3 text-sm font-medium text-ink hover:bg-surface2">
+            Choose snapshot to restore
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setRestoreMessage(null);
+                void file.text().then((text) => {
+                  const parsed = parsePortabilitySnapshot(text);
+                  if (!parsed.snapshot) {
+                    setPendingRestore(null);
+                    setRestoreMessage(parsed.warnings.join(" "));
+                    return;
+                  }
+                  setPendingRestore(parsed.snapshot);
+                  const restore = portabilityRestorePreview(parsed.snapshot);
+                  setRestoreMessage(
+                    restore.fullRestoreSupported
+                      ? "Snapshot validated at the file level. Review the counts below before replacing this device profile."
+                      : restore.reason,
+                  );
+                }).catch(() => {
+                  setPendingRestore(null);
+                  setRestoreMessage("Could not read that snapshot file.");
+                });
+              }}
+            />
+          </label>
           <Button
             onClick={async () => {
               const ok = confirm(`${preview.warning}\n\nErase every row on this device? This cannot be undone.`);
@@ -599,6 +642,42 @@ function DataControls() {
           </Button>
         </div>
         <p className="text-[11px] text-ink3">Portable snapshot: {filename} — single-file, machine-readable, GDPR Art. 20 portable.</p>
+        {restorePreview ? (
+          <div className="rounded-[10px] border border-line bg-surface2 p-3 text-xs text-ink2">
+            <p className="font-semibold text-ink">
+              Restore preview · {restorePreview.counts.cards} cards · {restorePreview.counts.reviewLogs} reviews · {restorePreview.counts.attempts} attempts
+            </p>
+            <p className="mt-1">
+              {restorePreview.counts.mistakes} mistakes · {restorePreview.counts.plannedSessions} planned sessions · {restorePreview.counts.examDates} exam dates · {restorePreview.counts.papers} papers
+            </p>
+            {restorePreview.fullRestoreSupported && pendingRestore ? (
+              <Button
+                className="mt-3"
+                variant="secondary"
+                onClick={() => {
+                  const ok = confirm(
+                    "Replace this device's current profile with the selected snapshot? The restore is transactional, but once it succeeds the previous local profile is replaced. Export the current profile first if you may need it."
+                  );
+                  if (!ok) return;
+                  setRestoreMessage("Validating snapshot and restoring…");
+                  void restorePortableSnapshot(pendingRestore, store.userId)
+                    .then((result) => {
+                      setRestoreMessage(
+                        `Restored ${result.restored.cards} cards, ${result.restored.reviewLogs} reviews and ${result.restored.attempts} attempts. Reloading…`,
+                      );
+                      window.setTimeout(() => location.reload(), 300);
+                    })
+                    .catch((error: unknown) => {
+                      setRestoreMessage(error instanceof Error ? error.message : "Restore failed. No partial restore was committed.");
+                    });
+                }}
+              >
+                Replace this device profile
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {restoreMessage ? <p className="text-[11px] text-ink2" role="status">{restoreMessage}</p> : null}
         <p className="text-[11px] text-ink3">{preview.warning}</p>
         <p className="text-[11px] text-ink3">
           {isSupabaseConfigured
@@ -615,6 +694,13 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     userId: store.userId,
     displayName: store.settings.displayName,
     cards: store.cards,
+    // Preserve only question rows needed to make historical/custom attempts
+    // intelligible after restore; untouched shipped content is reproducible.
+    questions: store.questions.filter(
+      (question) => question.userId === store.userId || store.attempts.some((attempt) => attempt.questionId === question.id),
+    ),
+    papers: store.papers,
+    lessonProgress: store.lessonProgress,
     attempts: store.attempts,
     reviewLogs: store.reviewLogs,
     mistakes: store.mistakes,
