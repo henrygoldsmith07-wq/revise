@@ -122,7 +122,11 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
 
     const reviewedCardIds = new Set(logs.map((log) => log.cardId));
     const reviewedCards = cards.filter((card) => card.reps > 0 || reviewedCardIds.has(card.id));
-    const evidence = reviewedCards.length + attempts.length * 2;
+    // Evidence strength discounts assisted/viewed attempts: a hinted success
+    // cannot establish mastery as though it were independent exam evidence.
+    // Independent counts 2, assisted 1, viewed-solution 0.3 toward FULL_EVIDENCE.
+    const attemptEvidence = attempts.reduce((sum, attempt) => sum + hintEvidenceMultiplier(attempt.hintTier ?? null) * 2, 0);
+    const evidence = reviewedCards.length + attemptEvidence;
     const weight = Math.min(1, evidence / FULL_EVIDENCE);
 
     // Weighted blend — questions are the closest proxy to the real exam, so

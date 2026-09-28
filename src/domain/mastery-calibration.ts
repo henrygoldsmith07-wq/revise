@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { computeTopicMastery } from "./mastery";
-import type { Attempt, Card, Id, Mistake, ReviewLog, Topic, TopicMastery } from "./types";
+import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,6 +90,9 @@ export function buildHistoricalSnapshots(input: {
   attempts: Attempt[];
   mistakes: Mistake[];
   cutoffs: string[]; // sorted ascending ISO instants
+  /** Optional bank snapshot: unreviewed WJEC marks are excluded from calibration. */
+  questions?: Question[];
+  trustedQuestion?: (question: Question) => boolean;
 }): HistoricalSnapshot[] {
   const { topics, cards, reviewLogs, attempts, mistakes, cutoffs } = input;
   const out: HistoricalSnapshot[] = [];
@@ -101,6 +104,8 @@ export function buildHistoricalSnapshots(input: {
       attempts: filterAttempts(attempts, cutoff),
       mistakes: filterMistakes(mistakes, cutoff),
       now: new Date(cutoff),
+      ...(input.questions ? { questions: input.questions } : {}),
+      ...(input.trustedQuestion ? { trustedQuestion: input.trustedQuestion } : {}),
     };
     const mastery = computeTopicMastery(filtered);
     const byId = new Map<string, TopicMastery>(mastery.map((m) => [m.topicId, m]));
@@ -256,6 +261,8 @@ export function evaluateMasteryCalibration(input: {
   cutoffs: string[];
   minEvidence?: number;
   minFutures?: number;
+  questions?: Question[];
+  trustedQuestion?: (question: Question) => boolean;
 }): MasteryCalibrationReport {
   const snapshots = buildHistoricalSnapshots(input);
   const outcomes = evaluateFutureOutcomes({ snapshots, attempts: input.attempts });

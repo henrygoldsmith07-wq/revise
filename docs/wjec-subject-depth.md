@@ -51,7 +51,7 @@ Export refuses an existing directory. Each subject folder contains a student boo
 
 Review returned rows in `new-draft-review.json`, then merge them into the matching rows in `content-review.json`. The check command requires qualified reviewer details for approval, detects edits, rejects mismatched subjects and produces proposed checked records. It does not alter the application or publish approvals. Source changes require a fresh export and a new review of the changed fingerprint.
 
-The underlying Physics-named APIs and `physics-review-v2` fingerprint prefix remain for backward compatibility. A subject parameter selects the Maths, Biology or Chemistry packet. This reuses the existing contract instead of creating a parallel trust system. Physics's separate marking-corpus, paper-source acquisition and experiment intake files remain Physics-specific; they are not evidence for these three subjects.
+The underlying Physics-named APIs remain for backward compatibility, with fingerprint prefix `physics-review-v3` (covers difficulty and AO mapping; v2 attestations are stale and fail closed). A subject parameter selects the Maths, Biology or Chemistry packet, and `src/domain/content-lifecycle.ts` reports authored/reviewed/verified/blocked with the next review batch. This reuses the existing contract instead of creating a parallel trust system. Physics's separate marking-corpus, paper-source acquisition and experiment intake files remain Physics-specific; they are not evidence for these three subjects.
 
 ## Remaining validation work
 

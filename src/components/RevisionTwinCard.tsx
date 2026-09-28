@@ -9,7 +9,13 @@ import { useStore } from "@/state/store";
 import type { ActivityKind } from "@/domain/types";
 import { Button, ButtonLink, Panel, Pill, cx } from "./ui";
 
-function formatMarks(value: number): string {
+function formatMarks(value: number, sampleSize?: number): string {
+  // Avoid false precision: uncalibrated baselines render as approximate whole
+  // marks; 0.1-mark resolution is reserved for calibrated estimates.
+  if ((sampleSize ?? 0) < 2) {
+    const whole = Math.round(value);
+    return `~${whole}`;
+  }
   const rounded = Math.round(value * 10) / 10;
   return rounded.toFixed(1);
 }
@@ -104,8 +110,8 @@ function ChoiceList({ compact }: { compact: boolean }) {
                   </div>
                 </div>
                 <div className="sm:text-right pl-9 sm:pl-0">
-                  <p className="text-base sm:text-lg font-semibold tabular-nums text-ink">+{formatMarks(choice.predictedMarks)}</p>
-                  <p className="text-[10px] text-ink3">expected marks</p>
+                  <p className="text-base sm:text-lg font-semibold tabular-nums text-ink">+{formatMarks(choice.predictedMarks, choice.sampleSize)}</p>
+                  <p className="text-[10px] text-ink3">{choice.sampleSize < 2 ? "provisional estimate" : "expected marks"}</p>
                 </div>
                 <Button
                   size="sm"
@@ -120,7 +126,7 @@ function ChoiceList({ compact }: { compact: boolean }) {
               </div>
               <div className="flex items-center gap-2 mt-2 pl-9 sm:pl-9">
                 <Pill tone={confidence.tone}>{confidence.label}</Pill>
-                <span className="text-[11px] text-ink3 tabular-nums">+{formatMarks(choice.marksPerHour)}/h {choice.sampleSize ? "calibrated" : "baseline"}</span>
+                <span className="text-[11px] text-ink3 tabular-nums">+{formatMarks(choice.marksPerHour, choice.sampleSize)}/h {choice.sampleSize ? "calibrated" : "baseline · provisional"}</span>
               </div>
             </li>
           );
@@ -163,7 +169,7 @@ export function RevisionTwinCard({ compact = false }: { compact?: boolean }) {
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-wide text-speak font-semibold">Block in progress</p>
             <p className="text-sm font-semibold text-ink truncate mt-0.5">{revisionSessionTitle(active)}</p>
-            <p className="text-[11px] text-ink3 mt-0.5">Predicted +{formatMarks(active.predictedMarks)} marks · log the check when you finish.</p>
+            <p className="text-[11px] text-ink3 mt-0.5">Predicted +{formatMarks(active.predictedMarks, 5)} marks · log the check when you finish.</p>
           </div>
           <ButtonLink href="/twin" size="sm" variant="secondary">Finish block</ButtonLink>
         </div>

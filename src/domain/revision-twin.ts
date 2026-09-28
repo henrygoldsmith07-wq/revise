@@ -79,6 +79,8 @@ export interface RevisionTwinChoice {
   marksPerHour: number;
   sampleSize: number;
   confidence: RevisionTwinConfidence;
+  /** Canonical policy score from the underlying recommendation; twin ordering must not silently diverge from it. */
+  policyScore: number;
 }
 
 export interface RevisionTwinReport {
@@ -256,6 +258,7 @@ export function buildRevisionTwinChoices(input: {
       marksPerHour: roundMarks((predictedMarks / budgetMinutes) * 60),
       sampleSize: calibration?.sampleSize ?? 0,
       confidence: calibration?.confidence ?? "new",
+      policyScore: recommendation.score,
     };
     const previous = byKey.get(key);
     if (!previous || candidate.predictedMarks > previous.predictedMarks || recommendation.score > previous.recommendation.score) {

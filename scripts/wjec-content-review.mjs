@@ -15,6 +15,8 @@ const bundle = await build({ stdin: { contents: `
     buildPhysicsPrerequisiteReviewTemplate as edges, importPhysicsPrerequisiteReviews as importEdges } from './src/domain/physics-validation-intake';
   export { auditPhysicsAssessmentQuality as audit, physicsQualityQueue as queue, physicsAuthoringBriefs as briefs } from './src/domain/physics-assessment-quality';
   export { markPart } from './src/domain/marking';
+  export { summariseLifecycle as lifecycle, findLedgerAnomalies as anomalies } from './src/domain/content-lifecycle';
+  export { detectShallowVariants as variants, demandDiversity as demand } from './src/domain/content-variation';
 `, resolveDir: process.cwd(), loader: "ts" }, bundle: true, platform: "node", format: "esm", write: false });
 const data = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
 const out = resolve(destination);
@@ -72,10 +74,16 @@ for (const curriculum of data.curricula) {
   await json("quality-queue.json", data.queue(audit));
   await json("authoring-briefs.json", data.briefs(audit));
   await json("model-answer-self-check.json", markingChecks);
+  const lifecycle = data.lifecycle(questions, subjectId);
+  const shallow = data.variants(questions);
+  await json("lifecycle-summary.json", lifecycle);
+  await json("shallow-variants.json", shallow);
   report.push({ subjectId, questions: questions.length, capabilities: nodes.length,
     internalStatements: curriculum.topics.reduce((n, t) => n + (t.specPoints?.length ?? 0), 0),
     draftCompleteStatements: audit.capabilityCoverage.filter(row => row.complete).length,
     approvedQuestions: questions.filter(data.trusted).length,
+    lifecycle,
+    shallowVariantCount: shallow.length,
     modelAnswerDisagreements: markingChecks.filter(row => row.awarded !== row.available).length,
     remainingAuthoringBriefs: data.briefs(audit).length, errors, warnings,
     note: "Structural counts and authored-answer checks are not human validation or evidence of efficacy." });
@@ -87,7 +95,7 @@ if (mode === "export") await writeFile(resolve(out, "README.md"), [
   "Record six qualified review checks against exact fingerprints in new-draft-review.json, then merge those rows into content-review.json. Review prerequisite rationales separately. Never mark an AI review as human approval.", "",
   `Check returned files from the repository: node scripts/wjec-content-review.mjs check "${out.replaceAll("\\", "/")}"`, "",
   "The check writes proposed checked-content and checked-prerequisites files for inspection. It does not publish approvals or modify the app. Fix flagged content in source, export to a new folder and review the new fingerprint.", "",
-  "Existing fingerprint prefixes and Physics-named APIs are retained for compatibility; the subjectId parameter selects the bank. Human marking, authenticated papers and real learner studies are still required. This pack contains no fabricated evidence.",
+  "Fingerprint prefix is physics-review-v3 (covers difficulty and AO mapping; v2 attestations are stale and fail closed). lifecycle-summary.json answers authored/reviewed/blocked/why/next-batch; shallow-variants.json flags reskins for human authoring, never auto-merges. Physics-named APIs are retained for compatibility; the subjectId parameter selects the bank. Human marking, authenticated papers and real learner studies are still required. This pack contains no fabricated evidence.",
 ].join("\n"));
 console.log(JSON.stringify(report));
 if (report.some(row => row.errors.length)) process.exitCode = 1;

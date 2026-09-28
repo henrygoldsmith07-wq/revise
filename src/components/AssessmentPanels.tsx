@@ -924,7 +924,7 @@ export function PaperSimulationCard() {
             </ul>
           ) : null}
           <p className="text-[11px] text-ink3 mt-3">
-            Uses your current topic mastery, re-weighted by calibration (see below). <Link href="/papers" className="underline">Sit a real paper</Link> to tighten the prediction.
+            Provisional estimate from trusted questions only{simulation.untrustedCount ? ` · ${simulation.untrustedCount} unreviewed question${simulation.untrustedCount === 1 ? "" : "s"} excluded` : ""}. Uses your current topic mastery, re-weighted by calibration (see below). <Link href="/papers" className="underline">Sit a real paper</Link> to tighten the prediction.
           </p>
         </>
       )}

@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { buildDailySessionPlan, MAX_SESSION_MINUTES } from "@/domain/daily-session";
 import { capabilitySentence } from "@/domain/capability-mastery";
 import { deriveCapabilityProfiles } from "@/domain/capability-source";
+import { trustedAssessmentContent } from "@/domain/physics-content-review";
 import { useStore } from "@/state/store";
 import { ButtonLink, Panel, Pill, cx } from "./ui";
 import { PlayIcon, ICON_SIZE } from "./icons";
@@ -50,13 +51,15 @@ export function DailySessionCard({ subjectIds }: { subjectIds: string[] }) {
       recallMastery: store.recallMastery,
       applicationMastery: store.applicationMastery,
       attempts: store.attempts,
+      questions: store.questions,
+      trustedQuestion: trustedAssessmentContent,
     });
     const weakest = store.mastery
       .filter((m) => subjectIds.length === 0 || subjectIds.includes(m.subjectId))
       .sort((a, b) => a.mastery - b.mastery)[0];
     const profile = weakest ? profiles[weakest.topicId] : undefined;
     return profile ? capabilitySentence(profile) : null;
-  }, [store.recallMastery, store.applicationMastery, store.attempts, store.mastery, subjectIds]);
+  }, [store.recallMastery, store.applicationMastery, store.attempts, store.mastery, store.questions, subjectIds]);
 
   const requested = store.settings.sessionLengthMinutes;
   const capped = Math.min(Math.max(requested, 12), MAX_SESSION_MINUTES);

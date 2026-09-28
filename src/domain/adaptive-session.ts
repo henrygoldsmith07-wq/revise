@@ -1181,7 +1181,11 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
       .filter((id): id is Id => Boolean(id)),
   );
   // Mistakes still open that this run has not already repaired (by retest).
-  const openWithoutRepair = openMistakes.filter((mistake) => !resolvedIds.has(mistake.id));
+  // Ordered like the canonical mistake queue (marks lost, then recency) so
+  // repair targets the highest-value misconception first, not input order.
+  const openWithoutRepair = openMistakes
+    .filter((mistake) => !resolvedIds.has(mistake.id))
+    .sort((a, b) => (b.marksLost - a.marksLost) || b.createdAt.localeCompare(a.createdAt));
 
   const steps: AdaptiveSessionStep[] = [];
   const priorState: InterventionAttemptContext["priorState"] =

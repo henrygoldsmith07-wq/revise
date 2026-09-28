@@ -55,9 +55,10 @@ export function ExamOutlook() {
           const exam = examDates.find((e) => e.subjectId === row.subjectId);
           const name = subject?.name ?? row.subjectId;
           const when = exam ? ` in ${name} (exam ${formatExamDate(exam.date)})` : ` in ${name}`;
+          const provisional = row.provisional ? "Provisional estimate" : "Estimate";
           return (
             <p key={row.subjectId}>
-              Based on your current evidence, you&apos;re most likely to score {row.low}–{row.high}%{when}.
+              {provisional}: you&apos;re most likely to score {row.low}–{row.high}%{when} (n={row.independentAttempts} independent, confidence {Math.round(row.confidence * 100)}%).
             </p>
           );
         })}

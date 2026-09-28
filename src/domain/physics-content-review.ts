@@ -15,12 +15,25 @@ export const REQUIRED_HUMAN_CHECKS = ["question", "marking", "workedSolution", "
 export function physicsContentFingerprint(question: Question): string {
   const text = JSON.stringify([question.id, question.subjectId, question.topicIds,
     question.specPointIds, question.stem, question.parts, question.totalMarks,
+    question.difficulty, question.aos,
     question.learning, question.options, question.correctIndex, question.calculatorAllowed,
     question.source, question.origin, question.licensedSource, question.paperId, question.paperQuestionNumber,
     question.paperProvenance, question.specVersion]);
   let hash = 2166136261;
   for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return `physics-review-v2:${(hash >>> 0).toString(16)}`;
+  return `physics-review-v3:${(hash >>> 0).toString(16)}`;
+}
+
+/**
+ * Backwards-compatible check: v2 fingerprints (without difficulty/AO cover)
+ * are treated as stale rather than trusted, so a difficulty or AO remap
+ * fails closed and requires re-attestation. No automated process fabricates
+ * approval; this only invalidates.
+ */
+export function physicsFingerprintMatches(question: Question, fingerprint: string | undefined): boolean {
+  if (!fingerprint) return false;
+  if (fingerprint === physicsContentFingerprint(question)) return true;
+  return false;
 }
 
 export type PhysicsReviewQueueRow = {
@@ -44,7 +57,7 @@ export function humanVerifiedPhysicsQuestion(question: Question): boolean {
 /** Same six-check and edit-invalidation contract for all four WJEC flagships. */
 export function humanVerifiedWjecQuestion(question: Question): boolean {
   return requiresWjecContentReview(question.subjectId) && question.verification === "verified" && completeChecks(question.humanVerification) &&
-    question.humanVerification?.contentFingerprint === physicsContentFingerprint(question) &&
+    physicsFingerprintMatches(question, question.humanVerification?.contentFingerprint) &&
     (question.source !== "past-paper" || verifiedWjecPaperProvenance(question)) &&
     !["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "");
 }
@@ -94,7 +107,7 @@ export function buildPhysicsReviewQueue(questions: readonly Question[], subjectI
 
 /** Apply an immutable review decision; incomplete approvals remain untrusted. */
 export function applyHumanVerification(question: Question, record: HumanVerificationRecord): Question {
-  const approved = completeChecks(record) && record.contentFingerprint === physicsContentFingerprint(question);
+  const approved = completeChecks(record) && physicsFingerprintMatches(question, record.contentFingerprint);
   return {
     ...question,
     humanVerification: { ...record, status: approved ? "approved" : record.status === "approved" ? "pending" : record.status },
@@ -127,15 +140,26 @@ export function physicsContentReadiness(input: {
   /** Optional report from the external, double-marked Physics corpus. */
   markingBenchmark?: { usableForCalibration: boolean };
 }): PhysicsContentReadiness {
-  const topics = input.topics.filter((topic) => topic.subjectId === PHYSICS_SUBJECT_ID);
-  const questions = input.questions.filter((question) => question.subjectId === PHYSICS_SUBJECT_ID);
+  return wjecContentReadiness({ ...input, subjectId: PHYSICS_SUBJECT_ID });
+}
+
+/** Same release gate for any WJEC flagship; Physics wrapper above is retained for compatibility. */
+export function wjecContentReadiness(input: {
+  topics: readonly Topic[];
+  questions: readonly Question[];
+  nodes: readonly CapabilityNode[];
+  subjectId: Id;
+  markingBenchmark?: { usableForCalibration: boolean };
+}): PhysicsContentReadiness {
+  const topics = input.topics.filter((topic) => topic.subjectId === input.subjectId);
+  const questions = input.questions.filter((question) => question.subjectId === input.subjectId);
   // Release depth must be counted from approved content, not the draft inventory.
-  const audit = auditLearningDepth(topics, questions.filter(humanVerifiedPhysicsQuestion), input.nodes);
-  const quality = auditPhysicsAssessmentQuality({ topics, questions, nodes: input.nodes, trustedQuestion: humanVerifiedPhysicsQuestion });
-  const prerequisiteReviewGaps = validatePrerequisiteReviews(input.nodes, PHYSICS_SUBJECT_ID);
+  const audit = auditLearningDepth(topics, questions.filter(humanVerifiedWjecQuestion), input.nodes);
+  const quality = auditPhysicsAssessmentQuality({ topics, questions, nodes: input.nodes, trustedQuestion: humanVerifiedWjecQuestion });
+  const prerequisiteReviewGaps = validatePrerequisiteReviews(input.nodes, input.subjectId);
   const markingBenchmarkReady = input.markingBenchmark?.usableForCalibration === true;
-  const reviewQueue = buildPhysicsReviewQueue(questions);
-  const trustedQuestionCount = questions.filter(humanVerifiedPhysicsQuestion).length;
+  const reviewQueue = buildPhysicsReviewQueue(questions, input.subjectId);
+  const trustedQuestionCount = questions.filter(humanVerifiedWjecQuestion).length;
   const gaps = audit.rows.filter((row) => row.gaps.length).map((row) => ({ topicId: row.topicId, specPointId: row.specPointId, demands: row.gaps }));
   return {
     ready: audit.statements > 0 && audit.statementsWithFullDepth === audit.statements && reviewQueue.length === 0 && quality.releaseReady && prerequisiteReviewGaps.length === 0 && markingBenchmarkReady,

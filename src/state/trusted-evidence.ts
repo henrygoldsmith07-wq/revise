@@ -5,7 +5,8 @@
 // stay available for practice but cannot move mastery, readiness, or session
 // scoring.
 
-import { trustedAssessmentAttempt, trustworthyAttempt } from "@/domain/learning-evidence";
+import { requiresWjecContentReview } from "@/domain/physics-content-review";
+import { trustedAssessmentAttempt as trustedAttempt, trustworthyAttempt as baseTrustworthy } from "@/domain/learning-evidence";
 import type { Attempt, Question } from "@/domain/types";
 
 export function trustedSnapshotAttempt(
@@ -14,6 +15,6 @@ export function trustedSnapshotAttempt(
   history: readonly Attempt[],
 ): boolean {
   const question = questions.find((row) => row.id === attempt.questionId);
-  if (!question) return attempt.subjectId !== "wjec-alevel-physics" && trustworthyAttempt(attempt);
-  return trustedAssessmentAttempt(attempt, question, history, questions);
+  if (!question) return !requiresWjecContentReview(attempt.subjectId) && baseTrustworthy(attempt);
+  return trustedAttempt(attempt, question, history, questions);
 }

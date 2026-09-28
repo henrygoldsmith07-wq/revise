@@ -1172,6 +1172,8 @@ export interface PaperSimulation {
   recoverableMarks: number;
   /** Per-topic marks expected vs actual (from calibration). */
   marksByTopic: Array<{ topicId: Id; expected: number; available: number }>;
+  /** Untrusted questions excluded from the simulation; never silently predicted. */
+  untrustedCount?: number;
 }
 
 export interface Calibration {

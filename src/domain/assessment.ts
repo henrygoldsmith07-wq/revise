@@ -162,12 +162,16 @@ export function simulatePaper(input: {
   topicMastery: Map<Id, number>;
   calibration?: Calibration;
 }): PaperSimulation {
-  const totalMarks = input.questions.reduce((a, q) => a + q.totalMarks, 0);
+  // Trust gate: unreviewed WJEC content is practice-only and must not drive
+  // a predicted paper score as though it were authenticated exam evidence.
+  const untrustedCount = input.questions.filter((q) => !trustedAssessmentContent(q)).length;
+  const questions = input.questions.filter(trustedAssessmentContent);
+  const totalMarks = questions.reduce((a, q) => a + q.totalMarks, 0);
   const timeMinutes = input.subject.papers.find((p) => p.id === input.paperSpecId)?.durationMinutes ?? 90;
   // Naive prediction: sum over questions of (topic mastery avg for that question).
   let raw = 0;
   const byTopic = new Map<string, { expected: number; available: number }>();
-  for (const q of input.questions) {
+  for (const q of questions) {
     const masteryAvg = q.topicIds.length ? q.topicIds.reduce((a, id) => a + (input.topicMastery.get(id) ?? 0.4), 0) / q.topicIds.length : 0.4;
     const expected = q.totalMarks * (0.35 + masteryAvg * 0.6);
     raw += expected;
@@ -186,13 +190,14 @@ export function simulatePaper(input: {
   return {
     paperSpecId: input.paperSpecId,
     subjectId: input.subject.id,
-    questionIds: input.questions.map((q) => q.id),
+    questionIds: questions.map((q) => q.id),
     totalMarks,
     timeMinutes,
     predictedMarks,
     predictedGrade: grade,
     recoverableMarks,
     marksByTopic: [...byTopic.entries()].map(([topicId, v]) => ({ topicId, expected: Math.round(v.expected), available: Math.round(v.available) })),
+    ...(untrustedCount ? { untrustedCount } : {}),
   };
 }
 

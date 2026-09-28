@@ -33,7 +33,12 @@ function signalTone(status: ReadinessSignalStatus): "neutral" | "success" | "rev
   return "neutral";
 }
 
-function scoreLabel(score: number): string {
+function scoreLabel(score: number, confidence: number): string {
+  // Avoid false precision: sparse evidence renders as a band, not a point.
+  if (confidence < 0.35) {
+    const band = Math.round(score * 20) * 5;
+    return `~${band}/100 provisional`;
+  }
   return `${Math.round(score * 100)}/100`;
 }
 
@@ -84,7 +89,7 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
           </p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xl font-semibold tabular-nums text-ink">{scoreLabel(row.score)}</p>
+          <p className="text-xl font-semibold tabular-nums text-ink">{scoreLabel(row.score, row.confidence)}</p>
           <p className="text-[10px] uppercase tracking-wide text-ink3">readiness</p>
         </div>
       </div>
@@ -156,7 +161,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
         <div className="mt-4 grid sm:grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
           <div>
             <div className="flex items-baseline justify-between gap-3 text-xs mb-1.5">
-              <span className="font-semibold text-ink2">{scoreLabel(summary.score)} overall readiness</span>
+              <span className="font-semibold text-ink2">{scoreLabel(summary.score, summary.confidence)} overall readiness</span>
               <span className="text-ink3">{summary.subjectCount ? `${summary.readyCount}/${summary.subjectCount} ready` : "No subjects"}</span>
             </div>
             <ProgressBar value={summary.score} label="Overall exam readiness" tone={statusTone(summary.status) === "danger" ? "danger" : statusTone(summary.status) === "review" ? "review" : statusTone(summary.status) === "success" ? "success" : "accent"} />
@@ -183,7 +188,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
               <Pill tone="accent">Evidence, not vibes</Pill>
               <Pill tone={statusTone(summary.status)}>{STATUS_LABEL[summary.status]}</Pill>
             </div>
-            <h2 className="text-xl font-semibold tracking-tight text-ink">Your exam readiness is {scoreLabel(summary.score)}</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-ink">Your exam readiness is {scoreLabel(summary.score, summary.confidence)}</h2>
             <p className="text-sm text-ink3 mt-1 max-w-2xl">{readinessSummaryText(summary)} The passport separates outcome, knowledge, recall, pace and transfer so you can see exactly what still needs proof.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 shrink-0">

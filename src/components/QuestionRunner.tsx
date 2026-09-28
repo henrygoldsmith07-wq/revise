@@ -24,7 +24,7 @@ import { shouldOfferMathInput } from "@/domain/math-input";
 import { answerLooksCopied } from "@/domain/learning-evidence";
 import { analyseAttemptWorking } from "@/domain/working-analysis";
 import { EditorialBadge } from "./EditorialBadge";
-import { humanVerifiedPhysicsQuestion } from "@/domain/physics-content-review";
+import { humanVerifiedWjecQuestion, requiresWjecContentReview } from "@/domain/physics-content-review";
 import { evaluateMistakeRetest } from "@/domain/mistakes";
 import type { RetestEvaluation } from "@/domain/mistakes";
 import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
@@ -442,9 +442,9 @@ export function QuestionRunner({
           {retestMistake ? <Pill tone="review">Retest</Pill> : null}
           {question.origin === "past-paper" ? <Pill tone="review">Past paper</Pill> : null}
           <EditorialBadge source={question.source ?? null}
-            verification={question.subjectId === "wjec-alevel-physics" && !humanVerifiedPhysicsQuestion(question) ? "unverified" : question.verification ?? null}
+            verification={requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question) ? "unverified" : question.verification ?? null}
             origin={question.origin} reviewer={question.reviewer ?? null} contentTier={getSubject(question.subjectId)?.contentTier} />
-          {question.subjectId === "wjec-alevel-physics" && !humanVerifiedPhysicsQuestion(question) ?
+          {requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question) ?
             <span className="text-xs text-muted-foreground">Needs human review · practice evidence only</span> : null}
           {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
           {farTransfer ? <Pill tone="accent">Delayed far-transfer</Pill> : null}

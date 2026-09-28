@@ -19,7 +19,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 
 import type { GradePrediction } from "./grades";
-import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { authenticPaperEvidence, independentAttempt, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
 import type { Attempt, Id, IsoInstant, Question } from "./types";
 
@@ -43,11 +43,15 @@ export interface ExamOutlookRow {
   subjectId: Id;
   /** Marked answers recorded for this subject. */
   attempts: number;
+  /** Independent (unaided) answers; assisted work cannot strengthen the band alone. */
+  independentAttempts: number;
   percent: number;
   grade: string;
   low: number;
   high: number;
   confidence: number;
+  /** True when the band is provisional and must be labelled as such. */
+  provisional: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +99,10 @@ export function paperRunScores(attempts: Attempt[], questions?: readonly Questio
   }
   const paperAttempts = attempts.filter((a) => {
     if (a.mode !== "paper" || a.max <= 0 || !trustworthyAttempt(a)) return false;
+    // A paper run is exam evidence only when answered independently under the
+    // clock. Assisted or viewed paper attempts stay as practice; they must not
+    // strengthen a timed-paper score as though they were unseen exam runs.
+    if (!independentAttempt(a)) return false;
     if (!requiresWjecContentReview(a.subjectId)) return true;
     const question = questionById.get(a.questionId);
     return Boolean(question && authenticPaperEvidence(a, question, attempts, questions ?? []));
@@ -145,16 +153,23 @@ export function outlookRows(predictions: GradePrediction[], attempts: Attempt[],
     return trustedAssessmentAttempt(attempt, question, attempts, questions);
   });
   return predictions.map((prediction) => {
-    const marked = evidenceAttempts.filter((a) => a.subjectId === prediction.subjectId).length;
+    const subjectAttempts = evidenceAttempts.filter((a) => a.subjectId === prediction.subjectId);
+    const marked = subjectAttempts.length;
+    const independent = subjectAttempts.filter(independentAttempt).length;
     const band = percentBand(prediction);
+    // Provisional until there is enough independent evidence to trust the
+    // centre: assisted work may widen the sample but never confirms the band.
+    const provisional = prediction.confidence < 0.35 || independent < MIN_OUTLOOK_ATTEMPTS;
     return {
       subjectId: prediction.subjectId,
       attempts: marked,
+      independentAttempts: independent,
       percent: prediction.percent,
       grade: prediction.grade,
       low: band.low,
       high: band.high,
       confidence: prediction.confidence,
+      provisional,
     };
   });
 }

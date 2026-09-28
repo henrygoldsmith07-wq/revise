@@ -21,6 +21,11 @@ export interface MarkingValidationInput {
   /** Function that produces an AI/rubric mark for a record's answer */
   aiMark: (record: AnswerCorpusRecord) => number;
   provenance: ValidationProvenance;
+  /**
+   * Optional confidence/escalation signal from the marker under test.
+   * When absent, escalation fields report null rather than inventing labels.
+   */
+  aiConfidence?: (record: AnswerCorpusRecord) => { confidence: number | null; escalated: boolean };
 }
 
 export interface MarkingValidationSummary {
@@ -34,8 +39,12 @@ export interface MarkingValidationSummary {
   overMarkingRate: number; // AI > human
   underMarkingRate: number; // AI < human
   majorErrorRate: number; // |error| >= 2
+  partialCreditAgreement: number | null; // share where partial-credit status agrees, null when no partial rows
+  alternativeMethodExactRate: number | null; // exact rate on alternative-method rows, null when none
   misconceptionDetectionAccuracy: number | null;
   feedbackQuality: number | null; // reserved: null until labelled feedback exists
+  escalationRate: number | null; // share escalated by the marker, null when no signal supplied
+  escalationPrecision: number | null; // share of escalated rows that were true errors (|err|>=1), null when none escalated
 }
 
 export interface MarkingValidationByGroup {
@@ -63,8 +72,14 @@ export interface MarkingValidationReport {
   byQuestionType: MarkingValidationByGroup[];
   byDifficulty: MarkingValidationByGroup[];
   byAbility: MarkingValidationByGroup[];
+  /** Error-class slices: contradictory, ECF, alternative-method, borderline, long-form, etc. */
+  byErrorClass: MarkingValidationByGroup[];
+  /** Confidence slices when the marker supplies a confidence signal. */
+  byConfidence: MarkingValidationByGroup[];
   pointAgreement: MarkingPointAgreement | null;
   internalVsExternalWarning: string | null;
+  /** Ingestion guard: non-empty when the corpus cannot support reliability claims. */
+  ingestionWarnings: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +152,7 @@ function groupStats(records: AnswerCorpusRecord[], aiMark: (r: AnswerCorpusRecor
 // ---------------------------------------------------------------------------
 
 export function buildMarkingValidationReport(input: MarkingValidationInput): MarkingValidationReport {
-  const { records, aiMark, provenance } = input;
+  const { records, aiMark, provenance, aiConfidence } = input;
   const adjudicated = records.filter((r) => consensusMark(r) != null);
   const n = adjudicated.length;
   const errors: number[] = [];
@@ -147,6 +162,18 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
   let over = 0;
   let under = 0;
   let major = 0;
+  let partialTotal = 0;
+  let partialAgree = 0;
+  let altTotal = 0;
+  let altExact = 0;
+  let escalated = 0;
+  let escalatedTrueError = 0;
+
+  const ERROR_CLASS_TAGS = new Set([
+    "contradictory", "error-carried-forward", "method-marks", "equivalent-algebra",
+    "borderline-explanation", "6plus-extended", "calculation", "partially-correct",
+    "vague", "misconception", "first-incorrect-step", "significant-figures", "units",
+  ]);
 
   for (const r of adjudicated) {
     const human = consensusMark(r)!;
@@ -160,6 +187,24 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
     if (err > 0) over += 1;
     if (err < 0) under += 1;
     if (abs >= 2) major += 1;
+    const humanPartial = human > 0 && human < r.maximumMarks;
+    const aiPartial = ai > 0 && ai < r.maximumMarks;
+    if (humanPartial || aiPartial) {
+      partialTotal += 1;
+      if (humanPartial === aiPartial && abs <= 1) partialAgree += 1;
+    }
+    const tags = new Set(r.questionTypeTags.map(String));
+    if (tags.has("equivalent-algebra") || tags.has("method-marks")) {
+      altTotal += 1;
+      if (abs === 0) altExact += 1;
+    }
+    if (aiConfidence) {
+      const signal = aiConfidence(r);
+      if (signal.escalated) {
+        escalated += 1;
+        if (abs >= 1) escalatedTrueError += 1;
+      }
+    }
   }
 
   const summary: MarkingValidationSummary = {
@@ -173,8 +218,12 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
     overMarkingRate: n ? round(over / n, 3) : 0,
     underMarkingRate: n ? round(under / n, 3) : 0,
     majorErrorRate: n ? round(major / n, 3) : 0,
+    partialCreditAgreement: partialTotal ? round(partialAgree / partialTotal, 3) : null,
+    alternativeMethodExactRate: altTotal ? round(altExact / altTotal, 3) : null,
     misconceptionDetectionAccuracy: null, // requires labelled misconception detection output
     feedbackQuality: null, // requires labelled feedback quality
+    escalationRate: aiConfidence ? round(escalated / Math.max(1, n), 3) : null,
+    escalationPrecision: escalated ? round(escalatedTrueError / escalated, 3) : null,
   };
 
   // Breakdown groups
@@ -187,6 +236,21 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
   // Prior-attainment band of the student whose answer was marked, when the
   // corpus row records it. Unrecorded rows are grouped so coverage stays honest.
   const byAbility = groupStats(adjudicated, aiMark, (r) => r.abilityLevel ?? "unrecorded");
+  const byErrorClass = groupStats(adjudicated, aiMark, (r) =>
+    r.questionTypeTags.filter((tag) => ERROR_CLASS_TAGS.has(String(tag))).map(String).length
+      ? r.questionTypeTags.filter((tag) => ERROR_CLASS_TAGS.has(String(tag))).map(String)
+      : ["unclassified"],
+  );
+  const byConfidence = aiConfidence
+    ? groupStats(adjudicated, aiMark, (r) => {
+        const signal = aiConfidence(r);
+        if (signal.escalated) return "escalated";
+        if (signal.confidence == null) return "unscored-confidence";
+        if (signal.confidence < 0.6) return "low-confidence";
+        if (signal.confidence < 0.85) return "medium-confidence";
+        return "high-confidence";
+      })
+    : [];
 
   // Point-level agreement requires structured per-point AI output — not available from scalar aiMark
   const pointAgreement: MarkingPointAgreement | null = null;
@@ -199,6 +263,8 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
       ? "Internal regression: synthetic fixtures only — not examiner validation. Do not present as external human validation."
       : null;
 
+  const ingestionWarnings = validateBenchmarkIngestion(records, provenance);
+
   return {
     provenance,
     benchmarkVersion,
@@ -210,9 +276,43 @@ export function buildMarkingValidationReport(input: MarkingValidationInput): Mar
     byQuestionType,
     byDifficulty,
     byAbility,
+    byErrorClass,
+    byConfidence,
     pointAgreement,
     internalVsExternalWarning,
+    ingestionWarnings,
   };
+}
+
+/**
+ * Ingestion guard for reviewer-labelled scripts. Real human labels must carry
+ * independent double-marking (or adjudication), a non-synthetic source, and a
+ * recorded review status. Synthetic fixtures are valid for regression but
+ * must never be presented as external reliability evidence.
+ */
+export function validateBenchmarkIngestion(records: AnswerCorpusRecord[], provenance: ValidationProvenance): string[] {
+  const warnings: string[] = [];
+  if (!records.length) return ["Empty corpus: no reliability claim can be made."];
+  const synthetic = records.filter((r) => r.source === "internally authored" || r.source === "ai-generated-draft" || r.source === "unreviewed");
+  if (provenance === "external-human" && synthetic.length) {
+    warnings.push(`${synthetic.length}/${records.length} rows are synthetic or unreviewed and cannot support external reliability claims.`);
+  }
+  const singleMarked = records.filter((r) => r.humanMark1 == null && r.humanMark2 == null && r.adjudicatedMark == null);
+  if (singleMarked.length) warnings.push(`${singleMarked.length}/${records.length} rows have no human mark; they are excluded from agreement.`);
+  const noIndependence = records.filter((r) =>
+    r.humanMark1 != null && r.humanMark2 != null &&
+    !(r.marker1Meta?.independentlyMarked && r.marker2Meta?.independentlyMarked) && r.adjudicatedMark == null);
+  if (provenance === "external-human" && noIndependence.length) {
+    warnings.push(`${noIndependence.length}/${records.length} double-marked rows lack independent-marking attestation or adjudication.`);
+  }
+  const longForm = records.filter((r) => r.maximumMarks >= 6 || r.questionTypeTags.includes("6plus-extended" as never));
+  if (!longForm.length) warnings.push("No long-form (6+ mark) rows: extended-response reliability is unmeasured.");
+  const borderline = records.filter((r) => r.questionTypeTags.includes("borderline-explanation" as never));
+  if (!borderline.length) warnings.push("No borderline rows: threshold reliability is unmeasured.");
+  if (records.length < 30 && provenance === "external-human") {
+    warnings.push(`Small sample (n=${records.length}): report rates as provisional with wide uncertainty.`);
+  }
+  return warnings;
 }
 
 // ---------------------------------------------------------------------------

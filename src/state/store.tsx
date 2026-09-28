@@ -795,8 +795,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       if (!subject) return null;
       const questions = questionIds.map((id) => snapshot.questions.find((q) => q.id === id)).filter((q): q is Question => Boolean(q));
       if (!questions.length) return null;
+      // Trust gate: unreviewed WJEC content cannot drive a predicted score.
+      const trusted = questions.filter(trustedAssessmentContent);
+      if (!trusted.length) return null;
       const topicMastery = new Map(mastery.map((m) => [m.topicId, m.mastery]));
-      return simulatePaper({ subject, paperSpecId, questions, topicMastery, calibration: calibrations.get(subjectId) });
+      return simulatePaper({ subject, paperSpecId, questions: trusted, topicMastery, calibration: calibrations.get(subjectId) });
     },
     [snapshot, mastery, calibrations],
   );
