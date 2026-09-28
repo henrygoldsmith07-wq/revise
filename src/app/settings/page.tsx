@@ -696,9 +696,7 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     cards: store.cards,
     // Preserve only question rows needed to make historical/custom attempts
     // intelligible after restore; untouched shipped content is reproducible.
-    questions: store.questions.filter(
-      (question) => question.userId === store.userId || store.attempts.some((attempt) => attempt.questionId === question.id),
-    ),
+    questions: store.questions.filter((question) => question.userId === store.userId),
     papers: store.papers,
     lessonProgress: store.lessonProgress,
     attempts: store.attempts,
