@@ -641,23 +641,28 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   // Primary endpoint: assessment marks gained per revision hour.
   const effect = fullEfficacyReady && revMean != null && ctlMean != null ? round(revMean - ctlMean) : null;
   const comparisons: NonNullable<ExperimentAnalysis["comparisons"]> = [];
-  if (fullEfficacyReady) {
+  const comparablePairedData = primaryOutcomeReady && comparisonScales.size === 1;
+  if (comparablePairedData && revOuts.length) {
     const reviseGains = revOuts.map((outcome) => outcome.marksGainedPerHour!);
     for (const baseline of ["baseline-mastery", "baseline-overdue", "control"] as const) {
-      const baselineGains = primaryOutcomes.filter((outcome) => outcome.arm === baseline).map((outcome) => outcome.marksGainedPerHour!);
+      const baselineGains = primaryOutcomes
+        .filter((outcome) => outcome.arm === baseline)
+        .map((outcome) => outcome.marksGainedPerHour!);
+      if (!baselineGains.length) continue;
       const interval = bootstrapDifferenceCI(reviseGains, baselineGains, { iterations: 2000, seed: 42 });
       comparisons.push({ baseline, effect: interval.estimate, ci95Lower: interval.ci95Lower, ci95Upper: interval.ci95Upper,
         reviseN: reviseGains.length, baselineN: baselineGains.length, multiplicityAdjusted: false });
     }
   }
 
-  // Preregistered primary comparison: Revise versus self-directed control.
-  // Other arm comparisons above remain exploratory and unadjusted.
+  // Revise versus self-directed control is the preregistered primary
+  // comparison. The estimate can be reported provisionally once comparable
+  // paired data exist; readiness controls whether it may support a claim.
   let primaryComparison: ExperimentAnalysis["primaryComparison"] = null;
-  if (fullEfficacyReady && efficacyMin != null) {
-    const revGains = primaryOutcomes.filter((o) => o.arm === "revise").map((o) => o.marksGainedPerHour ?? 0);
-    const baseGains = primaryOutcomes.filter((o) => o.arm === "control").map((o) => o.marksGainedPerHour ?? 0);
-    if (revGains.length >= efficacyMin && baseGains.length >= efficacyMin) {
+  if (comparablePairedData) {
+    const revGains = primaryOutcomes.filter((o) => o.arm === "revise").map((o) => o.marksGainedPerHour!);
+    const baseGains = primaryOutcomes.filter((o) => o.arm === "control").map((o) => o.marksGainedPerHour!);
+    if (revGains.length && baseGains.length) {
       const ci = bootstrapDifferenceCI(revGains, baseGains, { iterations: 2000, seed: 42 });
       primaryComparison = {
         // Legacy field name retained for consumers; this is deliberately
