@@ -39,12 +39,31 @@ export function useExperiments(userId: Id): Experiments {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [assignment, funnel] = await Promise.all([
+      const [storedAssignment, funnel, storedParticipantId, storedEvents] = await Promise.all([
         readReviseMeta<ExperimentAssignment>("experimentAssignment"),
         readReviseMeta<FunnelEvent[]>("funnelEvents"),
+        readReviseMeta<string>("experimentParticipantId"),
+        readReviseMeta<ExperimentEvent[]>("experimentEvents"),
       ]);
+      let participantId = storedParticipantId;
+      if (!participantId) {
+        participantId = crypto.randomUUID();
+        await writeReviseMeta("experimentParticipantId", participantId);
+      }
+
+      let assignment = storedAssignment ?? null;
+      if (assignment && assignment.anonId !== participantId) {
+        const previousAnonId = assignment.anonId;
+        assignment = { ...assignment, anonId: participantId, version: 2 };
+        await writeReviseMeta("experimentAssignment", assignment);
+        const migratedEvents = (storedEvents ?? []).map((event) =>
+          event.anonId === previousAnonId ? { ...event, anonId: participantId! } : event
+        );
+        if (migratedEvents.length) await writeReviseMeta("experimentEvents", migratedEvents);
+      }
+
       if (cancelled) return;
-      setExperimentArm(assignment ?? null);
+      setExperimentArm(assignment?.optedOut ? null : assignment);
       setFunnelEvents(funnel ?? []);
       setLoaded(true);
     })();
@@ -72,15 +91,28 @@ export function useExperiments(userId: Id): Experiments {
   }, [userId]);
 
   const joinExperiment = useCallback(async () => {
-    const assignment = assignExperimentArm(userId);
+    let participantId = await readReviseMeta<string>("experimentParticipantId");
+    if (!participantId) {
+      participantId = crypto.randomUUID();
+      await writeReviseMeta("experimentParticipantId", participantId);
+    }
+    const assignment = { ...assignExperimentArm(participantId), version: 2 as const };
     await writeReviseMeta("experimentAssignment", assignment);
     setExperimentArm(assignment);
-  }, [userId]);
+  }, []);
 
   const leaveExperiment = useCallback(async () => {
-    await writeReviseMeta("experimentAssignment", { anonId: userId, arm: "control", assignedAt: new Date().toISOString(), optedOut: true });
+    const current = experimentArm ?? await readReviseMeta<ExperimentAssignment>("experimentAssignment");
+    if (current) {
+      await writeReviseMeta("experimentAssignment", {
+        ...current,
+        version: 2,
+        optedOut: true,
+        withdrawnAt: new Date().toISOString(),
+      });
+    }
     setExperimentArm(null);
-  }, [userId]);
+  }, [experimentArm]);
 
   const recordExperimentEvent = useCallback(async (type: ExperimentEventType, task: { taskId: string; activity: string; topicId?: Id | null }, at?: string) => {
     const arm = experimentArm;
