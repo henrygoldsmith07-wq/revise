@@ -44,7 +44,7 @@ type AnonOwned = { anonId?: string };
 function remapOwned<T extends Owned>(rows: unknown[], sourceUserId: Id, targetUserId: Id): T[] {
   return rows.map((value) => {
     const row = value as T;
-    if (row && typeof row === "object" && (row.userId === sourceUserId || row.userId == null)) {
+    if (row && typeof row === "object" && row.userId === sourceUserId) {
       return { ...row, userId: targetUserId } as T;
     }
     return row;
