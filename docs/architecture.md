@@ -304,3 +304,14 @@ the test.
   deterministic and offline, and a student can always practise a question from
   the topic they expect to find it under.
 - Grade boundaries are approximate and labelled as such.
+
+
+## Failed-sync recovery
+
+Outbox mutations retry automatically up to the shared retry cap. An entry that
+exhausts that budget is retained locally rather than silently dropped and no
+longer blocks newer mutations. The shell surfaces the failed count separately
+from ordinary pending work. Settings → Sync recovery exposes safe metadata only
+(entity, operation, attempts, queued time and error), with explicit actions to
+retry, export the private recovery record, or discard only the queued server
+mutation after confirmation. Payload/answer content is never shown by default.
