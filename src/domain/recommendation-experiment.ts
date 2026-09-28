@@ -38,7 +38,11 @@ export interface ExperimentAssignment {
   anonId: string;
   arm: ExperimentArm;
   assignedAt: IsoInstant;
-  version: 1;
+  /** v2 separates the study participant id from the application account id. */
+  version: 1 | 2;
+  /** Explicit withdrawal is retained for ITT accounting instead of deleting the assignment. */
+  optedOut?: boolean;
+  withdrawnAt?: IsoInstant;
 }
 
 export type ExperimentEventType = "shown" | "started" | "completed" | "rejected";
@@ -109,7 +113,18 @@ export interface ReviewLike {
   grade: string;
 }
 
-interface ParticipantWindow { assignedAt: number; arm: ExperimentArm }
+interface ParticipantWindow {
+  assignedAt: number;
+  arm: ExperimentArm;
+  withdrawnAt: number | null;
+}
+
+function inParticipantWindow(at: IsoInstant, window: ParticipantWindow): boolean {
+  const time = Date.parse(at);
+  return Number.isFinite(time) &&
+    time >= window.assignedAt &&
+    (window.withdrawnAt == null || time <= window.withdrawnAt);
+}
 
 function median(values: number[]): number | null {
   if (!values.length) return null;
@@ -218,6 +233,22 @@ export interface ExperimentReadinessGates {
   efficacyClaimReady: boolean;
 }
 
+export interface ExperimentEvidencePolicy {
+  /** Small engineering threshold: enough participants to verify that every arm operates. */
+  operationalMinParticipantsPerArm: number;
+  /**
+   * Preregistered sample requirement for an efficacy claim. Null means no
+   * efficacy claim is permitted yet; set this only from an explicit study
+   * design/power calculation, never from the observed results.
+   */
+  efficacyMinPairedPerArm: number | null;
+}
+
+export const DEFAULT_EXPERIMENT_EVIDENCE_POLICY: ExperimentEvidencePolicy = {
+  operationalMinParticipantsPerArm: 5,
+  efficacyMinPairedPerArm: null,
+};
+
 export interface ExperimentAnalysis {
   /** All prespecified alternatives; intervals are exploratory, not multiplicity-adjusted. */
   comparisons?: Array<{ baseline: Exclude<ExperimentArm, "revise">; effect: number; ci95Lower: number; ci95Upper: number;
@@ -264,7 +295,9 @@ export interface AnalyseExperimentInput {
   /** Post-study held-out assessment per participant (required for primary outcome). */
   finalAssessments: FinalAssessment[];
   now?: Date;
+  /** @deprecated Use evidencePolicy.operationalMinParticipantsPerArm. */
   minParticipantsPerArm?: number;
+  evidencePolicy?: Partial<ExperimentEvidencePolicy>;
 }
 
 const MS_HOUR = 3_600_000;
@@ -298,14 +331,18 @@ function armOutcome(
     validAttempt(a) && (requiresWjecContentReview(a.subjectId) ? a.trusted === true : a.trusted !== false);
   const mine = attempts.filter((a) => {
     const w = windows.get(a.anonId);
-    return w?.arm === arm && new Date(a.createdAt).getTime() >= w.assignedAt && eligibleAttempt(a);
+    return w?.arm === arm && inParticipantWindow(a.createdAt, w) && eligibleAttempt(a);
   });
-  const myEvents = events.filter((e) => windows.get(e.anonId)?.arm === arm);
-  // Only reviews AFTER assignment — pre-experiment FSRS history is baseline.
+  const myEvents = events.filter((e) => {
+    const w = windows.get(e.anonId);
+    return w?.arm === arm && inParticipantWindow(e.at, w);
+  });
+  // Only reviews inside the assigned study window — pre-experiment FSRS
+  // history is baseline and post-withdrawal activity is not intervention data.
   const myReviews = reviews.filter((r) => {
     const w = windows.get(r.anonId);
-    return w?.arm === arm && Number.isFinite(Date.parse(r.reviewedAt)) && typeof r.cardId === "string" &&
-      typeof r.grade === "string" && new Date(r.reviewedAt).getTime() >= w.assignedAt;
+    return w?.arm === arm && typeof r.cardId === "string" &&
+      typeof r.grade === "string" && inParticipantWindow(r.reviewedAt, w);
   });
 
   const hours = mine.reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
@@ -389,13 +426,19 @@ function armOutcome(
   const cutoff = now.getTime() - DROPOUT_DAYS * 86_400_000;
   let neverActivated = 0;
   let inactive = 0;
+  let dropoutEligible = 0;
   for (const p of participants) {
-    const myAttempts = attempts.filter((a) => a.anonId === p).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const w = windows.get(p);
+    if (!w || w.withdrawnAt != null) continue; // withdrawals are reported separately, not as dropout
+    dropoutEligible++;
+    const myAttempts = attempts
+      .filter((a) => a.anonId === p && inParticipantWindow(a.createdAt, w))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const lastAttempt = myAttempts.at(-1);
     if (!lastAttempt) neverActivated++;
-    else if (new Date(lastAttempt.createdAt).getTime() < cutoff) inactive++;
+    else if (Date.parse(lastAttempt.createdAt) < cutoff) inactive++;
   }
-  const dropoutRate = participants.size ? round((neverActivated + inactive) / participants.size) : null;
+  const dropoutRate = dropoutEligible ? round((neverActivated + inactive) / dropoutEligible) : null;
 
   const finals = participants.size
     ? [...participants].map((anon) => finalPerformance?.get(anon)).filter((v): v is number => v != null)
@@ -464,13 +507,29 @@ export function bootstrapDifferenceCI(
 
 export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnalysis {
   const now = input.now ?? new Date();
-  const windows = new Map<string, { assignedAt: number; arm: ExperimentArm }>();
+  const windows = new Map<string, ParticipantWindow>();
   for (const a of input.assignments) {
-    const at = new Date(a.assignedAt).getTime();
+    const at = Date.parse(a.assignedAt);
+    if (!Number.isFinite(at)) continue;
+    const withdrawal = a.withdrawnAt ? Date.parse(a.withdrawnAt) : (a.optedOut ? at : NaN);
+    const withdrawnAt = Number.isFinite(withdrawal) && withdrawal >= at ? withdrawal : null;
     const existing = windows.get(a.anonId);
-    if (!existing || at < existing.assignedAt) windows.set(a.anonId, { assignedAt: at, arm: a.arm });
+    if (!existing || at < existing.assignedAt) {
+      windows.set(a.anonId, { assignedAt: at, arm: a.arm, withdrawnAt });
+    } else if (withdrawnAt != null && (existing.withdrawnAt == null || withdrawnAt < existing.withdrawnAt)) {
+      existing.withdrawnAt = withdrawnAt;
+    }
   }
-  const minP = input.minParticipantsPerArm ?? 5;
+  const operationalMin = Math.max(
+    1,
+    Math.floor(input.evidencePolicy?.operationalMinParticipantsPerArm ?? input.minParticipantsPerArm ??
+      DEFAULT_EXPERIMENT_EVIDENCE_POLICY.operationalMinParticipantsPerArm),
+  );
+  const efficacyConfigured = input.evidencePolicy?.efficacyMinPairedPerArm ??
+    DEFAULT_EXPERIMENT_EVIDENCE_POLICY.efficacyMinPairedPerArm;
+  const efficacyMin = typeof efficacyConfigured === "number" && Number.isFinite(efficacyConfigured)
+    ? Math.max(2, Math.floor(efficacyConfigured))
+    : null;
 
   const enrolledN = windows.size;
   const attempts = input.attempts;
@@ -500,7 +559,7 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
       !Number.isInteger(final.maxMarks) || final.maxMarks <= 0 ||
       ![baseline.percent, final.percent].every((score) => Number.isFinite(score) && score >= 0 && score <= 100) ||
       !Number.isFinite(Date.parse(baseline.takenAt)) || !Number.isFinite(Date.parse(final.takenAt)) ||
-      Date.parse(baseline.takenAt) > w.assignedAt || Date.parse(final.takenAt) <= w.assignedAt) continue;
+      Date.parse(baseline.takenAt) > w.assignedAt || !inParticipantWindow(final.takenAt, w)) continue;
     // A Physics baseline is part of the durable marks endpoint.  Missing
     // attestation is as unsafe as an explicit rejection: a self/auto-marked
     // baseline can make later gain per hour look larger than it is.
@@ -520,7 +579,7 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     }
 
     const attemptHours = input.attempts
-      .filter((a) => a.anonId === anonId && new Date(a.createdAt).getTime() >= w.assignedAt &&
+      .filter((a) => a.anonId === anonId && inParticipantWindow(a.createdAt, w) &&
       Date.parse(a.createdAt) <= Date.parse(final.takenAt) && Number.isFinite(a.elapsedMs) && a.elapsedMs > 0)
       .reduce((acc, a) => acc + a.elapsedMs, 0) / MS_HOUR;
     const hours = final.revisionMinutes !== undefined ? final.revisionMinutes / 60 : attemptHours;
@@ -544,10 +603,15 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   const bo = arms.find((a) => a.arm === "baseline-overdue")!;
 
   const allPopulated = Boolean(revise && control && bm && bo);
-  const operationallyUsable = allPopulated && revise.participants >= minP && control.participants >= minP && bm.participants >= minP && bo.participants >= minP;
+  const operationallyUsable = allPopulated && EXPERIMENT_ARMS.every(
+    (arm) => (arms.find((row) => row.arm === arm)?.participants ?? 0) >= operationalMin,
+  );
   const descriptiveResultsReady = operationallyUsable && revise.practiceMarksPerHour != null && control.practiceMarksPerHour != null;
-  const primaryOutcomeReady = descriptiveResultsReady && primaryOutcomes.length >= minP * 2;
-  const efficacyClaimReady = primaryOutcomeReady && EXPERIMENT_ARMS.every((arm) => primaryOutcomes.filter((o) => o.arm === arm).length >= minP);
+  const primaryOutcomeReady = descriptiveResultsReady &&
+    primaryOutcomes.filter((o) => o.arm === "revise").length >= operationalMin &&
+    primaryOutcomes.filter((o) => o.arm === "control").length >= operationalMin;
+  const efficacyClaimReady = primaryOutcomeReady && efficacyMin != null &&
+    EXPERIMENT_ARMS.every((arm) => primaryOutcomes.filter((o) => o.arm === arm).length >= efficacyMin);
 
   // Additional evidence gates: transfer and retention must be computed for all arms.
   const transferReady = operationallyUsable &&
@@ -579,23 +643,18 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
     }
   }
 
-  // Strongest simple baseline comparison with bootstrap CI.
+  // Preregistered primary comparison: Revise versus self-directed control.
+  // Other arm comparisons above remain exploratory and unadjusted.
   let primaryComparison: ExperimentAnalysis["primaryComparison"] = null;
-  if (fullEfficacyReady) {
+  if (fullEfficacyReady && efficacyMin != null) {
     const revGains = primaryOutcomes.filter((o) => o.arm === "revise").map((o) => o.marksGainedPerHour ?? 0);
-    let strongestId = "baseline-mastery";
-    let strongestGain = -Infinity;
-    for (const bid of ["baseline-mastery", "baseline-overdue"] as const) {
-      const outs = primaryOutcomes.filter((o) => o.arm === bid);
-      if (!outs.length) continue;
-      const mean = outs.reduce((acc, o) => acc + (o.marksGainedPerHour ?? 0), 0) / outs.length;
-      if (mean > strongestGain) { strongestGain = mean; strongestId = bid; }
-    }
-    const baseGains = primaryOutcomes.filter((o) => o.arm === strongestId).map((o) => o.marksGainedPerHour ?? 0);
-    if (revGains.length >= minP && baseGains.length >= minP) {
+    const baseGains = primaryOutcomes.filter((o) => o.arm === "control").map((o) => o.marksGainedPerHour ?? 0);
+    if (revGains.length >= efficacyMin && baseGains.length >= efficacyMin) {
       const ci = bootstrapDifferenceCI(revGains, baseGains, { iterations: 2000, seed: 42 });
       primaryComparison = {
-        strongestBaselineId: strongestId,
+        // Legacy field name retained for consumers; this is deliberately
+        // always the preregistered control rather than a post-hoc winner.
+        strongestBaselineId: "control",
         effect: ci.estimate,
         ci95Lower: ci.ci95Lower,
         ci95Upper: ci.ci95Upper,
@@ -612,10 +671,17 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
       : !primaryOutcomeReady
         ? `Only ${primaryOutcomes.length} paired baseline-final outcomes so far.`
         : !fullEfficacyReady
-          ? `Primary outcomes are provisional: every arm needs at least ${minP} paired outcomes on one shared assessment scale, unseen transfer and delayed retention.`
+          ? efficacyMin == null
+            ? "Primary outcomes remain provisional: the preregistered efficacy sample threshold has not been configured."
+            : `Primary outcomes are provisional: every arm needs at least ${efficacyMin} paired outcomes on one shared assessment scale, unseen transfer and delayed retention.`
           : `Revise gained ${effect! > 0 ? "+" : ""}${effect} assessment marks per revision hour versus self-directed revision (${revOuts.length} vs ${ctlOuts.length} paired participants). Prospective design.`;
 
-  return { arms, primaryOutcomes, enrolledN, activatedN: [...windows.keys()].filter((anon: string) => attempts.some((a: { anonId: string }) => a.anonId === anon)).length, primaryOutcomeEligibleN: primaryOutcomes.length, missingBaselineN, missingFinalN, withdrawnN: 0,     marksGainedPerHourEffect: effect,
+  const activatedN = [...windows.entries()].filter(([anon, window]) =>
+    attempts.some((a) => a.anonId === anon && inParticipantWindow(a.createdAt, window))
+  ).length;
+  const withdrawnN = [...windows.values()].filter((window) => window.withdrawnAt != null).length;
+
+  return { arms, primaryOutcomes, enrolledN, activatedN, primaryOutcomeEligibleN: primaryOutcomes.length, missingBaselineN, missingFinalN, withdrawnN, marksGainedPerHourEffect: effect,
     primaryComparison, comparisons,
     sufficientData: fullEfficacyReady, readiness, gates, note };
 }
