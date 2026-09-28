@@ -32,9 +32,10 @@ import * as repo from "@/data/repository";
 import {
   abandonRevisionTwinSession as abandonStoredTwinSession,
   buildRevisionTwinChoices,
-  completeRevisionTwinSession as completeTwinSession,
+  completeRevisionTwinSessionFromAttempt as completeTwinSessionFromAttempt,
   createRevisionTwinSession,
   createRevisionTwinState,
+  finishRevisionTwinSession as finishTwinSession,
   revisionTwinReport,
 } from "@/domain/revision-twin";
 import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
@@ -51,7 +52,8 @@ export interface RevisionSessions {
   saveRevisionCheckpoint: (input: RevisionCheckpointInput) => Promise<void>;
   clearRevisionCheckpoint: () => Promise<void>;
   startRevisionTwinSession: (choice: RevisionTwinChoice, title?: string) => Promise<RevisionTwinSession>;
-  completeRevisionTwinSession: (id: Id, actualMarks: number, actualMinutes?: number) => Promise<void>;
+  completeRevisionTwinSessionFromAttempt: (id: Id, attemptId: Id, actualMinutes?: number) => Promise<void>;
+  finishRevisionTwinSession: (id: Id, actualMinutes?: number) => Promise<void>;
   abandonRevisionTwinSession: (id: Id) => Promise<void>;
 }
 
@@ -120,11 +122,22 @@ export function useRevisionSessions(input: {
     return session;
   }, [revisionTwin, userId]);
 
-  const completeRevisionTwinSession = useCallback(async (id: Id, actualMarks: number, actualMinutes?: number) => {
+  const completeRevisionTwinSessionFromAttempt = useCallback(async (id: Id, attemptId: Id, actualMinutes?: number) => {
+    const state = revisionTwin;
+    const session = state?.sessions.find((row) => row.id === id && row.status === "active");
+    const attempt = attempts.find((row) => row.id === attemptId);
+    if (!state || !session || !attempt) return;
+    const updated = completeTwinSessionFromAttempt(session, attempt, attempts, questions, { actualMinutes });
+    const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
+    await repo.saveRevisionTwin(next);
+    setRevisionTwin(next);
+  }, [revisionTwin, attempts, questions]);
+
+  const finishRevisionTwinSession = useCallback(async (id: Id, actualMinutes?: number) => {
     const state = revisionTwin;
     const session = state?.sessions.find((row) => row.id === id && row.status === "active");
     if (!state || !session) return;
-    const updated = completeTwinSession(session, { actualMarks, actualMinutes });
+    const updated = finishTwinSession(session, { actualMinutes });
     const next: RevisionTwinState = { ...state, sessions: state.sessions.map((row) => row.id === id ? updated : row), updatedAt: new Date().toISOString() };
     await repo.saveRevisionTwin(next);
     setRevisionTwin(next);
@@ -142,10 +155,6 @@ export function useRevisionSessions(input: {
 
   const twinState = useMemo(() => revisionTwin ?? createRevisionTwinState(userId), [revisionTwin, userId]);
   const twinReport = useMemo(() => revisionTwinReport(twinState), [twinState]);
-  const revisionTwinChoices = useMemo(
-    () => buildRevisionTwinChoices({ recommendations, sessions: twinState.sessions }),
-    [recommendations, twinState.sessions],
-  );
 
   // Unlike `recommendations`, this is not a list of competing activity
   // queues. It is one optimiser pass over the same snapshot, then one
@@ -173,6 +182,23 @@ export function useRevisionSessions(input: {
   }, [topics, cards, reviewLogs, questions, attempts, mistakes, mastery, exams,
     subjectIds, recallMastery, applicationMastery, readiness, interventionOutcomes]);
 
+  // The Twin audits Today's decision rather than introducing a second planner.
+  // Prefer the selected topic, then the selected subject, and use the exact
+  // same bounded learning window as the adaptive session.
+  const revisionTwinChoices = useMemo(() => {
+    if (!adaptiveSession) return [];
+    const exact = recommendations.filter((row) =>
+      row.subjectId === adaptiveSession.subjectId && row.topicId === adaptiveSession.topicId);
+    const sameSubject = recommendations.filter((row) => row.subjectId === adaptiveSession.subjectId);
+    const aligned = exact.length ? exact : sameSubject.length ? sameSubject : recommendations.slice(0, 1);
+    return buildRevisionTwinChoices({
+      recommendations: aligned,
+      sessions: twinState.sessions,
+      budgetMinutes: adaptiveSession.totalMinutes,
+      limit: 3,
+    });
+  }, [adaptiveSession, recommendations, twinState.sessions]);
+
   return {
     loaded,
     adaptiveSession,
@@ -183,7 +209,8 @@ export function useRevisionSessions(input: {
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     startRevisionTwinSession,
-    completeRevisionTwinSession,
+    completeRevisionTwinSessionFromAttempt,
+    finishRevisionTwinSession,
     abandonRevisionTwinSession,
   };
 }

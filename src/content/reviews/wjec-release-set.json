@@ -1,0 +1,53 @@
+{
+  "formatVersion": 1,
+  "subjects": {
+    "wjec-alevel-maths": [
+      "cnt:question:wjec-alevel-expansion-maths-conditional-probability",
+      "cnt:question:wjec-alevel-expansion-maths-continuous-distributions",
+      "cnt:question:wjec-alevel-expansion-maths-correlation-tests",
+      "cnt:question:wjec-alevel-expansion-maths-differential-equations-context",
+      "cnt:question:wjec-alevel-expansion-maths-inference-errors",
+      "cnt:question:wjec-alevel-expansion-maths-modelling-assumptions",
+      "cnt:question:wjec-alevel-expansion-maths-moments-statics",
+      "cnt:question:wjec-alevel-expansion-maths-poisson-uniform",
+      "cnt:question:maths-differentiation-stationary",
+      "cnt:question:maths-mechanics-connected"
+    ],
+    "wjec-alevel-biology": [
+      "cnt:question:wjec-alevel-expansion-biology-genetic-applications",
+      "cnt:question:wjec-alevel-expansion-biology-human-impact",
+      "cnt:question:wjec-alevel-expansion-biology-immunity-disease",
+      "cnt:question:wjec-alevel-expansion-biology-microbiology",
+      "cnt:question:wjec-alevel-expansion-biology-musculoskeletal",
+      "cnt:question:wjec-alevel-expansion-biology-nervous-coordination",
+      "cnt:question:wjec-alevel-expansion-biology-neurobiology-behaviour",
+      "cnt:question:wjec-alevel-expansion-biology-nutrition",
+      "cnt:question:wjec-alevel-expansion-biology-plant-reproduction",
+      "cnt:question:wjec-alevel-expansion-biology-practical-skills"
+    ],
+    "wjec-alevel-chemistry": [
+      "cnt:question:wjec-alevel-expansion-chemistry-amino-acids-proteins",
+      "cnt:question:wjec-alevel-expansion-chemistry-electrochemical-cells",
+      "cnt:question:wjec-alevel-expansion-chemistry-entropy-feasibility",
+      "cnt:question:wjec-alevel-expansion-chemistry-organic-mechanisms",
+      "cnt:question:wjec-alevel-expansion-chemistry-organic-synthesis",
+      "cnt:question:wjec-alevel-expansion-chemistry-p-block",
+      "cnt:question:wjec-alevel-expansion-chemistry-practical-analysis",
+      "cnt:question:wjec-alevel-expansion-chemistry-stereoisomerism",
+      "cnt:question:chem-equilibrium-lechatelier",
+      "cnt:question:chem-organic-isomerism"
+    ],
+    "wjec-alevel-physics": [
+      "cnt:question:wjec-alevel-expansion-physics-capacitance",
+      "cnt:question:wjec-alevel-expansion-physics-electromagnetic-induction",
+      "cnt:question:wjec-alevel-expansion-physics-sports-physics",
+      "cnt:question:wjec-alevel-expansion-physics-alternating-currents",
+      "cnt:question:wjec-alevel-expansion-physics-energy-environment",
+      "cnt:question:wjec-alevel-expansion-physics-medical-physics",
+      "cnt:question:wjec-alevel-expansion-physics-orbits-universe",
+      "cnt:question:wjec-alevel-expansion-physics-practical-investigations",
+      "cnt:question:depth-circuits-internal-r",
+      "cnt:question:depth-circular-banked"
+    ]
+  }
+}

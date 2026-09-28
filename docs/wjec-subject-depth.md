@@ -43,15 +43,17 @@ This may reduce previously displayed evidence, mastery or readiness for these su
 From the repository:
 
 ```text
-node scripts/wjec-content-review.mjs export <new-directory>
-node scripts/wjec-content-review.mjs check <returned-directory>
+npm run wjec:review:batch -- maths <new-directory> --limit=10
+npm run wjec:review:batch -- biology <new-directory> --limit=10
+npm run wjec:review:batch -- chemistry <new-directory> --limit=10
+npm run wjec:review:apply -- <returned-directory> --dry-run
 ```
 
-Export refuses an existing directory. Each subject folder contains a student booklet, a separate marking booklet for the 28 new drafts, an exact-fingerprint draft packet, the full content and prerequisite packets, a quality audit, authoring briefs and model-answer self-checks. A reviewer should solve the student version before opening the marking version.
+Focused batch export refuses an existing directory. Each subject folder contains a student booklet, a separate reviewer key, an exact-fingerprint review packet, a simulated coverage-gain report and a release-set proposal. A reviewer should solve the student version before opening the marking version. The whole-bank export/check workflow remains available for audit/backfill, but is no longer the default reviewer workflow.
 
-Review returned rows in `new-draft-review.json`, then merge them into the matching rows in `content-review.json`. The check command requires qualified reviewer details for approval, detects edits, rejects mismatched subjects and produces proposed checked records. It does not alter the application or publish approvals. Source changes require a fresh export and a new review of the changed fingerprint.
+Review returned rows in `new-draft-review.json`, then merge them into the matching rows in `content-review.json`. The check command requires qualified reviewer details for approval, detects edits, rejects mismatched subjects and produces proposed checked records. Once the packet passes, `npm run wjec:review:apply -- <returned-review-directory>` atomically persists only canonical approvals into the fingerprint-keyed repository ledger. It never edits the authored question bank. Source changes require a fresh export and a new review of the changed fingerprint; the previous ledger entry remains audit history but stops contributing trusted evidence.
 
-The underlying Physics-named APIs remain for backward compatibility, with fingerprint prefix `physics-review-v3` (covers difficulty and AO mapping; v2 attestations are stale and fail closed). A subject parameter selects the Maths, Biology or Chemistry packet, and `src/domain/content-lifecycle.ts` reports authored/reviewed/verified/blocked with the next review batch. This reuses the existing contract instead of creating a parallel trust system. Physics's separate marking-corpus, paper-source acquisition and experiment intake files remain Physics-specific; they are not evidence for these three subjects.
+The underlying Physics-named APIs remain for compatibility, but exact review fingerprints now use canonical SHA-256 under `wjec-review-v3:sha256:` (covering difficulty and AO mapping). Historical `physics-review-v2:` attestations are retained only as audit history and cannot make current content trusted. A subject parameter selects the Maths, Biology or Chemistry packet, and `src/domain/content-lifecycle.ts` reports authored/reviewed/verified/blocked with the next review batch. This reuses the existing contract instead of creating a parallel trust system. Physics's separate marking-corpus, paper-source acquisition and experiment intake files remain Physics-specific; they are not evidence for these three subjects.
 
 ## Remaining validation work
 
@@ -68,3 +70,11 @@ Recheck on 2026-09-11: strict TypeScript and zero-warning lint passed again; cur
 ## Local main integration
 
 The subject upgrade was isolated from the separate uncommitted Physics work before integration. Its staged snapshot passed strict TypeScript and all 164 targeted tests across content, subject quality, the durable learning loop, prerequisite diagnosis, paper selection and grade calibration. The broader benchmark figures above describe the earlier combined working tree, not this isolated snapshot.
+
+## WJEC part-level trust update (2026-09-26)
+
+WJEC flagship trust and authored depth are credited per mapped question part rather than by assigning one depth label to an entire structured question. A question can therefore contribute recall, application and transfer evidence through different parts, but still counts as only one independent question toward the four-question threshold for a specification statement.
+
+Human review attestations require a full timezone-bearing ISO instant and reject date-only, impossible-calendar or materially future-dated times across question approval, WJEC paper provenance, marking/outcomes and prerequisite decisions. Verified paper provenance additionally requires an official HTTPS WJEC origin and a SHA-256 source digest. Marking/outcome and prerequisite attestations use exact canonical SHA-256 fingerprints; legacy 32-bit fingerprints are historical only. The exact authored-content ceiling is tracked in `src/content/reviews/wjec-authoring-backlog.json`; `npm run wjec:authoring:gaps` reports the gaps, `npm run wjec:authoring:plan -- <subject> --limit=12` produces prioritized new-family authoring briefs, and `npm run wjec:authoring:check` verifies that the source-controlled backlog matches the live bank. Prerequisite hypotheses use a separate reviewed ledger via `wjec:prerequisite:batch` and `wjec:prerequisite:apply`; neither workflow fabricates approvals.
+
+Focused review batches emit `release-set-proposal.json`. `npm run wjec:release:check -- <proposal>` validates a proposal without writing; `npm run wjec:release:apply -- <proposal>` atomically updates only the editorial release-candidate manifest. The generated `resultingQuestionIds` snapshot is mandatory so stale proposals fail closed. Release selection never creates or changes human approvals.

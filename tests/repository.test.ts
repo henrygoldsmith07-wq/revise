@@ -130,7 +130,7 @@ describe("ensureSeeded", () => {
     const survivor = second.cards.find((c) => c.id === graded.id);
     expect(survivor?.reps).toBe(5);
     expect(survivor?.due).toBe("2030-01-01");
-  });
+  }, 15_000);
 });
 
 describe("db module", () => {

@@ -1,8 +1,10 @@
-import { capabilityEdgeFingerprint, validateCapabilityGraph, validatePrerequisiteRationales, validatePrerequisiteReviews, type CapabilityNode } from "@/domain/capability-graph";
+import { validCapabilityDependencyReview, validateCapabilityGraph, validatePrerequisiteRationales, validatePrerequisiteReviews, type CapabilityNode } from "@/domain/capability-graph";
 import { wjecPhysics } from "@/domain/curriculum/wjec-physics";
 import type { PrerequisiteEdge } from "@/domain/prerequisites";
 import { wjecSubjectCapabilities } from "./wjec-subject-capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
+import prerequisiteReviewLedger from "./reviews/wjec-prerequisite-verification.json";
+import { applyPrerequisiteReviewLedger } from "@/domain/prerequisite-review-ledger";
 
 const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 
@@ -203,7 +205,7 @@ const legacyWjecCapabilities: CapabilityNode[] = [
 ];
 
 /** All WJEC nodes, including the original stable ids kept for old attempts. */
-export const wjecCapabilities: CapabilityNode[] = [
+const baseWjecCapabilities: CapabilityNode[] = [
   { id: "phys.motion.graph-gradient", subjectId: PHYSICS_SUBJECT_ID,
     topicId: "wjec-alevel-physics.kinematics-dynamics", label: "Interpret local slopes and their signs in motion graphs",
     specPointIds: ["wjec-alevel-physics.kinematics-dynamics.sp-02"], prerequisites: [],
@@ -217,6 +219,9 @@ export const wjecCapabilities: CapabilityNode[] = [
   ...physicsCircuitCapabilities,
   ...wjecSubjectCapabilities,
 ];
+const prerequisiteLedgerApplication = applyPrerequisiteReviewLedger(baseWjecCapabilities, prerequisiteReviewLedger);
+export const wjecCapabilities: CapabilityNode[] = prerequisiteLedgerApplication.nodes;
+export const wjecPrerequisiteReviewLedgerIssues = prerequisiteLedgerApplication.issues;
 
 /**
  * Convert only subject-expert-approved Physics capability edges into the
@@ -238,8 +243,7 @@ export function reviewedWjecTopicEdges(subjectId?: string): PrerequisiteEdge[] {
       const prerequisite = byId.get(prerequisiteId);
       const review = node.prerequisiteReviews?.[prerequisiteId];
       if (!prerequisite || prerequisite.subjectId !== node.subjectId || node.topicId === prerequisite.topicId ||
-        review?.status !== "approved" || !review.reviewerId?.trim() || !review.reviewedAt ||
-        !Number.isFinite(Date.parse(review.reviewedAt)) || review.edgeFingerprint !== capabilityEdgeFingerprint(node, prerequisite)) continue;
+        !validCapabilityDependencyReview(node, prerequisite, review)) continue;
       const key = `${node.topicId}<-${prerequisite.topicId}`;
       if (seen.has(key)) continue;
       seen.add(key);

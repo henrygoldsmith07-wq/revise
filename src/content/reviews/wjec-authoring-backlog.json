@@ -1,0 +1,2675 @@
+{
+  "formatVersion": 1,
+  "coreQuestionCount": 4,
+  "model": "part-level-depth-v1",
+  "subjects": {
+    "wjec-alevel-maths": [
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-02",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-03",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-04",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-05",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-06",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.conditional-probability.sp-02",
+        "topicId": "wjec-alevel-maths.conditional-probability",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.conditional-probability.sp-03",
+        "topicId": "wjec-alevel-maths.conditional-probability",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.conditional-probability.sp-04",
+        "topicId": "wjec-alevel-maths.conditional-probability",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.continuous-distributions.sp-01",
+        "topicId": "wjec-alevel-maths.continuous-distributions",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.continuous-distributions.sp-02",
+        "topicId": "wjec-alevel-maths.continuous-distributions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.continuous-distributions.sp-03",
+        "topicId": "wjec-alevel-maths.continuous-distributions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.continuous-distributions.sp-04",
+        "topicId": "wjec-alevel-maths.continuous-distributions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.coordinate-geometry.sp-02",
+        "topicId": "wjec-alevel-maths.coordinate-geometry",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.coordinate-geometry.sp-03",
+        "topicId": "wjec-alevel-maths.coordinate-geometry",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.correlation-tests.sp-01",
+        "topicId": "wjec-alevel-maths.correlation-tests",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.correlation-tests.sp-02",
+        "topicId": "wjec-alevel-maths.correlation-tests",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.correlation-tests.sp-03",
+        "topicId": "wjec-alevel-maths.correlation-tests",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.correlation-tests.sp-04",
+        "topicId": "wjec-alevel-maths.correlation-tests",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differential-equations-context.sp-01",
+        "topicId": "wjec-alevel-maths.differential-equations-context",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differential-equations-context.sp-02",
+        "topicId": "wjec-alevel-maths.differential-equations-context",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differential-equations-context.sp-03",
+        "topicId": "wjec-alevel-maths.differential-equations-context",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differential-equations-context.sp-04",
+        "topicId": "wjec-alevel-maths.differential-equations-context",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differentiation.sp-02",
+        "topicId": "wjec-alevel-maths.differentiation",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differentiation.sp-03",
+        "topicId": "wjec-alevel-maths.differentiation",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.distributions.sp-01",
+        "topicId": "wjec-alevel-maths.distributions",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.distributions.sp-02",
+        "topicId": "wjec-alevel-maths.distributions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.distributions.sp-03",
+        "topicId": "wjec-alevel-maths.distributions",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.distributions.sp-04",
+        "topicId": "wjec-alevel-maths.distributions",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.exponentials.sp-02",
+        "topicId": "wjec-alevel-maths.exponentials",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.exponentials.sp-04",
+        "topicId": "wjec-alevel-maths.exponentials",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.forces.sp-01",
+        "topicId": "wjec-alevel-maths.forces",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.forces.sp-02",
+        "topicId": "wjec-alevel-maths.forces",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.forces.sp-03",
+        "topicId": "wjec-alevel-maths.forces",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.forces.sp-04",
+        "topicId": "wjec-alevel-maths.forces",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.inference-errors.sp-01",
+        "topicId": "wjec-alevel-maths.inference-errors",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.inference-errors.sp-02",
+        "topicId": "wjec-alevel-maths.inference-errors",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.inference-errors.sp-03",
+        "topicId": "wjec-alevel-maths.inference-errors",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.inference-errors.sp-04",
+        "topicId": "wjec-alevel-maths.inference-errors",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.integration.sp-02",
+        "topicId": "wjec-alevel-maths.integration",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.integration.sp-03",
+        "topicId": "wjec-alevel-maths.integration",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.integration.sp-04",
+        "topicId": "wjec-alevel-maths.integration",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.kinematics.sp-01",
+        "topicId": "wjec-alevel-maths.kinematics",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.kinematics.sp-02",
+        "topicId": "wjec-alevel-maths.kinematics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.kinematics.sp-03",
+        "topicId": "wjec-alevel-maths.kinematics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.kinematics.sp-04",
+        "topicId": "wjec-alevel-maths.kinematics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.modelling-assumptions.sp-01",
+        "topicId": "wjec-alevel-maths.modelling-assumptions",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.modelling-assumptions.sp-02",
+        "topicId": "wjec-alevel-maths.modelling-assumptions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.modelling-assumptions.sp-03",
+        "topicId": "wjec-alevel-maths.modelling-assumptions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.modelling-assumptions.sp-04",
+        "topicId": "wjec-alevel-maths.modelling-assumptions",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.moments-statics.sp-01",
+        "topicId": "wjec-alevel-maths.moments-statics",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.moments-statics.sp-02",
+        "topicId": "wjec-alevel-maths.moments-statics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.moments-statics.sp-03",
+        "topicId": "wjec-alevel-maths.moments-statics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.moments-statics.sp-04",
+        "topicId": "wjec-alevel-maths.moments-statics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.numerical.sp-01",
+        "topicId": "wjec-alevel-maths.numerical",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.numerical.sp-02",
+        "topicId": "wjec-alevel-maths.numerical",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.numerical.sp-03",
+        "topicId": "wjec-alevel-maths.numerical",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.poisson-uniform.sp-01",
+        "topicId": "wjec-alevel-maths.poisson-uniform",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.poisson-uniform.sp-02",
+        "topicId": "wjec-alevel-maths.poisson-uniform",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.poisson-uniform.sp-03",
+        "topicId": "wjec-alevel-maths.poisson-uniform",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.poisson-uniform.sp-04",
+        "topicId": "wjec-alevel-maths.poisson-uniform",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.probability.sp-01",
+        "topicId": "wjec-alevel-maths.probability",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.probability.sp-02",
+        "topicId": "wjec-alevel-maths.probability",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.probability.sp-03",
+        "topicId": "wjec-alevel-maths.probability",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.proof.sp-01",
+        "topicId": "wjec-alevel-maths.proof",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.proof.sp-02",
+        "topicId": "wjec-alevel-maths.proof",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.proof.sp-03",
+        "topicId": "wjec-alevel-maths.proof",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.sequences.sp-01",
+        "topicId": "wjec-alevel-maths.sequences",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.sequences.sp-02",
+        "topicId": "wjec-alevel-maths.sequences",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.sequences.sp-03",
+        "topicId": "wjec-alevel-maths.sequences",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.statistical-sampling.sp-01",
+        "topicId": "wjec-alevel-maths.statistical-sampling",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.statistical-sampling.sp-02",
+        "topicId": "wjec-alevel-maths.statistical-sampling",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.statistical-sampling.sp-03",
+        "topicId": "wjec-alevel-maths.statistical-sampling",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.trigonometry.sp-02",
+        "topicId": "wjec-alevel-maths.trigonometry",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-maths.trigonometry.sp-03",
+        "topicId": "wjec-alevel-maths.trigonometry",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.trigonometry.sp-04",
+        "topicId": "wjec-alevel-maths.trigonometry",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.vectors.sp-01",
+        "topicId": "wjec-alevel-maths.vectors",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.vectors.sp-02",
+        "topicId": "wjec-alevel-maths.vectors",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.vectors.sp-03",
+        "topicId": "wjec-alevel-maths.vectors",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      }
+    ],
+    "wjec-alevel-biology": [
+      {
+        "specPointId": "wjec-alevel-biology.biodiversity.sp-01",
+        "topicId": "wjec-alevel-biology.biodiversity",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biodiversity.sp-02",
+        "topicId": "wjec-alevel-biology.biodiversity",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biodiversity.sp-03",
+        "topicId": "wjec-alevel-biology.biodiversity",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biodiversity.sp-04",
+        "topicId": "wjec-alevel-biology.biodiversity",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biodiversity.sp-05",
+        "topicId": "wjec-alevel-biology.biodiversity",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biological-molecules.sp-04",
+        "topicId": "wjec-alevel-biology.biological-molecules",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biological-molecules.sp-05",
+        "topicId": "wjec-alevel-biology.biological-molecules",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biological-molecules.sp-06",
+        "topicId": "wjec-alevel-biology.biological-molecules",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.cell-structure.sp-02",
+        "topicId": "wjec-alevel-biology.cell-structure",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.cell-structure.sp-03",
+        "topicId": "wjec-alevel-biology.cell-structure",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.cell-structure.sp-04",
+        "topicId": "wjec-alevel-biology.cell-structure",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.cell-structure.sp-05",
+        "topicId": "wjec-alevel-biology.cell-structure",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.ecosystems.sp-01",
+        "topicId": "wjec-alevel-biology.ecosystems",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.ecosystems.sp-02",
+        "topicId": "wjec-alevel-biology.ecosystems",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.ecosystems.sp-03",
+        "topicId": "wjec-alevel-biology.ecosystems",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.ecosystems.sp-04",
+        "topicId": "wjec-alevel-biology.ecosystems",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.ecosystems.sp-05",
+        "topicId": "wjec-alevel-biology.ecosystems",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.enzymes.sp-02",
+        "topicId": "wjec-alevel-biology.enzymes",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.gas-exchange.sp-02",
+        "topicId": "wjec-alevel-biology.gas-exchange",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.gas-exchange.sp-03",
+        "topicId": "wjec-alevel-biology.gas-exchange",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.gas-exchange.sp-04",
+        "topicId": "wjec-alevel-biology.gas-exchange",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.gas-exchange.sp-05",
+        "topicId": "wjec-alevel-biology.gas-exchange",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetic-applications.sp-01",
+        "topicId": "wjec-alevel-biology.genetic-applications",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetic-applications.sp-02",
+        "topicId": "wjec-alevel-biology.genetic-applications",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetic-applications.sp-03",
+        "topicId": "wjec-alevel-biology.genetic-applications",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetic-applications.sp-04",
+        "topicId": "wjec-alevel-biology.genetic-applications",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetics-inheritance.sp-01",
+        "topicId": "wjec-alevel-biology.genetics-inheritance",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetics-inheritance.sp-02",
+        "topicId": "wjec-alevel-biology.genetics-inheritance",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetics-inheritance.sp-03",
+        "topicId": "wjec-alevel-biology.genetics-inheritance",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetics-inheritance.sp-04",
+        "topicId": "wjec-alevel-biology.genetics-inheritance",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.genetics-inheritance.sp-05",
+        "topicId": "wjec-alevel-biology.genetics-inheritance",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.homeostasis.sp-01",
+        "topicId": "wjec-alevel-biology.homeostasis",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.homeostasis.sp-02",
+        "topicId": "wjec-alevel-biology.homeostasis",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.homeostasis.sp-03",
+        "topicId": "wjec-alevel-biology.homeostasis",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.homeostasis.sp-04",
+        "topicId": "wjec-alevel-biology.homeostasis",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.homeostasis.sp-05",
+        "topicId": "wjec-alevel-biology.homeostasis",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.human-impact.sp-01",
+        "topicId": "wjec-alevel-biology.human-impact",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.human-impact.sp-02",
+        "topicId": "wjec-alevel-biology.human-impact",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.human-impact.sp-03",
+        "topicId": "wjec-alevel-biology.human-impact",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.human-impact.sp-04",
+        "topicId": "wjec-alevel-biology.human-impact",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.immunity-disease.sp-01",
+        "topicId": "wjec-alevel-biology.immunity-disease",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.immunity-disease.sp-02",
+        "topicId": "wjec-alevel-biology.immunity-disease",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.immunity-disease.sp-03",
+        "topicId": "wjec-alevel-biology.immunity-disease",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.immunity-disease.sp-04",
+        "topicId": "wjec-alevel-biology.immunity-disease",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.membranes-transport.sp-02",
+        "topicId": "wjec-alevel-biology.membranes-transport",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.membranes-transport.sp-04",
+        "topicId": "wjec-alevel-biology.membranes-transport",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.membranes-transport.sp-05",
+        "topicId": "wjec-alevel-biology.membranes-transport",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.microbiology.sp-01",
+        "topicId": "wjec-alevel-biology.microbiology",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.microbiology.sp-02",
+        "topicId": "wjec-alevel-biology.microbiology",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.microbiology.sp-03",
+        "topicId": "wjec-alevel-biology.microbiology",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.microbiology.sp-04",
+        "topicId": "wjec-alevel-biology.microbiology",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.musculoskeletal.sp-01",
+        "topicId": "wjec-alevel-biology.musculoskeletal",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.musculoskeletal.sp-02",
+        "topicId": "wjec-alevel-biology.musculoskeletal",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.musculoskeletal.sp-03",
+        "topicId": "wjec-alevel-biology.musculoskeletal",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.musculoskeletal.sp-04",
+        "topicId": "wjec-alevel-biology.musculoskeletal",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nervous-coordination.sp-01",
+        "topicId": "wjec-alevel-biology.nervous-coordination",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nervous-coordination.sp-02",
+        "topicId": "wjec-alevel-biology.nervous-coordination",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nervous-coordination.sp-03",
+        "topicId": "wjec-alevel-biology.nervous-coordination",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nervous-coordination.sp-04",
+        "topicId": "wjec-alevel-biology.nervous-coordination",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.neurobiology-behaviour.sp-01",
+        "topicId": "wjec-alevel-biology.neurobiology-behaviour",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.neurobiology-behaviour.sp-02",
+        "topicId": "wjec-alevel-biology.neurobiology-behaviour",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.neurobiology-behaviour.sp-03",
+        "topicId": "wjec-alevel-biology.neurobiology-behaviour",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.neurobiology-behaviour.sp-04",
+        "topicId": "wjec-alevel-biology.neurobiology-behaviour",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nucleic-acids.sp-02",
+        "topicId": "wjec-alevel-biology.nucleic-acids",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nucleic-acids.sp-03",
+        "topicId": "wjec-alevel-biology.nucleic-acids",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nucleic-acids.sp-04",
+        "topicId": "wjec-alevel-biology.nucleic-acids",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nucleic-acids.sp-05",
+        "topicId": "wjec-alevel-biology.nucleic-acids",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nutrition.sp-01",
+        "topicId": "wjec-alevel-biology.nutrition",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nutrition.sp-02",
+        "topicId": "wjec-alevel-biology.nutrition",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nutrition.sp-03",
+        "topicId": "wjec-alevel-biology.nutrition",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.nutrition.sp-04",
+        "topicId": "wjec-alevel-biology.nutrition",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.photosynthesis.sp-01",
+        "topicId": "wjec-alevel-biology.photosynthesis",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.photosynthesis.sp-02",
+        "topicId": "wjec-alevel-biology.photosynthesis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.photosynthesis.sp-03",
+        "topicId": "wjec-alevel-biology.photosynthesis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.photosynthesis.sp-04",
+        "topicId": "wjec-alevel-biology.photosynthesis",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.photosynthesis.sp-05",
+        "topicId": "wjec-alevel-biology.photosynthesis",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.plant-reproduction.sp-01",
+        "topicId": "wjec-alevel-biology.plant-reproduction",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.plant-reproduction.sp-02",
+        "topicId": "wjec-alevel-biology.plant-reproduction",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.plant-reproduction.sp-03",
+        "topicId": "wjec-alevel-biology.plant-reproduction",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.plant-reproduction.sp-04",
+        "topicId": "wjec-alevel-biology.plant-reproduction",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.practical-skills.sp-01",
+        "topicId": "wjec-alevel-biology.practical-skills",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.practical-skills.sp-02",
+        "topicId": "wjec-alevel-biology.practical-skills",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.practical-skills.sp-03",
+        "topicId": "wjec-alevel-biology.practical-skills",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.practical-skills.sp-04",
+        "topicId": "wjec-alevel-biology.practical-skills",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.respiration.sp-01",
+        "topicId": "wjec-alevel-biology.respiration",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.respiration.sp-02",
+        "topicId": "wjec-alevel-biology.respiration",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.respiration.sp-03",
+        "topicId": "wjec-alevel-biology.respiration",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.respiration.sp-04",
+        "topicId": "wjec-alevel-biology.respiration",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.respiration.sp-05",
+        "topicId": "wjec-alevel-biology.respiration",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.sexual-reproduction.sp-01",
+        "topicId": "wjec-alevel-biology.sexual-reproduction",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.sexual-reproduction.sp-02",
+        "topicId": "wjec-alevel-biology.sexual-reproduction",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.sexual-reproduction.sp-03",
+        "topicId": "wjec-alevel-biology.sexual-reproduction",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.sexual-reproduction.sp-04",
+        "topicId": "wjec-alevel-biology.sexual-reproduction",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-animals.sp-01",
+        "topicId": "wjec-alevel-biology.transport-animals",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-animals.sp-02",
+        "topicId": "wjec-alevel-biology.transport-animals",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-animals.sp-03",
+        "topicId": "wjec-alevel-biology.transport-animals",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-animals.sp-04",
+        "topicId": "wjec-alevel-biology.transport-animals",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-animals.sp-05",
+        "topicId": "wjec-alevel-biology.transport-animals",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-plants.sp-01",
+        "topicId": "wjec-alevel-biology.transport-plants",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-plants.sp-02",
+        "topicId": "wjec-alevel-biology.transport-plants",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-plants.sp-03",
+        "topicId": "wjec-alevel-biology.transport-plants",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.transport-plants.sp-04",
+        "topicId": "wjec-alevel-biology.transport-plants",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      }
+    ],
+    "wjec-alevel-chemistry": [
+      {
+        "specPointId": "wjec-alevel-chemistry.acids-bases.sp-02",
+        "topicId": "wjec-alevel-chemistry.acids-bases",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.acids-bases.sp-03",
+        "topicId": "wjec-alevel-chemistry.acids-bases",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.acids-bases.sp-04",
+        "topicId": "wjec-alevel-chemistry.acids-bases",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.acids-bases.sp-05",
+        "topicId": "wjec-alevel-chemistry.acids-bases",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.amino-acids-proteins.sp-01",
+        "topicId": "wjec-alevel-chemistry.amino-acids-proteins",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.amino-acids-proteins.sp-02",
+        "topicId": "wjec-alevel-chemistry.amino-acids-proteins",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.amino-acids-proteins.sp-03",
+        "topicId": "wjec-alevel-chemistry.amino-acids-proteins",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.amino-acids-proteins.sp-04",
+        "topicId": "wjec-alevel-chemistry.amino-acids-proteins",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.aromatics-nitrogen.sp-01",
+        "topicId": "wjec-alevel-chemistry.aromatics-nitrogen",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.aromatics-nitrogen.sp-02",
+        "topicId": "wjec-alevel-chemistry.aromatics-nitrogen",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.aromatics-nitrogen.sp-03",
+        "topicId": "wjec-alevel-chemistry.aromatics-nitrogen",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.aromatics-nitrogen.sp-04",
+        "topicId": "wjec-alevel-chemistry.aromatics-nitrogen",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.aromatics-nitrogen.sp-05",
+        "topicId": "wjec-alevel-chemistry.aromatics-nitrogen",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-02",
+        "topicId": "wjec-alevel-chemistry.atomic-structure",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-03",
+        "topicId": "wjec-alevel-chemistry.atomic-structure",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-05",
+        "topicId": "wjec-alevel-chemistry.atomic-structure",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.bonding.sp-02",
+        "topicId": "wjec-alevel-chemistry.bonding",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.bonding.sp-03",
+        "topicId": "wjec-alevel-chemistry.bonding",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.bonding.sp-04",
+        "topicId": "wjec-alevel-chemistry.bonding",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.bonding.sp-05",
+        "topicId": "wjec-alevel-chemistry.bonding",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.carbonyls-acids.sp-01",
+        "topicId": "wjec-alevel-chemistry.carbonyls-acids",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.carbonyls-acids.sp-02",
+        "topicId": "wjec-alevel-chemistry.carbonyls-acids",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.carbonyls-acids.sp-03",
+        "topicId": "wjec-alevel-chemistry.carbonyls-acids",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.carbonyls-acids.sp-04",
+        "topicId": "wjec-alevel-chemistry.carbonyls-acids",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.carbonyls-acids.sp-05",
+        "topicId": "wjec-alevel-chemistry.carbonyls-acids",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-01",
+        "topicId": "wjec-alevel-chemistry.electrochemical-cells",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-02",
+        "topicId": "wjec-alevel-chemistry.electrochemical-cells",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-03",
+        "topicId": "wjec-alevel-chemistry.electrochemical-cells",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-04",
+        "topicId": "wjec-alevel-chemistry.electrochemical-cells",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.energetics.sp-01",
+        "topicId": "wjec-alevel-chemistry.energetics",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.energetics.sp-02",
+        "topicId": "wjec-alevel-chemistry.energetics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.energetics.sp-03",
+        "topicId": "wjec-alevel-chemistry.energetics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.energetics.sp-04",
+        "topicId": "wjec-alevel-chemistry.energetics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.energetics.sp-05",
+        "topicId": "wjec-alevel-chemistry.energetics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.entropy-feasibility.sp-01",
+        "topicId": "wjec-alevel-chemistry.entropy-feasibility",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.entropy-feasibility.sp-02",
+        "topicId": "wjec-alevel-chemistry.entropy-feasibility",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.entropy-feasibility.sp-03",
+        "topicId": "wjec-alevel-chemistry.entropy-feasibility",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.entropy-feasibility.sp-04",
+        "topicId": "wjec-alevel-chemistry.entropy-feasibility",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.equilibria.sp-04",
+        "topicId": "wjec-alevel-chemistry.equilibria",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.equilibria.sp-05",
+        "topicId": "wjec-alevel-chemistry.equilibria",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.hydrocarbons.sp-02",
+        "topicId": "wjec-alevel-chemistry.hydrocarbons",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.hydrocarbons.sp-03",
+        "topicId": "wjec-alevel-chemistry.hydrocarbons",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.hydrocarbons.sp-04",
+        "topicId": "wjec-alevel-chemistry.hydrocarbons",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.hydrocarbons.sp-05",
+        "topicId": "wjec-alevel-chemistry.hydrocarbons",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.kinetics.sp-02",
+        "topicId": "wjec-alevel-chemistry.kinetics",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.kinetics.sp-03",
+        "topicId": "wjec-alevel-chemistry.kinetics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.kinetics.sp-04",
+        "topicId": "wjec-alevel-chemistry.kinetics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.kinetics.sp-05",
+        "topicId": "wjec-alevel-chemistry.kinetics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.moles.sp-03",
+        "topicId": "wjec-alevel-chemistry.moles",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.moles.sp-04",
+        "topicId": "wjec-alevel-chemistry.moles",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.moles.sp-05",
+        "topicId": "wjec-alevel-chemistry.moles",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": []
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-basics.sp-01",
+        "topicId": "wjec-alevel-chemistry.organic-basics",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-basics.sp-02",
+        "topicId": "wjec-alevel-chemistry.organic-basics",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-basics.sp-03",
+        "topicId": "wjec-alevel-chemistry.organic-basics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-basics.sp-04",
+        "topicId": "wjec-alevel-chemistry.organic-basics",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-basics.sp-05",
+        "topicId": "wjec-alevel-chemistry.organic-basics",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-mechanisms.sp-01",
+        "topicId": "wjec-alevel-chemistry.organic-mechanisms",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-mechanisms.sp-02",
+        "topicId": "wjec-alevel-chemistry.organic-mechanisms",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-mechanisms.sp-03",
+        "topicId": "wjec-alevel-chemistry.organic-mechanisms",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-mechanisms.sp-04",
+        "topicId": "wjec-alevel-chemistry.organic-mechanisms",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-synthesis.sp-01",
+        "topicId": "wjec-alevel-chemistry.organic-synthesis",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-synthesis.sp-02",
+        "topicId": "wjec-alevel-chemistry.organic-synthesis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-synthesis.sp-03",
+        "topicId": "wjec-alevel-chemistry.organic-synthesis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.organic-synthesis.sp-04",
+        "topicId": "wjec-alevel-chemistry.organic-synthesis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.p-block.sp-01",
+        "topicId": "wjec-alevel-chemistry.p-block",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.p-block.sp-02",
+        "topicId": "wjec-alevel-chemistry.p-block",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.p-block.sp-03",
+        "topicId": "wjec-alevel-chemistry.p-block",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.p-block.sp-04",
+        "topicId": "wjec-alevel-chemistry.p-block",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.periodicity.sp-02",
+        "topicId": "wjec-alevel-chemistry.periodicity",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.periodicity.sp-03",
+        "topicId": "wjec-alevel-chemistry.periodicity",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.periodicity.sp-04",
+        "topicId": "wjec-alevel-chemistry.periodicity",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.periodicity.sp-05",
+        "topicId": "wjec-alevel-chemistry.periodicity",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.practical-analysis.sp-01",
+        "topicId": "wjec-alevel-chemistry.practical-analysis",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.practical-analysis.sp-02",
+        "topicId": "wjec-alevel-chemistry.practical-analysis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.practical-analysis.sp-03",
+        "topicId": "wjec-alevel-chemistry.practical-analysis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.practical-analysis.sp-04",
+        "topicId": "wjec-alevel-chemistry.practical-analysis",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.redox.sp-01",
+        "topicId": "wjec-alevel-chemistry.redox",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.redox.sp-02",
+        "topicId": "wjec-alevel-chemistry.redox",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.redox.sp-03",
+        "topicId": "wjec-alevel-chemistry.redox",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.redox.sp-04",
+        "topicId": "wjec-alevel-chemistry.redox",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.redox.sp-05",
+        "topicId": "wjec-alevel-chemistry.redox",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.spectroscopy.sp-01",
+        "topicId": "wjec-alevel-chemistry.spectroscopy",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.spectroscopy.sp-02",
+        "topicId": "wjec-alevel-chemistry.spectroscopy",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.spectroscopy.sp-03",
+        "topicId": "wjec-alevel-chemistry.spectroscopy",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.spectroscopy.sp-04",
+        "topicId": "wjec-alevel-chemistry.spectroscopy",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.spectroscopy.sp-05",
+        "topicId": "wjec-alevel-chemistry.spectroscopy",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.stereoisomerism.sp-01",
+        "topicId": "wjec-alevel-chemistry.stereoisomerism",
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.stereoisomerism.sp-02",
+        "topicId": "wjec-alevel-chemistry.stereoisomerism",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.stereoisomerism.sp-03",
+        "topicId": "wjec-alevel-chemistry.stereoisomerism",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.stereoisomerism.sp-04",
+        "topicId": "wjec-alevel-chemistry.stereoisomerism",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.transition-metals.sp-01",
+        "topicId": "wjec-alevel-chemistry.transition-metals",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.transition-metals.sp-02",
+        "topicId": "wjec-alevel-chemistry.transition-metals",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.transition-metals.sp-03",
+        "topicId": "wjec-alevel-chemistry.transition-metals",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.transition-metals.sp-04",
+        "topicId": "wjec-alevel-chemistry.transition-metals",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.transition-metals.sp-05",
+        "topicId": "wjec-alevel-chemistry.transition-metals",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      }
+    ],
+    "wjec-alevel-physics": []
+  }
+}

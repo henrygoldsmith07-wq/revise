@@ -70,7 +70,7 @@ Chemistry, Physics - are being built to per-statement depth: for every
 specification point, retrieval cards plus simple, application,
 unfamiliar-context, misconception and harder/synoptic questions, each with
 a worked solution and verified provenance. The headline the depth ledger
-makes computable is not "440 topics" but:
+makes computable is not "475 topics" but:
 
 > N% of WJEC A-level Physics specification statements have at least four
 > independently reviewed exam questions covering recall, application and
@@ -84,7 +84,7 @@ and honestly labelled, but not where authoring effort goes.
 ```
 src/domain/      Pure revision engine — no React, no I/O, fully unit-tested
   types.ts         The board-agnostic domain model
-  curriculum/      Registry + 32 WJEC/AQA/Edexcel/OCR × A-level/GCSE subjects (440 topics)
+  curriculum/      Registry + 32 WJEC/AQA/Edexcel/OCR × A-level/GCSE subjects (475 topics)
   scheduling.ts    FSRS wrapper: grading, queues, forgetting curve
   mastery.ts       Topic mastery with explicit evidence weighting
   recommender.ts   "What should I do right now?" (+ recommender-enhancements: cold-start, ties, exploration, gain)
@@ -250,13 +250,26 @@ provenance record (`source` / `verification` / `reviewer` / `lastChecked` /
 `specVersion`). Coverage on Progress is measured **per statement**: how many have
 retrieval cards, how many have an exam question (*which* parts test *which*
 statements), which are verified, and — per `SPEC_MANIFEST` — which unit/paper
-(duration, marks, weighting) each belongs to. The statement model now covers all **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE): 440 topics,
-718 seed questions**, every topic with `specPoints` and every seed question part
+(duration, marks, weighting) each belongs to. The statement model now covers all
+**32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
+
+Runtime inventory: **475 topics, 3923 materialised seed questions, 2238 WJEC flagship questions**.
+The static source audit currently sees 869 authoring/catalogue records before
+runtime expansion; CI treats the materialised bank above as the authoritative
+question inventory. Every topic carries `specPoints` and every seed question part
 mapped with `specPointIds + learningClaims` (explicit per-mark allocation via
 `claimMap` where needed).
 Topic lists and grade boundaries remain approximate and labelled as such; always
 check the current board specification for exact assessment objectives and
 weightings.
+
+WJEC flagship human review is deliberately separate from authored volume.
+`npm run wjec:review:batch -- <subject> <new-directory> --limit=10` exports a
+small prioritized reviewer packet. Exact approvals use canonical SHA-256
+fingerprints and persist to a separate attestation ledger; the source-controlled
+release set identifies candidate assessment content but does not itself confer
+trust. `npm run wjec:trust:report` shows trusted depth, release depth, stale
+attestations and remaining statement-level review workload.
 
 ## Specification Coverage Audit
 
@@ -307,3 +320,13 @@ validation, provenance or coverage tooling — only bare topic titles — so
 nothing of competitive value was lost in that deletion. The previous repo's
 only reusable asset was the FSRS + study-plan scheduling math, which Revise
 already supersedes.
+
+## WJEC part-level trust update (2026-09-26)
+
+WJEC flagship trust and authored depth are credited per mapped question part rather than by assigning one depth label to an entire structured question. A question can therefore contribute recall, application and transfer evidence through different parts, but still counts as only one independent question toward the four-question threshold for a specification statement.
+
+Human review attestations require a full timezone-bearing ISO instant and reject date-only, impossible-calendar and materially future-dated review times. The same strict contract is used by question review, WJEC paper provenance, paper marking/outcomes and prerequisite decisions. Verified WJEC paper provenance must use an official HTTPS WJEC origin and a SHA-256 source digest. WJEC paper marking/outcomes and prerequisite edges require exact canonical SHA-256 fingerprints; legacy 32-bit fingerprints are historical only and do not confer current trust. The exact authored-content ceiling is tracked in `src/content/reviews/wjec-authoring-backlog.json`; `npm run wjec:authoring:gaps` reports the gaps, `npm run wjec:authoring:plan -- <subject> --limit=12` turns them into prioritized new-family authoring briefs, and `npm run wjec:authoring:check` verifies that the source-controlled backlog matches the live bank.
+
+Prerequisite edges remain hypotheses until separately reviewed. `npm run wjec:prerequisite:batch -- <subject> <new-directory> --limit=20` exports a focused packet; `npm run wjec:prerequisite:apply -- <returned-directory> --dry-run` validates qualified approved/rejected decisions before the same command without `--dry-run` atomically records them in the source-controlled prerequisite ledger. No command creates an approval automatically.
+
+Focused review batches emit `release-set-proposal.json`. `npm run wjec:release:check -- <proposal>` validates a proposal without writing; `npm run wjec:release:apply -- <proposal>` atomically updates only the editorial release-candidate manifest. Proposals must carry the generated `resultingQuestionIds` snapshot so stale proposals fail closed. Release selection never creates or changes human approvals.

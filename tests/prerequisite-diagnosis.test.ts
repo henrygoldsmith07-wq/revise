@@ -115,7 +115,8 @@ function approvedQuestion(topicId: string, questionId: string): Question {
     createdAt: daysAgo(3),
   };
   return applyHumanVerification(base, {
-    status: "approved", reviewerId: "test-only", reviewedAt: daysAgo(3),
+    status: "approved", reviewerId: "test-only", reviewerRole: "teacher",
+    reviewerQualification: "Test fixture only", reviewedAt: daysAgo(3),
     contentFingerprint: physicsContentFingerprint(base),
     checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
   });

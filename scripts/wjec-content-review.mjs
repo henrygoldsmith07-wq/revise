@@ -11,6 +11,7 @@ const bundle = await build({ stdin: { contents: `
   export { wjecCapabilities as nodes } from './src/content/capabilities';
   export { wjecDepthCurricula as curricula } from './src/content/wjec-subject-capabilities';
   export { humanVerifiedWjecQuestion as trusted } from './src/domain/physics-content-review';
+  export { flagshipTrustReadiness as trustReadiness } from './src/domain/flagship-trust';
   export { buildPhysicsReviewPacketTemplate as packet, importPhysicsReviewPacket as importPacket,
     buildPhysicsPrerequisiteReviewTemplate as edges, importPhysicsPrerequisiteReviews as importEdges } from './src/domain/physics-validation-intake';
   export { auditPhysicsAssessmentQuality as audit, physicsQualityQueue as queue, physicsAuthoringBriefs as briefs } from './src/domain/physics-assessment-quality';
@@ -68,11 +69,14 @@ for (const curriculum of data.curricula) {
     await json("checked-prerequisites.json", nodes);
   }
   const audit = data.audit({ subjectId, topics: curriculum.topics, questions, nodes, trustedQuestion: data.trusted });
+  const trust = data.trustReadiness({ subjectId, topics: curriculum.topics, questions });
+  const qualityQueue = data.queue(audit);
+  const authoringBriefs = data.briefs(audit);
   const markingChecks = questions.flatMap(q => q.parts.map(p => ({ questionId: q.id, partId: p.id,
     awarded: data.markPart(p, p.modelAnswer).awarded, available: p.marks })));
   await json("quality-audit.json", audit);
-  await json("quality-queue.json", data.queue(audit));
-  await json("authoring-briefs.json", data.briefs(audit));
+  await json("quality-queue.json", qualityQueue);
+  await json("authoring-briefs.json", authoringBriefs);
   await json("model-answer-self-check.json", markingChecks);
   const lifecycle = data.lifecycle(questions, subjectId);
   const shallow = data.variants(questions);
@@ -84,18 +88,23 @@ for (const curriculum of data.curricula) {
     approvedQuestions: questions.filter(data.trusted).length,
     lifecycle,
     shallowVariantCount: shallow.length,
+    trustedStatements: trust.statementsWithTrustedQuestions,
+    trustedCoreStatements: trust.statementsMeetingCoreTrustBar,
+    trustedCoreShare: trust.coreTrustShare,
+    reviewQueue: trust.reviewQueue,
     modelAnswerDisagreements: markingChecks.filter(row => row.awarded !== row.available).length,
-    remainingAuthoringBriefs: data.briefs(audit).length, errors, warnings,
+    remainingAuthoringBriefs: authoringBriefs.length, errors, warnings,
     note: "Structural counts and authored-answer checks are not human validation or evidence of efficacy." });
 }
 await writeFile(resolve(out, "review-report.json"), JSON.stringify(report, null, 2));
 if (mode === "export") await writeFile(resolve(out, "README.md"), [
   "# WJEC Maths, Biology and Chemistry review pack", "",
-  "Each subject has 28 new drafts across two capabilities. Start with its student.md; independently solve before opening reviewer.md.", "",
+  "This is the complete-bank audit/backfill export. For routine human review prefer: npm run wjec:review:batch -- <subject> <new-directory> --limit=10.", "",
+  "This packet covers WJEC A-level Mathematics, Biology and Chemistry. Start with each subject's student.md and independently solve before opening reviewer.md. Physics uses the deeper dedicated physics:evidence:init / physics:evidence:check workflow.", "",
   "Record six qualified review checks against exact fingerprints in new-draft-review.json, then merge those rows into content-review.json. Review prerequisite rationales separately. Never mark an AI review as human approval.", "",
   `Check returned files from the repository: node scripts/wjec-content-review.mjs check "${out.replaceAll("\\", "/")}"`, "",
   "The check writes proposed checked-content and checked-prerequisites files for inspection. It does not publish approvals or modify the app. Fix flagged content in source, export to a new folder and review the new fingerprint.", "",
-  "Fingerprint prefix is physics-review-v3 (covers difficulty and AO mapping; v2 attestations are stale and fail closed). lifecycle-summary.json answers authored/reviewed/blocked/why/next-batch; shallow-variants.json flags reskins for human authoring, never auto-merges. Physics-named APIs are retained for compatibility; the subjectId parameter selects the bank. Human marking, authenticated papers and real learner studies are still required. This pack contains no fabricated evidence.",
+  "Fingerprint prefix is wjec-review-v3:sha256 (canonical SHA-256 covering difficulty and AO mapping; v2 attestations are stale and fail closed). lifecycle-summary.json answers authored/reviewed/blocked/why/next-batch; shallow-variants.json flags reskins for human authoring, never auto-merges. Physics-named APIs are retained for compatibility; the subjectId parameter selects the bank. Human marking, authenticated papers and real learner studies are still required. This pack contains no fabricated evidence.",
 ].join("\n"));
 console.log(JSON.stringify(report));
 if (report.some(row => row.errors.length)) process.exitCode = 1;

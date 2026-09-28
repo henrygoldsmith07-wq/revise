@@ -4,7 +4,8 @@ import type { Id, Subject } from "./types";
 // ---------------------------------------------------------------------------
 // Exam Readiness Passport
 //
-// The Digital Twin answers "what should I do with the next 45 minutes?".
+// Today answers "what should I do next?"; the Digital Twin audits that same
+// bounded decision rather than introducing a second time horizon.
 // Readiness answers the more consequential question: "will those marks hold
 // when the paper is timed and unfamiliar?" This module keeps that answer
 // evidence-based and decomposable instead of inventing a single opaque score.

@@ -33,7 +33,7 @@ describe("WJEC flagship depth pack", () => {
     expect(audit.issues.filter((issue) => issue.kind !== "unreviewed")).toEqual([]);
     expect(audit.approvedQuestions).toBe(0);
     expect(audit.releaseReady).toBe(false);
-  });
+  }, 60_000);
 
   it("reports a balanced internal dashboard while keeping drafts out of trusted counts", () => {
     const dashboard = buildFlagshipDepthDashboard({

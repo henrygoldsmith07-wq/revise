@@ -1,5 +1,7 @@
 import { authenticPaperEvidence, independentAttempt, partFamily, trustworthyAttempt } from "./learning-evidence";
 import { requiresWjecContentReview, trustedAssessmentContent } from "./physics-content-review";
+import { canonicalJson, sha256Hex } from "./content-fingerprint";
+import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { Attempt, Question } from "./types";
 
 export interface CapabilityNode {
@@ -37,15 +39,32 @@ export interface CapabilityDependencyReview {
 export function capabilityEdgeFingerprint(node: CapabilityNode, prerequisite: CapabilityNode | string): string {
   const prerequisiteNode = typeof prerequisite === "string" ? null : prerequisite;
   const prerequisiteId = typeof prerequisite === "string" ? prerequisite : prerequisite.id;
-  const text = JSON.stringify([
+  const payload = [
     node.id, node.subjectId, node.topicId, node.label, node.specPointIds, node.prerequisites, node.explanation,
     prerequisiteId, prerequisiteNode?.subjectId ?? null, prerequisiteNode?.topicId ?? null,
     prerequisiteNode?.label ?? null, prerequisiteNode?.specPointIds ?? null,
     node.prerequisiteRationales?.[prerequisiteId] ?? null,
-  ]);
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return `capability-edge-v1:${(hash >>> 0).toString(16)}`;
+  ];
+  return `capability-edge-v2:sha256:${sha256Hex(canonicalJson(payload))}`;
+}
+
+export function capabilityEdgeFingerprintMatches(
+  fingerprint: string | undefined,
+  node: CapabilityNode,
+  prerequisite: CapabilityNode | string,
+): boolean {
+  return fingerprint === capabilityEdgeFingerprint(node, prerequisite);
+}
+
+export function validCapabilityDependencyReview(
+  node: CapabilityNode,
+  prerequisite: CapabilityNode | string,
+  review: CapabilityDependencyReview | undefined,
+): boolean {
+  return review?.status === "approved" && Boolean(review.reviewerId?.trim()) &&
+    Boolean(review.reviewerRole && WJEC_ATTESTATION_ROLES.includes(review.reviewerRole)) &&
+    Boolean(review.reviewerQualification?.trim()) && validAttestationInstant(review.reviewedAt) &&
+    capabilityEdgeFingerprintMatches(review.edgeFingerprint, node, prerequisite);
 }
 
 export interface SkillEvidence {
@@ -121,12 +140,13 @@ export function validatePrerequisiteReviews(nodes: readonly CapabilityNode[], su
         errors.push(`Unreviewed prerequisite ${node.id} <- ${prerequisiteId}`);
         continue;
       }
-      if (!review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) {
+      if (!review.reviewerId?.trim() || !review.reviewerRole || !WJEC_ATTESTATION_ROLES.includes(review.reviewerRole) ||
+        !review.reviewerQualification?.trim() || !validAttestationInstant(review.reviewedAt)) {
         errors.push(`Invalid prerequisite review ${node.id} <- ${prerequisiteId}`);
         continue;
       }
       if (!review.edgeFingerprint) errors.push(`Missing prerequisite fingerprint ${node.id} <- ${prerequisiteId}`);
-      else if (review.edgeFingerprint !== capabilityEdgeFingerprint(node, prerequisite)) errors.push(`Stale prerequisite review ${node.id} <- ${prerequisiteId}`);
+      else if (!capabilityEdgeFingerprintMatches(review.edgeFingerprint, node, prerequisite)) errors.push(`Stale prerequisite review ${node.id} <- ${prerequisiteId}`);
     }
   }
   return errors;
@@ -163,9 +183,7 @@ export function redundantPrerequisiteEdges(nodes: readonly CapabilityNode[], sub
 
 function trustedPrerequisiteEdge(node: CapabilityNode, prerequisiteId: string, trustedOnly: boolean, byId: ReadonlyMap<string, CapabilityNode>): boolean {
   if (!trustedOnly || !requiresWjecContentReview(node.subjectId)) return true;
-  const review = node.prerequisiteReviews?.[prerequisiteId];
-  return review?.status === "approved" && Boolean(review.reviewerId?.trim() && review.reviewedAt && Number.isFinite(Date.parse(review.reviewedAt))) &&
-    Boolean(review.edgeFingerprint && review.edgeFingerprint === capabilityEdgeFingerprint(node, byId.get(prerequisiteId) ?? prerequisiteId));
+  return validCapabilityDependencyReview(node, byId.get(prerequisiteId) ?? prerequisiteId, node.prerequisiteReviews?.[prerequisiteId]);
 }
 
 /** Part-level evidence only. A combined part cannot locate its smallest failed skill. */
@@ -182,7 +200,7 @@ export function deriveSkillEvidence(nodes: readonly CapabilityNode[], questions:
       seenAttempts.add(attempt.id);
       const question = byQuestion.get(attempt.questionId);
       if (!question || question.subjectId !== node.subjectId) continue;
-      // Draft Physics questions remain useful for practice, but their marks
+      // Draft review-gated WJEC questions remain useful for practice, but their marks
       // cannot establish capability mastery. Paper attempts additionally need
       // authenticated provenance and a human marking attestation.
       if (!trustedAssessmentContent(question)) continue;

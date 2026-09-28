@@ -38,4 +38,30 @@ describe("security — API route guards", () => {
     expect(route).toContain("MAX_BODY_CHARS");
     expect(route).toContain("status: 413");
   });
+
+  it("/api/ai uses account-aware shared quota enforcement with an IP fallback", () => {
+    const route = readFileSync(join(process.cwd(), "src/app/api/ai/route.ts"), "utf8");
+    expect(route).toContain("auth.user.id");
+    expect(route).toContain("resolveRateLimitKey");
+    expect(route).toContain("enforceAiRateLimit");
+    expect(route).toContain("RateLimiterUnavailableError");
+  });
+});
+
+describe("security — browser response headers", () => {
+  it("ships baseline CSP, framing, MIME, referrer and permissions protections", () => {
+    const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+    for (const header of [
+      "Content-Security-Policy",
+      "Referrer-Policy",
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "Permissions-Policy",
+      "Strict-Transport-Security",
+    ]) {
+      expect(config).toContain(header);
+    }
+    expect(config).toContain("frame-ancestors 'none'");
+    expect(config).toContain("object-src 'none'");
+  });
 });

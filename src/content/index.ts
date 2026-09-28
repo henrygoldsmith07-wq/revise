@@ -60,6 +60,10 @@ import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
 import { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts } from "./questions/wjec-flagship-depth";
 import { seedMisconceptions } from "./misconceptions";
+import humanVerificationLedger from "./reviews/wjec-human-verification.json";
+import wjecReleaseSet from "./reviews/wjec-release-set.json";
+import { applyHumanVerificationLedger } from "@/domain/human-verification-ledger";
+import { resolveWjecReleaseSet } from "@/domain/wjec-release-set";
 
 export { seedCards, seedCardsForTopic, makeCloze } from "./seed-cards";
 export { authoredDiagrams, diagramForTopic } from "./diagram-cards";
@@ -130,7 +134,20 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...wjecPhysicsDeepQuestions,
 ].map(honestQuestion);
 
-export const seedQuestions: Question[] = enrichCuratedPhysicsLearning(BASE_SEED_QUESTIONS);
+const authoredSeedQuestions = enrichCuratedPhysicsLearning(BASE_SEED_QUESTIONS);
+const ledgerApplication = applyHumanVerificationLedger(authoredSeedQuestions, humanVerificationLedger);
+const releaseSetApplication = resolveWjecReleaseSet(authoredSeedQuestions, wjecReleaseSet);
+
+/** Current runtime bank after exact-fingerprint human attestations are applied. */
+export const seedQuestions: Question[] = ledgerApplication.questions;
+/** CI/operator diagnostics; historical fingerprints are non-blocking audit history. */
+export const seedHumanVerificationLedgerIssues = ledgerApplication.issues;
+/** Explicit operator-selected release candidates. Selection is not approval. */
+export const seedWjecReleaseQuestionIds = releaseSetApplication.questionIds;
+export const seedWjecReleaseSetIssues = releaseSetApplication.issues;
+export function isSeedWjecReleaseQuestion(question: Question): boolean {
+  return seedWjecReleaseQuestionIds.has(question.id);
+}
 
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
 export { gcseExpansionQuestions };

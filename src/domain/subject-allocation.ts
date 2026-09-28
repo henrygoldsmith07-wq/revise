@@ -32,7 +32,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 
 import type { Attempt, Card, Id, IsoDate, Mistake } from "./types";
-import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import type { Question } from "./types";
 
 /** A 25-minute self-testing block clears roughly this many review cards. */
@@ -104,10 +104,7 @@ export function buildSubjectEvidence(
     return trustedAssessmentAttempt(attempt, question, attempts, questions);
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    const attempt = mistake.attemptId ? attempts.find((row) => row.id === mistake.attemptId) : undefined;
-    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
-    return Boolean(attempt && question && trustedAttempt(attempt));
+    return trustedAssessmentMistake(mistake, questions, attempts);
   };
 
   for (const card of cards) {

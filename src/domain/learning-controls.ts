@@ -1,6 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import type { QuestionTrace } from "./knowledge-tracing";
-import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { authenticPaperEvidence, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import { masteryIntervals } from "./mastery-uncertainty";
 import type { Attempt, Card, Id, Mistake, Question, Topic, TopicMastery } from "./types";
 import type { MasteryInterval } from "./mastery-uncertainty";
@@ -35,7 +35,7 @@ export function sparseEvidenceConfidence(input: {
   cards: Card[];
   attempts: Attempt[];
   mistakes: Mistake[];
-  /** Optional bank snapshot used to keep unreviewed Physics out of confidence. */
+  /** Optional bank snapshot used to keep unreviewed WJEC flagship content out of confidence. */
   questions?: Question[];
   now?: Date;
 }): SparseEvidenceConfidenceReport {
@@ -44,17 +44,13 @@ export function sparseEvidenceConfidence(input: {
   const attemptsByTopic = new Map<Id, Attempt[]>();
   const mistakesByTopic = new Map<Id, Mistake[]>();
   const questionById = new Map((input.questions ?? []).map((question) => [question.id, question] as const));
-  const attemptById = new Map(input.attempts.map((attempt) => [attempt.id, attempt] as const));
   const trustedAttempt = (attempt: Attempt): boolean => {
     const question = questionById.get(attempt.questionId);
     if (!question) return !requiresWjecContentReview(attempt.subjectId);
     return trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? []);
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
-    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
-    return Boolean(attempt && question && trustedAttempt(attempt));
+    return trustedAssessmentMistake(mistake, input.questions ?? [], input.attempts);
   };
 
   for (const card of input.cards) {

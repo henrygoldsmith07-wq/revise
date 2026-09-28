@@ -149,6 +149,8 @@ export function QuestionRunner({
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
 }) {
+  const needsWjecHumanReview =
+    requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question);
   const store = useStore();
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
   const [choice, setChoice] = useState<number | null>(() => draft?.choice ?? null);
@@ -442,9 +444,9 @@ export function QuestionRunner({
           {retestMistake ? <Pill tone="review">Retest</Pill> : null}
           {question.origin === "past-paper" ? <Pill tone="review">Past paper</Pill> : null}
           <EditorialBadge source={question.source ?? null}
-            verification={requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question) ? "unverified" : question.verification ?? null}
+            verification={needsWjecHumanReview ? "unverified" : question.verification ?? null}
             origin={question.origin} reviewer={question.reviewer ?? null} contentTier={getSubject(question.subjectId)?.contentTier} />
-          {requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question) ?
+          {needsWjecHumanReview ?
             <span className="text-xs text-muted-foreground">Needs human review · practice evidence only</span> : null}
           {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
           {farTransfer ? <Pill tone="accent">Delayed far-transfer</Pill> : null}

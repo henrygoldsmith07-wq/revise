@@ -27,11 +27,14 @@ import {
 import {
   applyHumanVerification,
   buildPhysicsReviewQueue,
+  humanVerificationIssues,
   humanVerifiedWjecQuestion,
   physicsContentFingerprint,
   REQUIRED_HUMAN_CHECKS,
+  WJEC_REVIEWER_ROLES,
   type PhysicsReviewQueueRow,
 } from "./physics-content-review";
+import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest } from "./trust-attestation";
 import {
   capabilityEdgeFingerprint,
   type CapabilityDependencyReview,
@@ -69,8 +72,6 @@ export const PHYSICS_INTERVENTION_PACKET_VERSION = 1 as const;
 export const PHYSICS_EXPERIMENT_PACKET_VERSION = 1 as const;
 
 type PhysicsReviewerRole = NonNullable<HumanVerificationRecord["reviewerRole"]>;
-
-const REVIEWER_ROLES: readonly PhysicsReviewerRole[] = ["examiner", "teacher", "subject-expert"];
 const ANSWER_SOURCES: readonly AnswerCorpusProvenance[] = ["official/past-paper", "examiner-reviewed", "teacher-reviewed"];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -83,6 +84,10 @@ function text(value: unknown): value is string {
 
 function instant(value: unknown): value is IsoInstant {
   return text(value) && Number.isFinite(Date.parse(value));
+}
+
+function reviewInstant(value: unknown): value is IsoInstant {
+  return validAttestationInstant(value);
 }
 
 function integer(value: unknown): value is number {
@@ -137,22 +142,22 @@ function reviewRecord(value: unknown, prefix: string, expectedFingerprint: strin
     errors.push(`${prefix}.contentFingerprint does not match the current question fingerprint`);
   }
   if (value.reviewerId !== undefined && !text(value.reviewerId)) errors.push(`${prefix}.reviewerId must be a non-empty string`);
-  if (value.reviewerRole !== undefined && (!text(value.reviewerRole) || !REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole))) {
+  if (value.reviewerRole !== undefined && (!text(value.reviewerRole) || !WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole))) {
     errors.push(`${prefix}.reviewerRole must be examiner, teacher or subject-expert`);
   }
   if (value.reviewerQualification !== undefined && !text(value.reviewerQualification)) errors.push(`${prefix}.reviewerQualification must be a non-empty string`);
-  if (value.reviewedAt !== undefined && !instant(value.reviewedAt)) errors.push(`${prefix}.reviewedAt must be an ISO instant`);
+  if (value.reviewedAt !== undefined && !reviewInstant(value.reviewedAt)) errors.push(`${prefix}.reviewedAt must be a non-future ISO instant with timezone`);
   if (status === "approved") {
-    if (!text(value.reviewerId) || !instant(value.reviewedAt)) errors.push(`${prefix}: an approved decision needs a named reviewer and review time`);
-    if (!text(value.reviewerRole) || !REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) {
-      errors.push(`${prefix}: an approved Physics decision needs reviewerRole and reviewerQualification`);
+    if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) errors.push(`${prefix}: an approved decision needs a named reviewer and valid review time`);
+    if (!text(value.reviewerRole) || !WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) {
+      errors.push(`${prefix}: an approved WJEC decision needs reviewerRole and reviewerQualification`);
     }
     if (checksResult.checks && REQUIRED_HUMAN_CHECKS.some((check) => checksResult.checks?.[check] !== true)) {
       errors.push(`${prefix}: all six human checks must be true before approval`);
     }
   } else if (status === "pending") {
     warnings.push(`${prefix}: pending review remains practice-only`);
-  } else if (!text(value.reviewerId) || !instant(value.reviewedAt)) {
+  } else if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) {
     warnings.push(`${prefix}: changes-requested row has no complete reviewer attestation`);
   }
   if (errors.length || !checksResult.checks || !text(status)) return { errors, warnings };
@@ -162,7 +167,7 @@ function reviewRecord(value: unknown, prefix: string, expectedFingerprint: strin
       reviewerId: text(value.reviewerId) ? value.reviewerId : undefined,
       reviewerRole: value.reviewerRole as PhysicsReviewerRole | undefined,
       reviewerQualification: text(value.reviewerQualification) ? value.reviewerQualification : undefined,
-      reviewedAt: instant(value.reviewedAt) ? value.reviewedAt : undefined,
+      reviewedAt: reviewInstant(value.reviewedAt) ? value.reviewedAt : undefined,
       contentFingerprint: expectedFingerprint,
       checks: checksResult.checks,
       notes: typeof value.notes === "string" ? value.notes : undefined,
@@ -221,7 +226,12 @@ export function buildPhysicsReviewPacketTemplate(questions: readonly Question[],
 }
 
 /** Import completed packet rows against the current live bank. */
-export function importPhysicsReviewPacket(raw: string, questions: readonly Question[], subjectId: Id = "wjec-alevel-physics"): PhysicsReviewImportResult {
+export function importPhysicsReviewPacket(
+  raw: string,
+  questions: readonly Question[],
+  subjectId: Id = "wjec-alevel-physics",
+  options: { allowPartial?: boolean } = {},
+): PhysicsReviewImportResult {
   const parsed = jsonRows(raw, "rows");
   const errors = [...parsed.errors];
   const warnings: string[] = [];
@@ -265,6 +275,13 @@ export function importPhysicsReviewPacket(raw: string, questions: readonly Quest
     errors.push(...result.errors);
     warnings.push(...result.warnings);
     if (!result.review) continue;
+    if (result.review.status === "approved") {
+      const trustIssues = humanVerificationIssues(current, result.review);
+      if (trustIssues.length) {
+        errors.push(`${prefix}: approval failed the canonical WJEC trust contract (${trustIssues.join(", ")})`);
+        continue;
+      }
+    }
     const next = applyHumanVerification(current, result.review);
     if (result.review.status === "approved") {
       if (!humanVerifiedWjecQuestion(next)) {
@@ -278,7 +295,9 @@ export function importPhysicsReviewPacket(raw: string, questions: readonly Quest
     updated.set(questionId, next);
   }
   const missingQuestionIds = [...byId.keys()].filter((id) => !seen.has(id));
-  if (missingQuestionIds.length) warnings.push(`${missingQuestionIds.length} live Physics questions were not present in the packet`);
+  if (missingQuestionIds.length && !options.allowPartial) {
+    warnings.push(`${missingQuestionIds.length} live ${subjectId} questions were not present in the packet`);
+  }
   const merged = questions.map((question) => updated.get(question.id) ?? question);
   return {
     updatedQuestions: merged,
@@ -319,15 +338,16 @@ export function buildPhysicsPrerequisiteReviewTemplate(nodes: readonly Capabilit
   const byId = new Map(physics.map((node) => [node.id, node]));
   return physics.flatMap((node) => node.prerequisites.map((prerequisiteId) => {
     const prerequisite = byId.get(prerequisiteId) ?? nodes.find((candidate) => candidate.id === prerequisiteId);
+    const edgeFingerprint = capabilityEdgeFingerprint(node, prerequisite ?? prerequisiteId);
     return {
       targetId: node.id,
       targetLabel: node.label,
       prerequisiteId,
       prerequisiteLabel: prerequisite?.label ?? null,
       rationale: node.prerequisiteRationales?.[prerequisiteId] ?? null,
-      edgeFingerprint: capabilityEdgeFingerprint(node, prerequisite ?? prerequisiteId),
-      review: { status: "unreviewed" as const },
-      reviewerInstructions: "Approve only when the rationale is a real conceptual dependency and the fingerprint matches this graph version.",
+      edgeFingerprint,
+      review: { status: "unreviewed" as const, edgeFingerprint },
+      reviewerInstructions: "Approve only when the rationale is a real conceptual dependency. Reject false dependencies. Fill reviewer identity/qualification/time and keep both fingerprint fields unchanged.",
     };
   }));
 }
@@ -339,21 +359,21 @@ function dependencyReview(value: unknown, prefix: string, expectedFingerprint: s
   const status = value.status;
   if (status !== "unreviewed" && status !== "approved" && status !== "rejected") errors.push(`${prefix}.review.status is invalid`);
   if (value.reviewerId !== undefined && !text(value.reviewerId)) errors.push(`${prefix}.review.reviewerId must be a non-empty string`);
-  if (value.reviewedAt !== undefined && !instant(value.reviewedAt)) errors.push(`${prefix}.review.reviewedAt must be an ISO instant`);
+  if (value.reviewedAt !== undefined && !reviewInstant(value.reviewedAt)) errors.push(`${prefix}.review.reviewedAt must be a non-future ISO instant with timezone`);
   if (value.edgeFingerprint !== undefined && value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}.review.edgeFingerprint is stale`);
-  if (status === "approved") {
-    if (!text(value.reviewerId) || !instant(value.reviewedAt)) errors.push(`${prefix}: an approved edge needs a named reviewer and review time`);
-    if (value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}: an approved edge needs the current edge fingerprint`);
-    if (!REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: an approved edge needs reviewerRole and reviewerQualification`);
+  if (status === "approved" || status === "rejected") {
+    if (!text(value.reviewerId) || !reviewInstant(value.reviewedAt)) errors.push(`${prefix}: a final edge decision needs a named reviewer and valid review time`);
+    if (value.edgeFingerprint !== expectedFingerprint) errors.push(`${prefix}: a final edge decision needs the current edge fingerprint`);
+    if (!WJEC_REVIEWER_ROLES.includes(value.reviewerRole as PhysicsReviewerRole) || !text(value.reviewerQualification)) errors.push(`${prefix}: a final edge decision needs reviewerRole and reviewerQualification`);
   } else if (status === "unreviewed") warnings.push(`${prefix}: edge remains a diagnosis hypothesis`);
-  if (errors.length || (status !== "unreviewed" && (!text(value.reviewerId) || !instant(value.reviewedAt)))) return { errors, warnings };
+  if (errors.length) return { errors, warnings };
   return {
     review: {
       status: status as CapabilityDependencyReview["status"],
       reviewerId: text(value.reviewerId) ? value.reviewerId : undefined,
       reviewerRole: value.reviewerRole as CapabilityDependencyReview["reviewerRole"] | undefined,
       reviewerQualification: text(value.reviewerQualification) ? value.reviewerQualification : undefined,
-      reviewedAt: instant(value.reviewedAt) ? value.reviewedAt : undefined,
+      reviewedAt: reviewInstant(value.reviewedAt) ? value.reviewedAt : undefined,
       edgeFingerprint: expectedFingerprint,
     },
     errors,
@@ -387,7 +407,7 @@ export function importPhysicsPrerequisiteReviews(raw: string, nodes: readonly Ca
     const target = byId.get(rawRow.targetId);
     const prerequisite = byId.get(rawRow.prerequisiteId);
     if (!target || !prerequisite || target.subjectId !== subjectId || prerequisite.subjectId !== subjectId) {
-      errors.push(`${prefix}: unknown or non-Physics edge ${key}`);
+      errors.push(`${prefix}: unknown or out-of-subject edge ${key}`);
       continue;
     }
     if (!expected.has(key)) {
@@ -548,27 +568,21 @@ export function validatePhysicsPaperManifest(value: unknown, prefix = "Manifest"
   if (value.subjectId !== "wjec-alevel-physics") errors.push(`${prefix}.subjectId must be wjec-alevel-physics`);
   if (value.qualificationLevel !== "alevel") errors.push(`${prefix}.qualificationLevel must be alevel`);
   if (!integer(value.year) || value.year < 2015 || value.year > 2100) errors.push(`${prefix}.year must be an exam year`);
-  try {
-    const url = new URL(String(value.sourceUrl));
-    if (url.protocol !== "https:" || url.username || url.password || !(url.hostname === "wjec.co.uk" || url.hostname.endsWith(".wjec.co.uk"))) throw new Error("not official");
-  } catch { errors.push(`${prefix}.sourceUrl must be an official WJEC https URL`); }
-  if (!text(value.sourceDigest) || !/^(sha256:)?[a-f0-9]{64}$/i.test(value.sourceDigest)) errors.push(`${prefix}.sourceDigest must be a SHA-256 file digest`);
-  if (value.markSchemeDigest !== undefined && (!text(value.markSchemeDigest) || !/^(sha256:)?[a-f0-9]{64}$/i.test(value.markSchemeDigest))) errors.push(`${prefix}.markSchemeDigest must be a SHA-256 file digest`);
+  if (!validOfficialWjecUrl(value.sourceUrl)) errors.push(`${prefix}.sourceUrl must be an official WJEC https URL`);
+  if (!validSha256Digest(value.sourceDigest)) errors.push(`${prefix}.sourceDigest must be a SHA-256 file digest`);
+  if (value.markSchemeDigest !== undefined && !validSha256Digest(value.markSchemeDigest)) errors.push(`${prefix}.markSchemeDigest must be a SHA-256 file digest`);
   for (const key of ["markSchemeUrl", "dataBookletUrl"] as const) {
     if (value[key] === undefined) continue;
-    try {
-      const url = new URL(String(value[key]));
-      if (url.protocol !== "https:" || url.username || url.password || !(url.hostname === "wjec.co.uk" || url.hostname.endsWith(".wjec.co.uk"))) throw new Error("not official");
-    } catch { errors.push(`${prefix}.${key} must be an official WJEC https URL`); }
+    if (!validOfficialWjecUrl(value[key])) errors.push(`${prefix}.${key} must be an official WJEC https URL`);
   }
-  if (value.dataBookletDigest !== undefined && (!text(value.dataBookletDigest) || !/^(sha256:)?[a-f0-9]{64}$/i.test(value.dataBookletDigest))) errors.push(`${prefix}.dataBookletDigest must be a SHA-256 file digest`);
+  if (value.dataBookletDigest !== undefined && !validSha256Digest(value.dataBookletDigest)) errors.push(`${prefix}.dataBookletDigest must be a SHA-256 file digest`);
   for (const key of ["durationMinutes", "maximumMarks"] as const) {
     if (value[key] !== undefined && (!integer(value[key]) || value[key] <= 0)) errors.push(`${prefix}.${key} must be a positive integer`);
   }
   if (value.questionCount !== undefined && (!integer(value.questionCount) || value.questionCount < 1)) errors.push(`${prefix}.questionCount must be a positive integer when supplied`);
   if (!["pending", "verified", "rejected"].includes(String(value.status))) errors.push(`${prefix}.status is invalid`);
   if (value.status === "verified") {
-    if (!text(value.verifiedBy) || !instant(value.verifiedAt)) errors.push(`${prefix}: verified manifests need verifiedBy and verifiedAt`);
+    if (!text(value.verifiedBy) || !reviewInstant(value.verifiedAt)) errors.push(`${prefix}: verified manifests need verifiedBy and a non-future ISO instant with timezone`);
   } else if (value.status === "pending") {
     warnings.push(`${prefix}: pending provenance cannot create trusted paper questions`);
   } else {
@@ -596,7 +610,7 @@ export function validatePhysicsPaperManifest(value: unknown, prefix = "Manifest"
     ...(integer(value.questionCount) ? { questionCount: value.questionCount as number } : {}),
     status: value.status as PhysicsPaperManifest["status"],
     ...(text(value.verifiedBy) ? { verifiedBy: value.verifiedBy as Id } : {}),
-    ...(instant(value.verifiedAt) ? { verifiedAt: value.verifiedAt as IsoInstant } : {}),
+    ...(reviewInstant(value.verifiedAt) ? { verifiedAt: value.verifiedAt as IsoInstant } : {}),
     ...(typeof value.notes === "string" ? { notes: value.notes } : {}),
   } satisfies PhysicsPaperManifest;
   return { manifest, trusted: manifest.status === "verified", errors, warnings };

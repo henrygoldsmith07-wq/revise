@@ -1,7 +1,7 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { hintEvidenceMultiplier } from "./hint-tiers";
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
-import { trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ export interface MasteryInput {
   reviewLogs: ReviewLog[];
   attempts: Attempt[];
   mistakes: Mistake[];
-  /** Optional bank snapshot used to exclude unreviewed Physics marks. */
+  /** Optional bank snapshot used to exclude unreviewed WJEC flagship marks. */
   questions?: Question[];
   trustedQuestion?: (question: Question) => boolean;
   now?: Date;
@@ -94,14 +94,8 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     }
   }
   const logsByTopic = groupBy(input.reviewLogs, (l) => l.topicId);
-  const trustedMistakes = input.mistakes.filter((mistake) => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    const question = mistake.questionId ? questionById.get(mistake.questionId) : undefined;
-    // A mistake on an unreviewed Physics item is useful feedback to the
-    // learner, but it cannot lower or otherwise establish trusted mastery.
-    const attempt = mistake.attemptId ? input.attempts.find((row) => row.id === mistake.attemptId) : undefined;
-    return Boolean(question && attempt && trustedQuestion(question) && trustedAssessmentAttempt(attempt, question, input.attempts, input.questions ?? []));
-  });
+  const trustedMistakes = input.mistakes.filter((mistake) =>
+    trustedAssessmentMistake(mistake, input.questions ?? [], input.attempts, trustedQuestion));
   const openMistakes = groupBy(
     trustedMistakes.filter((m) => !m.resolved),
     (m) => m.topicId,

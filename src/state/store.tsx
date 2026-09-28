@@ -107,7 +107,7 @@ import type {
 // Domain-separated concerns (no behaviour change — pure moves out of the monolith):
 import { currentActiveMinutes, touchSessionClock } from "./session-clock";
 import { legacyLessonProgress, localDayKey, nextLessonStreak } from "./lesson-streak";
-import { trustedSnapshotAttempt } from "./trusted-evidence";
+import { trustedSnapshotAttempt, trustedSnapshotMistake } from "./trusted-evidence";
 import type { SyncStatus } from "./sync-status";
 import { subjectsForSettings } from "./selectors";
 // Responsibility modules: each owns its state, persistence and actions; the
@@ -209,7 +209,8 @@ interface StoreValue extends Snapshot {
   saveRevisionCheckpoint(input: RevisionCheckpointInput): Promise<void>;
   clearRevisionCheckpoint(): Promise<void>;
   startRevisionTwinSession(choice: RevisionTwinChoice, title?: string): Promise<RevisionTwinSession>;
-  completeRevisionTwinSession(id: Id, actualMarks: number, actualMinutes?: number): Promise<void>;
+  completeRevisionTwinSessionFromAttempt(id: Id, attemptId: Id, actualMinutes?: number): Promise<void>;
+  finishRevisionTwinSession(id: Id, actualMinutes?: number): Promise<void>;
   abandonRevisionTwinSession(id: Id): Promise<void>;
   syncNow(): Promise<void>;
   experimentArm: ExperimentAssignment | null;
@@ -387,10 +388,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     if (!snapshot) return [];
 
     const trustedAttempts = snapshot.attempts.filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
-    const trustedAttemptIds = new Set(trustedAttempts.map((attempt) => attempt.id));
-    const trustedQuestions = new Set(snapshot.questions.filter(trustedAssessmentContent).map((question) => question.id));
-    const trustedMistakes = snapshot.mistakes.filter((mistake) => mistake.subjectId !== "wjec-alevel-physics" ||
-      Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId) && mistake.questionId && trustedQuestions.has(mistake.questionId)));
+    const trustedMistakes = snapshot.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, snapshot.questions, snapshot.attempts));
 
     const cardsByTopic = new Map<Id, Card[]>();
     for (const card of snapshot.cards) {
@@ -565,12 +563,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const recurringMisconceptions = useMemo(
     () => {
       if (!snapshot) return [];
-      const trustedAttemptIds = new Set(snapshot.attempts
-        .filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts))
-        .map((attempt) => attempt.id));
-      const trustedQuestions = new Set(snapshot.questions.filter(trustedAssessmentContent).map((question) => question.id));
-      const mistakes = snapshot.mistakes.filter((mistake) => mistake.subjectId !== "wjec-alevel-physics" ||
-        Boolean(mistake.attemptId && trustedAttemptIds.has(mistake.attemptId) && mistake.questionId && trustedQuestions.has(mistake.questionId)));
+      const mistakes = snapshot.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, snapshot.questions, snapshot.attempts));
       return tallyMisconceptions(mistakes, seedMisconceptions);
     },
     [snapshot],
@@ -769,7 +762,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     startRevisionTwinSession,
-    completeRevisionTwinSession,
+    completeRevisionTwinSessionFromAttempt,
+    finishRevisionTwinSession,
     abandonRevisionTwinSession: abandonTwinSession,
   } = useRevisionSessions({
     userId,
@@ -1127,7 +1121,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       saveRevisionCheckpoint,
       clearRevisionCheckpoint,
       startRevisionTwinSession,
-      completeRevisionTwinSession,
+      completeRevisionTwinSessionFromAttempt,
+      finishRevisionTwinSession,
       abandonRevisionTwinSession: abandonTwinSession,
       syncNow,
       experimentArm,
@@ -1208,7 +1203,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     saveRevisionCheckpoint,
     clearRevisionCheckpoint,
     startRevisionTwinSession,
-    completeRevisionTwinSession,
+    completeRevisionTwinSessionFromAttempt,
+    finishRevisionTwinSession,
     abandonTwinSession,
     syncNow,
     experimentArm,

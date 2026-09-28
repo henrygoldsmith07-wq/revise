@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSubject } from "@/domain/curriculum";
-import { actualMarksForWindow, revisionTwinKey } from "@/domain/revision-twin";
+import {
+  eligibleRevisionTwinProofAttempts,
+  observedGainForWindow,
+  revisionTwinKey,
+} from "@/domain/revision-twin";
 import { activityHref } from "@/lib/activity";
 import { useStore } from "@/state/store";
 import { RevisionTwinCard, revisionSessionTitle, formatMarks } from "@/components/RevisionTwinCard";
-import { Button, ButtonLink, Field, Panel, Pill, SectionHeading, StatTile, cx } from "@/components/ui";
+import { Button, ButtonLink, Panel, Pill, SectionHeading, StatTile, cx } from "@/components/ui";
 
 function signedMarks(value: number): string {
   const mark = formatMarks(Math.abs(value));
@@ -25,8 +29,6 @@ export default function RevisionTwinPage() {
   const active = report.activeSession;
   const [clock, setClock] = useState(() => Date.now());
   const [finishOpen, setFinishOpen] = useState(false);
-  const [actualMarks, setActualMarks] = useState("");
-  const [actualMinutes, setActualMinutes] = useState("45");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -40,6 +42,10 @@ export default function RevisionTwinPage() {
   const elapsedMinutes = active
     ? Math.max(0, Math.floor((clock - new Date(active.startedAt).getTime()) / 60_000))
     : 0;
+  const proofCandidates = useMemo(
+    () => active ? eligibleRevisionTwinProofAttempts(active, store.attempts, store.questions).slice(0, 3) : [],
+    [active, store.attempts, store.questions],
+  );
   const calibrationRows = useMemo(() => {
     const completed = report.completedSessions;
     return report.calibrations.map((calibration) => {
@@ -50,29 +56,40 @@ export default function RevisionTwinPage() {
     });
   }, [report.calibrations, report.completedSessions]);
 
-  async function finish() {
+  async function finishWithProof(attemptId: string) {
     if (!active) return;
-    const marks = Number(actualMarks);
-    const minutes = Number(actualMinutes);
-    if (!actualMarks.trim() || !Number.isFinite(marks) || marks < 0) {
-      setError("Enter the marks earned in the check (zero is valid). ");
-      return;
-    }
-    if (!actualMinutes.trim() || !Number.isFinite(minutes) || minutes < 1) {
-      setError("Enter at least one minute of actual study time.");
-      return;
-    }
+    const candidate = proofCandidates.find((row) => row.attempt.id === attemptId);
+    if (!candidate) return;
+    const minutes = Math.max(1, elapsedMinutes || active.plannedMinutes);
     setBusy(true);
     setError(null);
     try {
-      await store.completeRevisionTwinSession(active.id, marks, minutes);
-      const effective = actualMarksForWindow({ ...active, actualMarks: marks, actualMinutes: minutes });
-      setNotice(`${signedMarks((effective ?? marks) - active.predictedMarks)} vs forecast — the twin has updated its next ranking.`);
+      await store.completeRevisionTwinSessionFromAttempt(active.id, attemptId, minutes);
+      const effective = observedGainForWindow({
+        ...active,
+        observedGainMarks: candidate.proof.observedGainMarks,
+        actualMinutes: minutes,
+        outcomeSource: "trusted-attempt",
+      });
+      setNotice(`${signedMarks((effective ?? candidate.proof.observedGainMarks) - active.predictedMarks)} vs forecast from a trusted before/after check.`);
       setFinishOpen(false);
-      setActualMarks("");
-      setActualMinutes("45");
     } catch {
-      setError("Could not save this check. Your active block is still open.");
+      setError("Could not attach that marked check. Your active block is still open.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finishWithoutProof() {
+    if (!active) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await store.finishRevisionTwinSession(active.id, Math.max(1, elapsedMinutes || active.plannedMinutes));
+      setNotice("Block saved without calibration evidence. The forecast was not changed.");
+      setFinishOpen(false);
+    } catch {
+      setError("Could not close this block. Your active block is still open.");
     } finally {
       setBusy(false);
     }
@@ -94,10 +111,10 @@ export default function RevisionTwinPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Decision layer</p>
+        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Calibration layer</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Revision Digital Twin</h1>
         <p className="text-sm text-ink3 mt-1 max-w-2xl">
-          A falsifiable answer to “what should I revise next?” Pick one 45-minute block, run a marked check, and let the model learn whether its forecast was right.
+          Today chooses the topic. The Twin audits that decision on the same learning window and only updates its forecast from canonical marked Revise attempts with a trusted pre-block baseline.
         </p>
       </header>
 
@@ -132,46 +149,51 @@ export default function RevisionTwinPage() {
                 Open task
               </ButtonLink>
               <Button variant="primary" size="sm" onClick={() => setFinishOpen((open) => !open)}>
-                {finishOpen ? "Hide check" : "Finish + check"}
+                {finishOpen ? "Hide proof" : "Finish block"}
               </Button>
             </div>
           </div>
 
           {finishOpen ? (
-            <div className="mt-4 pt-4 border-t border-line grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-              <Field label="Marks from the check" hint="Use the marked score, not your confidence.">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={actualMarks}
-                  onChange={(event) => setActualMarks(event.target.value)}
-                  className="field text-sm"
-                  inputMode="decimal"
-                  aria-label="Marks from the check"
-                  autoFocus
-                />
-              </Field>
-              <Field label="Actual minutes" hint="Include the check itself.">
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={actualMinutes}
-                  onChange={(event) => setActualMinutes(event.target.value)}
-                  className="field text-sm"
-                  inputMode="numeric"
-                  aria-label="Actual minutes"
-                />
-              </Field>
-              <Button variant="primary" onClick={() => void finish()} disabled={busy}>
-                {busy ? "Saving…" : "Update the twin"}
-              </Button>
+            <div className="mt-4 pt-4 border-t border-line space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">Attach trusted proof</p>
+                <p className="text-xs text-ink3 mt-0.5 max-w-2xl">
+                  Revise will only calibrate from an independent marked attempt completed after this block when it can also find a trusted pre-block attempt on the same target. Typed scores are not accepted as learning evidence.
+                </p>
+              </div>
+              {proofCandidates.length ? (
+                <ul className="space-y-2" aria-label="Eligible marked checks">
+                  {proofCandidates.map(({ attempt, proof }) => (
+                    <li key={attempt.id} className="rounded-[10px] border border-line bg-surface2 px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">{proof.actualMarks}/{proof.actualMax} marked</p>
+                        <p className="text-[11px] text-ink3 mt-0.5">
+                          Baseline {Math.round(proof.baselineAccuracy * 100)}% → {Math.round(proof.observedAccuracy * 100)}% · observed {signedMarks(proof.observedGainMarks)} marks
+                        </p>
+                      </div>
+                      <Button size="sm" variant="primary" onClick={() => void finishWithProof(attempt.id)} disabled={busy}>
+                        {busy ? "Saving…" : "Use this check"}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-[10px] bg-surface2 px-3 py-3">
+                  <p className="text-sm text-ink2">No eligible trusted before/after check yet.</p>
+                  <p className="text-[11px] text-ink3 mt-1">Open the task and complete a marked question. If there is no comparable trusted baseline, Revise will keep the block in history without changing the forecast.</p>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button variant="secondary" size="sm" onClick={() => void finishWithoutProof()} disabled={busy}>
+                  {busy ? "Saving…" : "Finish without calibration"}
+                </Button>
+              </div>
             </div>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-ink3">When you finish, record the score from a short marked check so the prediction can be tested.</p>
+            <p className="text-[11px] text-ink3">A completed block is history; only trusted before/after marked evidence changes calibration.</p>
             <Button variant="ghost" size="sm" onClick={() => void abandon()} disabled={busy}>Abandon block</Button>
           </div>
           {error ? <p className="text-xs text-danger mt-2" role="alert">{error}</p> : null}
@@ -179,9 +201,9 @@ export default function RevisionTwinPage() {
       ) : null}
 
       <section>
-        <SectionHeading title="Twin health" hint="How closely the last forecasts matched the checks you logged." />
+        <SectionHeading title="Twin health" hint="How closely forecasts matched trusted before/after evidence." />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatTile label="Checks" value={report.checks} sub={report.checks ? "closed blocks" : "none yet"} />
+          <StatTile label="Trusted checks" value={report.checks} sub={report.unverifiedCompleted ? `${report.unverifiedCompleted} blocks excluded` : report.checks ? "calibration evidence" : "none yet"} />
           <StatTile
             label="Mean error"
             value={report.meanAbsoluteError == null ? "—" : `${formatMarks(report.meanAbsoluteError)} marks`}
@@ -232,20 +254,19 @@ export default function RevisionTwinPage() {
         ) : (
           <Panel>
             <p className="text-sm font-semibold text-ink">The model starts neutral.</p>
-            <p className="text-sm text-ink3 mt-1 max-w-2xl">Complete one block and enter the marks from its check. The next table will show whether this activity tends to return more or fewer marks than expected for you.</p>
+            <p className="text-sm text-ink3 mt-1 max-w-2xl">Complete blocks normally. Calibration starts only when Revise can pair a trusted post-block marked attempt with a trusted pre-block baseline on the same target.</p>
           </Panel>
         )}
       </section>
 
       <section>
-        <SectionHeading title="Prediction history" hint="Every closed block becomes evidence for the next decision." />
+        <SectionHeading title="Prediction history" hint="Closed blocks are retained; only trusted proof changes the forecast." />
         {report.completedSessions.length ? (
           <div className="card overflow-hidden">
             <ul className="divide-y divide-line">
               {report.completedSessions.slice(0, 8).map((session) => {
-                const actual = session.actualMarks ?? 0;
-                const effective = actualMarksForWindow(session) ?? actual;
-                const delta = effective - session.predictedMarks;
+                const effective = observedGainForWindow(session);
+                const delta = effective == null ? null : effective - session.predictedMarks;
                 return (
                   <li key={session.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -254,13 +275,15 @@ export default function RevisionTwinPage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0 text-right">
                       <div>
-                        <p className="text-[11px] text-ink3">forecast / 45m-equivalent</p>
-                        <p className="text-sm tabular-nums text-ink">+{formatMarks(session.predictedMarks)} / +{formatMarks(effective)}</p>
-                        {session.actualMinutes && session.actualMinutes !== session.plannedMinutes ? (
-                          <p className="text-[10px] text-ink3">raw check +{formatMarks(actual)} in {session.actualMinutes}m</p>
-                        ) : null}
+                        <p className="text-[11px] text-ink3">forecast / observed gain</p>
+                        <p className="text-sm tabular-nums text-ink">
+                          +{formatMarks(session.predictedMarks)} / {effective == null ? "—" : signedMarks(effective)}
+                        </p>
+                        <p className="text-[10px] text-ink3">
+                          {session.outcomeSource === "trusted-attempt" ? "trusted before/after attempt" : "not calibration evidence"}
+                        </p>
                       </div>
-                      <Pill tone={Math.abs(delta) <= 0.5 ? "success" : "review"}>{signedMarks(delta)}</Pill>
+                      {delta == null ? <Pill>history only</Pill> : <Pill tone={Math.abs(delta) <= 0.5 ? "success" : "review"}>{signedMarks(delta)}</Pill>}
                     </div>
                   </li>
                 );
@@ -269,7 +292,7 @@ export default function RevisionTwinPage() {
           </div>
         ) : (
           <Panel>
-            <p className="text-sm text-ink3">No completed blocks yet. Start the top choice above, then come back with the marked check score.</p>
+            <p className="text-sm text-ink3">No completed blocks yet. Start the aligned task above and finish it with a marked Revise check when possible.</p>
           </Panel>
         )}
       </section>
@@ -277,9 +300,9 @@ export default function RevisionTwinPage() {
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer text-sm font-semibold text-ink">How the Digital Twin learns</summary>
         <div className="mt-3 space-y-2 text-sm text-ink3 max-w-3xl">
-          <p>The base forecast comes from Revise&apos;s existing marks-per-hour model, normalised to the same 45-minute window for every choice.</p>
-          <p>When you enter a marked check score, Revise compares actual marks with the forecast for that activity and topic. A conservative multiplier nudges future forecasts up or down; three neutral prior observations prevent one noisy session from taking over.</p>
-          <p>That makes the recommendation measurable: the goal is not to sound intelligent, but to improve marks returned per hour of your revision time.</p>
+          <p>The base forecast comes from the same recommendation evidence that feeds Today, normalised to the same bounded learning window rather than a separate 45-minute planner.</p>
+          <p>A post-block score is not automatically “marks gained”. Revise requires a canonical independent marked attempt plus a trusted pre-block baseline on the same target, then records the before/after accuracy change on the post-check denominator.</p>
+          <p>Manual or unsupported results remain visible in history but cannot change calibration. Trusted observations are still shrunk toward the neutral prior so one noisy question cannot take over the next ranking.</p>
         </div>
       </details>
     </div>

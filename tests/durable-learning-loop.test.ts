@@ -19,7 +19,8 @@ import type { Attempt, Question } from "@/domain/types";
 // carry test-only human approvals before it can move repair evidence. No
 // production content is approved by these fixtures.
 const approve = (question: Question): Question => applyHumanVerification(question, {
-  status: "approved", reviewerId: "test-only", reviewedAt: "2026-09-08T00:00:00Z",
+  status: "approved", reviewerId: "test-only", reviewerRole: "teacher",
+  reviewerQualification: "Test fixture only", reviewedAt: "2026-09-08T00:00:00Z",
   contentFingerprint: physicsContentFingerprint(question),
   checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
 });
@@ -155,6 +156,7 @@ describe("smallest skill diagnosis and live action choice", () => {
     expect(action?.calibrated).toBe(false);
     expect(action?.policy?.score).toBeGreaterThan(0);
     expect(action?.teaching).toBe(false);
+    expect(action?.contentTrust).toBe("trusted-assessment");
   });
   it("does not bring a retention check forward to fill a session", () => {
     const { m3, history } = progressed();

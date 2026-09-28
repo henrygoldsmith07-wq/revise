@@ -5,8 +5,10 @@ import {
   GAIN_MULTIPLIER_MAX,
   GAIN_MULTIPLIER_MIN,
   paperOutcomeGainMultiplier,
+  paperOutcomeMarkingFingerprint,
   paperOutcomeNarrative,
   subjectPredictionDrift,
+  trustedPaperOutcome,
 } from "../src/domain/paper-outcome";
 import type { PaperOutcomeRecord } from "../src/domain/paper-outcome";
 
@@ -49,6 +51,22 @@ describe("buildPaperOutcomeRecord / closePaperOutcome", () => {
 
     // Actuals beyond the paper total clamp (defensive).
     expect(closePaperOutcome(record, 999).actualMarks).toBe(90);
+  });
+
+  it("rejects weak or future-dated human attestations for review-gated subjects", () => {
+    const base = outcome({ subjectId: "wjec-alevel-maths", actualMarks: 60 });
+    expect(trustedPaperOutcome({ ...base, markingReview: { status: "human-reviewed", reviewerId: "teacher", reviewedAt: "2026-09-26" } })).toBe(false);
+    expect(trustedPaperOutcome({ ...base, markingReview: { status: "human-reviewed", reviewerId: "teacher", reviewedAt: "2099-01-01T00:00:00Z" } })).toBe(false);
+    const reviewed = { ...base, markingReview: {
+      status: "human-reviewed" as const,
+      reviewerId: "teacher",
+      reviewerRole: "teacher" as const,
+      reviewerQualification: "Qualified maths teacher",
+      reviewedAt: "2026-09-26T12:00:00Z",
+      markingFingerprint: paperOutcomeMarkingFingerprint(base),
+    } };
+    expect(trustedPaperOutcome(reviewed)).toBe(true);
+    expect(trustedPaperOutcome({ ...reviewed, actualMarks: 59 })).toBe(false);
   });
 });
 

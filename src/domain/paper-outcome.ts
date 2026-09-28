@@ -1,4 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
+import { canonicalJson, sha256Hex } from "./content-fingerprint";
+import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 // ---------------------------------------------------------------------------
 // Paper-outcome feedback loop — the sat-paper half of prediction honesty.
 //
@@ -34,6 +36,8 @@ export type PaperOutcomeReviewStatus = "unreviewed" | "human-reviewed" | "adjudi
 export interface PaperOutcomeReview {
   status: PaperOutcomeReviewStatus;
   reviewerId?: Id;
+  reviewerRole?: "examiner" | "teacher" | "subject-expert";
+  reviewerQualification?: string;
   reviewedAt?: IsoInstant;
   /** Adjudicated outcomes must record that two qualified markers were involved. */
   markerCount?: number;
@@ -55,7 +59,7 @@ export interface PaperOutcomeRecord {
   /** Marks actually awarded once marking completed. */
   actualMarks: number;
   satAt: IsoInstant;
-  /** Physics outcomes remain provisional until a named human attests the mark. */
+  /** Review-gated WJEC outcomes remain provisional until a qualified human attests the exact marked outcome. */
   markingReview?: PaperOutcomeReview;
 }
 
@@ -71,6 +75,15 @@ export const GAIN_SENSITIVITY = 0.6;
 
 /** Each older outcome counts EXPONENTIAL_DECAY× less than the one after it. */
 export const EXPONENTIAL_DECAY = 0.85;
+
+export function paperOutcomeMarkingFingerprint(record: Pick<PaperOutcomeRecord,
+  "id" | "userId" | "subjectId" | "paperId" | "paperRunId" | "predictedMarks" | "totalMarks" | "actualMarks" | "satAt"
+>): string {
+  return `paper-outcome-v1:sha256:${sha256Hex(canonicalJson([
+    record.id, record.userId, record.subjectId, record.paperId, record.paperRunId,
+    record.predictedMarks, record.totalMarks, record.actualMarks, record.satAt,
+  ]))}`;
+}
 
 /** A subject's prediction drift — mean(actual − predicted) as a share of available marks. */
 export interface SubjectPredictionDrift {
@@ -125,7 +138,7 @@ export function closePaperOutcome(
   };
 }
 
-/** A Physics outcome can calibrate recommendations only after human review. */
+/** A review-gated WJEC outcome can calibrate recommendations only after human review. */
 export function trustedPaperOutcome(record: PaperOutcomeRecord): boolean {
   if (!Number.isFinite(record.predictedMarks) || !Number.isFinite(record.actualMarks) ||
     !Number.isFinite(record.totalMarks) || record.totalMarks <= 0 ||
@@ -133,9 +146,10 @@ export function trustedPaperOutcome(record: PaperOutcomeRecord): boolean {
   if (!requiresWjecContentReview(record.subjectId)) return true;
   const review = record.markingReview;
   if (!review || !["human-reviewed", "adjudicated"].includes(review.status) ||
-    !review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) return false;
+    !review.reviewerId?.trim() || !validAttestationInstant(review.reviewedAt)) return false;
+  if (!review.reviewerRole || !WJEC_ATTESTATION_ROLES.includes(review.reviewerRole) || !review.reviewerQualification?.trim()) return false;
   if (review.status === "adjudicated" && (!Number.isInteger(review.markerCount) || (review.markerCount ?? 0) < 2)) return false;
-  return true;
+  return review.markingFingerprint === paperOutcomeMarkingFingerprint(record);
 }
 
 /** Per-subject prediction drift over the recorded outcomes (newest first). */

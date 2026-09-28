@@ -17,6 +17,75 @@ editorialConfidence() distils lineage into one number (source prior,
 +passed gates, -open issues, -stale re-review) with named reasons. UI
 badges visibly separate Verified from Generated / unreviewed.
 
+For routine WJEC human review, use focused batches rather than handing reviewers
+the whole bank. The planner selects pending explicit release candidates first,
+then fills the batch with questions that maximise marginal trusted
+specification coverage:
+
+`npm run wjec:review:batch -- <maths|biology|chemistry|physics> <new-directory> --limit=10`
+
+Each batch contains a student sheet, separate reviewer key, exact review JSON,
+a coverage-gain simulation and a release-set proposal. The simulation is
+planning data only. Reviewer approval still requires independently solving the
+item and completing all six qualified checks.
+
+Validate the returned batch without changing the repository:
+
+`npm run wjec:review:apply -- <directory> --dry-run`
+
+To persist only validated approvals into the repository-backed attestation
+ledger, run:
+
+`npm run wjec:review:apply -- <returned-review-directory>`
+
+The apply step re-runs the canonical trust contract against the live bank,
+requires reviewer identity, role, qualification, review time, all six checks
+and the exact current content fingerprint, then atomically appends the
+attestation to `src/content/reviews/wjec-human-verification.json`. Ledger keys
+are `questionId + contentFingerprint`: when content changes, the old record is
+kept as audit history but no longer applies.
+
+Review fingerprints are canonical SHA-256 values with the prefix
+`wjec-review-v3:sha256:`. The previous 32-bit `physics-review-v2:` format is
+historical only; v2 attestations never upgrade themselves and require a fresh
+review of the v3 fingerprint.
+
+The explicit release-candidate set lives in
+`src/content/reviews/wjec-release-set.json`. Inclusion there is **not**
+approval. Release readiness requires every selected question to pass the human
+trust gate and the trusted questions inside that release set to meet the
+four-question recall/application/transfer core bar for every specification
+statement. Draft questions outside the release set stay practice-only and do
+not block release just because they exist.
+
+For complete-bank auditing/backfill, the older full export/check workflow
+remains available:
+
+`npm run wjec:review:export -- <new-directory>`
+
+`npm run wjec:review:check -- <directory>`
+
+The generated `review-report.json` keeps authored depth separate from trusted
+depth. It reports approved questions, statements with any trusted question,
+statements meeting the trusted core bar (at least four approved questions
+spanning recall, application and transfer), and the remaining review queue.
+No structural check or generated packet creates a human approval.
+
+For a fast read-only status check across all four flagships, run
+`npm run wjec:trust:report`. This uses the same trust predicate as mastery
+and readiness, so a draft question cannot inflate the headline. It also emits
+a greedy ten-item reviewer batch per flagship, prioritising new trusted
+specification coverage before missing recall/application/transfer categories,
+plus release-set progress, statement-level review-slot deficit, stale
+attestations and 7/30-day approval throughput. Review-slot deficit is not a
+minimum number of human reviews because one question can map to several
+statements.
+Physics keeps its deeper evidence workflow because it also packages marking
+corpora, paper provenance, prerequisite review, intervention outcomes and the
+prospective experiment: `npm run physics:evidence:init -- <directory>` and
+`npm run physics:evidence:check -- <directory> --strict`. The trusted-depth
+ledger in the app covers all four flagships.
+
 ## Past-paper import benchmark
 
 Import becomes trustworthy when it is measured and confidence-aware.
@@ -213,7 +282,7 @@ interactive speed.
 
 - Every topic has `specPoints` on every unit; every `specPointIds` is paired with `learningClaims`; stale topics (>365d) and unverified statements are surfaced by `regressionReport`.
 - Spec-change diff tooling (`curriculum-diff.ts`): diff two snapshots of a subject's topics (old spec version vs new) and get added/removed/reworded spec points, key-point and common-error changes, plus the questions pinned to affected points — so a board revision is triaged instead of re-read. `recordedSpecVersionChanges` lists subjects whose manifest history spans multiple spec versions.
-- CI gate: `node scripts/validate-curriculum.mjs` — 440 topics / 577 authored question templates today; the runtime bank materialises 1,595 GCSE, Edexcel A-level, data-question, unfamiliar-context and authentic-source expansion entries (8 boards×levels, tree-shakable modules).
+- CI gate: `node scripts/validate-curriculum.mjs` prints the live topic/question totals and fails when README's advertised totals drift. Keep that validator as the inventory source of truth rather than copying another fast-staling count into benchmark prose.
 - Visual regression: `e2e/visual.spec.ts` guards the Today shell (2% tolerance, `e2e/__screenshots__/`); update with `--update-snapshots`.
 
 
@@ -246,3 +315,11 @@ The product ships with synthetic longitudinal histories checked by CI harnesses.
 
 - Cohort: n, weeks, board, grade movement, MAE/bias/correlation before and after each engine change.
 - The method will be the same harnesses above; numbers will be from observed `(predicted, actual)` rather than synthetic — same functions, real pairs.
+
+## WJEC part-level trust update (2026-09-26)
+
+WJEC flagship trust and authored depth are credited per mapped question part rather than by assigning one depth label to an entire structured question. A question can therefore contribute recall, application and transfer evidence through different parts, but still counts as only one independent question toward the four-question threshold for a specification statement.
+
+Human review attestations require a full timezone-bearing ISO instant and reject date-only, impossible-calendar or materially future-dated times across question approval, WJEC paper provenance, marking/outcomes and prerequisite decisions. Verified paper provenance additionally requires an official HTTPS WJEC origin and a SHA-256 source digest. Marking/outcome and prerequisite attestations use exact canonical SHA-256 fingerprints; legacy 32-bit fingerprints are historical only. The exact authored-content ceiling is tracked in `src/content/reviews/wjec-authoring-backlog.json`; `npm run wjec:authoring:gaps` reports the gaps, `npm run wjec:authoring:plan -- <subject> --limit=12` produces prioritized new-family authoring briefs, and `npm run wjec:authoring:check` verifies that the source-controlled backlog matches the live bank. Prerequisite hypotheses use a separate reviewed ledger via `wjec:prerequisite:batch` and `wjec:prerequisite:apply`; neither workflow fabricates approvals.
+
+Focused review batches emit `release-set-proposal.json`. `npm run wjec:release:check -- <proposal>` validates a proposal without writing; `npm run wjec:release:apply -- <proposal>` atomically updates only the editorial release-candidate manifest. The generated `resultingQuestionIds` snapshot is mandatory so stale proposals fail closed. Release selection never creates or changes human approvals.

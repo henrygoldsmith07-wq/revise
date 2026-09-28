@@ -1,5 +1,7 @@
-import type { Attempt, Id, LearningDemand, PaperMarkingReview, Question, QuestionPart } from "./types";
+import type { Attempt, Id, LearningDemand, Mistake, PaperMarkingReview, Question, QuestionPart } from "./types";
 import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
+import { canonicalJson, sha256Hex } from "./content-fingerprint";
+import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import { isReasoningTransfer, reasoningNovelty } from "./reasoning-signature";
 
 function normaliseAnswer(text: string): string {
@@ -46,15 +48,14 @@ export function independentAttempt(attempt: Attempt): boolean {
 
 /**
  * Fingerprint the exact response and marks a human reviewer saw. This is an
- * optional forward-compatible field on persisted attempts: older reviewed
- * rows can still be trusted, while a supplied fingerprint invalidates the
- * attestation if the response or awarded marks are edited later.
+ * New WJEC review-gated paper attestations require this fingerprint so edited
+ * responses or marks invalidate the review. Legacy v1 fingerprints are not
+ * trusted after this migration; non-WJEC historical rows may still omit the field.
  */
 export function paperMarkingFingerprint(attempt: Pick<Attempt, "id" | "questionId" | "answers" | "marked" | "awarded" | "max">): string {
-  const text = JSON.stringify([attempt.id, attempt.questionId, attempt.answers, attempt.marked, attempt.awarded, attempt.max]);
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return `paper-mark-v1:${(hash >>> 0).toString(16)}`;
+  return `paper-mark-v2:sha256:${sha256Hex(canonicalJson([
+    attempt.id, attempt.questionId, attempt.answers, attempt.marked, attempt.awarded, attempt.max,
+  ]))}`;
 }
 
 /** A paper response is trusted only after a named human has reviewed its mark. */
@@ -62,17 +63,20 @@ export function humanReviewedPaperAttempt(attempt: Attempt): boolean {
   if (attempt.mode !== "paper") return false;
   const review: PaperMarkingReview | undefined = attempt.paperMarking;
   if (!review || !["human-reviewed", "adjudicated"].includes(review.status) ||
-    !review.reviewerId?.trim() || !review.reviewedAt || !Number.isFinite(Date.parse(review.reviewedAt))) return false;
+    !review.reviewerId?.trim() || !validAttestationInstant(review.reviewedAt)) return false;
+  if (requiresWjecContentReview(attempt.subjectId) &&
+    (!review.reviewerRole || !WJEC_ATTESTATION_ROLES.includes(review.reviewerRole) || !review.reviewerQualification?.trim())) return false;
   const markerCount = review.markerCount;
   if (review.status === "adjudicated" && (typeof markerCount !== "number" || !Number.isInteger(markerCount) || markerCount < 2)) return false;
   if (review.status === "human-reviewed" && markerCount !== undefined &&
     (typeof markerCount !== "number" || !Number.isInteger(markerCount) || markerCount < 1)) return false;
-  return !review.markingFingerprint || review.markingFingerprint === paperMarkingFingerprint(attempt);
+  if (!review.markingFingerprint) return !requiresWjecContentReview(attempt.subjectId);
+  return review.markingFingerprint === paperMarkingFingerprint(attempt);
 }
 
 /**
  * Shared gate for answer evidence. A question must be the same subject as
- * the attempt, the content must be trusted, and Physics paper attempts must
+ * the attempt, the content must be trusted, and review-gated WJEC paper attempts must
  * additionally pass the authenticated provenance + human-marking check. This
  * keeps planners and analytics from inventing their own weaker trust rules.
  */
@@ -85,6 +89,26 @@ export function trustedAssessmentAttempt(
   if (!question || !trustworthyAttempt(attempt) || question.subjectId !== attempt.subjectId || !trustedAssessmentContent(question)) return false;
   return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
     authenticPaperEvidence(attempt, question, history, questions);
+}
+
+/**
+ * Canonical mistake-evidence gate. Review-gated mistakes must point to the
+ * exact trusted attempt and question that produced them; they cannot borrow a
+ * trusted attempt from a different question or survive a missing legacy link.
+ */
+export function trustedAssessmentMistake(
+  mistake: Mistake,
+  questions: readonly Question[],
+  attempts: readonly Attempt[],
+  trustedQuestion: (question: Question) => boolean = trustedAssessmentContent,
+): boolean {
+  if (!requiresWjecContentReview(mistake.subjectId)) return true;
+  if (!mistake.questionId || !mistake.attemptId) return false;
+  const question = questions.find((row) => row.id === mistake.questionId);
+  const attempt = attempts.find((row) => row.id === mistake.attemptId);
+  if (!question || !attempt || attempt.questionId !== question.id ||
+    question.subjectId !== mistake.subjectId || attempt.subjectId !== mistake.subjectId) return false;
+  return trustedQuestion(question) && trustedAssessmentAttempt(attempt, question, attempts, questions);
 }
 
 export function questionFamily(question: Question): string {

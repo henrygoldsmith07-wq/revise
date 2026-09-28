@@ -73,7 +73,7 @@ export type ContentSource = "authored" | "licensed" | "generated" | "past-paper"
 export interface HumanVerificationRecord {
   status: "pending" | "approved" | "changes-requested";
   reviewerId?: Id;
-  /** Role of the qualified Physics reviewer who made the decision. */
+  /** Role of the qualified WJEC reviewer who made the decision. */
   reviewerRole?: "examiner" | "teacher" | "subject-expert";
   /** Free-text qualification evidence, e.g. "WJEC A-level Physics examiner". */
   reviewerQualification?: string;
@@ -875,10 +875,12 @@ export type PaperMarkingReviewStatus = "unreviewed" | "human-reviewed" | "adjudi
 export interface PaperMarkingReview {
   status: PaperMarkingReviewStatus;
   reviewerId?: Id;
+  reviewerRole?: "examiner" | "teacher" | "subject-expert";
+  reviewerQualification?: string;
   reviewedAt?: IsoInstant;
   /** Number of qualified human markers whose marks contributed to this row. */
   markerCount?: number;
-  /** Optional fingerprint of the exact answer/marking reviewed. */
+  /** Exact answer/marking fingerprint; mandatory for review-gated WJEC paper evidence. */
   markingFingerprint?: string;
 }
 

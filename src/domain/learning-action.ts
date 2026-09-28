@@ -1,10 +1,9 @@
-import { requiresWjecContentReview } from "./physics-content-review";
 import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
-import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentAttempt, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentMistake, unseenQuestion } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
-import { humanVerifiedPhysicsQuestion, trustedAssessmentContent } from "./physics-content-review";
+import { trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, InterventionOutcomeRecord, Mistake, Question, InterventionPriorState } from "./types";
 
 export interface LearningAction {
@@ -24,7 +23,7 @@ export interface LearningAction {
   expectedDurableGain: number;
   calibrated: boolean;
   calibrationSampleSize: number;
-  contentTrust: "human-verified" | "needs-human-review";
+  contentTrust: "trusted-assessment" | "needs-human-review";
   /** Shared policy value, separate from the intervention's gain prior. */
   policy?: { score: number; evidenceLevel: "limited" | "developing" | "strong" };
 }
@@ -39,7 +38,6 @@ export function selectLearningAction(input: {
   const evidence = deriveSkillEvidence(nodes, trustedQuestions, attempts);
   const baselineEvidence = evidence;
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
-  const attemptById = new Map(attempts.map((attempt) => [attempt.id, attempt] as const));
   const exposedQuestions = attempts.flatMap(attempt => questionById.has(attempt.questionId) ? [questionById.get(attempt.questionId)!] : []);
   const freshness = new Map<Question, ReturnType<typeof questionFreshness>>();
   const freshReasoning = (question: Question) => {
@@ -48,11 +46,7 @@ export function selectLearningAction(input: {
     return result;
   };
   const trustedMistake = (mistake: Mistake): boolean => {
-    if (!requiresWjecContentReview(mistake.subjectId)) return true;
-    const attempt = mistake.attemptId ? attemptById.get(mistake.attemptId) : undefined;
-    const question = questionById.get(mistake.questionId ?? attempt?.questionId ?? "");
-    if (!attempt || !question) return false;
-    return trustedAssessmentAttempt(attempt, question, attempts, questions);
+    return trustedAssessmentMistake(mistake, questions, attempts);
   };
   const calibrations = calibrateInterventions(input.interventionOutcomes ?? []);
   const candidates: LearningAction[] = [];
@@ -70,7 +64,7 @@ export function selectLearningAction(input: {
       const lost = mistake?.marksLost ?? evidence.get(capabilityId)?.lostMarks ?? 1;
       const gap = 1 - (evidence.get(capabilityId)?.accuracy ?? 0.35);
       const effect = effectivenessFor(kind, capabilityId, calibrations, question.subjectId);
-      const trust = humanVerifiedPhysicsQuestion(question) ? "human-verified" as const : "needs-human-review" as const;
+      const trust = trustedAssessmentContent(question) ? "trusted-assessment" as const : "needs-human-review" as const;
       // Rank by durable gain PER LEARNER MINUTE, the north-star metric. A
       // capability where many marks are at stake has more headroom, but the
       // influence is bounded (square root) so a five-mark loss does not
@@ -157,7 +151,7 @@ export function selectLearningAction(input: {
         weakness: action.priorAccuracy == null ? 0.35 : 1 - action.priorAccuracy,
         mistakePressure: action.mistakeId ? Math.min(1, (skill?.lostMarks ?? 1) / 4) : 0,
         learningBenefit: Math.min(1, action.expectedGainPerMinute / 0.08) *
-          (action.contentTrust === "human-verified" ? 1 : 0.7),
+          (action.contentTrust === "trusted-assessment" ? 1 : 0.7),
         retentionBenefit: action.kind === "retention" ? 1 : 0,
         diagnosticValue: action.priorState === "unknown" ? 1 : 0,
         transferNeed: action.kind === "transfer" ? 1 : 0,

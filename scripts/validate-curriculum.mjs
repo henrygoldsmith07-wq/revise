@@ -4,6 +4,7 @@
 // Reports the competitive-moat dashboard the brief asked for.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { build } from "esbuild";
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -45,19 +46,71 @@ function parseQuestions() {
   return { total, withVerification };
 }
 
+async function runtimeInventory() {
+  const bundle = await build({
+    stdin: {
+      contents: `
+        export { seedQuestions } from "./src/content";
+        export { allTopics } from "./src/domain/curriculum";
+        export { FLAGSHIP_SUBJECTS } from "./src/domain/flagship";
+      `,
+      resolveDir: ROOT,
+      loader: "ts",
+    },
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    write: false,
+  });
+  const data = await import(
+    `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`,
+  );
+  const flagshipIds = new Set(data.FLAGSHIP_SUBJECTS.map((row) => row.subjectId));
+  return {
+    topics: data.allTopics().length,
+    questions: data.seedQuestions.length,
+    flagshipQuestions: data.seedQuestions.filter((question) => flagshipIds.has(question.subjectId)).length,
+  };
+}
+
 const topics = parseTopics();
 const q = parseQuestions();
 const totalTopics = topics.reduce((a, x) => a + x.topicCount, 0);
+const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+const runtime = await runtimeInventory();
 
 console.log("Revise curriculum audit -", new Date().toISOString().slice(0, 10));
 console.log("");
 for (const t of topics) console.log(`  ${t.file}: ${t.topicCount} topics (${t.slugs.length} slugs inc. units)`);
 console.log(`  total topics: ${totalTopics}`);
-console.log(`  seed questions: ${q.total}  (${q.withVerification} with verification tag)`);
+console.log(`  static catalogue records: ${q.total}  (${q.withVerification} with verification tag)`);
+console.log(`  runtime topics: ${runtime.topics}`);
+console.log(`  materialised seed questions: ${runtime.questions}`);
+console.log(`  WJEC flagship questions: ${runtime.flagshipQuestions}`);
 
 const errors = [];
 if (totalTopics < 200) errors.push(`too few topics: ${totalTopics} - expected >=200 across boards/levels (WJEC+AQA+Edexcel+OCR x GCSE/A-level)`);
 if (q.total < 20) errors.push(`too few questions: ${q.total} - seed bank looks pruned`);
+if (runtime.topics !== totalTopics) errors.push(`runtime/static topic count mismatch: runtime ${runtime.topics}, static audit ${totalTopics}`);
+if (runtime.questions < q.total) errors.push(`runtime question bank is smaller than the static catalogue audit: ${runtime.questions} < ${q.total}`);
+
+// Public inventory claims must move with the measured bank. Revise presents
+// provenance/auditability as a product property, so stale README totals are a
+// release defect rather than harmless prose drift.
+const advertised = readme.match(/runtime inventory:\s*\*\*(\d+) topics,\s*(\d+) materialised seed questions,\s*(\d+) WJEC flagship questions\*\*/i);
+if (!advertised) {
+  errors.push("README.md: missing live curriculum inventory claim");
+} else {
+  const advertisedTopics = Number(advertised[1]);
+  const advertisedQuestions = Number(advertised[2]);
+  const advertisedFlagshipQuestions = Number(advertised[3]);
+  if (advertisedTopics !== runtime.topics || advertisedQuestions !== runtime.questions ||
+      advertisedFlagshipQuestions !== runtime.flagshipQuestions) {
+    errors.push(
+      `README.md: advertised runtime inventory is stale (${advertisedTopics} topics / ${advertisedQuestions} questions / ${advertisedFlagshipQuestions} flagship; measured ${runtime.topics} / ${runtime.questions} / ${runtime.flagshipQuestions})`,
+    );
+  }
+}
 
 for (const t of topics) {
   const text = readFileSync(join(ROOT, `src/domain/curriculum/${t.file}`), "utf8");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateCalculationMastery } from "@/domain/calculation-mastery";
+import { applyHumanVerification, physicsContentFingerprint } from "@/domain/physics-content-review";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 
 const DATE = "2026-01-01T00:00:00.000Z";
@@ -61,6 +62,22 @@ function mistake(id: string, questionId: string, marksLost: number, category: Mi
 }
 
 describe("calculation mastery", () => {
+  it("uses the shared WJEC trust predicate by default", () => {
+    const draft = { ...question("wjec-calc"), subjectId: "wjec-alevel-maths", topicIds: ["wjec-alevel-maths.algebra"] };
+    const approved = applyHumanVerification(draft, {
+      status: "approved",
+      reviewerId: "test-only",
+      reviewerRole: "teacher",
+      reviewerQualification: "Test fixture only",
+      reviewedAt: "2026-09-26T12:00:00Z",
+      contentFingerprint: physicsContentFingerprint(draft),
+      checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
+    });
+    const evidence = { ...attempt("wjec-a", approved.id, 8, 1), subjectId: approved.subjectId, topicIds: approved.topicIds };
+    expect(calculateCalculationMastery({ questions: [draft], attempts: [evidence], mistakes: [] }).attempts).toBe(0);
+    expect(calculateCalculationMastery({ questions: [approved], attempts: [evidence], mistakes: [] }).attempts).toBe(1);
+  });
+
   it("filters to calculation questions and weights accuracy by marks", () => {
     const report = calculateCalculationMastery({
       questions: [question("calc"), question("essay", "structured")],

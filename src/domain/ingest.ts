@@ -1,6 +1,7 @@
 import type { Id, PaperQuestionProvenance, Question } from "./types";
 import { defineQuestion } from "@/content/questions/authoring";
 import type { QuestionSpec } from "@/content/questions/authoring";
+import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest } from "./trust-attestation";
 
 // ---------------------------------------------------------------------------
 // Past-paper ingestion helpers (synthetic now, real later).
@@ -109,8 +110,8 @@ export function ingestPaperPayload(payload: IngestPaperPayload): Question[] {
 export function ingestAuthenticatedPhysicsPaper(payload: AuthenticatedPhysicsPaperPayload): Question[] {
   const provenance = payload.paperProvenance;
   if (provenance.board.toLowerCase() !== "wjec" || provenance.status !== "verified" ||
-    !provenance.paperId || !provenance.sourceDigest.trim() || !/^https:\/\//i.test(provenance.sourceUrl) ||
-    !provenance.verifiedBy || !provenance.verifiedAt || !Number.isFinite(Date.parse(provenance.verifiedAt))) {
+    !provenance.paperId || !validSha256Digest(provenance.sourceDigest) || !validOfficialWjecUrl(provenance.sourceUrl) ||
+    !provenance.verifiedBy || !validAttestationInstant(provenance.verifiedAt)) {
     throw new Error("WJEC Physics paper provenance must be verified with a source digest and named reviewer before import");
   }
   return ingestPaperPayload(payload);

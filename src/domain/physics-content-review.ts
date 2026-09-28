@@ -2,38 +2,38 @@ import { auditLearningDepth } from "./learning-depth";
 import { auditPhysicsAssessmentQuality, type PhysicsAssessmentQualityAudit } from "./physics-assessment-quality";
 import type { CapabilityNode } from "./capability-graph";
 import { validatePrerequisiteReviews } from "./capability-graph";
+import { canonicalJson, sha256Hex } from "./content-fingerprint";
+import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 export const REVIEWED_WJEC_SUBJECT_IDS = [PHYSICS_SUBJECT_ID, "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry"] as const;
+export const WJEC_REVIEWER_ROLES = WJEC_ATTESTATION_ROLES;
+function nonBlank(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+export function validHumanReviewInstant(value: unknown, nowMs = Date.now()): value is string {
+  return validAttestationInstant(value, nowMs);
+}
 export function requiresWjecContentReview(subjectId: string | undefined): boolean {
   return REVIEWED_WJEC_SUBJECT_IDS.some((id) => id === subjectId);
 }
 export const REQUIRED_HUMAN_CHECKS = ["question", "marking", "workedSolution", "capabilityMapping", "specificationMapping", "examRealism"] as const;
 
-/** Change detector, not a signature: reviewer identity still needs human attestation. */
+/**
+ * Exact-content change detector for review attestations.
+ *
+ * This is not an identity signature: reviewer identity is still a separate
+ * human attestation. v3 replaces the old 32-bit v2 hash with canonical SHA-256.
+ */
 export function physicsContentFingerprint(question: Question): string {
-  const text = JSON.stringify([question.id, question.subjectId, question.topicIds,
+  const reviewPayload = [question.id, question.subjectId, question.topicIds,
     question.specPointIds, question.stem, question.parts, question.totalMarks,
     question.difficulty, question.aos,
     question.learning, question.options, question.correctIndex, question.calculatorAllowed,
     question.source, question.origin, question.licensedSource, question.paperId, question.paperQuestionNumber,
-    question.paperProvenance, question.specVersion]);
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return `physics-review-v3:${(hash >>> 0).toString(16)}`;
-}
-
-/**
- * Backwards-compatible check: v2 fingerprints (without difficulty/AO cover)
- * are treated as stale rather than trusted, so a difficulty or AO remap
- * fails closed and requires re-attestation. No automated process fabricates
- * approval; this only invalidates.
- */
-export function physicsFingerprintMatches(question: Question, fingerprint: string | undefined): boolean {
-  if (!fingerprint) return false;
-  if (fingerprint === physicsContentFingerprint(question)) return true;
-  return false;
+    question.paperProvenance, question.specVersion];
+  return `wjec-review-v3:sha256:${sha256Hex(canonicalJson(reviewPayload))}`;
 }
 
 export type PhysicsReviewQueueRow = {
@@ -44,9 +44,48 @@ export type PhysicsReviewQueueRow = {
   status: HumanVerificationRecord["status"] | "unreviewed";
 };
 
-function completeChecks(record: HumanVerificationRecord | undefined): boolean {
-  return record?.status === "approved" && Boolean(record.reviewerId?.trim() && record.reviewedAt && Number.isFinite(Date.parse(record.reviewedAt))) &&
-    REQUIRED_HUMAN_CHECKS.every((check) => record.checks?.[check] === true);
+export type HumanVerificationIssue =
+  | "subject-not-review-gated"
+  | "not-approved"
+  | "missing-reviewer-id"
+  | "missing-reviewer-role"
+  | "missing-reviewer-qualification"
+  | "invalid-reviewed-at"
+  | "missing-human-check"
+  | "stale-content-fingerprint"
+  | "invalid-paper-provenance"
+  | "blocked-validation-stage";
+
+/**
+ * Canonical human-review contract for all four WJEC flagships.
+ *
+ * Every path that can turn content into trusted assessment evidence must use
+ * this exact predicate. Importers may perform extra file-shape validation, but
+ * they are not allowed to define a weaker or stronger approval contract.
+ */
+export function humanVerificationIssues(
+  question: Question,
+  record: HumanVerificationRecord | undefined,
+): HumanVerificationIssue[] {
+  const issues: HumanVerificationIssue[] = [];
+  if (!requiresWjecContentReview(question.subjectId)) issues.push("subject-not-review-gated");
+  if (record?.status !== "approved") issues.push("not-approved");
+  if (!nonBlank(record?.reviewerId)) issues.push("missing-reviewer-id");
+  if (!record?.reviewerRole || !WJEC_REVIEWER_ROLES.includes(record.reviewerRole)) issues.push("missing-reviewer-role");
+  if (!nonBlank(record?.reviewerQualification)) issues.push("missing-reviewer-qualification");
+  if (!validHumanReviewInstant(record?.reviewedAt)) issues.push("invalid-reviewed-at");
+  if (!record || REQUIRED_HUMAN_CHECKS.some((check) => record.checks?.[check] !== true)) issues.push("missing-human-check");
+  if (record?.contentFingerprint !== physicsContentFingerprint(question)) issues.push("stale-content-fingerprint");
+  if (question.source === "past-paper" && !verifiedWjecPaperProvenance(question)) issues.push("invalid-paper-provenance");
+  if (["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "")) issues.push("blocked-validation-stage");
+  return [...new Set(issues)];
+}
+
+export function validHumanVerification(
+  question: Question,
+  record: HumanVerificationRecord | undefined,
+): boolean {
+  return humanVerificationIssues(question, record).length === 0;
 }
 
 /** A question is trusted only when every component has an approved check. */
@@ -56,10 +95,7 @@ export function humanVerifiedPhysicsQuestion(question: Question): boolean {
 
 /** Same six-check and edit-invalidation contract for all four WJEC flagships. */
 export function humanVerifiedWjecQuestion(question: Question): boolean {
-  return requiresWjecContentReview(question.subjectId) && question.verification === "verified" && completeChecks(question.humanVerification) &&
-    physicsFingerprintMatches(question, question.humanVerification?.contentFingerprint) &&
-    (question.source !== "past-paper" || verifiedWjecPaperProvenance(question)) &&
-    !["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "");
+  return question.verification === "verified" && validHumanVerification(question, question.humanVerification);
 }
 
 export function trustedAssessmentContent(question: Question): boolean {
@@ -78,11 +114,12 @@ export function verifiedPhysicsPaperProvenance(question: Question): boolean {
 export function verifiedWjecPaperProvenance(question: Question): boolean {
   const provenance = question.paperProvenance;
   return requiresWjecContentReview(question.subjectId) && question.source === "past-paper" &&
-    Boolean(question.paperId && question.paperQuestionNumber?.trim() && provenance &&
-      provenance.status === "verified" && provenance.board.toLowerCase() === "wjec" &&
+    Boolean(nonBlank(question.paperId) && nonBlank(question.paperQuestionNumber) && provenance &&
+      provenance.status === "verified" && nonBlank(provenance.board) && provenance.board.toLowerCase() === "wjec" &&
       provenance.paperId === question.paperId && provenance.questionNumber === question.paperQuestionNumber &&
-      provenance.specification.trim() && /^https:\/\//i.test(provenance.sourceUrl) && provenance.sourceDigest.trim() &&
-      provenance.verifiedBy?.trim() && provenance.verifiedAt && Number.isFinite(Date.parse(provenance.verifiedAt)) &&
+      nonBlank(provenance.specification) && validOfficialWjecUrl(provenance.sourceUrl) &&
+      validSha256Digest(provenance.sourceDigest) && nonBlank(provenance.verifiedBy) && nonBlank(provenance.verifiedAt) &&
+      validAttestationInstant(provenance.verifiedAt) &&
       (!provenance.specificationVersion || !question.specVersion || provenance.specificationVersion === question.specVersion));
 }
 
@@ -107,7 +144,7 @@ export function buildPhysicsReviewQueue(questions: readonly Question[], subjectI
 
 /** Apply an immutable review decision; incomplete approvals remain untrusted. */
 export function applyHumanVerification(question: Question, record: HumanVerificationRecord): Question {
-  const approved = completeChecks(record) && physicsFingerprintMatches(question, record.contentFingerprint);
+  const approved = validHumanVerification(question, record);
   return {
     ...question,
     humanVerification: { ...record, status: approved ? "approved" : record.status === "approved" ? "pending" : record.status },
