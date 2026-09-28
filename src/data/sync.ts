@@ -117,7 +117,62 @@ export async function authIdentity(
 }
 
 /** After this many failed attempts an outbox item stops blocking the queue. */
-const MAX_OUTBOX_ATTEMPTS = 10;
+export const MAX_OUTBOX_ATTEMPTS = 10;
+
+export interface FailedOutboxItemSummary {
+  id: Id;
+  entity: SyncEntity;
+  op: OutboxItem["op"];
+  attempts: number;
+  queuedAt: string;
+  lastError: string | null;
+}
+
+/** Safe metadata only — payload/answer content is intentionally omitted. */
+export async function failedOutboxItems(userId?: Id): Promise<FailedOutboxItemSummary[]> {
+  const db = await getDb();
+  const items = (await db.getAll("outbox")) as OutboxItem[];
+  return items
+    .filter((item) => item.attempts >= MAX_OUTBOX_ATTEMPTS && (!userId || isOwnedBy(item, userId)))
+    .sort(queueOrder)
+    .map((item) => ({
+      id: item.id,
+      entity: item.entity,
+      op: item.op,
+      attempts: item.attempts,
+      queuedAt: item.queuedAt,
+      lastError: item.lastError ?? null,
+    }));
+}
+
+export async function retryFailedOutboxItem(id: Id, userId: Id): Promise<boolean> {
+  const db = await getDb();
+  const item = (await db.get("outbox", id)) as OutboxItem | undefined;
+  if (!item || !isOwnedBy(item, userId) || item.attempts < MAX_OUTBOX_ATTEMPTS) return false;
+  await db.put("outbox", { ...item, attempts: 0, lastError: undefined });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUE_EVENT));
+  return true;
+}
+
+export async function discardFailedOutboxItem(id: Id, userId: Id): Promise<boolean> {
+  const db = await getDb();
+  const item = (await db.get("outbox", id)) as OutboxItem | undefined;
+  if (!item || !isOwnedBy(item, userId) || item.attempts < MAX_OUTBOX_ATTEMPTS) return false;
+  await db.delete("outbox", id);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUE_EVENT));
+  return true;
+}
+
+/**
+ * Explicit recovery export: unlike failedOutboxItems this includes the payload.
+ * Callers must treat it as private student data.
+ */
+export async function failedOutboxRecoveryItem(id: Id, userId: Id): Promise<OutboxItem | null> {
+  const db = await getDb();
+  const item = (await db.get("outbox", id)) as OutboxItem | undefined;
+  if (!item || !isOwnedBy(item, userId) || item.attempts < MAX_OUTBOX_ATTEMPTS) return null;
+  return item;
+}
 
 /** Push the outbox, then pull anything newer from the server. */
 export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncResult> {
