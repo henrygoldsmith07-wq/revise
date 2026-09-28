@@ -430,13 +430,21 @@ function armOutcome(
   for (const p of participants) {
     const w = windows.get(p);
     if (!w || w.withdrawnAt != null) continue; // withdrawals are reported separately, not as dropout
-    dropoutEligible++;
     const myAttempts = attempts
       .filter((a) => a.anonId === p && inParticipantWindow(a.createdAt, w))
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const lastAttempt = myAttempts.at(-1);
-    if (!lastAttempt) neverActivated++;
-    else if (Date.parse(lastAttempt.createdAt) < cutoff) inactive++;
+    if (!lastAttempt) {
+      // A newly enrolled participant is not a dropout until they have had the
+      // full inactivity window in which to activate.
+      if (now.getTime() - w.assignedAt >= DROPOUT_DAYS * 86_400_000) {
+        dropoutEligible++;
+        neverActivated++;
+      }
+      continue;
+    }
+    dropoutEligible++;
+    if (Date.parse(lastAttempt.createdAt) < cutoff) inactive++;
   }
   const dropoutRate = dropoutEligible ? round((neverActivated + inactive) / dropoutEligible) : null;
 
