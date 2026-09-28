@@ -65,18 +65,23 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
     : syncStatus.syncing
       ? { title: "Syncing your latest changes…", body: "You can keep revising while this finishes." }
-      : syncStatus.lastSyncError
-        ? { title: "Sync needs another attempt", body: syncStatus.lastSyncError }
-        : syncStatus.pending
+      : syncStatus.failed > 0
+        ? {
+            title: `${syncStatus.failed} change${syncStatus.failed === 1 ? "" : "s"} could not be synced`,
+            body: "Automatic retries stopped for these changes. Review them in Settings before retrying or discarding anything.",
+          }
+        : syncStatus.lastSyncError
+          ? { title: "Sync needs another attempt", body: syncStatus.lastSyncError }
+          : syncStatus.pending
           ? {
               title: `${syncStatus.pending} change${syncStatus.pending === 1 ? "" : "s"} waiting to sync`,
               body: "Your work is saved here. We’ll retry automatically, or you can try now.",
             }
           : null;
-  const SyncNoticeIcon = !syncStatus.online ? OfflineIcon : syncStatus.lastSyncError ? WarningIcon : SyncIcon;
+  const SyncNoticeIcon = !syncStatus.online ? OfflineIcon : syncStatus.failed > 0 || syncStatus.lastSyncError ? WarningIcon : SyncIcon;
   const syncNoticeClass = !syncStatus.online
     ? "bg-reviewsoft text-review"
-    : syncStatus.lastSyncError
+    : syncStatus.failed > 0 || syncStatus.lastSyncError
       ? "bg-dangersoft text-danger"
       : "bg-surface2 text-ink2";
 
@@ -217,9 +222,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="mt-0.5 leading-relaxed">{syncNotice.body}</p>
             </div>
             {syncStatus.online && !syncStatus.syncing ? (
-              <button type="button" onClick={() => void syncNow()} className="shrink-0 underline underline-offset-2">
-                {syncStatus.lastSyncError ? "Try again" : "Sync now"}
-              </button>
+              syncStatus.failed > 0 ? (
+                <Link href="/settings#sync-recovery" className="shrink-0 underline underline-offset-2">
+                  Review
+                </Link>
+              ) : (
+                <button type="button" onClick={() => void syncNow()} className="shrink-0 underline underline-offset-2">
+                  {syncStatus.lastSyncError ? "Try again" : "Sync now"}
+                </button>
+              )
             ) : null}
           </div>
         ) : null}
@@ -281,23 +292,31 @@ function StatusStrip() {
           {syncStatus.enabled
             ? syncStatus.syncing
               ? "Syncing…"
-              : syncStatus.online
-                ? syncStatus.pending
-                  ? `${syncStatus.pending} queued`
-                  : "Synced"
-                : "Offline — saved here"
+              : syncStatus.failed > 0
+                ? `${syncStatus.failed} need${syncStatus.failed === 1 ? "s" : ""} attention`
+                : syncStatus.online
+                  ? syncStatus.pending
+                    ? `${syncStatus.pending} queued`
+                    : "Synced"
+                  : "Offline — saved here"
             : "Local only — saved here"}
         </span>
         {syncStatus.enabled ? (
-          <button type="button" onClick={() => void syncNow()} className="underline hover:text-ink">
-            {syncStatus.syncing
-              ? "Syncing…"
-              : syncStatus.lastSyncError
-                ? "Try again"
-                : syncStatus.pending
-                  ? `${syncStatus.pending} queued`
-                  : "Sync now"}
-          </button>
+          syncStatus.failed > 0 ? (
+            <Link href="/settings#sync-recovery" className="underline hover:text-ink">
+              Review
+            </Link>
+          ) : (
+            <button type="button" onClick={() => void syncNow()} className="underline hover:text-ink">
+              {syncStatus.syncing
+                ? "Syncing…"
+                : syncStatus.lastSyncError
+                  ? "Try again"
+                  : syncStatus.pending
+                    ? `${syncStatus.pending} queued`
+                    : "Sync now"}
+            </button>
+          )
         ) : null}
       </div>
       {syncStatus.lastSyncError ? <p className="text-danger" role="status">{syncStatus.lastSyncError}</p> : null}
