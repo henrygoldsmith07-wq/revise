@@ -16,7 +16,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { Id } from "@/domain/types";
 import type { Snapshot } from "@/data/repository";
 import * as repo from "@/data/repository";
-import { SYNC_QUEUE_EVENT, outboxSize, sync } from "@/data/sync";
+import { SYNC_QUEUE_EVENT, failedOutboxItems, outboxSize, sync } from "@/data/sync";
 import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
 import { isSupabaseConfigured } from "@/data/supabase";
 import { initialSyncStatus, type SyncStatus } from "./sync-status";
@@ -92,7 +92,7 @@ export function useSyncEngine(input: {
     setSyncStatus((s) => ({ ...s, syncing: true }));
     try {
       const result = await sync(userId);
-      const pending = await outboxSize(userId);
+      const [pending, failedItems] = await Promise.all([outboxSize(userId), failedOutboxItems(userId)]);
       const error =
         result.failed > 0
           ? "Some changes are still waiting to sync. We’ll keep trying."
@@ -103,6 +103,7 @@ export function useSyncEngine(input: {
         ...s,
         syncing: false,
         pending,
+        failed: failedItems.length,
         lastSyncedAt: result.skipped || result.failed > 0 ? s.lastSyncedAt : new Date().toISOString(),
         lastSyncError: error,
       }));
@@ -116,11 +117,12 @@ export function useSyncEngine(input: {
       // Keep a diagnostic trail instead of swallowing the failure: without it,
       // a permanently broken sync looks identical to a slow one.
       console.warn("[sync] failed", caught);
-      const pending = await outboxSize(userId);
+      const [pending, failedItems] = await Promise.all([outboxSize(userId), failedOutboxItems(userId)]);
       setSyncStatus((s) => ({
         ...s,
         syncing: false,
         pending,
+        failed: failedItems.length,
         lastSyncError: "Sync is unavailable right now. Your data is still saved on this device.",
       }));
     } finally {
@@ -148,7 +150,9 @@ export function useSyncEngine(input: {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const refreshPending = () => {
-      void outboxSize(userId).then((pending) => setSyncStatus((s) => ({ ...s, pending })));
+      void Promise.all([outboxSize(userId), failedOutboxItems(userId)]).then(([pending, failedItems]) =>
+        setSyncStatus((s) => ({ ...s, pending, failed: failedItems.length }))
+      );
     };
     refreshPending();
     window.addEventListener(SYNC_QUEUE_EVENT, refreshPending);
