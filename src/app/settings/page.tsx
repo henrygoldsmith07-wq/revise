@@ -591,10 +591,13 @@ function FailedSyncRecovery() {
 
   useEffect(() => {
     if (!store.syncStatus.enabled || store.syncStatus.failed === 0) return;
-    void refresh();
-    // syncStatus.failed changes whenever queue recovery actions or a sync run
-    // change the exhausted-entry count.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    void failedOutboxItems(store.userId).then((next) => {
+      if (!cancelled) setItems(next);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [store.userId, store.syncStatus.enabled, store.syncStatus.failed]);
 
   if (!store.syncStatus.enabled || store.syncStatus.failed === 0) return null;
