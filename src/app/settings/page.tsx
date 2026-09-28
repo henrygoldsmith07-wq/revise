@@ -590,17 +590,14 @@ function FailedSyncRecovery() {
   };
 
   useEffect(() => {
-    if (!store.syncStatus.enabled || store.syncStatus.failed === 0) {
-      setItems([]);
-      return;
-    }
+    if (!store.syncStatus.enabled || store.syncStatus.failed === 0) return;
     void refresh();
     // syncStatus.failed changes whenever queue recovery actions or a sync run
     // change the exhausted-entry count.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.userId, store.syncStatus.enabled, store.syncStatus.failed]);
 
-  if (!store.syncStatus.enabled || (store.syncStatus.failed === 0 && items.length === 0)) return null;
+  if (!store.syncStatus.enabled || store.syncStatus.failed === 0) return null;
 
   return (
     <section id="sync-recovery">
