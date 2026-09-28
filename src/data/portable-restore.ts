@@ -84,7 +84,7 @@ function buildRows(snapshot: PortabilitySnapshot, targetUserId: Id) {
   const mistakes = remapOwned<Mistake>(snapshot.mistakes ?? [], sourceUserId, targetUserId);
   const plannedSessions = remapOwned<PlannedSession>(snapshot.plannedSessions ?? [], sourceUserId, targetUserId);
   const examDates = remapOwned<ExamDate>(snapshot.examDates ?? [], sourceUserId, targetUserId);
-  const questions = remapOwned<Question>(snapshot.questions ?? [], sourceUserId, targetUserId);
+  const questions = snapshot.questions ?? [];
   const papers = remapOwned<Paper>(snapshot.papers ?? [], sourceUserId, targetUserId);
   const settings = snapshot.settings
     ? ({ ...snapshot.settings, userId: targetUserId } as UserSettings)
@@ -157,7 +157,7 @@ export async function validatePortableRestore(
   const db = await getDb();
   const existingQuestions = (await db.getAll("questions")) as Question[];
   const questionIds = new Set([
-    ...existingQuestions.filter((q) => q.userId == null).map((q) => q.id),
+    ...existingQuestions.map((q) => q.id),
     ...rows.questions.map((q) => q.id),
   ]);
   for (const attempt of rows.attempts) {
@@ -242,13 +242,12 @@ export async function restorePortableSnapshot(
       await deleteOwnedRows(store, targetUserId, tx.objectStore(store) as never);
     }
 
-    // Questions without userId are shipped/shared curriculum and are never
-    // rolled back to an older export. Only replace user-owned question rows.
+    // Questions are globally keyed/shared in the current schema. Never
+    // overwrite current shipped content with an older export. Historical
+    // non-seed/custom questions from the snapshot are inserted only when the
+    // id does not already exist locally.
     const questionStore = tx.objectStore("questions");
-    for (const value of await questionStore.getAll()) {
-      const question = value as Question;
-      if (question.userId === targetUserId) await questionStore.delete(question.id);
-    }
+    const existingQuestionIds = new Set((await questionStore.getAll()).map((question) => question.id));
 
     const outbox = tx.objectStore("outbox");
     for (const value of await outbox.getAll()) {
@@ -259,7 +258,7 @@ export async function restorePortableSnapshot(
     await Promise.all([
       ...rows.cards.map((row) => tx.objectStore("cards").put(row)),
       ...rows.reviewLogs.map((row) => tx.objectStore("reviewLogs").put(row)),
-      ...rows.questions.map((row) => tx.objectStore("questions").put(row)),
+      ...rows.questions.filter((row) => !existingQuestionIds.has(row.id)).map((row) => tx.objectStore("questions").put(row)),
       ...rows.attempts.map((row) => tx.objectStore("attempts").put(row)),
       ...rows.mistakes.map((row) => tx.objectStore("mistakes").put(row)),
       ...rows.papers.map((row) => tx.objectStore("papers").put(row)),
