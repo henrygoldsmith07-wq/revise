@@ -23,6 +23,13 @@ import { clearAll } from "@/data/db";
 import { restorePortableSnapshot } from "@/data/portable-restore";
 import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
+import {
+  discardFailedOutboxItem,
+  failedOutboxItems,
+  failedOutboxRecoveryItem,
+  retryFailedOutboxItem,
+  type FailedOutboxItemSummary,
+} from "@/data/sync";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
@@ -325,6 +332,8 @@ export default function SettingsPage() {
 
       <Account />
 
+      <FailedSyncRecovery />
+
       <DataControls />
 
       <section>
@@ -565,6 +574,129 @@ function Account() {
           </>
         )}
         {message ? <p className="text-xs text-ink3">{message}</p> : null}
+      </Panel>
+    </section>
+  );
+}
+
+function FailedSyncRecovery() {
+  const store = useStore();
+  const [items, setItems] = useState<FailedOutboxItemSummary[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const refresh = async () => {
+    const next = await failedOutboxItems(store.userId);
+    setItems(next);
+  };
+
+  useEffect(() => {
+    if (!store.syncStatus.enabled || store.syncStatus.failed === 0) {
+      setItems([]);
+      return;
+    }
+    void refresh();
+    // syncStatus.failed changes whenever queue recovery actions or a sync run
+    // change the exhausted-entry count.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.userId, store.syncStatus.enabled, store.syncStatus.failed]);
+
+  if (!store.syncStatus.enabled || (store.syncStatus.failed === 0 && items.length === 0)) return null;
+
+  return (
+    <section id="sync-recovery">
+      <SectionHeading
+        title="Sync recovery"
+        hint="These changes exhausted automatic retries. Nothing is discarded without your confirmation."
+      />
+      <Panel className="space-y-3">
+        <p className="text-xs text-ink2">
+          The local revision data is still saved. Only safe queue metadata is shown here; answer content stays hidden unless you explicitly export a recovery record.
+        </p>
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-[10px] border border-line bg-surface2 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-ink">
+                    {item.entity} · {item.op}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink3">
+                    {item.attempts} failed attempts · queued {new Date(item.queuedAt).toLocaleString("en-GB")}
+                  </p>
+                  {item.lastError ? (
+                    <p className="mt-1 max-w-xl text-[11px] text-danger">
+                      {item.lastError.slice(0, 180)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setMessage(null);
+                      void retryFailedOutboxItem(item.id, store.userId).then(async (retried) => {
+                        if (!retried) {
+                          setMessage("That failed change is no longer available to retry.");
+                          await refresh();
+                          return;
+                        }
+                        setMessage("Retry enabled. Running sync now…");
+                        await store.syncNow();
+                        await refresh();
+                      });
+                    }}
+                  >
+                    Retry
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setMessage(null);
+                      void failedOutboxRecoveryItem(item.id, store.userId).then((record) => {
+                        if (!record) {
+                          setMessage("That recovery record is no longer available.");
+                          return;
+                        }
+                        const blob = new Blob(
+                          [JSON.stringify({ app: "revise", kind: "failed-sync-recovery", exportedAt: new Date().toISOString(), record }, null, 2)],
+                          { type: "application/json" },
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `revise-failed-sync-${item.entity}-${item.id.slice(0, 8)}.json`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                        setMessage("Private recovery record exported. It may contain revision content; store it securely.");
+                      });
+                    }}
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const ok = confirm(
+                        "Discard this queued sync mutation? The local study record remains on this device, but this specific change will no longer be sent to the server.",
+                      );
+                      if (!ok) return;
+                      void discardFailedOutboxItem(item.id, store.userId).then(async (discarded) => {
+                        setMessage(discarded ? "Queued mutation discarded." : "That failed change was already gone.");
+                        await refresh();
+                      });
+                    }}
+                  >
+                    Discard queued change
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {message ? <p className="text-xs text-ink2" role="status">{message}</p> : null}
       </Panel>
     </section>
   );
