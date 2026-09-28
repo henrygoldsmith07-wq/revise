@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearAll } from "@/data/db";
-import { loadSnapshot, saveAttempt, saveCard, saveReviewLog } from "@/data/repository";
+import { loadSnapshot, saveCard } from "@/data/repository";
 import { buildPortabilitySnapshot, parsePortabilitySnapshot } from "@/domain/portability";
 import { restorePortableSnapshot, validatePortableRestore } from "@/data/portable-restore";
 import type { Attempt, Card, ReviewLog } from "@/domain/types";
