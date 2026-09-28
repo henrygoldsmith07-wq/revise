@@ -1,5 +1,6 @@
 import type { Id, IsoDate, IsoInstant, MisconceptionTag, Question, Topic } from "./types";
 import { createDraft, submitForReview } from "./moderation";
+import { todayLocal } from "./local-date";
 import type { ModerationEntry } from "./moderation";
 
 // ---------------------------------------------------------------------------
@@ -438,7 +439,7 @@ export function demoTeacherWorkspace(input: { questions: Question[]; topics: Top
   const students = demoTeacherStudents(input.subjectIds);
   const firstQuestions = input.questions.slice(0, 3);
   const firstTopic = input.topics[0];
-  const today = (input.now ?? new Date()).toISOString().slice(0, 10);
+  const today = todayLocal(input.now ?? new Date());
   return {
     assignments: firstQuestions.length
       ? [

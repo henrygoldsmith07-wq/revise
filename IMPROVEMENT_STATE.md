@@ -609,3 +609,114 @@ edges, 0 `missing-capability` / `missing-part-learning` /
 `incomplete-mark-scheme` issues. No human approvals fabricated
 (`approvalsCreated: 0`); `releaseReady` correctly remains false until the
 six-check attestation and double-marked benchmark are supplied by people.
+
+## Improvement state: deterministic sync, local dates and bounded sessions
+
+### Goal and observable outcome
+
+Cross-device state should converge deterministically no matter how far a device
+clock has drifted or how long a student has been offline, due dates should mean
+the same calendar day on every device, and an adaptive session should never
+promise more time than the student has.
+
+Success signals:
+
+- a pull with thousands of rows (including many sharing one timestamp) completes
+  without relying on the server's default row limit, and resumes exactly where
+  it failed after a retry with no duplicate writes;
+- one future-dated row from a badly-clocked device cannot hide every legitimate
+  row beneath it;
+- calendar-day decisions (due, forecast, streak, exam proximity) use the
+  student's local day, not a UTC truncation;
+- the planned and replanned session budgets satisfy `totalMinutes <= targetMinutes`
+  for any target and any measured elapsed time;
+- oversized modules are decomposed along existing seams without behaviour
+  change, and the compatibility barrels keep every existing import working.
+
+### Baseline evidence and diagnosis
+
+- `pull` read one `lastPullAt` timestamp per account and did a single unbounded
+  `.gt("updated_at", since)` read. A large history silently truncated at the
+  server's default row limit, and one failing table meant the shared cursor was
+  either frozen for everything or advanced past rows that were never read.
+- `touch_updated_at` only guarded `UPDATE`, and did nothing on `INSERT`, so the
+  first write of a badly-clocked device was never bounded.
+- Outbox ordering used client wall clocks, so two devices with skewed clocks
+  could push their writes in a different order than the logical order of the
+  mutations themselves.
+- Calendar code derived "today" with `new Date().toISOString().slice(0, 10)` in
+  many places, so a student in any negative UTC offset saw tomorrow's due cards
+  in the evening, and vice versa.
+- `adaptive-session.ts` grew to hold topic scoring, budget fitting, session
+  construction, replanning and the debrief in one file; `types.ts` and
+  `AssessmentPanels.tsx` were the two other large concentration points, and
+  `store.tsx` derived paper calibration inline.
+
+### Decisions
+
+- Pull becomes a per-entity `(updated_at, id)` keyset with an explicit
+  `SYNC_PULL_PAGE_SIZE`, so ordering is total and pagination is exact even when
+  every row shares one timestamp. Cursors persist per entity under a new
+  `pullCursors` meta key, seeded once from the legacy global `lastPullAt` for
+  cross-version compatibility, and advance only after that entity's pages merge
+  cleanly. Merges stay keyed puts, so a re-fetched page is idempotent.
+- Bound device clocks on the server, not the client: any `updated_at` more than
+  five minutes ahead of the database clock is clamped, and the trigger runs on
+  `INSERT` as well as `UPDATE`. `sync_writes` and `ai_rate_quota` are excluded
+  because neither has an `updated_at` column to compare.
+- Order the outbox by Lamport counter and device id rather than by wall clock.
+  Logical order is what merge determinism actually depends on, and it is
+  available on every device.
+- Introduce `src/domain/local-date.ts` as the single place that converts an
+  instant to a student-local `YYYY-MM-DD` key. Instants stay instants; only
+  calendar-day comparisons route through it.
+- Extract budget arithmetic into `adaptive-budget.ts` so the invariants are
+  testable without constructing a session, and assert them in both the initial
+  plan and every replan. Replanning uses measured elapsed time and falls back to
+  planned minutes when timing is unavailable. Delayed retrieval stays
+  represented even at zero minutes, so the durable loop is never silently
+  dropped to satisfy the budget.
+- Decompose along existing seams: `types-*.ts` by bounded context, the
+  assessment panels by panel family, paper calibration into `paper-preview.ts`,
+  and the lesson run state machine into `use-lesson-runner.ts`. `types.ts` and
+  `AssessmentPanels.tsx` remain barrels, so no import path changes.
+
+### Delivered scope
+
+- Deterministic paginated pull: per-entity keyset cursors, explicit page size
+  and max-pages ceiling, cursor pinning on both per-row decrypt failures and
+  per-page transport failures, account-identity re-checks before writes, and
+  legacy `lastPullAt` maintained as a cross-version fallback.
+- Server timestamp clamping on insert and update, with a documented rationale
+  for the excluded tables.
+- Lamport-ordered outbox drain.
+- `local-date.ts` adopted across scheduling, retention, forecasting, planner,
+  adaptive sessions, recommendation, exam dates, streaks, experiments, paper
+  selection, moderation, browser and teacher paths.
+- Adaptive budget, scoring and summary modules extracted; budget invariants
+  asserted on the initial plan and on replans.
+- Module decomposition with compatibility barrels; 113 exported type names
+  preserved exactly.
+
+### Status
+
+- [x] per-entity keyset pull with cursor pinning, retry safety and account checks
+- [x] server-side future-timestamp clamp on insert and update
+- [x] logical-clock outbox ordering
+- [x] student-local calendar-day abstraction adopted repo-wide
+- [x] hard adaptive budget invariants on initial plans and replans
+- [x] decomposition of types, assessment panels, store calibration and lesson run state
+- [x] full lint, regular and strict TypeScript, test suite, build and perf budget
+
+### Verification log
+
+2026-09-28: `npm run verify` passed end to end — lint (0 warnings), `tsc
+--noEmit`, `tsc --noEmit -p tsconfig.strict.json`, curriculum validation and
+freshness, docs integrity, WJEC authoring and trust checks, **230 test files /
+2,010 tests passed** (1 file, 2 tests skipped), production build and the client
+performance budget. New coverage: `sync-pagination` (8 tests, including a
+5,000-row pull and a mid-pagination failure/retry), `sync-clock` (6),
+`local-date` (10, spanning UTC/local boundaries, positive and negative offsets
+and a BST transition), `adaptive-budget` (9, including property-based random
+budgets) and `paper-preview` (2). No human approvals were fabricated and no
+trust gate was relaxed.

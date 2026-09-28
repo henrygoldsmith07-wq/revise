@@ -19,6 +19,20 @@ describe("security — RLS + schema invariants", () => {
     expect(sql).toContain("new.updated_at <= old.updated_at");
     expect(sql).toContain("return old;");
   });
+  it("updated_at trigger clamps future device clocks so the pull cursor cannot be poisoned", () => {
+    const sql = schema();
+    // A row days in the future must be rewritten server-side; the bound is
+    // what keeps one bad clock from hiding every legitimate row beneath it.
+    expect(sql).toContain("interval '5 minutes'");
+    expect(sql).toContain("max_allowed");
+    expect(sql).toContain("before insert");
+  });
+  it("touch triggers skip tables without an updated_at column", () => {
+    const sql = schema();
+    // sync_writes is an append-only idempotency ledger; attaching an
+    // updated_at trigger to it would error on write.
+    expect(sql).toContain("sync_writes has no updated_at column");
+  });
   it("text columns that must be scoped contain user_id", () => {
     const sql = schema();
     expect(sql.match(/user_id/g)!.length).toBeGreaterThan(10);

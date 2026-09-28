@@ -2,6 +2,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 import { daysToExam } from "./recommender";
 import { hintEvidenceMultiplier } from "./hint-tiers";
 import { questionFamily, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { addLocalDays, localDayOfInstant, todayLocal } from "./local-date";
 import type { Attempt, ExamDate, Id, IsoDate, Question, Subject, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -79,7 +80,7 @@ export function predictGrade(
   mastery: TopicMastery[],
   attempts: Attempt[],
   exams: ExamDate[] = [],
-  today: IsoDate = new Date().toISOString().slice(0, 10),
+  today: IsoDate = todayLocal(),
   questions: Question[] = [],
 ): GradePrediction {
   const rows = mastery.filter((m) => m.subjectId === subject.id);
@@ -132,9 +133,9 @@ export function predictGrade(
   // Trend: the last 30 days of marked work against the 30 before it.
   const cutoff = daysAgo(today, 30);
   const priorCutoff = daysAgo(today, 60);
-  const recent = subjectAttempts.filter((a) => a.createdAt.slice(0, 10) >= cutoff);
+  const recent = subjectAttempts.filter((a) => localDayOfInstant(a.createdAt) >= cutoff);
   const prior = subjectAttempts.filter(
-    (a) => a.createdAt.slice(0, 10) >= priorCutoff && a.createdAt.slice(0, 10) < cutoff,
+    (a) => localDayOfInstant(a.createdAt) >= priorCutoff && localDayOfInstant(a.createdAt) < cutoff,
   );
   const trend = prior.length && recent.length ? Math.round((rate(recent) - rate(prior)) * 100) : 0;
 
@@ -268,7 +269,7 @@ function rate(attempts: Attempt[]): number {
 }
 
 function daysAgo(today: IsoDate, days: number): IsoDate {
-  return new Date(new Date(`${today}T00:00:00Z`).getTime() - days * 86_400_000).toISOString().slice(0, 10);
+  return addLocalDays(today, -days);
 }
 
 function clamp(n: number, lo: number, hi: number): number {

@@ -50,6 +50,8 @@ function fakeClient(options: { failAfter?: number; signOutAfter?: number } = {})
       builder.in = async () => ({ error: null });
       builder.select = () => builder;
       builder.gt = () => builder;
+      builder.gte = () => builder;
+      builder.or = () => builder;
       builder.order = () => builder;
       builder.range = async () => ({ data: [], error: null });
       return builder;
@@ -61,14 +63,41 @@ function fakeClient(options: { failAfter?: number; signOutAfter?: number } = {})
 function pullClient(userId: string, rows: Record<string, Record<string, unknown>[]>, failTable?: string): SupabaseClient {
   return {
     auth: { getUser: async () => ({ data: { user: { id: userId } } }) },
-    from: (table: string) => ({
-      select: () => ({ eq: (_column: string, owner: string) => ({
-        gt: async (_timestamp: string, since: string) => ({
-          data: (rows[table] ?? []).filter((row) => row.user_id === owner && Date.parse(String(row.updated_at)) > Date.parse(since)),
-          error: table === failTable ? { message: "offline" } : null,
-        }),
-      }) }),
-    }),
+    from: (table: string) => {
+      const state: { owner?: string; or?: string; range?: [number, number] } = {};
+      const builder: Record<string, (...args: never[]) => unknown> = {};
+      builder.select = () => builder;
+      builder.eq = ((_column: string, owner: string) => {
+        state.owner = owner;
+        return builder;
+      }) as never;
+      builder.or = ((clause: string) => {
+        state.or = clause;
+        return builder;
+      }) as never;
+      builder.order = () => builder;
+      builder.range = (async (from: number, to: number) => {
+        state.range = [from, to];
+        if (table === failTable) return { data: null, error: { message: "offline" } };
+        let out = (rows[table] ?? []).filter((row) => row.user_id === state.owner);
+        // Mirror the production keyset: (updated_at, id) strictly after the cursor.
+        const match = /updated_at\.gt\.([^,]+),and\(updated_at\.eq\.([^,]+),id\.gt\.(.*)\)/.exec(state.or ?? "");
+        if (match) {
+          const [, gtTs, eqTs, gtId] = match;
+          out = out.filter((row) => {
+            const ts = String(row.updated_at ?? "");
+            const id = String(row.id ?? "");
+            return ts > (gtTs ?? "") || (ts === (eqTs ?? "") && id > (gtId ?? ""));
+          });
+        }
+        out = out.slice().sort((a, b) =>
+          String(a.updated_at ?? "").localeCompare(String(b.updated_at ?? "")) ||
+          String(a.id ?? "").localeCompare(String(b.id ?? "")));
+        const [lo, hi] = state.range ?? [0, out.length];
+        return { data: out.slice(lo, hi + 1), error: null };
+      }) as never;
+      return builder;
+    },
   } as unknown as SupabaseClient;
 }
 

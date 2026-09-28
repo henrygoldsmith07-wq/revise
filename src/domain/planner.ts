@@ -2,6 +2,7 @@ import { countdownGuidance } from "./exam-countdown";
 import { daysToExam, examUrgency } from "./recommender";
 import { valueNextAction } from "./next-best-action";
 import { toDateOnly } from "./scheduling";
+import { addLocalDays } from "./local-date";
 import { REVIEW_CAP, allocateDay, reviewBlocksNeeded, type AllocOpportunity, type SubjectEvidence } from "./subject-allocation";
 import type {
   ActivityKind,
@@ -149,7 +150,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
   const out: PlannedSession[] = [...kept];
 
   for (let dayOffset = 0; dayOffset < horizon; dayOffset++) {
-    const date = toDateOnly(new Date(new Date(`${today}T00:00:00Z`).getTime() + dayOffset * 86_400_000));
+    const date = addLocalDays(today, dayOffset);
     const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
     let minutes = input.availability.find((a) => a.weekday === weekday)?.minutes ?? 0;
     if (input.dailyMinutesCap != null) minutes = Math.min(minutes, input.dailyMinutesCap);
@@ -160,7 +161,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
     if (fatigueN > 0 && dayOffset >= fatigueN) {
       let heavyStreak = 0;
       for (let k = dayOffset - fatigueN; k < dayOffset; k++) {
-        const d = toDateOnly(new Date(new Date(`${today}T00:00:00Z`).getTime() + k * 86_400_000));
+        const d = addLocalDays(today, k);
         const wk = new Date(`${d}T00:00:00Z`).getUTCDay();
         const m = Math.min(input.availability.find((a) => a.weekday === wk)?.minutes ?? 0, input.dailyMinutesCap ?? 9999);
         if (m >= 90) heavyStreak++;
@@ -601,7 +602,7 @@ export function rescheduleMissed(
     session.status = "missed";
     let target = today;
     for (let i = 0; i < 14; i++) {
-      const candidate = toDateOnly(new Date(new Date(`${today}T00:00:00Z`).getTime() + i * 86_400_000));
+      const candidate = addLocalDays(today, i);
       if ((countByDate.get(candidate) ?? 0) < dailyBlockCap) {
         target = candidate;
         break;
@@ -701,10 +702,9 @@ export function diminishingReturnsFactor(minutes: number): number {
 export function assessPlanRealism(input: PlanInput, plan: PlannedSession[]): PlanRealismReport {
   const today = toDateOnly(input.now ?? new Date());
   const horizon = input.horizonDays ?? DEFAULT_HORIZON;
-  const start = new Date(`${today}T00:00:00Z`);
   let totalAvailable = 0;
   for (let i = 0; i < horizon; i++) {
-    const d = toDateOnly(new Date(start.getTime() + i * 86_400_000));
+    const d = addLocalDays(today, i);
     const weekday = new Date(`${d}T00:00:00Z`).getUTCDay();
     let m = input.availability.find((a) => a.weekday === weekday)?.minutes ?? 0;
     if (input.dailyMinutesCap != null) m = Math.min(m, input.dailyMinutesCap);
@@ -749,7 +749,7 @@ export function assessPlanRealism(input: PlanInput, plan: PlannedSession[]): Pla
   const zeroDays = (() => {
     let z = 0;
     for (let i = 0; i < horizon; i++) {
-      const d = toDateOnly(new Date(start.getTime() + i * 86_400_000));
+      const d = addLocalDays(today, i);
       const weekday = new Date(`${d}T00:00:00Z`).getUTCDay();
       let m = input.availability.find((a) => a.weekday === weekday)?.minutes ?? 0;
       if (input.dailyMinutesCap != null) m = Math.min(m, input.dailyMinutesCap);
@@ -814,7 +814,7 @@ export function rescheduleMissedPrioritised(
   for (const session of stale) {
     let target = today;
     for (let i = 0; i < 14; i++) {
-      const candidate = toDateOnly(new Date(new Date(`${today}T00:00:00Z`).getTime() + i * 86_400_000));
+      const candidate = addLocalDays(today, i);
       if ((countByDate.get(candidate) ?? 0) < dailyBlockCap) { target = candidate; break; }
     }
     countByDate.set(target, (countByDate.get(target) ?? 0) + 1);

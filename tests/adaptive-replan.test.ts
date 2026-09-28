@@ -45,7 +45,14 @@ function topicStep(kind: AdaptiveStepKind, index: number, extra: Partial<Adaptiv
 
 /** A minimal but well-formed plan; original ladder = the given step list. */
 function plan(steps: AdaptiveSessionStep[], overrides: Partial<AdaptiveSessionPlan> = {}): AdaptiveSessionPlan {
-  const targetMinutes = overrides.targetMinutes ?? Math.max(12, steps.reduce((sum, step) => sum + step.minutes, 0));
+  const minutes = steps.reduce((sum, step) => sum + step.minutes, 0);
+  // Strip explicitly-undefined overrides first: `{ targetMinutes: undefined }`
+  // must not clobber the computed budget with undefined (which silently made
+  // every NaN comparison false and hid over-budget replans).
+  const rest: Partial<AdaptiveSessionPlan> = { ...overrides };
+  const targetMinutes = rest.targetMinutes ?? Math.max(12, minutes);
+  delete rest.targetMinutes;
+  delete rest.totalMinutes;
   return {
     key: `2026-09-05:${TOPIC}`,
     subjectId: SUBJECT,
@@ -83,7 +90,7 @@ function plan(steps: AdaptiveSessionStep[], overrides: Partial<AdaptiveSessionPl
     },
     steps,
     startHref: "/adaptive-session?topic=bio.respiration&start=1",
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -151,12 +158,15 @@ function card(id: string): Card {
 }
 
 function record(partial: Partial<AdaptiveStepRecord> & Pick<AdaptiveStepRecord, "stepId" | "kind" | "result">): AdaptiveStepRecord {
+  const minutes = partial.minutes ?? 4;
   return {
-    minutes: 4,
+    minutes,
     awardedMarks: 0,
     maxMarks: 0,
     hintTier: null,
-    elapsedMs: 0,
+    // Measured wall-clock agrees with planned minutes unless a test says a
+    // step ran long or short: spent/remaining math prefers elapsedMs.
+    elapsedMs: partial.elapsedMs ?? minutes * 60_000,
     ...partial,
   };
 }

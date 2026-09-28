@@ -6,6 +6,7 @@ import { countdownGuidance } from "@/domain/exam-countdown";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { formatTime } from "@/domain/planner";
 import type { ActivityKind, ExamDate, PlannedSession } from "@/domain/types";
+import { addLocalDays, todayLocal, toLocalDateKey } from "@/domain/local-date";
 import { useStore, useSubjects } from "@/state/store";
 import { Button, EmptyState, Pill, SectionHeading } from "@/components/ui";
 
@@ -28,10 +29,10 @@ const ACTIVITY_LABEL: Record<ActivityKind, string> = {
 };
 
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return toLocalDateKey(d);
 }
 function addDays(key: string, days: number): string {
-  return dateKey(new Date(new Date(`${key}T00:00:00Z`).getTime() + days * 86_400_000));
+  return addLocalDays(key, days);
 }
 function dayDiff(a: string, b: string): number {
   return Math.round(
@@ -64,7 +65,7 @@ export default function SchedulePage() {
   const [rebuilding, setRebuilding] = useState(false);
   const autoBuilt = useRef(false);
 
-  const today = dateKey(new Date());
+  const today = todayLocal();
   const sessions = useMemo(
     () => store.plannedSessions.filter((s) => s.date >= today).sort((a, b) => (a.date === b.date ? a.startMinute - b.startMinute : a.date < b.date ? -1 : 1)),
     [store.plannedSessions, today],

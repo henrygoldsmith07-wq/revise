@@ -13,6 +13,7 @@ import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
 import { assignArm as assignExperimentArm,
   type ExperimentAssignment, type ExperimentEvent, type ExperimentEventType } from "@/domain/recommendation-experiment";
+import { localDayOfInstant } from "@/domain/local-date";
 
 export interface Experiments {
   experimentArm: ExperimentAssignment | null;
@@ -86,8 +87,8 @@ export function useExperiments(userId: Id): Experiments {
     if (!arm) return;
     const events = (await readReviseMeta<ExperimentEvent[]>("experimentEvents")) ?? [];
     const atIso = at ?? new Date().toISOString();
-    const day = atIso.slice(0, 10);
-    const duplicate = events.some((e) => e.type === type && e.taskId === task.taskId && e.at.slice(0, 10) === day);
+    const day = localDayOfInstant(atIso);
+    const duplicate = events.some((e) => e.type === type && e.taskId === task.taskId && localDayOfInstant(e.at) === day);
     if (duplicate) return;
     const next = [...events.slice(-2000), { anonId: arm.anonId, taskId: task.taskId, activity: task.activity, topicId: task.topicId ?? null, type, at: atIso }];
     await writeReviseMeta("experimentEvents", next);

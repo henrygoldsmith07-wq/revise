@@ -218,11 +218,14 @@ describe("WCAG 2.1 AA: maths and non-colour cues", () => {
   });
 
   it("Wilson-bound pills carry iconography and screen-reader text, not colour alone", () => {
-    const panel = readFileSync(src("src/components/AssessmentPanels.tsx"), "utf8");
-    expect(panel).toContain("UncertaintyGlyph");
-    expect(panel).toContain('aria-hidden="true"'); // the glyph is decorative
-    expect(panel).toContain('<span className="sr-only">{level} uncertainty. </span>');
-    expect(panel).toContain("title={`${level} uncertainty`}");
+    // The pill markup lives in the mastery panels; the decorative glyph itself
+    // is shared, so read both rather than the AssessmentPanels barrel.
+    const mastery = readFileSync(src("src/components/assessment/mastery-panels.tsx"), "utf8");
+    const shared = readFileSync(src("src/components/assessment/shared.tsx"), "utf8");
+    expect(mastery).toContain("UncertaintyGlyph");
+    expect(shared).toContain('aria-hidden="true"'); // the glyph is decorative
+    expect(mastery).toContain('<span className="sr-only">{level} uncertainty. </span>');
+    expect(mastery).toContain("title={`${level} uncertainty`}");
   });
 
   it("grade-history swatches expose per-bar labels and a visible legend", () => {

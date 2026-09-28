@@ -9,6 +9,7 @@ import type {
   Question,
 } from "./types";
 import { independentAttempt, isTransferQuestion, questionFamily, trustedAssessmentAttempt } from "./learning-evidence";
+import { addLocalDays, localDayOfInstant, todayLocal } from "./local-date";
 
 export const DELAYED_FAR_TRANSFER_DELAY_DAYS = 7;
 export const FAR_TRANSFER_SOURCE_THRESHOLD = 0.8;
@@ -146,8 +147,8 @@ function validDelayDays(value: number | undefined): number {
 function scheduledDate(createdAt: string, delayDays: number): IsoDate | undefined {
   const date = new Date(createdAt);
   if (!Number.isFinite(date.getTime())) return undefined;
-  date.setUTCDate(date.getUTCDate() + delayDays);
-  return date.toISOString().slice(0, 10);
+  // Calendar-day due in the student's local zone, not a UTC truncation.
+  return addLocalDays(localDayOfInstant(createdAt), delayDays);
 }
 
 function score(attempt: Attempt): number {
@@ -234,7 +235,7 @@ export function completeDelayedFarTransfer(
 }
 
 function todayIso(): IsoDate {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 export function delayedFarTransferRetests(input: {
@@ -280,7 +281,7 @@ export function delayedFarTransferRetests(input: {
     const candidateQuestion = input.questions.find((question) => question.id === candidate?.questionId);
     const completed = candidate && candidate.userId === sourceAttempt.userId && candidate.subjectId === sourceAttempt.subjectId &&
       candidate.questionId === link.candidateQuestionId && independentAttempt(candidate) &&
-      candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && candidate.createdAt.slice(0, 10) >= link.scheduledFor &&
+      candidate.farTransfer?.sourceAttemptId === sourceAttempt.id && localDayOfInstant(candidate.createdAt) >= link.scheduledFor &&
       (!requiresWjecContentReview(candidate.subjectId) || Boolean(candidateQuestion && trustedAssessmentAttempt(candidate, candidateQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions))) ? candidate : undefined;
     records.set(link.retestId, {
       ...link,

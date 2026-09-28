@@ -10,22 +10,42 @@
 --    on. A new field in the TypeScript domain model needs no migration, which
 --    matters when the client can be weeks out of date and still syncing.
 -- 2. Conflict resolution is last-write-wins on `updated_at`, applied per row
---    by the client. The server only has to accept the upsert.
+--    by the client. The server bounds that timestamp (see touch_updated_at):
+--    a device clock days in the future cannot push the pull cursor ahead of
+--    legitimate rows, and a stale write can never replace a newer row.
 --
 -- Every table is protected by row-level security keyed on auth.uid(), so one
 -- student can never read or write another's revision data.
 -- ---------------------------------------------------------------------------
 
--- Shared trigger: the client sends updated_at, but a stale/duplicate device
--- write must never replace a newer row. Returning OLD makes the comparison
--- atomic inside the UPDATE used by Supabase upsert; no client-side race can
--- make an older answer, card state or review log win.
+-- Shared trigger: the client sends updated_at, but two server-side bounds
+-- keep one bad clock from corrupting sync for every device.
+--
+-- 1. Future clamp: any timestamp more than 5 minutes ahead of the database
+--    clock is rewritten to now() + 5 minutes. Without this, a single row from
+--    a device days in the future would advance every other device's pull
+--    cursor past all legitimate rows beneath it, hiding them forever.
+-- 2. Monotonic update: on UPDATE, a stale/duplicate device write (new <= old)
+--    must never replace a newer row. Returning OLD makes the comparison
+--    atomic inside the UPDATE used by Supabase upsert; no client-side race can
+--    make an older answer, card state or review log win.
+--
+-- The trigger runs on INSERT as well as UPDATE so the first write is also
+-- bounded. sync_writes carries no updated_at column and is excluded: it is an
+-- append-only ledger keyed by idempotency UUID, never LWW-compared.
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
 as $$
+declare
+  max_allowed timestamptz := now() + interval '5 minutes';
 begin
-  if new.updated_at is null or new.updated_at <= old.updated_at then
+  if new.updated_at is null then
+    new.updated_at := now();
+  elsif new.updated_at > max_allowed then
+    new.updated_at := max_allowed;
+  end if;
+  if TG_OP = 'UPDATE' and new.updated_at <= old.updated_at then
     return old;
   end if;
   return new;
@@ -319,10 +339,25 @@ begin
       'create policy %I on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())',
       target || '_owner', target
     );
+  end loop;
+  -- LWW data tables only: sync_writes has no updated_at column (append-only
+  -- ledger), and ai_rate_quota is written solely by its SECURITY DEFINER
+  -- function. Attaching the touch trigger to either would error on write.
+  foreach target in array array[
+    'cards', 'review_logs', 'questions', 'attempts', 'mistakes',
+    'papers', 'planned_sessions', 'exam_dates', 'user_settings', 'streaks',
+    'lesson_progress'
+  ]
+  loop
     execute format('drop trigger if exists %I on public.%I', target || '_touch', target);
     execute format(
       'create trigger %I before update on public.%I for each row execute function public.touch_updated_at()',
       target || '_touch', target
+    );
+    execute format('drop trigger if exists %I on public.%I', target || '_touch_insert', target);
+    execute format(
+      'create trigger %I before insert on public.%I for each row execute function public.touch_updated_at()',
+      target || '_touch_insert', target
     );
   end loop;
 end;

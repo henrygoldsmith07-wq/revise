@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { buildReviewQueue, todayIso } from "./scheduling";
+import { localDayOfInstant } from "./local-date";
 import { shapeForMastery } from "./session-structure";
 import { FATIGUE_LOCK_MINUTES, FATIGUE_MESSAGE } from "./fatigue";
 import { State } from "ts-fsrs";
@@ -85,7 +86,7 @@ export function buildDailySessionPlan(input: {
   const weakest = pickWeakestTopic(input.masteryByTopic, input.subjectIds);
 
   // Repair: only misses recorded today, still unresolved.
-  const missesToday = input.mistakes.filter((m) => !m.resolved && m.createdAt.slice(0, 10) === on);
+  const missesToday = input.mistakes.filter((m) => !m.resolved && localDayOfInstant(m.createdAt) === on);
 
   const exam = Math.max(3, Math.round(5 * scale));
   const repair = missesToday.length > 0 ? Math.max(2, Math.round(3 * scale)) : 0;

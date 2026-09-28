@@ -140,8 +140,9 @@ describe("resilience chain wiring (structural contracts)", () => {
   });
 
   it("the local-model tier is opt-in through UserSettings.localAiMarking", () => {
-    const types = read("src/domain/types.ts");
-    expect(types).toMatch(/localAiMarking\?: boolean/);
+    // UserSettings moved to the planning context module; the barrel no longer
+    // carries the field text.
+    expect(read("src/domain/types-planning.ts")).toMatch(/localAiMarking\?: boolean/);
     const settings = read("src/app/settings/page.tsx");
     expect(settings).toMatch(/localAiMarking/);
     const runner = read("src/components/QuestionRunner.tsx");

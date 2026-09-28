@@ -1,5 +1,6 @@
 import { getSubject, getTopic } from "./curriculum";
 import { isBuried, isDue, retrievability, todayIso } from "./scheduling";
+import { localDayOfInstant } from "./local-date";
 import type { Card, Id, IsoDate } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -282,7 +283,7 @@ function matchesTerm(card: Card, term: Term, today: IsoDate, now: Date): boolean
       hit = matchesFlag(card, term.value, today, now);
       break;
     case "added":
-      hit = daysBetween(card.createdAt.slice(0, 10), today) <= (term.number ?? 0);
+      hit = daysBetween(localDayOfInstant(card.createdAt), today) <= (term.number ?? 0);
       break;
     case "due":
       hit = daysBetween(today, card.due) <= (term.number ?? 0);

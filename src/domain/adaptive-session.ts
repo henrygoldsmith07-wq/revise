@@ -1,4 +1,3 @@
-import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 // One adaptive learning session.
 //
@@ -11,24 +10,37 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // and transfer, ending on a delayed retrieval.
 //
 // Pure domain: no React, storage, network, or model calls.
+//
+// Topic scoring lives in ./adaptive-scoring, time budgeting in
+// ./adaptive-budget; this module owns plan construction, replanning and the
+// run summary.
 // ---------------------------------------------------------------------------
 
-import { daysToExam, examUrgency } from "./recommender";
-import { valueNextAction } from "./next-best-action";
-import { isDue, retrievability, todayIso } from "./scheduling";
+import { todayIso } from "./scheduling";
+import { localDayOfInstant } from "./local-date";
+import {
+  ADAPTIVE_MAX_QUESTION_ATTEMPTS,
+  ADAPTIVE_MAX_REPAIR_ATTEMPTS,
+  ADAPTIVE_MAX_RETRIEVAL_FAILS,
+  ADAPTIVE_PASS_RATIO,
+  REBUILT_STEP_MINUTES,
+  assertBudgetNotExceeded,
+  clampTargetMinutes,
+  fitToBudget,
+  QUESTION_STEP_KINDS,
+  remainingMinutes,
+  spentMinutes,
+} from "./adaptive-budget";
 import {
   capabilityState,
   emptyProfile,
-  focusCapability,
-  type Capability,
   type CapabilityProfile,
-  type CapabilityState,
 } from "./capability-mastery";
 import { deriveCapabilityProfiles } from "./capability-source";
 import { readinessStopFor } from "./adaptive-stop";
 import { wjecCapabilities } from "@/content/capabilities";
 import { selectLearningAction, type LearningAction } from "./learning-action";
-import { isTransferQuestion, questionContexts, questionFamilies, reasoningNoveltyFor, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
+import { isTransferQuestion, questionContexts, questionFamilies, reasoningNoveltyFor } from "./learning-evidence";
 import { questionExposureReport } from "./question-exposure";
 import { capabilityCombination, combinationKey, isSynopticQuestion, synopticLearningValue } from "./synoptic-coverage";
 import { trustedAssessmentContent } from "./physics-content-review";
@@ -41,7 +53,6 @@ import type {
   Card,
   ExamDate,
   Id,
-  IsoDate,
   Mistake,
   Question,
   RecallGrade,
@@ -52,9 +63,19 @@ import type {
   InterventionOutcomeRecord,
 } from "./types";
 
-export const ADAPTIVE_SESSION_MINUTES = 20;
-export const ADAPTIVE_SESSION_MIN_MINUTES = 12;
-export const ADAPTIVE_SESSION_MAX_MINUTES = 25;
+// Time-budget constants and fitting live in ./adaptive-budget (re-exported
+// here so existing importers keep working while ownership sits in one place).
+export {
+  ADAPTIVE_MAX_QUESTION_ATTEMPTS,
+  ADAPTIVE_MAX_REPAIR_ATTEMPTS,
+  ADAPTIVE_MAX_RETRIEVAL_FAILS,
+  ADAPTIVE_PASS_RATIO,
+  ADAPTIVE_SESSION_MAX_MINUTES,
+  ADAPTIVE_SESSION_MINUTES,
+  ADAPTIVE_SESSION_MIN_MINUTES,
+  QUESTION_STEP_KINDS,
+  REBUILT_STEP_MINUTES,
+} from "./adaptive-budget";
 
 export type AdaptiveStepKind =
   | "overdue-retrieval"
@@ -111,50 +132,25 @@ export interface AdaptiveSessionStep {
   intervention?: InterventionAttemptContext;
 }
 
-/** Normalised signals used by the single topic optimiser. */
-export interface AdaptiveScoreFactors {
-  /** Due/overdue pressure and current FSRS retrievability. 0–1. */
-  fsrs: number;
-  /** Distance from proven topic mastery. 0–1. */
-  mastery: number;
-  /** Marks and unresolved errors already captured. 0–1. */
-  mistakes: number;
-  /** Exam proximity, zero when no exam date is known. 0–1. */
-  examProximity: number;
-  /** Forgetting pressure independent of the due count. 0–1. */
-  forgetting: number;
-  /** Weakest measured capability, or diagnostic pressure when unknown. 0–1. */
-  capabilityGap: number;
-  /** Thin evidence should receive a small exploration allowance. 0–1. */
-  uncertainty: number;
-}
+// Topic scoring lives in ./adaptive-scoring (re-exported here so existing
+// importers keep working while optimisation owns its own module).
+export type {
+  AdaptiveEvidence,
+  AdaptiveScoreFactors,
+  AdaptiveTopicCandidate,
+  ScoreData,
+} from "./adaptive-scoring";
+export { scoreAdaptiveTopic, scoreTopic, trustedAdaptiveAttempt, trustedAdaptiveEvidence } from "./adaptive-scoring";
+import {
+  scoreTopic,
+  trustedAdaptiveEvidence,
+  type AdaptiveEvidence,
+  type AdaptiveTopicCandidate,
+} from "./adaptive-scoring";
 
-export interface AdaptiveEvidence {
-  dueCount: number;
-  overdueCount: number;
-  dueCardIds: Id[];
-  openMistakes: number;
-  openMistakeIds: Id[];
-  marksLost: number;
-  mastery: number;
-  retention: number;
-  daysSinceStudy: number | null;
-  daysToExam: number | null;
-  examUrgency: number;
-  questionCount: number;
-  attempts: number;
-  focus: Capability;
-  focusState: CapabilityState;
-  factors: AdaptiveScoreFactors;
-}
-
-export interface AdaptiveTopicCandidate {
-  topicId: Id;
-  subjectId: Id;
-  score: number;
-  evidence: AdaptiveEvidence;
-}
-
+// ---------------------------------------------------------------------------
+// Sequence construction
+// ---------------------------------------------------------------------------
 export interface AdaptiveSessionPlan {
   /** Stable for a topic/day so a checkpoint can identify the same plan. */
   key: string;
@@ -200,80 +196,11 @@ export interface AdaptiveSessionInput {
 }
 
 
-/**
- * Evidence used to rank a topic must meet the same trust bar as the mastery
- * engines. Draft review-gated WJEC answers remain available in the question pool for
- * practice, but a draft/poorly marked answer cannot make a topic look better
- * or worse, and a paper answer also needs authenticated provenance and human
- * marking. Keeping this predicate here prevents the session optimiser from
- * accidentally bypassing the lower-level evidence gates.
- */
-function trustedAdaptiveAttempt(
-  attempt: Attempt,
-  questionById: ReadonlyMap<Id, Question>,
-  allAttempts: readonly Attempt[],
-  questions: readonly Question[],
-): boolean {
-  const question = questionById.get(attempt.questionId);
-  if (!question) return !requiresWjecContentReview(attempt.subjectId) && trustworthyAttempt(attempt);
-  return trustedAssessmentAttempt(attempt, question, allAttempts, questions);
-}
-
-function trustedAdaptiveEvidence(input: {
-  attempts: readonly Attempt[];
-  mistakes: readonly Mistake[];
-  questions: readonly Question[];
-}): { attempts: Attempt[]; mistakes: Mistake[] } {
-  const questionById = new Map(input.questions.map((question) => [question.id, question] as const));
-  const attempts = input.attempts.filter((attempt) => trustedAdaptiveAttempt(attempt, questionById, input.attempts, input.questions));
-  const mistakes = input.mistakes.filter((mistake) => trustedAssessmentMistake(mistake, input.questions, input.attempts));
-  return { attempts, mistakes };
-}
-
-/**
- * Score one topic. The exported shape makes the optimisation auditable and
- * easy to regression-test without mounting the app.
- */
-export function scoreAdaptiveTopic(input: {
-  topic: Topic;
-  cards: Card[];
-  reviewLogs: ReviewLog[];
-  questions: Question[];
-  attempts: Attempt[];
-  mistakes: Mistake[];
-  mastery?: TopicMastery;
-  exams: ExamDate[];
-  profile?: CapabilityProfile;
-  now?: Date;
-}): AdaptiveTopicCandidate {
-  const now = input.now ?? new Date();
-  const today = todayIso(now);
-  const topic = input.topic;
-  const profile = input.profile ?? emptyProfile();
-  const trusted = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: input.mistakes, questions: input.questions });
-  return scoreTopic(topic, {
-    cards: input.cards,
-    reviewLogs: input.reviewLogs,
-    questions: input.questions,
-    attempts: trusted.attempts,
-    mistakes: trusted.mistakes,
-    mastery: input.mastery,
-    exams: input.exams,
-    profile,
-    today,
-    now,
-  });
-}
-
 /** Build the one best sequence for the next bounded study window. */
 export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessionPlan | null {
   const now = input.now ?? new Date();
   const today = todayIso(now);
-  const targetMinutes = clamp(
-    Math.round(input.targetMinutes ?? ADAPTIVE_SESSION_MINUTES),
-    ADAPTIVE_SESSION_MIN_MINUTES,
-    ADAPTIVE_SESSION_MAX_MINUTES,
-  );
+  const targetMinutes = clampTargetMinutes(input.targetMinutes);
   const enrolled = input.subjectIds.length
     ? new Set(input.subjectIds)
     : new Set(input.topics.map((topic) => topic.subjectId));
@@ -353,8 +280,13 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     const delayed = retrieval.find((s) => s.kind === "delayed-retrieval");
     steps.splice(0, steps.length, ...retrieval.filter((s) => s.kind !== "delayed-retrieval"),
       ...(action ? [learningActionStep(action, topic.id, topic.subjectId, 0)] : []), ...(delayed ? [{ ...delayed, minutes: 1 }] : []));
+    // The capability path replaces the fitted ladder wholesale, so it must be
+    // fitted too: retrieval + the selected action + delayed retrieval cannot
+    // collectively exceed the advertised session length.
+    fitToBudget(steps, targetMinutes);
   }
   const totalMinutes = steps.reduce((sum, step) => sum + step.minutes, 0);
+  assertBudgetNotExceeded(steps, targetMinutes, `buildAdaptiveSession:${topic.id}`);
   const startHref = `/adaptive-session?topic=${encodeURIComponent(topic.id)}&start=1`;
   const key = `${today}:${topic.id}`;
 
@@ -372,128 +304,6 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     startHref,
     ...(mapped ? { learningPolicy: "capability-evidence-v1" as const } : {}),
     ...(stop.stop && stop.reason ? { stoppedEarly: { reason: stop.reason } } : {}),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Topic scoring
-// ---------------------------------------------------------------------------
-
-interface ScoreData {
-  cards: Card[];
-  reviewLogs: ReviewLog[];
-  questions: Question[];
-  attempts: Attempt[];
-  mistakes: Mistake[];
-  mastery?: TopicMastery;
-  exams: ExamDate[];
-  profile: CapabilityProfile;
-  today: IsoDate;
-  now: Date;
-}
-
-function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
-  const dueCards = input.cards.filter((card) => isDue(card, input.today));
-  const overdueCards = dueCards.filter((card) => card.due < input.today);
-  const openMistakes = input.mistakes.filter((mistake) => !mistake.resolved &&
-    !(mistake.repair?.stage === "transfer" && mistake.repair.dueAt && Date.parse(mistake.repair.dueAt) > input.now.getTime()));
-  const marksLost = openMistakes.reduce((sum, mistake) => sum + Math.max(0, mistake.marksLost), 0);
-  const retention = input.cards.length
-    ? average(input.cards.map((card) => retrievability(card, input.now)))
-    : 0;
-  const mastery = clamp01(input.mastery?.mastery ?? 0);
-  const lastStudy = latestTimestamp([
-    ...input.reviewLogs.map((log) => log.reviewedAt),
-    ...input.attempts.map((attempt) => attempt.createdAt),
-  ]);
-  const daysSinceStudy = lastStudy ? Math.max(0, daysBetween(lastStudy.slice(0, 10), input.today)) : null;
-  const daysTo = daysToExam(input.exams, topic.subjectId, input.today);
-  const urgency = examUrgency(daysTo);
-  const focus = focusCapability(input.profile);
-  const focusEvidence = input.profile[focus];
-  const focusState = capabilityState(focusEvidence);
-
-  // These seven signals deliberately live in one weighted score. There is no
-  // early return for due cards: a near exam, a large open mark-loss, or a
-  // capability gap can win the same competition when it is worth more.
-  const duePressure = Math.min(1, dueCards.length / 3);
-  const overduePressure = Math.min(1, overdueCards.length / 3);
-  const fsrs = clamp01(
-    duePressure * 0.6 +
-      overduePressure * 0.25 +
-      (input.cards.length ? (1 - clamp01(retention)) * 0.15 : 0),
-  );
-  const measured = input.attempts.length > 0 || (input.mastery?.attempts ?? 0) > 0 ||
-    input.reviewLogs.length > 0 || input.cards.some((card) => card.reps > 0);
-  const masteryPressure = measured ? 1 - mastery : 0.35;
-  const mistakePressure = clamp01(
-    Math.min(1, marksLost / 6) * 0.7 + Math.min(1, openMistakes.length / 3) * 0.3,
-  );
-  const examProximity = daysTo == null ? 0 : clamp01((urgency - 1) / 1);
-  const forgetting = clamp01(
-    input.cards.length
-      ? (1 - clamp01(retention)) * 0.75 + Math.min(1, (daysSinceStudy ?? 0) / 30) * 0.25
-      : daysSinceStudy == null
-        ? 0.25
-        : Math.min(1, daysSinceStudy / 30),
-  );
-  const capabilityGap = focusEvidence.score == null ? 0 : 1 - clamp01(focusEvidence.score);
-  const evidence = input.reviewLogs.length +
-    Math.max(input.attempts.length, input.mastery?.attempts ?? 0) * 2 +
-    input.cards.filter((card) => card.reps > 0).length;
-  const uncertainty = clamp01(1 - evidence / 8);
-  const factors: AdaptiveScoreFactors = {
-    fsrs,
-    mastery: masteryPressure,
-    mistakes: mistakePressure,
-    examProximity,
-    forgetting,
-    capabilityGap,
-    uncertainty,
-  };
-  const policy = valueNextAction({
-    id: topic.id, kind: "adaptive-session", subjectId: topic.subjectId,
-    topicId: topic.id, minutes: ADAPTIVE_SESSION_MINUTES,
-    signals: {
-      weakness: Math.max(masteryPressure, capabilityGap),
-      forgettingRisk: forgetting, retrievalPressure: fsrs,
-      mistakePressure, examUrgency: examProximity,
-      examWeighting: 1, learningBenefit: Math.max(masteryPressure, capabilityGap),
-      retentionBenefit: fsrs, diagnosticValue: focusState === "unknown" ? 1 : uncertainty,
-      transferNeed: focusState === "secure" ? 0.8 : 0,
-      evidenceConfidence: 1 - uncertainty,
-    },
-  });
-  const score = policy.score;
-
-  return {
-    topicId: topic.id,
-    subjectId: topic.subjectId,
-    score: Math.round(score * 10_000) / 10_000,
-    evidence: {
-      dueCount: dueCards.length,
-      overdueCount: overdueCards.length,
-      dueCardIds: dueCards
-        .slice()
-        .sort((a, b) => a.due.localeCompare(b.due) || b.lapses - a.lapses || a.id.localeCompare(b.id))
-        .map((card) => card.id),
-      openMistakes: openMistakes.length,
-      openMistakeIds: openMistakes
-        .slice()
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
-        .map((mistake) => mistake.id),
-      marksLost,
-      mastery,
-      retention: Math.round(retention * 10_000) / 10_000,
-      daysSinceStudy,
-      daysToExam: daysTo,
-      examUrgency: urgency,
-      questionCount: input.questions.length,
-      attempts: input.attempts.length,
-      focus,
-      focusState,
-      factors,
-    },
   };
 }
 
@@ -775,44 +585,6 @@ function buildSteps(input: StepInput): AdaptiveSessionStep[] {
   return steps;
 }
 
-function fitToBudget(steps: AdaptiveSessionStep[], target: number): void {
-  if (!steps.length) return;
-  let total = steps.reduce((sum, step) => sum + step.minutes, 0);
-  if (total < target) {
-    const preferred =
-      steps.find((step) => step.kind === "independent-application") ??
-      steps.find((step) => step.kind === "supported-practice") ??
-      steps.find((step) => step.kind === "transfer") ??
-      steps.find((step) => step.kind === "explanation") ??
-      steps[steps.length - 1];
-    preferred.minutes += target - total;
-    total = target;
-  }
-  if (total <= target) return;
-
-  // Keep every block visible, but shave time from the most flexible blocks
-  // first. Delayed retrieval retains at least one minute even on a short test
-  // budget, so the overnight rule cannot disappear by accident.
-  const order: AdaptiveStepKind[] = [
-    "independent-application",
-    "supported-practice",
-    "transfer",
-    "explanation",
-    "misconception-repair",
-    "overdue-retrieval",
-    "delayed-retrieval",
-  ];
-  let over = total - target;
-  for (const kind of order) {
-    const step = steps.find((candidate) => candidate.kind === kind);
-    if (!step || over <= 0) continue;
-    const minimum = kind === "delayed-retrieval" ? 1 : 1;
-    const shave = Math.min(over, Math.max(0, step.minutes - minimum));
-    step.minutes -= shave;
-    over -= shave;
-  }
-}
-
 function practiceHref(topicId: Id, questionId: Id, step: string): string {
   const back = `/adaptive-session?topic=${encodeURIComponent(topicId)}&start=1&resume=1`;
   return `/practice?topic=${encodeURIComponent(topicId)}&question=${encodeURIComponent(questionId)}&adaptiveStep=${step}&from=adaptive&return=${encodeURIComponent(back)}`;
@@ -834,28 +606,6 @@ function reasonFor(candidate: AdaptiveTopicCandidate, topicTitle: string): strin
   if (evidence.focusState === "unknown") reasons.push(`first ${evidence.focus} evidence`);
   if (!reasons.length) reasons.push("the best balance of recall, application and exam readiness");
   return `${topicTitle}: ${reasons.slice(0, 3).join(" · ")}.`;
-}
-
-function average(values: number[]): number {
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-}
-
-function latestTimestamp(values: string[]): string | null {
-  return values.filter(Boolean).sort().at(-1) ?? null;
-}
-
-function daysBetween(from: IsoDate, to: IsoDate): number {
-  return Math.round(
-    (new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86_400_000,
-  );
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clamp01(value: number): number {
-  return clamp(value, 0, 1);
 }
 
 function groupBy<T>(items: T[], key: (item: T) => Id): Map<Id, T[]> {
@@ -889,35 +639,7 @@ function groupBy<T>(items: T[], key: (item: T) => Id): Map<Id, T[]> {
 // Pure and deterministic: no React, storage, network or model calls.
 // ---------------------------------------------------------------------------
 
-/** Kinds executed as one markable question pass (also the only retestable kinds). */
-export const QUESTION_STEP_KINDS: ReadonlySet<AdaptiveStepKind> = new Set([
-  "supported-practice",
-  "independent-application",
-  "transfer",
-  "misconception-repair",
-  "prerequisite-repair",
-]);
 
-/** Minutes a rebuilt mid-session step claims from the remaining budget. */
-const REBUILT_STEP_MINUTES: Record<AdaptiveStepKind, number> = {
-  "overdue-retrieval": 2,
-  "misconception-repair": 3,
-  explanation: 2,
-  "supported-practice": 4,
-  "independent-application": 4,
-  transfer: 4,
-  "prerequisite-repair": 3,
-  "delayed-retrieval": 1,
-};
-
-/** Marks ratio a question attempt needs to count as a pass. */
-export const ADAPTIVE_PASS_RATIO = 0.7;
-/** Question attempts per topic before the tutor closes instead of looping. */
-export const ADAPTIVE_MAX_QUESTION_ATTEMPTS = 5;
-/** Times the same retrieval card may fail before teaching replaces retrying. */
-export const ADAPTIVE_MAX_RETRIEVAL_FAILS = 2;
-/** Misconception-repair attempts per session (each one is an independent retest). */
-export const ADAPTIVE_MAX_REPAIR_ATTEMPTS = 2;
 
 export type AdaptiveStepResult =
   | "passed-independent"
@@ -1057,8 +779,8 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
   const { plan, completed, questions, cards, mistakes, attempts, prereq, prereqQuestions } = input;
 
   if (plan.learningPolicy === "capability-evidence-v1") {
-    const spent = completed.reduce((sum, r) => sum + (r.elapsedMs > 0 ? r.elapsedMs / 60_000 : r.minutes), 0);
-    const remaining = Math.max(0, plan.targetMinutes - spent);
+    const spent = spentMinutes(completed);
+    const remaining = remainingMinutes(plan.targetMinutes, spent);
     const count = completed.filter((r) => QUESTION_STEP_KINDS.has(r.kind)).length;
     const scheduled = completed.some((r) => r.kind === "delayed-retrieval" && r.result === "scheduled");
     const trusted = trustedAdaptiveEvidence({ attempts, mistakes, questions });
@@ -1066,22 +788,25 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
       topicId: plan.topicId, nodes: wjecCapabilities, questions, attempts, mistakes,
       now: input.now ?? new Date(), remainingMinutes: remaining, interventionOutcomes: input.interventionOutcomes,
     }) : undefined;
-    if (action) return { steps: [learningActionStep(action, plan.topicId, plan.subjectId, completed.length + 1)],
-      done: false, stopped: false, reason: action.reason };
+    if (action) {
+      const next = [learningActionStep(action, plan.topicId, plan.subjectId, completed.length + 1)];
+      assertBudgetNotExceeded(next, remaining, `replanAdaptiveSession:capability:${plan.topicId}`);
+      return { steps: next, done: false, stopped: false, reason: action.reason };
+    }
     const delayed = plan.steps.find((s) => s.kind === "delayed-retrieval");
     const delayedStep = !scheduled && delayed && remaining > 0 ? { ...delayed, minutes: Math.min(1, remaining) } : undefined;
     // Draft/auto-marked Physics mistakes may remain in storage for practice,
     // but they cannot make the session claim that transfer has been shown.
     const waiting = trusted.mistakes.find((m) => !m.resolved && m.repair?.stage === "transfer" && m.repair.dueAt);
     const reason = count >= ADAPTIVE_MAX_QUESTION_ATTEMPTS ? DONE_REASON_CAPPED : waiting?.repair?.dueAt
-      ? `Transfer is demonstrated. The repair stays open until an independent check after ${waiting.repair.dueAt.slice(0, 10)}.`
+      ? `Transfer is demonstrated. The repair stays open until an independent check after ${localDayOfInstant(waiting.repair.dueAt)}.`
       : "No further fresh mapped check fits this session. Remaining skills stay unproven; more targeted content or a later check is needed.";
     return { steps: delayedStep ? [delayedStep] : [],
       done: scheduled || !delayed || remaining <= 0, stopped: true, reason };
   }
 
-  const spent = completed.reduce((sum, record) => sum + Math.max(0, record.minutes), 0);
-  const remaining = Math.max(0, plan.targetMinutes - spent);
+  const spent = spentMinutes(completed);
+  const remaining = remainingMinutes(plan.targetMinutes, spent);
   const executed = new Set(completed.map((record) => record.stepId));
   // Steps of the original ladder that have not run yet (original order).
   const tail = plan.steps.filter((step) => !executed.has(step.id));
@@ -1419,7 +1144,8 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
   }
 
   // --- J. Fit the remaining time budget. Delayed retrieval is structural:
-  // it survives even when every budgeted minute is already spent.
+  // it survives even when every budgeted minute is already spent, shrunk to
+  // whatever remains (a 0-minute schedule-later action when nothing does).
   const trimmed: AdaptiveSessionStep[] = [];
   let allotted = 0;
   for (const step of steps) {
@@ -1428,26 +1154,32 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
     if (!isDelayed && remaining <= 0) continue; // a rung cannot start with no time
     const stepMinutes = isDelayed ? Math.max(0, Math.min(1, remaining - allotted)) : step.minutes;
     if (!isDelayed && allotted + stepMinutes > remaining) continue;
-    trimmed.push(step);
+    // Store the capped minutes, not the original: what the runner displays
+    // and records must equal what the budget accounted for.
+    trimmed.push(isDelayed ? { ...step, minutes: stepMinutes } : step);
     allotted += stepMinutes;
   }
   // A structural final step that reports "schedule later" still closes the
-  // loop even when every budgeted minute is gone.
+  // loop even when every budgeted minute is gone (kept at whatever remains,
+  // possibly zero — the scheduling action itself costs no study time).
   if (!scheduled) {
     const delayed = steps.find((step) => step.kind === "delayed-retrieval");
     if (delayed && !trimmed.some((step) => step.kind === "delayed-retrieval")) {
-      trimmed.push(delayed.intervention ? delayed : {
+      const fallbackMinutes = Math.max(0, Math.min(delayed.minutes, remaining - allotted));
+      trimmed.push(delayed.intervention ? { ...delayed, minutes: fallbackMinutes } : {
         ...delayed,
+        minutes: fallbackMinutes,
         intervention: defaultIntervention(
           `${delayed.id}:schedule`,
           "retention",
           "retrieval",
-          delayed.minutes,
+          fallbackMinutes,
           "none",
         ),
       });
     }
   }
+  assertBudgetNotExceeded(trimmed, remaining, `replanAdaptiveSession:${plan.topicId}`);
 
   const evidenceSatisfied =
     independentPassedIndependent &&
@@ -1508,131 +1240,7 @@ function learningActionStep(action: LearningAction, topicId: Id, subjectId: Id, 
   };
 }
 
-// ---------------------------------------------------------------------------
-// Run summary — the session debrief from the run's own evidence.
-// ---------------------------------------------------------------------------
-
-export interface AdaptiveRunSummary {
-  /** What measurably improved, per rung. */
-  improved: string[];
-  /** What is still fragile or unproven. */
-  fragile: string[];
-  /** Mistakes repaired by an independent retest this run. */
-  repaired: string[];
-  /** What happens later (delayed checks). */
-  later: string[];
-  /** What Revise learned about the student's support needs. */
-  learned: string[];
-  /** The single best next action, from the run evidence. */
-  bestNext: string;
-  /** Marks earned across the run's question rungs (0/0 when none ran). */
-  marks: { awarded: number; max: number };
-}
-
-const RUNG_LABELS: Partial<Record<AdaptiveStepKind, string>> = {
-  "supported-practice": "Supported application",
-  "independent-application": "Independent application",
-  transfer: "Unfamiliar transfer",
-  "misconception-repair": "Misconception repair",
-  "prerequisite-repair": "Prerequisite repair",
-};
-
-/** The tutor-grade debrief for a finished run, straight from its records. */
-export function summariseAdaptiveRun(input: {
-  plan: AdaptiveSessionPlan;
-  completed: AdaptiveStepRecord[];
-  openMistakeIds: Id[];
-}): AdaptiveRunSummary {
-  const { plan, completed, openMistakeIds } = input;
-  const questionRecords = completed.filter((record) => QUESTION_STEP_KINDS.has(record.kind));
-  const questionPasses = questionRecords.filter((record) => record.result === "passed-independent");
-  const assistedPasses = questionRecords.filter((record) => record.result === "passed-assisted");
-  const questionMisses = questionRecords.filter(
-    (record) => record.result === "missed" || record.result === "gave-up",
-  );
-  const repairEvidence = completed.filter((record) => record.resolvedMistakeId);
-  const stillMissedRetrieval = completed
-    .filter((record) => record.kind === "overdue-retrieval" && record.result === "missed")
-    .flatMap((record) => record.missedItemIds ?? []);
-  const scheduledLater = completed.filter(
-    (record) => record.kind === "delayed-retrieval" && record.result === "scheduled",
-  );
-
-  const improved: string[] = [];
-  const fragile: string[] = [];
-  const repaired: string[] = [];
-  const learned: string[] = [];
-  const later: string[] = [];
-
-  for (const pass of questionPasses) {
-    const label = RUNG_LABELS[pass.kind] ?? "Application";
-    if (pass.maxMarks > 0 && pass.awardedMarks === pass.maxMarks) {
-      improved.push(`${label} of ${plan.topicTitle} demonstrated without support (full marks).`);
-    } else {
-      improved.push(`${label} on ${plan.topicTitle} passed without support.`);
-    }
-  }
-
-  if (assistedPasses.length) {
-    learned.push(
-      `Some successes needed a cue or prompt — ${assistedPasses.length} assisted pass${assistedPasses.length === 1 ? "" : "es"} counted as weaker evidence than independent work.`,
-    );
-  }
-
-  const fragileKinds = new Set<AdaptiveStepKind>();
-  for (const miss of questionMisses) {
-    fragileKinds.add(miss.kind);
-  }
-  const fragiles = [...fragileKinds]
-    .map((kind) => RUNG_LABELS[kind] ?? kind)
-    .filter((label): label is string => Boolean(label));
-  if (fragiles.length) {
-    fragile.push(`Still fragile: ${fragiles.join(" and ").toLowerCase()} missed a mark this session.`);
-  }
-  if (stillMissedRetrieval.length) {
-    fragile.push(
-      `${stillMissedRetrieval.length} retrieval${stillMissedRetrieval.length === 1 ? "" : "s"} did not hold — the topic's recall schedule needs another pass.`,
-    );
-  }
-  if (openMistakeIds.length) {
-    fragile.push(
-      `${openMistakeIds.length} open mistake${openMistakeIds.length === 1 ? "" : "s"} remain${openMistakeIds.length === 1 ? "s" : ""} to repair across sessions.`,
-    );
-  }
-
-  const repairedLines = repairEvidence.map((record) => {
-    const label = RUNG_LABELS[record.kind] ?? "A retest";
-    return `${label} re-earned its point independently — the mistake is closed.`;
-  });
-  if (repairedLines.length) {
-    repaired.push(...repairedLines);
-  }
-
-  if (scheduledLater.length) {
-    later.push("Delayed retrieval scheduled — the gain is only proven once it survives a delay.");
-  } else {
-    later.push("A delayed retrieval check is the next scheduled event for this topic.");
-  }
-
-  if (!improved.length && !repairedLines.length && !questionMisses.length) {
-    improved.push("This session's work is recorded; no new marks were earned or lost.");
-  }
-
-  const marks = {
-    awarded: questionRecords.reduce((sum, record) => sum + record.awardedMarks, 0),
-    max: questionRecords.reduce((sum, record) => sum + record.maxMarks, 0),
-  };
-
-  let bestNext: string;
-  if (openMistakeIds.length) {
-    bestNext = "Clear the open mistakes first — each needs an independent retest before it closes.";
-  } else if (fragiles.length) {
-    bestNext = "Revisit the fragile rung with support in the next session before new material.";
-  } else if (!scheduledLater.length) {
-    bestNext = "Queue the delayed retrieval so today's gain is tested after a delay.";
-  } else {
-    bestNext = "Move to the next best topic — this one has earned a delay before more practice.";
-  }
-
-  return { improved, fragile, repaired: repairedLines, later, learned, bestNext, marks };
-}
+// Run summary lives in ./adaptive-summary (re-exported here so existing
+// importers keep working while the debrief owns its own module).
+export type { AdaptiveRunSummary } from "./adaptive-summary";
+export { summariseAdaptiveRun } from "./adaptive-summary";

@@ -35,9 +35,15 @@ describe("offline feedback contracts", () => {
     const sync = read("src/data/sync.ts");
 
     expect(sync).toContain("Promise<{ pulled: number; failed: number; skipped?: SyncSkip }>");
-    // The cursor only advances on a fully successful pass, and it advances to
-    // the newest server-authored timestamp observed — never the local clock.
-    // The cursor is account-scoped so one device cannot skip another's rows.
-    expect(sync).toContain('if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseUserMeta("lastPullAt", userId, maxObservedUpdatedAt);');
+    // Cursors are per entity, so one failing table no longer blocks or replays
+    // the others. Each cursor advances only after that entity's pages merged
+    // cleanly, and only to server-authored values — never the local clock. They
+    // are account-scoped so one device cannot skip another's rows.
+    expect(sync).toContain("SYNC_PULL_PAGE_SIZE = 500");
+    expect(sync).toMatch(/if \(entityOk\) \{[\s\S]*await writePullCursor\(userId, entity, cursor\);/);
+    expect(sync).toContain('writeReviseUserMeta("pullCursors", userId, { ...all, [pullCursorKey(entity)]: cursor })');
+    // A page with undecryptable rows pins that entity's cursor so the retry
+    // re-reads the unreadable rows instead of skipping past them.
+    expect(sync).toMatch(/if \(rowFailures > 0\) \{[\s\S]*entityOk = false;[\s\S]*break;/);
   });
 });

@@ -3,6 +3,7 @@
 // What is persisted: LessonProgress.completed + streak (synced row).
 // What is derived: streak roll from local day keys (never stored as logic).
 // Migration: one-time import from legacy localStorage keys.
+import { addLocalDays, todayLocal } from "@/domain/local-date";
 
 export interface LessonStreak {
   count: number;
@@ -33,12 +34,7 @@ export function legacyLessonProgress(): {
 
 /** Local-time YYYY-MM-DD for lesson streaks (a day flips at midnight, not UTC). */
 export function localDayKey(offsetDays = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return offsetDays === 0 ? todayLocal() : addLocalDays(todayLocal(), offsetDays);
 }
 
 /**

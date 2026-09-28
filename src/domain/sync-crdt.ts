@@ -1,6 +1,7 @@
 import { createEmptyCard, fsrs, generatorParameters, Rating, State } from "ts-fsrs";
 import type { Card, CardGradeEvent, CardSyncBase, Id, IsoInstant, LessonProgress, ReviewLog } from "./types";
 import { compareStamps, stampJson, type LamportStamp } from "./lamport";
+import { addLocalDays, toLocalDateKey } from "./local-date";
 
 // ---------------------------------------------------------------------------
 // CRDT layer for multi-device sync.
@@ -168,7 +169,7 @@ export function syncCardState(card: Card): CardMergeResult {
 }
 
 function toDateOnly(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return toLocalDateKey(d);
 }
 
 /**
@@ -294,9 +295,7 @@ function mergeStreak(local: LessonProgress, remote: LessonProgress, completedOn:
 }
 
 function previousDay(iso: string): string {
-  const d = new Date(`${iso}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return addLocalDays(iso, -1);
 }
 
 function maxInstant(a: IsoInstant, b: IsoInstant): IsoInstant {

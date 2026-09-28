@@ -18,6 +18,7 @@
 
 import type { ExamDate, Id, ReviewLog, TopicMastery } from "./types";
 import { allTopics } from "./curriculum";
+import { localDayOfInstant, todayLocal } from "./local-date";
 
 /** How far back the pace is measured, in calendar days (inclusive of today). */
 export const REVIEW_PACE_WINDOW_DAYS = 7;
@@ -51,20 +52,27 @@ export interface PaceForecast {
   sentence: string;
 }
 
+/**
+ * Calendar-day key for a persisted instant or an already date-only string.
+ * Instants convert in the student's local zone; YYYY-MM-DD keys pass through.
+ */
 function dateKey(iso: string): string {
-  return iso.slice(0, 10);
+  return iso.length > 10 ? localDayOfInstant(iso) : iso.slice(0, 10);
 }
 
 /** Calendar-day distance from `now` to an IsoDate, in whole days (≥ 0). */
 export function daysUntil(now: Date, isoDate: string): number {
   const target = Date.parse(`${dateKey(isoDate)}T00:00:00.000Z`);
-  const today = Date.parse(`${dateKey(now.toISOString())}T00:00:00.000Z`);
+  const today = Date.parse(`${todayLocal(now)}T00:00:00.000Z`);
   return Math.round((target - today) / 86_400_000);
 }
 
 export function formatExamDate(isoDate: string): string {
-  const d = new Date(`${dateKey(isoDate)}T00:00:00.000Z`);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+  // Noon-anchored parse plus an explicit UTC zone: a pure YYYY-MM-DD key has
+  // no zone, and midnight parsing would render the previous day in negative
+  // offsets. The displayed date must equal the authored key everywhere.
+  const d = new Date(`${dateKey(isoDate)}T12:00:00.000Z`);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
 }
 
 export function forecastUntouched(input: PaceForecastInput): PaceForecast | null {
@@ -100,8 +108,8 @@ export function forecastUntouched(input: PaceForecastInput): PaceForecast | null
 
   // --- pace: distinct topics touched per day over the window ----------------
   const windowStart = new Date(now.getTime() - (REVIEW_PACE_WINDOW_DAYS - 1) * 86_400_000);
-  const startKey = dateKey(windowStart.toISOString());
-  const todayKey = dateKey(now.toISOString());
+  const startKey = localDayOfInstant(windowStart.toISOString());
+  const todayKey = todayLocal(now);
 
   const firstTouched = new Set([...firstReviewByTopic].filter(([id, day]) => day >= startKey && day <= todayKey && (masteryByTopic.get(id)?.attempts ?? 0) === 0).map(([id]) => id));
   const touchedByDay = new Map<string, Set<Id>>();

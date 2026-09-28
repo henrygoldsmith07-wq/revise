@@ -11,6 +11,7 @@ import type {
   Topic,
 } from "./types";
 import { validateDistractorQuality } from "./distractor-quality";
+import { toLocalDateKey } from "./local-date";
 
 export type QuestionValidationDecision = "validate" | "request_changes" | "reject";
 
@@ -43,7 +44,7 @@ function at(options: { now?: Date }): Date {
 }
 
 function dateOnly(date: Date): IsoDate {
-  return date.toISOString().slice(0, 10);
+  return toLocalDateKey(date);
 }
 
 function addIssue(issues: QuestionValidationIssue[], code: QuestionValidationIssue["code"], message: string): void {

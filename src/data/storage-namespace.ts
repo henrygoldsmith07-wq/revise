@@ -24,6 +24,8 @@ export const REVISE_META_KEYS = {
   device: "revise.device.v1",
   /** Per-device Lamport counter — the logical clock behind sync ordering. */
   lamport: "revise.lamport.v1",
+  /** Per-entity pull cursors for keyset pagination — resume points per table. */
+  pullCursors: "revise.pullCursors.v1",
 } as const;
 
 // New keys have no legacy spelling; lookups fall back gracefully.

@@ -24,6 +24,7 @@ import {
 } from "./capability-mastery";
 import type { Attempt, Id, Question } from "./types";
 import { authenticPaperEvidence, independentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { localDayOfInstant } from "./local-date";
 
 export interface CapabilitySourceInput {
   recallMastery: RecallMasteryRow[];
@@ -43,7 +44,7 @@ export function transferEvidenceFromAttempts(attempts: Attempt[]): Array<{ topic
   for (const attempt of attempts) {
     const link = attempt.farTransfer;
     if (!link || link.role !== "retest" || !link.outcome || !independentAttempt(attempt) ||
-      attempt.questionId !== link.candidateQuestionId || attempt.createdAt.slice(0, 10) < link.scheduledFor) continue;
+      attempt.questionId !== link.candidateQuestionId || localDayOfInstant(attempt.createdAt) < link.scheduledFor) continue;
     const source = attempts.find((a) => a.id === link.sourceAttemptId && a.userId === attempt.userId);
     if (!source || !independentAttempt(source)) continue;
     const topicId = attempt.topicIds[0];

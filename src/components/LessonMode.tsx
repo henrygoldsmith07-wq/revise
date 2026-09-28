@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { buildRoadmapLessons, summariseLesson } from "@/content/lessons";
+import { buildRoadmapLessons } from "@/content/lessons";
 import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import type { RoadmapLessonEntry } from "@/content/lessons";
@@ -11,6 +11,7 @@ import { RichText } from "./RichText";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
 import { useStore } from "@/state/store";
+import { useLessonRunner } from "./use-lesson-runner";
 
 const STEP_META = {
   overview: { label: "Big picture", tone: "accent" },
@@ -76,121 +77,32 @@ export function LessonMode({
         .filter((group) => group.entries.length > 0),
     [currentSubjectId, lessons],
   );
-  const [activeIdx, setActiveIdx] = useState<number | null>(() => (initialLessonIdx >= 0 ? initialLessonIdx : null));
-  const [stepIdx, setStepIdx] = useState(0);
-  const [checked, setChecked] = useState<Record<string, number>>({}); // stepId -> chosen option
-  // Recall answers stay local to the active lesson. They are deliberately not
-  // persisted or sent to a provider: the value is a prompt to retrieve before
-  // seeing the authored takeaway, not another answer-history data source.
-  const [recallDraft, setRecallDraft] = useState<Record<string, string>>({});
-  const [recallRevealed, setRecallRevealed] = useState<Record<string, boolean>>({});
-  // Application answers stay hidden until the learner chooses to compare.
-  // Keeping this separate from recall means a student can revisit a step
-  // without losing their active-recall gate.
-  const [applicationRevealed, setApplicationRevealed] = useState<Record<string, boolean>>({});
-  const [summary, setSummary] = useState<{
-    correct: number;
-    total: number;
-    missed: { body: string; answer: string; explanation: string }[];
-  } | null>(null);
-  const active = activeIdx !== null ? lessons[activeIdx] : null;
-  const lesson = active?.lesson ?? null;
-  const step = lesson && !summary ? lesson.steps[stepIdx] : null;
-  const isEntryComplete = useCallback(
-    (entry: LessonEntry) =>
-      Boolean(
-        completed[entry.lesson.id] ||
-          completed[`lesson:${entry.topic.id}`],
-      ),
-    [completed],
-  );
-  const chosen = step?.id ? checked[step.id] : undefined;
-  const recallDone = !step?.id || Boolean(recallRevealed[step.id]);
-  // Check questions and active recall both gate progress. Every step asks the
-  // student to produce the idea before the authored answer is shown.
-  const hasCheck = Boolean(step?.check);
-  const checkAnswered = recallDone && (!hasCheck || chosen !== undefined);
-  const isLast = lesson ? stepIdx === lesson.steps.length - 1 : false;
-
-  const startLesson = useCallback((idx: number) => {
-    setActiveIdx(idx);
-    setStepIdx(0);
-    setChecked({});
-    setRecallDraft({});
-    setRecallRevealed({});
-    setApplicationRevealed({});
-    setSummary(null);
-  }, []);
-
-  const exitLesson = useCallback(() => {
-    setActiveIdx(null);
-    setStepIdx(0);
-    setChecked({});
-    setRecallDraft({});
-    setRecallRevealed({});
-    setApplicationRevealed({});
-    setSummary(null);
-  }, []);
-
-  const nextIdx = useMemo(() => {
-    if (activeIdx === null) return null;
-    // Suggest the first not-yet-completed lesson *after* this one; if every
-    // later lesson is done, wrap around to the earliest remaining.
-    for (let i = activeIdx + 1; i < lessons.length; i++) {
-      if (!isEntryComplete(lessons[i])) return i;
-    }
-    for (let i = 0; i < activeIdx; i++) {
-      if (!isEntryComplete(lessons[i])) return i;
-    }
-    return null;
-  }, [activeIdx, isEntryComplete, lessons]);
-
-  const finishLesson = useCallback(() => {
-    if (!lesson || !checkAnswered) return;
-    // Persist through the synced store — it writes IndexedDB then queues the
-    // same row for Supabase, so progress survives on this device and follows
-    // the student elsewhere. The summary renders the updated streak once the
-    // patch lands.
-    void completeLesson(lesson.id);
-    // Carry the missed checks into the summary so the student re-exposes the
-    // correction instead of only seeing a score.
-    setSummary(summariseLesson(lesson, checked));
-  }, [checked, checkAnswered, completeLesson, lesson]);
-
-  const advance = useCallback(() => {
-    if (!lesson || !checkAnswered) return;
-    if (isLast) {
-      finishLesson();
-    } else {
-      setStepIdx((s) => s + 1);
-    }
-  }, [checkAnswered, finishLesson, isLast, lesson]);
-
-  const goBack = useCallback(() => {
-    setStepIdx((s) => Math.max(0, s - 1));
-  }, []);
-
-  const answer = useCallback(
-    (optionIdx: number) => {
-      if (!step?.id || !recallDone || checkAnswered) return;
-      setChecked((prev) => ({ ...prev, [step.id!]: optionIdx }));
-    },
-    [checkAnswered, recallDone, step],
-  );
-
-  const revealRecall = useCallback(() => {
-    if (!step?.id || !recallDraft[step.id]?.trim()) return;
-    setRecallRevealed((previous) => ({ ...previous, [step.id!]: true }));
-  }, [recallDraft, step]);
-
-  const continueFromSummary = useCallback(() => {
-    if (nextIdx !== null) {
-      startLesson(nextIdx);
-    } else {
-      exitLesson();
-    }
-  }, [exitLesson, nextIdx, startLesson]);
-
+  const run = useLessonRunner({ lessons, initialLessonIdx, completed, completeLesson });
+  const {
+    lesson,
+    step,
+    stepIdx,
+    summary,
+    chosen,
+    recallDone,
+    hasCheck,
+    checkAnswered,
+    isLast,
+    currentRecallDraft,
+    nextIdx,
+    isEntryComplete,
+    isApplicationRevealed,
+    startLesson,
+    exitLesson,
+    advance,
+    goBack,
+    answer,
+    revealRecall,
+    finishLesson,
+    continueFromSummary,
+    updateRecallDraft,
+    revealApplication,
+  } = run;
   // When this subject is finished, point at the next enrolled subject that
   // still has lessons left, in curriculum order — momentum over dead ends.
   // Recomputed on render: it only matters on the summary screen, where the
@@ -214,7 +126,6 @@ export function LessonMode({
   // steps back, Esc leaves the lesson. Registered through the shared shortcut
   // registry so the keys show up in the global `?` sheet.
   const answerKeys = lesson && !summary && step?.check ? step.check.options.map((_, oi) => String(oi + 1)) : [];
-  const currentRecallDraft = step?.id ? recallDraft[step.id] ?? "" : "";
   useShortcuts(
     [
       ...answerKeys.map((key) => ({
@@ -496,9 +407,7 @@ export function LessonMode({
               <>
                 <textarea
                   value={currentRecallDraft}
-                  onChange={(event) =>
-                    step.id && setRecallDraft((previous) => ({ ...previous, [step.id]: event.target.value }))
-                  }
+                  onChange={(event) => updateRecallDraft(step.id, event.target.value)}
                   rows={3}
                   placeholder="Write what you remember…"
                   aria-label="Your active recall answer"
@@ -601,11 +510,11 @@ export function LessonMode({
                 {step.application.commandWord ? <Pill tone="accent">{step.application.commandWord}</Pill> : null}
               </div>
               <RichText className="text-sm text-ink2">{step.application.prompt}</RichText>
-              {!applicationRevealed[step.id] ? (
+              {!isApplicationRevealed(step.id) ? (
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setApplicationRevealed((previous) => ({ ...previous, [step.id]: true }))}
+                  onClick={() => revealApplication(step.id)}
                 >
                   Reveal model answer
                 </Button>

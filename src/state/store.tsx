@@ -37,7 +37,6 @@ import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, Revis
 import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
 import { getDeviceIdentity, nextLamport } from "@/data/device";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
-import { calibrateFromHistory, simulatePaper } from "@/domain/assessment";
 import { calibrateDifficulty } from "@/domain/knowledge-tracing";
 import type { DifficultyCalibrationReport, QuestionTrace } from "@/domain/knowledge-tracing";
 import { calculateCalculationMastery } from "@/domain/calculation-mastery";
@@ -117,6 +116,7 @@ import { useExperiments } from "./experiments";
 import { useOutcomes } from "./outcomes";
 import { useRevisionSessions } from "./sessions";
 import { usePlanning } from "./planning";
+import { buildPaperCalibrations, previewPaperSimulation } from "./paper-preview";
 
 // ---------------------------------------------------------------------------
 // Store composition. Revision data is small (thousands of rows at most), so
@@ -571,31 +571,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   // Calibration per subject from paper-mode attempts: predicted vs actual.
   // Paper attempts are the only ones with a stable "total marks" denominator.
-  const calibrations = useMemo(() => {
-    if (!snapshot) return new Map<Id, Calibration>();
-    const bySubject = new Map<Id, Array<{ predicted: number; actual: number }>>();
-    const masteryMap = new Map(mastery.map((m) => [m.topicId, m.mastery]));
-    // Group paper-mode attempts by subject; use current mastery as a proxy for predicted %
-    // until real simulations are stored. This still yields a meaningful bias once ≥3 papers exist.
-    for (const a of snapshot.attempts.filter((x) => x.mode === "paper")) {
-      const q = snapshot.questions.find((qq) => qq.id === a.questionId);
-      const subjectId = a.subjectId;
-      if (!trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)) continue;
-      // predicted marks for this attempt: sum of topic mastery averaged across its topics
-      const qMastery = q ? q.topicIds.reduce((s, id) => s + (masteryMap.get(id) ?? 0.4), 0) / Math.max(1, q.topicIds.length) : 0.4;
-      const predicted = a.max * (0.35 + qMastery * 0.6);
-      const list = bySubject.get(subjectId) ?? [];
-      list.push({ predicted, actual: a.awarded });
-      bySubject.set(subjectId, list);
-    }
-    const out = new Map<Id, Calibration>();
-    for (const [subjectId, pairs] of bySubject) {
-      out.set(subjectId, calibrateFromHistory({ subjectId, pairs }));
-    }
-    // Ensure every enrolled subject has at least a neutral calibration
-    for (const sid of subjectIds) if (!out.has(sid)) out.set(sid, { subjectId: sid, bias: 0, slope: 1, sampleSize: 0, mae: 0 });
-    return out;
-  }, [snapshot, mastery, subjectIds]);
+  const calibrations = useMemo(() => buildPaperCalibrations(snapshot, mastery, subjectIds),
+    [snapshot, mastery, subjectIds]);
 
   // --- session fatigue tracking ---------------------------------------------
   // The recommender needs time-on-task, but a ref read inside a render-path
@@ -783,18 +760,8 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     interventionOutcomes,
   });
   const previewPaper = useCallback(
-    (subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null => {
-      if (!snapshot) return null;
-      const subject = getSubject(subjectId);
-      if (!subject) return null;
-      const questions = questionIds.map((id) => snapshot.questions.find((q) => q.id === id)).filter((q): q is Question => Boolean(q));
-      if (!questions.length) return null;
-      // Trust gate: unreviewed WJEC content cannot drive a predicted score.
-      const trusted = questions.filter(trustedAssessmentContent);
-      if (!trusted.length) return null;
-      const topicMastery = new Map(mastery.map((m) => [m.topicId, m.mastery]));
-      return simulatePaper({ subject, paperSpecId, questions: trusted, topicMastery, calibration: calibrations.get(subjectId) });
-    },
+    (subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null =>
+      previewPaperSimulation({ snapshot, mastery, calibrations, subjectId, paperSpecId, questionIds }),
     [snapshot, mastery, calibrations],
   );
 

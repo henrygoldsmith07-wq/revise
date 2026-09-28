@@ -33,6 +33,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 
 import type { Attempt, Card, Id, IsoDate, Mistake } from "./types";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
+import { addLocalDays, localDayOfInstant } from "./local-date";
 import type { Question } from "./types";
 
 /** A 25-minute self-testing block clears roughly this many review cards. */
@@ -96,7 +97,7 @@ export function buildSubjectEvidence(
     out.set(subjectId, { ...row, ...patch });
   };
 
-  const weekAgo = new Date(new Date(`${today}T00:00:00Z`).getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const weekAgo = addLocalDays(today, -7);
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
   const trustedAttempt = (attempt: Attempt): boolean => {
     const question = questionById.get(attempt.questionId);
@@ -119,7 +120,7 @@ export function buildSubjectEvidence(
     bump(mistake.subjectId, { openMistakes: (out.get(mistake.subjectId)?.openMistakes ?? 0) + 1 });
   }
   for (const attempt of attempts.filter(trustedAttempt)) {
-    if (attempt.createdAt.slice(0, 10) < weekAgo) continue;
+    if (localDayOfInstant(attempt.createdAt) < weekAgo) continue;
     const lost = Math.max(0, attempt.max - attempt.awarded);
     if (lost <= 0) continue;
     bump(attempt.subjectId, { recentLossMarks: (out.get(attempt.subjectId)?.recentLossMarks ?? 0) + lost });

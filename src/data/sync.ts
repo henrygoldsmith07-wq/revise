@@ -23,6 +23,15 @@ import { captureTelemetry, errorClass } from "@/lib/observability";
 // merge as unions. A week offline on one device can no longer erase daily
 // progress made on another.
 //
+// Pull cursors are (updated_at, id) keysets per entity, ordered ascending and
+// paged. The server bounds updated_at (supabase/schema.sql clamps device
+// clocks to now() + 5 minutes), so one future-dated row cannot hide every
+// legitimate row beneath it. A persisted cursor never advances past rows that
+// were not processed successfully: per-row decrypt failures and per-page
+// transport failures pin that entity's cursor while other entities still
+// progress, and the next pull resumes from the persisted cursor. Merges are
+// keyed puts, so re-fetched pages are idempotent and never duplicate writes.
+//
 // Delivery: every mutation is queued under a UUID idempotency key. The server
 // records keys in `sync_writes` and rejects duplicates (see supabase/schema.sql),
 // so a hung request retried by the browser or service worker cannot double-count
@@ -231,38 +240,177 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
 }
 
 async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: number; failed: number; skipped?: SyncSkip }> {
-  const db = await getDb();
-  const since = (await readReviseUserMeta<string>("lastPullAt", userId)) ?? "1970-01-01T00:00:00.000Z";
+  const legacySince = (await readReviseUserMeta<string>("lastPullAt", userId)) ?? "1970-01-01T00:00:00.000Z";
   let pulled = 0;
   let failed = 0;
-  // Advance the cursor to the newest server-authored timestamp actually
-  // observed — comparing against this device's wall clock would permanently
-  // skip rows from any device whose clock runs behind ours.
-  let maxObservedUpdatedAt = since;
+  let skipped: SyncSkip | undefined;
+  // Newest server-authored timestamp actually observed — comparing against
+  // this device's wall clock would permanently skip rows from any device
+  // whose clock runs behind ours. Kept only for pre-pagination clients.
+  let maxObservedUpdatedAt = legacySince;
 
   for (const [entity, table] of Object.entries(TABLES) as [SyncEntity, string][]) {
+    const outcome = await pullEntity(userId, supabase, entity, table, legacySince);
+    pulled += outcome.pulled;
+    failed += outcome.failed;
+    if (outcome.skipped) {
+      skipped = outcome.skipped;
+      break;
+    }
+    if (instantOf(outcome.maxObservedUpdatedAt) > instantOf(maxObservedUpdatedAt)) {
+      maxObservedUpdatedAt = outcome.maxObservedUpdatedAt;
+    }
+  }
+
+  // Keep the old cursor when a table failed so reconnecting retries that
+  // table instead of silently skipping rows that were never pulled. Per-entity
+  // cursors (written inside pullEntity) already let a retry resume exactly
+  // where the failure happened; the legacy key stays as the cross-version
+  // fallback for clients that predate per-entity cursors. It must cover every
+  // entity's persisted progress — not just this run's observations — or one
+  // already-ahead entity would regress the shared cursor on a quiet run.
+  if (!skipped && failed === 0) {
+    let max = maxObservedUpdatedAt;
+    const persisted = await readReviseUserMeta<Partial<Record<string, PullCursor>>>("pullCursors", userId).catch(() => undefined);
+    for (const entry of Object.values(persisted ?? {})) {
+      if (entry && typeof entry.updatedAt === "string" && instantOf(entry.updatedAt) > instantOf(max)) {
+        max = entry.updatedAt;
+      }
+    }
+    if (instantOf(max) > instantOf(legacySince)) {
+      await writeReviseUserMeta("lastPullAt", userId, max);
+    }
+  }
+  return { pulled, failed, ...(skipped ? { skipped } : {}) };
+}
+
+/** Rows per pull page. Small enough to stay well under transport limits, large enough that a 5k-row history finishes in ~10 pages. */
+export const SYNC_PULL_PAGE_SIZE = 500;
+/** Defensive ceiling: 500 rows × 10k pages covers histories far beyond any real account without looping forever on a pathological server. */
+const SYNC_PULL_MAX_PAGES = 10_000;
+/** Sorts after every real row id, so a legacy timestamp-only cursor keeps its exact exclusive (`gt`) meaning under the keyset. */
+const CURSOR_SENTINEL_ID = "\uffff";
+
+export interface PullCursor {
+  updatedAt: string;
+  id: string;
+}
+
+function pullCursorKey(entity: SyncEntity): string {
+  return `lastPullAt:${entity}`;
+}
+
+/** Per-entity resume cursor, seeded once from the legacy global timestamp. */
+async function readPullCursor(userId: Id, entity: SyncEntity, legacySince: string): Promise<PullCursor> {
+  const all = await readReviseUserMeta<Partial<Record<string, PullCursor>>>("pullCursors", userId).catch(() => undefined);
+  const scoped = all?.[pullCursorKey(entity)];
+  if (scoped && typeof scoped.updatedAt === "string" && scoped.updatedAt) {
+    return { updatedAt: scoped.updatedAt, id: typeof scoped.id === "string" ? scoped.id : CURSOR_SENTINEL_ID };
+  }
+  return { updatedAt: legacySince, id: CURSOR_SENTINEL_ID };
+}
+
+async function writePullCursor(userId: Id, entity: SyncEntity, cursor: PullCursor): Promise<void> {
+  const all = (await readReviseUserMeta<Partial<Record<string, PullCursor>>>("pullCursors", userId).catch(() => undefined)) ?? {};
+  await writeReviseUserMeta("pullCursors", userId, { ...all, [pullCursorKey(entity)]: cursor });
+}
+
+/** Lexicographic (updated_at, id) cursor comparison over ISO strings. */
+function cursorAfter(a: { updatedAt: string; id: string }, b: { updatedAt: string; id: string }): boolean {
+  return a.updatedAt > b.updatedAt || (a.updatedAt === b.updatedAt && a.id > b.id);
+}
+
+/** Instant compare for cursor freshness; mixed ISO precisions order differently as raw strings but are identical moments. */
+function instantOf(value: string): number {
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+interface PullEntityOutcome {
+  pulled: number;
+  failed: number;
+  skipped?: SyncSkip;
+  maxObservedUpdatedAt: string;
+}
+
+/**
+ * Pull one entity through deterministic (updated_at, id) keyset pages.
+ *
+ * Never relies on the server's default row limit: every page is explicitly
+ * ordered and bounded, many rows may share one timestamp, and the persisted
+ * cursor advances only after every row of the page merged successfully, so an
+ * interrupted pull resumes from the last fully-processed page. Unreadable
+ * (E2EE) rows fail individually — counted, never silently dropped — while the
+ * rest of the page still merges; the entity cursor stays pinned so a later
+ * pull (perhaps with the key restored) retries them.
+ */
+async function pullEntity(
+  userId: Id,
+  supabase: SupabaseClient,
+  entity: SyncEntity,
+  table: string,
+  legacySince: string,
+): Promise<PullEntityOutcome> {
+  const db = await getDb();
+  let cursor = await readPullCursor(userId, entity, legacySince);
+  let pulled = 0;
+  let failed = 0;
+  let maxObservedUpdatedAt = legacySince;
+  let entityOk = true;
+
+  for (let page = 0; page < SYNC_PULL_MAX_PAGES; page++) {
     const identity = await authIdentity(supabase, userId);
-    if (identity !== "ok") return { pulled, failed, skipped: identity };
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
-      .eq("user_id", userId)
-      .gt("updated_at", since);
+    if (identity !== "ok") return { pulled, failed, skipped: identity, maxObservedUpdatedAt };
+    let data: Array<Record<string, unknown>> | null;
+    let error: { message: string } | null;
+    try {
+      const response = await supabase
+        .from(table)
+        .select("*")
+        .eq("user_id", userId)
+        .or(`updated_at.gt.${cursor.updatedAt},and(updated_at.eq.${cursor.updatedAt},id.gt.${cursor.id})`)
+        .order("updated_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(0, SYNC_PULL_PAGE_SIZE - 1);
+      data = (response.data ?? null) as Array<Record<string, unknown>> | null;
+      error = (response.error ?? null) as { message: string } | null;
+    } catch {
+      return { pulled, failed: failed + 1, maxObservedUpdatedAt };
+    }
     if (error) {
       failed++;
-      continue;
+      entityOk = false;
+      break;
     }
-    if (!data?.length) continue;
+    const rows = data ?? [];
+    // Belt-and-braces: the server already keyset-filters, but never process a
+    // row at or behind the cursor — that is what makes resume duplicate-free.
+    const fresh = rows.filter((row) => cursorAfter(
+      { updatedAt: String(row.updated_at ?? ""), id: String(row.id ?? "") },
+      cursor,
+    ));
+    if (!fresh.length) break;
 
-    const store = STORE_FOR[entity];
-    try {
-      const incomingRows = await Promise.all(data.map((row) => fromRow(entity, row)));
-      const identity = await authIdentity(supabase, userId);
-      if (identity !== "ok") return { pulled, failed, skipped: identity };
+    const identityBeforeWrite = await authIdentity(supabase, userId);
+    if (identityBeforeWrite !== "ok") return { pulled, failed, skipped: identityBeforeWrite, maxObservedUpdatedAt };
+
+    const incomingRows: Array<Record<string, unknown>> = [];
+    let rowFailures = 0;
+    for (const row of fresh) {
+      try {
+        incomingRows.push(await fromRow(entity, row));
+      } catch {
+        // One unreadable row (E2EE key mismatch) must not abort its siblings:
+        // count it and keep the entity cursor pinned so a future pull retries.
+        rowFailures++;
+      }
+    }
+    if (incomingRows.length) {
       for (const incoming of incomingRows) {
         const remoteLamport = Number(incoming.lamport);
         if (Number.isFinite(remoteLamport)) await observeRemoteLamport(remoteLamport);
       }
+      const store = STORE_FOR[entity];
       const tx = db.transaction(store, "readwrite");
       try {
         for (const incoming of incomingRows) {
@@ -271,28 +419,33 @@ async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: num
           if (merged) await tx.store.put(merged as never);
         }
         await tx.done;
-      } catch (error) {
-        try { tx.abort(); } catch {}
+      } catch {
+        try { tx.abort(); } catch { /* already finished */ }
         await tx.done.catch(() => undefined);
-        throw error;
+        return { pulled, failed: failed + 1, maxObservedUpdatedAt };
       }
       pulled += incomingRows.length;
-      for (const row of data) {
-        const rowUpdatedAt = String(row.updated_at ?? "");
-        if (rowUpdatedAt > maxObservedUpdatedAt) maxObservedUpdatedAt = rowUpdatedAt;
-      }
-    } catch {
-      // A single unreadable row (E2EE key mismatch) fails the table's
-      // transaction; counting it keeps the cursor conservative so a future
-      // pull — perhaps after the key is restored — retries these rows.
-      failed++;
     }
+    failed += rowFailures;
+    if (rowFailures > 0) {
+      // Pin this entity's cursor: successfully merged pages stay merged
+      // (keyed puts are idempotent), and the retry re-fetches from the last
+      // fully-processed page instead of skipping the unreadable rows.
+      entityOk = false;
+      break;
+    }
+    const last = fresh[fresh.length - 1]!;
+    cursor = { updatedAt: String(last.updated_at ?? ""), id: String(last.id ?? "") };
+    if (instantOf(cursor.updatedAt) > instantOf(maxObservedUpdatedAt)) maxObservedUpdatedAt = cursor.updatedAt;
+    if (rows.length < SYNC_PULL_PAGE_SIZE) break;
   }
 
-  // Keep the old cursor when a table failed so reconnecting retries that
-  // table instead of silently skipping rows that were never pulled.
-  if (failed === 0 && maxObservedUpdatedAt > since) await writeReviseUserMeta("lastPullAt", userId, maxObservedUpdatedAt);
-  return { pulled, failed };
+  if (entityOk) {
+    const persistIdentity = await authIdentity(supabase, userId);
+    if (persistIdentity !== "ok") return { pulled, failed, skipped: persistIdentity, maxObservedUpdatedAt };
+    await writePullCursor(userId, entity, cursor);
+  }
+  return { pulled, failed, maxObservedUpdatedAt };
 }
 
 /**
@@ -410,6 +563,16 @@ function isOwnedBy(item: OutboxItem, userId: Id): boolean {
 }
 
 function queueOrder(a: OutboxItem, b: OutboxItem): number {
+  // Causal order first: the Lamport clock is the only ordering that survives
+  // skewed wall clocks (a device days ahead must not jump its queued edits
+  // ahead of causally-earlier work). Wall-clock queuedAt is only the
+  // tie-break for legacy rows minted before Lamport stamping.
+  const lamportA = a.lamport ?? 0;
+  const lamportB = b.lamport ?? 0;
+  if (lamportA !== lamportB) return lamportA - lamportB;
+  const deviceA = a.deviceId ?? "";
+  const deviceB = b.deviceId ?? "";
+  if (deviceA !== deviceB) return deviceA < deviceB ? -1 : 1;
   return a.queuedAt.localeCompare(b.queuedAt) || a.id.localeCompare(b.id);
 }
 

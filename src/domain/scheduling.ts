@@ -1,6 +1,7 @@
 import { createEmptyCard, fsrs, generatorParameters, Rating, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import type { Card, CardKind, Id, IsoDate, RecallGrade } from "./types";
+import { todayLocal, toLocalDateKey } from "./local-date";
 
 // FSRS is the empirically-fit successor to SM-2 (it is what current Anki
 // ships). It tracks memory *stability* and *difficulty* separately rather than
@@ -27,12 +28,14 @@ const GRADE_TO_RATING: Record<RecallGrade, Rating.Again | Rating.Hard | Rating.G
   easy: Rating.Easy,
 };
 
+/** Device-local YYYY-MM-DD. Due dates, bury dates and review days flip at local midnight, never UTC. */
 export function toDateOnly(date: Date): IsoDate {
-  return date.toISOString().slice(0, 10);
+  return toLocalDateKey(date);
 }
 
+/** The student's local today. See domain/local-date.ts for the UTC distinction. */
 export function todayIso(now: Date = new Date()): IsoDate {
-  return toDateOnly(now);
+  return todayLocal(now);
 }
 
 function fromCard(card: Card): FsrsCard {

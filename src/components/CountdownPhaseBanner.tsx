@@ -17,6 +17,7 @@ import { useMemo } from "react";
 import { getSubject } from "@/domain/curriculum";
 import { countdownGuidance } from "@/domain/exam-countdown";
 import { daysToExam } from "@/domain/recommender";
+import { todayLocal } from "@/domain/local-date";
 import { useStore } from "@/state/store";
 import { Pill } from "@/components/ui";
 
@@ -42,7 +43,7 @@ export function CountdownPhaseBanner() {
   const store = useStore();
 
   const rows = useMemo<BannerRow[]>(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocal();
     const out: BannerRow[] = [];
     for (const subjectId of store.settings.subjectIds) {
       const days = daysToExam(store.examDates, subjectId, today);

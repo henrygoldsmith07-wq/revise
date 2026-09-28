@@ -20,6 +20,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 
 import type { GradePrediction } from "./grades";
 import { authenticPaperEvidence, independentAttempt, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { localDayOfInstant } from "./local-date";
 import { trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
 import type { Attempt, Id, IsoInstant, Question } from "./types";
 
@@ -109,7 +110,7 @@ export function paperRunScores(attempts: Attempt[], questions?: readonly Questio
   });
   const byRun = new Map<string, Attempt[]>();
   for (const attempt of paperAttempts) {
-    const key = attempt.paperRunId ?? attempt.createdAt.slice(0, 10);
+    const key = attempt.paperRunId ?? localDayOfInstant(attempt.createdAt);
     const list = byRun.get(key) ?? [];
     list.push(attempt);
     byRun.set(key, list);

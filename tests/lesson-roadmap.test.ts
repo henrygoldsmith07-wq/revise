@@ -5,6 +5,9 @@ import { allSubjects, allTopics, unitsFor } from "@/domain/curriculum";
 import { buildLessons, buildRoadmapLessons } from "@/content/lessons";
 
 const source = readFileSync(resolve(process.cwd(), "src/components/LessonMode.tsx"), "utf8");
+// The recall/check gate lives in the extracted run state machine, so the
+// roadmap assertions read the hook alongside the component.
+const runnerSource = readFileSync(resolve(process.cwd(), "src/components/use-lesson-runner.ts"), "utf8");
 
 describe("learning roadmap", () => {
   it("groups every authored lesson under its subject unit", () => {
@@ -74,7 +77,12 @@ describe("learning roadmap", () => {
   });
 
   it("makes retrieval the gate before a model takeaway or next step", () => {
-    expect(source).toContain("recallRevealed");
+    // The gate itself lives in the extracted state machine: progress requires
+    // a non-empty recall draft, and the check answer only counts once the
+    // recall has been revealed.
+    expect(runnerSource).toContain("const recallDone = !step?.id || Boolean(recallRevealed[step.id]);");
+    expect(runnerSource).toContain("const checkAnswered = recallDone && (!hasCheck || chosen !== undefined);");
+    expect(runnerSource).toContain("if (!step?.id || !recallDraft[step.id]?.trim()) return;");
     expect(source).toContain("Your active recall answer");
     expect(source).toContain("Show model answer");
     expect(source).toContain("Retrieve the idea first");

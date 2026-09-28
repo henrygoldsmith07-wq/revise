@@ -1,4 +1,5 @@
 import type { Id, IsoDate } from "./types";
+import { todayLocal } from "./local-date";
 
 // One entry per qualification·subject spec that Revise tracks.
 export interface SpecVersionHistory {
@@ -73,7 +74,7 @@ export function specFor(subjectId: Id): SpecManifestEntry | undefined {
 }
 
 /** True when the entry needs re-checking (older than staleDays — default 365). */
-export function isSpecStale(entry: SpecManifestEntry, todayIso: string = new Date().toISOString().slice(0, 10), staleDays = 365): boolean {
+export function isSpecStale(entry: SpecManifestEntry, todayIso: string = todayLocal(), staleDays = 365): boolean {
   const days = Math.round((new Date(todayIso).getTime() - new Date(entry.lastChecked).getTime()) / 86_400_000);
   return days > staleDays;
 }

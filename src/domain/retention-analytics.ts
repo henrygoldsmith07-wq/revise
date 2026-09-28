@@ -15,6 +15,7 @@
 
 import type { Attempt, Card, Id, IsoDate, Mistake, ReviewLog, TechniqueVsKnowledge } from "./types";
 import { retrievability, todayIso } from "./scheduling";
+import { addLocalDays, localDayOfInstant } from "./local-date";
 
 export const RETENTION_CHECKPOINTS: ReadonlyArray<1 | 7 | 30> = [1, 7, 30] as const;
 export type RetentionCheckpoint = (typeof RETENTION_CHECKPOINTS)[number];
@@ -46,9 +47,7 @@ export interface RetentionReport {
 }
 
 function isoDateDaysAgo(today: IsoDate, days: number): IsoDate {
-  return new Date(new Date(`${today}T00:00:00Z`).getTime() - days * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  return addLocalDays(today, -days);
 }
 
 /** Mean FSRS retrievability for the given cards right now. */
@@ -80,7 +79,7 @@ export function retentionReport(input: {
     const windowDays = cp === 1 ? 1 : cp;
     const since = isoDateDaysAgo(today, windowDays);
     const inWindow = logs.filter((l) => {
-      const d = l.reviewedAt.slice(0, 10);
+      const d = localDayOfInstant(l.reviewedAt);
       // Exclude today: reviews minutes apart grade short-term memory and
       // inflate the checkpoint. Checkpoint N means "the N days before today".
       return d >= since && d < today;
@@ -153,7 +152,7 @@ function windowAttempts(attempts: Attempt[], today: IsoDate, windowLabel: MarksP
   const days = windowLabel === "1d" ? 1 : windowLabel === "7d" ? 7 : 30;
   const since = isoDateDaysAgo(today, days);
   return attempts.filter((a) => {
-    const d = a.createdAt.slice(0, 10);
+    const d = localDayOfInstant(a.createdAt);
     return d > since && d <= today;
   });
 }

@@ -28,6 +28,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 import { classifyTopic, type TopicStatusInfo } from "./topic-status";
 import { MIN_OUTLOOK_ATTEMPTS, outlookRows, paperRunScores, type ExamOutlookRow, type PaperRunScore } from "./exam-outlook";
 import { authenticPaperEvidence, trustworthyAttempt } from "./learning-evidence";
+import { todayLocal } from "./local-date";
 import { trustedAssessmentContent } from "./physics-content-review";
 import type { GradePrediction } from "./grades";
 import type {
@@ -365,7 +366,7 @@ export function buildSubjectGraph(input: GraphInput, now: Date = new Date()): Su
     })
     .filter((u) => u.topics.length > 0);
 
-  const today = now.toISOString().slice(0, 10);
+  const today = todayLocal(now);
   const upcoming = examDates
     .filter((e) => e.subjectId === subject.id && e.date >= today)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))[0];

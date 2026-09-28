@@ -3,6 +3,7 @@ import { auditPhysicsAssessmentQuality, type PhysicsAssessmentQualityAudit } fro
 import type { CapabilityNode } from "./capability-graph";
 import { validatePrerequisiteReviews } from "./capability-graph";
 import { canonicalJson, sha256Hex } from "./content-fingerprint";
+import { localDayOfInstant } from "./local-date";
 import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { HumanVerificationRecord, Id, Question, Topic } from "./types";
 
@@ -148,7 +149,7 @@ export function applyHumanVerification(question: Question, record: HumanVerifica
   return {
     ...question,
     humanVerification: { ...record, status: approved ? "approved" : record.status === "approved" ? "pending" : record.status },
-    ...(approved ? { verification: "verified" as const, reviewer: record.reviewerId ?? question.reviewer ?? null, lastChecked: record.reviewedAt?.slice(0, 10) ?? question.lastChecked ?? null } :
+    ...(approved ? { verification: "verified" as const, reviewer: record.reviewerId ?? question.reviewer ?? null, lastChecked: record.reviewedAt ? localDayOfInstant(record.reviewedAt) : (question.lastChecked ?? null) } :
       { verification: "unverified" as const, reviewer: null, lastChecked: null }),
   };
 }

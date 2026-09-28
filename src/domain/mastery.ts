@@ -1,6 +1,7 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { hintEvidenceMultiplier } from "./hint-tiers";
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { todayLocal } from "./local-date";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
 
@@ -76,7 +77,7 @@ function mean(values: number[], fallback = 0): number {
 
 export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
   const now = input.now ?? new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = todayLocal(now);
 
   const cardsByTopic = groupBy(input.cards, (c) => c.topicId);
   const attemptsByTopic = new Map<Id, Attempt[]>();

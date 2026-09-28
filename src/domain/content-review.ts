@@ -3,6 +3,7 @@ import { getSubject } from "@/domain/curriculum";
 import type { SubjectCoverage } from "./coverage";
 import type { ModerationEntry } from "./moderation";
 import { entriesWithProvenanceGaps } from "./moderation";
+import { todayLocal } from "./local-date";
 
 // ---------------------------------------------------------------------------
 // Teacher / content-review tooling + curriculum regression checks.
@@ -41,7 +42,7 @@ export function regressionReport(input: {
   coverageBySubject?: Map<Id, SubjectCoverage>;
   today?: string;
 }): RegressionReport {
-  const today = input.today ?? new Date().toISOString().slice(0,10);
+  const today = input.today ?? todayLocal();
   const flags: ReviewFlag[] = [];
   const topicIds = new Set(input.topics.map((t)=> t.id));
   // Topics

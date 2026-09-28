@@ -1,6 +1,7 @@
 import type { SpecManifestEntry } from "./spec";
 import { SPEC_MANIFEST } from "./spec";
 import { getQualification } from "./curriculum";
+import { todayLocal } from "./local-date";
 import type { Card, Id, IsoDate, Question, Subject, Topic } from "./types";
 
 export type SpecificationAuditStatus = "pass" | "review" | "fail";
@@ -107,7 +108,7 @@ const DEFAULT_STALE_DAYS = 365;
 export function specificationCoverageAudit(
   input: SpecificationCoverageAuditInput,
 ): SpecificationCoverageAudit {
-  const today = input.today ?? new Date().toISOString().slice(0, 10);
+  const today = input.today ?? todayLocal();
   const staleAfterDays = input.staleAfterDays ?? DEFAULT_STALE_DAYS;
   const manifest = input.manifest ?? SPEC_MANIFEST;
   const subjectIds = new Set(input.subjects.map((subject) => subject.id));

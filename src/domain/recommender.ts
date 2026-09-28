@@ -8,6 +8,7 @@ import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue"
 import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
 import { paperOutcomeGainMultiplier } from "./paper-outcome";
 import { trustedAssessmentMistake } from "./learning-evidence";
+import { localDayOfInstant, todayLocal } from "./local-date";
 import type {
   ActivityKind,
   Card,
@@ -276,7 +277,7 @@ void buildExplanation;
 
 export function recommend(input: RecommendInput): Recommendation[] {
   const now = input.now ?? new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = todayLocal(now);
   const block = input.sessionLengthMinutes;
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
   const masteryById = new Map(input.mastery.map((m) => [m.topicId, m]));
@@ -291,7 +292,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
 
   function daysSinceFor(row: TopicMastery | undefined): number | null {
     if (!row?.lastStudiedAt) return null;
-    const last = row.lastStudiedAt.slice(0, 10);
+    const last = localDayOfInstant(row.lastStudiedAt);
     if (last > today) return 0;
     return daysBetween(last, today);
   }

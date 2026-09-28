@@ -27,6 +27,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // ---------------------------------------------------------------------------
 
 import { questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake } from "./learning-evidence";
+import { localDayOfInstant } from "./local-date";
 import type { Attempt, Id, IsoInstant, Mistake, Paper, Question, Topic, TopicMastery } from "./types";
 
 /** Losses older than this count as history, not as "what is wrong now". */
@@ -279,7 +280,7 @@ export function selectNextPaper(input: PaperSelectionInput): PaperSelectionResul
       (!requiresWjecContentReview(input.subjectId) || trustedPhysicsAttempt(attempt)));
     const attemptsByRun = new Map<string, Attempt[]>();
     for (const attempt of paperAttempts) {
-      const runKey = attempt.paperRunId ?? attempt.createdAt.slice(0, 10);
+      const runKey = attempt.paperRunId ?? localDayOfInstant(attempt.createdAt);
       const rows = attemptsByRun.get(runKey) ?? [];
       rows.push(attempt);
       attemptsByRun.set(runKey, rows);

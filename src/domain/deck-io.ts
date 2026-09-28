@@ -1,5 +1,6 @@
 import { createCard, normaliseTags } from "./scheduling";
 import { normaliseCloze } from "./cloze";
+import { todayLocal } from "./local-date";
 import type { Card, DeckExport, DeckExportCard, Id } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -171,7 +172,7 @@ export function parseDeckJson(text: string): ImportReport {
       subjectId: str(record.subjectId, 200) || undefined,
       scheduling: scheduling
         ? {
-            due: str(scheduling.due, 10) || new Date().toISOString().slice(0, 10),
+            due: str(scheduling.due, 10) || todayLocal(),
             stability: clamp(Number(scheduling.stability) || 0, 0, 36500),
             difficulty: clamp(Number(scheduling.difficulty) || 5, 1, 10),
             reps: clamp(Math.round(Number(scheduling.reps) || 0), 0, 100000),

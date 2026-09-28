@@ -8,6 +8,7 @@
 
 import type { Card, Id, ReviewLog } from "./types";
 import { retrievability } from "./scheduling";
+import { addLocalDays, todayLocal } from "./local-date";
 
 export type SchedulerId = "revise-fsrs" | "fixed-interval-7d" | "fsrs-only" | "recency-accuracy";
 export type SchedulerBaseline = Exclude<SchedulerId, "revise-fsrs">;
@@ -134,7 +135,7 @@ function retentionForScheduler(scheduler: SchedulerId, cards: Card[], logs: Revi
 
 export function schedulerMetrics(input: SchedulerValidationInput & { schedulerId: SchedulerId }): SchedulerMetrics {
   const { cards, reviewLogs, attempts, schedulerId } = input;
-  const windowStart = input.windowStart ?? new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const windowStart = input.windowStart ?? addLocalDays(todayLocal(), -30);
   const retentionAt: RetentionAtDelay[] = [7, 14, 30].map((d) => retentionForScheduler(schedulerId, cards, reviewLogs, d as 7 | 14 | 30, windowStart));
   const totalReviews = reviewLogs.length;
   const totalMinutes = Math.round(reviewLogs.reduce((a, l) => a + (l.elapsedMs ?? 1500), 0) / 60000);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { getBoard, getQualification, getSubject } from "@/domain/curriculum";
 import type { ActivityKind, ExamDate, PlannedSession, Subject } from "@/domain/types";
+import { todayLocal } from "@/domain/local-date";
 import { useStore } from "@/state/store";
 import { ButtonLink } from "./ui";
 import { CreditedIcon, ForwardIcon, LessonsIcon, LibraryIcon, PlanIcon, PracticeIcon, ReviewIcon } from "./icons";
@@ -90,7 +91,7 @@ export function TodayOverview() {
   const subjects = settings.subjectIds
     .map((id) => getSubject(id))
     .filter((subject): subject is Subject => Boolean(subject));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const exam = examDates
     .filter((entry) => settings.subjectIds.includes(entry.subjectId) && entry.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0];

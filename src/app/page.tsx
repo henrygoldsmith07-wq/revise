@@ -13,6 +13,7 @@ import { useStore } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
 import { TodayOverview } from "@/components/TodayOverview";
+import { todayLocal } from "@/domain/local-date";
 
 // The roadmap derives lessons from the authored curriculum, which is a much
 // larger client chunk than Today needs for its bounded review action. Load it
@@ -73,7 +74,7 @@ export default function TodayPage() {
   const recordExperimentEvent = store.recordExperimentEvent;
   useEffect(() => {
     if (!adaptiveSession) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocal();
     void recordFunnel("recommendation_displayed", `adaptive:${adaptiveSession.topicId}:${today}`);
     if (!experimentArm) return;
     const taskId = `adaptive:${adaptiveSession.topicId}:${today}`;

@@ -1,5 +1,6 @@
 import type { ContentSource, Id, IsoDate, IsoInstant, LicensedSource, VerificationStatus } from "./types";
 import type { ReviewFlag } from "./content-review";
+import { localDayOfInstant } from "./local-date";
 
 // ---------------------------------------------------------------------------
 // Moderation workflow — teacher / tutor review with versioned provenance.
@@ -152,7 +153,7 @@ export function reviewEntry(
           ...entry.provenance,
           verification: opts.verification,
           reviewer: opts.reviewerName ?? reviewerId,
-          lastChecked: at.slice(0, 10),
+          lastChecked: localDayOfInstant(at),
         }
       : entry.provenance;
 
