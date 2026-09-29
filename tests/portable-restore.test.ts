@@ -116,6 +116,33 @@ describe("portable profile restore", () => {
     expect(after.cards.some((row) => row.id === "existing-card")).toBe(true);
   });
 
+  it("rejects mixed-owner rows before any restore mutation", async () => {
+    const original = manualCard(TARGET, "existing-card");
+    await saveCard(original);
+
+    const snap = buildPortabilitySnapshot({
+      userId: SOURCE,
+      cards: [{ ...manualCard(SOURCE), userId: "unexpected-owner" }],
+      attempts: [],
+      reviewLogs: [],
+      mistakes: [],
+      plannedSessions: [],
+      examDates: [],
+      settings: null,
+      streak: null,
+    });
+
+    const validation = await validatePortableRestore(snap, TARGET);
+    expect(validation.ok).toBe(false);
+    expect(validation.issues).toContainEqual(
+      expect.objectContaining({ store: "cards", field: "userId" }),
+    );
+
+    await expect(restorePortableSnapshot(snap, TARGET)).rejects.toThrow(/snapshot owner/);
+    const after = await loadSnapshot(TARGET);
+    expect(after.cards.some((row) => row.id === "existing-card")).toBe(true);
+  });
+
   it("rejects attempts whose question no longer exists instead of reviving stale seed content", async () => {
     const attempt: Attempt = {
       id: "attempt-1",
