@@ -642,7 +642,12 @@ export function analyseExperiment(input: AnalyseExperimentInput): ExperimentAnal
   const effect = fullEfficacyReady && revMean != null && ctlMean != null ? round(revMean - ctlMean) : null;
   const comparisons: NonNullable<ExperimentAnalysis["comparisons"]> = [];
   const comparablePairedData = primaryOutcomeReady && comparisonScales.size === 1;
-  if (comparablePairedData && revOuts.length) {
+  const exploratoryComparisonsReady = comparablePairedData && EXPERIMENT_ARMS.every(
+    (arm) => primaryOutcomes.filter((outcome) => outcome.arm === arm).length >= operationalMin,
+  );
+  // Do not silently drop an invalid prespecified arm and then present the
+  // remaining multi-arm comparisons as if the comparison set were complete.
+  if (exploratoryComparisonsReady && revOuts.length) {
     const reviseGains = revOuts.map((outcome) => outcome.marksGainedPerHour!);
     for (const baseline of ["baseline-mastery", "baseline-overdue", "control"] as const) {
       const baselineGains = primaryOutcomes
