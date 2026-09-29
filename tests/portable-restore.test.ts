@@ -175,6 +175,25 @@ describe("portable profile restore", () => {
     );
   });
 
+  it("fails malformed outcome history through validation instead of crashing", async () => {
+    const snap = buildPortabilitySnapshot({
+      userId: SOURCE,
+      cards: [manualCard(SOURCE)],
+      attempts: [],
+      reviewLogs: [],
+      mistakes: [],
+      plannedSessions: [],
+      examDates: [],
+      settings: null,
+      streak: null,
+    });
+    snap.gradePredictions = [null as never];
+    snap.gradePredictionsCount = 1;
+
+    await expect(validatePortableRestore(snap, TARGET)).resolves.toMatchObject({ ok: false });
+    await expect(restorePortableSnapshot(snap, TARGET)).rejects.toThrow(/snapshot owner/);
+  });
+
   it("rejects attempts whose question no longer exists instead of reviving stale seed content", async () => {
     const attempt: Attempt = {
       id: "attempt-1",
