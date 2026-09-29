@@ -143,6 +143,38 @@ describe("portable profile restore", () => {
     expect(after.cards.some((row) => row.id === "existing-card")).toBe(true);
   });
 
+  it("rejects grade history belonging to a different snapshot owner", async () => {
+    const snap = buildPortabilitySnapshot({
+      userId: SOURCE,
+      cards: [manualCard(SOURCE)],
+      attempts: [],
+      reviewLogs: [],
+      mistakes: [],
+      plannedSessions: [],
+      examDates: [],
+      settings: null,
+      streak: null,
+      gradePredictions: [{
+        id: "prediction-foreign",
+        anonId: "unexpected-owner",
+        subjectId: "wjec-alevel-physics",
+        predictedPercent: 70,
+        lowerPercent: 60,
+        upperPercent: 80,
+        gradeLabel: "B",
+        confidence: 0.7,
+        evidenceShare: 0.5,
+        createdAt: AT,
+      }],
+    });
+
+    const validation = await validatePortableRestore(snap, TARGET);
+    expect(validation.ok).toBe(false);
+    expect(validation.issues).toContainEqual(
+      expect.objectContaining({ store: "meta", field: "anonId" }),
+    );
+  });
+
   it("rejects attempts whose question no longer exists instead of reviving stale seed content", async () => {
     const attempt: Attempt = {
       id: "attempt-1",
