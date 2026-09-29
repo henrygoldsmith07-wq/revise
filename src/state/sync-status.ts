@@ -9,6 +9,8 @@ import { isSupabaseConfigured } from "@/data/supabase";
 export interface SyncStatus {
   online: boolean;
   pending: number;
+  /** Entries that exhausted automatic retries and need an explicit user decision. */
+  failed: number;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
   enabled: boolean;
@@ -19,6 +21,7 @@ export function initialSyncStatus(): SyncStatus {
   return {
     online: true,
     pending: 0,
+    failed: 0,
     lastSyncedAt: null,
     lastSyncError: null,
     enabled: isSupabaseConfigured,

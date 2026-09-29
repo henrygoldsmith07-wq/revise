@@ -7,6 +7,8 @@ export const REVISE_META_KEYS = {
   seedVersion: "revise.seedVersion.v1",
   revisionCheckpoint: "revise.revisionCheckpoint.v1",
   experimentAssignment: "revise.experimentAssignment.v1",
+  /** Random study identity, deliberately unrelated to account/user ids. */
+  experimentParticipantId: "revise.experimentParticipantId.v1",
   experimentEvents: "revise.experimentEvents.v1",
   funnelEvents: "revise.funnelEvents.v1",
   gradePredictions: "revise.gradePredictions.v1",

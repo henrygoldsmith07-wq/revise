@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { forecastUntouched } from "@/domain/pace-forecast";
 import { AdaptiveSessionHero } from "@/components/AdaptiveSessionHero";
 import { PaceForecastLine } from "@/components/PaceForecast";
@@ -174,20 +174,47 @@ function TodayRoadmapLoading() {
 // Greeting hook (client-only wall clock, SSR-safe)
 // ---------------------------------------------------------------------------
 
-const NO_SUBSCRIBE = () => () => {};
-let cachedHour: number | null = null;
-function clientHour(): number {
-  if (cachedHour == null) cachedHour = new Date().getHours();
-  return cachedHour;
-}
-function serverHour(): number {
-  return -1;
-}
-
-function useGreeting(): string {
-  const hour = useSyncExternalStore(NO_SUBSCRIBE, clientHour, serverHour);
-  if (hour < 0) return "";
+function greetingAt(date: Date): string {
+  const hour = date.getHours();
   if (hour < 12) return "Morning";
   if (hour < 18) return "Afternoon";
   return "Evening";
+}
+
+function nextGreetingBoundary(now: Date): Date {
+  const next = new Date(now);
+  if (now.getHours() < 12) next.setHours(12, 0, 0, 0);
+  else if (now.getHours() < 18) next.setHours(18, 0, 0, 0);
+  else {
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 0, 0, 0);
+  }
+  return next;
+}
+
+function useGreeting(): string {
+  // Keep the server/client first render identical, then schedule only the next
+  // semantic greeting boundary. Focus/visibility refresh handles suspended tabs.
+  const [greeting, setGreeting] = useState("");
+  useEffect(() => {
+    let timer = 0;
+    const refresh = () => {
+      const now = new Date();
+      setGreeting(greetingAt(now));
+      window.clearTimeout(timer);
+      timer = window.setTimeout(refresh, Math.max(1_000, nextGreetingBoundary(now).getTime() - now.getTime() + 250));
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+  return greeting;
 }

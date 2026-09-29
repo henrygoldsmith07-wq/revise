@@ -112,16 +112,28 @@ Most overdue, Lowest predicted marks, Mistake-first, FSRS-only, the Revise
 heuristic, a LinUCB contextual bandit and a logistic learned ranker - are
 replayed over learner trajectories in src/domain/recommender-tournament.ts.
 
+This is **observational replay**, not a causal counterfactual experiment. A
+policy is scored only where its pick matches what the learner actually studied;
+the realised outcome at that point cannot be assumed to be what would have
+happened had a different policy changed the learner's behaviour. Tournament
+results are therefore diagnostics for leakage, policy coverage, ranking
+stability and candidate selection. The prospective randomised experiment below
+is the efficacy gate.
+
 Leakage rule: at decision i the policy context folds events[0..i) only;
 the realised event at i is the outcome. A maxEvents probe slices the
 window so tests can flip future outcomes and prove earlier decisions are
 untouched (static policies) while online learners legitimately adapt.
 
-Reported: completion rate and immediate score per decision; 7-day delayed
-retention; unseen final-assessment marks per invested hour as the ranking
-metric. The deterministic Revise heuristic stays in production unless a
-challenger beats it on real learner replays. Demo tables in CI are
-synthetic and labelled as such.
+Observed study exposure is isolated by participant and policy. Held-out
+marks/hour is calculated per participant as held-out marks on exposed topics
+divided by that participant's observed aligned study hours, then aggregated
+across participants. Exposure below 15 minutes is treated as insufficient
+rather than dividing by an unstable denominator.
+
+Reported: observational completion/alignment rate and immediate score per
+decision; 7-day delayed retention; held-out marks per observed study hour.
+Demo tables in CI are synthetic and labelled as such.
 
 ## Examiner benchmark (the real gate)
 
@@ -155,11 +167,18 @@ The thesis - open, recommended task, complete, mark, update, next - is now
 instrumented for a real prospective trial (`src/domain/recommendation-experiment.ts`).
 Participants are deterministically assigned across four arms: production recommender,
 self-directed control, weakest-topic-first baseline and most-overdue-first baseline.
+The study identity is a separate random identifier and is not the application user id.
 Shown / started / completed / rejected events accumulate locally; attempts and reviews
-supply hours, marks, transfer and calibration. analyseExperiment() emits all ten
-preregistered metrics per arm plus the headline marks-per-hour effect versus control,
-and refuses any efficacy claim until every arm has real participants and delayed
-unseen assessments. Enrol in Settings.
+supply hours, marks, transfer and calibration. Every behavioural metric is bounded to
+the participant's post-assignment, pre-withdrawal study window.
+
+analyseExperiment() reports operational readiness separately from efficacy readiness.
+The five-per-arm default is only an engineering/operational floor. An efficacy claim is
+disabled until the study configuration supplies an explicit preregistered paired-sample
+threshold derived outside the observed results. Revise-vs-self-directed control is the
+primary comparison; the two simple-baseline comparisons are exploratory and are not
+multiplicity-adjusted. Delayed retention, unseen transfer, comparable assessment forms
+and the existing human/held-out trust requirements remain mandatory. Enrol in Settings.
  — recommendation quality, marking and grades
 
 Revise owns its claims with numbers. This doc records the harnesses, the invariants and the honest limits.

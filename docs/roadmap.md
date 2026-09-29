@@ -132,7 +132,7 @@ These exist today and are the foundation the roadmap builds on:
 - Proper native-quality mobile/PWA UX.
 - Notifications.
 - Sync grade-prediction calibration history across devices *(the portable export includes it today; the calibration metadata itself is currently device-local).*
-- Full portable-snapshot restore with id-safe reconstruction of cards, review logs, attempts and calibration history *(export exists; deck import exists; complete archive restore does not yet).* 
+- Full portable-snapshot restore *(shipped — v2 exports preserve stable card ids, validate linked history before mutation, restore one profile transactionally, keep current shipped curriculum authoritative, and refuse unsafe full-history restore from legacy v1 archives).*
 - Reliable offline exam packs.
 
 ## 13. Evidence & efficacy

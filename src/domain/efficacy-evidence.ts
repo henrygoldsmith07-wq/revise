@@ -19,8 +19,14 @@ export interface EfficacyEvidence {
     label: string;
     hours: number;
     marks: number;
+    /** Raw practice throughput, not the primary learning-gain endpoint. */
+    practiceMarksPerHour: number | null;
+    /** @deprecated Backwards-compatible alias for practiceMarksPerHour. */
     marksPerHour: number | null;
     delayedRetention: number | null;
+    unseenExposureShare: number | null;
+    unseenTransferScore: number | null;
+    /** @deprecated Backwards-compatible alias for unseenExposureShare. */
     unseenTransferShare: number | null;
     participants: number;
   }>;
@@ -49,8 +55,11 @@ export function computeEfficacyEvidence(analysis: ExperimentAnalysis): EfficacyE
       label: ARM_LABELS[arm.arm] ?? arm.arm,
       hours: arm.hoursPractised,
       marks: arm.marksEarned,
+      practiceMarksPerHour: arm.practiceMarksPerHour,
       marksPerHour: arm.practiceMarksPerHour,
       delayedRetention: arm.delayedRetention,
+      unseenExposureShare: arm.unseenExposureShare,
+      unseenTransferScore: arm.unseenTransferScore,
       unseenTransferShare: arm.unseenExposureShare,
       participants: arm.participants,
     })),

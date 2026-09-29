@@ -10,10 +10,26 @@ const ARM_LABELS: Record<string, string> = {
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/lib/optional-ai";
 import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
-import { buildPortabilitySnapshot, deletionPreview, portabilityFilename, privacyDisclosure } from "@/domain/portability";
+import {
+  buildPortabilitySnapshot,
+  deletionPreview,
+  parsePortabilitySnapshot,
+  portabilityFilename,
+  portabilityRestorePreview,
+  privacyDisclosure,
+  type PortabilitySnapshot,
+} from "@/domain/portability";
 import { clearAll } from "@/data/db";
+import { restorePortableSnapshot } from "@/data/portable-restore";
 import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
+import {
+  discardFailedOutboxItem,
+  failedOutboxItems,
+  failedOutboxRecoveryItem,
+  retryFailedOutboxItem,
+  type FailedOutboxItemSummary,
+} from "@/data/sync";
 import { useStore } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
@@ -316,6 +332,8 @@ export default function SettingsPage() {
 
       <Account />
 
+      <FailedSyncRecovery />
+
       <DataControls />
 
       <section>
@@ -561,9 +579,135 @@ function Account() {
   );
 }
 
+function FailedSyncRecovery() {
+  const store = useStore();
+  const [items, setItems] = useState<FailedOutboxItemSummary[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const refresh = async () => {
+    const next = await failedOutboxItems(store.userId);
+    setItems(next);
+  };
+
+  useEffect(() => {
+    if (!store.syncStatus.enabled || store.syncStatus.failed === 0) return;
+    let cancelled = false;
+    void failedOutboxItems(store.userId).then((next) => {
+      if (!cancelled) setItems(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [store.userId, store.syncStatus.enabled, store.syncStatus.failed]);
+
+  if (!store.syncStatus.enabled || store.syncStatus.failed === 0) return null;
+
+  return (
+    <section id="sync-recovery">
+      <SectionHeading
+        title="Sync recovery"
+        hint="These changes exhausted automatic retries. Nothing is discarded without your confirmation."
+      />
+      <Panel className="space-y-3">
+        <p className="text-xs text-ink2">
+          The local revision data is still saved. Only safe queue metadata is shown here; answer content stays hidden unless you explicitly export a recovery record.
+        </p>
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-[10px] border border-line bg-surface2 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-ink">
+                    {item.entity} · {item.op}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink3">
+                    {item.attempts} failed attempts · queued {new Date(item.queuedAt).toLocaleString("en-GB")}
+                  </p>
+                  {item.lastError ? (
+                    <p className="mt-1 max-w-xl text-[11px] text-danger">
+                      {item.lastError.slice(0, 180)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setMessage(null);
+                      void retryFailedOutboxItem(item.id, store.userId).then(async (retried) => {
+                        if (!retried) {
+                          setMessage("That failed change is no longer available to retry.");
+                          await refresh();
+                          return;
+                        }
+                        setMessage("Retry enabled. Running sync now…");
+                        await store.syncNow();
+                        await refresh();
+                      });
+                    }}
+                  >
+                    Retry
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setMessage(null);
+                      void failedOutboxRecoveryItem(item.id, store.userId).then((record) => {
+                        if (!record) {
+                          setMessage("That recovery record is no longer available.");
+                          return;
+                        }
+                        const blob = new Blob(
+                          [JSON.stringify({ app: "revise", kind: "failed-sync-recovery", exportedAt: new Date().toISOString(), record }, null, 2)],
+                          { type: "application/json" },
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `revise-failed-sync-${item.entity}-${item.id.slice(0, 8)}.json`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                        setMessage("Private recovery record exported. It may contain revision content; store it securely.");
+                      });
+                    }}
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const ok = confirm(
+                        "Discard this queued sync mutation? The local study record remains on this device, but this specific change will no longer be sent to the server.",
+                      );
+                      if (!ok) return;
+                      void discardFailedOutboxItem(item.id, store.userId).then(async (discarded) => {
+                        setMessage(discarded ? "Queued mutation discarded." : "That failed change was already gone.");
+                        await refresh();
+                      });
+                    }}
+                  >
+                    Discard queued change
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {message ? <p className="text-xs text-ink2" role="status">{message}</p> : null}
+      </Panel>
+    </section>
+  );
+}
+
 function DataControls() {
   const store = useStore();
   const filename = portabilityFilename(store.userId);
+  const [pendingRestore, setPendingRestore] = useState<PortabilitySnapshot | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const restorePreview = pendingRestore ? portabilityRestorePreview(pendingRestore) : null;
   const preview = deletionPreview(
     [
       { store: "cards", count: store.cards.length },
@@ -587,6 +731,37 @@ function DataControls() {
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => exportDataPortable(store, filename)}>Export portable snapshot</Button>
           <Button onClick={() => exportDataLegacy(store)}>Export legacy JSON</Button>
+          <label className="inline-flex min-h-9 cursor-pointer items-center rounded-[10px] border border-line px-3 text-sm font-medium text-ink hover:bg-surface2">
+            Choose snapshot to restore
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setRestoreMessage(null);
+                void file.text().then((text) => {
+                  const parsed = parsePortabilitySnapshot(text);
+                  if (!parsed.snapshot) {
+                    setPendingRestore(null);
+                    setRestoreMessage(parsed.warnings.join(" "));
+                    return;
+                  }
+                  setPendingRestore(parsed.snapshot);
+                  const restore = portabilityRestorePreview(parsed.snapshot);
+                  setRestoreMessage(
+                    restore.fullRestoreSupported
+                      ? "Snapshot validated at the file level. Review the counts below before replacing this device profile."
+                      : restore.reason,
+                  );
+                }).catch(() => {
+                  setPendingRestore(null);
+                  setRestoreMessage("Could not read that snapshot file.");
+                });
+              }}
+            />
+          </label>
           <Button
             onClick={async () => {
               const ok = confirm(`${preview.warning}\n\nErase every row on this device? This cannot be undone.`);
@@ -599,6 +774,42 @@ function DataControls() {
           </Button>
         </div>
         <p className="text-[11px] text-ink3">Portable snapshot: {filename} — single-file, machine-readable, GDPR Art. 20 portable.</p>
+        {restorePreview ? (
+          <div className="rounded-[10px] border border-line bg-surface2 p-3 text-xs text-ink2">
+            <p className="font-semibold text-ink">
+              Restore preview · {restorePreview.counts.cards} cards · {restorePreview.counts.reviewLogs} reviews · {restorePreview.counts.attempts} attempts
+            </p>
+            <p className="mt-1">
+              {restorePreview.counts.mistakes} mistakes · {restorePreview.counts.plannedSessions} planned sessions · {restorePreview.counts.examDates} exam dates · {restorePreview.counts.papers} papers
+            </p>
+            {restorePreview.fullRestoreSupported && pendingRestore ? (
+              <Button
+                className="mt-3"
+                variant="secondary"
+                onClick={() => {
+                  const ok = confirm(
+                    "Replace this device's current profile with the selected snapshot? The restore is transactional, but once it succeeds the previous local profile is replaced. Export the current profile first if you may need it."
+                  );
+                  if (!ok) return;
+                  setRestoreMessage("Validating snapshot and restoring…");
+                  void restorePortableSnapshot(pendingRestore, store.userId)
+                    .then((result) => {
+                      setRestoreMessage(
+                        `Restored ${result.restored.cards} cards, ${result.restored.reviewLogs} reviews and ${result.restored.attempts} attempts. Reloading…`,
+                      );
+                      window.setTimeout(() => location.reload(), 300);
+                    })
+                    .catch((error: unknown) => {
+                      setRestoreMessage(error instanceof Error ? error.message : "Restore failed. No partial restore was committed.");
+                    });
+                }}
+              >
+                Replace this device profile
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {restoreMessage ? <p className="text-[11px] text-ink2" role="status">{restoreMessage}</p> : null}
         <p className="text-[11px] text-ink3">{preview.warning}</p>
         <p className="text-[11px] text-ink3">
           {isSupabaseConfigured
@@ -615,6 +826,15 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
     userId: store.userId,
     displayName: store.settings.displayName,
     cards: store.cards,
+    // Preserve only question rows needed to make historical/custom attempts
+    // intelligible after restore; untouched shipped content is reproducible.
+    questions: store.questions.filter((question) =>
+      question.origin !== "seed" &&
+      (store.attempts.some((attempt) => attempt.questionId === question.id) ||
+        store.papers.some((paper) => paper.questionIds.includes(question.id))),
+    ),
+    papers: store.papers,
+    lessonProgress: store.lessonProgress,
     attempts: store.attempts,
     reviewLogs: store.reviewLogs,
     mistakes: store.mistakes,

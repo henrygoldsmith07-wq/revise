@@ -393,8 +393,13 @@ export interface PolicyOutcome {
   retention7d: number | null;
   /** Deferred until mistake events join the trajectory schema. */
   mistakeClosureRate?: null;
+  /**
+   * Mean participant-level held-out marks per observed study hour.
+   * This is observational replay, not a causal counterfactual estimate.
+   */
   unseenMarksPerHour: number | null;
   unseenMarksTotal: number | null;
+  hoursPractised: number;
 }
 
 export const TOURNAMENT_POLICIES: Policy[] = [
@@ -410,12 +415,6 @@ export const TOURNAMENT_POLICIES: Policy[] = [
 
 export interface TournamentOptions {
   seed?: number;
-  minDecisionPoints?: number;
-}
-
-
-export interface TournamentOptions {
-  seed?: number;
   /** Replay only the first N events: no-leakage probes slice here so mutations beyond the window cannot touch earlier decisions. */
   maxEvents?: number;
   /** Minimum decision points before a policy's percentages are reported. */
@@ -427,7 +426,8 @@ interface Accum {
   completed: number;
   scoreSum: number;
   scoreN: number;
-  minutesOnTopic: Map<Id, number>;
+  /** Observed policy-aligned exposure, isolated by participant and topic. */
+  minutesByParticipantTopic: Map<string, number>;
   retained7d: number;
   delayedTotal: number;
   hours: number;
@@ -440,7 +440,7 @@ function blankAcc(): Accum {
     completed: 0,
     scoreSum: 0,
     scoreN: 0,
-    minutesOnTopic: new Map(),
+    minutesByParticipantTopic: new Map(),
     retained7d: 0,
     delayedTotal: 0,
     hours: 0,
@@ -506,7 +506,11 @@ export function runTournament(
             runner.acc.scoreSum += event.awarded / event.max;
             runner.acc.scoreN++;
           }
-          runner.acc.minutesOnTopic.set(event.topicId, (runner.acc.minutesOnTopic.get(event.topicId) ?? 0) + event.durationMinutes);
+          const exposureKey = `${participant.anonId}:${event.topicId}`;
+          runner.acc.minutesByParticipantTopic.set(
+            exposureKey,
+            (runner.acc.minutesByParticipantTopic.get(exposureKey) ?? 0) + event.durationMinutes,
+          );
           runner.acc.hours += event.durationMinutes / 60;
         }
 
@@ -527,7 +531,7 @@ export function runTournament(
         const tMs = new Date(event.at).getTime();
         if (prevAt != null && tMs - prevAt >= 7 * 86_400_000) {
           // Only count when the learner was steered here at least once.
-          if ((runner.acc.minutesOnTopic.get(event.topicId) ?? 0) > 0 || went) {
+          if ((runner.acc.minutesByParticipantTopic.get(key) ?? 0) > 0 || went) {
             runner.acc.delayedTotal++;
             if (event.max > 0 && event.awarded / event.max >= 0.5) runner.acc.retained7d++;
           }
@@ -540,20 +544,38 @@ export function runTournament(
   }
 
   const outcomes = runners.map((runner) => {
-    let unseenMarks = 0;
-    let unseenMax = 0;
-    for (const participant of participants) {
-      if (!participant.finalAssessment) continue;
-      for (const item of participant.finalAssessment) {
-        const minutes = runner.acc.minutesOnTopic.get(item.topicId) ?? 0;
-        if (minutes <= 0) continue;
-        unseenMarks += item.awarded * (minutes / 60);
-        unseenMax += item.max * (minutes / 60);
-      }
-    }
     const acc = runner.acc;
     const enough = acc.decisionPoints >= minSteps;
     const rate = (num: number, den: number): number | null => (enough && den ? round(num / den) : null);
+
+    // Held-out efficiency is computed per participant first so one learner's
+    // exposure can never borrow another learner's final marks or study time.
+    // The replay only scores topics where this policy's pick matched what the
+    // learner actually studied; that makes this an observational diagnostic,
+    // not evidence of what would have happened under a different policy.
+    const participantRates: number[] = [];
+    let unseenMarks = 0;
+    for (const participant of participants) {
+      if (!participant.finalAssessment?.length) continue;
+      const exposedTopics = new Set<Id>();
+      for (const item of participant.finalAssessment) {
+        const key = `${participant.anonId}:${item.topicId}`;
+        if ((acc.minutesByParticipantTopic.get(key) ?? 0) > 0) exposedTopics.add(item.topicId);
+      }
+      const minutes = [...exposedTopics].reduce(
+        (sum, topicId) => sum + (acc.minutesByParticipantTopic.get(`${participant.anonId}:${topicId}`) ?? 0),
+        0,
+      );
+      // Below 15 observed minutes the denominator is too unstable to describe
+      // as marks/hour; keep the metric honestly unavailable.
+      if (minutes < 15) continue;
+      const awarded = participant.finalAssessment
+        .filter((item) => exposedTopics.has(item.topicId))
+        .reduce((sum, item) => sum + item.awarded, 0);
+      participantRates.push(awarded / (minutes / 60));
+      unseenMarks += awarded;
+    }
+
     return {
       policyId: runner.policy.id,
       label: runner.policy.label,
@@ -562,10 +584,12 @@ export function runTournament(
       immediateScore: rate(acc.scoreSum, acc.scoreN),
       retention7d: rate(acc.retained7d, acc.delayedTotal),
       mistakeClosureRate: null,
-      unseenMarksPerHour: unseenMax > 0 ? round((unseenMarks / unseenMax)) : null,
-      unseenMarksTotal: unseenMax > 0 ? round(unseenMarks) : null,
+      unseenMarksPerHour: enough && participantRates.length
+        ? round(participantRates.reduce((sum, value) => sum + value, 0) / participantRates.length)
+        : null,
+      unseenMarksTotal: enough && participantRates.length ? round(unseenMarks) : null,
       hoursPractised: round(acc.hours * 100) / 100,
-    } as PolicyOutcome & { hoursPractised?: number };
+    } satisfies PolicyOutcome;
   });
 
   return outcomes.sort(

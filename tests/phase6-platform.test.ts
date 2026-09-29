@@ -322,7 +322,8 @@ describe("portability", () => {
       seedVersion: 1,
       now: NOW,
     });
-    expect(snap.formatVersion).toBe(1);
+    expect(snap.formatVersion).toBe(2);
+    expect(snap.cardRecords?.map((row) => row.id)).toEqual(["c1", "c2"]);
     expect(snap.cards.cards.length).toBe(2);
     expect(snap.attemptsCount).toBe(1);
     const text = JSON.stringify(snap);
@@ -335,6 +336,30 @@ describe("portability", () => {
   it("parsePortabilitySnapshot rejects bad JSON / non-revise", () => {
     expect(parsePortabilitySnapshot("not json").ok).toBe(false);
     expect(parsePortabilitySnapshot(JSON.stringify({ app: "other", formatVersion: 1 })).ok).toBe(false);
+  });
+
+  it("keeps legacy v1 exports readable but refuses to call them fully restorable", () => {
+    const legacy = {
+      app: "revise",
+      formatVersion: 1,
+      exportedAt: AT,
+      userId: "u",
+      cards: { formatVersion: 1, name: "legacy", exportedAt: AT, cards: [{ front: "Q", back: "A", kind: "basic", tags: [] }] },
+      attempts: [],
+      reviewLogs: [],
+      mistakes: [],
+      plannedSessions: [],
+      examDates: [],
+      gradePredictions: [],
+      gradeActuals: [],
+      interventionOutcomes: [],
+      settings: null,
+      streak: null,
+      seedVersion: 1,
+    };
+    const parsed = parsePortabilitySnapshot(JSON.stringify(legacy));
+    expect(parsed.snapshot?.formatVersion).toBe(1);
+    expect(parsed.warnings.join(" ")).toContain("full study-history restore is unavailable");
   });
 
   it("portabilityFilename is safe", () => {

@@ -37,18 +37,33 @@ import { Onboarding } from "./Onboarding";
 // above the loop — it places those same actions across the run-up to each
 // exam, derived from the same planner the store already maintains.
 
-const NAV: { href: string; label: string; Icon: LucideIcon; primary?: boolean }[] = [
+type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolean };
+
+const TODAY_NAV: NavItem[] = [
   { href: "/", label: "Today", Icon: TodayIcon, primary: true },
+];
+
+const STUDY_NAV: NavItem[] = [
   { href: "/review", label: "Review", Icon: ReviewIcon, primary: true },
   { href: "/study", label: "Study", Icon: ModesIcon, primary: true },
   { href: "/lesson", label: "Lessons", Icon: LessonsIcon, primary: true },
   { href: "/practice", label: "Practice", Icon: PracticeIcon, primary: true },
   { href: "/papers", label: "Past papers", Icon: PapersIcon, primary: true },
+];
+
+const MANAGEMENT_NAV: NavItem[] = [
   { href: "/readiness", label: "Readiness", Icon: ProgressIcon },
   { href: "/schedule", label: "Schedule", Icon: PlanIcon },
   { href: "/library", label: "Library", Icon: LibraryIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
+
+const NAV = [...TODAY_NAV, ...STUDY_NAV, ...MANAGEMENT_NAV];
+const DESKTOP_NAV_GROUPS = [
+  { label: null, items: TODAY_NAV },
+  { label: "Study tools", items: STUDY_NAV },
+  { label: "Plan & progress", items: MANAGEMENT_NAV },
+] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -65,18 +80,23 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
     : syncStatus.syncing
       ? { title: "Syncing your latest changes…", body: "You can keep revising while this finishes." }
-      : syncStatus.lastSyncError
-        ? { title: "Sync needs another attempt", body: syncStatus.lastSyncError }
-        : syncStatus.pending
+      : syncStatus.failed > 0
+        ? {
+            title: `${syncStatus.failed} change${syncStatus.failed === 1 ? "" : "s"} could not be synced`,
+            body: "Automatic retries stopped for these changes. Review them in Settings before retrying or discarding anything.",
+          }
+        : syncStatus.lastSyncError
+          ? { title: "Sync needs another attempt", body: syncStatus.lastSyncError }
+          : syncStatus.pending
           ? {
               title: `${syncStatus.pending} change${syncStatus.pending === 1 ? "" : "s"} waiting to sync`,
               body: "Your work is saved here. We’ll retry automatically, or you can try now.",
             }
           : null;
-  const SyncNoticeIcon = !syncStatus.online ? OfflineIcon : syncStatus.lastSyncError ? WarningIcon : SyncIcon;
+  const SyncNoticeIcon = !syncStatus.online ? OfflineIcon : syncStatus.failed > 0 || syncStatus.lastSyncError ? WarningIcon : SyncIcon;
   const syncNoticeClass = !syncStatus.online
     ? "bg-reviewsoft text-review"
-    : syncStatus.lastSyncError
+    : syncStatus.failed > 0 || syncStatus.lastSyncError
       ? "bg-dangersoft text-danger"
       : "bg-surface2 text-ink2";
 
@@ -152,25 +172,34 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <p className="text-[11px] text-ink3 mt-0.5">{settings.displayName}</p>
         </div>
-        <nav className="flex-1 px-2 space-y-0.5" aria-label="Main">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={isActive(item.href) ? "page" : undefined}
-              className={cx(
-                "flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-sm transition-colors",
-                isActive(item.href) ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
-              )}
-            >
-              {/* No colour of its own: the icon inherits the link's ink so the
-                  active item's icon sharpens with its label. */}
-              <item.Icon size={ICON_SIZE.md} aria-hidden className="shrink-0" />
-              <span className="flex-1">{item.label}</span>
-              {item.href === "/review" && dueCards.length > 0 ? (
-                <span className="text-[11px] font-semibold tabular-nums text-review">{dueCards.length}</span>
+        <nav className="flex-1 px-2" aria-label="Main">
+          {DESKTOP_NAV_GROUPS.map((group, groupIndex) => (
+            <div key={group.label ?? "today"} className={groupIndex ? "mt-4" : ""}>
+              {group.label ? (
+                <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3">
+                  {group.label}
+                </p>
               ) : null}
-            </Link>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                    className={cx(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-sm transition-colors",
+                      isActive(item.href) ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
+                    )}
+                  >
+                    <item.Icon size={ICON_SIZE.md} aria-hidden className="shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                    {item.href === "/review" && dueCards.length > 0 ? (
+                      <span className="text-[11px] font-semibold tabular-nums text-review">{dueCards.length}</span>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
         <div className="p-3 space-y-2">
@@ -217,9 +246,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="mt-0.5 leading-relaxed">{syncNotice.body}</p>
             </div>
             {syncStatus.online && !syncStatus.syncing ? (
-              <button type="button" onClick={() => void syncNow()} className="shrink-0 underline underline-offset-2">
-                {syncStatus.lastSyncError ? "Try again" : "Sync now"}
-              </button>
+              syncStatus.failed > 0 ? (
+                <Link href="/settings#sync-recovery" className="shrink-0 underline underline-offset-2">
+                  Review
+                </Link>
+              ) : (
+                <button type="button" onClick={() => void syncNow()} className="shrink-0 underline underline-offset-2">
+                  {syncStatus.lastSyncError ? "Try again" : "Sync now"}
+                </button>
+              )
             ) : null}
           </div>
         ) : null}
@@ -281,23 +316,31 @@ function StatusStrip() {
           {syncStatus.enabled
             ? syncStatus.syncing
               ? "Syncing…"
-              : syncStatus.online
-                ? syncStatus.pending
-                  ? `${syncStatus.pending} queued`
-                  : "Synced"
-                : "Offline — saved here"
+              : syncStatus.failed > 0
+                ? `${syncStatus.failed} need${syncStatus.failed === 1 ? "s" : ""} attention`
+                : syncStatus.online
+                  ? syncStatus.pending
+                    ? `${syncStatus.pending} queued`
+                    : "Synced"
+                  : "Offline — saved here"
             : "Local only — saved here"}
         </span>
         {syncStatus.enabled ? (
-          <button type="button" onClick={() => void syncNow()} className="underline hover:text-ink">
-            {syncStatus.syncing
-              ? "Syncing…"
-              : syncStatus.lastSyncError
-                ? "Try again"
-                : syncStatus.pending
-                  ? `${syncStatus.pending} queued`
-                  : "Sync now"}
-          </button>
+          syncStatus.failed > 0 ? (
+            <Link href="/settings#sync-recovery" className="underline hover:text-ink">
+              Review
+            </Link>
+          ) : (
+            <button type="button" onClick={() => void syncNow()} className="underline hover:text-ink">
+              {syncStatus.syncing
+                ? "Syncing…"
+                : syncStatus.lastSyncError
+                  ? "Try again"
+                  : syncStatus.pending
+                    ? `${syncStatus.pending} queued`
+                    : "Sync now"}
+            </button>
+          )
         ) : null}
       </div>
       {syncStatus.lastSyncError ? <p className="text-danger" role="status">{syncStatus.lastSyncError}</p> : null}

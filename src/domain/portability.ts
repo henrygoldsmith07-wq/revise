@@ -1,7 +1,5 @@
-import type { Id, IsoInstant, UserSettings } from "./types";
-import type { DeckExport } from "./types";
+import type { Card, DeckExport, Id, IsoInstant, LessonProgress, Paper, Question, UserSettings } from "./types";
 import { exportDeck } from "./deck-io";
-import type { Card } from "./types";
 import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
 
 // ---------------------------------------------------------------------------
@@ -22,13 +20,23 @@ import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
 // ---------------------------------------------------------------------------
 
 export interface PortabilitySnapshot {
-  formatVersion: 1;
+  formatVersion: 1 | 2;
   exportedAt: IsoInstant;
   app: "revise";
   userId: Id;
   /** Human label for the export file name, not an id. */
   exportedBy?: string;
   cards: DeckExport;
+  /**
+   * v2 raw card rows retain stable ids so review logs and FSRS history can be
+   * restored transactionally. v1 exports omitted these ids and are therefore
+   * readable but not eligible for a full-history restore.
+   */
+  cardRecords?: Card[];
+  /** Question records needed to preserve attempt/paper references. */
+  questions?: Question[];
+  papers?: Paper[];
+  lessonProgress?: LessonProgress | null;
   attemptsCount: number;
   attempts: unknown[];
   reviewLogsCount: number;
@@ -61,6 +69,9 @@ export interface PortabilityInput {
   userId: Id;
   displayName?: string;
   cards: Card[];
+  questions?: Question[];
+  papers?: Paper[];
+  lessonProgress?: LessonProgress | null;
   attempts: unknown[];
   reviewLogs: unknown[];
   mistakes: unknown[];
@@ -78,12 +89,16 @@ export interface PortabilityInput {
 export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySnapshot {
   const at = (input.now ?? new Date()).toISOString();
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     exportedAt: at,
     app: "revise",
     userId: input.userId,
     exportedBy: input.displayName,
     cards: exportDeck(input.cards, { name: `Revise export — ${input.userId}`, includeScheduling: true }),
+    cardRecords: input.cards,
+    questions: input.questions ?? [],
+    papers: input.papers ?? [],
+    lessonProgress: input.lessonProgress ?? null,
     attemptsCount: input.attempts.length,
     attempts: input.attempts,
     reviewLogsCount: input.reviewLogs.length,
@@ -104,8 +119,8 @@ export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySn
     streak: input.streak ?? null,
     seedVersion: input.seedVersion ?? 1,
     notes: [
-      "This is a complete, machine-readable export of your Revise data. Keep it private — it contains authored cards, study history and any recorded assessment outcomes.",
-      "Card content can be re-imported from the Library deck importer. Keep this full snapshot as the machine-readable archive for study history and recorded outcomes; full snapshot restore is not yet available.",
+      "This is a machine-readable Revise profile snapshot. Keep it private — it contains card content, study history and recorded assessment outcomes.",
+      "Format v2 preserves raw record ids so Settings can validate and transactionally restore this profile on another device.",
     ],
   };
 }
@@ -126,8 +141,8 @@ export function parsePortabilitySnapshot(text: string): ParsedPortability {
     return { ok: false, snapshot: null, warnings: ["Not valid JSON — is this a Revise export?"], counts: { cards: 0, attempts: 0, reviewLogs: 0, mistakes: 0 } };
   }
   const body = raw as Record<string, unknown>;
-  if (body.app !== "revise" || body.formatVersion !== 1) {
-    return { ok: false, snapshot: null, warnings: ["This does not look like a Revise export (missing app/formatVersion)."], counts: { cards: 0, attempts: 0, reviewLogs: 0, mistakes: 0 } };
+  if (body.app !== "revise" || (body.formatVersion !== 1 && body.formatVersion !== 2)) {
+    return { ok: false, snapshot: null, warnings: ["This does not look like a supported Revise export (missing/unsupported app or formatVersion)."], counts: { cards: 0, attempts: 0, reviewLogs: 0, mistakes: 0 } };
   }
   const snap = body as unknown as PortabilitySnapshot;
   // Grade-loop fields were added additively to format v1. Older v1 exports
@@ -137,6 +152,13 @@ export function parsePortabilitySnapshot(text: string): ParsedPortability {
   snap.gradePredictionsCount = snap.gradePredictions.length;
   snap.gradeActualsCount = snap.gradeActuals.length;
   if (!Array.isArray(snap.cards?.cards)) warnings.push("Cards deck missing — the rest of the export was read.");
+  if (snap.formatVersion === 1) {
+    warnings.push("Legacy v1 export: card ids were not preserved, so full study-history restore is unavailable. Deck import is still supported.");
+  } else {
+    if (!Array.isArray(snap.cardRecords)) warnings.push("v2 snapshot is missing raw card records required for full restore.");
+    if (!Array.isArray(snap.questions)) snap.questions = [];
+    if (!Array.isArray(snap.papers)) snap.papers = [];
+  }
   if (typeof snap.seedVersion !== "number") warnings.push("No seedVersion — restore may behave differently on a newer app.");
   return {
     ok: warnings.length === 0,
@@ -147,6 +169,41 @@ export function parsePortabilitySnapshot(text: string): ParsedPortability {
       attempts: Array.isArray(snap.attempts) ? snap.attempts.length : 0,
       reviewLogs: Array.isArray(snap.reviewLogs) ? snap.reviewLogs.length : 0,
       mistakes: Array.isArray(snap.mistakes) ? snap.mistakes.length : 0,
+    },
+  };
+}
+
+export interface PortabilityRestorePreview {
+  fullRestoreSupported: boolean;
+  reason: string | null;
+  counts: {
+    cards: number;
+    reviewLogs: number;
+    attempts: number;
+    mistakes: number;
+    plannedSessions: number;
+    examDates: number;
+    questions: number;
+    papers: number;
+  };
+}
+
+export function portabilityRestorePreview(snapshot: PortabilitySnapshot): PortabilityRestorePreview {
+  const fullRestoreSupported = snapshot.formatVersion >= 2 && Array.isArray(snapshot.cardRecords);
+  return {
+    fullRestoreSupported,
+    reason: fullRestoreSupported
+      ? null
+      : "This legacy export does not contain stable card ids, so restoring linked review history would be unsafe.",
+    counts: {
+      cards: snapshot.cardRecords?.length ?? snapshot.cards?.cards?.length ?? 0,
+      reviewLogs: Array.isArray(snapshot.reviewLogs) ? snapshot.reviewLogs.length : 0,
+      attempts: Array.isArray(snapshot.attempts) ? snapshot.attempts.length : 0,
+      mistakes: Array.isArray(snapshot.mistakes) ? snapshot.mistakes.length : 0,
+      plannedSessions: Array.isArray(snapshot.plannedSessions) ? snapshot.plannedSessions.length : 0,
+      examDates: Array.isArray(snapshot.examDates) ? snapshot.examDates.length : 0,
+      questions: snapshot.questions?.length ?? 0,
+      papers: snapshot.papers?.length ?? 0,
     },
   };
 }
