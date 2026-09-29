@@ -53,7 +53,9 @@ function remapOwned<T extends Owned>(rows: unknown[], sourceUserId: Id, targetUs
 
 function remapAnon<T extends AnonOwned>(rows: T[], sourceUserId: Id, targetUserId: Id): T[] {
   return rows.map((row) =>
-    row.anonId === sourceUserId ? { ...row, anonId: targetUserId } : row
+    row && typeof row === "object" && row.anonId === sourceUserId
+      ? { ...row, anonId: targetUserId }
+      : row
   );
 }
 
@@ -104,7 +106,10 @@ function snapshotOwnershipIssues(snapshot: PortabilitySnapshot): PersistenceIssu
     ...(snapshot.gradeActuals ?? []),
   ];
   for (const value of anonOwnedMeta) {
-    if (!value || typeof value !== "object") continue;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      issues.push(customIssue("meta", "?", "anonId", "missing or invalid snapshot owner"));
+      continue;
+    }
     const row = value as { id?: unknown; anonId?: unknown };
     if (row.anonId !== sourceUserId) {
       issues.push(customIssue(
@@ -117,7 +122,10 @@ function snapshotOwnershipIssues(snapshot: PortabilitySnapshot): PersistenceIssu
   }
 
   for (const value of snapshot.interventionOutcomes ?? []) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      issues.push(customIssue("meta", "?", "userId", "missing or invalid snapshot owner"));
+      continue;
+    }
     const row = value as { id?: unknown; userId?: unknown };
     if (row.userId !== sourceUserId) {
       issues.push(customIssue(
