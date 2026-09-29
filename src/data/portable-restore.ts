@@ -76,6 +76,46 @@ function customIssue(
   return { store, row, field, reason };
 }
 
+function ownershipIssues(
+  store: PersistenceIssue["store"],
+  rows: unknown[],
+  sourceUserId: Id,
+): PersistenceIssue[] {
+  return rows.flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const row = value as { userId?: unknown };
+    return row.userId === sourceUserId
+      ? []
+      : [customIssue(
+          store,
+          rowId(value),
+          "userId",
+          "does not match the snapshot owner",
+        )];
+  });
+}
+
+function snapshotOwnershipIssues(snapshot: PortabilitySnapshot): PersistenceIssue[] {
+  const sourceUserId = snapshot.userId;
+  const issues: PersistenceIssue[] = [];
+  const ownedStores: Array<[PersistenceIssue["store"], unknown[]]> = [
+    ["cards", snapshot.cardRecords ?? []],
+    ["reviewLogs", snapshot.reviewLogs ?? []],
+    ["attempts", snapshot.attempts ?? []],
+    ["mistakes", snapshot.mistakes ?? []],
+    ["papers", snapshot.papers ?? []],
+    ["plannedSessions", snapshot.plannedSessions ?? []],
+    ["examDates", snapshot.examDates ?? []],
+  ];
+  for (const [store, rows] of ownedStores) {
+    issues.push(...ownershipIssues(store, rows, sourceUserId));
+  }
+  if (snapshot.settings) issues.push(...ownershipIssues("settings", [snapshot.settings], sourceUserId));
+  if (snapshot.streak) issues.push(...ownershipIssues("streak", [snapshot.streak], sourceUserId));
+  if (snapshot.lessonProgress) issues.push(...ownershipIssues("lessonProgress", [snapshot.lessonProgress], sourceUserId));
+  return issues;
+}
+
 function buildRows(snapshot: PortabilitySnapshot, targetUserId: Id) {
   const sourceUserId = snapshot.userId;
   const cards = remapOwned<Card>(snapshot.cardRecords ?? [], sourceUserId, targetUserId);
@@ -122,6 +162,11 @@ export async function validatePortableRestore(
       issues: [customIssue("cards", "snapshot", "formatVersion", preview.reason ?? "Full restore is unavailable.")],
       counts: preview.counts,
     };
+  }
+
+  const ownership = snapshotOwnershipIssues(snapshot);
+  if (ownership.length) {
+    return { ok: false, issues: ownership, counts: preview.counts };
   }
 
   const rows = buildRows(snapshot, targetUserId);
