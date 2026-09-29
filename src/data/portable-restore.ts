@@ -98,6 +98,36 @@ function ownershipIssues(
 function snapshotOwnershipIssues(snapshot: PortabilitySnapshot): PersistenceIssue[] {
   const sourceUserId = snapshot.userId;
   const issues: PersistenceIssue[] = [];
+
+  const anonOwnedMeta = [
+    ...(snapshot.gradePredictions ?? []),
+    ...(snapshot.gradeActuals ?? []),
+  ];
+  for (const value of anonOwnedMeta) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as { id?: unknown; anonId?: unknown };
+    if (row.anonId !== sourceUserId) {
+      issues.push(customIssue(
+        "meta",
+        typeof row.id === "string" ? row.id : "?",
+        "anonId",
+        "does not match the snapshot owner",
+      ));
+    }
+  }
+
+  for (const value of snapshot.interventionOutcomes ?? []) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const row = value as { id?: unknown; userId?: unknown };
+    if (row.userId !== sourceUserId) {
+      issues.push(customIssue(
+        "meta",
+        typeof row.id === "string" ? row.id : "?",
+        "userId",
+        "does not match the snapshot owner",
+      ));
+    }
+  }
   const ownedStores: Array<[PersistenceIssue["store"], unknown[]]> = [
     ["cards", snapshot.cardRecords ?? []],
     ["reviewLogs", snapshot.reviewLogs ?? []],
