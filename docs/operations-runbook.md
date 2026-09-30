@@ -79,22 +79,24 @@ GitHub repository secrets are exactly:
   trusted certificate. Never disable certificate verification.
 
 Provision two distinct confirmed password users dedicated to the suite, with
-empty settings/streak/lesson-progress rows. The suite creates and cleans up only
-its fixtures; a failed cleanup must be repaired before the next run. Apply
-`supabase/schema.sql`, including its keyset indexes, to staging first. Do not use
+empty settings/streak/lesson-progress rows. The suite removes active study fixtures; permanent deletion markers and deleted
+history envelopes intentionally remain in those dedicated accounts. A failed
+active-fixture cleanup must be repaired before the next run. Apply
+`supabase/schema.sql`, including the continuity tables, ordering/deletion triggers and indexes, to staging first. Do not use
 production users or a production database. No service-role key is needed.
 The database connection only reads catalogs; all fixture writes use the anon
 key and the two users' JWTs, so they exercise RLS.
 
 `npm run test:staging` checks all required secrets, deployed tables, column types,
 primary keys, owner policies, RLS flags, enabled insert/update triggers and
-keyset indexes. Live tests independently authenticate A, B and a duplicate A
+keyset/change-sequence indexes, terminal-history permissions and continuity
+function definitions. Live tests independently authenticate A, B and a duplicate A
 client; test all sync tables for cross-account read/insert/update/delete and
 ownership rewrite denial; reject stale and equal writes; clamp future timestamps;
 page equal-timestamp rows; and run the actual app sync across independent
 IndexedDB devices with namespaced curriculum ids. A mismatch cannot drain a
 queue. Failure labels distinguish infrastructure, authentication, schema-drift,
-RLS and application-sync. Always-uploaded staging JSON artifacts preserve
+RLS, sync-algorithm, timestamp-ordering, ownership and deletion-tombstone. Always-uploaded staging JSON artifacts preserve
 schema and test diagnostics. Credentials never appear in those artifacts.
 
 A local missing-credential check is evidence that the runner fails closed, not
@@ -111,3 +113,31 @@ Mixed-owner local data needs an ownership-aware export/recovery before copying;
 choosing a separate profile remains available. A browser reset affects only the
 active profile database; account databases are not a remote backup of unsynced
 metadata. Export before clearing data.
+
+
+## Continuity rollout and pre-release gate
+
+1. Apply the additive `supabase/schema.sql` migration to staging. Existing study
+   rows retain their schemas; pre-migration hard deletions cannot be reconstructed.
+2. Run **Revise pre-release** at the exact candidate ref. It requires `verify`,
+   Chromium journeys and the reusable `revise-staging-sync` job, with all seven
+   secrets. Failures stop the workflow; missing secrets are failures. Configure
+   release protection to require its checks before production promotion. Adding
+   a workflow file does not configure GitHub branch protection automatically.
+3. Apply the verified migration to the production database before deploying the
+   v2 client. Without new tables/RPCs, sync fails visibly and retains offline work.
+4. Keep tombstones permanently while stale clients may exist. Never clear them
+   to repair a stuck queue: export diagnostics, resolve malformed/mixed-owner rows
+   and retry. A restored/imported deleted record needs a new ID.
+
+`tests/continuity-sql.test.ts` executes the real migration twice in PGlite and
+checks RLS, terminal intent, frozen prediction fields and the deployed-catalog
+checker. It is local SQL evidence, not a substitute for concurrent live Supabase
+transactions, PostgREST behaviour or runner network readiness. New continuity
+cursors use server commit-order sequence numbers; old study tables retain their
+existing timestamp bounds. Server deadlock/transport errors retain mutations
+for retry.
+
+History corruption now uses the existing recovery screen instead of feeding
+calibration or hanging boot. Download the raw recovery copy before repair.
+History load errors never manufacture a replacement result or attestation.

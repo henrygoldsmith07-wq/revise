@@ -1,3 +1,8 @@
+import { HISTORY_KINDS, validateHistoryValue, validateHistoryRecord, historyRecordId, historyStorageKey, mergeHistoryRecord } from "@/domain/learner-history";
+import { tombstoneKey, wireTombstoneKey, validateTombstone } from "@/domain/sync-tombstone";
+import { syncWireIdValue } from "./sync-contract";
+import { isSupabaseConfigured } from "./supabase";
+import type { OutboxItem } from "@/domain/types";
 import type {
   Attempt,
   Card,
@@ -207,6 +212,20 @@ export async function validatePortableRestore(
     return { ok: false, issues: ownership, counts: preview.counts };
   }
 
+  try {
+    for (const kind of HISTORY_KINDS) {
+      const values = kind === "paperOutcomes" ? snapshot.paperOutcomes ?? [] : snapshot[kind] ?? [];
+      if (!Array.isArray(values)) throw new Error("Malformed learner history.");
+      for (const value of values) validateHistoryValue(kind, value, snapshot.userId);
+    }
+    for (const marker of snapshot.deletions ?? []) validateTombstone(marker,snapshot.userId);
+    for (const marker of snapshot.learnerHistoryDeletions ?? []) {
+      if (!validateHistoryRecord(marker,snapshot.userId).deleted) throw new Error("Expected history deletion.");
+    }
+  } catch (error) {
+    return {ok:false,issues:[customIssue("meta","history","ownership",error instanceof Error ? error.message : "Malformed history.")],counts:preview.counts};
+  }
+
   const rows = buildRows(snapshot, targetUserId);
   const issues = validatePersistedStores({
     cards: rows.cards,
@@ -321,6 +340,22 @@ export async function restorePortableSnapshot(
   );
 
   try {
+    const meta = tx.objectStore("meta");
+    // Imported terminal markers and existing device markers both suppress IDs.
+    for (const raw of snapshot.deletions ?? []) {
+      if (raw.wireOnly && snapshot.userId !== targetUserId) continue; // wire hashes belong to the source account
+      const marker = {...validateTombstone(raw,snapshot.userId),userId:targetUserId};
+      await meta.put({key:marker.wireOnly ? wireTombstoneKey(marker.entity,marker.id) : tombstoneKey(marker.entity,marker.id),value:marker});
+    }
+    for (const raw of snapshot.learnerHistoryDeletions ?? []) {
+      const marker = {...validateHistoryRecord(raw,snapshot.userId),userId:targetUserId};
+      await meta.put({key:historyStorageKey(marker.id),value:marker});
+    }
+    for (const store of ["cards","reviewLogs","questions","attempts","mistakes","papers","plannedSessions","examDates"] as const) {
+      for (const row of rows[store]) {
+        if (await meta.get(tombstoneKey(store,row.id)) || await meta.get(wireTombstoneKey(store,syncWireIdValue(targetUserId,row.id)))) throw new Error("Restore includes a deleted id. Import it as a new record instead.");
+      }
+    }
     for (const store of ["cards", "reviewLogs", "attempts", "mistakes", "papers", "plannedSessions", "examDates"] as const) {
       await deleteOwnedRows(store, targetUserId, tx.objectStore(store) as never);
     }
@@ -352,7 +387,6 @@ export async function restorePortableSnapshot(
       ...(rows.lessonProgress ? [tx.objectStore("lessonProgress").put(rows.lessonProgress)] : []),
     ]);
 
-    const meta = tx.objectStore("meta");
     const mergeMeta = async <T extends Record<string, unknown>>(
       key: string,
       incoming: T[],
@@ -360,6 +394,16 @@ export async function restorePortableSnapshot(
     ) => {
       const current = await meta.get(key);
       const existing = Array.isArray(current?.value) ? (current.value as T[]) : [];
+      const kind = HISTORY_KINDS.find(kind => REVISE_META_KEYS[kind] === key)!;
+      for (const value of incoming) {
+        validateHistoryValue(kind,value,targetUserId);
+        const stored = (await meta.get(historyStorageKey(historyRecordId(kind,String(value.id)))))?.value;
+        if (stored) {
+          const old = validateHistoryRecord(stored,targetUserId);
+          if (old.deleted) throw new Error("Restore includes deleted learner history.");
+          mergeHistoryRecord(old,{...old,value,lamport:old.lamport+1});
+        }
+      }
       await meta.put({ key, value: [...existing.filter((row) => !belongsToTarget(row)), ...incoming] });
     };
 
@@ -394,6 +438,26 @@ export async function restorePortableSnapshot(
       interventions,
       (row) => row.userId === targetUserId,
     );
+
+    await mergeMeta(REVISE_META_KEYS.paperOutcomes, remapOwned<Record<string,unknown> & Owned>(snapshot.paperOutcomes ?? [],snapshot.userId,targetUserId), row => row.userId === targetUserId);
+    // Old exports have no continuity fields. Existing markers remain durable.
+    // Requeue imported study rows and every deletion in the same restore commit.
+    if (isSupabaseConfigured && targetUserId !== "local") {
+      const queue = async (entity: OutboxItem["entity"], op: OutboxItem["op"], payload: unknown) => {
+        await outbox.put({id:crypto.randomUUID(),entity,op,payload,ownerId:targetUserId,queuedAt:new Date().toISOString(),attempts:0,idempotencyKey:crypto.randomUUID()});
+      };
+      for (const store of ["cards","reviewLogs","attempts","mistakes","papers","plannedSessions","examDates"] as const) for (const row of rows[store]) await queue(store,"upsert",row);
+      for (const entry of await meta.getAll()) {
+        if (entry.key.startsWith("revise.deleted.v1:")) {
+          const marker=validateTombstone(entry.value,targetUserId); await queue(marker.entity,"delete",marker);
+        } else if (entry.key.startsWith("revise.historyRecord.v1:")) {
+          const marker=validateHistoryRecord(entry.value,targetUserId);
+          if (marker.deleted) await queue("learnerRecords","upsert",marker);
+        }
+      }
+    }
+    await meta.delete(`revise.changeCursor.v1:learner_records::user:${targetUserId}`);
+    await meta.delete(`revise.changeCursor.v1:sync_tombstones::user:${targetUserId}`);
 
     // A restored profile must not resume a pre-restore sync cursor. The next
     // pull starts from the beginning and reconciles deliberately.

@@ -1,0 +1,144 @@
+{
+  "topic": "waves",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:young-equation-form",
+      "context": "physics-depth:young-equation-form:fringe-spacing",
+      "move": "state the Young double-slit fringe relation and each symbol's meaning",
+      "prompt": "State the Young double-slit equation for fringe spacing and define each symbol.",
+      "marks": 2,
+      "scheme": [
+        "w = λD/d",
+        "w is the fringe spacing, λ the wavelength, D the slit-to-screen distance, d the slit separation"
+      ],
+      "answer": "For Young's double slits, w = λD/d, where w is the fringe spacing, λ the wavelength of light, D the distance from slits to screen and d the centre-to-centre slit separation."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:grating-equation-form",
+      "context": "physics-depth:grating-equation-form:order-max",
+      "move": "state the grating equation and the condition that bounds the visible order",
+      "prompt": "State the diffraction grating equation, and explain what bounds the highest visible order.",
+      "marks": 3,
+      "scheme": [
+        "nλ = d sinθ, with n the order, λ the wavelength, d the slit spacing, θ the diffraction angle",
+        "Since sinθ cannot exceed 1, n ≤ d/λ",
+        "The highest visible order is the largest integer n with nλ ≤ d"
+      ],
+      "answer": "The grating equation is nλ = d sinθ. Because sinθ ≤ 1, the order is bounded by n ≤ d/λ; the highest visible order is the largest whole number of wavelengths that fit into the slit spacing."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:fringe-why-lost",
+      "context": "physics-depth:fringe-why-lost:single-slit-envelope",
+      "move": "explain why higher grating orders can be missing even when the equation is satisfied",
+      "prompt": "A grating produces a bright second-order maximum at some angle, but no fourth-order maximum is seen at the same wavelength. Give a reason the fourth order can be absent even though nλ ≤ d is satisfied.",
+      "marks": 3,
+      "scheme": [
+        "The single-slit diffraction envelope of each grating slit can have a minimum where the interference order would appear",
+        "If the fourth-order angle coincides with a minimum of the envelope, the order is suppressed",
+        "The interference condition is necessary but the envelope also modulates the intensity"
+      ],
+      "answer": "Each grating slit acts as a single slit whose diffraction envelope modulates the interference pattern. If the fourth-order interference maximum falls at (or near) a minimum of that single-slit envelope, the order is effectively invisible even though nλ = d sinθ is satisfied."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:white-light-grating",
+      "context": "physics-depth:white-light-grating:zeroth-order-white",
+      "move": "explain why the zeroth order of a grating lit by white light is white while other orders show spectra",
+      "prompt": "White light falls on a diffraction grating. Explain why the central (zeroth-order) maximum is white while the first and higher orders are spread into spectra.",
+      "marks": 3,
+      "scheme": [
+        "At zeroth order sinθ = 0 regardless of λ, so all wavelengths coincide in one direction",
+        "For n ≥ 1, sinθ = nλ/d grows with wavelength, so red deviates more than blue",
+        "The superposition of all colours at θ = 0 re-forms white; separated elsewhere, they resolve into a spectrum"
+      ],
+      "answer": "The zeroth order satisfies nλ = d sinθ with n = 0, so every wavelength emerges at θ = 0 and the colours recombine to white. In nonzero orders the angle depends on λ — red diffracts further than blue — so the colours separate into spectra."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:fringe-spacing-measure",
+      "context": "physics-depth:fringe-spacing-measure:ten-fringes",
+      "move": "convert a many-fringe measurement into a single spacing and solve for wavelength",
+      "prompt": "In a Young's double-slit experiment, the distance across 10 fringe spacings is 24 mm. The slits are 0.40 mm apart and the screen is 2.0 m away. Calculate the wavelength of the light.",
+      "marks": 3,
+      "scheme": [
+        "One fringe spacing w = 24 mm/10 = 2.4 mm = 2.4×10⁻³ m",
+        "w = λD/d rearranges to λ = wd/D",
+        "λ = (2.4×10⁻³ × 0.40×10⁻³)/2.0 = 4.8×10⁻⁷ m (480 nm)"
+      ],
+      "answer": "Ten fringe spacings span 24 mm, so w = 2.4 mm. Then λ = wd/D = (2.4×10⁻³ × 0.40×10⁻³)/2.0 = 4.8×10⁻⁷ m — a 480 nm blue-green light."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:grating-angle-swap",
+      "context": "physics-depth:grating-angle-swap:second-order",
+      "move": "apply the grating equation to a second-order angle to find the wavelength",
+      "prompt": "A grating has 300 lines per mm. The second-order maximum is observed at 26.0° (sin 26.0° = 0.438). Calculate the wavelength of the light.",
+      "marks": 3,
+      "scheme": [
+        "d = 1/(300 per mm) = 3.33×10⁻³ mm = 3.33×10⁻⁶ m",
+        "λ = d sinθ/n = (3.33×10⁻⁶ × 0.438)/2",
+        "= 7.3×10⁻⁷ m (730 nm)"
+      ],
+      "answer": "The grating spacing is d = 1/(300 mm⁻¹) = 3.33×10⁻⁶ m. The second order gives λ = d sinθ/n = (3.33×10⁻⁶ × 0.438)/2 ≈ 7.3×10⁻⁷ m, a red light near 730 nm."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:slit-density-fallacy",
+      "context": "physics-depth:slit-density-fallacy:spacing-vs-lines",
+      "move": "reject reading lines-per-mm as the grating spacing d",
+      "prompt": "A student uses a 500 lines per mm grating with d = 500 in the grating equation. Identify the error and state the correct value of d.",
+      "marks": 2,
+      "scheme": [
+        "d is the spacing between adjacent slits, the reciprocal of the lines per unit length",
+        "d = 1/500 mm = 2.0×10⁻³ mm = 2.0×10⁻⁶ m"
+      ],
+      "answer": "The 500 is a line density, not a spacing. The slit spacing is its reciprocal: d = 1/(500 mm⁻¹) = 2.0×10⁻⁶ m. Substituting 500 directly is wrong by nine orders of magnitude."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:fringe-narrowing-fallacy",
+      "context": "physics-depth:fringe-narrowing-fallacy:distance-change",
+      "move": "reject the claim that moving the screen away reduces fringe spacing",
+      "prompt": "A student claims that pulling the screen further from the slits makes the fringes closer together because the pattern spreads over a larger area. Explain why this is wrong, and state what actually happens to the spacing.",
+      "marks": 2,
+      "scheme": [
+        "For fixed wavelength and slit separation, w = λD/d gives fringe spacing proportional to screen distance D",
+        "Increasing D therefore increases the spacing; spreading over a larger screen area does not imply narrower fringes"
+      ],
+      "answer": "For fixed λ and d, w = λD/d makes fringe spacing proportional to D. Moving the screen further away increases the spacing, so the fringes become wider. The illumination may become fainter as the light spreads; brightness and fringe spacing are different quantities."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:cd-track-spacing",
+      "context": "physics-depth:cd-track-spacing:laser-reflection",
+      "move": "transfer the grating equation to reflected laser light off a CD to find track spacing",
+      "prompt": "A laser of wavelength 670 nm reflects from a CD and a strong first-order reflection appears at 55° to the normal (sin 55° = 0.819). The pits act as a reflection grating. Estimate the track spacing of the disc.",
+      "marks": 3,
+      "scheme": [
+        "Treat the tracks as reflection grating slits: nλ = d sinθ with n = 1",
+        "d = λ/sinθ = 670×10⁻⁹/0.819",
+        "= 8.2×10⁻⁷ m (about 0.82 μm)"
+      ],
+      "answer": "The regularly spaced tracks act as a reflection grating. The first order gives d = λ/sinθ = 670×10⁻⁹/0.819 ≈ 8.2×10⁻⁷ m — a track spacing of roughly 0.8 μm, small enough to store data densely."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:grating-order-energy",
+      "context": "physics-depth:grating-order-energy:photon-count",
+      "move": "combine the grating equation with photon energy to find the energy delivered per second at a maximum",
+      "prompt": "Laser light of wavelength 633 nm, of power 3.0 mW, passes through a grating of spacing 2.00×10⁻⁶ m. Calculate the angle of the first-order maximum, and the number of photons per second passing through it, given that 40% of the beam's energy reaches the first order. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "sinθ = λ/d = 633×10⁻⁹/2.00×10⁻⁶ = 0.317, θ ≈ 18.5°",
+        "Photon energy E = hc/λ = (6.63×10⁻³⁴ × 3.00×10⁸)/633×10⁻⁹ = 3.14×10⁻¹⁹ J",
+        "Power in first order = 0.40 × 3.0 mW = 1.2×10⁻³ W",
+        "Photons per second = 1.2×10⁻³/3.14×10⁻¹⁹ ≈ 3.8×10¹⁵"
+      ],
+      "answer": "The first order lies at sinθ = λ/d = 0.317, θ ≈ 18.5°. Each 633 nm photon carries E = hc/λ = 3.14×10⁻¹⁹ J; 40% of 3.0 mW is 1.2×10⁻³ W, so about 3.8×10¹⁵ photons per second reach the first order."
+    }
+  ]
+}

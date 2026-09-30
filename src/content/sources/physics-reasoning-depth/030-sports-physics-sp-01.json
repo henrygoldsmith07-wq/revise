@@ -1,0 +1,195 @@
+{
+  "topic": "sports-physics",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:projectile-independence",
+      "context": "physics-depth:projectile-independence:component-split",
+      "move": "state the independence of horizontal and vertical projectile motion and its condition",
+      "prompt": "State the principle that lets a projectile's motion be treated as two independent motions, and the condition under which it holds.",
+      "marks": 3,
+      "scheme": [
+        "Horizontal and vertical components are analysed separately",
+        "Vertical motion is uniform acceleration g downward; horizontal motion is uniform velocity",
+        "The split is exact only when air resistance is negligible"
+      ],
+      "answer": "A projectile's velocity splits into a horizontal part and a vertical part that do not affect each other: the vertical motion accelerates downward at g while the horizontal motion coasts. The division is exact only when drag is negligible — the model's foundational assumption."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:range-symmetry",
+      "context": "physics-depth:range-symmetry:complementary-angles",
+      "move": "state the equal-range property of complementary launch angles and its assumptions",
+      "prompt": "State the relationship between launch angles that give equal range for the same speed on level ground, and the two assumptions behind it.",
+      "marks": 3,
+      "scheme": [
+        "Angles θ and (90° − θ) give the same range",
+        "Requires launch and landing at the same height",
+        "Requires negligible air resistance and the same launch speed"
+      ],
+      "answer": "For equal launch and landing heights with no air resistance, angles θ and 90°−θ share a range because R = u²sin2θ/g is unchanged when θ → 90°−θ. Same speed, level ground, no drag: three quiet assumptions that real sport routinely violates."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:drag-asymmetry",
+      "context": "physics-depth:drag-asymmetry:real-trajectory",
+      "move": "explain how drag degrades the symmetric-parabola model in sporting flight",
+      "prompt": "A javelin thrown at 45° lands considerably shorter than the range formula predicts, and its descent is steeper than its ascent. Explain both discrepancies.",
+      "marks": 3,
+      "scheme": [
+        "Drag continuously removes horizontal velocity, so the average horizontal speed over the descent is lower",
+        "The flight becomes asymmetric: the descent is compressed into a shorter horizontal distance than a parabola allows",
+        "The optimal launch angle drops below 45° because the early, fast part of flight suffers most from drag"
+      ],
+      "answer": "Drag taxes the fast early part of flight hardest, bleeding horizontal velocity all the way. Over the descent the javelin carries less horizontal speed than the parabola assumes, so it covers less ground falling than rising — an asymmetric, steeper descent, and a real optimum launch below the vacuum's 45°."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:magnus-effect",
+      "context": "physics-depth:magnus-effect:spin-curve",
+      "move": "explain how spin produces a side force through asymmetric pressure",
+      "prompt": "A football struck with side spin curves in flight. Explain the Magnus effect in terms of the airflow over the spinning ball.",
+      "marks": 3,
+      "scheme": [
+        "Spin drags a boundary layer of air around one side faster than the other",
+        "Faster flow means lower pressure (Bernoulli) on one side",
+        "The pressure difference gives a net sideways force, curving the trajectory"
+      ],
+      "answer": "The spinning surface carries air around one flank, speeding the flow there while slowing it on the opposite side. The asymmetric velocity means asymmetric pressure — lower where the flow is faster — and the pressure imbalance pushes the ball sideways. The same physics that bends a free kick lifts a topspin drive short of the baseline."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:projectile-components-compute",
+      "context": "physics-depth:projectile-components-compute:free-throw",
+      "move": "resolve a launch into components and track each independently",
+      "prompt": "A basketball leaves the hands at 7.0 m s⁻¹ at 55° above horizontal, 2.0 m below the 3.05 m rim. Calculate the time to reach rim height and the horizontal distance travelled in that time, neglecting drag.",
+      "marks": 4,
+      "scheme": [
+        "Components: vₓ = 7.0 cos55° = 4.02 m s⁻¹; v_y = 7.0 sin55° = 5.74 m s⁻¹",
+        "Vertical: Δy = +1.05 m = 5.74t − 4.905t² → 4.905t² − 5.74t + 1.05 = 0",
+        "t = [5.74 ± √(32.9 − 20.6)]/9.81 = (5.74 − 3.51)/9.81 = 0.227 s (rising branch) or 0.94 s (falling)",
+        "Horizontal distance at 0.94 s: 4.02 × 0.94 = 3.8 m"
+      ],
+      "answer": "The launch splits into 4.02 m s⁻¹ horizontal and 5.74 m s⁻¹ vertical. Requiring 1.05 m of rise gives t = 0.23 s on the way up and 0.94 s on the way down — the shooter needs the descending branch — and the ball covers 4.02×0.94 ≈ 3.8 m horizontally by then. Every jump shot is solved by this quadratic."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:drag-velocity-budget",
+      "context": "physics-depth:drag-velocity-budget:compare-models",
+      "move": "compare a vacuum-model prediction with an observed range to quantify drag",
+      "prompt": "A shot put released at 13 m s⁻¹ at 40° travels 16.5 m. The vacuum model predicts R = u²sin2θ/g. Calculate the predicted range and the percentage shortfall attributable to drag.",
+      "marks": 4,
+      "scheme": [
+        "Predicted: R = 13²×sin80°/9.81 = 169×0.985/9.81 = 17.0 m",
+        "Observed: 16.5 m",
+        "Shortfall: 17.0 − 16.5 = 0.5 m",
+        "Percentage: 0.5/17.0 ≈ 2.9% — modest, because a shot put is dense and slow"
+      ],
+      "answer": "The vacuum model gives 17.0 m; the throw measured 16.5 m — a 0.5 m or ~3% shortfall. A heavy, slow projectile sheds only a few per cent to drag, which is why shot put coaches can trust the parabola while discus coaches cannot."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:horizontal-velocity-drag-fallacy",
+      "context": "physics-depth:horizontal-velocity-drag-fallacy:constant-vx",
+      "move": "reject the constant-horizontal-velocity assumption when drag is significant",
+      "prompt": "A student analyses a badminton smash with uₓ constant throughout. Explain why the model fails badly for a shuttlecock but would be acceptable for a shot put.",
+      "marks": 3,
+      "scheme": [
+        "A shuttlecock is light with a large drag area: drag decelerates it rapidly",
+        "Its horizontal velocity decays quickly toward a small terminal value — nowhere near constant",
+        "A shot put is dense and slow: drag is a small fraction of the flight, so the constant-vₓ model is a good approximation"
+      ],
+      "answer": "The shuttlecock's extreme drag-to-mass ratio strangles its horizontal velocity within metres — it nearly stops horizontally and drops steeply, so uₓ constant is hopeless. The shot put, dense and slow, loses only a few per cent to drag, so the idealisation survives. The same model, two different regimes: the physics is in knowing when."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:forty-five-always-fallacy",
+      "context": "physics-depth:forty-five-always-fallacy:optimum-angle",
+      "move": "reject 45° as a universal optimum in real sporting conditions",
+      "prompt": "A coach tells athletes to always launch at 45° for maximum distance. Give two distinct reasons this is wrong in real sport.",
+      "marks": 3,
+      "scheme": [
+        "Drag makes the optimum angle lower than 45° (the fast early flight is penalised)",
+        "Launch height above landing (or release mechanics) shifts the optimum — releasing above the ground favours a flatter angle",
+        "So the true optimum is sport- and condition-specific, found by experiment"
+      ],
+      "answer": "Two independent corrections: with drag, the optimum drops below 45° because drag punishes the fast early flight a high launch creates; and whenever release height exceeds landing height — as in javelin or football — the flatter trajectory wins again. The 45° rule is a vacuum curiosity, not a coaching instruction."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:clear-the-bar",
+      "context": "physics-depth:clear-the-bar:penalty-arc",
+      "move": "compute whether a projectile clears a barrier by solving the trajectory at a horizontal position",
+      "prompt": "A penalty kick is struck at 19 m s⁻¹ at 30° from 11 m in front of a 2.44 m goal crossbar, neglecting drag and keeper. Calculate the ball's height when it reaches the goal line and state whether it scores.",
+      "marks": 4,
+      "scheme": [
+        "vₓ = 19 cos30° = 16.5 m s⁻¹; v_y = 19 sin30° = 9.5 m s⁻¹",
+        "Time to goal line: t = 11/16.5 = 0.667 s",
+        "Height: y = 9.5×0.667 − 4.905×0.667² = 6.33 − 2.18 = 4.15 m",
+        "4.15 m > 2.44 m — the ball sails over the bar"
+      ],
+      "answer": "The ball reaches the goal line at t = 11/16.5 = 0.667 s, at height 9.5×0.667 − 4.905×0.667² ≈ 4.2 m. That clears the 2.44 m bar by 1.7 m — a row-Z miss: the trajectory evaluated at the exact position that matters."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:skeleton-luge-model",
+      "context": "physics-depth:skeleton-luge-model:slope-projectile",
+      "move": "transfer projectile reasoning to a launch from a slope landing on a slope",
+      "prompt": "A ski jumper leaves the ramp at 26 m s⁻¹ along a 15° downward slope from a ramp already 3.0 m above the landing slope, which falls at 35°. Set up (do not fully solve) the equations whose solution gives the flight time, explaining how the slope geometry enters.",
+      "marks": 4,
+      "scheme": [
+        "Resolve launch velocity: horizontal 26cos15°, vertical −26sin15°",
+        "The landing condition is no longer y = 0: the slope means y_land = −(x − x₀) tan35° relative to launch",
+        "Both x(t) and y(t) are substituted into that linear slope condition",
+        "The resulting quadratic in t is solved for the positive root — the geometry enters through the slope constraint"
+      ],
+      "answer": "The launch velocity resolves to 25.1 m s⁻¹ horizontal and −6.7 m s⁻¹ vertical (downward). Unlike level-ground problems, the landing point is unknown because the ground itself falls away: the landing condition is y(t) = 3.0 − x(t)tan35°. Substituting the kinematic x(t) and y(t) into that line gives one quadratic whose positive root is the flight time — the slope geometry is the boundary condition."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:stadium-design-wind",
+      "context": "physics-depth:stadium-design-wind:tailwind-geometry",
+      "move": "transfer projectile analysis to how a tailwind alters the effective launch frame",
+      "prompt": "A 3.0 m s⁻¹ tailwind blows during a long-jump takeoff at 9.5 m s⁻¹ at 20°. Explain, in the ground frame, how the wind affects each component of the flight, and estimate the change in range if the jump lasts 0.75 s.",
+      "marks": 4,
+      "scheme": [
+        "Vertical motion is untouched by the horizontal wind: same rise, same flight time",
+        "The horizontal motion gains a relative 3.0 m s⁻¹ boost over the flight",
+        "Extra distance ≈ 3.0 × 0.75 = 2.3 m beyond the still-air range",
+        "This is why wind limits exist for record purposes"
+      ],
+      "answer": "The horizontal wind does not change the vertical motion: the vertical component, rise and flight time remain those of the still-air jump. It adds 3.0 m s⁻¹ to the horizontal component, so over 0.75 s the extra distance is 3.0×0.75 ≈ 2.3 m. That extra distance is why wind limits are used for record purposes."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:projectile-energy-audit",
+      "context": "physics-depth:projectile-energy-audit:launch-and-landing",
+      "move": "combine kinematics with energy accounting across a projectile flight",
+      "prompt": "A tennis ball is served at 50 m s⁻¹ at 8° below the horizontal from 2.8 m height. Calculate its speed on striking the court at the base line, neglecting drag and spin, and verify the answer energy-wise.",
+      "marks": 4,
+      "scheme": [
+        "vₓ = 50cos8° = 49.5 m s⁻¹; v_y0 = −50sin8° = −6.96 m s⁻¹",
+        "Vertical at ground (2.8 m below): v_y² = 6.96² + 2×9.81×2.8 = 48.4 + 54.9 = 103.3 → v_y = 10.2 m s⁻¹",
+        "Speed = √(49.5² + 10.2²) = √(2450 + 104) = 50.5 m s⁻¹",
+        "Energy check: ½v² = ½v₀² + gh → v² = 2500 + 54.9 = 2554.9, v = 50.5 ✓"
+      ],
+      "answer": "The vertical component grows from 6.96 m s⁻¹ to 10.2 m s⁻¹ over the 2.8 m drop while the horizontal 49.5 m s⁻¹ coasts, giving 50.5 m s⁻¹ on impact. Energy confirms it: v = √(50² + 2×9.81×2.8) = 50.5 m s⁻¹ — the ball arrives faster than it left, gravity's interest added."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:cycling-power-drag",
+      "context": "physics-depth:cycling-power-drag:equilibrium-speed",
+      "move": "combine drag modelling with power to find an equilibrium speed",
+      "prompt": "A cyclist supplies 250 W. The drag force is F = 0.50v² and rolling resistance is a constant 4.0 N. Estimate her equilibrium speed, explaining the equation that determines it. (Give 2 s.f.)",
+      "marks": 4,
+      "scheme": [
+        "At equilibrium the driving power equals the dissipation: P = (0.50v² + 4.0)v",
+        "0.50v³ + 4.0v = 250",
+        "Solve iteratively: v = 7 → 171.5+28 = 200 W (low); v = 7.5 → 211+30 = 241 W (close); v = 7.6 → 219+30 = 249 W ✓",
+        "v ≈ 7.6 m s⁻¹ (about 27 km h⁻¹)"
+      ],
+      "answer": "Balance power in against power out: 250 = (0.50v² + 4.0)v, a cubic because drag's own velocity-dependence multiplies through the speed. Iterating finds v ≈ 7.6 m s⁻¹ — 27 km h⁻¹, a realistic club cyclist's cruise, and the reason time-trialling is dominated by aerodynamics."
+    }
+  ]
+}

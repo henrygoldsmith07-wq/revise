@@ -1,0 +1,211 @@
+{
+  "topic": "fields",
+  "point": 5,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:conductor-force-statement",
+      "context": "physics-depth:conductor-force-statement:bil-direction",
+      "move": "state the qualitative law for the force on a current-carrying conductor in a magnetic field",
+      "prompt": "State the three factors that set the size of the force on a current-carrying wire in a magnetic field, and describe the force's direction.",
+      "marks": 4,
+      "scheme": [
+        "Field strength (flux density B)",
+        "Current I, and the length of wire in the field",
+        "The angle to the field (sinθ dependence)",
+        "Perpendicular to both the wire and the field (Fleming's left-hand rule)"
+      ],
+      "answer": "The force grows with flux density, current and in-field wire length, and scales as sinθ with the angle between current and field. Its direction is at right angles to both — Fleming's left-hand rule maps thumb, first and second finger to force, field and current."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:moving-charge-force-statement",
+      "context": "physics-depth:moving-charge-force-statement:bqv-direction",
+      "move": "state how the force on a moving charge differs from that on a current-carrying wire",
+      "prompt": "State the factors determining the magnetic force on a moving charge, and the two ways it differs in direction from the force on a current-carrying wire.",
+      "marks": 3,
+      "scheme": [
+        "F = BQv sinθ: charge, speed, flux density, angle",
+        "The force is perpendicular to both the velocity and the field",
+        "Opposite charges feel opposite forces; conventional current already folds in the sign"
+      ],
+      "answer": "A moving charge feels F = BQv sinθ — same geometry as the wire, but two differences bite: the force depends on the charge's sign (an electron deflects opposite to a proton), and it is perpendicular to the velocity, which is why it steers without ever speeding up the particle."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:from-charges-to-wire",
+      "context": "physics-depth:from-charges-to-wire:summed-forces",
+      "move": "explain the wire force as the sum of forces on its drifting charges",
+      "prompt": "The force on a current-carrying wire is sometimes called 'the charge force on a bigger scale'. Explain this, sketching how the microscopic picture produces F = BIl.",
+      "marks": 4,
+      "scheme": [
+        "A current is many drifting charges, each feeling BQv",
+        "The charges pass their sideways push to the lattice through collisions",
+        "Summed over all carriers: NqAv_d × Bv_d → BIl",
+        "The wire force is literally the collective of the individual charge forces"
+      ],
+      "answer": "Each drifting electron feels BQv sideways. The electrons cannot leave the metal, so they hand that push to the lattice in countless collisions. Summed over all carriers, NqAv_d × Bv_d → BIl: the wire force is literally the collective of the individual charge forces. The motor's torque is not a new force; it is the charge force with a payroll."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:force-direction-symmetry",
+      "context": "physics-depth:force-direction-symmetry:cross-product-geometry",
+      "move": "explain why the magnetic force must be perpendicular to both field and motion",
+      "prompt": "Explain why the magnetic force lies perpendicular to the field AND perpendicular to the current/velocity, and what would violate that if it pointed any other way.",
+      "marks": 3,
+      "scheme": [
+        "A component along the wire/current would do work on the carriers — impossible for a force arising from a static field",
+        "A component along B would make 'parallel' and 'antiparallel' motions feel different sideways pushes — no experimental basis",
+        "The unique geometry satisfying the observations (no work, symmetric dependence) is perpendicular to both — the cross-product structure"
+      ],
+      "answer": "Any force along the current would do work on charges, which a steady magnetic field never does; any force along the field would treat the two field directions inequivalently, which experiments deny. The only geometry that fits every observation is perpendicularity to both — F = BQv sinθ, direction by the right-hand rule — and nature insists on it: the force is exactly a cross product."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:wire-force-compute",
+      "context": "physics-depth:wire-force-compute:loudspeaker-coil",
+      "move": "invert BIl to size a voice coil: work out the wire length the geometry offers and the turns needed for a target force",
+      "prompt": "A loudspeaker must exert 0.50 N on its coil in a 0.15 T radial field with 1.0 A through the wire. Each turn of the 2.5 cm-diameter former contributes one circumference of wire. How many turns does the coil need?",
+      "marks": 4,
+      "scheme": [
+        "Required BIl product: l = F/(BI) = 0.50/(0.15×1.0) = 3.33 m of wire in the field",
+        "One turn supplies πd = π×0.025 = 0.0785 m",
+        "N = 3.33/0.0785 = 42.4 turns",
+        "≈ 43 turns (round up: 42 turns fall just short)"
+      ],
+      "answer": "The force target demands l = F/(BI) = 0.50/(0.15×1) = 3.3 m of current-carrying wire. A 2.5 cm former gives 7.85 cm per turn, so 3.33/0.0785 ≈ 43 turns. The designer works backwards from the force through the geometry."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:charge-force-compute",
+      "context": "physics-depth:charge-force-compute:electron-beam",
+      "move": "apply F = BQv to find the force on a beam electron",
+      "prompt": "An electron travels at 3.0×10⁷ m s⁻¹ perpendicular to a 4.0 mT field. Calculate the force on it, and compare it with the electron's weight. (e = 1.60×10⁻¹⁹ C, m_e = 9.11×10⁻³¹ kg, g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "F = BQv = 4.0×10⁻³ × 1.60×10⁻¹⁹ × 3.0×10⁷",
+        "= 1.92×10⁻¹⁴ N ≈ 1.9×10⁻¹⁴ N",
+        "Weight = mg = 9.11×10⁻³¹ × 9.81 = 8.9×10⁻³⁰ N",
+        "Magnetic force exceeds weight by ~10¹⁵ — gravity is laughably irrelevant here"
+      ],
+      "answer": "The field deflects the electron with BQv = 1.9×10⁻¹⁴ N. Its entire weight is 8.9×10⁻³⁰ N — the magnetic push is fifteen orders of magnitude stronger. This is the arithmetic reason CRT and electron-optics textbooks never mention gravity."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:left-right-hand-fallacy",
+      "context": "physics-depth:left-right-hand-fallacy:motor-vs-generator",
+      "move": "correct confusion between the motor rule and the generator rule",
+      "prompt": "A student uses Fleming's left-hand rule to find the current produced by a spinning generator coil. Explain the mix-up and name the right rule for each machine.",
+      "marks": 3,
+      "scheme": [
+        "Left-hand rule: motion of a current (motor effect) — given current and field, find force",
+        "Right-hand rule: current from motion (generator) — given force/motion and field, find induced current",
+        "The two are different problems: one finds effect of current, the other finds effect of motion"
+      ],
+      "answer": "Left hand answers 'which way does a current-carrying wire get pushed?' — the motor question. The generator asks the reverse, 'which current does this motion produce?' — the right-hand (or Lenz-law) question. Both machines share the same field and current, but the roles of cause and effect are swapped, and the student's left hand reads the right-hand problem."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:field-force-along-wire-fallacy",
+      "context": "physics-depth:field-force-along-wire-fallacy:along-field-wire",
+      "move": "reject the idea that a parallel field-current arrangement still gives a force",
+      "prompt": "A wire carries current straight along a 2.0 T field line, and a student predicts F = BIl = 1.0 N for a 0.50 m, 1.0 A wire. Calculate the true force and explain the error.",
+      "marks": 3,
+      "scheme": [
+        "The full law is F = BIl sinθ",
+        "θ = 0 (current along field) → sinθ = 0",
+        "True force = 0 N, not 1.0 N"
+      ],
+      "answer": "The formula the student skipped is F = BIl sinθ: with the current running along the field, sin 0° = 0 and the force vanishes. The field only pushes charges that cut across it — sliding along field lines is magnetically invisible."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:balance-wire-mass",
+      "context": "physics-depth:balance-wire-mass:levitation-current",
+      "move": "balance magnetic force against weight to find a levitation current",
+      "prompt": "A horizontal wire of mass 0.012 kg and length 0.30 m lies perpendicular to a 0.60 T field. Calculate the current needed to levitate it. (g = 9.81 m s⁻²)",
+      "marks": 3,
+      "scheme": [
+        "Set BIl = mg",
+        "I = mg/(Bl) = 0.012×9.81/(0.60×0.30)",
+        "= 0.654 A ≈ 0.65 A"
+      ],
+      "answer": "Levitation needs BIl = mg, so I = 0.012×9.81/(0.60×0.30) ≈ 0.65 A in the right direction. A modest current, but the field must hold the wire perpendicular and the current exactly right — drift either and the balance tips."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:radius-helical-path",
+      "context": "physics-depth:radius-helical-path:perpendicular-component",
+      "move": "compute the helix radius from a charge's perpendicular velocity component",
+      "prompt": "A proton enters a 0.20 T field with speed 5.0×10⁶ m s⁻¹ at 30° to the field. Calculate the radius of its helical path and the pitch of the helix. (m_p = 1.67×10⁻²⁷ kg, e = 1.60×10⁻¹⁹ C)",
+      "marks": 4,
+      "scheme": [
+        "v⊥ = v sin30° = 2.5×10⁶ m s⁻¹; v∥ = v cos30° = 4.33×10⁶ m s⁻¹",
+        "r = mv⊥/(Bq) = 1.67×10⁻²⁷×2.5×10⁶/(0.20×1.6×10⁻¹⁹) = 1.3×10⁻¹ m",
+        "Period T = 2πm/(Bq) = 2π×1.67×10⁻²⁷/(0.20×1.6×10⁻¹⁹) = 3.27×10⁻⁷ s",
+        "Pitch = v∥T = 4.33×10⁶ × 3.27×10⁻⁷ = 1.4 m"
+      ],
+      "answer": "Only the perpendicular component circles: r = mv sinθ/Bq = 0.13 m. The period T = 2πm/Bq = 0.33 μs is set by the field alone, so the parallel 4.3×10⁶ m s⁻¹ carries the proton 1.4 m along the field each turn. The helix is a circle and a straight line superposed — the field cannot touch the parallel part."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:mass-spec-radius-separation",
+      "context": "physics-depth:mass-spec-radius-separation:ion-sorting",
+      "move": "use the radius-mass relation r = mv/Bq as a sorting principle to separate isotopes",
+      "prompt": "Singly ionised ²⁰Ne and ²²Ne atoms, both travelling at 1.0×10⁵ m s⁻¹, enter a 0.10 T field perpendicularly. Calculate each orbit radius and explain how this sorts isotopes. (m₂₀ ≈ 3.32×10⁻²⁶ kg, m₂₂ ≈ 3.65×10⁻²⁶ kg, e = 1.60×10⁻¹⁹ C)",
+      "marks": 4,
+      "scheme": [
+        "r = mv/(Bq)",
+        "²⁰Ne: r = 3.32×10⁻²⁶×1.0×10⁵/(0.10×1.6×10⁻¹⁹) = 0.208 m",
+        "²²Ne: r = 3.65×10⁻²⁶×1.0×10⁵/(0.10×1.6×10⁻¹⁹) = 0.228 m",
+        "The heavier isotope turns wider — their landing points differ by 2(r₂₂ − r₂₀) = 4 cm; a detector plate sorts them"
+      ],
+      "answer": "At the same speed and charge, r = mv/Bq grows with mass: 0.21 m for ²⁰Ne, 0.23 m for ²²Ne. After their semicircles the beams land 4 cm apart — enough to collect them separately. Magnetic sorting by inertia is exactly how mass spectrometers separate isotopes."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:hall-probe-field-mapping",
+      "context": "physics-depth:hall-probe-field-mapping:hall-voltage",
+      "move": "explain the Hall effect's transverse voltage as the steady state of magnetic and electric forces balancing",
+      "prompt": "A current flows along a thin metal strip placed in a field perpendicular to it, and a voltage develops across the strip's width. Explain, in terms of forces on charges, why the Hall voltage appears and what it measures.",
+      "marks": 4,
+      "scheme": [
+        "The field pushes the drifting charges sideways (BQv)",
+        "They accumulate on one edge until the built-up charge's electric force balances the magnetic push",
+        "That equilibrium gives eE_H = BQv_d, so the Hall voltage measures B",
+        "Swap the current or field direction and the voltage sign reverses"
+      ],
+      "answer": "The field shoves the drifting charges sideways (BQv), and they accumulate on one edge until the built-up charge's electric force balances the magnetic push. At equilibrium eE_H = BQv_d, so the Hall voltage measures B. Swap the current or field direction and the voltage sign reverses; it is a direct field meter."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:galvanometer-torque-balance",
+      "context": "physics-depth:galvanometer-torque-balance:coil-in-radial-field",
+      "move": "combine motor-effect forces with moments to explain a moving-coil meter",
+      "prompt": "A moving-coil meter has 100 turns of 2.0 cm × 1.5 cm coil in a 0.20 T radial field, on a spring of constant 2.4×10⁻⁴ N m rad⁻¹. Calculate the current that deflects the pointer 60°.",
+      "marks": 4,
+      "scheme": [
+        "Force per pair of sides: each active side BIl, torque from the pair = BIl×width per turn",
+        "Total torque = NBIl × 0.015 m (radial field: torque angle-independent)",
+        "Spring torque = kθ = 2.4×10⁻⁴ × π/3 = 2.51×10⁻⁴ N m",
+        "NBIl×0.015 = kθ → I = 2.51×10⁻⁴/(100×0.20×0.020×0.015) ≈ 4.2×10⁻² A = 42 mA"
+      ],
+      "answer": "Each of the 100 turns feels BIl on two sides, and the radial field keeps that torque steady at every angle. Balancing magnetic torque NBIl×0.015 against the spring's kθ at 60° gives I ≈ 4.2×10⁻² A, or 42 mA. The whole meter is F = BIl wearing a moment's clothing, and the radial field is what makes its scale linear."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:velocity-selector-crossed",
+      "context": "physics-depth:velocity-selector-crossed:forces-balanced",
+      "move": "combine the charge-force law with electric force balance to select a speed",
+      "prompt": "In a region where a 0.040 T field points into the page, a 2.0×10⁵ V m⁻¹ electric field points upward. A positive ion of charge e crosses perpendicular to both and is undeflected. Calculate its speed, and explain why ions of different mass and different charge pass together provided they share that speed.",
+      "marks": 4,
+      "scheme": [
+        "Electric force qE upward; magnetic force qvB downward when v points right",
+        "Undeflected: qE = qvB → v = E/B = 2.0×10⁵/0.040 = 5.0×10⁶ m s⁻¹",
+        "q cancels — the selector is mass- and charge-blind",
+        "Only speed matters: any charge-to-mass ratio passes if it crosses at E/B"
+      ],
+      "answer": "Balancing qE against qvB gives v = E/B = 5.0×10⁶ m s⁻¹. The charge cancels on both sides, so every undeflected particle crosses at exactly this speed — heavy ions, light ions, singly or doubly charged, all pass together. After this gate, any further deflection by a field is pure mass-to-charge bookkeeping: the selector is the entrance, not the spectrometer."
+    }
+  ]
+}

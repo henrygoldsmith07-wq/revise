@@ -1,0 +1,179 @@
+{
+  "topic": "nuclear",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:radius-law-form",
+      "context": "physics-depth:radius-law-form:r-na-third",
+      "move": "state the nuclear radius law and the meaning of the constant r₀",
+      "prompt": "State the equation relating a nucleus's radius to its nucleon number, and what the constant r₀ represents and roughly equals.",
+      "marks": 3,
+      "scheme": [
+        "r = r₀A^(1/3)",
+        "r₀ is the radius of a single-nucleon-scale 'nuclear building block'",
+        "r₀ ≈ 1.2 fm (1.2×10⁻¹⁵ m)"
+      ],
+      "answer": "Nuclear radius obeys r = r₀A^(1/3) with r₀ ≈ 1.2 fm. The radius grows with the cube root of the nucleon number: eight times as many nucleons give twice the radius."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:scattering-probe-conditions",
+      "context": "physics-depth:scattering-probe-conditions:wavelength-resolution",
+      "move": "state what makes a good nuclear-size probe and what the diffraction minimum reveals",
+      "prompt": "State the condition on a probe's wavelength for it to resolve a nucleus, and what the first minimum of an electron-scattering pattern gives.",
+      "marks": 3,
+      "scheme": [
+        "The de Broglie wavelength must be comparable to or smaller than the target size (λ ≲ D)",
+        "High-energy electrons have such short wavelengths",
+        "The first diffraction minimum locates the size: sinθ ≈ 1.22λ/D"
+      ],
+      "answer": "A probe resolves what its wavelength can 'see': only particles with λ at or below a few femtometres — high-energy electrons — map the nucleus. Their scattering pattern's first minimum then fixes the diameter through the diffraction relation sinθ = 1.22λ/D."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:constant-density-from-law",
+      "context": "physics-depth:constant-density-from-law:volume-proportional-A",
+      "move": "explain how the radius law forces nuclear density to be the same for every nucleus",
+      "prompt": "The radius law r = r₀A^(1/3) implies all nuclei have the same density. Show this.",
+      "marks": 4,
+      "scheme": [
+        "Volume = (4/3)πr³ = (4/3)πr₀³A — volume is proportional to A",
+        "Mass is also proportional to A (each nucleon ≈ same mass)",
+        "Density = mass/volume: the A cancels",
+        "All nuclei share one density ≈ 2.3×10¹⁷ kg m⁻³"
+      ],
+      "answer": "Cubing r = r₀A^⅓ makes volume ∝ A exactly. Mass ∝ A too, so density = mass/volume has no A left to vary with: from hydrogen to uranium, nuclear matter packs at the same 2×10¹⁷ kg m⁻³. The cube root is the fingerprint of incompressible, saturating nuclear material."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:radius-compute-gold",
+      "context": "physics-depth:radius-compute-gold:direct-substitution",
+      "move": "apply the radius law to compute a specific nucleus's size",
+      "prompt": "Calculate the radius of a gold-197 nucleus. (r₀ = 1.2 fm; 197^(1/3) ≈ 5.8)",
+      "marks": 3,
+      "scheme": [
+        "r = r₀A^(1/3)",
+        "= 1.2 × 5.8 fm",
+        "= 7.0 fm (7.0×10⁻¹⁵ m)"
+      ],
+      "answer": "r = 1.2 fm × 197^⅓ = 1.2×5.8 ≈ 7.0 fm — a sphere seven femtometres across, a millionth of a millionth of a metre."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:diffraction-size-measure",
+      "context": "physics-depth:diffraction-size-measure:first-minimum",
+      "move": "use the diffraction condition to extract a nuclear diameter from a measured scattering angle",
+      "prompt": "In an electron-scattering experiment, 3.0×10⁻¹⁵ m wavelength electrons show their first intensity minimum at sinθ = 0.610. Estimate the diameter of the target nucleus. (sinθ = 1.22λ/D)",
+      "marks": 3,
+      "scheme": [
+        "Rearrange: D = 1.22λ/sinθ",
+        "D = 1.22 × 3.0×10⁻¹⁵/0.610",
+        "= 6.0×10⁻¹⁵ m (6.0 fm)"
+      ],
+      "answer": "The diffraction relation inverted gives D = 1.22λ/sinθ = 1.22×3.0×10⁻¹⁵/0.610 = 6.0 fm. The nucleus is as much a diffraction object as a grating is — the pattern's angles encode its size."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:radius-proportional-A-fallacy",
+      "context": "physics-depth:radius-proportional-A-fallacy:octet-sizes",
+      "move": "reject linear growth of radius with nucleon number",
+      "prompt": "A student says a uranium-238 nucleus is 238/12 ≈ 20 times the size of a carbon-12 nucleus. Correct the claim using the radius law.",
+      "marks": 3,
+      "scheme": [
+        "Radius follows A^(1/3), not A",
+        "Ratio = (238/12)^(1/3) = 19.8^(1/3) ≈ 2.7",
+        "Uranium's radius is only about three times carbon's — its volume ~20 times"
+      ],
+      "answer": "Only the volume tracks nucleon number; the radius scales as the cube root: (238/12)^⅓ ≈ 2.7. Uranium is nearly twenty carbon's worth of nucleons packed into a sphere less than three times wider — the student confused volume with length."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:big-nucleus-denser-fallacy",
+      "context": "physics-depth:big-nucleus-denser-fallacy:saturation-matter",
+      "move": "reject the idea that heavier nuclei pack their matter more tightly",
+      "prompt": "A student reasons that because uranium contains more nucleons, its interior must be 'more tightly packed' than carbon's. Explain why nuclear matter density is identical in both.",
+      "marks": 4,
+      "scheme": [
+        "The strong force saturates: each nucleon binds only its nearest neighbours",
+        "Adding nucleons adds volume at the same rate as mass — the drop-on-drop behaviour of liquids",
+        "r ∝ A^⅓ gives V ∝ A, so mass/volume is constant across nuclei",
+        "A heavy nucleus is a bigger drop, not a denser one"
+      ],
+      "answer": "Nuclear force saturation makes nuclei behave like liquid drops: every added nucleon brings its own share of volume while only bonding to neighbours. Volume grows exactly with mass, so the density is universal — uranium is a bigger drop, never a denser one."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:iron-density-compute",
+      "context": "physics-depth:iron-density-compute:mass-over-volume",
+      "move": "compute nuclear density from an iron nucleus's mass and radius",
+      "prompt": "An iron-56 nucleus has mass 9.30×10⁻²⁶ kg and radius 4.6 fm. Calculate the nuclear density. (1 fm = 10⁻¹⁵ m)",
+      "marks": 4,
+      "scheme": [
+        "V = (4/3)πr³ = 4.19 × (4.6×10⁻¹⁵)³ = 4.07×10⁻⁴³ m³",
+        "(4.6)³ = 97.3 → ×4.19 = 4.07×10⁻⁴³ m³",
+        "ρ = m/V = 9.30×10⁻²⁶/4.07×10⁻⁴³",
+        "≈ 2.3×10¹⁷ kg m⁻³"
+      ],
+      "answer": "The volume is ⅓πr³ ≈ 4.1×10⁻⁴³ m³, so ρ = 9.3×10⁻²⁶/4.1×10⁻⁴³ ≈ 2×10¹⁷ kg m⁻³ — a teaspoon of nuclear matter would weigh hundreds of millions of tons on Earth."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:neutron-star-cube",
+      "context": "physics-depth:neutron-star-cube:astronomical-density",
+      "move": "transfer the nuclear density result to estimate a neutron-star sample's mass",
+      "prompt": "Neutron stars are essentially giant nuclei. Estimate the mass of a 1 cm³ cube of neutron-star material, taking nuclear density 2.3×10¹⁷ kg m⁻³, and compare it with something familiar. (1 cm³ = 10⁻⁶ m³)",
+      "marks": 3,
+      "scheme": [
+        "m = ρV = 2.3×10¹⁷ × 1.0×10⁻⁶",
+        "= 2.3×10¹¹ kg",
+        "≈ a few hundred ocean liners, or ~30 Empire State Buildings' worth of mass in a sugar cube"
+      ],
+      "answer": "Mass = ρV = 2.3×10¹⁷×10⁻⁶ = 2.3×10¹¹ kg — hundreds of billions of kilograms in a sugar-cube volume. The density that governs femtometre nuclei, scaled up, is what makes neutron stars bend light and shake spacetime when they collide."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:alpha-reach-limit",
+      "context": "physics-depth:alpha-reach-limit:distance-upper-bound",
+      "move": "convert a distance of closest approach into a size limit for the nucleus",
+      "prompt": "A 5.0 MeV alpha particle fired head-on at a gold nucleus turns around 45 fm out. Explain why this makes 45 fm an upper bound on the nuclear radius rather than its actual size.",
+      "marks": 3,
+      "scheme": [
+        "The alpha never touches the nucleus: Coulomb repulsion stops it well outside",
+        "The turnaround point is set by energy conservation (all KE becomes electric PE) at 45 fm",
+        "So the nucleus must be no bigger than 45 fm; the true radius (~7 fm) requires higher-energy probes"
+      ],
+      "answer": "At 45 fm the alpha's kinetic energy has all gone into electric potential energy — it reverses before feeling the strong force, so the encounter only says the nucleus is smaller than 45 fm. Closest approach measures the wall of the Coulomb hill, not the object itself; Rutherford's numbers were bounds, and peering past them demands faster projectiles."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:saturation-be-a",
+      "context": "physics-depth:saturation-be-a:flat-binding-curve",
+      "move": "combine the radius law with binding-energy-per-nucleon flatness to argue for short-range saturation",
+      "prompt": "Binding energy per nucleon is roughly flat at 8 MeV for most nuclei, and nuclear radius scales as A^(1/3). Explain how each observation supports the other.",
+      "marks": 4,
+      "scheme": [
+        "BE ∝ A (flat BE/A) means each nucleon contributes a fixed amount regardless of size — it only bonds its neighbours: saturation",
+        "Saturation means density constant → volume ∝ A → r ∝ A^⅓",
+        "Conversely, the measured r = r₀A^⅓ confirms constant density, so nucleons can't be long-range-bound to the whole nucleus",
+        "Two independent observations pin one model: short-range, saturating nuclear force"
+      ],
+      "answer": "Flat BE/A says a nucleon's contribution doesn't grow with nucleus size — it is bound only to its immediate neighbours. Neighbour-only bonding forces constant density, which is exactly the A^⅓ radius law; and the measured A^⅓ law in turn proves the force is short-range. The size and the energy curves are two proofs of the same saturation physics — and why both fusion and fission can pay out."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:radius-charge-force",
+      "context": "physics-depth:radius-charge-force:surface-field-proton",
+      "move": "combine the radius law with Coulomb's law to compare electric and nuclear conditions at a nucleus's surface",
+      "prompt": "A proton sits at the surface of a gold nucleus (Z = 79, radius 7.0 fm). Calculate the Coulomb force on it and compare the result with the weight of a flea (~10⁻⁶ N). (1/(4πε₀) = 8.99×10⁹ N m² C⁻², e = 1.60×10⁻¹⁹ C)",
+      "marks": 4,
+      "scheme": [
+        "Gold charge Q = 79e = 1.264×10⁻¹⁷ C; proton charge e",
+        "F = kQq/r² = 8.99×10⁹ × 1.264×10⁻¹⁷ × 1.60×10⁻¹⁹/(7.0×10⁻¹⁵)²",
+        "= 8.99×10⁹ × 2.022×10⁻³⁶/4.9×10⁻²⁹",
+        "≈ 37 N — tens of newtons, millions of times a flea's weight, yet the strong force wins locally"
+      ],
+      "answer": "The surface proton feels F = kQq/r² ≈ 37 N — the force of a heavy suitcase acting on a single particle, tens of millions of times its weight-like scale. That a 37-newton repulsion sits unfelt at nuclear scales is precisely what the strong force's local dominance means — and why heavy nuclei are the ones that fission."
+    }
+  ]
+}

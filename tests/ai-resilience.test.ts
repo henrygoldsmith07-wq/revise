@@ -114,7 +114,7 @@ describe("resilience chain wiring (structural contracts)", () => {
   });
 
   it("the runner enqueues only genuine fallback grades and after the attempt is persisted", () => {
-    const runner = read("src/components/QuestionRunner.tsx");
+    const runner = read("src/state/question-execution.ts");
     const persist = runner.indexOf("await store.recordAttempt(persistedAttempt, question);");
     const enqueue = runner.indexOf("enqueueDeadMark(");
     expect(persist).toBeGreaterThan(-1);
@@ -145,7 +145,7 @@ describe("resilience chain wiring (structural contracts)", () => {
     expect(read("src/domain/types-planning.ts")).toMatch(/localAiMarking\?: boolean/);
     const settings = read("src/app/settings/page.tsx");
     expect(settings).toMatch(/localAiMarking/);
-    const runner = read("src/components/QuestionRunner.tsx");
+    const runner = read("src/state/question-execution.ts");
     expect(runner).toMatch(/useLocalModel: Boolean\(store\.settings\?\.localAiMarking\)/);
   });
 

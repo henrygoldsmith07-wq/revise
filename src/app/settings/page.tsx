@@ -1,5 +1,7 @@
 "use client";
 
+import { exportContinuityDeletions } from "@/data/learner-history";
+
 import { useAccount } from "@/state/account";
 
 const ARM_LABELS: Record<string, string> = {
@@ -725,7 +727,7 @@ function DataControls() {
       <SectionHeading title="Data" hint="Portable, private, and yours to delete." />
       <Panel className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => exportDataPortable(store, filename)}>Export portable snapshot</Button>
+          <Button onClick={() => { void exportDataPortable(store, filename).catch(error => setRestoreMessage(error instanceof Error ? error.message : "Export failed.")); }}>Export portable snapshot</Button>
           <Button onClick={() => exportDataLegacy(store)}>Export legacy JSON</Button>
           <label className="inline-flex min-h-9 cursor-pointer items-center rounded-[10px] border border-line px-3 text-sm font-medium text-ink hover:bg-surface2">
             Choose snapshot to restore
@@ -817,8 +819,11 @@ function DataControls() {
   );
 }
 
-function exportDataPortable(store: ReturnType<typeof usePageStore>, filename: string) {
+async function exportDataPortable(store: ReturnType<typeof usePageStore>, filename: string) {
+  const continuity = await exportContinuityDeletions(store.userId);
   const snap = buildPortabilitySnapshot({
+    ...continuity,
+    paperOutcomes: store.paperOutcomeLog,
     userId: store.userId,
     displayName: store.settings.displayName,
     cards: store.cards,
@@ -877,5 +882,5 @@ function exportDataLegacy(store: ReturnType<typeof usePageStore>) {
 }
 
 function usePageStore() {
-  return useStoreFields("attempts", "cards", "examDates", "experimentArm", "gradeActuals", "gradePredictionLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
+  return useStoreFields("attempts", "cards", "examDates", "experimentArm", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
 }

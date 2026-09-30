@@ -111,15 +111,16 @@ describe("client wiring: masking precedes every outbound AI call", () => {
   });
 
   it("QuestionRunner surfaces the disclosure next to the mark", () => {
-    const runner = readFileSync(src("src/components/QuestionRunner.tsx"), "utf8");
+    const runner = readFileSync(src("src/components/QuestionMarkedResult.tsx"), "utf8");
     expect(runner).toContain("withheld before sending");
     expect(runner).toContain("result.withheld");
   });
 
   it("QuestionRunner applies the human-review warning to every review-gated WJEC flagship", () => {
     const runner = readFileSync(src("src/components/QuestionRunner.tsx"), "utf8");
-    expect(runner).toContain("requiresWjecContentReview(question.subjectId)");
-    expect(runner).toContain("!humanVerifiedWjecQuestion(question)");
+    const execution = readFileSync(src("src/state/question-execution.ts"), "utf8");
+    expect(execution).toContain("requiresWjecContentReview(question.subjectId)");
+    expect(execution).toContain("!humanVerifiedWjecQuestion(question)");
     expect(runner).toContain("Needs human review · practice evidence only");
     expect(runner).not.toContain('question.subjectId === "wjec-alevel-physics" && !humanVerified');
   });

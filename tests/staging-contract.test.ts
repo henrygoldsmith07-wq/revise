@@ -2,16 +2,17 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // The CI runner is native ESM; test its actual preflight and catalog checker.
 // @ts-expect-error Native tooling module has no TypeScript declaration.
-import { REQUIRED_STAGING_SECRETS, STAGING_TABLES, SINGLETON_TABLES, stagingConfiguration, validateStagingCatalog } from "../scripts/staging-contract.mjs";
+import { CONTINUITY_COLUMNS, DELETION_TABLES, validateStagingFunctions, REQUIRED_STAGING_SECRETS, STAGING_TABLES, SINGLETON_TABLES, stagingConfiguration, validateStagingCatalog } from "../scripts/staging-contract.mjs";
 
 function catalog() {
   return (STAGING_TABLES as string[]).map((table) => ({
     table, rls: true, primaryKey: (SINGLETON_TABLES as string[]).includes(table) ? "user_id" : "id",
-    columns: table === "sync_writes" ? { id: "uuid", user_id: "uuid", created_at: "timestamp with time zone" }
-      : { id: "uuid", user_id: "uuid", subject_id: "text", topic_id: "text", due: "date", date: "date", data: "jsonb", updated_at: "timestamp with time zone" },
-    policies: [{ name: `${table}_owner`, command: "ALL", roles: ["authenticated"], using: "(user_id = auth.uid())", check: "(user_id = auth.uid())" }],
-    triggers: ["touch", "touch_insert"].map((suffix) => ({ name: `${table}_${suffix}`, enabled: "O", function: "touch_updated_at", definition: suffix === "touch" ? "BEFORE UPDATE" : "BEFORE INSERT" })),
-    indexes: [`CREATE INDEX ON ${table} (user_id, updated_at, id)`],
+    canDelete: !["learner_records","sync_tombstones"].includes(table), canUpdate: table !== "sync_tombstones",
+    columns: CONTINUITY_COLUMNS[table] ?? (table === "sync_writes" ? { id: "uuid", user_id: "uuid", created_at: "timestamp with time zone" }
+      : { id: "uuid", user_id: "uuid", subject_id: "text", topic_id: "text", due: "date", date: "date", data: "jsonb", updated_at: "timestamp with time zone" }),
+    policies: table === "sync_tombstones" ? [{name:"sync_tombstones_read",command:"SELECT",roles:["authenticated"],using:"(user_id = auth.uid())",check:""},{name:"sync_tombstones_insert",command:"INSERT",roles:["authenticated"],using:"",check:"(user_id = auth.uid())"}] : [{ name: `${table}_owner`, command: "ALL", roles: ["authenticated"], using: "(user_id = auth.uid())", check: "(user_id = auth.uid())" }],
+    triggers: (CONTINUITY_COLUMNS[table] ? [{name:`${table}_order`, enabled:"O", function:"order_continuity_change",definition:"BEFORE INSERT OR UPDATE"}] : ["touch", "touch_insert"].map((suffix) => ({ name: `${table}_${suffix}`, enabled: "O", function: "touch_updated_at", definition: suffix === "touch" ? "BEFORE UPDATE" : "BEFORE INSERT" }))).concat((DELETION_TABLES as string[]).includes(table) ? [{name:`${table}_delete_guard`,enabled:"O",function:"guard_replica_resurrection",definition:"BEFORE INSERT OR UPDATE"},{name:`${table}_retain_delete`,enabled:"O",function:"record_replica_deletion",definition:"BEFORE DELETE"}] : []),
+    indexes: [`CREATE INDEX ON ${table} ${CONTINUITY_COLUMNS[table] ? "(user_id, change_seq)" : "(user_id, updated_at, id)"}`],
   }));
 }
 
@@ -49,6 +50,8 @@ describe("required staging infrastructure and schema diagnostics", () => {
     const workflow = readFileSync(".github/workflows/revise-staging.yml", "utf8");
     for (const key of REQUIRED_STAGING_SECRETS as string[]) expect(workflow).toContain(`secrets.${key}`);
     expect(workflow).toContain("npm run test:staging");
+    expect(workflow).toContain("workflow_call:");
+    expect(validateStagingFunctions([])).toHaveLength(4);
     expect(workflow).toContain("if: always()");
     expect(workflow).not.toContain("continue-on-error");
     const runner = readFileSync("scripts/run-staging-tests.mjs", "utf8");

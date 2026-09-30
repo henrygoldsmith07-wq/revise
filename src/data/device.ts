@@ -1,4 +1,6 @@
 import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
+import { REVISE_META_KEYS } from "./storage-namespace";
+import { getDb } from "./db";
 import { compareStamps, maxStamp, parseStamp, stampJson, type LamportStamp } from "@/domain/lamport";
 
 // Re-export the pure algebra for convenience — data-layer consumers already
@@ -73,14 +75,12 @@ function guessDeviceLabel(): string {
 
 /** Load (or lazily mint) this device's identity. */
 export async function getDeviceIdentity(): Promise<DeviceIdentity> {
-  const existing = await readReviseMeta<DeviceIdentity>("device");
-  if (existing?.deviceId) return existing;
-  const identity: DeviceIdentity = {
-    deviceId: fallbackUuid(),
-    label: guessDeviceLabel(),
-    createdAt: new Date().toISOString(),
-  };
-  await writeReviseMeta("device", identity);
+  const tx = (await getDb()).transaction("meta", "readwrite");
+  const existing = (await tx.store.get(REVISE_META_KEYS.device))?.value as DeviceIdentity | undefined;
+  if (existing?.deviceId) { await tx.done; return existing; }
+  const identity: DeviceIdentity = { deviceId: fallbackUuid(), label: guessDeviceLabel(), createdAt: new Date().toISOString() };
+  await tx.store.put({ key: REVISE_META_KEYS.device, value: identity });
+  await tx.done;
   return identity;
 }
 
@@ -94,14 +94,15 @@ async function readCounter(): Promise<number> {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
-async function writeCounter(value: number): Promise<void> {
-  await writeReviseMeta("lamport", value);
-}
-
 /** Allocate the next strictly-greater local timestamp. */
 export async function nextLamport(): Promise<number> {
-  const next = (await readCounter()) + 1;
-  await writeCounter(next);
+  const tx = (await getDb()).transaction("meta", "readwrite");
+  const row = await tx.store.get(REVISE_META_KEYS.lamport);
+  const current = typeof row?.value === "number" && Number.isSafeInteger(row.value) && row.value >= 0 ? row.value : 0;
+  const next = current + 1;
+  if (!Number.isSafeInteger(next)) { tx.abort(); await tx.done.catch(() => undefined); throw new Error("Logical clock exhausted."); }
+  await tx.store.put({ key: REVISE_META_KEYS.lamport, value: next });
+  await tx.done;
   return next;
 }
 
@@ -112,9 +113,12 @@ export async function nextLamport(): Promise<number> {
  * history they causally follow.
  */
 export async function observeRemoteLamport(remote: number): Promise<void> {
-  if (!Number.isFinite(remote) || remote < 0) return;
-  const local = await readCounter();
-  if (remote > local) await writeCounter(remote);
+  if (!Number.isSafeInteger(remote) || remote < 0) return;
+  const tx = (await getDb()).transaction("meta", "readwrite");
+  const row = await tx.store.get(REVISE_META_KEYS.lamport);
+  const local = typeof row?.value === "number" && Number.isSafeInteger(row.value) ? row.value : 0;
+  if (remote > local) await tx.store.put({ key: REVISE_META_KEYS.lamport, value: remote });
+  await tx.done;
 }
 
 /** Read without advancing — for diagnostics and tests. */

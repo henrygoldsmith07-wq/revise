@@ -1,0 +1,177 @@
+{
+  "topic": "medical-physics",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:mri-signal-source",
+      "context": "physics-depth:mri-signal-source:proton-spins",
+      "move": "state where the MRI signal comes from and what is detected",
+      "prompt": "State what physical property of the body an MRI scanner uses to form its signal, and what is actually measured.",
+      "marks": 3,
+      "scheme": [
+        "Hydrogen nuclei (protons), abundant in water and fat, possess nuclear spin",
+        "A strong magnetic field aligns the spins; radiofrequency pulses tip them out of alignment",
+        "The scanner measures the radiofrequency signal emitted as spins relax back to alignment"
+      ],
+      "answer": "MRI exploits the spin of hydrogen nuclei — protons in the body's water and fat. A strong static field aligns the spins, a radiofrequency pulse tips them, and the scanner measures the faint radio signal they emit while relaxing back. The image is made of nuclear magnetisation, not any transmission through the body."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:mri-contrast-origin",
+      "context": "physics-depth:mri-contrast-origin:relaxation-times",
+      "move": "state what tissue properties generate MRI contrast",
+      "prompt": "State the two main hydrogen-related tissue properties that make one tissue look different from another in MRI.",
+      "marks": 3,
+      "scheme": [
+        "Proton density: how much hydrogen (water/fat) the tissue contains",
+        "Relaxation times T1 and T2: how quickly spins realign and lose phase coherence",
+        "Different tissues (fat, fluid, tumour) differ in both, producing contrast"
+      ],
+      "answer": "MRI contrast comes from how much hydrogen a tissue holds (proton density) and from its relaxation behaviour — T1 (spin realignment) and T2 (phase coherence decay). Fat, fluid and tumour differ in both, so they brighten or darken differently on weighted scans."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:mri-vs-xray-info",
+      "context": "physics-depth:mri-vs-xray-info:contrast-mechanisms",
+      "move": "contrast the image-formation physics of MRI with radiography",
+      "prompt": "Both an X-ray radiograph and an MRI scan distinguish tissues, but by entirely different physics. State the mechanism of contrast in each.",
+      "marks": 3,
+      "scheme": [
+        "Radiography: contrast from differential attenuation of ionising photons passing through the body",
+        "MRI: contrast from differences in proton density and relaxation times of hydrogen nuclei",
+        "Radiography is transmission imaging; MRI is emission imaging — nothing passes through, a signal comes out"
+      ],
+      "answer": "A radiograph reads what fails to pass through: tissues differ in how much they attenuate the ionising beam. MRI reads what comes out: tissues differ in hydrogen content and relaxation, so their spins emit different radio signals after excitation. Transmission versus emission — the same anatomy, opposite imaging physics."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:t1-t2-weighting",
+      "context": "physics-depth:t1-t2-weighting:scan-weights",
+      "move": "apply relaxation differences to predict bright and dark tissues on each weighting",
+      "prompt": "Water has long T1 and T2; fat has short T1 and intermediate T2. Predict whether cerebrospinal fluid (mostly water) appears bright or dark on (i) a T1-weighted and (ii) a T2-weighted scan.",
+      "marks": 3,
+      "scheme": [
+        "T1-weighted: long-T1 water recovers slowly → dark; fat bright",
+        "T2-weighted: long-T2 water holds its signal → bright; fat intermediate",
+        "CSF: dark on T1, bright on T2 — the standard signature used to identify fluid"
+      ],
+      "answer": "CSF is water-like: on T1-weighting its long recovery time leaves it dark, while fat's short T1 shines bright; on T2-weighting its long coherence time keeps the signal strong, so it brightens. Dark on T1, bright on T2 is the classic fluid signature radiologists read daily."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:mri-safety-screening",
+      "context": "physics-depth:mri-safety-screening:metal-implants",
+      "move": "apply the field physics to MRI safety screening questions",
+      "prompt": "Explain why a patient with a cardiac pacemaker or ferromagnetic implant is screened out of an MRI scan, giving the two distinct physical hazards.",
+      "marks": 3,
+      "scheme": [
+        "The multi-tesla static field exerts strong forces on ferromagnetic materials — the implant can move or twist",
+        "The field and RF pulses induce currents that can reprogram or heat electronic implants",
+        "Both hazards follow from the scanner's physics, not from any 'radiation' the patient imagines"
+      ],
+      "answer": "Two distinct dangers: the powerful static field pulls ferromagnetic implants with potentially lethal force, and the rapidly switching fields and RF pulses induce currents that reprogram or overheat electronic devices. Neither is ionising radiation — both are direct consequences of scanning with magnets and radio waves."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:mri-uses-xrays-fallacy",
+      "context": "physics-depth:mri-uses-xrays-fallacy:modality-mislabel",
+      "move": "reject the claim that MRI uses X-rays or ionising radiation",
+      "prompt": "A patient declines an MRI because 'it's basically an X-ray with a magnet bolted on'. Correct the misconception and state the radiation situation precisely.",
+      "marks": 3,
+      "scheme": [
+        "MRI uses no X-rays: its radiation is radiofrequency, non-ionising",
+        "The static magnetic field is not ionising radiation at all",
+        "The only ionising risk in the MRI suite would come from any X-ray equipment in the same room — not from the MRI itself"
+      ],
+      "answer": "MRI involves no X-rays and no ionising radiation whatsoever. Its inputs are a strong static magnetic field and radiofrequency pulses — both non-ionising — and the signal is the protons' own radio emission. 'Nuclear' in the original name referred to the nucleus, not radioactivity; the patient's exposure class is entirely different from radiography."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:mri-bright-always-better-fallacy",
+      "context": "physics-depth:mri-bright-always-better-fallacy:contrast-vs-noise",
+      "move": "reject interpreting brightness alone as diagnostic quality",
+      "prompt": "A student says a brighter MRI image is always more diagnostic. Explain why radiologists deliberately switch weightings that may make the same tissue darker.",
+      "marks": 3,
+      "scheme": [
+        "Brightness encodes a chosen property: T1, T2, or proton density weighting",
+        "A pathological fluid dark on one weighting brightens on another — pathology is the pattern across weightings",
+        "Contrast between tissues, not absolute brightness, carries the diagnostic information"
+      ],
+      "answer": "MRI brightness is not brightness of the body — it encodes whichever relaxation property the sequence weights. The same cerebrospinal fluid flips from dark to bright as the weighting changes, and the diagnostic information is that pattern of flips. Absolute brightness is an arbitrary scaling; relative contrast across weightings is the diagnostic content."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:larmor-frequency",
+      "context": "physics-depth:larmor-frequency:field-strength-dependence",
+      "move": "compute the proton resonance frequency from field strength",
+      "prompt": "The proton gyromagnetic ratio is 42.6 MHz T⁻¹. Calculate the Larmor frequency of hydrogen protons in (i) a 1.5 T scanner and (ii) a 3.0 T scanner, and explain the significance for image quality.",
+      "marks": 4,
+      "scheme": [
+        "f = γB",
+        "At 1.5 T: f = 42.6 × 1.5 = 63.9 MHz",
+        "At 3.0 T: f = 42.6 × 3.0 = 127.8 MHz",
+        "Higher field → higher frequency → more magnetisation and stronger signal-to-noise, but stronger RF heating and artefact constraints"
+      ],
+      "answer": "The Larmor frequency is f = γB: 63.9 MHz at 1.5 T, 127.8 MHz at 3.0 T. Doubling the field doubles the nuclear magnetisation, raising signal-to-noise — the reason 3 T machines resolve finer detail — at the cost of tighter RF-power limits and trickier artefacts."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:mri-scan-time",
+      "context": "physics-depth:mri-scan-time:sequence-timing",
+      "move": "compute scan time from repetition and number of phase encodings",
+      "prompt": "An idealised MRI acquisition uses one phase-encoding step per repetition, with TR = 500 ms, 256 steps and 2 signal averages. Neglect preparation time and other overheads. Calculate the acquisition time and explain why movement can cause image artefacts.",
+      "marks": 3,
+      "scheme": [
+        "Acquisition time = TR × steps × averages, with TR = 0.500 s",
+        "Time = 0.500 × 256 × 2 = 256 s (4 min 16 s)",
+        "Movement changes positions between measurements used in the same reconstruction, causing inconsistencies and possible blurring or ghosting"
+      ],
+      "answer": "There are 256×2 repetitions, each lasting 0.500 s. The acquisition time is 0.500×256×2 = 256 s, or 4 min 16 s. Movement changes the positions of structures between measurements used to reconstruct the same image, creating inconsistent data and possible blurring or ghosting artefacts."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:mri-nmr-shared",
+      "context": "physics-depth:mri-nmr-shared:spectroscopy-to-imaging",
+      "move": "transfer NMR spectroscopy physics to explain MRI signal content",
+      "prompt": "In chemistry, NMR spectroscopy identifies molecules by the resonance frequencies of their hydrogen environments. Explain how MRI exploits the same physics to distinguish tissues, and what MRI adds to make an image rather than a spectrum.",
+      "marks": 3,
+      "scheme": [
+        "Both rely on hydrogen protons resonating at the Larmor frequency, shifted slightly by their chemical environment",
+        "MRI detects the same relaxation differences to separate fat, water and pathology",
+        "MRI adds gradient fields to encode position, converting the spectroscopic signal into a spatial map"
+      ],
+      "answer": "Both techniques read hydrogen nuclei resonating near the Larmor frequency, with relaxation and chemical shifts telling environments apart. MRI inherits this as tissue contrast — fat versus water versus lesion — then adds gradient fields that tag each signal with a position, turning the chemist's spectrum into the radiologist's map. The same physics, extended by engineering into imaging."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:mri-gradients-localisation",
+      "context": "physics-depth:mri-gradients-localisation:position-encoding",
+      "move": "combine the Larmor relation with gradient fields to explain spatial encoding",
+      "prompt": "Explain how gradient magnetic fields allow an MRI scanner to tell where in the body a signal came from, using the Larmor relation.",
+      "marks": 4,
+      "scheme": [
+        "A gradient makes B, and hence the Larmor frequency, vary with position along one axis",
+        "Only protons at the matching frequency respond to a given RF pulse — slice selection",
+        "Gradients along the other axes encode position in phase and frequency of the emitted signal",
+        "The mathematics of reconstruction untangles the combined signal into a spatial map"
+      ],
+      "answer": "A gradient adds a position-dependent twist to the main field, so each slice depth has its own Larmor frequency: tuning the RF pulse selects the slice. Within the slice, further gradients encode position in the phase and frequency of the returning signal, and reconstruction converts that frequency-space data into the image. The entire localisation scheme is the Larmor relation, applied three times over."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:mri-cost-benefit-arbitration",
+      "context": "physics-depth:mri-cost-benefit-arbitration:scanner-choice",
+      "move": "combine field strength, timing and safety physics to evaluate a scanner proposal",
+      "prompt": "A hospital considers replacing a 1.5 T MRI with a 3.0 T unit. Synthesize the physics: signal-to-noise, RF power deposition, artefacts and scan time, into a balanced recommendation.",
+      "marks": 4,
+      "scheme": [
+        "3.0 T doubles magnetisation → roughly √2 improvement in signal-to-noise",
+        "RF power rises steeply with field (power ∝ B² for the same flip) — SAR limits tighten",
+        "Susceptibility and chemical-shift artefacts grow, complicating some studies",
+        "Recommendation: 3 T where detail is the priority (small structures, spectroscopy); 1.5 T remains fine for routine work, with easier safety margins"
+      ],
+      "answer": "Doubling the field strengthens the nuclear magnetisation, lifting signal-to-noise by roughly √2 — finer detail or shorter scans. But RF power deposition rises steeply, safety limits tighten, and artefacts grow more troublesome. The physics favours 3 T where resolution is the point and 1.5 T for routine throughput: a capability-versus-margin decision, exactly as an engineering trade-off should be."
+    }
+  ]
+}

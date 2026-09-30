@@ -1,0 +1,162 @@
+{
+  "topic": "kinematics-dynamics",
+  "point": 4,
+  "capability": "phys.acceleration",
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:acceleration-definition",
+      "context": "physics-depth:acceleration-definition:rate-of-change",
+      "move": "state acceleration as the rate of change of velocity including direction",
+      "prompt": "Define acceleration, and state whether an object moving at constant speed can be accelerating.",
+      "marks": 2,
+      "scheme": [
+        "Acceleration is the rate of change of velocity",
+        "Velocity is a vector, so a change in direction alone is a change in velocity — circular motion at constant speed is accelerated motion"
+      ],
+      "answer": "Acceleration is the rate of change of velocity. Because velocity has direction as well as magnitude, a body turning a corner at constant speed is accelerating — its velocity vector is changing."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:newton-second-forms",
+      "context": "physics-depth:newton-second-forms:f-ma",
+      "move": "state Newton's second law in both force and momentum forms",
+      "prompt": "State Newton's second law in terms of resultant force and acceleration, and in terms of momentum.",
+      "marks": 3,
+      "scheme": [
+        "Resultant force = mass × acceleration: F = ma",
+        "Equivalently, resultant force = rate of change of momentum: F = Δ(mv)/Δt",
+        "Both express the same law; the momentum form covers changing mass too"
+      ],
+      "answer": "Newton's second law: the resultant force equals mass times acceleration, F = ma. Equivalently the resultant force equals the rate of change of momentum, F = Δp/Δt — the form that remains valid when the mass itself changes."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:why-resultant-not-total",
+      "context": "physics-depth:why-resultant-not-total:balanced-forces",
+      "move": "explain that only the unbalanced part of the forces changes motion",
+      "prompt": "A box sits on the floor with gravity pulling down and a normal force pushing up. Explain why the box does not accelerate despite two sizeable forces acting on it.",
+      "marks": 3,
+      "scheme": [
+        "Gravity (weight) and the normal reaction are equal in magnitude and opposite in direction",
+        "Their resultant — the vector sum — is zero",
+        "Newton's second law uses the resultant force, so zero resultant means zero acceleration, not zero force"
+      ],
+      "answer": "The weight and the normal reaction are equal and opposite, so their vector sum — the resultant — is zero. Newton's second law is driven by the resultant force alone: with nothing left over, there is no acceleration, even though large individual forces act."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:acceleration-direction",
+      "context": "physics-depth:acceleration-direction:slowing-down",
+      "move": "explain the direction of acceleration when an object slows down",
+      "prompt": "A ball is thrown straight up. State the direction of its acceleration at the top of its flight, where its speed is momentarily zero, and explain how that follows from Newton's second law.",
+      "marks": 3,
+      "scheme": [
+        "At the top the only force is gravity, downward",
+        "F = ma means the acceleration is downward whenever the resultant is downward",
+        "Zero speed does not mean zero acceleration — direction of a, not of v, follows the force"
+      ],
+      "answer": "At the highest point the speed is zero but gravity still acts, so the resultant — and hence the acceleration — points downward throughout the flight. Acceleration reflects the force, not the velocity: the ball is momentarily at rest yet still accelerating downward at 9.8 m s⁻²."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:two-stage-acceleration",
+      "context": "physics-depth:two-stage-acceleration:brake-then-accelerate",
+      "move": "apply F = ma across successive intervals with different resultants",
+      "prompt": "A 1200 kg car brakes with a net resistive force of 6000 N until it stops, then is driven forward by a net force of 3000 N. Calculate the acceleration in each phase, stating directions.",
+      "marks": 3,
+      "scheme": [
+        "Braking: a = F/m = 6000/1200 = 5.0 m s⁻², directed opposite the motion",
+        "Driving: a = 3000/1200 = 2.5 m s⁻², in the direction of motion",
+        "The sign of each acceleration follows the direction of its resultant"
+      ],
+      "answer": "Braking gives a = 6000/1200 = 5.0 m s⁻² backward against the motion; the driving phase gives 3000/1200 = 2.5 m s⁻² forward. Each acceleration takes the direction of its own resultant force."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:zero-velocity-zero-force-fallacy",
+      "context": "physics-depth:zero-velocity-zero-force-fallacy:top-of-flight",
+      "move": "reject the inference from zero velocity to zero force or acceleration",
+      "prompt": "A student claims that at the top of a ball's vertical flight its acceleration is zero because it is momentarily at rest. Neglect air resistance and explain the error.",
+      "marks": 2,
+      "scheme": [
+        "Zero instantaneous velocity does not remove the gravitational force mg",
+        "The resultant remains mg downwards, so F = ma gives acceleration g downwards even at the top"
+      ],
+      "answer": "Being momentarily at rest says nothing about the forces: gravity still pulls, so F = mg gives a = g straight down even at the top. Zero velocity is an instant of the motion, not a property of the cause."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:mass-weight-confusion",
+      "context": "physics-depth:mass-weight-confusion:orbit-scale",
+      "move": "reject treating mass and weight as interchangeable in F = ma",
+      "prompt": "On the Moon (g = 1.6 m s⁻²), a student says a 70 kg astronaut 'only has 11 kg of mass now'. Correct the statement and calculate the astronaut's weight on the Moon and on Earth.",
+      "marks": 3,
+      "scheme": [
+        "Mass is the amount of matter and does not change with location",
+        "Weight is the gravitational force: W = mg, which varies with g",
+        "Moon: W = 70×1.6 = 112 N; Earth: W = 70×9.81 = 687 N — the mass is 70 kg in both places"
+      ],
+      "answer": "Mass — 70 kg — is invariant; it is the amount of matter, not a force. Weight is the gravitational force on it: on the Moon 70×1.6 = 112 N, on Earth 70×9.81 ≈ 687 N. The astronaut got lighter in newtons, never smaller in kilograms."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:cable-tension-elevator",
+      "context": "physics-depth:cable-tension-elevator:accelerating-lift",
+      "move": "solve for an unknown contact force given the motion and the weight",
+      "prompt": "A 500 kg lift accelerates upward at 2.0 m s⁻². Calculate the tension in the supporting cable. (g = 9.81 m s⁻²)",
+      "marks": 3,
+      "scheme": [
+        "Take up as positive: T − mg = ma",
+        "T = m(g + a) = 500 × (9.81 + 2.0)",
+        "= 5.9×10³ N"
+      ],
+      "answer": "With upward positive, T − mg = ma, so T = m(g+a) = 500×11.81 ≈ 5.9×10³ N. The cable must both support the weight and accelerate the lift, so the tension exceeds the 4.9 kN weight."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:air-track-buoyancy",
+      "context": "physics-depth:air-track-buoyancy:apparent-weight",
+      "move": "transfer F = ma to a submerged body where buoyancy supplies part of the resultant",
+      "prompt": "A 2.0 kg metal block is fully submerged in water. The buoyant force on it is 15 N. It is released from rest. Calculate its initial acceleration, and explain what happens to this value as it rises toward the surface. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Weight = 2.0×9.81 = 19.6 N down; buoyancy = 15 N up",
+        "Resultant = 19.6 − 15 = 4.6 N downward",
+        "a = 4.6/2.0 = 2.3 m s⁻² downward — the block sinks despite the buoyancy",
+        "If it instead rises (buoyancy exceeding weight), the acceleration shrinks as drag grows, ending at terminal velocity"
+      ],
+      "answer": "The resultant is weight minus buoyancy, 19.6 − 15 = 4.6 N down, so the block initially accelerates at 2.3 m s⁻² downward. For a body that rises instead, the shrinking resultant — growing drag against a fixed buoyant surplus — quickly brings it to terminal velocity: the same second law, with the force balance evolving in time."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:atwood-machine",
+      "context": "physics-depth:atwood-machine:two-connected-masses",
+      "move": "apply Newton's second law to a connected system and each body separately",
+      "prompt": "Two masses, 3.0 kg and 5.0 kg, hang from a light frictionless pulley, connected by a light inextensible string. Calculate the acceleration of the system and the string tension. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Net driving force = (5.0 − 3.0)g = 19.6 N, total mass = 8.0 kg",
+        "a = 19.6/8.0 = 2.45 m s⁻²",
+        "For the 3.0 kg mass: T − 3.0×9.81 = 3.0×2.45 → T = 36.8 N",
+        "Check with the 5.0 kg mass: 5.0×9.81 − T = 5.0×2.45 → T = 36.8 N ✓"
+      ],
+      "answer": "The imbalance (5.0−3.0)g = 19.6 N drives the total 8.0 kg at a = 2.45 m s⁻². The string tension, from the rising 3.0 kg mass, is T = 3.0(9.81+2.45) = 36.8 N — and the falling 5.0 kg mass confirms it: 5.0(9.81−2.45) = 36.8 N. Both bodies share the same acceleration magnitude because the string is inextensible."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:rocket-thrust-mass-loss",
+      "context": "physics-depth:rocket-thrust-mass-loss:momentum-form",
+      "move": "combine the momentum form of Newton's second law with a changing mass",
+      "prompt": "A rocket in deep space burns fuel at 50 kg s⁻¹, ejecting exhaust at 2000 m s⁻¹ relative to the rocket. Its instantaneous mass is 2000 kg. Calculate the thrust, and explain why the acceleration at this instant is 50 m s⁻² but grows with time even at constant thrust.",
+      "marks": 4,
+      "scheme": [
+        "Thrust F = (Δm/Δt)v_exhaust = 50 × 2000 = 1.0×10⁵ N",
+        "Instantaneous acceleration a = F/m = 1.0×10⁵/2000 = 50 m s⁻²",
+        "The mass keeps falling as fuel burns, so the same thrust meets less inertia",
+        "The momentum form F = Δ(mv)/Δt handles the changing mass correctly"
+      ],
+      "answer": "Thrust is the fuel rate times exhaust speed: 50×2000 = 1.0×10⁵ N, giving a = 1.0×10⁵/2000 = 50 m s⁻² now. As fuel burns the mass shrinks while thrust stays fixed, so the acceleration climbs steadily — a case where F = Δ(mv)/Δt, not F = ma with constant m, is the honest form of the second law."
+    }
+  ]
+}

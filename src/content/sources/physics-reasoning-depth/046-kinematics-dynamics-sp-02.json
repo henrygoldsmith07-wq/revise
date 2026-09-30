@@ -1,0 +1,209 @@
+{
+  "topic": "kinematics-dynamics",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:vt-graph-rules",
+      "context": "physics-depth:vt-graph-rules:gradient-and-area",
+      "move": "state what the gradient and the area of a velocity–time graph represent",
+      "prompt": "State what (i) the gradient and (ii) the area under a velocity–time graph represent at any instant or interval.",
+      "marks": 2,
+      "scheme": [
+        "Gradient = acceleration (rate of change of velocity)",
+        "Area under the curve = displacement (velocity accumulated over time, signed)"
+      ],
+      "answer": "On a velocity–time graph the gradient is the acceleration, and the area under the line — signed, so parts below the axis count negative — is the displacement."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:dt-gradient-rule",
+      "context": "physics-depth:dt-gradient-rule:instantaneous-velocity",
+      "move": "describe how to read instantaneous velocity from a displacement graph's steepness",
+      "prompt": "On a displacement–time graph, how is the instantaneous velocity at a point found? What does a section parallel to the time axis signify?",
+      "marks": 2,
+      "scheme": [
+        "Draw the tangent and take its slope — rise over run gives metres per second",
+        "A horizontal section means the position is unchanging: stationary"
+      ],
+      "answer": "The instantaneous velocity is the tangent's steepness on a displacement–time plot — its rise over run in metres per second. A flat section means the object simply sits there."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:signs-of-slowing",
+      "context": "physics-depth:signs-of-slowing:velocity-acceleration-antisense",
+      "move": "explain how opposite signs of velocity and acceleration identify slowing motion",
+      "prompt": "On a velocity–time graph a section lies below the time axis and slopes upward toward it. Describe the motion and explain the roles of the two signs.",
+      "marks": 3,
+      "scheme": [
+        "Below the axis: velocity is negative — motion in the chosen negative direction",
+        "Positive gradient: acceleration is positive, opposing the negative velocity",
+        "Speed = |v| falls toward zero: the object is slowing while still travelling backwards, then reverses when v crosses the axis"
+      ],
+      "answer": "Below the axis the object moves in the negative direction; the upward slope gives it positive acceleration. Opposite signs mean acceleration works against velocity, so the speed drops — the object eases backwards to a halt at the axis and only then accelerates forward. Slowing is a collision of signs, not a sign itself."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:area-derives-v-squared",
+      "context": "physics-depth:area-derives-v-squared:graphical-proof",
+      "move": "derive v² = u² + 2as graphically from the triangle area of a velocity–time line",
+      "prompt": "A body accelerates uniformly from u to v over displacement s in time t. Using the area of the velocity–time trapezium and the definition of acceleration, derive v² = u² + 2as.",
+      "marks": 4,
+      "scheme": [
+        "Area: s = ½(u+v)t (trapezium)",
+        "Acceleration definition: t = (v−u)/a",
+        "Substitute: s = ½(u+v)(v−u)/a",
+        "So 2as = (v+u)(v−u) = v² − u², giving v² = u² + 2as — the algebraic identity behind the geometry"
+      ],
+      "answer": "The trapezium area gives s = ½(u+v)t, and the slope definition gives t = (v−u)/a. Combining them: 2as = (u+v)(v−u) = v²−u². The famous equation is just the area and gradient of one straight v-t line read twice and multiplied out."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:commute-profile",
+      "context": "physics-depth:commute-profile:multi-segment-displacement",
+      "move": "assemble signed segment areas from a journey profile into total displacement and average velocity",
+      "prompt": "A cyclist's velocity–time profile: 0–60 s uniform +4.0 m s⁻¹, 60–90 s uniform deceleration to rest, 90–150 s parked, 150–210 s uniform −3.0 m s⁻¹. Calculate the total displacement over 210 s and the average velocity.",
+      "marks": 5,
+      "scheme": [
+        "Leg 1: 4.0×60 = 240 m",
+        "Leg 2 triangle: ½×4.0×30 = 60 m",
+        "Leg 3: 0",
+        "Leg 4: −3.0×60 = −180 m; total 240+60−180 = 120 m",
+        "Average velocity = 120/210 = 0.57 m s⁻¹"
+      ],
+      "answer": "Areas accumulate: +240 m, +60 m, 0, −180 m for a net 120 m. Average velocity over the whole 210 s is 120/210 ≈ 0.57 m s⁻¹ — a figure that weights the parked pause as heavily as the riding."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:curved-dt-reading",
+      "context": "physics-depth:curved-dt-reading:curvature-direction",
+      "move": "read the sign of acceleration from the curvature of a displacement–time graph",
+      "prompt": "A displacement–time graph rises steeply, bends so its slope eases, reaches a maximum, then falls with ever steeper negative slope. Describe the velocity and state the sign of the acceleration during each stage.",
+      "marks": 4,
+      "scheme": [
+        "Stage 1 (steep rise, easing): positive velocity, decreasing — acceleration negative",
+        "At the peak: velocity zero",
+        "Descent starting gently: negative velocity growing — acceleration still negative",
+        "One consistent negative acceleration throughout: the curve is concave down"
+      ],
+      "answer": "The ever-shrinking positive slope is a slowing positive velocity; the peak is the instant of rest; then a steepening negative slope is a growing negative velocity. The whole story is one negative acceleration — a concave-down curve, like a ball thrown upward."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:axis-crossing-rest-fallacy",
+      "context": "physics-depth:axis-crossing-rest-fallacy:instant-versus-state",
+      "move": "reject reading an instant of zero velocity as a period of rest or zero acceleration",
+      "prompt": "A student says a ball whose velocity–time graph crosses the axis is 'stopped, then at rest, then starts up' with zero acceleration at the crossing. Explain why the crossing is a single instant and the acceleration is anything but zero there.",
+      "marks": 3,
+      "scheme": [
+        "The axis crossing lasts an instant — the turnaround, not a stay",
+        "Velocity zero does not require acceleration zero: gradients at the crossing are steep",
+        "For a thrown ball the gradient at the apex is −9.81 m s⁻² throughout — gravity never pauses"
+      ],
+      "answer": "Rest means zero velocity over an interval (a flat line on the axis); a crossing is the one instant of turnaround, with the line still sloping through it. The acceleration is the gradient at that instant — for a ball, still −9.81 m s⁻² at the very top. Velocity being momentarily zero says nothing about what the acceleration is doing."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:at-area-displacement-fallacy",
+      "context": "physics-depth:at-area-displacement-fallacy:one-integration-too-few",
+      "move": "correct the claim that the area under an acceleration–time graph gives displacement",
+      "prompt": "A student says 'just as area under v–t gives displacement, area under a–t gives displacement.' Explain what it actually gives and why one integration step is needed per graph level.",
+      "marks": 3,
+      "scheme": [
+        "Area under a–t is ∫a dt = change in velocity, not position",
+        "Each level of the hierarchy integrates once to the next: a→Δv, v→Δs",
+        "Displacement needs the v–t area, which itself is built from the acceleration area added to an initial velocity"
+      ],
+      "answer": "An acceleration–time area delivers a velocity change — it is one integration, not two. To reach displacement you must build the velocity curve from it and then take that area: position is the double integral of acceleration. Skipping a level silently changes what the axes mean."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:vt-suvats-match",
+      "context": "physics-depth:vt-suvats-match:from-profile-to-equations",
+      "move": "extract accelerations and displacements from a described velocity–time profile using the equations",
+      "prompt": "A car goes from rest to 20 m s⁻¹ in 8.0 s at uniform acceleration, holds for 25 s, then brakes uniformly to rest in 5.0 s. Calculate the acceleration in each powered phase and the total distance.",
+      "marks": 4,
+      "scheme": [
+        "Launch: a = 20/8 = 2.5 m s⁻²; distance ½×20×8 = 80 m",
+        "Cruise: 20×25 = 500 m",
+        "Brake: a = −20/5 = −4.0 m s⁻²; distance ½×20×5 = 50 m",
+        "Total 80+500+50 = 630 m"
+      ],
+      "answer": "Slopes: +2.5 then −4.0 m s⁻². Areas (or ½at², then vt, then ½at²) give 80, 500 and 50 m — 630 m in total, every number recoverable from the same picture the graph already shows."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:at-area-velocity-change",
+      "context": "physics-depth:at-area-velocity-change:crash-pulse",
+      "move": "recover a velocity change by integrating a described acceleration–time pulse",
+      "prompt": "During a crash test a car's acceleration (take backwards as negative) traces a triangle: 0 to −40 m s⁻² over 0.04 s, back to 0 over the next 0.06 s. The car was moving at 14 m s⁻¹ forward. Calculate its speed after the pulse.",
+      "marks": 3,
+      "scheme": [
+        "Velocity change = area = ½ × 0.10 × (−40) = −2.0 m s⁻¹",
+        "v = 14 − 2.0 = 12.0 m s⁻¹",
+        "Still forward but slower: the pulse removes 2.0 m s⁻¹ from the speed"
+      ],
+      "answer": "The triangular a–t pulse carries an area of −2.0 m s⁻¹ — that is the velocity change, not a displacement. The car leaves the pulse at 14 − 2 = 12 m s⁻¹, still rolling forward. Crash pulses are read one integration at a time."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:ticker-tape-story",
+      "context": "physics-depth:ticker-tape-story:spacing-to-regime",
+      "move": "translate a ticker-tape's spacing pattern into the motion's graph and regime boundaries",
+      "prompt": "A ticker timer makes 50 dots s⁻¹. The tape is divided into successive strips, each spanning ten timer intervals; their lengths are 1.0, 2.0, 3.0, 4.0, 4.0, 4.0, 3.0 and 2.0 cm. Describe the motion, and state how long the eight-strip run lasted.",
+      "marks": 4,
+      "scheme": [
+        "Equal increases per strip = constant acceleration for the first 4 strips",
+        "Three equal 4.0 strips = uniform velocity",
+        "Decreasing 3.0, 2.0 = uniform deceleration",
+        "Each strip spans 10/50 = 0.20 s: 8 strips = 1.60 s total"
+      ],
+      "answer": "Each strip spans ten intervals, so its 0.20 s length is explicit rather than an ambiguous dot count. The first four mean speeds rise by 0.05 m s⁻¹ per strip, giving 0.25 m s⁻² acceleration; equal lengths mean coasting and falling lengths mean braking. Eight strips last 1.60 s."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:speed-graph-fuel",
+      "context": "physics-depth:speed-graph-fuel:energy-profile-shape",
+      "move": "transfer signed-area reasoning to an energy-rate graph, reading fuel use as an area under power",
+      "prompt": "A journey's engine power trace reads 30 kW for 20 min, 5 kW for 10 min idling-creep, then 0 for 15 min stopped. Calculate the energy consumed and explain why the area method here mirrors the displacement-from-v–t construction.",
+      "marks": 4,
+      "scheme": [
+        "30 kW × 1200 s = 3.6×10⁷ J; 5 kW × 600 s = 3.0×10⁶ J; 0 × 900 = 0",
+        "Total ≈ 3.9×10⁷ J",
+        "Power is the rate of energy use exactly as velocity is the rate of position change",
+        "So energy is to power what displacement is to velocity — area one level up"
+      ],
+      "answer": "Areas: 3.0×10⁷+… = 3.6×10⁷ + 0.3×10⁷ ≈ 3.9×10⁷ J. The method is borrowed wholesale from v–t graphs: power is the derivative of energy with respect to time, so integrating the power curve recovers energy consumed — the same area-as-accumulation logic wearing different units."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:two-stage-brake-chain",
+      "context": "physics-depth:two-stage-brake-chain:shared-peak-speed",
+      "move": "chain two constant-acceleration stages through their shared peak velocity to find total time",
+      "prompt": "A train accelerates uniformly from rest to v in 40 s, then brakes uniformly to rest over 20 s, covering 1800 m in all. Find v and sketch the v–t graph's role in the solution.",
+      "marks": 4,
+      "scheme": [
+        "Total distance = triangle area = ½ × v × (40+20)",
+        "1800 = 30v → v = 60 m s⁻¹",
+        "Graph: up-slope to the peak, down-slope to the axis — one triangle",
+        "The shared peak v is the bridge between the two stages"
+      ],
+      "answer": "The whole journey is one triangle: base 60 s, height v, area 1800 gives v = 60 m s⁻¹. The two SUVAT stages hand each other a single number — the shared peak velocity — and the area equation collapses the entire problem to one line."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:tangent-drag-deceleration",
+      "context": "physics-depth:tangent-drag-deceleration:instantaneous-gradient",
+      "move": "combine motion graphs with drag physics to read a falling object's instantaneous acceleration from a tangent",
+      "prompt": "A skydiver's velocity–time curve flattens toward 55 m s⁻¹ as terminal speed approaches. At a point where the curve's tangent falls from (2 s, 50 m s⁻¹) to (8 s, 54 m s⁻¹), estimate the acceleration and explain why the curve keeps bending toward horizontal.",
+      "marks": 4,
+      "scheme": [
+        "Tangent gradient = (54−50)/(8−2) = 4/6 ≈ 0.67 m s⁻²",
+        "Still positive: the speed is creeping up, not constant yet",
+        "As v approaches terminal, drag → weight, resultant → 0, so a → 0",
+        "The flattening tangent is the graph showing Newton's second law live"
+      ],
+      "answer": "The tangent gives ≈0.7 m s⁻² — a small but non-zero acceleration at nearly-terminal speed. Each metre per second of extra speed grows the drag until it nearly balances the weight, so the gradient decays toward zero and the curve asymptotes to 55 m s⁻¹: Newton's second law drawn as a flattening slope."
+    }
+  ]
+}

@@ -3,7 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
 import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { remapContentIds } from "./content-ids";
-import { SYNC_TABLES, syncPrimaryKey, syncWireId } from "./sync-contract";
+import { SYNC_TABLES, syncPrimaryKey, syncWireId, syncWireIdValue } from "./sync-contract";
+import { pullContinuity } from "./sync-continuity";
+import { deletionIsKnown, sendReplicaDeletion } from "./sync-deletions";
+import { migrateLearnerHistory } from "./learner-history";
+import { historyFrozenFingerprint, validateHistoryRecord } from "@/domain/learner-history";
+import { isDeletableEntity, tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { readReviseUserMeta, writeReviseUserMeta } from "./storage-namespace";
@@ -185,10 +190,26 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
     const identity = await authIdentity(supabase, userId);
     if (identity !== "ok") return finish({ pushed: 0, pulled: 0, failed: 0, skipped: identity });
 
+    // Mandatory v2 schema: never drain an offline stale upsert before learning
+    // which ids another device intentionally deleted.
+    let continuityPulled = 0;
+    try {
+      continuityPulled += await pullContinuity(supabase, userId, "sync_tombstones");
+      await migrateLearnerHistory(userId);
+      continuityPulled += await pullContinuity(supabase, userId, "learner_records");
+    } catch {
+      const changed = await authIdentity(supabase, userId);
+      if (changed !== "ok") return finish({ pushed: 0, pulled: continuityPulled, failed: 0, skipped: changed });
+      return finish({ pushed: 0, pulled: continuityPulled, failed: 1 });
+    }
     const pushed = await drainOutbox(userId, supabase);
     if (pushed.skipped) return finish({ pushed: pushed.pushed, pulled: 0, failed: pushed.failed, skipped: pushed.skipped });
     const pulled = await pull(userId, supabase);
-    return finish({ pushed: pushed.pushed, pulled: pulled.pulled, failed: pushed.failed + pulled.failed, ...(pulled.skipped ? { skipped: pulled.skipped } : {}) });
+    try {
+      continuityPulled += await pullContinuity(supabase, userId, "learner_records");
+      continuityPulled += await pullContinuity(supabase, userId, "sync_tombstones");
+    } catch { pulled.failed++; }
+    return finish({ pushed: pushed.pushed, pulled: pulled.pulled + continuityPulled, failed: pushed.failed + pulled.failed, ...(pulled.skipped ? { skipped: pulled.skipped } : {}) });
   } catch (error) {
     captureTelemetry("sync.failure", {
       status: "failed",
@@ -218,6 +239,10 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
   const deletes = new Map<SyncEntity, OutboxItem[]>();
   for (const item of collapsedItems) {
     if (item.attempts >= MAX_OUTBOX_ATTEMPTS) continue;
+    if (item.op === "upsert" && isDeletableEntity(item.entity) && await deletionIsKnown(item.entity, rowId(item.payload), userId)) {
+      for (const stale of items.filter(entry => entry.entity === item.entity && rowId(entry.payload) === rowId(item.payload))) await db.delete("outbox", stale.id);
+      continue;
+    }
     const bucket = item.op === "delete" ? deletes : upserts;
     const list = bucket.get(item.entity) ?? [];
     list.push(item);
@@ -260,25 +285,32 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
     const identity = await authIdentity(supabase, userId);
     if (identity !== "ok") return { pushed, failed, skipped: identity };
     const localIds = [...new Set(list.map((i) => rowId(i.payload)))].filter(Boolean);
-    const ids = await Promise.all(localIds.map((id) => syncWireId(userId, id)));
-    if (!ids.length) {
+    if (!localIds.length) {
       for (const item of list) await db.delete("outbox", item.id);
       continue;
     }
-    const { error } = await supabase.from(TABLES[entity]).delete().eq("user_id", userId).in(pkFor(entity), ids);
+    const originalEntries = items.filter(item => item.entity === entity && localIds.includes(rowId(item.payload)));
+    if (!isDeletableEntity(entity)) throw new Error("Unsupported replica deletion.");
+    let error: { message: string } | null = null;
+    for (const id of localIds) {
+      const currentIdentity = await authIdentity(supabase, userId);
+      if (currentIdentity !== "ok") return { pushed, failed, skipped: currentIdentity };
+      const result = await sendReplicaDeletion(supabase, entity, id, userId);
+      if (result.error) { error = result.error; break; }
+    }
     if (error) {
-      failed += list.length;
+      failed += originalEntries.length;
       // Mirror the upsert path: record the failure so it is diagnosable and
       // the attempt counter can eventually retire the item.
-      for (const item of list) {
+      for (const item of originalEntries) {
         await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
       }
       continue;
     }
     const stillOwned = await authIdentity(supabase, userId);
     if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned };
-    pushed += ids.length;
-    for (const item of list) await db.delete("outbox", item.id);
+    pushed += localIds.length;
+    for (const item of originalEntries) await db.delete("outbox", item.id);
   }
 
   return { pushed, failed, ...(hasUnknownOwner ? { skipped: "owner-unknown" as const } : {}) };
@@ -295,6 +327,7 @@ async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: num
   let maxObservedUpdatedAt = legacySince;
 
   for (const [entity, table] of Object.entries(TABLES) as [SyncEntity, string][]) {
+    if (entity === "learnerRecords") continue;
     const outcome = await pullEntity(userId, supabase, entity, table, legacySince);
     pulled += outcome.pulled;
     failed += outcome.failed;
@@ -460,12 +493,13 @@ async function pullEntity(
         if (Number.isFinite(remoteLamport)) await observeRemoteLamport(remoteLamport);
       }
       const store = STORE_FOR[entity];
-      const tx = db.transaction(store, "readwrite");
+      const tx = db.transaction([store, "meta"], "readwrite");
       try {
         for (const incoming of incomingRows) {
-          const existing = await tx.store.get(keyFor(entity, incoming));
+          if (isDeletableEntity(entity) && (await tx.objectStore("meta").get(tombstoneKey(entity, String(incoming.id))) || await tx.objectStore("meta").get(wireTombstoneKey(entity, syncWireIdValue(userId, String(incoming.id)))))) continue;
+          const existing = await tx.objectStore(store).get(keyFor(entity, incoming));
           const merged = mergeForEntity(entity, existing as never, incoming as never);
-          if (merged) await tx.store.put(merged as never);
+          if (merged) await tx.objectStore(store).put(merged as never);
         }
         await tx.done;
       } catch {
@@ -556,7 +590,8 @@ async function claimIdempotencyKeys(supabase: NonNullable<ReturnType<typeof getS
   );
 }
 
-const STORE_FOR: Record<SyncEntity, "cards" | "reviewLogs" | "attempts" | "mistakes" | "questions" | "papers" | "plannedSessions" | "examDates" | "settings" | "streak" | "lessonProgress"> = {
+const STORE_FOR: Record<SyncEntity, "cards" | "reviewLogs" | "attempts" | "mistakes" | "questions" | "papers" | "plannedSessions" | "examDates" | "settings" | "streak" | "lessonProgress" | "meta"> = {
+  learnerRecords: "meta",
   cards: "cards",
   reviewLogs: "reviewLogs",
   attempts: "attempts",
@@ -589,7 +624,7 @@ export function collapseOutboxItems(items: OutboxItem[]): OutboxItem[] {
   for (const item of items) {
     const key = `${item.entity}:${rowId(item.payload)}`;
     const current = latest.get(key);
-    if (!current || queueOrder(item, current) > 0) latest.set(key, item);
+    if (!current || (item.op === "delete" && current.op !== "delete") || (current.op !== "delete" && queueOrder(item, current) > 0)) latest.set(key, item);
   }
   return [...latest.values()].sort(queueOrder);
 }
@@ -651,6 +686,10 @@ async function toRow(entity: SyncEntity, payload: unknown, userId: Id, opts?: { 
   const updatedAt = (row.updatedAt as string) ?? (row.createdAt as string) ?? new Date().toISOString();
   const e2ee = opts?.e2ee ?? (await e2eeEnabledFor(userId));
   const data = e2ee ? await encryptPayload(row) : row;
+  if (entity === "learnerRecords") {
+    const record = validateHistoryRecord(row, userId);
+    return { id: await syncWireId(userId, record.id), user_id: userId, data, lamport: record.lamport, device_id: record.deviceId, deleted: record.deleted, kind: record.kind, frozen_fingerprint: historyFrozenFingerprint(record) };
+  }
   return {
     id: await syncWireId(userId, rowId(payload)),
     user_id: userId,

@@ -1,0 +1,146 @@
+{
+  "topic": "waves",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:wave-equation-form",
+      "context": "physics-depth:wave-equation-form:v-f-lambda",
+      "move": "state the wave equation and identify which quantity a source fixes",
+      "prompt": "State the wave equation relating wave speed, frequency and wavelength, and state which of the three is fixed by the source alone.",
+      "marks": 2,
+      "scheme": [
+        "v = fλ",
+        "Frequency is fixed by the source; speed depends on the medium, and wavelength adjusts to keep v = fλ"
+      ],
+      "answer": "The wave equation is v = fλ. The frequency is set by the source and does not change when the wave enters a new medium; the wave speed is set by the medium, so the wavelength is the quantity that adjusts."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:transverse-longitudinal",
+      "context": "physics-depth:transverse-longitudinal:polarisation-test",
+      "move": "state the defining displacement direction for transverse and longitudinal waves",
+      "prompt": "Distinguish between transverse and longitudinal waves by stating the direction of the oscillations relative to the energy transfer in each.",
+      "marks": 2,
+      "scheme": [
+        "In a transverse wave the oscillations are perpendicular to the direction of energy transfer",
+        "In a longitudinal wave the oscillations are parallel to the direction of energy transfer"
+      ],
+      "answer": "In a transverse wave the particles oscillate at right angles to the direction of energy transfer; in a longitudinal wave they oscillate back and forth along the direction of energy transfer, creating compressions and rarefactions."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:refraction-speed-wavelength",
+      "context": "physics-depth:refraction-speed-wavelength:air-to-water",
+      "move": "explain the medium change effect on speed and wavelength at fixed frequency",
+      "prompt": "A sound wave of frequency 340 Hz passes from air, where its speed is 340 m s⁻¹, into water where its speed is 1500 m s⁻¹. Explain what happens to its frequency and wavelength, and calculate the new wavelength.",
+      "marks": 3,
+      "scheme": [
+        "Frequency stays at 340 Hz — it is fixed by the source",
+        "Wavelength must grow because v = fλ and v has increased at fixed f",
+        "λ_water = 1500/340 = 4.4 m (air: λ = 1.0 m)"
+      ],
+      "answer": "The frequency remains 340 Hz because the source sets it; the water's higher wave speed at the same frequency forces a longer wavelength: λ = v/f = 1500/340 ≈ 4.4 m, compared with 1.0 m in air."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:wave-equation-swap",
+      "context": "physics-depth:wave-equation-swap:medium-change",
+      "move": "apply the wave equation across a boundary where only the speed changes",
+      "prompt": "A wave of frequency 500 Hz travels at 330 m s⁻¹ in a string. The wave passes into a heavier string where its speed is 220 m s⁻¹. Calculate the wavelength in each string.",
+      "marks": 3,
+      "scheme": [
+        "Frequency is unchanged at 500 Hz",
+        "λ₁ = 330/500 = 0.66 m",
+        "λ₂ = 220/500 = 0.44 m"
+      ],
+      "answer": "The frequency stays 500 Hz. In the first string λ = 330/500 = 0.66 m; in the heavier string the slower speed shortens the wavelength to 220/500 = 0.44 m."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:wavelength-unchanged-fallacy",
+      "context": "physics-depth:wavelength-unchanged-fallacy:refraction-entry",
+      "move": "reject the claim that wavelength is preserved across a refraction boundary",
+      "prompt": "A student says: 'When light refracts from air into glass only its direction changes; the wavelength must stay the same because the colour doesn't change.' Explain the error and state what actually stays constant.",
+      "marks": 3,
+      "scheme": [
+        "Frequency is the quantity preserved on refraction, fixed by the source",
+        "Speed drops in the denser medium, so v = fλ forces the wavelength to shrink",
+        "Colour correlates with frequency, which is why it is unchanged while wavelength is not"
+      ],
+      "answer": "It is the frequency that stays constant on refraction, because the source sets it and colour tracks frequency. Since the wave slows in glass, v = fλ demands a proportionally shorter wavelength — the direction and the wavelength both change, the frequency does not."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:speed-universal-fallacy",
+      "context": "physics-depth:speed-universal-fallacy:all-waves-3e8",
+      "move": "reject treating 3.00×10⁸ m s⁻¹ as the speed of every wave",
+      "prompt": "A student uses c = 3.00×10⁸ m s⁻¹ to find the wavelength of a 2.0 MHz ultrasound wave in tissue. Explain why this is wrong and which speed should be used.",
+      "marks": 3,
+      "scheme": [
+        "3.00×10⁸ m s⁻¹ is the speed of electromagnetic waves in a vacuum only",
+        "Ultrasound is a mechanical sound wave; in tissue it travels at about 1540 m s⁻¹",
+        "λ = v/f = 1540/(2.0×10⁶) = 7.7×10⁻⁴ m"
+      ],
+      "answer": "The 3.00×10⁸ m s⁻¹ figure applies to light in a vacuum, not to sound in tissue. Ultrasound is mechanical and travels at roughly 1540 m s⁻¹ in soft tissue, giving λ = 1540/(2.0×10⁶) ≈ 7.7×10⁻⁴ m."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:seismic-waves",
+      "context": "physics-depth:seismic-waves:p-and-s-waves",
+      "move": "transfer the wave equation to P-waves and S-waves to find a distance from a lag",
+      "prompt": "After an earthquake, a detector 1900 km from the epicentre records the P-wave (speed 8.0 km s⁻¹) arriving 210 s before the S-wave (speed 4.0 km s⁻¹). Use the arrival-time difference to determine the distance to the epicentre. (Treat speeds as constant.)",
+      "marks": 4,
+      "scheme": [
+        "Travel times: t_P = d/8.0 and t_S = d/4.0 (d in km, times in s)",
+        "Lag: d/4.0 − d/8.0 = 210 s",
+        "d(2 − 1)/8.0 = 210 so d/8.0 = 210",
+        "d = 210 × 8.0 = 1680 km"
+      ],
+      "answer": "The S-wave lags by d/4.0 − d/8.0 = d/8.0 = 210 s, so the epicentre is 210 × 8.0 = 1680 km away. (The 1900 km figure would give a lag of 237 s, so it is inconsistent with the measurement.)"
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:shallow-water-speed",
+      "context": "physics-depth:shallow-water-speed:depth-dependence",
+      "move": "apply a stated speed-depth relation to find wavelength change as a water wave shoals",
+      "prompt": "A water wave of period 5.0 s travels in 9.0 m deep water at 8.4 m s⁻¹. In water 2.5 m deep its speed drops to 4.4 m s⁻¹ (speed ∝ √depth). Find the wavelength in the deep and the shallow water.",
+      "marks": 3,
+      "scheme": [
+        "Frequency = 1/period = 0.20 Hz, unchanged by depth",
+        "λ_deep = 8.4/0.20 = 42 m",
+        "λ_shallow = 4.4/0.20 = 22 m"
+      ],
+      "answer": "The 5.0 s period gives f = 0.20 Hz in both depths. Deep water: λ = 8.4/0.20 = 42 m; shallow water: the reduced speed shortens the wavelength to 4.4/0.20 = 22 m."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:wave-energy-power",
+      "context": "physics-depth:wave-energy-power:intensity-spread",
+      "move": "combine the wave equation with inverse-square intensity spreading to compare two distances",
+      "prompt": "A seismic monitoring station is 40 km from a source where a wave of frequency 0.50 Hz and speed 4.0 km s⁻¹ is detected. The wave's intensity falls off as 1/r². Calculate the wavelength, and the ratio of intensities at 40 km and 80 km.",
+      "marks": 3,
+      "scheme": [
+        "λ = v/f = 4000/0.50 = 8000 m",
+        "Intensity ∝ 1/r², so doubling r quarters the intensity",
+        "I₄₀/I₈₀ = (80/40)² = 4, i.e. the intensity at 80 km is one quarter"
+      ],
+      "answer": "λ = v/f = 4000/0.50 = 8.0×10³ m. Because intensity spreads over a sphere, doubling the distance from 40 km to 80 km reduces the intensity by 2² = 4: the nearer station measures four times the intensity."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:doppler-siren",
+      "context": "physics-depth:doppler-siren:moving-source",
+      "move": "link the wave equation to the Doppler shift of a moving source to find the observed wavelength",
+      "prompt": "A fire engine's siren emits a 750 Hz tone while driving at 30 m s⁻¹ toward a stationary listener. Sound travels at 340 m s⁻¹. Calculate the wavelength of the sound in still air, and the wavelength the listener perceives as the engine approaches.",
+      "marks": 4,
+      "scheme": [
+        "Emitted wavelength λ = v/f = 340/750 = 0.453 m",
+        "Approaching source chases its own wavefronts: the wavefront spacing compresses by v−v_s per period T",
+        "λ' = (v − v_s)/f = (340 − 30)/750 = 0.413 m",
+        "The listener hears a raised frequency f' = v/λ' = 340/0.413 ≈ 823 Hz"
+      ],
+      "answer": "The siren's sound has λ = 340/750 ≈ 0.45 m in still air. Moving toward the listener at 30 m s⁻¹, the engine compresses the wavefronts to λ' = (340−30)/750 ≈ 0.41 m, which the listener hears as a raised pitch of about 823 Hz."
+    }
+  ]
+}

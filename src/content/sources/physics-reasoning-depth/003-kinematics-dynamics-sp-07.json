@@ -1,0 +1,89 @@
+{
+  "topic": "kinematics-dynamics",
+  "point": 7,
+  "capability": "phys.drag",
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:drag-factors",
+      "context": "physics-depth:drag-factors:drag-variables",
+      "move": "list the physical factors the drag force on a moving body depends on",
+      "prompt": "For an object in a regime where drag is modelled by F = ½ρC_DAv², identify how the speed, the fluid and the object's geometry affect the drag force.",
+      "marks": 3,
+      "scheme": [
+        "Drag is proportional to the square of the speed v in this model",
+        "Drag is proportional to the fluid density ρ",
+        "The presented area A and the shape-dependent drag coefficient C_D determine the geometry contribution"
+      ],
+      "answer": "In this model, drag is proportional to v² and to the fluid density ρ. The object's geometry enters through its presented cross-sectional area A and its shape-dependent drag coefficient C_D."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:drag-coast",
+      "context": "physics-depth:drag-coast:no-drive",
+      "move": "explain deceleration from speed-dependent drag with no driving force",
+      "prompt": "A cyclist stops pedalling on level ground and slows down. Explain, in terms of forces, why the deceleration is greatest at first and what happens to the speed.",
+      "marks": 3,
+      "scheme": [
+        "With no drive, air resistance is the resultant and it increases with speed",
+        "At high speed the backward resultant is large so deceleration is large",
+        "As speed falls drag falls, so deceleration decreases toward zero and the bike approaches a steady crawl"
+      ],
+      "answer": "Once pedalling stops, drag is the only horizontal force and it grows with speed. The fast bike decelerates hard at first; as it slows, drag and hence deceleration shrink, so the speed levels off instead of dropping to zero abruptly."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:drag-skydiver-weight",
+      "context": "physics-depth:drag-skydiver-weight:known-mass",
+      "move": "equate drag to weight for a known mass at terminal velocity",
+      "prompt": "A 70 kg skydiver falls at terminal velocity. Calculate the drag force on the skydiver. (g = 9.81 m s⁻²)",
+      "marks": 2,
+      "scheme": [
+        "At terminal velocity the resultant is zero",
+        "Drag = weight = 70 × 9.81 = 687 N (≈ 690 N)"
+      ],
+      "answer": "At terminal velocity drag balances weight: 70 × 9.81 = 687 N, about 690 N upward."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:drag-mass-fallacy",
+      "context": "physics-depth:drag-mass-fallacy:heavy-vs-light",
+      "move": "counter a mass-only fallacy by naming the drag factors that set terminal speed",
+      "prompt": "A student claims a 5 kg ball always reaches the ground before a 1 kg ball dropped from the same height in air. Explain why mass alone does not decide this.",
+      "marks": 2,
+      "scheme": [
+        "Terminal velocity depends on weight AND drag (area, shape, speed)",
+        "A light streamlined object can outfall a heavy flat one; without air both land together"
+      ],
+      "answer": "In air, terminal velocity balances weight against drag, which depends on size, shape and speed — not mass alone. A streamlined light object can fall faster than a flat heavy one, and in a vacuum both land together."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:drag-quadratic",
+      "context": "physics-depth:drag-quadratic:kv-squared",
+      "move": "solve a quadratic drag law for terminal speed",
+      "prompt": "A 0.50 kg ball experiences drag F = 0.20v² (v in m s⁻¹, F in N). Calculate its terminal velocity. (g = 9.81 m s⁻²)",
+      "marks": 3,
+      "scheme": [
+        "At terminal velocity mg = kv²",
+        "v = √(0.50 × 9.81 / 0.20) = √24.5",
+        "= 4.9 m s⁻¹"
+      ],
+      "answer": "Setting mg = kv² gives v = √(0.50×9.81/0.20) = √24.5 = 4.9 m s⁻¹."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:drag-dissipation",
+      "context": "physics-depth:drag-dissipation:rain-power",
+      "move": "combine terminal-velocity force balance with power as rate of energy dissipation",
+      "prompt": "A raindrop of mass 4.0×10⁻⁶ kg falls at a terminal velocity of 9.0 m s⁻¹. Calculate the rate at which it dissipates energy. (g = 9.81 m s⁻²)",
+      "marks": 3,
+      "scheme": [
+        "Drag = weight = 4.0e-6 × 9.81 = 3.92e-5 N",
+        "P = Fv = 3.92e-5 × 9.0",
+        "= 3.5 × 10⁻⁴ W"
+      ],
+      "answer": "The drag equals the weight, 4.0×10⁻⁶ × 9.81 = 3.92×10⁻⁵ N. Dissipated power is Fv = 3.92×10⁻⁵ × 9.0 = 3.5×10⁻⁴ W."
+    }
+  ]
+}

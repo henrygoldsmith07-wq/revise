@@ -53,6 +53,7 @@ function fakeClient(options: { failAfter?: number; signOutAfter?: number } = {})
       builder.gte = () => builder;
       builder.or = () => builder;
       builder.order = () => builder;
+      builder.gt = () => builder;
       builder.range = async () => ({ data: [], error: null });
       return builder;
     },
@@ -76,6 +77,7 @@ function pullClient(userId: string, rows: Record<string, Record<string, unknown>
         return builder;
       }) as never;
       builder.order = () => builder;
+      builder.gt = () => builder;
       builder.range = (async (from: number, to: number) => {
         state.range = [from, to];
         if (table === failTable) return { data: null, error: { message: "offline" } };

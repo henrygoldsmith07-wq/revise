@@ -1,0 +1,163 @@
+{
+  "topic": "momentum",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:momentum-definition",
+      "context": "physics-depth:momentum-definition:mv",
+      "move": "state the definition and vector nature of linear momentum",
+      "prompt": "Define linear momentum, including its unit and the property that makes it more informative than velocity alone.",
+      "marks": 3,
+      "scheme": [
+        "Momentum p = mv: mass multiplied by velocity",
+        "Unit: kg m s⁻¹ (equivalently N s)",
+        "It is a vector — direction matters, and it captures how hard it is to stop a body, not just how fast it moves"
+      ],
+      "answer": "Linear momentum is p = mv, measured in kg m s⁻¹. It is a vector, and it weights velocity by mass: a lorry at 2 m s⁻¹ is harder to stop than a tennis ball at 30 m s⁻¹ precisely because momentum, not speed, measures the stopping effort."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:impulse-definition",
+      "context": "physics-depth:impulse-definition:ft",
+      "move": "state the definition of impulse and its link to momentum change",
+      "prompt": "Define impulse, state its unit, and write its relation to momentum.",
+      "marks": 3,
+      "scheme": [
+        "Impulse = force × time for which it acts: J = FΔt",
+        "Unit: N s, identical to kg m s⁻¹",
+        "Impulse equals the change in momentum it produces: J = Δp"
+      ],
+      "answer": "Impulse is the product of a force and the time it acts, J = FΔt, in N s. It equals the momentum change it causes — the same units are no coincidence: N s and kg m s⁻¹ are the same physical thing."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:impulse-momentum-link",
+      "context": "physics-depth:impulse-momentum-link:second-law",
+      "move": "derive the impulse-momentum relation from Newton's second law",
+      "prompt": "Starting from Newton's second law in its momentum form, show that the impulse of a force equals the momentum change it produces.",
+      "marks": 3,
+      "scheme": [
+        "Newton's second law: resultant force F = rate of change of momentum = Δp/Δt",
+        "Rearrange: Δp = FΔt",
+        "FΔt is the impulse, so impulse = change in momentum"
+      ],
+      "answer": "The second law in momentum form says F = Δp/Δt. Multiplying through by Δt gives Δp = FΔt: the impulse (force × time) is exactly the momentum change it delivers. The familiar F = ma is just this with constant mass."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:cricket-catch",
+      "context": "physics-depth:cricket-catch:hands-moving-back",
+      "move": "apply the impulse relation to explain reducing force by extending time",
+      "prompt": "A cricketer catches a 0.16 kg ball moving at 40 m s⁻¹, bringing it to rest. Compare the average force on the hands if the stop takes 0.050 s versus pulling the hands back so it takes 0.20 s.",
+      "marks": 3,
+      "scheme": [
+        "Momentum change = 0.16 × 40 = 6.4 kg m s⁻¹ either way",
+        "Fast stop: F = Δp/Δt = 6.4/0.050 = 128 N",
+        "Slow stop: F = 6.4/0.20 = 16 N — one eighth of the force"
+      ],
+      "answer": "The ball's momentum changes by 6.4 kg m s⁻¹ regardless. Stopping in 0.050 s requires 128 N; stretching the stop to 0.20 s needs only 16 N — the same impulse spread over four times the time, one quarter the force. That is the whole art of catching with soft hands."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:impulse-from-graph",
+      "context": "physics-depth:impulse-from-graph:force-time-area",
+      "move": "compute impulse as the area under a force-time graph",
+      "prompt": "A force-time graph for a golf club striking a ball rises linearly from 0 to 800 N in 0.50 ms, then falls linearly to 0 in another 0.50 ms. Calculate the impulse delivered to the ball.",
+      "marks": 3,
+      "scheme": [
+        "Impulse = area under the force-time graph",
+        "Triangle area = ½ × base × height = ½ × (1.0×10⁻³) × 800",
+        "= 0.40 N s"
+      ],
+      "answer": "The triangular pulse has area ½×1.0×10⁻³ s×800 N = 0.40 N s. That impulse is the ball's momentum change — around 0.40 kg m s⁻¹, enough to send a 45 g ball away at nearly 9 m s⁻¹... and a driver launches it far faster because real contact forces run far higher."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:momentum-speed-confusion",
+      "context": "physics-depth:momentum-speed-confusion:small-fast-vs-large-slow",
+      "move": "reject speed as the measure of stopping difficulty",
+      "prompt": "A student claims a 20 g bullet at 400 m s⁻¹ has more momentum than a 2000 kg car at 2.0 m s⁻¹ because it is far faster. Compare the two momenta.",
+      "marks": 3,
+      "scheme": [
+        "Bullet: p = 0.020 × 400 = 8.0 kg m s⁻¹",
+        "Car: p = 2000 × 2.0 = 4000 kg m s⁻¹",
+        "The car carries 500 times the momentum despite its low speed"
+      ],
+      "answer": "The bullet carries 0.020×400 = 8.0 kg m s⁻¹; the car carries 2000×2.0 = 4000 kg m s⁻¹ — five hundred times more. Speed alone is a poor guide: momentum weights it by mass, and the slow car is vastly the harder one to stop."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:impulse-force-sign-fallacy",
+      "context": "physics-depth:impulse-force-sign-fallacy:rebound-direction",
+      "move": "reject computing momentum change as a difference of speeds without regard to direction",
+      "prompt": "A 0.50 kg ball hits a wall at 6.0 m s⁻¹ and rebounds at 4.0 m s⁻¹. A student writes Δp = 0.50(6.0 − 4.0) = 1.0 kg m s⁻¹. Identify the error and give the correct momentum change magnitude.",
+      "marks": 3,
+      "scheme": [
+        "Taking the incoming direction as positive, the rebound velocity is negative",
+        "Δp = m(v_final − v_initial) = 0.50(−4.0 − 6.0) = −5.0 kg m s⁻¹",
+        "Magnitude 5.0 kg m s⁻¹ — five times the student's answer"
+      ],
+      "answer": "The error is dropping the sign: the rebound reverses direction, so taking incoming as positive, Δp = 0.50(−4.0 − 6.0) = −5.0 kg m s⁻¹. The magnitude is 5.0 kg m s⁻¹, not 1.0 — the ball must be slowed AND re-launched the other way, and the wall supplies both."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:rocket-impulse",
+      "context": "physics-depth:rocket-impulse:exhaust-momentum",
+      "move": "transfer impulse reasoning to a rocket expelling exhaust",
+      "prompt": "A small rocket expels 0.020 kg of gas per second at 500 m s⁻¹ downward. Explain, using impulse, why the rocket is pushed upward, and calculate the thrust.",
+      "marks": 3,
+      "scheme": [
+        "The gas gains 0.020×500 = 10 kg m s⁻¹ of downward momentum each second",
+        "By Newton's third law the rocket gains equal upward momentum change per second",
+        "Thrust = rate of momentum change = 10 N upward"
+      ],
+      "answer": "Each second the exhaust gains 0.020×500 = 10 kg m s⁻¹ of downward momentum; momentum conservation hands the rocket an equal, opposite impulse. The thrust is the momentum flow rate: 10 N upward — rockets push on nothing but their own exhaust."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:squid-propulsion",
+      "context": "physics-depth:squid-propulsion:water-jet",
+      "move": "transfer impulse reasoning to a squid ejecting water",
+      "prompt": "A 0.60 kg squid at rest ejects 0.10 kg of water backward at 2.5 m s⁻¹ in one quick jet. Calculate the squid's recoil velocity, and estimate the average thrust if the jet lasts 0.040 s.",
+      "marks": 4,
+      "scheme": [
+        "Momentum conservation: 0 = 0.10×(−2.5) + 0.60v",
+        "v = 0.25/0.60 = 0.42 m s⁻¹ forward",
+        "Water impulse = 0.10×2.5 = 0.25 N s; same for the squid",
+        "Thrust = impulse/time = 0.25/0.040 = 6.3 N"
+      ],
+      "answer": "The ejected water carries 0.25 kg m s⁻¹ backward, so the 0.60 kg squid recoils at 0.25/0.60 = 0.42 m s⁻¹ forward. The jet's impulse of 0.25 N s delivered in 0.040 s is a thrust of 6.3 N — biology's version of the rocket equation."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:airbag-design-reasoning",
+      "context": "physics-depth:airbag-design-reasoning:crumple-comparison",
+      "move": "combine impulse, energy and pressure reasoning to compare protection methods",
+      "prompt": "In a 15 m s⁻¹ crash that brings a 70 kg occupant to rest, compare the average decelerating force if the stopping distance is (a) 0.10 m against a rigid dashboard and (b) 0.50 m with an airbag and crumple zone. Then explain why the airbag also reduces injury from pressure, not just force.",
+      "marks": 4,
+      "scheme": [
+        "(a) Work-energy: F×0.10 = ½×70×15² = 7875 J, so F = 7.9×10⁴ N",
+        "(b) F×0.50 = 7875 J gives F = 1.6×10⁴ N — a five-fold reduction",
+        "The impulse (1050 N s) is fixed by the momentum change; extending Δt divides the force",
+        "The airbag also spreads the contact over a much larger area, cutting the pressure on any one region"
+      ],
+      "answer": "The momentum change of 70×15 = 1050 N s is fixed, so only the stopping time can vary. Over 0.10 m the force is ½×70×15²/0.10 ≈ 79 kN; over 0.50 m it is about 16 kN — five times gentler. And because the bag deforms over a large contact area, the pressure on ribs and skull falls too: same impulse, shared wider."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:impulse-energy-contrast",
+      "context": "physics-depth:impulse-energy-contrast:momentum-vs-ke-change",
+      "move": "contrast momentum conservation with kinetic energy loss in a collision",
+      "prompt": "A 1000 kg car at 20 m s⁻¹ collides head-on with a stationary 1000 kg car and they lock together. Calculate the combined velocity from momentum conservation, and show that half the kinetic energy has gone missing — then explain where it went.",
+      "marks": 4,
+      "scheme": [
+        "Total momentum: 1000×20 = 2000v → v = 10 m s⁻¹",
+        "KE before = ½×1000×400 = 2.0×10⁵ J",
+        "KE after = ½×2000×100 = 1.0×10⁵ J",
+        "Half the KE is gone — deformed metal, heat and sound: momentum is conserved, kinetic energy is not"
+      ],
+      "answer": "Momentum is conserved: 2000 kg m s⁻¹ is shared by 2000 kg, so the wreck moves at 10 m s⁻¹. But KE fell from 200 kJ to 100 kJ — the missing half went into crumpling the cars, heat and sound. In inelastic collisions momentum survives; kinetic energy does not have to."
+    }
+  ]
+}

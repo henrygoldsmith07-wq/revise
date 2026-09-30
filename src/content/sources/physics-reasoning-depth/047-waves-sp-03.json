@@ -1,0 +1,179 @@
+{
+  "topic": "waves",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:stationary-formation-conditions",
+      "context": "physics-depth:stationary-formation-conditions:identical-opposite",
+      "move": "state the two-wave requirements for forming a stationary wave",
+      "prompt": "State the requirements on two progressive waves for them to form a stationary wave.",
+      "marks": 3,
+      "scheme": [
+        "Equal frequency and wavelength, equal amplitude, and a fixed phase relationship",
+        "Travelling in opposite directions along the same line",
+        "Their superposition is stationary: ideal nodes have zero displacement and antinodes have maximum displacement"
+      ],
+      "answer": "An ideal stationary wave is formed by two coherent waves of equal frequency, wavelength and amplitude travelling in opposite directions along the same line. Their interference fixes zero-displacement nodes and maximum-displacement antinodes instead of a travelling pattern."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:node-antinode-spacing",
+      "context": "physics-depth:node-antinode-spacing:half-wavelength-grid",
+      "move": "define node and antinode and state the characteristic spacings",
+      "prompt": "Define a node and an antinode of a stationary wave, and state the distance between adjacent nodes and between a node and its neighbouring antinode.",
+      "marks": 3,
+      "scheme": [
+        "Node: zero displacement — waves arrive in antiphase",
+        "Antinode: maximum displacement — waves arrive in phase",
+        "Node to node: λ/2; node to adjacent antinode: λ/4"
+      ],
+      "answer": "Nodes are points that never move (perfect destructive interference); antinodes swing hardest (constructive). The grid is fixed: neighbouring nodes half a wavelength apart, node-to-antinode a quarter."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:no-net-energy-flow",
+      "context": "physics-depth:no-net-energy-flow:cancelling-fluxes",
+      "move": "explain why a stationary wave transports no net energy along the medium",
+      "prompt": "Each of the two progressive waves carries energy. Explain why the stationary pattern they form transmits none.",
+      "marks": 3,
+      "scheme": [
+        "Equal energy fluxes travel in opposite directions and cancel on average",
+        "Energy is trapped, sloshing between kinetic and potential within each loop",
+        "Antinodes and nodes only redistribute where the sloshing is visible"
+      ],
+      "answer": "The pair send identical energy streams in opposite directions — their net flow is zero. Energy is confined, exchanging kinetic and elastic form inside each loop: the stationary wave is energy standing still in place, not vanishing."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:microwave-node-measure",
+      "context": "physics-depth:microwave-node-measure:probe-spacing",
+      "move": "extract wavelength from measured node spacing in a standing microwave pattern",
+      "prompt": "A probe detects five successive minima spaced 3.0 cm apart along a microwave standing wave set up by reflection from a metal plate. Determine the wavelength and the frequency of the microwaves.",
+      "marks": 3,
+      "scheme": [
+        "Node-to-node distance = λ/2 = 3.0 cm, so λ = 6.0 cm",
+        "f = c/λ = 3.0×10⁸/0.060",
+        "= 5.0×10⁹ Hz (5 GHz)"
+      ],
+      "answer": "Five minima mean 3.0 cm is half a wavelength: λ = 6.0 cm, and f = c/λ = 3×10⁸/0.060 = 5 GHz. Counting cold spots is a metre rule's way of weighing light."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:node-annihilation-fallacy",
+      "context": "physics-depth:node-annihilation-fallacy:cancel-not-destroy",
+      "move": "reject the idea that waves are destroyed at nodes",
+      "prompt": "A student says at a node the two waves 'cancel each other out of existence'. Explain what cancellation does and does not remove.",
+      "marks": 3,
+      "scheme": [
+        "Only the displacement sums to zero — the waves' energy and identities survive",
+        "The waves pass through each other unchanged, as always in superposition",
+        "Evidence: past a node the antinode swings; remove one source and all energy returns to travelling"
+      ],
+      "answer": "Nodes cancel displacement, never existence: the two waves glide through one another intact, continuing on. The proof is next door — the antinode's vigour shows the energy is still present, merely parked. Superposition subtracts motion at points; it does not subtract waves."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:loop-equals-wavelength-fallacy",
+      "context": "physics-depth:loop-equals-wavelength-fallacy:half-wave-loops",
+      "move": "correct loop-length-equals-wavelength confusion in stationary patterns",
+      "prompt": "A string vibrating in one loop (nodes at both ends) has length L. A student writes λ = L. Correct the claim and state the true relation for the fundamental.",
+      "marks": 3,
+      "scheme": [
+        "One loop is half a wavelength: nodes are λ/2 apart",
+        "So λ = 2L for the fundamental",
+        "The full wave needs the loop plus its mirror half"
+      ],
+      "answer": "A loop spans node to node — exactly half a wavelength — so the fundamental has λ = 2L, not L. The string holds half a wave; the other half is borrowed from the reflection."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:string-fundamental-calc",
+      "context": "physics-depth:string-fundamental-calc:guitar-frequency",
+      "move": "compute fundamental frequency from string length and wave speed",
+      "prompt": "A guitar string's fixed points are 0.64 m apart and waves travel along it at 320 m s⁻¹. Calculate the wavelength and frequency of its fundamental vibration.",
+      "marks": 3,
+      "scheme": [
+        "Fundamental: λ = 2L = 2×0.64 = 1.28 m",
+        "f = v/λ = 320/1.28",
+        "= 250 Hz"
+      ],
+      "answer": "The fundamental fits one loop between the bridges: λ = 2L = 1.28 m, so f = v/λ = 320/1.28 = 250 Hz — a middle C, roughly, of the string's own voice."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:closed-pipe-resonance",
+      "context": "physics-depth:closed-pipe-resonance:odd-quarters",
+      "move": "compute resonant frequencies of a closed pipe by counting quarter-wavelength steps",
+      "prompt": "A pipe closed at one end is 0.40 m long. Calculate its fundamental frequency and its next allowed resonance. (speed of sound = 340 m s⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "Closed end node + open end antinode: L = λ/4 fundamental",
+        "λ₁ = 4L = 1.6 m → f₁ = 340/1.6 = 212.5 Hz",
+        "Next allowed resonance is the third harmonic: L = 3λ/4 → f₃ = 3f₁ = 637.5 Hz",
+        "Even harmonics are impossible: no antinode–node pairing fits"
+      ],
+      "answer": "A closed pipe must start at a node and end at an antinode: L = λ/4 gives f₁ = 212.5 Hz, and the next fit is three quarter-waves: f₃ = 3f₁ ≈ 638 Hz. Only odd harmonics answer — the pipe's geometry vetoes the even ones."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:microwave-oven-cold-spots",
+      "context": "physics-depth:microwave-oven-cold-spots:turntable-duty",
+      "move": "transfer node-spacing reasoning to the uneven heating in a microwave oven",
+      "prompt": "A microwave oven (2.45 GHz) leaves cold bands in unmoved food. Calculate the spacing of the standing-wave nodes in the cavity and explain why a turntable is the fix.",
+      "marks": 3,
+      "scheme": [
+        "λ = c/f = 3×10⁸/2.45×10⁹ ≈ 12 cm",
+        "Nodes every λ/2 ≈ 6 cm — the cavity walls set up a stationary pattern",
+        "Cold bands mark the nodes; rotating carries every part of the food through them and the antinodes"
+      ],
+      "answer": "At 2.45 GHz λ ≈ 12 cm, so the reflected waves freeze into nodes every ~6 cm — precisely the cold spacing measured across an unmoved plate. The turntable is the standing-wave antidote: spin the food, and every bite samples both node and antinode."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:bridge-mode-shapes",
+      "context": "physics-depth:bridge-mode-shapes:walking-frequency",
+      "move": "transfer standing-wave boundary conditions to a bridge's dangerous resonant mode shapes",
+      "prompt": "Marching soldiers break step across a bridge. Using the string analogy — fixed ends, allowed half-wavelengths — explain why one step rate can be far worse than others.",
+      "marks": 4,
+      "scheme": [
+        "A span clamped at both ends admits only standing waves with L = nλ/2",
+        "Each mode has its own natural frequency f = nv/2L",
+        "Rhythmic steps matching a mode pump energy in; off-resonance steps largely miss",
+        "Breaking step removes the periodic shove that could lock onto a mode"
+      ],
+      "answer": "A bridge, like a string, stores only half-wavelengths: L = nλ/2, each mode ringing at a fixed frequency. Marching feet deliver impulses at a chosen rate — and if that rate matches a mode, every step lands on the swing and energy piles up. Off step, the pushes stop phasing with the bridge and the danger passes."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:standing-form-derivation",
+      "context": "physics-depth:standing-form-derivation:sum-of-sines",
+      "move": "combine the superposition principle with wave functions to derive the stationary form and node spacing",
+      "prompt": "Two waves y₁ = A sin(ωt − kx) and y₂ = A sin(ωt + kx) travel in opposite directions. Their sum is y = 2A sin kx cos ωt (you may use this result). Explain from the form why nodes sit at x = 0, λ/2, λ, … and why no energy travels.",
+      "marks": 4,
+      "scheme": [
+        "The shape factor sin kx is time-independent — the amplitude envelope stands still",
+        "Nodes where sin kx = 0: kx = nπ → x = nλ/2",
+        "Time part cos ωt makes every point oscillate together — a breathing shape, not a travelling one",
+        "Equal ±x fluxes in y₁, y₂ cancel: the net energy flow is zero"
+      ],
+      "answer": "The sum factors into a fixed shape 2A sin kx and a common heartbeat cos ωt: positions of zero amplitude satisfy kx = nπ, i.e. x = nλ/2 — a standing grid. Since the envelope never moves, and the two travelling halves carried equal opposite fluxes, energy simply oscillates in place. The algebra holds the whole picture: nodes by geometry, stillness by factorisation."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:resonance-tube-speed",
+      "context": "physics-depth:resonance-tube-speed:two-lengths-one-speed",
+      "move": "combine closed-pipe resonance with the wave equation to measure sound speed while cancelling the end correction",
+      "prompt": "A tube dipped in water resonates with a 512 Hz tuning fork at lengths 0.160 m and 0.490 m (first and second resonances). Write the λ–L relations including the end correction e, subtract them to remove e, and calculate the speed of sound.",
+      "marks": 5,
+      "scheme": [
+        "Resonances: L₁ + e = λ/4 and L₂ + e = 3λ/4",
+        "Subtract: L₂ − L₁ = λ/2 = 0.330 m → λ = 0.660 m",
+        "v = fλ = 512 × 0.660",
+        "= 338 m s⁻¹",
+        "The end correction cancels — a two-reading method needs no guess for e"
+      ],
+      "answer": "Each resonance satisfies L + e = (odd)λ/4. The two equations differ by exactly λ/2, so 0.490 − 0.160 = 0.330 m is λ/2: λ = 0.660 m and v = 512×0.660 ≈ 338 m s⁻¹. Subtracting the resonance pair eliminates the mouth's end correction — two lengths, one honest speed."
+    }
+  ]
+}

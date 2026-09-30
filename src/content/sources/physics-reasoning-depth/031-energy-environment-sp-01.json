@@ -1,0 +1,194 @@
+{
+  "topic": "energy-environment",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:capacity-factor-definition",
+      "context": "physics-depth:capacity-factor-definition:energy-vs-power",
+      "move": "state the distinction between a plant's power rating and its delivered energy",
+      "prompt": "Distinguish between the rated power and the annual energy output of a generating plant, naming the quantity that links them.",
+      "marks": 3,
+      "scheme": [
+        "Rated power is the maximum instantaneous output (MW)",
+        "Annual energy output is the total delivered (MWh or TWh)",
+        "The capacity factor links them: energy = rated power × hours × capacity factor"
+      ],
+      "answer": "Rated power is an instantaneous ceiling in MW; annual energy is what actually arrives, in MWh. The capacity factor — the fraction of the year the plant runs at full tilt — converts one into the other: energy = power × 8760 h × capacity factor."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:efficiency-definition-energy",
+      "context": "physics-depth:efficiency-definition-energy:useful-over-input",
+      "move": "state the efficiency definition and its limits as a comparison metric",
+      "prompt": "State the definition of efficiency for an energy system, and explain why two systems with the same efficiency may still be very different.",
+      "marks": 3,
+      "scheme": [
+        "Efficiency = useful energy (or power) output ÷ total energy (or power) input",
+        "It says nothing about reliability, when the output is available, or the resource's cost and emissions",
+        "A 40% wind turbine and a 40% coal plant deliver very different products: one intermittent, one dispatchable"
+      ],
+      "answer": "Efficiency is useful output over total input — but it measures conversion quality only. A 40%-efficient wind farm and a 40%-efficient coal station share a number while differing in when, how reliably, and at what external cost the energy arrives. Efficiency is one axis of a multi-dimensional comparison."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:intermittency-dispatchability",
+      "context": "physics-depth:intermittency-dispatchability:grid-balancing",
+      "move": "explain why dispatchability matters as much as average power",
+      "prompt": "Two sources each average 500 MW of output: a nuclear plant and a solar-and-wind portfolio. Explain why the grid treats them differently despite the equal averages.",
+      "marks": 3,
+      "scheme": [
+        "Nuclear is dispatchable/controllable — its 500 MW is available on demand, day or night",
+        "Solar and wind are weather-driven — output arrives when nature chooses, not the grid",
+        "Matching demand to supply requires storage, backup or curtailment for the intermittent portfolio"
+      ],
+      "answer": "Averages hide timing. The nuclear plant's 500 MW can be ordered up at 6 p.m. on a windless winter evening; the renewables' 500 MW is a statistical average with output concentrated at times nature chooses. A grid can be run on demand-following power; on weather it needs storage, backup, or acceptance of blackouts — the hidden engineering behind identical averages."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:capacity-factor-compute",
+      "context": "physics-depth:capacity-factor-compute:annual-energy",
+      "move": "compute annual energy from capacity factor and compare two rated plants",
+      "prompt": "A 30 MW wind farm runs at a 32% capacity factor; a 15 MW hydro plant runs at 55%. Calculate the annual energy output of each, in GWh.",
+      "marks": 4,
+      "scheme": [
+        "Wind: 30 MW × 8760 h × 0.32 = 84 096 MWh ≈ 84 GWh",
+        "Hydro: 15 MW × 8760 h × 0.55 = 72 270 MWh ≈ 72 GWh",
+        "The larger nameplate delivers only ~17% more energy despite being twice the rating",
+        "Capacity factor, not nameplate, sets delivered energy"
+      ],
+      "answer": "Wind: 30×8760×0.32 ≈ 84 GWh. Hydro: 15×8760×0.55 ≈ 72 GWh. The twice-as-big wind farm delivers only about a sixth more energy — capacity factor does the quiet arithmetic that nameplate marketing hides."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:efficiency-chain-energy",
+      "context": "physics-depth:efficiency-chain-energy:multi-stage-conversion",
+      "move": "chain multiple conversion efficiencies to find overall system performance",
+      "prompt": "A solar panel converts 20% of incident light to DC electricity; the inverter passes 96%; transmission delivers 92% of that to the point of use. Calculate the overall efficiency, and the land-area implication if a house needs 3.0 kW average and sunlight averages 150 W m⁻².",
+      "marks": 4,
+      "scheme": [
+        "Overall: 0.20 × 0.96 × 0.92 = 0.177 ≈ 18%",
+        "Required incident power: 3000/0.177 = 17 000 W",
+        "Area = 17 000/150 = 113 m²",
+        "About 110 m² of panel — roughly a tennis court's half — for one home's average demand"
+      ],
+      "answer": "The chain multiplies: 0.20×0.96×0.92 ≈ 18% overall. Meeting 3.0 kW means intercepting 17 kW of sunlight, which at 150 W m⁻² averages calls for about 110 m² of panels. Chained efficiencies compound into the land-area bill that energy-density arguments hinge on."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:free-fuel-efficient-fallacy",
+      "context": "physics-depth:free-fuel-efficient-fallacy:efficiency-labels",
+      "move": "reject equating free fuel with high efficiency",
+      "prompt": "A student says solar power must be nearly 100% efficient 'because sunlight is free'. Separate the two concepts the student has confused.",
+      "marks": 3,
+      "scheme": [
+        "Efficiency measures conversion: photons in versus electricity out — for commercial panels, ~20%",
+        "Fuel cost measures economics: zero-cost input does not raise conversion efficiency",
+        "A wasteful converter of a free resource is still wasteful — it just wastes cheap input"
+      ],
+      "answer": "Efficiency is conversion quality — photons to electrons — and commercial silicon manages only ~20%. That sunlight costs nothing is an economic statement about the input, not a physical statement about conversion. A 20%-efficient device wasting a free resource is still 80% wasteful; it is merely wasting something nobody charges for."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:power-energy-swap-fallacy",
+      "context": "physics-depth:power-energy-swap-fallacy:battery-rating",
+      "move": "reject treating a power rating as an energy quantity",
+      "prompt": "A news report praises a 'game-changing 100 MW battery'. A student assumes this means it can power 100 MW 'for a long time'. Explain the missing quantity and give a concrete example.",
+      "marks": 3,
+      "scheme": [
+        "100 MW is a power rating — an energy flow rate",
+        "Batteries also have an energy capacity in MWh, which sets how long the flow lasts",
+        "A 100 MW / 400 MWh battery runs at full power for only 4 hours — the two numbers must both be quoted"
+      ],
+      "answer": "The 100 MW is a rate of delivery — how fast, not how much. A battery's endurance is its energy capacity in MWh: a 100 MW/400 MWh system drains in four hours at full tilt. Quoting one without the other is like quoting a car's top speed without its fuel tank — technically true, practically meaningless."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:pumped-storage-energy",
+      "context": "physics-depth:pumped-storage-energy:reservoir-budget",
+      "move": "compute the energy stored in a pumped-storage scheme and its round-trip delivery",
+      "prompt": "A pumped-storage station pumps water to a reservoir 380 m above its turbines, storing 8.0×10⁶ m³. With 90% turbine-generator efficiency, calculate the electrical energy deliverable. (ρ = 1000 kg m⁻³, g = 9.81 m s⁻²; give 2 s.f.)",
+      "marks": 4,
+      "scheme": [
+        "Mass of water: m = 8.0×10⁶ × 1000 = 8.0×10⁹ kg",
+        "Gravitational energy: E = mgh = 8.0×10⁹ × 9.81 × 380 = 2.98×10¹³ J",
+        "Deliverable at 90%: 2.7×10¹³ J",
+        "≈ 7.4 GWh (2.7×10¹³/3.6×10⁹ J per kWh)"
+      ],
+      "answer": "Eight million tonnes of water lifted 380 m stores mgh = 3.0×10¹³ J, of which the turbines return 90%: 2.7×10¹³ J ≈ 7.4 GWh — the scale of a national peaker plant built from geography instead of chemistry."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:ev-battery-arithmetic",
+      "context": "physics-depth:ev-battery-arithmetic:driving-energy",
+      "move": "transfer energy and power reasoning to an electric vehicle's battery",
+      "prompt": "An electric car uses 0.20 kWh per km at 90 km h⁻¹. Its battery holds 60 kWh. Calculate the driving range and the average power drawn at that speed. Then state how long a 100 kW fast charger needs to deliver a full charge (charging losses ignored).",
+      "marks": 4,
+      "scheme": [
+        "Range: 60/0.20 = 300 km",
+        "Power: 0.20 kWh/km × 90 km/h = 18 kW average draw",
+        "Charging at 100 kW: 60/100 = 0.60 h ≈ 36 min",
+        "Energy (kWh), power (kW) and time (h) link through E = Pt"
+      ],
+      "answer": "At 0.20 kWh km⁻¹ the 60 kWh pack drives 300 km, while cruising at 90 km h⁻¹ draws 18 kW. Refilling 60 kWh from a 100 kW charger takes 60/100 = 0.6 h — 36 minutes. The kWh–kW–hour triangle is the whole story of EV practicality."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:hydro-power-baseline",
+      "context": "physics-depth:hydro-power-baseline:dam-flow",
+      "move": "compute the continuous power available from a dam's flow rate",
+      "prompt": "A hydroelectric dam releases 60 m³ s⁻¹ of water falling 50 m to its turbines, which convert 88% of the available energy. Calculate the mean electrical power. (ρ = 1000 kg m⁻³, g = 9.81 m s⁻²)",
+      "marks": 3,
+      "scheme": [
+        "Per-second mass flow: 60 m³ × 1000 = 6.0×10⁴ kg s⁻¹",
+        "Available power: mgh per second = 6.0×10⁴ × 9.81 × 50 = 2.94×10⁷ W",
+        "Electrical: 0.88 × 2.94×10⁷ ≈ 26 MW"
+      ],
+      "answer": "Each second, 6.0×10⁴ kg of water drops 50 m, delivering mgh = 29.4 MW of mechanical power; at 88% conversion the grid receives about 26 MW — a steady, dispatchable 26 MW that a wind farm of ten times the nameplate would struggle to match hour by hour."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:heat-pump-cop",
+      "context": "physics-depth:heat-pump-cop:efficiency-reframe",
+      "move": "transfer efficiency thinking to a heat pump whose COP exceeds 100%",
+      "prompt": "An air-source heat pump delivers 3.2 kW of heating while drawing 0.8 kW of electricity — an efficiency of 400% by naive reckoning. Explain why this does not violate energy conservation, and what the proper performance metric is.",
+      "marks": 3,
+      "scheme": [
+        "The pump moves heat from outside air rather than converting electricity to heat",
+        "Energy delivered = electrical input + heat extracted from the environment",
+        "The proper metric is the coefficient of performance: COP = heat out ÷ work in = 4.0 here"
+      ],
+      "answer": "Nothing is violated: the electricity drives a pump that lifts heat from the cold outside air into the warm house, so the delivered heat is the electrical input plus the environmental heat gathered. The honest metric is the coefficient of performance — here COP = 3.2/0.8 = 4 — which counts heat moved per unit of work, not energy created."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:grid-carbon-displacement",
+      "context": "physics-depth:grid-carbon-displacement:marginal-emissions",
+      "move": "combine capacity factors with emissions accounting to evaluate a claim",
+      "prompt": "A country adds 10 GW of wind at 30% capacity factor to a grid where the marginal generator is a coal plant emitting 0.90 tCO₂ MWh⁻¹. Estimate the annual emissions displaced, and explain why the real saving is usually lower.",
+      "marks": 4,
+      "scheme": [
+        "Wind energy: 10 000 MW × 8760 h × 0.30 = 26.3 TWh",
+        "Coal displaced: 26.3 TWh × 0.90 t/MWh = 23.6 MtCO₂ per year",
+        "But when wind output collapses, backup (often gas) must run; some wind is curtailed when demand is low",
+        "Real displacement < 23.6 Mt because of backup emissions, curtailment and grid constraints"
+      ],
+      "answer": "The arithmetic ceiling: 10 GW at 30% gives 26.3 TWh, displacing 26.3 million MWh of coal at 0.90 t each — up to 24 MtCO₂ per year. The real figure is lower because backup plants emit while wind is idle, some wind is curtailed when demand cannot absorb it, and grids constrain delivery: the marginal accounting, not the nameplate, decides the tonnage."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:national-energy-budget",
+      "context": "physics-depth:national-energy-budget:supply-demand-match",
+      "move": "combine demand profiles, capacity factors and storage into a national-scale feasibility judgement",
+      "prompt": "A nation averaging 40 GW of electricity demand wants to supply it with 60% wind (40% capacity factor) and 40% solar (15% capacity factor). Calculate the required nameplate powers, and explain the seasonal storage problem the mix creates.",
+      "marks": 4,
+      "scheme": [
+        "Wind must average 24 GW: nameplate = 24/0.40 = 60 GW",
+        "Solar must average 16 GW: nameplate = 16/0.15 ≈ 107 GW",
+        "Winter demand peaks while solar output collapses to a few per cent — the mismatch concentrates in winter",
+        "Multi-week storage (or overbuild/curtailment) is needed to bridge calm, dark spells — tens of TWh"
+      ],
+      "answer": "Nameplates: wind 24/0.40 = 60 GW; solar 16/0.15 ≈ 107 GW — huge but buildable. The bind is seasonal: demand peaks in winter exactly when solar's factor craters, so the nation must bridge weeks of low wind and darkness, demanding tens of TWh of storage or deliberate overbuild-and-curtail. The average balances on paper; the winter is the physics problem."
+    }
+  ]
+}

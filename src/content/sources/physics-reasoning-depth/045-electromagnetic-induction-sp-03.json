@@ -1,0 +1,182 @@
+{
+  "topic": "electromagnetic-induction",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:slip-ring-function",
+      "context": "physics-depth:slip-ring-function:continuous-ac-contact",
+      "move": "state what slip rings do in an AC generator",
+      "prompt": "State the function of slip rings in a simple alternating generator.",
+      "marks": 2,
+      "scheme": [
+        "Slip rings give a continuous, unswitched connection from the rotating coil to the stationary circuit",
+        "The current's natural reversals in the coil pass through unchanged — the output is AC"
+      ],
+      "answer": "Slip rings keep the spinning coil wired to the external circuit without reversing anything: each ring rides under its brush all the way round, so the alternating current inside the coil arrives outside still alternating."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:commutator-function",
+      "context": "physics-depth:commutator-function:half-turn-swap",
+      "move": "state what a split-ring commutator does and the waveform it yields",
+      "prompt": "State how a split-ring commutator changes a generator's output, and name the resulting current type.",
+      "marks": 3,
+      "scheme": [
+        "It swaps the coil's external connections every half-turn, exactly as the coil's current reverses",
+        "The external current therefore keeps one direction but pulsates in size",
+        "Output is direct current (pulsating DC)"
+      ],
+      "answer": "The split ring reverses which brush each coil end talks to at every half-turn — precisely when the coil's own current flips — so the external current never changes direction, merely rises and dips: a pulsating DC."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:sinusoid-explanation",
+      "context": "physics-depth:sinusoid-explanation:cos-flux-sin-emf",
+      "move": "explain why a spinning coil's emf is sinusoidal rather than square or triangular",
+      "prompt": "Explain, using the coil's orientation during rotation, why the induced emf of a spinning coil is a sine wave.",
+      "marks": 4,
+      "scheme": [
+        "Flux linkage is Φ = NBA cos ωt as the coil angle grows linearly with time",
+        "Only the rate of change induces: ε = −dΦ/dt = NBAω sin ωt",
+        "Edge-on (max rate) gives peak emf; face-on (max flux, zero rate) gives none",
+        "The slope of a cosine is a sine — the wave shape is a derivative in disguise"
+      ],
+      "answer": "As the coil spins uniformly, its flux traces a cosine — fastest changing edge-on, momentarily flat face-on. Faraday reads the rate of that change, so the emf traces its derivative: a sine, peaking when flux crosses zero and vanishing at peak flux. The smooth waveform is geometry differentiated."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:rings-versus-split",
+      "context": "physics-depth:rings-versus-split:waveform-prediction",
+      "move": "predict the output traces of the same spinning coil with slip rings versus a commutator",
+      "prompt": "The same coil, spun identically, is wired first through slip rings, then through a split-ring commutator. Describe the two traces an oscilloscope shows and identify the shared quantity they agree on.",
+      "marks": 4,
+      "scheme": [
+        "Slip rings: a symmetric sine about zero, equal positive and negative half-cycles",
+        "Commutator: the negative half-cycles flip above the axis — a train of positive bumps, zero crossings twice per turn",
+        "Same frequency of reversal in the coil; same peak magnitude either way",
+        "The rms value of the bumps is the same magnitude as the sine's rms — rectification moves charge, not energy"
+      ],
+      "answer": "With slip rings the scope draws the full ± sine; with the commutator the troughs fold upward into repeated humps. The peak heights and the underlying frequency agree — the commutator has only decided which way is 'out', not how much."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:device-output-matching",
+      "context": "physics-depth:device-output-matching:which-machine-for-which-job",
+      "move": "select the generator wiring that suits a stated energy need and justify by waveform physics",
+      "prompt": "Two jobs: charge a battery (needs one-direction current) and drive a transformer-fed mains supply (needs changing current). State the coil-contact arrangement for each and why a transformer fails on the other arrangement's raw output.",
+      "marks": 3,
+      "scheme": [
+        "Battery: commutator (DC), so charge flows one way into the cell",
+        "Mains: slip rings — AC whose changing current the transformer's core can couple",
+        "A transformer on steady commutated DC after smoothing would see no changing flux and output nothing; the pulsating form would work only through rectification+chopping"
+      ],
+      "answer": "The charger wants a commutator's one-way push to fill the cell; the grid wants slip rings' alternation, because a transformer only transfers power through changing flux. Feed a transformer a smoothed DC and its secondary goes silent — the coil's reversal rate is its paycheck."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:commutator-reverses-coil-current-fallacy",
+      "context": "physics-depth:commutator-reverses-coil-current-fallacy:external-only-switch",
+      "move": "reject the claim that a commutator makes the coil's own current direct",
+      "prompt": "A student says the commutator makes the current in the coil itself unidirectional. Correct this and identify exactly what the device switches.",
+      "marks": 3,
+      "scheme": [
+        "The coil's current is AC throughout — reversal is induced by the physics of rotation, no hardware can veto it",
+        "The commutator swaps the connections to the outside circuit at each reversal",
+        "Only the external branch sees the one-direction result"
+      ],
+      "answer": "Inside the coil the current flips every half-turn regardless — Faraday's law writes that reversal, and no contact strips can countermand it. The commutator only re-labels the terminals each time it happens, so the outside world sees one-way current. It steers the exit, not the engine."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:motor-cannot-generate-fallacy",
+      "context": "physics-depth:motor-cannot-generate-fallacy:single-machine-two-jobs",
+      "move": "reject the belief that a motor's winding cannot act as a generator",
+      "prompt": "A student claims an electric motor's coils are built to consume power and can never generate. Explain why the same spinning coils necessarily generate an emf, and where motor circuits call it a nuisance but regenerative braking calls it a feature.",
+      "marks": 3,
+      "scheme": [
+        "Any coil turning in a field has changing flux linkage and develops an emf — generator physics has no exceptions",
+        "In a powered motor this induced emf opposes the supply (back emf) — it is the same Lenz-law opposition that makes motors self-limiting",
+        "With the supply removed and wheels driving the coils, that emf feeds energy outward: regeneration"
+      ],
+      "answer": "A spinning coil generating emf is induction, not intention — the motor's armature can't opt out. Fed from the mains it fights the supply as back-emf, which is why motors draw less current at speed; unplug the drive and let the wheels spin it, and that same emf now exports the car's kinetic energy as current. One machine, two directions of energy — Lenz's law is the hinge."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:quarter-turn-average-emf",
+      "context": "physics-depth:quarter-turn-average-emf:delta-over-time",
+      "move": "compute the average emf over a quarter-turn as flux swings from max to zero",
+      "prompt": "A 300-turn coil of area 2.5×10⁻³ m² spins at 50 rev s⁻¹ in a 0.060 T field. Calculate the average emf induced during the quarter-turn from face-on to edge-on.",
+      "marks": 4,
+      "scheme": [
+        "ΔΦ per turn = BA = 0.060×2.5×10⁻³ = 1.5×10⁻⁴ Wb",
+        "Quarter turn at 50 rev s⁻¹: Δt = (1/4)/50 = 5.0×10⁻³ s",
+        "ε_avg = NΔΦ/Δt = 300×1.5×10⁻⁴/5.0×10⁻³",
+        "= 9.0 V"
+      ],
+      "answer": "One quarter-turn changes each turn's flux by BA = 1.5×10⁻⁴ Wb in (1/4)/50 = 5 ms. Averaged over that sweep, ε = NΔΦ/Δt = 9.0 V — a quarter-slice of the full sine, lower than its 14 V peak because the average of a rising slope is not its maximum."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:rms-power-lamp",
+      "context": "physics-depth:rms-power-lamp:heater-on-a-generator",
+      "move": "apply rms conversion to a generator's peak emf and compute delivered power",
+      "prompt": "A generator's peak emf is 20.0 V. It feeds a 6.0 Ω resistive heater. Calculate the rms voltage, rms current and mean power dissipated.",
+      "marks": 4,
+      "scheme": [
+        "V_rms = 20.0/√2 = 14.1 V",
+        "I_rms = 14.1/6.0 = 2.36 A",
+        "P = V_rms I_rms = 14.1×2.36 ≈ 33 W",
+        "(Check: P = V₀²/2R = 400/12 = 33 W ✓)"
+      ],
+      "answer": "The heater sees V_rms = 20/√2 = 14.1 V driving I_rms = 2.36 A — mean power 14.1×2.36 ≈ 33 W, identical to V₀²/2R. Power bills are written in rms, never in peaks, and this is that arithmetic in one line."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:alternator-rotating-field",
+      "context": "physics-depth:alternator-rotating-field:car-electrical-system",
+      "move": "transfer the rotating-coil model to a car alternator's rotating field and fixed windings",
+      "prompt": "A car alternator spins an electromagnet between stationary three-phase windings and outputs DC. Explain, transferring the generator model, why the coils stand still and which device replaces the old dynamo's commutator.",
+      "marks": 4,
+      "scheme": [
+        "Stationary windings avoid commutating huge currents through brushes — a spinning field keeps flux linkage changing in them instead",
+        "Their three-phase AC is rectified by a diode bridge (solid-state commutation)",
+        "The rotor's field current is small and slip-ring fed, needing no heavy switches",
+        "So AC generation plus electronic rectification replaces a mechanical DC generator"
+      ],
+      "answer": "Swap the roles: the weak magnetic field spins while the heavy current comes from fixed coils — Faraday only cares about relative change, so generation is intact without brushes hauling amps. The commutator's job — one-way output — is done by diodes instead: the dynamo becomes an alternator plus a bridge, and a car stops needing a spark-prone rotating switch."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:dynamo-load-drag",
+      "context": "physics-depth:dynamo-load-drag:power-in-equals-power-out",
+      "move": "combine back-torque from Lenz's law with electrical power to explain why a lit dynamo is harder to pedal",
+      "prompt": "A bicycle dynamo (V_rms = 6.0 V) lights a lamp drawing 1.2 A. The wheel radius is 0.35 m and the dynamo roller contacts near it; assume 80% conversion to electrical power. Estimate the extra resistive force the tyre must supply at 5.0 m s⁻¹.",
+      "marks": 5,
+      "scheme": [
+        "Electrical power out = 6.0×1.2 = 7.2 W",
+        "Mechanical power needed = 7.2/0.80 = 9.0 W",
+        "At wheel speed 5.0 m s⁻¹, force = P/v = 9.0/5.0",
+        "= 1.8 N extra drag",
+        "That force is the tyre doing the Lenz-law work the lamp demands"
+      ],
+      "answer": "The lamp takes 7.2 W of electrical power, costing 9.0 W at the wheel — which at 5.0 m s⁻¹ means an extra 1.8 N of retarding force. Switch the light on and the bike slows: the induced currents' Lenz-law back-torque has been paid for in tyre-work, energy conservation felt in the calf."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:turbine-gear-chain",
+      "context": "physics-depth:turbine-gear-chain:from-rotor-to-grid",
+      "move": "combine Faraday scaling with transformer step-up to reason about wind-turbine output",
+      "prompt": "A wind turbine's rotor turns the generator shaft at 20 times the blade speed. Blades sweep at 12 rev min⁻¹; the generator peak emf at that speed is 2.4 kV. Calculate the shaft speed and explain, chaining Faraday's and the transformer's laws, what happens to (i) the emf if wind doubles blade rate and (ii) the current after stepping up to 25 kV for the grid.",
+      "marks": 5,
+      "scheme": [
+        "Shaft: 12×20 = 240 rev min⁻¹ = 4.0 rev s⁻¹",
+        "Faraday: ε₀ = NBAω ∝ ω — doubled wind doubles frequency and peak emf to 4.8 kV",
+        "Transformer 2.4→25 kV is ≈10.4:1 step-up",
+        "For the same delivered power, current falls by 10.4 (VI conserved)",
+        "Cable loss I²R shrinks by ~108 — the gearbox and the step-up both buy grid efficiency"
+      ],
+      "answer": "Blades at 12 rpm through a 20:1 gearbox spin the generator at 4.0 rev s⁻¹. Wind twice as strong doubles ω, and Faraday's law passes that straight into double frequency and double peak emf (4.8 kV). The transformer then trades that voltage's ~10× gain for 10× less current on the 25 kV feeder — the I²R bill on the cable falls by ~100, the same conservation that spins the shaft ending in watts saved on the wire."
+    }
+  ]
+}

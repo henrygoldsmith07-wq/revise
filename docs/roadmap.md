@@ -131,7 +131,7 @@ These exist today and are the foundation the roadmap builds on:
 
 - Proper native-quality mobile/PWA UX.
 - Notifications.
-- Sync grade-prediction calibration history across devices *(the portable export includes it today; the calibration metadata itself is currently device-local).*
+- Sync grade-prediction calibration history across devices *(shipped — forecast, actual, paper and intervention row histories sync; derived calibration is recomputed locally).*
 - Full portable-snapshot restore *(shipped — v2 exports preserve stable card ids, validate linked history before mutation, restore one profile transactionally, keep current shipped curriculum authoritative, and refuse unsafe full-history restore from legacy v1 archives).*
 - Reliable offline exam packs.
 
@@ -165,10 +165,16 @@ Staging now has mandatory catalog checks and live all-table RLS, conflict,
 timestamp and independent-device sync tests. Local unit tests do not establish
 live staging success; run the required credentialed workflow before rollout.
 
-Deferred: remaining giant question banks; finer per-field derived-model computation;
-device-local outcome/experiment/checkpoint metadata replication; transactional
-remote deletes/tombstones; an encrypted local vault; and signed-in browser E2E
-against a real configured Supabase project. Browser tests exercise the actual
-account boundary with a simulated auth transport, including adoption, cached
-session restoration, sign-out and switching. Human verification and real learner
-outcomes remain external evidence requirements, never generated approvals.
+The continuation pass adds 540 reasoning-depth questions in 48 structured groups,
+generic capability registration, separate selection/sequence/replanning,
+execution/presentation boundaries, narrower derived models and runtime cycle
+regressions. Forecast/actual/paper/intervention row continuity and permanent
+legacy-compatible deletion markers are implemented with an additive SQL migration.
+The staging workflow is reusable and the pre-release workflow requires local
+verification, Chromium and credentialed staging at the same candidate ref.
+
+Remaining: further bounded bank migrations; finer recommendation inputs;
+a real configured Supabase browser journey; an encrypted local vault; and
+credentialed concurrent staging validation of the continuity rollout. Experiments
+and execution checkpoints deliberately stay device-local. Human verification,
+real learner outcomes and efficacy validation remain external evidence needs.

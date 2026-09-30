@@ -1,0 +1,165 @@
+{
+  "topic": "capacitance",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:series-capacitance-rule",
+      "context": "physics-depth:series-capacitance-rule:derive-from-voltage-add",
+      "move": "derive the series rule by adding the voltages across a shared charge",
+      "prompt": "Two capacitors C₁ and C₂ are in series across a supply. Using the fact that they share the same charge Q and that their voltages must add to the supply voltage, derive the expression for the total capacitance.",
+      "marks": 4,
+      "scheme": [
+        "V_total = V₁ + V₂ = Q/C₁ + Q/C₂",
+        "Define C_total by Q = C_total V_total, so V_total = Q/C_total",
+        "Q/C_total = Q/C₁ + Q/C₂, cancel Q: 1/C_total = 1/C₁ + 1/C₂",
+        "The total is smaller than either member — the gaps stack"
+      ],
+      "answer": "The same charge Q sits on both series capacitors, and the supply voltage splits: V = Q/C₁ + Q/C₂. Writing the pair as one capacitor, V = Q/C_total, and cancelling Q gives 1/C_total = 1/C₁ + 1/C₂ — the reciprocal-addition rule, and a total smaller than either member."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:parallel-capacitance-rule",
+      "context": "physics-depth:parallel-capacitance-rule:total-comparison",
+      "move": "state the parallel combination rule and how the total compares with each member",
+      "prompt": "A 2.0 μF and a 3.0 μF capacitor are connected in parallel. State the rule for finding the total capacitance, give the value, and state how the total compares with the largest single capacitor.",
+      "marks": 3,
+      "scheme": [
+        "Parallel capacitances add: C_total = C₁ + C₂",
+        "C_total = 2.0 + 3.0 = 5.0 μF",
+        "The total exceeds the largest member — unlike series, where it falls below the smallest"
+      ],
+      "answer": "In parallel the values add directly: 2.0 + 3.0 = 5.0 μF. The total is bigger than any member — each branch adds storage capacity at the shared voltage, whereas series would have given less than the smallest."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:series-charge-shared",
+      "context": "physics-depth:series-charge-shared:why-same-q",
+      "move": "explain why series capacitors must carry the same charge",
+      "prompt": "Two initially uncharged ideal capacitors are connected in series across a battery. Explain why the charge magnitudes on the capacitors are equal, even if their capacitances differ, using charge conservation on the isolated conductor between them.",
+      "marks": 3,
+      "scheme": [
+        "The connecting conductor and its two attached plates form an isolated, initially neutral conductor",
+        "Charge cannot cross either dielectric, so its total charge remains zero",
+        "Its two plates therefore acquire equal and opposite charges; each capacitor's two plates have equal and opposite charges, giving equal charge magnitudes on both capacitors"
+      ],
+      "answer": "The two inner plates and their connecting wire form an isolated conductor that starts neutral. No charge can enter it across the ideal dielectrics, so its net charge stays zero. Charge redistributes within it: if one inner plate has −Q, the other has +Q. Each capacitor has equal and opposite plate charges, so both have charge magnitude Q."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:parallel-charge-adds",
+      "context": "physics-depth:parallel-charge-adds:why-capacitance-adds",
+      "move": "explain why parallel combination adds capacitance at fixed voltage",
+      "prompt": "Explain why placing capacitors in parallel increases the total charge drawn from a supply at a fixed voltage, and why this is described as adding capacitance.",
+      "marks": 3,
+      "scheme": [
+        "Each parallel branch connects directly across the supply, so each holds V across itself",
+        "Total charge drawn: Q_total = Q₁ + Q₂ = C₁V + C₂V = (C₁+C₂)V",
+        "Same V, additive Q — the definition of a single larger capacitance C₁+C₂"
+      ],
+      "answer": "Parallel wiring puts the full supply voltage across each capacitor, so each draws its own Q = CV from the source. The supply sees the sum, (C₁+C₂)V — more charge for the same voltage, which is precisely what a bigger capacitance means. Parallel capacitors behave as one fat capacitor."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:series-resistor-analogy-fallacy",
+      "context": "physics-depth:series-resistor-analogy-fallacy:wrong-addition",
+      "move": "reject adding series capacitances as if they were resistors",
+      "prompt": "A student adds 2.0 μF and 3.0 μF in series as 5.0 μF 'because resistances add in series'. Calculate the correct total and explain the error.",
+      "marks": 3,
+      "scheme": [
+        "1/C_total = 1/2.0 + 1/3.0 = 5/6, so C_total = 1.2 μF",
+        "The total is smaller than either capacitor, not larger",
+        "Capacitance adds like conductance in series: the gaps stack, reducing the ability to store charge"
+      ],
+      "answer": "The correct total is 1/C = 1/2.0 + 1/3.0 = 5/6, giving C_total = 1.2 μF — smaller than either member. The resistor analogy fails because capacitance is per-volt storage, not per-volt loss: stacking gaps reduces storage, it does not add opposition."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:series-voltage-equal-fallacy",
+      "context": "physics-depth:series-voltage-equal-fallacy:v-share",
+      "move": "reject equal voltage division between series capacitors of different sizes",
+      "prompt": "Two capacitors, 1.0 μF and 5.0 μF, are in series across 12 V. A student expects 6 V across each. Explain why the split is unequal and calculate it.",
+      "marks": 3,
+      "scheme": [
+        "Equal series charge and V = Q/C give voltages inversely proportional to capacitance",
+        "V₁/V₂ = 5 and V₁ + V₂ = 12 V; accept an equivalent total-capacitance and charge method",
+        "V₁ = 10 V across 1.0 μF and V₂ = 2.0 V across 5.0 μF"
+      ],
+      "answer": "For initially uncharged ideal capacitors in series, the charge magnitudes are equal. V = Q/C therefore gives V₁/V₂ = 5: the smaller capacitor has the larger voltage. Since V₁+V₂ = 12 V, the voltages are 10 V across 1.0 μF and 2.0 V across 5.0 μF."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:series-combo-calc",
+      "context": "physics-depth:series-combo-calc:two-in-series",
+      "move": "compute a series combination and the charge and voltages across each",
+      "prompt": "Capacitors of 4.0 μF and 12 μF are in series across a 24 V supply. Calculate the total capacitance, the charge on each, and the voltage across each.",
+      "marks": 4,
+      "scheme": [
+        "1/C = 1/4.0 + 1/12 = 1/3 → C_total = 3.0 μF",
+        "Q = C_total V = 3.0×10⁻⁶ × 24 = 72 μC (same on both)",
+        "V₄ = Q/C = 72/4.0 = 18 V",
+        "V₁₂ = 72/12 = 6.0 V; check 18 + 6 = 24 ✓"
+      ],
+      "answer": "The series pair combines to 1/(1/4.0 + 1/12) = 3.0 μF, so the chain stores Q = 3.0 μF×24 V = 72 μC on every capacitor. That charge gives V = 72/4.0 = 18 V across the 4.0 μF and 6.0 V across the 12 μF — summing to the 24 V supply."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:parallel-combo-calc",
+      "context": "physics-depth:parallel-combo-calc:charge-budget",
+      "move": "compute a parallel charge budget and verify it against the added capacitance",
+      "prompt": "Capacitors of 2.0 μF and 6.0 μF are in parallel across a 9.0 V supply. Calculate the charge on each branch, the total charge drawn, and confirm the total equals the combined capacitance times the voltage.",
+      "marks": 4,
+      "scheme": [
+        "Each branch sees the full 9.0 V: Q₂ = 2.0×9.0 = 18 μC; Q₆ = 6.0×9.0 = 54 μC",
+        "Total charge drawn = 18 + 54 = 72 μC",
+        "Combined capacitance = 2.0 + 6.0 = 8.0 μF",
+        "Check: 8.0 μF × 9.0 V = 72 μC ✓ — the branches' charges account for the whole"
+      ],
+      "answer": "Each parallel branch takes the full 9.0 V: 18 μC and 54 μC respectively, so the supply delivers 72 μC. The combined capacitance is 2.0 + 6.0 = 8.0 μF, and 8.0 μF×9.0 V = 72 μC confirms the budget: charges add, voltage does not."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:tuning-capacitor-range",
+      "context": "physics-depth:tuning-capacitor-range:radio-dial",
+      "move": "transfer combination rules to a variable tuning capacitor in a radio",
+      "prompt": "A radio's tuning circuit combines a fixed 220 pF capacitor with a variable capacitor adjustable from 20 pF to 200 pF, in parallel. Calculate the total capacitance range, and explain what the variable capacitor is for.",
+      "marks": 3,
+      "scheme": [
+        "Parallel: C_total = 220 + variable",
+        "Range: 240 pF (at 20 pF) to 420 pF (at 200 pF)",
+        "The resonance frequency f ∝ 1/√(LC), so varying C sweeps which station's frequency the circuit selects"
+      ],
+      "answer": "In parallel the values add, so the circuit ranges from 220+20 = 240 pF to 220+200 = 420 pF. Because the resonant frequency of the LC circuit falls as 1/√(LC), turning the dial — changing C — sweeps the selected frequency across the band: capacitance is the station selector."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:series-energy-split",
+      "context": "physics-depth:series-energy-split:voltage-sharing",
+      "move": "combine series combination with energy accounting across unequal capacitors",
+      "prompt": "Capacitors of 2.0 μF and 8.0 μF in series hold 40 μC of charge each. Calculate the voltage across and energy stored in each, and which stores more energy.",
+      "marks": 4,
+      "scheme": [
+        "V₂ = 40/2.0 = 20 V; V₈ = 40/8.0 = 5.0 V",
+        "E₂ = ½QV = ½×40×10⁻⁶×20 = 4.0×10⁻⁴ J",
+        "E₈ = ½×40×10⁻⁶×5.0 = 1.0×10⁻⁴ J",
+        "The 2.0 μF stores four times more energy: at fixed Q, E = Q²/2C favours the small capacitor"
+      ],
+      "answer": "With 40 μC shared, the 2.0 μF sits at 20 V storing 4.0×10⁻⁴ J, while the 8.0 μF sits at 5.0 V storing 1.0×10⁻⁴ J. At fixed charge, E = Q²/2C, so the smaller capacitance — which must develop the bigger voltage — banks most of the energy: four times more here."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:capacitor-divider",
+      "context": "physics-depth:capacitor-divider:voltage-sensor-chain",
+      "move": "combine the series voltage split with the energy relations to design a voltage-sharing chain",
+      "prompt": "A sensor needs a 3.0 V sample derived from a 15 V rail using two capacitors in series, with the output taken across the larger one. Using a 1.0 μF capacitor for the output, find the other capacitance needed, and the charge on the chain.",
+      "marks": 4,
+      "scheme": [
+        "Output capacitor takes 3.0 V, so the other must take 12 V",
+        "Same charge: Q = 1.0 μF×3.0 V = 3.0 μC",
+        "C_other = Q/12 V = 0.25 μF",
+        "The divider runs on charge equality: capacitance ratios invert the voltage ratios"
+      ],
+      "answer": "The chain shares one charge, so with 3.0 V across the 1.0 μF output capacitor it holds Q = 3.0 μC. The remaining 12 V must sit on C = Q/V = 3.0 μC/12 V = 0.25 μF. Voltage splits inversely as capacitance — the opposite of a resistive divider, a distinction that trips up many a designer."
+    }
+  ]
+}

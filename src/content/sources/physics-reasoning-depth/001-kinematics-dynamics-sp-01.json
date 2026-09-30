@@ -1,0 +1,143 @@
+{
+  "topic": "kinematics-dynamics",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:kin-vector-quantities",
+      "context": "physics-depth:kin-vector-quantities:classify",
+      "move": "classify a list of quantities as scalar or vector by whether direction is needed to specify them",
+      "prompt": "State which of the following are vectors and which are scalars: speed, velocity, distance, displacement, mass, force, energy, momentum.",
+      "marks": 2,
+      "scheme": [
+        "Speed, distance, mass and energy are scalars (magnitude only)",
+        "Velocity, displacement, force and momentum are vectors (magnitude and direction)"
+      ],
+      "answer": "Scalars have magnitude only: speed, distance, mass, energy. Vectors need a direction as well: velocity, displacement, force, momentum."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:kin-resolve-rule",
+      "context": "physics-depth:kin-resolve-rule:component-formula",
+      "move": "state the perpendicular-component formulas for a vector at an angle to an axis",
+      "prompt": "State the formulas for the components of a vector F at an angle θ to an axis.",
+      "marks": 2,
+      "scheme": [
+        "Component along the axis is F cos θ",
+        "Component perpendicular to the axis is F sin θ (θ measured from the axis)"
+      ],
+      "answer": "For a vector F at angle θ to an axis, the component along the axis is F cos θ and the component at right angles is F sin θ."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:kin-inclined-push",
+      "context": "physics-depth:kin-inclined-push:horizontal-component",
+      "move": "resolve an angled force and use only the along-slope component to find the resultant",
+      "prompt": "A sledge is pulled with a 50 N force at 30° above the horizontal while friction opposes with 12 N. Calculate the resultant force along the ground.",
+      "marks": 3,
+      "scheme": [
+        "Horizontal component = 50 cos 30° = 43.3 N",
+        "Resultant along the direction of motion = 43.3 − 12 = 31.3 N",
+        "Accept 31 N"
+      ],
+      "answer": "The pull's component along the ground is 50 cos 30° = 43.3 N. Subtracting the 12 N friction gives a resultant of 31.3 N along the motion."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:kin-two-forces",
+      "context": "physics-depth:kin-two-forces:vector-sum",
+      "move": "combine two perpendicular forces with Pythagoras and give the direction",
+      "prompt": "Two perpendicular forces of 3 N and 4 N act on a point. Calculate the magnitude and direction of their resultant.",
+      "marks": 3,
+      "scheme": [
+        "Resultant = √(3² + 4²) = 5 N",
+        "Direction = tan⁻¹(4/3) = 53° to the 3 N force",
+        "Both magnitude and direction stated"
+      ],
+      "answer": "The two perpendicular forces give a resultant of √(3²+4²) = 5 N at tan⁻¹(4/3) ≈ 53° to the 3 N force."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:kin-speed-velocity",
+      "context": "physics-depth:kin-speed-velocity:round-trip",
+      "move": "distinguish average speed from average velocity using total distance versus displacement",
+      "prompt": "A student walks 60 m out and 60 m back in 100 s and claims their average velocity is 1.2 m s⁻¹. Explain the error and give the correct average velocity.",
+      "marks": 2,
+      "scheme": [
+        "Average speed uses total distance; average velocity uses displacement",
+        "A round trip has zero displacement so average velocity is zero even though speed is not"
+      ],
+      "answer": "Speed divides total distance by time; velocity divides displacement by time. Walking out and back gives zero displacement, so the average velocity is zero while the average speed is positive."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:kin-add-magnitudes",
+      "context": "physics-depth:kin-add-magnitudes:opposing-vectors",
+      "move": "reject adding vector magnitudes directly when directions differ",
+      "prompt": "A student adds a 3 N east force and a 4 N north force to get 7 N. Explain why this is wrong and give the correct resultant.",
+      "marks": 2,
+      "scheme": [
+        "Vectors cannot be added by adding magnitudes unless they are in the same direction",
+        "Opposite directions subtract; perpendicular directions combine by Pythagoras"
+      ],
+      "answer": "Adding 3 N and 4 N to get 7 N is only correct if they act in the same line and direction. Opposite forces give 1 N; perpendicular forces give 5 N."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:kin-wind-drift",
+      "context": "physics-depth:kin-wind-drift:aircraft-heading",
+      "move": "transfer component resolution to a crosswind and find the resultant ground velocity",
+      "prompt": "An aircraft flies north at 120 m s⁻¹ relative to the air while a 40 m s⁻¹ wind blows east. Calculate the aircraft's ground speed and direction.",
+      "marks": 3,
+      "scheme": [
+        "Aircraft velocity 120 m s⁻¹ north, wind 40 m s⁻¹ east are perpendicular",
+        "Ground speed = √(120² + 40²) = 126 m s⁻¹",
+        "Direction = tan⁻¹(40/120) = 18° east of north"
+      ],
+      "answer": "The north and east velocities are perpendicular, so ground speed = √(120²+40²) = 126 m s⁻¹, directed tan⁻¹(40/120) ≈ 18° east of north."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:kin-ramp-package",
+      "context": "physics-depth:kin-ramp-package:component-along-slope",
+      "move": "apply resolution to a new slope scenario and link the component to the acceleration",
+      "prompt": "A 20 kg package is released from rest on a frictionless 25° slope. Calculate its acceleration down the slope.",
+      "marks": 3,
+      "scheme": [
+        "Component of weight down the slope = mg sin θ",
+        "= 20 × 9.81 × sin 25° = 82.9 N",
+        "a = F/m = 82.9/20 = 4.1 m s⁻² down the slope"
+      ],
+      "answer": "The downslope component of weight is mg sin 25° = 20×9.81×0.423 = 82.9 N, so a = 82.9/20 = 4.1 m s⁻² down the slope (friction neglected)."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:kin-resolve-then-newton",
+      "context": "physics-depth:kin-resolve-then-newton:lift-drag",
+      "move": "resolve an angled thrust, then apply Newton's second law to the resultant",
+      "prompt": "A 250 kg vehicle is driven by an 800 N thrust at 20° above the horizontal against 250 N drag. The vertical forces balance. Calculate its horizontal acceleration.",
+      "marks": 4,
+      "scheme": [
+        "Forward component of thrust = 800 cos 20° = 752 N",
+        "Resultant = 752 − 250 drag = 502 N",
+        "a = F/m = 502/250 = 2.0 m s⁻²",
+        "Vertical component balanced by weight/normal so no vertical acceleration"
+      ],
+      "answer": "The thrust's forward component is 800 cos 20° = 752 N. Minus the 250 N drag gives a 502 N resultant, so a = 502/250 = 2.0 m s⁻². The vertical component is balanced, so there is no vertical acceleration."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:kin-vector-graph",
+      "context": "physics-depth:kin-vector-graph:displacement-from-components",
+      "move": "combine perpendicular displacement components then read the vector nature from a motion description",
+      "prompt": "A walker goes 90 m east then 120 m north, covering 210 m in total. Calculate the magnitude and direction of their displacement and explain why it differs from the distance.",
+      "marks": 3,
+      "scheme": [
+        "East 90 m and north 120 m are perpendicular displacements",
+        "Resultant displacement = √(90²+120²) = 150 m",
+        "Direction = tan⁻¹(120/90) = 53° north of east"
+      ],
+      "answer": "Treating the two legs as perpendicular displacement vectors, the resultant is √(90²+120²) = 150 m at tan⁻¹(120/90) ≈ 53° north of east — a vector, unlike the 210 m total distance."
+    }
+  ]
+}

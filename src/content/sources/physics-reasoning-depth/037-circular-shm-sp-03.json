@@ -1,0 +1,180 @@
+{
+  "topic": "circular-shm",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:omega-period-units",
+      "context": "physics-depth:omega-period-units:radian-link",
+      "move": "state the unit of angular frequency and its link to period and ordinary frequency",
+      "prompt": "State the SI unit of angular frequency ω and write the two relations connecting ω to the period T and to the frequency f.",
+      "marks": 3,
+      "scheme": [
+        "ω is measured in radians per second (rad s⁻¹)",
+        "ω = 2π/T",
+        "ω = 2πf"
+      ],
+      "answer": "Angular frequency is in rad s⁻¹, linked to the period and frequency by ω = 2π/T = 2πf — the angle swept per second around the circle whose projection is the oscillation."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:minus-sign-physical",
+      "context": "physics-depth:minus-sign-physical:restoring-direction",
+      "move": "explain what the minus sign in the SHM equation says physically",
+      "prompt": "Explain the physical meaning of the minus sign in a = −ω²x, and what kind of motion would result if the sign were positive.",
+      "marks": 3,
+      "scheme": [
+        "The minus sign says acceleration opposes displacement — it points back to the centre",
+        "A positive sign would make acceleration push further away — runaway exponential motion",
+        "Oscillation requires a restoring (opposing) force; without it there is no turning back"
+      ],
+      "answer": "The minus sign records that the acceleration always points home: displace right, accelerate left. Replace it with a plus and the acceleration would fling the object farther each instant — exponential runaway, not vibration. The sign is not decoration; it is the difference between an oscillation and an explosion."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:restoring-force-origin",
+      "context": "physics-depth:restoring-force-origin:from-newton",
+      "move": "derive the SHM condition from a linear restoring force and Newton's second law",
+      "prompt": "A mass on a spring obeys Hooke's law F = −kx. Derive the SHM condition a = −ω²x from Newton's second law and identify ω.",
+      "marks": 4,
+      "scheme": [
+        "F = ma gives ma = −kx",
+        "Rearrange: a = −(k/m)x",
+        "Compare with a = −ω²x: ω² = k/m, so ω = √(k/m)",
+        "This is why T = 2π√(m/k)"
+      ],
+      "answer": "Newton's second law gives F = ma, so ma = −kx. Rearrange: a = −(k/m)x. Comparing with a = −ω²x identifies ω² = k/m and ω = √(k/m). This is why T = 2π√(m/k): stiffer springs and lighter masses mean faster oscillations."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:recognise-shm-equations",
+      "context": "physics-depth:recognise-shm-equations:form-matching",
+      "move": "identify SHM by matching a given acceleration expression to the defining form",
+      "prompt": "Which of these are simple harmonic? State the period for those that are: (i) a = −4x; (ii) a = −4t²; (iii) a = 4x; (iv) a = −4x³.",
+      "marks": 4,
+      "scheme": [
+        "(i) SHM: a = −ω²x with ω² = 4, ω = 2, T = 2π/2 = π s",
+        "(ii) Not SHM: proportional to time, not displacement",
+        "(iii) Not SHM: wrong sign — acceleration away from centre",
+        "(iv) Not SHM: proportional to x³, not x (nonlinear restoring)"
+      ],
+      "answer": "Only (i) fits: a = −4x matches a = −ω²x with ω = 2 rad s⁻¹, a period of π seconds. (ii) scales with time, not displacement; (iii) has the sign backwards — it flees the centre; (iv) is a real restoring force but the wrong power: cubic acceleration gives vibration, but not simple harmonic motion."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:shm-amplitude-acceleration",
+      "context": "physics-depth:shm-amplitude-acceleration:max-values",
+      "move": "apply a = −ω²x to find maximum acceleration from amplitude and period",
+      "prompt": "A loudspeaker cone oscillates with amplitude 2.0 mm at 50 Hz. Calculate its angular frequency and the maximum acceleration of the cone. (Give 2 s.f.)",
+      "marks": 3,
+      "scheme": [
+        "ω = 2πf = 100π = 314 rad s⁻¹",
+        "Maximum |a| = ω²x₀ = 314² × 0.0020",
+        "= 197 m s⁻² ≈ 2.0×10² m s⁻²"
+      ],
+      "answer": "ω = 2π×50 = 314 rad s⁻¹, so the cone's peak acceleration is ω²×amplitude = 314²×0.0020 ≈ 2.0×10² m s⁻² — over twenty gravities at the extremes of its tiny travel. Bass drivers live violently on a millimetre scale."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:maximum-force-at-centre-fallacy",
+      "context": "physics-depth:maximum-force-at-centre-fallacy:speed-vs-force-peak",
+      "move": "reject the conflation of maximum speed with maximum force in oscillation",
+      "prompt": "A student says the restoring force on an oscillating mass is greatest at the centre, 'because that is where it is moving fastest'. Correct the error and state where force and speed each peak.",
+      "marks": 3,
+      "scheme": [
+        "Force is proportional to displacement: it peaks at the extremes, where speed is zero",
+        "At the centre the displacement is zero, so the force is zero — but the speed is greatest",
+        "Speed peaks where force vanishes: the two maxima are a quarter-cycle apart, never together"
+      ],
+      "answer": "The force is largest exactly where the mass is momentarily stationary — the extremes — because that is where the displacement is largest. At the centre the spring pulls equally from both sides, the force is zero, and the speed is at its maximum. Fastest and hardest-pushed are never simultaneous in SHM."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:omega-from-measurements",
+      "context": "physics-depth:omega-from-measurements:a-over-x",
+      "move": "measure ω² as the ratio of acceleration to displacement from paired data",
+      "prompt": "A glider on an air track has acceleration 1.8 m s⁻² when its displacement is 0.050 m. Calculate ω and the period. (Give 2 s.f.)",
+      "marks": 3,
+      "scheme": [
+        "ω² = a/x = 1.8/0.050 = 36 s⁻²",
+        "ω = 6.0 rad s⁻¹",
+        "T = 2π/ω = 1.0 s"
+      ],
+      "answer": "From a = ω²x the ratio gives ω² = 1.8/0.050 = 36, so ω = 6.0 rad s⁻¹ and T = 2π/6.0 ≈ 1.0 s. One clean (a, x) pair at the extreme — where acceleration is maximal and velocity zero — is enough to read off the whole oscillation."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:shm-displacement-solve",
+      "context": "physics-depth:shm-displacement-solve:acceleration-at-position",
+      "move": "solve the SHM relation for position given a measured acceleration",
+      "prompt": "A pendulum bob oscillates with period 2.0 s and amplitude 0.10 m. Find the magnitude of its acceleration when its displacement is 0.050 m.",
+      "marks": 4,
+      "scheme": [
+        "ω = 2π/T = π = 3.14 rad s⁻¹",
+        "ω² = 9.87 s⁻²",
+        "|a| = ω²x = 9.87 × 0.050 = 0.49 m s⁻²",
+        "Note: at x = 0 the acceleration would be zero — it tracks displacement"
+      ],
+      "answer": "ω = 2π/2.0 = 3.14 rad s⁻¹, so ω² = 9.9 s⁻². At half the amplitude the acceleration is |a| = ω²x = 9.9×0.050 ≈ 0.49 m s⁻² — half the maximum, because acceleration is proportional to displacement, not to position's closeness to centre."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:pendulum-small-angle-shm",
+      "context": "physics-depth:pendulum-small-angle-shm:restoring-torque",
+      "move": "transfer the SHM condition to a pendulum by linearising the restoring force",
+      "prompt": "A simple pendulum of length L has a restoring force −mg sin θ. Show that for small angles its motion satisfies the SHM condition, and derive T = 2π√(L/g).",
+      "marks": 4,
+      "scheme": [
+        "Small angle: sin θ ≈ θ ≈ x/L (arc length over radius)",
+        "F ≈ −mgx/L, so a = −(g/L)x",
+        "This is a = −ω²x with ω² = g/L",
+        "T = 2π/ω = 2π√(L/g) — mass-independent"
+      ],
+      "answer": "Only the small-angle step is needed: sinθ ≈ θ ≈ x/L turns the restoring force into −(mg/L)x — linear, opposing, exactly the SHM form with ω² = g/L. Hence T = 2π√(L/g), and notice what fell out: neither mass nor amplitude enters. The pendulum isochronism Galileo admired lives inside that linearisation."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:vertical-spring-shift",
+      "context": "physics-depth:vertical-spring-shift:gravity-relocates-equilibrium",
+      "move": "transfer the SHM condition to a vertical spring where gravity moves the equilibrium",
+      "prompt": "A mass hangs from a vertical spring and stretches it by e₀ = 0.020 m at equilibrium. Show that pulling it down and releasing gives SHM about the new equilibrium with ω = √(g/e₀), and calculate the period. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "At equilibrium: ke₀ = mg",
+        "Displace by x from equilibrium: net force = k(e₀+x) upward push... resultant restoring force = −kx (gravity cancels against ke₀)",
+        "So a = −(k/m)x: SHM with the same ω² = k/m = g/e₀",
+        "T = 2π√(e₀/g) = 2π√(0.020/9.81) = 0.28 s"
+      ],
+      "answer": "Gravity's job is done at equilibrium: it stretches the spring by e₀ = mg/k and is then cancelled by that pre-tension. Any extra displacement x sees only the additional spring force −kx — pure SHM about the shifted centre with ω² = k/m = g/e₀, giving T = 2π√(e₀/g) = 0.28 s. The weight repositions the dance floor, not the dance."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:shm-circle-projection",
+      "context": "physics-depth:shm-circle-projection:uniform-motion-link",
+      "move": "link the SHM equation to uniform circular motion through the projection of the radius",
+      "prompt": "A ball on a turntable of radius A viewed edge-on casts a shadow whose position is x = A cos ωt. Show that this shadow satisfies a = −ω²x, and state what the rotating ball contributes to the equation.",
+      "marks": 3,
+      "scheme": [
+        "Differentiate twice: v = −Aω sin ωt; a = −Aω² cos ωt",
+        "Since x = A cos ωt, substitute: a = −ω²x ✓",
+        "ω is the turntable's angular velocity — the SHM 'ω' is literal rotation speed projected"
+      ],
+      "answer": "Two derivatives of x = Acosωt give a = −Aω²cosωt = −ω²x — the SHM identity. The projection reproduces the defining equation exactly, and the ω in a = −ω²x is nothing mysterious: it is the turntable's angular velocity, carried through the shadow by geometry. Every SHM hides a circle."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:shm-energy-double",
+      "context": "physics-depth:shm-energy-double:amplitude-scaling",
+      "move": "combine the SHM condition with energy formulas to scale stored and kinetic energy with amplitude",
+      "prompt": "A mass-spring system with k = 200 N m⁻¹ oscillates with amplitude 0.10 m. Calculate the total energy and the maximum speed, then state what happens to the maximum acceleration if the amplitude doubles. (m = 0.50 kg)",
+      "marks": 4,
+      "scheme": [
+        "E_total = ½kA² = ½×200×0.01 = 1.0 J",
+        "v_max = ωA with ω = √(k/m) = 20 rad s⁻¹ → v_max = 20×0.10 = 2.0 m s⁻¹",
+        "Double A: E quadruples to 4.0 J; v_max doubles; a_max = ω²A doubles too",
+        "ω and T are unchanged — frequency is set by k and m alone"
+      ],
+      "answer": "The energy is all spring energy at the extreme: ½kA² = 1.0 J; released, it becomes ½mv², giving v_max = ωA = 2.0 m s⁻¹. Double the amplitude and energy quadruples, speed and peak acceleration double — but ω = √(k/m) is untouched: amplitude sets how hard, mass and spring set how fast."
+    }
+  ]
+}

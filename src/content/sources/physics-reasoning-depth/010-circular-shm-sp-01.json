@@ -1,0 +1,143 @@
+{
+  "topic": "circular-shm",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:angular-velocity-definition",
+      "context": "physics-depth:angular-velocity-definition:rad-per-second",
+      "move": "define angular velocity and state its unit",
+      "prompt": "Define angular velocity and state its SI unit.",
+      "marks": 2,
+      "scheme": [
+        "Angular velocity is the rate of change of angular displacement",
+        "Measured in radians per second (rad s⁻¹)"
+      ],
+      "answer": "Angular velocity is the rate of change of angle swept out per unit time, measured in radians per second (rad s⁻¹)."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:linear-angular-relation",
+      "context": "physics-depth:linear-angular-relation:v-omega-r",
+      "move": "state the relation between linear and angular speed",
+      "prompt": "State the equation relating the linear speed v of a point on a rotating body to its angular velocity ω and radius r.",
+      "marks": 2,
+      "scheme": [
+        "v = ωr",
+        "The linear speed grows in direct proportion to both ω and the radius"
+      ],
+      "answer": "v = ωr: a point's linear speed is its angular velocity multiplied by its distance from the rotation axis."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:inner-outer-rider",
+      "context": "physics-depth:inner-outer-rider:same-omega",
+      "move": "explain why riders at different radii share angular velocity but not linear speed",
+      "prompt": "Two children sit on a rotating roundabout, one near the centre and one at the edge. Explain why they have the same angular velocity but different linear speeds.",
+      "marks": 3,
+      "scheme": [
+        "Both sweep out the same angle per second, so ω is equal",
+        "v = ωr, and the edge child has the larger r",
+        "The edge child therefore moves faster in m s⁻¹ despite the same rad s⁻¹"
+      ],
+      "answer": "Sitting on the same rigid roundabout, both children turn through the same angle every second — same ω. But v = ωr, so the child at the larger radius has the proportionally larger linear speed."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:omega-from-revs",
+      "context": "physics-depth:omega-from-revs:rev-per-minute",
+      "move": "convert a rotation rate in rev min⁻¹ to angular velocity and edge speed",
+      "prompt": "A ceiling fan spins at 210 rev min⁻¹ with blade tips 0.60 m from the axis. Calculate its angular velocity and the tip speed.",
+      "marks": 3,
+      "scheme": [
+        "ω = 210 × 2π/60 = 22.0 rad s⁻¹",
+        "v = ωr = 22.0 × 0.60",
+        "= 13 m s⁻¹"
+      ],
+      "answer": "210 rev min⁻¹ = 210×2π/60 = 22 rad s⁻¹. The tip speed is v = ωr = 22×0.60 ≈ 13 m s⁻¹."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:degrees-in-formulas",
+      "context": "physics-depth:degrees-in-formulas:omega-in-degrees",
+      "move": "reject degrees in the v = ωr relation",
+      "prompt": "A student calculates v = ωr with ω = 90 (meaning 90 degrees per second) and r = 2.0 m, giving 180 m s⁻¹. Identify the error and give the correct speed.",
+      "marks": 3,
+      "scheme": [
+        "ω must be in radians per second in v = ωr",
+        "90° s⁻¹ = 90×π/180 = 1.57 rad s⁻¹",
+        "v = 1.57 × 2.0 = 3.1 m s⁻¹"
+      ],
+      "answer": "The equation v = ωr requires ω in rad s⁻¹, not degrees per second. Converting: 90° s⁻¹ = 1.57 rad s⁻¹, so v = 1.57×2.0 = 3.1 m s⁻¹ — not 180 m s⁻¹."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:radian-is-extra-unit-fallacy",
+      "context": "physics-depth:radian-is-extra-unit-fallacy:dimensionless-angle",
+      "move": "reject treating the radian as a physically separate unit in derived quantities",
+      "prompt": "A student notes that the unit of v/r simplifies to s⁻¹ and claims that any numerical angular speed, including one in degrees per second, can therefore be used in v = ωr. Explain the error using the definition of a radian.",
+      "marks": 2,
+      "scheme": [
+        "Angle in radians is arc length divided by radius, a dimensionless ratio",
+        "Differentiating arc length = rθ gives v = rω for θ in radians; degree values require conversion by π/180"
+      ],
+      "answer": "An angle in radians is the dimensionless ratio of arc length to radius. For a fixed radius, differentiating s = rθ gives v = rω with θ in radians. Although rad s⁻¹ has dimensions s⁻¹, a numerical value in degrees per second must first be multiplied by π/180."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:hard-drive-platter",
+      "context": "physics-depth:hard-drive-platter:read-speed",
+      "move": "transfer angular-to-linear conversion to data read speed at different radii",
+      "prompt": "A hard drive platter rotates at 7200 rev min⁻¹. Data at radius 0.030 m passes the read head. Express the angular velocity in rad s⁻¹ and find the linear speed of the track under the head.",
+      "marks": 3,
+      "scheme": [
+        "ω = 7200 × 2π/60 = 754 rad s⁻¹",
+        "v = ωr = 754 × 0.030",
+        "= 22.6 m s⁻¹"
+      ],
+      "answer": "7200 rev min⁻¹ is 7200×2π/60 = 754 rad s⁻¹. The track at r = 0.030 m sweeps past at v = 754×0.030 ≈ 23 m s⁻¹."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:bike-wheel-omega",
+      "context": "physics-depth:bike-wheel-omega:wheel-rotation",
+      "move": "translate a forward cycling speed into wheel angular velocity",
+      "prompt": "A bicycle travels at 6.0 m s⁻¹ on a straight road. Its wheels have diameter 0.70 m and roll without slipping. Find the wheel's angular velocity and the number of revolutions per second.",
+      "marks": 3,
+      "scheme": [
+        "Rolling without slip: v = ωr with r = 0.35 m",
+        "ω = 6.0/0.35 = 17.1 rad s⁻¹",
+        "Revs per second = ω/2π = 17.1/6.28 = 2.7 rev s⁻¹"
+      ],
+      "answer": "Rolling without slipping means the contact point is instantaneously at rest, so v = ωr. With r = 0.35 m, ω = 6.0/0.35 = 17 rad s⁻¹, which is 17/2π ≈ 2.7 revolutions each second."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:earth-rotation-surface",
+      "context": "physics-depth:earth-rotation-surface:equator-speed",
+      "move": "combine Earth's angular velocity with radius to find surface speed and pole-star geometry",
+      "prompt": "Earth rotates once in 86164 s (a sidereal day). Its equatorial radius is 6.38×10⁶ m. Calculate Earth's angular velocity and the linear speed of a point on the equator.",
+      "marks": 3,
+      "scheme": [
+        "ω = 2π/T = 2π/86164 = 7.29×10⁻⁵ rad s⁻¹",
+        "v = ωr = 7.29×10⁻⁵ × 6.38×10⁶",
+        "= 465 m s⁻¹"
+      ],
+      "answer": "One turn per 86164 s gives ω = 2π/86164 = 7.29×10⁻⁵ rad s⁻¹. A point on the equator moves at v = ωr = 7.29×10⁻⁵×6.38×10⁶ ≈ 465 m s⁻¹ — fast, yet the centripetal need is tiny compared with gravity."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:satellite-omega-sync",
+      "context": "physics-depth:satellite-omega-sync:geostationary",
+      "move": "combine angular velocity matching with orbital radius to reason about geostationary orbit",
+      "prompt": "A geostationary satellite must remain above the same point on Earth's equator. State the satellite's required angular velocity in terms of Earth's rotation, and calculate the period that ω implies. (T_Earth = 86164 s)",
+      "marks": 3,
+      "scheme": [
+        "The satellite must match Earth's angular velocity: ω_sat = ω_Earth = 2π/86164",
+        "Its period equals Earth's sidereal day",
+        "T = 2π/ω = 86164 s ≈ 23 h 56 min, not 24 h exactly"
+      ],
+      "answer": "Hovering over one equatorial point demands the same angular velocity as Earth: ω = 2π/86164 = 7.29×10⁻⁵ rad s⁻¹. The orbital period is therefore the sidereal day, 86164 s ≈ 23 h 56 min — four minutes short of the solar 24 h, because Earth also moves around the Sun."
+    }
+  ]
+}

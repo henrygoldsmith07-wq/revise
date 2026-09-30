@@ -1,3 +1,18 @@
+# Current improvement state — 30 September 2026
+
+The current architecture/continuity pass is recorded in
+[the implementation report](docs/improvement-continuity-2026-09-30.md).
+It covers generic capability registration, responsibility extraction, 540
+structured reasoning questions, row-level outcome continuity, permanent deletion
+markers, narrower derived inputs and the reusable pre-release gate. Live staging
+requires credentials and is not established by local tests. Apply the additive
+SQL migration before deploying the continuity client.
+
+The sections below are the historical implementation ledger, including earlier
+baseline diagnoses and superseded decisions; they are not current architecture.
+
+---
+
 # Improvement state: one adaptive learning session
 
 ## Goal and observable outcome

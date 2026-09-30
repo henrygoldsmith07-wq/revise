@@ -200,7 +200,7 @@ export function LessonMode({
             <AchievementIcon size={ICON_SIZE.lg} />
           </div>
           <div>
-            <p className="text-lg font-semibold text-ink">{perfect ? "Perfect — the deck will stick." : "Lesson done — review the misses below."}</p>
+            <p className="text-lg font-semibold text-ink">{perfect ? "All lesson checks passed." : "Lesson done — review the misses below."}</p>
             <p className="text-sm text-ink3 mt-1">
               {summary.correct} of {summary.total} check questions correct
             </p>
@@ -208,7 +208,7 @@ export function LessonMode({
 
           {lesson.learningObjectives?.length ? (
             <div className="text-left rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-3">
-              <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">What you can now do</p>
+              <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">What to practise next</p>
               <ul className="mt-2 space-y-1.5">
                 {lesson.learningObjectives.map((objective, index) => (
                   <li key={`${lesson.id}:objective:${index}`} className="flex items-start gap-2 text-sm text-ink2">
@@ -777,6 +777,17 @@ export function LessonMode({
                                 </span>
                               </div>
                             </button>
+                          </div>
+
+                          <details className="border-t border-line">
+                            <summary className="cursor-pointer list-none px-3.5 py-2.5 text-xs font-bold text-ink2 transition hover:bg-surface2 hover:text-ink">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="text-ink" aria-hidden="true">＋</span>
+                                See detailed lesson outline
+                              </span>
+                            </summary>
+                            <div className="space-y-3 px-3.5 pb-3.5">
+                              <div className="flex flex-wrap gap-2">
                             <Button
                               size="sm"
                               variant="secondary"
@@ -799,16 +810,7 @@ export function LessonMode({
                             >
                               <span aria-hidden="true">?</span> <span className="hidden sm:inline">Practice</span>
                             </Button>
-                          </div>
-
-                          <details className="border-t border-line">
-                            <summary className="cursor-pointer list-none px-3.5 py-2.5 text-xs font-bold text-ink2 transition hover:bg-surface2 hover:text-ink">
-                              <span className="inline-flex items-center gap-2">
-                                <span className="text-ink" aria-hidden="true">＋</span>
-                                See detailed lesson outline
-                              </span>
-                            </summary>
-                            <div className="space-y-3 px-3.5 pb-3.5">
+                              </div>
                               {entry.lesson.learningObjectives?.length ? (
                                 <div>
                                   <p className="text-[10px] uppercase tracking-wide text-ink3 font-bold">Success criteria</p>

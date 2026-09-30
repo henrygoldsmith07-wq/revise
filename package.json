@@ -41,7 +41,8 @@
     "test:staging": "node scripts/run-staging-tests.mjs",
     "type-check:strict": "tsc --noEmit -p tsconfig.strict.json",
     "content:physics": "node scripts/generate-structured-physics.mjs",
-    "content:check": "node scripts/generate-content.mjs capacitors --check && node scripts/generate-structured-physics.mjs --check"
+    "content:check": "node scripts/generate-content.mjs capacitors --check && node scripts/generate-structured-physics.mjs --check && node scripts/generate-physics-reasoning.mjs --check",
+    "content:reasoning": "node scripts/generate-physics-reasoning.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
@@ -61,6 +62,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/katex": "^0.16.7",

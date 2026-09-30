@@ -1,0 +1,180 @@
+{
+  "topic": "electric-circuits",
+  "point": 2,
+  "capability": "phys.circuit.divider",
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:divider-unloaded-rule",
+      "context": "physics-depth:divider-unloaded-rule:ratio-with-condition",
+      "move": "state the unloaded potential-divider ratio and the condition for using it",
+      "prompt": "State the equation for the output voltage across the lower resistor of an unloaded potential divider, and the condition under which it is valid.",
+      "marks": 3,
+      "scheme": [
+        "V_out = V_in × R₂/(R₁ + R₂)",
+        "Valid only when the output draws negligible current — open circuit or an ideal voltmeter",
+        "The two resistors must share the full supply voltage in series"
+      ],
+      "answer": "An unloaded divider gives V_out = V_in·R₂/(R₁+R₂): the lower resistor's share of the total resistance, times the input. It holds only while nothing drains the output — the instant a load draws current, the ratio rule breaks."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:loading-direction-rule",
+      "context": "physics-depth:loading-direction-rule:output-sags",
+      "move": "state the resistance combination that makes a loaded divider's output fall below its ratio value",
+      "prompt": "In one sentence and in terms of resistances, state why attaching a load to a divider's output makes that output drop below the no-load value.",
+      "marks": 2,
+      "scheme": [
+        "The load sits in parallel with the lower arm, lowering the section's resistance",
+        "A smaller share of the total resistance takes a smaller share of the voltage"
+      ],
+      "answer": "The load parallels the lower resistor, so that section's resistance shrinks — and a shrunken share of the total claims a smaller slice of the voltage."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:sensor-arm-placement",
+      "context": "physics-depth:sensor-arm-placement:light-to-voltage-sign",
+      "move": "deduce which arm a sensor occupies from the required output direction as its resistance changes",
+      "prompt": "An LDR's resistance falls in bright light. A designer wants the output voltage (taken across one resistor) to fall as light increases. Which arm must hold the LDR, and why? Explain using the divider ratio.",
+      "marks": 3,
+      "scheme": [
+        "Output across the lower arm tracks R₂/(R₁+R₂)",
+        "With the LDR low: R₂ falls, so the fraction falls and the output falls with light",
+        "Reversed placement would make the output rise — the wrong sign"
+      ],
+      "answer": "Put the LDR in the lower arm: its dropping resistance shrinks the share R₂/(R₁+R₂), so the output sinks as light grows. In the upper arm the same light would push the lower resistor's share up — the opposite response. Sensor placement decides the sign of every alarm."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:loading-worst-midspan",
+      "context": "physics-depth:loading-worst-midspan:parallel-sensitivity",
+      "move": "explain why loading distorts a divider most near half-scale and least near the extremes",
+      "prompt": "Explain why adding the same load to a divider changes the output far more when the no-load output is half the supply than when it is a tenth of it.",
+      "marks": 3,
+      "scheme": [
+        "At half-scale both arms are equal; a load across the lower one halves its value — a 25–33% drop",
+        "Near a tenth, the lower resistor is far smaller than the upper; a parallel load comparable to the big arm changes the small arm little in practice",
+        "The damage tracks how much the smaller arm's value is displaced by the parallel combination"
+      ],
+      "answer": "At mid-span the two arms are equal, so a load across the lower halves its contribution and yanks the output down by about 25–33%. When the lower arm is already tiny, a normal-sized load across it can only steal so much from a small number — the output, already near zero, barely notices. Loading bites hardest where the arms are comparable."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:threshold-arm-design",
+      "context": "physics-depth:threshold-arm-design:choose-fixed-resistor",
+      "move": "design the fixed arm of a divider so the output crosses a stated threshold at the critical sensor reading",
+      "prompt": "A thermistor reads 4.7 kΩ at 40 °C. As the lower arm of a 6.0 V divider, what fixed upper-arm resistance makes the output exactly 3.0 V at that temperature?",
+      "marks": 3,
+      "scheme": [
+        "3.0 is half of 6.0, so the arms must be equal at the threshold",
+        "R_fixed = R_therm(40 °C) = 4.7 kΩ",
+        "Then V_out crosses 3.0 V precisely at 40 °C"
+      ],
+      "answer": "The target output is exactly half the supply, so the two arms must match at the trigger point: a 4.7 kΩ fixed resistor above the thermistor. Above 40 °C the thermistor falls below 4.7 kΩ and the output drops under 3.0 V — the switch point, set by one equal sign."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:voltmeter-reads-unloaded-fallacy",
+      "context": "physics-depth:voltmeter-reads-unloaded-fallacy:meter-as-load",
+      "move": "correct the assumption that any voltmeter reads the no-load divider value",
+      "prompt": "A 10 kΩ voltmeter is connected across the lower 10 kΩ resistor of a divider made from two 10 kΩ resistors on 12 V. A student predicts 6.0 V. Calculate the reading and name the overlooked effect.",
+      "marks": 4,
+      "scheme": [
+        "The meter parallels the lower arm: 10∥10 = 5.0 kΩ",
+        "Output = 12×5.0/(10+5.0)",
+        "= 4.0 V, not 6.0 V",
+        "The voltmeter is a load — real meters change what they measure"
+      ],
+      "answer": "The meter's own 10 kΩ halves the lower section to 5.0 kΩ, so it reads 12×5/(10+5) = 4.0 V. The missing fifth of a volt is the measurement itself: a real voltmeter is a current-hungry component wearing a scale."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:arm-swap-invariance-fallacy",
+      "context": "physics-depth:arm-swap-invariance-fallacy:ratio-not-symmetric",
+      "move": "reject the claim that exchanging a divider's two resistors leaves the output unchanged",
+      "prompt": "A divider has 1.0 kΩ above a 2.0 kΩ lower resistor on 9.0 V, with the output across the 2.0 kΩ. A student says swapping the positions of the two resistors keeps the output the same. Calculate both values.",
+      "marks": 3,
+      "scheme": [
+        "Original: V_out = 9.0×2.0/3.0 = 6.0 V",
+        "Swapped: output across 1.0 kΩ = 9.0×1.0/3.0 = 3.0 V",
+        "The ratio is position-sensitive — which arm's share you read matters"
+      ],
+      "answer": "Across the 2.0 kΩ the output is 6.0 V; with the resistors exchanged the tapped arm is the 1.0 kΩ and it claims 3.0 V. The total resistance never changed — but the fraction did. A divider's ratio is a statement about positions, not a property of two resistors in a bag."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:max-load-resistance",
+      "context": "physics-depth:max-load-resistance:threshold-back-solve",
+      "move": "solve backwards for the smallest permissible lower-section conductance that keeps the output above a limit",
+      "prompt": "A divider of 2.0 kΩ above and 6.0 kΩ below on 8.0 V feeds a load. Calculate the largest load resistance that keeps the output at 5.0 V or above.",
+      "marks": 4,
+      "scheme": [
+        "Require 8p/(2.0k+p) ≥ 5.0 → 3p ≥ 10 000 → p ≥ 3.33 kΩ (parallel section)",
+        "1/R_L = 1/3333 − 1/6000 = 1.333×10⁻⁴",
+        "R_L ≤ 7.5 kΩ",
+        "Any heavier load than 7.5 kΩ pulls the output under 5.0 V"
+      ],
+      "answer": "The loaded lower section p must stay at or above 3.33 kΩ for 8p/(2000+p) ≥ 5, and p = (6000·R_L)/(6000+R_L) inverts to R_L ≤ 7.5 kΩ. The load's ceiling is 7.5 kΩ — beyond that the divider sags past the limit, which is why buffers exist between dividers and the things they feed."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:cascaded-dividers",
+      "context": "physics-depth:cascaded-dividers:second-stage-loads-first",
+      "move": "compute the first stage's output when a second divider is attached as its load",
+      "prompt": "A divider of 20 kΩ above and 20 kΩ below on 12 V has its output taken across the lower 20 kΩ. A second divider of 10 kΩ + 10 kΩ is connected across that output (top to the tap, bottom to the rail). Calculate the actual voltage at the tap.",
+      "marks": 4,
+      "scheme": [
+        "Second divider's total across the tap: 20 kΩ",
+        "Parallel with the lower arm: 20∥20 = 10 kΩ",
+        "Tap voltage: 12×10/(20+10)",
+        "= 4.0 V — not the 6.0 V an unloaded calculation promises"
+      ],
+      "answer": "The follower presents 20 kΩ, parallelling the lower arm to 10 kΩ, so the tap collapses to 12×10/30 = 4.0 V. Chaining dividers is not free: the second is the first's load, and each stage silently taxes the last."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:potentiometer-dimmer",
+      "context": "physics-depth:potentiometer-dimmer:wiper-as-tap",
+      "move": "transfer divider analysis to a potentiometer's sliding wiper as an adjustable output",
+      "prompt": "A 12 Ω, 1.00 m slide-wire potentiometer is wired across a 6.0 V supply with a lamp to the wiper. Calculate the wiper position that gives 4.0 V when the lamp is disconnected. With the lamp attached, explain why the voltage-versus-position graph is not a straight line.",
+      "marks": 4,
+      "scheme": [
+        "Unloaded: position = fraction of supply = 4.0/6.0 = 0.667 m",
+        "The lamp parallels the lower wire section, reducing it",
+        "A reduced lower section steals less than its length suggests — output falls below the linear value mid-track",
+        "Only near the ends, where the lamp parallels a tiny or huge section, does linearity return"
+      ],
+      "answer": "The open-circuit tap needs 2/3 of the track: 0.67 m. But with the lamp connected, it bridges the wiper-to-end section and shrinks it, so the real voltage trails the straight-line prediction through the middle — the same loading law, now sliding along a wire."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:bridge-null-solve",
+      "context": "physics-depth:bridge-null-solve:two-dividers-one-voltmeter",
+      "move": "combine two loaded dividers as a bridge and use the null condition to find an unknown resistance",
+      "prompt": "Two dividers share a 6.0 V rail: left 4.0 kΩ above a 2.0 kΩ, right R above a 2.0 kΩ, outputs taken from each tap to one voltmeter. Calculate the voltmeter reading, and state what nulling the bridge (zero reading) requires of R.",
+      "marks": 4,
+      "scheme": [
+        "Left tap: 6×2/(4+2) = 2.0 V",
+        "Right tap with R = 8.0 kΩ: 6×2/(8+2) = 1.2 V",
+        "Difference across the meter: 0.8 V",
+        "Null requires equal divider ratios, so R must equal 4.0 kΩ for both taps to sit at 2.0 V"
+      ],
+      "answer": "The taps sit at 2.0 V and 1.2 V, so the meter reads 0.8 V. Null comes when both dividers share a ratio — here equal arms below demand equal arms above — so R must equal 4.0 kΩ to bring both taps to 2.0 V. A bridge is two dividers in argument; the voltmeter is the referee, and zero is its settlement."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:divider-charges-capacitor",
+      "context": "physics-depth:divider-charges-capacitor:thevenin-timing",
+      "move": "combine a divider with a charging capacitor by replacing the divider with its Thevenin pair",
+      "prompt": "A capacitor of 200 μF charges through the tap of a divider of two 10 kΩ resistors on 6.0 V. Calculate the final capacitor voltage and the time constant of the charging circuit.",
+      "marks": 4,
+      "scheme": [
+        "Open-circuit tap (final voltage): 6.0×10/20 = 3.0 V",
+        "Driving resistance: the two 10 kΩ arms in parallel = 5.0 kΩ",
+        "τ = RC = 5.0×10³ × 200×10⁻⁶",
+        "= 1.0 s"
+      ],
+      "answer": "The capacitor fills to the unloaded tap voltage, 3.0 V, and sees the supply resistance as the two arms in parallel — 5 kΩ — giving τ = 1.0 s. Swapping a divider for its Thevenin twin (voltage, resistance) turns any RC timing question into one multiplication."
+    }
+  ]
+}

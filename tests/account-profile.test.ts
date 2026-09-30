@@ -6,6 +6,7 @@ import { defaultSettings } from "@/data/repository";
 import { createCard } from "@/domain/scheduling";
 
 const A = "11111111-1111-4111-8111-111111111111";
+const outcome = { userId: "local", id: "outcome", subjectId: "wjec-alevel-physics", topicId: "energy", capabilityId: "energy", kind: "independent", priorState: "unknown", plannedMinutes: 2, actualMinutes: 2, support: "none", immediate: { awarded: 1, max: 2, independent: true, attemptId: "fixture-attempt", at: "2026-09-01T00:00:00.000Z" }, createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z" };
 const B = "22222222-2222-4222-8222-222222222222";
 beforeEach(() => { vi.resetModules(); globalThis.indexedDB = new IDBFactory(); });
 
@@ -18,7 +19,7 @@ async function fixture() {
   await local.put("settings", { ...defaultSettings("local"), displayName: "Local learner" });
   await local.put("meta", { key: "revise.revisionCheckpoint.v1", value: { local: { userId: "local", session: "resume" } } });
   await local.put("meta", { key: "revise.experimentAssignment.v1::user:local", value: { arm: "a", anonId: "anonymous" } });
-  await local.put("meta", { key: "revise.interventionOutcomes.v1", value: [{ userId: "local", id: "outcome" }] });
+  await local.put("meta", { key: "revise.interventionOutcomes.v1", value: [outcome] });
   await local.put("outbox", { id: "offline-write", ownerId: "local", entity: "cards", op: "upsert", payload: card, queuedAt: new Date().toISOString(), attempts: 0 });
   return { db, profiles, local, card };
 }
@@ -28,13 +29,15 @@ function replica(account: () => string | null, tables: Record<string, Record<str
     auth: { getUser: async () => ({ data: { user: account() ? { id: account() } : null } }) },
     from: (table: string) => {
       let owner = "";
+      let cursor = 0;
       const query = {
         select: () => query, order: () => query, or: () => query,
+        gt: (_column: string, value: number) => { cursor = value; return query; },
         eq: (_column: string, value: string) => { owner = value; return query; },
-        range: async () => ({ data: (tables[table] ?? []).filter((row) => malicious || row.user_id === owner), error: null }),
+        range: async () => ({ data: (tables[table] ?? []).filter((row) => (malicious || row.user_id === owner) && (table !== "learner_records" || Number(row.change_seq) > cursor)), error: null }),
         upsert: async (input: Record<string, unknown> | Record<string, unknown>[]) => {
           const rows = Array.isArray(input) ? input : [input];
-          tables[table] = rows;
+          tables[table] = table === "learner_records" ? rows.map((row, i) => ({ ...row, change_seq: i + 1 })) : rows;
           return { data: rows, error: null };
         },
         delete: () => query, in: async () => ({ error: null }),
@@ -63,7 +66,7 @@ describe("canonical account profile boundary", () => {
     expect((await account.getAll("cards"))[0].userId).toBe(A);
     expect((await account.get("settings", A))?.displayName).toBe("Local learner");
     expect((await account.get("meta", "revise.revisionCheckpoint.v1"))?.value).toEqual({ [A]: { userId: A, session: "resume" } });
-    expect((await account.get("meta", "revise.interventionOutcomes.v1"))?.value).toEqual([{ userId: A, id: "outcome" }]);
+    expect((await account.get("meta", "revise.interventionOutcomes.v1"))?.value).toEqual([{ ...outcome, userId: A }]);
     expect(await account.get("meta", `revise.experimentAssignment.v1::user:${A}`)).toBeTruthy();
     expect((await account.getAll("outbox")).every((item) => item.ownerId === A)).toBe(true);
     expect((await local.getAll("cards"))[0].userId).toBe("local");

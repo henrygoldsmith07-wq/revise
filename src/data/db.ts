@@ -1,3 +1,4 @@
+import { syncWireIdValue } from "./sync-contract";
 import { openDB } from "idb";
 import type { DBSchema, IDBPDatabase } from "idb";
 import type {
@@ -17,6 +18,7 @@ import type {
 } from "@/domain/types";
 import { PERSISTED_SCHEMA_VERSION } from "./persistence-schema";
 import { captureTelemetry, errorClass } from "@/lib/observability";
+import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 
 // ---------------------------------------------------------------------------
 // IndexedDB is the *primary* store, not a cache. Every write lands here first
@@ -271,14 +273,17 @@ export async function getAll<T>(store: CollectionStore): Promise<T[]> {
 export async function putAll<T extends { id: Id }>(store: CollectionStore, rows: T[]): Promise<void> {
   if (!rows.length) return;
   const db = await getDb();
-  const tx = db.transaction(store, "readwrite");
-  await Promise.all(rows.map((row) => tx.store.put(row as never)));
+  const tx = db.transaction([store, "meta"], "readwrite");
+  try {
+    const markers = await Promise.all(rows.flatMap(row => [tx.objectStore("meta").get(tombstoneKey(store, row.id)), tx.objectStore("meta").get(wireTombstoneKey(store, syncWireIdValue((row as T & { userId?: string }).userId ?? activeDatabaseProfile(), row.id)))]));
+    if (markers.some(Boolean)) throw new Error("This record was deleted. Create a new record instead.");
+    await Promise.all(rows.map(row => tx.objectStore(store).put(row as never)));
+  } catch (error) { tx.abort(); await tx.done.catch(() => undefined); throw error; }
   await tx.done;
 }
 
 export async function putOne<T extends { id: Id }>(store: CollectionStore, row: T): Promise<void> {
-  const db = await getDb();
-  await db.put(store, row as never);
+  await putAll(store, [row]);
 }
 
 export async function removeOne(store: CollectionStore, id: Id): Promise<void> {

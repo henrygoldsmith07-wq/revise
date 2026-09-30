@@ -1,0 +1,192 @@
+{
+  "topic": "medical-physics",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:ultrasound-nature",
+      "context": "physics-depth:ultrasound-nature:mechanical-longitudinal",
+      "move": "state what kind of wave diagnostic ultrasound is and its defining property",
+      "prompt": "State what physical quantity an ultrasound wave varies, its wave type, and what 'ultra' refers to.",
+      "marks": 3,
+      "scheme": [
+        "It is a mechanical (sound) wave — a pressure oscillation carried by the medium",
+        "Longitudinal: particles oscillate along the propagation direction",
+        "'Ultra' means above roughly 20 kHz, the human hearing limit; diagnostic probes use MHz frequencies"
+      ],
+      "answer": "Ultrasound is a longitudinal mechanical wave — pressure oscillations travelling through tissue, with particles moving along the propagation direction. 'Ultra' marks it above 20 kHz; diagnostic transducers work in the megahertz range, far beyond hearing."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:impedance-definition",
+      "context": "physics-depth:impedance-definition:z-rho-c",
+      "move": "state the acoustic impedance relation and its units",
+      "prompt": "State how acoustic impedance Z is defined for a medium, its unit, and what determines reflection at a boundary.",
+      "marks": 3,
+      "scheme": [
+        "Z = ρc: density multiplied by the speed of sound in that medium",
+        "Unit: kg m⁻² s⁻¹ (the rayl)",
+        "The fraction reflected at a boundary depends on the impedance mismatch (Z₂ − Z₁)/(Z₂ + Z₁)"
+      ],
+      "answer": "Acoustic impedance is Z = ρc — density times sound speed — in kg m⁻² s⁻¹. At a boundary, the reflected fraction grows with the impedance mismatch: a large (Z₂−Z₁)/(Z₂+Z₁) sends back a strong echo, matched impedances pass the wave cleanly through."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:gel-coupling",
+      "context": "physics-depth:gel-coupling:air-gap-removal",
+      "move": "explain why coupling gel is needed using impedance matching",
+      "prompt": "An ultrasound probe pressed onto dry skin images almost nothing, but with coupling gel the image appears. Explain using acoustic impedance.",
+      "marks": 3,
+      "scheme": [
+        "Air has a very low impedance; tissue a high one — a huge mismatch",
+        "Nearly all the ultrasound reflects at the air-skin boundary, never entering the body",
+        "Gel's impedance matches both probe and skin, so the wave crosses with little reflection"
+      ],
+      "answer": "Air-to-tissue is the worst impedance mismatch in the chain: nearly all the energy bounces off the skin surface and never enters. The gel's impedance sits close to both probe and skin, bridging the gap so the wave passes through — the transducer's whole window into the body is that smear of gel."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:doppler-flow-direction",
+      "context": "physics-depth:doppler-flow-direction:shift-sign",
+      "move": "explain how the Doppler shift reveals blood speed and direction",
+      "prompt": "In Doppler ultrasound, blood moving toward the probe raises the echo frequency and blood moving away lowers it. Explain why, and what the size of the shift measures.",
+      "marks": 3,
+      "scheme": [
+        "Moving reflectors compress (approach) or stretch (recede) the returning wavefronts",
+        "Approach raises the observed frequency; recession lowers it",
+        "The shift magnitude is proportional to the reflector speed along the beam: Δf/f = 2v/c for a back-scattered echo"
+      ],
+      "answer": "Blood cells act as moving reflectors: approaching flow compresses the returning wavefronts (higher frequency), receding flow stretches them (lower). The shift's sign gives direction; its magnitude gives speed through Δf/f = 2v/c — one measurement, both flow direction and velocity."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:doppler-speed-compute",
+      "context": "physics-depth:doppler-speed-compute:carotid-flow",
+      "move": "compute blood velocity from a measured Doppler shift",
+      "prompt": "A 7.5 MHz probe detects a shift of 1.5 kHz from blood in an artery. The speed of sound in tissue is 1540 m s⁻¹. Calculate the blood's velocity along the beam.",
+      "marks": 4,
+      "scheme": [
+        "Δf/f = 2v/c → v = c·Δf/(2f)",
+        "v = 1540 × 1.5×10³/(2 × 7.5×10⁶)",
+        "= 0.154 m s⁻¹",
+        "≈ 15 cm s⁻¹ along the beam direction"
+      ],
+      "answer": "The Doppler relation for a back-scattered echo is Δf = 2vf/c, so v = cΔf/2f = 1540×1.5×10³/(2×7.5×10⁶) ≈ 0.15 m s⁻¹ — a typical arterial value, obtained entirely from a frequency measurement."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:a-scan-depth-scan",
+      "context": "physics-depth:a-scan-depth-scan:eye-length",
+      "move": "apply pulse-echo timing to measure distances inside the eye",
+      "prompt": "In an A-scan of the eye, echoes from the front of the lens (t = 8.0 μs) and the retina (t = 34 μs) are recorded. Taking the sound speed as 1540 m s⁻¹, calculate the lens-to-retina distance.",
+      "marks": 3,
+      "scheme": [
+        "Each echo time is a round trip: one-way time = Δt/2 = (34−8)/2 = 13 μs",
+        "Distance = 1540 × 13×10⁻⁶",
+        "= 0.0200 m = 20 mm"
+      ],
+      "answer": "The 26 μs echo gap is a round-trip difference, so the one-way time is 13 μs and the lens-to-retina distance is 1540×13×10⁻⁶ = 20 mm. Intraocular lens implants are sized with exactly this arithmetic."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:attenuation-rate-calc",
+      "context": "physics-depth:attenuation-rate-calc:db-per-cm",
+      "move": "compute the depth reached before an ultrasound beam attenuates below a threshold",
+      "prompt": "A 5.0 MHz ultrasound beam attenuates at 1.2 dB cm⁻¹ MHz⁻¹ in soft tissue. Calculate the one-way depth at which its intensity has fallen by 30 dB, and state why this sets the useful imaging depth. (Ignore impedance losses.)",
+      "marks": 4,
+      "scheme": [
+        "Attenuation coefficient at 5.0 MHz: 1.2 × 5.0 = 6.0 dB cm⁻¹",
+        "One-way depth for 30 dB: d = 30/6.0 = 5.0 cm",
+        "The echo must travel out and back, halving the usable depth to ~2.5 cm for a 30 dB round-trip budget",
+        "Higher frequencies attenuate faster — the depth-versus-resolution trade"
+      ],
+      "answer": "At 5.0 MHz the tissue attenuates at 6.0 dB per cm, so 30 dB of loss is reached in 5.0 cm. An echo must survive the round trip, so the practical imaging depth for that budget is nearer 2.5 cm — the quantitative face of the frequency–depth trade-off that governs probe choice."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:ultrasound-em-fallacy",
+      "context": "physics-depth:ultrasound-em-fallacy:wave-classification",
+      "move": "reject classifying ultrasound as electromagnetic radiation",
+      "prompt": "A patient says the ultrasound scan 'uses the same radiation as X-rays, just a different frequency'. Correct the statement and explain the physical difference.",
+      "marks": 3,
+      "scheme": [
+        "Ultrasound is a mechanical pressure wave requiring a medium; X-rays are electromagnetic waves",
+        "Electromagnetic waves (including X-rays) travel through vacuum at c; sound cannot",
+        "Only the X-ray carries ionising risk — the electromagnetic classification, not frequency alone, sets that"
+      ],
+      "answer": "X-rays are electromagnetic waves — oscillating fields propagating through vacuum at light speed and energetic enough to ionise atoms. Ultrasound is mechanical: pressure oscillations carried by tissue molecules, needing a medium, unable to ionise anything. The patient's classification by frequency confuses two fundamentally different kinds of wave."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:ultrasound-resolution-wavelength-fallacy",
+      "context": "physics-depth:ultrasound-resolution-wavelength-fallacy:frequency-choice",
+      "move": "reject ignoring the frequency-depth trade-off when choosing probe frequency",
+      "prompt": "A student reasons: 'higher-frequency ultrasound always gives better images, so we should use 20 MHz everywhere.' Explain what this ignores.",
+      "marks": 3,
+      "scheme": [
+        "Resolution improves with higher frequency because features smaller than a wavelength blur",
+        "But attenuation also rises steeply with frequency — high-frequency beams die within centimetres",
+        "Deep abdominal imaging needs lower frequencies to reach the target; the eye or superficial vessels can take 15 MHz+"
+      ],
+      "answer": "Higher frequency does sharpen resolution — wavelength shrinks toward organ detail — but tissue attenuates sound ever more strongly as frequency rises: a 20 MHz beam is spent within a centimetre or two. Deep organs must trade resolution for reach at 3–5 MHz; only superficial work can exploit high frequencies."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:sonar-medical-shared",
+      "context": "physics-depth:sonar-medical-shared:echo-ranging",
+      "move": "transfer echo-ranging between medical imaging and naval sonar",
+      "prompt": "Explain the shared physics between a naval sonar mapping the seabed and a diagnostic A-scan measuring an organ's depth. State one constraint that differs sharply between the two.",
+      "marks": 3,
+      "scheme": [
+        "Both emit a pulse, time the echo and compute range from speed × time/2",
+        "Both rely on partial reflection at impedance/density boundaries",
+        "Sonar's seawater carries sound with modest loss over kilometres; tissue attenuates MHz frequencies within centimetres — the range constraint differs enormously"
+      ],
+      "answer": "Both systems are echo-rangers: send a pulse, clock the return, and read range = vt/2 from partial reflection at boundaries. The difference is attenuation: sonar's kHz frequencies cross kilometres of ocean, while a diagnostic probe's MHz frequencies are absorbed within centimetres — which is why submarines ping low and physicians scan high."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:doppler-weather-shared",
+      "context": "physics-depth:doppler-weather-shared:shift-reading",
+      "move": "transfer Doppler shift interpretation to weather radar",
+      "prompt": "A weather radar shows rain moving toward the antenna as a raised echo frequency. Explain how the same Doppler principle used for blood flow measures a storm's approach speed, and state the key difference in the wave used.",
+      "marks": 3,
+      "scheme": [
+        "Both rely on the shift in frequency of a wave scattered by a moving reflector",
+        "The shift's sign gives direction; magnitude gives speed (v = cΔf/2f)",
+        "Weather radar uses electromagnetic microwaves, not mechanical sound — reflecting off water droplets, not tissue"
+      ],
+      "answer": "Rain drops, like blood cells, scatter a wave back with a Doppler shift — approach raises the returned frequency, and the shift size gives the speed. The difference is the carrier: radar sends electromagnetic microwaves through air, while medical Doppler sends mechanical ultrasound through tissue. The shift mathematics is identical."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:ultrasound-beam-penumbra",
+      "context": "physics-depth:ultrasound-beam-penumbra:probe-physics",
+      "move": "combine the piezoelectric effect with impedance matching and attenuation",
+      "prompt": "Describe the full journey of one ultrasound pulse from the probe to a 4 cm deep organ and back, naming each physics process involved.",
+      "marks": 4,
+      "scheme": [
+        "Piezoelectric crystal converts an electrical pulse into a mechanical vibration (inverse piezo effect)",
+        "The gel impedance-match carries the wave into the tissue with minimal reflection",
+        "The wave attenuates with depth and partially reflects at the organ boundary (impedance mismatch)",
+        "The echo returns, and the crystal converts it back to an electrical signal (piezo effect) for timing"
+      ],
+      "answer": "The piezoelectric crystal turns an electrical drive pulse into vibration; the gel's matched impedance lets the wave enter tissue with little loss. It attenuates as it travels 4 cm, partially reflecting at the organ's impedance boundary. The returning echo strains the same crystal, now acting as a sensor, and the timing electronics convert the round trip into depth: four physics processes — transduction, matching, attenuation, reflection — in a single pulse."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:ekg-imaging-choice",
+      "context": "physics-depth:ekg-imaging-choice:modality-arbitration",
+      "move": "combine physics of three modalities to arbitrate a clinical choice",
+      "prompt": "A clinician suspects a blood clot in a deep leg vein, a lung tumour, and a torn knee ligament — three patients, three imaging questions. Assign the best modality for each with a physics-based justification.",
+      "marks": 4,
+      "scheme": [
+        "Clot in a leg vein: Doppler ultrasound — flow interruption and altered shift, no ionising dose",
+        "Lung tumour: CT — X-ray attenuation differences through lung tissue and 3D localisation without superposition",
+        "Torn knee ligament: MRI — soft-tissue contrast from proton relaxation, no dose",
+        "Each choice matches the physics of image formation to the tissue and question"
+      ],
+      "answer": "The clot: Doppler ultrasound — venous flow has a measurable Doppler signature, and no ionising dose matters for a scanning exam. The tumour: CT — differential attenuation in lung tissue with slice reconstruction localises a mass cleanly. The ligament: MRI — proton relaxation times distinguish soft tissues X-rays cannot. Three physics mechanisms, three right answers."
+    }
+  ]
+}

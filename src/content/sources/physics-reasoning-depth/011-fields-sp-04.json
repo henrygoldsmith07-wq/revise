@@ -1,0 +1,151 @@
+{
+  "topic": "fields",
+  "point": 4,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:field-strength-formulas",
+      "context": "physics-depth:field-strength-formulas:inverse-square-forms",
+      "move": "state the inverse-square expressions for gravitational and electric field strength",
+      "prompt": "State the inverse-square expressions for gravitational field strength g and electric field strength E at distance r from a point mass M or point charge Q.",
+      "marks": 3,
+      "scheme": [
+        "g = GM/r², directed toward the mass",
+        "E = Q/(4πε₀r²), directed away from a positive charge (toward a negative one)",
+        "Both fall off as 1/r² with distance from the source"
+      ],
+      "answer": "Gravitational field strength: g = GM/r², pointing toward the mass. Electric field strength: E = Q/(4πε₀r²), pointing away from positive charge. Both share the inverse-square distance dependence."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:potential-formulas",
+      "context": "physics-depth:potential-formulas:scalar-potentials",
+      "move": "state the point-source potential expressions and the sign convention for each",
+      "prompt": "State the expressions for gravitational potential V_g and electric potential V_e at distance r from a point mass M or point charge Q, and state the sign each takes by convention.",
+      "marks": 3,
+      "scheme": [
+        "V_g = −GM/r, always negative (zero at infinity)",
+        "V_e = Q/(4πε₀r), positive or negative according to the sign of Q",
+        "Potential is a scalar; the field is its negative gradient"
+      ],
+      "answer": "Gravitational potential is V_g = −GM/r — negative everywhere because gravity attracts and zero is defined at infinity. Electric potential is V_e = Q/(4πε₀r), taking the sign of Q. Both are scalars, with field strength as minus the potential gradient."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:orbit-speed-radius",
+      "context": "physics-depth:orbit-speed-radius:circular-orbit-balance",
+      "move": "derive how orbital speed depends on radius by equating gravity to centripetal force",
+      "prompt": "Show, by equating gravitational force to centripetal force, that a satellite's orbital speed around a planet falls off as 1/√r, and explain the consequence for low versus high orbits.",
+      "marks": 4,
+      "scheme": [
+        "For a circular orbit: GMm/r² = mv²/r",
+        "Cancel m and one r: v = √(GM/r)",
+        "So v ∝ 1/√r: larger orbits are slower orbits",
+        "The International Space Station (low) races round in ~90 min; geostationary craft (high) take 24 h"
+      ],
+      "answer": "Setting gravity as the centripetal force, GMm/r² = mv²/r, gives v = √(GM/r). Orbital speed therefore falls as 1/√r: low orbits are fast (ISS ~7.7 km s⁻¹, 90-minute period) while high orbits are slow (geostationary, 24-hour period)."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:g-at-height",
+      "context": "physics-depth:g-at-height:above-surface",
+      "move": "apply the inverse-square law from the planet's centre to find g at an altitude",
+      "prompt": "Earth has mass 5.97×10²⁴ kg and radius 6.37×10⁶ m. Calculate the gravitational field strength at the altitude of the International Space Station, 4.00×10⁵ m above the surface. (G = 6.67×10⁻¹¹ N m² kg⁻²)",
+      "marks": 3,
+      "scheme": [
+        "r must be measured from Earth's centre: r = 6.37×10⁶ + 4.00×10⁵ = 6.77×10⁶ m",
+        "g = GM/r² = 6.67×10⁻¹¹ × 5.97×10²⁴/(6.77×10⁶)²",
+        "= 8.68 m s⁻²"
+      ],
+      "answer": "Measuring from the centre, r = 6.77×10⁶ m. Then g = GM/r² = 6.67×10⁻¹¹×5.97×10²⁴/(6.77×10⁶)² ≈ 8.7 m s⁻² — only about 11% less than at the surface, which is why astronauts float from free fall, not weak gravity."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:potential-difference-orbit",
+      "context": "physics-depth:potential-difference-orbit:between-radii",
+      "move": "compute the potential difference between two orbital radii and interpret its sign",
+      "prompt": "The gravitational potential around Earth (M = 5.97×10²⁴ kg) is V = −GM/r. Calculate the potential difference between r = 6.77×10⁶ m and r = 4.22×10⁷ m (geostationary radius), stating which point is at higher potential. (G = 6.67×10⁻¹¹ N m² kg⁻²)",
+      "marks": 3,
+      "scheme": [
+        "V_low = −GM/6.77×10⁶ = −5.88×10⁷ J kg⁻¹",
+        "V_high = −GM/4.22×10⁷ = −9.43×10⁶ J kg⁻¹",
+        "ΔV = V_high − V_low = +4.93×10⁷ J kg⁻¹; the higher orbit is at higher (less negative) potential"
+      ],
+      "answer": "V(6.77×10⁶ m) = −5.88×10⁷ J kg⁻¹ and V(4.22×10⁷ m) = −9.43×10⁶ J kg⁻¹. The geostationary radius sits 4.9×10⁷ J kg⁻¹ higher — less negative — so raising a satellite requires energy input against gravity."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:zero-g-orbit-fallacy",
+      "context": "physics-depth:zero-g-orbit-fallacy:weightlessness",
+      "move": "reject the idea that orbiting astronauts are weightless because gravity vanishes",
+      "prompt": "A student says astronauts aboard the ISS are weightless because there is no gravity up there. Using the inverse-square law, explain why gravity is still substantial and what actually causes weightlessness.",
+      "marks": 3,
+      "scheme": [
+        "At 400 km altitude, g = GM/r² ≈ 8.7 m s⁻², about 89% of its surface value",
+        "Gravity does not vanish; it is what bends the station's path into an orbit",
+        "The astronauts are in continuous free fall with the station, so there is no contact force to give a sensation of weight"
+      ],
+      "answer": "Gravity at ISS altitude is still about 8.7 m s⁻² — nearly 90% of surface gravity — and is precisely the force holding the orbit. The astronauts feel weightless because they and the station fall together: nothing pushes back on them, so no contact force registers weight."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:charge-orbit-magnetic",
+      "context": "physics-depth:charge-orbit-magnetic:cyclotron",
+      "move": "transfer the orbital-balance idea to a charge circling in a magnetic field",
+      "prompt": "An electron (mass 9.11×10⁻³¹ kg, charge 1.60×10⁻¹⁹ C) moves at 2.0×10⁶ m s⁻¹ perpendicular to a magnetic field of 0.050 T. Show that its path is a circle and calculate the radius. (Treat gravity as negligible and explain why.)",
+      "marks": 4,
+      "scheme": [
+        "Magnetic force F = BQv is always perpendicular to v, so it acts as a centripetal force: BQv = mv²/r",
+        "r = mv/(BQ) = (9.11×10⁻³¹ × 2.0×10⁶)/(0.050 × 1.60×10⁻¹⁹)",
+        "= 2.3×10⁻⁴ m",
+        "Gravity on the electron is ~mg = 9×10⁻³⁰ N, utterly negligible against BQv = 1.6×10⁻¹⁴ N"
+      ],
+      "answer": "The magnetic force BQv stays perpendicular to the velocity, supplying exactly the centripetal requirement: r = mv/BQ = (9.11×10⁻³¹×2.0×10⁶)/(0.050×1.60×10⁻¹⁹) ≈ 2.3×10⁻⁴ m. The electron's weight (~9×10⁻³⁰ N) is over a million billion times smaller than the 1.6×10⁻¹⁴ N magnetic force, so gravity is irrelevant."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:orbital-boost-energy",
+      "context": "physics-depth:orbital-boost-energy:raise-orbit",
+      "move": "transfer energy reasoning to raising a satellite between circular orbits",
+      "prompt": "A satellite of mass 1200 kg is raised from a 300 km circular Earth orbit (r₁ = 6.67×10⁶ m) to a 700 km orbit (r₂ = 7.07×10⁶ m). Using E_total = −GMm/(2r) for a circular orbit, calculate the energy that must be added. (M = 5.97×10²⁴ kg, G = 6.67×10⁻¹¹ N m² kg⁻²)",
+      "marks": 4,
+      "scheme": [
+        "E₁ = −GMm/(2r₁) = −(6.67×10⁻¹¹ × 5.97×10²⁴ × 1200)/(2×6.67×10⁶) = −3.58×10¹⁰ J",
+        "E₂ = −(same numerator)/(2×7.07×10⁶) = −3.38×10¹⁰ J",
+        "ΔE = E₂ − E₁ = +2.0×10⁹ J",
+        "The orbit gains energy (less negative), even though it moves slower"
+      ],
+      "answer": "E₁ = −GMm/2r₁ = −3.58×10¹⁰ J and E₂ = −GMm/2r₂ = −3.38×10¹⁰ J. Raising the orbit needs ΔE = +2.0×10⁹ J — the orbit's total energy rises (toward zero) even though the satellite's speed in the higher orbit is lower; the extra energy goes into potential energy."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:orbital-escape-compare",
+      "context": "physics-depth:orbital-escape-compare:bound-vs-unbound",
+      "move": "compare circular-orbit energy with the escape energy from the same radius",
+      "prompt": "A probe orbits Earth in a circular orbit of radius 7.0×10⁶ m. Its total orbital energy is E = −GMm/(2r) and escape needs +GMm/r from the surface potential −GMm/r. Calculate the extra energy per kilogram needed to escape from this orbit, and compare it with the orbital kinetic energy per kilogram. (GM = 3.98×10¹⁴ m³ s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Per kg in orbit: E = −GM/2r = −3.98×10¹⁴/(2×7.0×10⁶) = −2.84×10⁷ J kg⁻¹",
+        "At rest on the same orbit the potential is −GM/r = −5.68×10⁷ J kg⁻¹, and escape requires +5.68×10⁷ J kg⁻¹ from rest",
+        "From orbit, the probe already holds kinetic energy +GM/2r = +2.84×10⁷ J kg⁻¹, so extra energy = 5.68×10⁷ − 2.84×10⁷ = 2.84×10⁷ J kg⁻¹",
+        "The extra energy exactly equals the orbital kinetic energy per kg: doubling the speed escapes"
+      ],
+      "answer": "In circular orbit E = −GM/2r = −2.84×10⁷ J kg⁻¹, made of potential −5.68×10⁷ plus kinetic +2.84×10⁷. Escape demands total energy 0, i.e. +5.68×10⁷ J kg⁻¹ from rest, but the orbiting probe already has half of that as kinetic energy. The additional need is exactly its kinetic energy, 2.84×10⁷ J kg⁻¹ — escape speed is √2 times orbital speed."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:tidal-field-gradient",
+      "context": "physics-depth:tidal-field-gradient:moon-field",
+      "move": "combine inverse-square fields at two points with a gradient argument to reason about tides",
+      "prompt": "The Moon (mass 7.35×10²² kg) sits 3.84×10⁸ m from Earth's centre; Earth's radius is 6.37×10⁶ m. Calculate the Moon's gravitational field at Earth's centre and at the near-side surface, and explain what the difference between them produces. (G = 6.67×10⁻¹¹ N m² kg⁻²)",
+      "marks": 4,
+      "scheme": [
+        "At centre: g = GM/r² = 6.67×10⁻¹¹×7.35×10²²/(3.84×10⁸)² = 3.32×10⁻⁵ N kg⁻¹",
+        "Near side: r = 3.84×10⁸ − 6.37×10⁶ = 3.776×10⁸ m, g = 3.43×10⁻⁵ N kg⁻¹",
+        "The near-side field exceeds the average by ~1.1×10⁻⁶ N kg⁻¹ and the far side falls short by the same amount",
+        "This field gradient — the tidal differential — stretches Earth's oceans toward and away from the Moon, producing two tidal bulges"
+      ],
+      "answer": "The Moon's field is 3.32×10⁻⁵ N kg⁻¹ at Earth's centre and 3.43×10⁻⁵ N kg⁻¹ at the near surface (using r = 3.776×10⁸ m). The near side is pulled more than the centre, the far side less, and this ~10⁻⁶ N kg⁻¹ gradient stretches the oceans into two bulges — the tides — one facing the Moon, one opposite."
+    }
+  ]
+}

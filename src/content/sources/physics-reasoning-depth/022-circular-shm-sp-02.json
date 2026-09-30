@@ -1,0 +1,165 @@
+{
+  "topic": "circular-shm",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:centripetal-acceleration-form",
+      "context": "physics-depth:centripetal-acceleration-form:two-equivalent-forms",
+      "move": "state both centripetal acceleration formulas and when each is convenient",
+      "prompt": "State the two equivalent expressions for centripetal acceleration, and say when each form is more convenient.",
+      "marks": 3,
+      "scheme": [
+        "a = v²/r and a = ω²r",
+        "Use a = v²/r when the linear speed is known",
+        "Use a = ω²r when the rotation rate (revolutions or rad s⁻¹) is known"
+      ],
+      "answer": "Centripetal acceleration is a = v²/r or, equivalently, a = ω²r. The v-form suits a known linear speed; the ω-form suits a known rotation rate — they are the same statement via v = ωr."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:centripetal-direction",
+      "context": "physics-depth:centripetal-direction:toward-centre",
+      "move": "state the direction of centripetal acceleration and what physical interaction supplies it",
+      "prompt": "State the direction of the acceleration of a body in uniform circular motion, and name two different physical interactions that can supply it.",
+      "marks": 3,
+      "scheme": [
+        "Always toward the centre of the circle",
+        "Supplied by a real force, never an extra 'centripetal force'",
+        "Examples: string tension (stone on rope), gravity (orbiting moon), friction (car on bend), normal reaction (banked track)"
+      ],
+      "answer": "The acceleration points to the centre at every instant. It is not a new kind of force: something real must provide it — tension for a whirled stone, gravity for the Moon, friction for a cornering car, the normal reaction on a banked track."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:v-squared-over-r-apply",
+      "context": "physics-depth:v-squared-over-r-apply:two-radii-compare",
+      "move": "apply a = v²/r to compare accelerations across two curves at fixed speed",
+      "prompt": "A train travels at 25 m s⁻¹ around a curve of radius 400 m and later around a curve of radius 100 m. Calculate the centripetal acceleration on each curve, and the ratio between them.",
+      "marks": 3,
+      "scheme": [
+        "a₁ = v²/r₁ = 625/400 = 1.56 m s⁻²",
+        "a₂ = 625/100 = 6.25 m s⁻²",
+        "Ratio = 6.25/1.56 = 4:1 — quadrupling when radius is quartered"
+      ],
+      "answer": "At 25 m s⁻¹ the 400 m curve gives a = 1.56 m s⁻² and the 100 m curve gives 6.25 m s⁻². Halving nothing here — the radius fell fourfold, so the acceleration rose fourfold: at fixed speed the acceleration is inversely proportional to radius."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:corner-acceleration",
+      "context": "physics-depth:corner-acceleration:car-rounding-bend",
+      "move": "compute centripetal acceleration from speed and radius in a road context",
+      "prompt": "A car takes a bend of radius 50 m at a steady 20 m s⁻¹. Calculate its centripetal acceleration, and the minimum tyre-road friction coefficient needed to provide it. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "a = v²/r = 400/50 = 8.0 m s⁻²",
+        "Friction supplies ma: μmg ≥ mv²/r",
+        "μ ≥ v²/(gr) = 400/(9.81×50) = 0.82",
+        "Any friction coefficient below 0.82 and the car skids outward"
+      ],
+      "answer": "The acceleration is v²/r = 8.0 m s⁻² toward the bend's centre. Tyre friction μmg must supply mv²/r, so μ ≥ v²/gr = 0.82 — demanding on a dry road, impossible on ice."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:omega-form-apply",
+      "context": "physics-depth:omega-form-apply:centrifuge-digits",
+      "move": "use a = ω²r with a rotation rate quoted in rev min⁻¹",
+      "prompt": "A laboratory centrifuge spins at 3000 rev min⁻¹ with samples 0.090 m from the axis. Calculate the centripetal acceleration and express it as a multiple of g.",
+      "marks": 4,
+      "scheme": [
+        "ω = 3000 × 2π/60 = 314 rad s⁻¹",
+        "a = ω²r = 314² × 0.090 = 8.9×10³ m s⁻²",
+        "As a multiple of g: 8900/9.81 ≈ 910 g",
+        "Nearly a thousand gravities — why centrifuges separate suspensions so effectively"
+      ],
+      "answer": "3000 rpm is ω = 314 rad s⁻¹, so a = ω²r = 314²×0.090 ≈ 8.9×10³ m s⁻² — roughly 910 g. At such acceleration, buoyant sorting of particles by density happens hundreds of times faster than under gravity alone."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:centrifugal-force-fallacy",
+      "context": "physics-depth:centrifugal-force-fallacy:outward-force-claim",
+      "move": "reject an outward 'centrifugal force' as a real agent in the ground frame",
+      "prompt": "A passenger slides outward on a rotating fairground ride and a student explains it as 'the centrifugal force pushing them out'. Give the correct explanation in the ground frame.",
+      "marks": 3,
+      "scheme": [
+        "In the ground frame there is no outward force on the passenger",
+        "Their inertia tends to keep them moving straight; insufficient inward friction fails to provide the needed centripetal force",
+        "They therefore move along a path less curved than the ride — drifting outward relative to it"
+      ],
+      "answer": "Nothing pushes the passenger outward. Their body simply obeys inertia — straight-line tendency — while the friction available falls short of the centripetal force the ride demands. Relative to the rotating seat they drift outward; in the ground frame they merely under-steer relative to its curve. 'Centrifugal force' is a bookkeeping fiction of the rotating frame, not a real agent."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:constant-speed-no-acceleration-fallacy",
+      "context": "physics-depth:constant-speed-no-acceleration-fallacy:velocity-vector",
+      "move": "reject steady speed as evidence of zero acceleration",
+      "prompt": "A student says a stone whirled at constant speed on a string has no acceleration because its speed is unchanging. Explain the error.",
+      "marks": 2,
+      "scheme": [
+        "Velocity is a vector whose direction changes continuously during circular motion",
+        "Acceleration is the rate of change of velocity, so it is non-zero and directed towards the centre despite constant speed"
+      ],
+      "answer": "Velocity includes direction as well as speed. In uniform circular motion its direction changes continuously. Acceleration is the rate of change of velocity, so the stone has an acceleration towards the centre even though the magnitude of its velocity stays constant."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:moon-orbit-acceleration",
+      "context": "physics-depth:moon-orbit-acceleration:gravitational-supply",
+      "move": "transfer centripetal reasoning to an orbit supplied by gravity",
+      "prompt": "The Moon orbits Earth at a mean distance of 3.84×10⁸ m with a period of 27.3 days. Calculate its centripetal acceleration and verify it is consistent with Earth's gravity at that distance. (G = 6.67×10⁻¹¹, M_E = 5.97×10²⁴ kg)",
+      "marks": 4,
+      "scheme": [
+        "T = 27.3×24×3600 = 2.36×10⁶ s; ω = 2π/T = 2.66×10⁻⁶ rad s⁻¹",
+        "a = ω²r = (2.66×10⁻⁶)² × 3.84×10⁸ = 2.72×10⁻³ m s⁻²",
+        "Gravity at that distance: GM/r² = 6.67×10⁻¹¹×5.97×10²⁴/(3.84×10⁸)² = 2.70×10⁻³ m s⁻²",
+        "They agree — the Moon is in free fall, its weight exactly the centripetal force required"
+      ],
+      "answer": "From the period, ω = 2.66×10⁻⁶ rad s⁻¹ and a = ω²r = 2.72×10⁻³ m s⁻². Earth's gravity there supplies GM/r² = 2.70×10⁻³ m s⁻² — the same number. The Moon is permanently falling toward us; it just keeps missing."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:loop-the-loop",
+      "context": "physics-depth:loop-the-loop:minimum-speed",
+      "move": "transfer centripetal analysis to the top of a vertical loop",
+      "prompt": "A rollercoaster car just maintains contact at the top of a vertical loop of radius 8.0 m. Calculate the minimum speed at the top, and the normal force at that speed. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "At the minimum, the track reaction N = 0 and gravity alone supplies the centripetal force",
+        "mg = mv²/r → v = √(gr)",
+        "v = √(9.81×8.0) = 8.9 m s⁻¹",
+        "At this threshold the normal force is zero — any slower and contact is lost"
+      ],
+      "answer": "At the threshold of losing contact, the track pushes nothing (N = 0) and gravity alone bends the path: mg = mv²/r, so v_min = √(gr) = √(9.81×8.0) = 8.9 m s⁻¹. The normal force is then exactly zero — the slowest the car can crest the loop and stay on the rails."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:banked-curve-design",
+      "context": "physics-depth:banked-curve-design:no-friction-speed",
+      "move": "combine circular conditions with force components for a frictionless banked turn",
+      "prompt": "A road bend of radius 100 m is banked at 20° to the horizontal. Calculate the speed at which a car can round it with zero friction, explaining the force geometry.",
+      "marks": 4,
+      "scheme": [
+        "The normal reaction N has components: N sinθ horizontal (centripetal), N cosθ vertical (balancing weight)",
+        "N cosθ = mg and N sinθ = mv²/r",
+        "Dividing: tanθ = v²/(gr)",
+        "v = √(gr tanθ) = √(9.81×100×tan20°) = 19 m s⁻¹"
+      ],
+      "answer": "With no friction, only the normal force acts besides weight: its vertical part N cosθ = mg and horizontal part N sinθ = mv²/r. Dividing gives tanθ = v²/gr, so v = √(9.81×100×0.364) ≈ 19 m s⁻¹ — the design speed where the banking alone does the steering."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:vertical-circle-forces",
+      "context": "physics-depth:vertical-circle-forces:bottom-vs-top",
+      "move": "compare the forces at the top and bottom of a vertical circle using centripetal bookkeeping",
+      "prompt": "A 60 kg rider on a Ferris wheel of radius 15 m moves at 8.0 m s⁻¹. Calculate the seat force on the rider at the bottom and at the top of the circle, and explain the difference. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Centripetal acceleration a = v²/r = 64/15 = 4.3 m s⁻² toward the centre",
+        "Bottom: seat pushes up, must overcome weight and provide centripetal force: F = m(g + a) = 60×14.1 = 846 N",
+        "Top: weight alone can exceed the requirement: F = m(g − a) = 60×5.55 = 333 N",
+        "The rider feels ~2.5× heavier at the bottom than at the top"
+      ],
+      "answer": "The required centripetal acceleration is v²/r = 4.3 m s⁻². At the bottom the seat must both lift the rider and accelerate her upward-centre: F = m(g+a) = 846 N; at the top gravity supplies part of the requirement, so the seat need only give m(g−a) = 333 N. The same circular motion, felt as 2.5 times the seat force at the bottom versus the top."
+    }
+  ]
+}

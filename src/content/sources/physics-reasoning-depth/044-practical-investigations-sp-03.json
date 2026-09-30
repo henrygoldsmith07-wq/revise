@@ -1,0 +1,166 @@
+{
+  "topic": "practical-investigations",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:gradient-units-rule",
+      "context": "physics-depth:gradient-units-rule:divide-the-units",
+      "move": "state how a gradient's units are derived from the axes",
+      "prompt": "State how to find the units of a graph's gradient from the units of the two axes, and give an example.",
+      "marks": 2,
+      "scheme": [
+        "Gradient units = (y-axis unit) ÷ (x-axis unit)",
+        "Example: gradient of velocity–time has units m s⁻¹ ÷ s = m s⁻²"
+      ],
+      "answer": "A gradient divides the y-quantity by the x-quantity, so its units divide likewise: velocity over time gives m s⁻¹ per s = m s⁻² — the acceleration. Units you cannot name from the axes mean the axes are mislabelled."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:linearise-strategy",
+      "context": "physics-depth:linearise-strategy:make-the-law-a-line",
+      "move": "state the general strategy for linearising a power-law relationship",
+      "prompt": "You believe y = kaⁿ relates two measured quantities. State what to plot to test this as a straight line, and what the gradient and intercept give.",
+      "marks": 4,
+      "scheme": [
+        "Take logs: log y = n log a + log k",
+        "Plot log y against log a",
+        "Gradient = n (the power), intercept = log k",
+        "A straight line confirms the power law; curvature rejects it"
+      ],
+      "answer": "Linearise by taking logarithms: log y = n·log a + log k. Plot log y against log a — a straight line proves the power law, with gradient reading off the exponent n and intercept giving log k. Lines are easier to judge than curves, which is why physicists log things."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:worst-line-method",
+      "context": "physics-depth:worst-line-method:gradient-uncertainty",
+      "move": "explain how the worst acceptable line yields a gradient uncertainty",
+      "prompt": "Explain how you would obtain an uncertainty in the gradient of a best-fit line using error bars, and how the gradient's percentage uncertainty feeds into a derived quantity.",
+      "marks": 4,
+      "scheme": [
+        "Draw the steepest and shallowest straight lines still consistent with the error bars",
+        "Worst-line gradient difference from the best-fit gradient gives the absolute uncertainty (often half the spread)",
+        "Percentage gradient uncertainty = Δgrad/grad × 100",
+        "If the quantity equals the gradient directly, that percentage carries straight through; if divided by another measurement, the percentages add"
+      ],
+      "answer": "The best-fit line's slope is not a fact but an estimate bounded by the data's error bars: the steepest and shallowest lines that still thread the bars give extreme gradients whose half-spread estimates the uncertainty. If the constant you want IS the gradient, its percentage error simply passes on; if you then divide by another reading, percentages combine — the line is uncertainty, graphed."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:intercept-diagnostic",
+      "context": "physics-depth:intercept-diagnostic:what-the-offset-reveals",
+      "move": "explain how a non-zero intercept exposes a systematic error or unmodelled term",
+      "prompt": "A resistance–length graph for a wire has gradient ρ/A but cuts the resistance axis at +0.4 Ω instead of the origin. Explain what that intercept likely represents, and why forcing the line through zero would be wrong.",
+      "marks": 3,
+      "scheme": [
+        "The 0.4 Ω offset is extra series resistance: leads, contacts or ammeter resistance the model ignored",
+        "It behaves as a constant added to every reading — a systematic offset",
+        "Forcing zero would bias the gradient as well: the fit must let physics put the offset where the data say"
+      ],
+      "answer": "The wire itself contributes ρL/A — zero at zero length — so the surviving 0.4 Ω must come from elsewhere: crocodile clips, lead resistance, or the ammeter's own resistance. The intercept is the experiment telling you about the unmodelled series resistance. Pinning the line to zero doesn't remove that resistance; it only hides the clue and bends the gradient to cover it up."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:spring-power-choice",
+      "context": "physics-depth:spring-power-choice:which-plot",
+      "move": "choose the axes that linearise a stated proposed relationship",
+      "prompt": "A student expects the extension x of a rubber band to grow with the hanging mass m as x = b·m^c. State the plot that turns this into a straight line and what c and log b are read from.",
+      "marks": 4,
+      "scheme": [
+        "log x = c·log m + log b",
+        "Plot log x (y-axis) against log m (x-axis)",
+        "Gradient gives c; intercept gives log b",
+        "Curvature in this plot would reject the power-law form"
+      ],
+      "answer": "Take logs of x = b·m^c: log x = c log m + log b. Log-extension against log-mass must then be straight, its gradient the exponent c and its intercept log b. If the logged points still curve, the power-law assumption is dead — which the original x-m graph could only hint at."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:gradient-reading-compute",
+      "context": "physics-depth:gradient-reading-compute:triangle-not-points",
+      "move": "compute a gradient using a large triangle on the line of best fit",
+      "prompt": "On a T² (s²) against L (m) graph for a pendulum, the best-fit line passes through (0.30 m, 1.21 s²) and (1.00 m, 4.04 s²). Calculate the gradient and the implied g. (T² = 4π²L/g)",
+      "marks": 4,
+      "scheme": [
+        "Gradient = (4.04−1.21)/(1.00−0.30) = 2.83/0.70 = 4.04 s² m⁻¹",
+        "Set 4π²/g = 4.04 → g = 4π²/4.04",
+        "= 9.77 m s⁻²",
+        "Use the line's points, not raw data points off the line"
+      ],
+      "answer": "The long triangle across the line gives 4.04 s² m⁻¹. With T² = (4π²/g)L, g = 4π²/gradient = 9.77 m s⁻². The arithmetic is nothing special — the method is: measure the gradient of the line, never of two scattered points, because the line has already averaged every reading."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:curve-fitting-every-point-fallacy",
+      "context": "physics-depth:curve-fitting-every-point-fallacy:line-vs-data",
+      "move": "reject connecting points (or forcing through all) instead of a best-fit line",
+      "prompt": "A student draws a curve through every plotted point and says it is more accurate because it touches all the data. Explain why that misrepresents the results.",
+      "marks": 3,
+      "scheme": [
+        "Every point carries measurement scatter; a curve through all of them bakes noise into the model",
+        "A best-fit line averages the scatter — it represents the mean trend, not each reading",
+        "Accuracy is improved by the fit's averaging, not by preserving each individual error"
+      ],
+      "answer": "The points' individual errors are the very thing the graph should average away; a line kissing every dot memorises the mistakes instead. The best-fit line's distance from the points IS the scatter — discarding it doesn't add accuracy, it hides the measurement quality. The line should have the dots around it, none of them on command."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:log-gradient-power",
+      "context": "physics-depth:log-gradient-power:read-exponent",
+      "move": "read a power-law exponent from logged data values",
+      "prompt": "log₁₀(T/s) rises by 0.50 while log₁₀(L/m) rises by 1.00 for a pendulum's data. State the exponent relating T to L and write the resulting proportional law.",
+      "marks": 3,
+      "scheme": [
+        "Gradient = 0.50/1.00 = 0.5 = the power n",
+        "So T ∝ L^0.5 = √L",
+        "Equivalent: T² ∝ L — the familiar pendulum relation"
+      ],
+      "answer": "A gradient of 0.5 in log-log space means T ∝ L^½ — the square-root law, equivalently T² ∝ L. The logged rise-ratio did in two numbers what the pendulum's whole theory says in one: period grows with the root of length."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:reciprocal-rearrangement",
+      "context": "physics-depth:reciprocal-rearrangement:emf-from-1-over-V",
+      "move": "transfer linearisation to a reciprocal rearrangement extracting two constants from one line",
+      "prompt": "A battery of unknown emf ε and internal resistance r drives currents I through variable resistors R, so ε = I(R + r). State what to plot to get a straight line from which both ε and r can be found, and identify the gradient and intercept.",
+      "marks": 4,
+      "scheme": [
+        "Rearrange: R = ε(1/I) − r",
+        "Plot R (y-axis) against 1/I (x-axis)",
+        "Gradient = ε; intercept on the R-axis = −r",
+        "Alternatively plot 1/I against R: gradient = 1/ε, intercept = r/ε"
+      ],
+      "answer": "Rearrange ε = I(R+r) to R = ε/I − r: plotting R against 1/I gives a straight line whose gradient is the emf and whose negative intercept is the internal resistance. One rearrangement hands two hidden constants to two obvious features of a single line."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:resistivity-from-gradient",
+      "context": "physics-depth:resistivity-from-gradient:two-graphs-one-material",
+      "move": "combine gradient-based resistivity extraction with uncertainty propagation to report a material constant",
+      "prompt": "A wire's resistance-vs-length graph has gradient 2.2 ± 0.2 Ω m⁻¹; its diameter is measured as 0.30 ± 0.01 mm. Calculate the resistivity and its percentage uncertainty, and state which measurement should be improved first. (Give 2 s.f.)",
+      "marks": 4,
+      "scheme": [
+        "Area A = π(d/2)² = π×(1.5×10⁻⁴)² = 7.07×10⁻⁸ m²",
+        "ρ = gradient × A = 2.2×7.07×10⁻⁸ = 1.56×10⁻⁷ ≈ 1.6×10⁻⁷ Ω m",
+        "Gradient percentage = 0.2/2.2 ≈ 9%; diameter's 3% doubles through the square → 6%",
+        "Total ≈ 15% — the gradient (graph) dominates, improve the fit data first"
+      ],
+      "answer": "ρ = (R/L)×A = 2.2×7.07×10⁻⁸ ≈ 1.6×10⁻⁷ Ω m — nichrome territory. Uncertainties: the gradient contributes 9%; the diameter's 3% becomes 6% squared. At ~15% combined, the graph's scatter is the villain, so the next round means more length readings and tighter contacts — a micrometer can only fix a smaller slice."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:half-life-log-line",
+      "context": "physics-depth:half-life-log-line:decay-as-a-line",
+      "move": "combine exponential decay with linearisation to extract the decay constant from a log graph",
+      "prompt": "Count-rate data for a source is linearised as ln(A/s⁻¹) against t/s, giving a straight line of gradient −0.035 s⁻¹ and intercept 7.0. Calculate the decay constant and the initial activity.",
+      "marks": 4,
+      "scheme": [
+        "A = A₀e^(−λt) → ln A = −λt + ln A₀",
+        "Gradient = −λ → λ = 0.035 s⁻¹",
+        "Intercept ln A₀ = 7.0 → A₀ = e⁷·⁰ ≈ 1.1×10³ s⁻¹",
+        "Half-life check: t½ = ln2/λ ≈ 20 s"
+      ],
+      "answer": "The logged straight line has gradient −λ, so λ = 0.035 s⁻¹ (t½ = 0.693/0.035 ≈ 20 s), and the intercept e⁷·⁰ gives an initial activity near 1100 s⁻¹. An exponential decay is a straight line wearing logarithmic make-up — the graph reads both the rate and the start from one ruler."
+    }
+  ]
+}

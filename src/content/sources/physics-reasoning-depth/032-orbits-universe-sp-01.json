@@ -1,0 +1,193 @@
+{
+  "topic": "orbits-universe",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:orbit-force-balance-statement",
+      "context": "physics-depth:orbit-force-balance-statement:gravity-as-centripetal",
+      "move": "state the force balance that defines a circular orbit",
+      "prompt": "State the condition that makes a satellite's orbit circular, and identify which force provides the centripetal requirement.",
+      "marks": 2,
+      "scheme": [
+        "Gravity provides exactly the centripetal force: GMm/r² = mv²/r",
+        "The balance holds at every point: a steady speed and fixed radius"
+      ],
+      "answer": "A circular orbit requires gravity alone to supply the centripetal force: GMm/r² = mv²/r at every instant. Nothing else acts — the satellite is in perpetual free fall around the planet."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:kepler-third-statement",
+      "context": "physics-depth:kepler-third-statement:t-squared-r-cubed",
+      "move": "state the Kepler third-law relation and its consequence for orbital radius",
+      "prompt": "State the relation between a planet's orbital period and its orbital radius, and the qualitative consequence of moving a satellite to a much higher orbit.",
+      "marks": 3,
+      "scheme": [
+        "T² = 4π²r³/(GM): the square of the period is proportional to the cube of the radius",
+        "A higher orbit means a much longer period (r³ growth)",
+        "It also means a slower orbital speed (v = √(GM/r))"
+      ],
+      "answer": "Kepler's third law: T² ∝ r³ — specifically T² = 4π²r³/(GM). Raise the radius and the period grows fast (as r to the 3/2) while the speed falls as 1/√r: high orbits are slow and stately, low orbits quick and frantic."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:orbit-speed-not-force",
+      "context": "physics-depth:orbit-speed-not-force:bigger-radius-slower",
+      "move": "explain why higher orbits are slower despite gravity growing weaker",
+      "prompt": "Gravity weakens with distance, yet a satellite in a higher orbit moves more slowly. Explain why less force does not mean more speed.",
+      "marks": 3,
+      "scheme": [
+        "From GMm/r² = mv²/r, the m and one r cancel: v = √(GM/r)",
+        "v depends on the planet's mass and radius only — a weaker field demands less centripetal acceleration at the lower speed",
+        "Doubling r halves the required acceleration but quarters the available force: the only consistent speed is lower"
+      ],
+      "answer": "The orbit condition v = √(GM/r) comes from balancing gravity against the needed centripetal force. Weaker gravity at larger r means less centripetal force is required, and the slower speed at that height is exactly the one whose mv²/r matches the weakened pull. The satellite is not fighting gravity; it is falling with just the right sideways speed."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:orbit-mass-irrelevant",
+      "context": "physics-depth:orbit-mass-irrelevant:cancellation-of-m",
+      "move": "explain why a satellite's own mass never enters its orbital motion",
+      "prompt": "A 100 kg research probe and a 10 tonne module are placed in the same orbit. Explain, from the force balance, why they orbit identically.",
+      "marks": 3,
+      "scheme": [
+        "The orbit condition GMm/r² = mv²/r has m on both sides",
+        "m cancels: v = √(GM/r) is independent of the satellite's mass",
+        "This mirrors Galileo's falling bodies — gravity's universality"
+      ],
+      "answer": "The satellite's mass appears on both sides of GMm/r² = mv²/r and cancels, leaving v = √(GM/r): only the planet's mass and the orbital radius matter. A feather and a hammer fall together in orbit for the same reason they fall together in a vacuum — gravity's universality."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:orbit-speed-compute",
+      "context": "physics-depth:orbit-speed-compute:iss-altitude",
+      "move": "compute an orbital speed from altitude, converting properly from the planet's centre",
+      "prompt": "The ISS orbits 410 km above Earth's surface. Calculate its orbital speed. (M_E = 5.97×10²⁴ kg, R_E = 6.37×10⁶ m, G = 6.67×10⁻¹¹ N m² kg⁻²)",
+      "marks": 4,
+      "scheme": [
+        "r = 6.37×10⁶ + 4.10×10⁵ = 6.78×10⁶ m",
+        "v = √(GM/r) = √(6.67×10⁻¹¹ × 5.97×10²⁴/6.78×10⁶)",
+        "= √(5.87×10⁷) = 7.66×10³ m s⁻¹",
+        "≈ 7.7 km s⁻¹ — one sunrise every 92 minutes"
+      ],
+      "answer": "The orbital radius is R_E + 410 km = 6.78×10⁶ m, so v = √(GM/r) = 7.7 km s⁻¹. The ISS crosses 27 600 km every hour — sixteen sunrises a day at Mach 23."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:orbit-period-from-speed",
+      "context": "physics-depth:orbit-period-from-speed:circumference-link",
+      "move": "turn an orbital speed into a period through the circumference",
+      "prompt": "Using the ISS speed of 7.66×10³ m s⁻¹ at r = 6.78×10⁶ m, calculate its orbital period, and check it against the Kepler relation.",
+      "marks": 4,
+      "scheme": [
+        "Circumference: 2πr = 4.26×10⁷ m",
+        "Period: T = 2πr/v = 4.26×10⁷/7.66×10³ = 5560 s",
+        "≈ 93 min",
+        "Kepler check: T = 2π√(r³/GM) = 2π√(6.78³×10¹⁸/3.98×10¹⁴) ≈ 5560 s ✓"
+      ],
+      "answer": "The orbit's circumference is 2π×6.78×10⁶ = 4.26×10⁷ m, so T = circumference/speed = 5560 s ≈ 93 min. Kepler's formula returns the same 5560 s — two routes to the same dawn every 93 minutes."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:orbit-needs-thrust-fallacy",
+      "context": "physics-depth:orbit-needs-thrust-fallacy:continuous-push",
+      "move": "reject the idea that a satellite needs continuous thrust to keep moving",
+      "prompt": "A student says the ISS must fire its engines constantly to stay up, 'otherwise it would stop and fall'. Explain the error, and why the ISS does slowly lose altitude.",
+      "marks": 3,
+      "scheme": [
+        "Newton's first law: in orbit no forward force is needed to maintain horizontal motion",
+        "Gravity is not cancelled — it IS the force bending the path into a circle",
+        "The tiny residual atmosphere at 410 km drags the station, which is why it needs periodic re-boosts"
+      ],
+      "answer": "Nothing must push the station forward: inertia handles the horizontal part while gravity supplies the continuous downward bend — that combination is the orbit. The engines are silent for years at a time. What re-boosts actually fight is the whisper of residual air at 410 km, a drag the student's 'falling' intuition mistook for the whole story."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:geostationary-anywhere-fallacy",
+      "context": "physics-depth:geostationary-anywhere-fallacy:latitude-constraint",
+      "move": "reject geostationary orbit above arbitrary latitudes",
+      "prompt": "A proposed satellite is to hover 'geostationarily' above mid-Wales at 52°N. Explain why no such orbit exists.",
+      "marks": 3,
+      "scheme": [
+        "A geostationary orbit must have its plane coincident with Earth's equatorial plane",
+        "Only then does the satellite's angular velocity vector match Earth's rotation vector",
+        "An orbit above 52°N would require its plane tilted; its ground track would oscillate in latitude rather than staying fixed"
+      ],
+      "answer": "Geostationary requires the satellite's orbital plane to contain Earth's rotation axis — i.e. the equatorial plane — so its angular velocity vector matches the planet's. Any orbit reaching 52°N lies in a tilted plane whose ground track sweeps north and south daily. It can be geosynchronous over the equator, but never stationary over Wales."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:geostationary-radius",
+      "context": "physics-depth:geostationary-radius:full-derivation",
+      "move": "derive the geostationary orbital radius from the period condition",
+      "prompt": "Derive the required orbital radius for a geostationary satellite (T = 86164 s), and state the altitude above the equator. (GM_E = 3.98×10¹⁴ m³ s⁻², R_E = 6.37×10⁶ m)",
+      "marks": 4,
+      "scheme": [
+        "Set gravity as centripetal with ω = 2π/T: GMm/r² = mω²r",
+        "r³ = GM/ω² = GMT²/(4π²)",
+        "r = [3.98×10¹⁴ × (86164)²/(4π²)]^(1/3) = 4.22×10⁷ m",
+        "Altitude = 4.22×10⁷ − 6.37×10⁶ ≈ 3.6×10⁷ m (36 000 km)"
+      ],
+      "answer": "Matching Earth's rotation needs ω = 2π/86164 s; setting GMm/r² = mω²r gives r³ = GMT²/4π², so r = 4.22×10⁷ m — an altitude of about 36 000 km, nearly six Earth radii up. One number fixes the entire belt where broadcast satellites cluster."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:escape-velocity-link",
+      "context": "physics-depth:escape-velocity-link:satellite-vs-escape",
+      "move": "relate orbital speed to escape speed at the same radius",
+      "prompt": "A satellite orbits at radius r at speed v. Show that the escape speed at that radius is √2 × v, and explain the physical meaning of the factor.",
+      "marks": 4,
+      "scheme": [
+        "Orbital: ½mv² = GMm/2r (kinetic energy is half the potential magnitude)",
+        "Escape: ½mv_esc² = GMm/r → v_esc = √(2GM/r)",
+        "v_esc/v = √(2GM/r)/√(GM/r) = √2",
+        "Escape means supplying kinetic energy equal to the full potential well, not half"
+      ],
+      "answer": "In circular orbit the kinetic energy is half the depth of the potential well: ½mv² = GMm/2r. Escape requires kinetic energy equal to the whole well, so v_esc = √(2GM/r) = √2×v. The √2 is the ratio between half a well's depth and the full climb out — the boundary between circling and leaving."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:black-hole-orbit",
+      "context": "physics-depth:black-hole-orbit:photon-sphere",
+      "move": "transfer the orbit-speed relation to a black hole and light itself",
+      "prompt": "Near a black hole, the orbital speed formula v = √(GM/r) formally reaches the speed of light at the photon sphere, r = 1.5 times the Schwarzschild radius. Explain what this signals, and why Newtonian reasoning is being pushed past its validity.",
+      "marks": 3,
+      "scheme": [
+        "Setting v = c in √(GM/r) gives the radius where light itself could circle: the photon sphere",
+        "But orbital speeds near light speed require relativistic treatment — Newton's model no longer holds",
+        "The calculation marks the boundary where the Newtonian orbit model must be replaced by general relativity"
+      ],
+      "answer": "Formally, v = √(GM/r) reaches c at r = 1.5 r_s — the photon sphere, where light itself could circle. But that is precisely where the Newtonian machinery fails: orbits at near-light speed belong to general relativity, where space-time curvature replaces the inverse-square force. The formula's breakdown is not an error to fix but a boundary announcing the next theory — a lesson in every model's domain of validity."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:hohmann-transfer-reasoning",
+      "context": "physics-depth:hohmann-transfer-reasoning:two-boost-ellipse",
+      "move": "combine orbital speeds with energy accounting to reason about transfer orbits",
+      "prompt": "A satellite in low orbit (r₁ = 7.0×10⁶ m) must reach a higher orbit (r₂ = 4.2×10⁷ m). Describe the two-boost strategy of a Hohmann transfer and explain why two boosts, not one, are needed. (GM_E = 3.98×10¹⁴ m³ s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Speeds: v₁ = √(GM/r₁) = 7.54 km s⁻¹; v₂ = √(GM/r₂) = 3.08 km s⁻¹",
+        "Boost 1 raises the far side of an ellipse to r₂: an elliptical orbit between the two circles",
+        "At the ellipse's far point the satellite is moving slower than the circular speed there — boost 2 circularises it",
+        "One boost gives an ellipse that returns to its start point; the second sets the new permanent radius"
+      ],
+      "answer": "The circular speeds differ: 7.5 km s⁻¹ low, 3.1 km s⁻¹ high. The first boost stretches the orbit into an ellipse whose far side just grazes r₂ — but at that far point the satellite coasts below the local circular speed, so without the second boost it would fall back along the ellipse. Boost 2 supplies the missing energy to circularise at the new height: climb, then settle — the two-step logic of every orbital rendezvous."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:tidal-lock-reasoning",
+      "context": "physics-depth:tidal-lock-reasoning:moon-synchronous-spin",
+      "move": "combine orbital period reasoning with tidal physics to explain a synchronous rotation",
+      "prompt": "The Moon rotates exactly once per orbit, so the same face always points at Earth. Explain how the orbital period relation and tidal effects together account for this synchronisation.",
+      "marks": 4,
+      "scheme": [
+        "The Moon's orbital period (27.3 d) equals its spin period — a 1:1 spin-orbit resonance",
+        "Earth's tidal pull on the Moon's near side stretches it into a slight prolate shape",
+        "A spinning, elongated Moon dissipates energy through internal friction — tides doing work on rock",
+        "The configuration of least dissipation is the locked one: the bulge always facing Earth — the same physics that synchronises many moons"
+      ],
+      "answer": "The Moon's spin and orbital periods match exactly — a 1:1 resonance. Earth's tide stretches the Moon slightly; any spin faster or slower than the orbit drags that bulge out of alignment, and the resulting tidal torque, powered by internal friction, brakes the spin. The system settles where dissipation vanishes: bulge Earthward, spin locked — the fate toward which many satellites have already settled."
+    }
+  ]
+}

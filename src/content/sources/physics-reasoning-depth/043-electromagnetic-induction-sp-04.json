@@ -1,0 +1,192 @@
+{
+  "topic": "electromagnetic-induction",
+  "point": 4,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:transformer-equation",
+      "context": "physics-depth:transformer-equation:turns-ratio",
+      "move": "state the ideal transformer voltage ratio and the quantity it is proportional to",
+      "prompt": "State the relationship between primary and secondary voltages and turns for an ideal transformer, and the condition on the supply for it to work at all.",
+      "marks": 3,
+      "scheme": [
+        "V_s/V_p = N_s/N_p (the ratio of voltages equals the ratio of turns)",
+        "The supply must be alternating — a changing flux is required to induce emf",
+        "A steady DC gives no changing flux and no output after the switch is thrown"
+      ],
+      "answer": "An ideal transformer gives V_s/V_p = N_s/N_p: the turns ratio sets the voltage ratio. But this requires a changing flux — an alternating supply. On steady DC nothing changes, nothing is induced, and the transformer does nothing at all."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:transformer-power-conservation",
+      "context": "physics-depth:transformer-power-conservation:current-inverse",
+      "move": "state the power-conservation consequence for primary and secondary currents",
+      "prompt": "For an ideal transformer stepping voltage up by a factor of 10, state what happens to the current, and name the principle used.",
+      "marks": 2,
+      "scheme": [
+        "Power is conserved: V_p I_p = V_s I_s",
+        "So the current falls by the same factor, 10 — a step-up is a step-down for current"
+      ],
+      "answer": "Conservation of power, V_pI_p = V_sI_s, forces the current down by exactly the factor the voltage went up: a ten-fold step-up carries one tenth the current. Voltage gains are paid for in current."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:soft-iron-core",
+      "context": "physics-depth:soft-iron-core:flux-channeling",
+      "move": "explain why the core is soft iron and why it is laminated",
+      "prompt": "Explain why a transformer core is made of soft iron and why that core is built from thin insulated laminations rather than a solid block.",
+      "marks": 3,
+      "scheme": [
+        "Soft iron has high permeability, channeling nearly all the primary flux through the secondary",
+        "It is 'soft' because it demagnetises easily, minimising hysteresis loss on each AC cycle",
+        "Laminations break up the paths for large eddy currents that a solid core would host"
+      ],
+      "answer": "Soft iron guides the alternating flux from one coil to the other so linkage is near-complete, and it magnetises and demagnetises with little waste — a hard core would fight every cycle with hysteresis heating. Laminating it slices the bulk into insulated slabs so eddy currents can only loop within thin sections, shrinking those losses again."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:flux-linkage-mechanism",
+      "context": "physics-depth:flux-linkage-mechanism:shared-alternating-flux",
+      "move": "explain how energy crosses between circuits that never touch",
+      "prompt": "A transformer's primary and secondary windings are electrically isolated. Explain step by step how an alternating voltage on one produces a voltage on the other.",
+      "marks": 4,
+      "scheme": [
+        "AC in the primary creates an alternating current and hence an alternating magnetic field",
+        "The laminated core funnels this changing flux through the secondary",
+        "By Faraday's law the changing flux linkage induces an emf in the secondary",
+        "Each turn links the same flux, so the emfs add in proportion to the turns ratio"
+      ],
+      "answer": "The alternating primary current continually rebuilds the core's flux; the core carries that changing flux into every secondary turn; and each turn, per Faraday, develops an emf as its linkage changes. With the same flux threading N_p turns versus N_s turns, the emfs stand in the turns ratio — magnetism is the wire that joins the two separate circuits."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:phone-charger-transformer",
+      "context": "physics-depth:phone-charger-transformer:ratio-solve",
+      "move": "apply the turns ratio to size a small step-down transformer",
+      "prompt": "A phone charger steps 230 V mains to 5.0 V. The primary has 920 turns. Calculate the secondary turns, and state why the charger gets warm.",
+      "marks": 2,
+      "scheme": [
+        "N_s = N_p × V_s/V_p = 920 × 5/230 = 20 turns",
+        "Warming from non-ideal losses: resistance heating in the windings, plus hysteresis and eddy currents in the core"
+      ],
+      "answer": "The secondary needs 920×5/230 = 20 turns. It warms because no transformer is ideal: winding resistance, incomplete flux linkage, and the core's hysteresis and eddy currents convert some power to heat — which is exactly why an unused charger left plugged in still trickles watts."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:load-current-find",
+      "context": "physics-depth:load-current-find:two-winding-power",
+      "move": "apply power equality with the ratio to find winding currents for a rated load",
+      "prompt": "An ideal transformer feeds a 2.4 kW heater from a 240 V primary through a 4800 V secondary. Calculate the secondary and primary currents.",
+      "marks": 3,
+      "scheme": [
+        "I_s = P/V_s = 2400/4800 = 0.50 A",
+        "I_p = P/V_p = 2400/240 = 10 A",
+        "Check the ratio: V and I step opposite ways; 10/0.50 = 4800/240 = 20 ✓"
+      ],
+      "answer": "The load draws I_s = 2400/4800 = 0.50 A at the high-voltage end; the primary draws 2400/240 = 10 A from the mains. The ratio 20:1 appears flipped between voltage and current — one side's advantage is the other's cost."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:dc-transformer-fallacy",
+      "context": "physics-depth:dc-transformer-fallacy:steady-current",
+      "move": "reject the idea that transformers work on direct current",
+      "prompt": "A student connects a transformer to a car battery and expects the rated output voltage. Explain why the secondary shows almost nothing after switch-on, and what a brief flicker during switching actually is.",
+      "marks": 3,
+      "scheme": [
+        "A steady DC means a steady flux — dΦ/dt = 0, so Faraday gives no emf",
+        "Only during switching does the flux change, so one spike per make or break",
+        "That flicker is the transient induction of a changing current, not steady transformer action"
+      ],
+      "answer": "A transformer needs change; a battery's steady current builds a steady flux and induces nothing except a brief spike each time the circuit is made or broken. The flicker is exactly the Faraday emf of the changing current — proof that induction is about the derivative, and that steady DC is invisible to a transformer."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:step-up-creates-power-fallacy",
+      "context": "physics-depth:step-up-creates-power-fallacy:no-free-lunch",
+      "move": "reject the belief that stepping voltage up increases delivered power",
+      "prompt": "A student says the 120 000 V line 'multiplies the power' because the voltage grew from the 20 000 V plant output. Correct this with the transformer's power rule.",
+      "marks": 3,
+      "scheme": [
+        "Ideal transformers conserve power: V_sI_s = V_pI_p",
+        "The step-up raised voltage by 6 but cut current by 6",
+        "Power is unchanged; only the loss profile on the line improves because loss = I²R"
+      ],
+      "answer": "The transformer multiplies voltage while dividing current — 6 times the volts means a sixth the amperes, so power in equals power out. Nothing is created: the gain is that the line's own I²R heating shrinks thirty-six-fold. Step-up is a loss-management tool, not a power pump."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:transmission-loss-compare",
+      "context": "physics-depth:transmission-loss-compare:with-and-without",
+      "move": "compute cable losses at two transmission voltages for the same delivered power",
+      "prompt": "A line must deliver 10 MW through cables of total resistance 10 Ω. Calculate the power lost when transmitting at 20 kV versus 400 kV.",
+      "marks": 4,
+      "scheme": [
+        "At 20 kV: I = 10×10⁶/20×10³ = 500 A; loss = I²R = 2.5×10⁶ W = 2.5 MW (25% wasted)",
+        "At 400 kV: I = 25 A; loss = 6.25×10³ W = 6.25 kW (0.06% wasted)",
+        "The 20-fold voltage step cuts loss by 20² = 400×",
+        "The reason national grids exist at all"
+      ],
+      "answer": "At 20 kV the line carries 500 A and burns 2.5 MW — a quarter of the power — in its own resistance. At 400 kV only 25 A flows, losing a mere 6.25 kW. Voltage up 20 times, loss down 400: the I² in the heating law is the whole argument for high-voltage transmission."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:national-grid-chain",
+      "context": "physics-depth:national-grid-chain:step-up-step-down-chain",
+      "move": "transfer transformer ratios across the generation-to-home chain",
+      "prompt": "Power flows generator → 25 kV/400 kV step-up → transmission → 400 kV/33 kV → 33 kV/230 V → home. For an ideal chain delivering 50 MW to a home cluster, calculate the turns ratio of each transformer and the current on the transmission line.",
+      "marks": 4,
+      "scheme": [
+        "Ratios: 400/25 = 16:1; 33/400 (step-down); 230 V/33 kV = 143:1 down",
+        "Transmission current: I = P/V = 5×10⁷/4×10⁵ = 125 A",
+        "The 400 kV section carries only 125 A for 50 MW",
+        "Each local substation transforms again toward domestic voltage"
+      ],
+      "answer": "The chain steps 25→400 kV (16:1 up), 400→33 kV (12:1 down), 33 kV→230 V (143:1 down). The trunk line carries just 50 MW/400 kV = 125 A — the amperage of an electric kettle on a grid carrying a city's worth of power. Transformers hand the load down through voltage grades so no single cable carries both high volts and high amps."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:welder-step-down",
+      "context": "physics-depth:welder-step-down:current-amplification",
+      "move": "transfer the transformer ratio to a step-DOWN design chosen for its high secondary current",
+      "prompt": "A workshop transformer steps 230 V down to 30 V to drive a welding arc needing 250 A, the arc being its load. Calculate the ideal primary current, and explain why the secondary cable is thick while the primary flex is thin.",
+      "marks": 4,
+      "scheme": [
+        "Power to the arc: P = 30×250 = 7.5 kW",
+        "Primary current: I_p = P/V_p = 7500/230 ≈ 33 A",
+        "Ratio: voltage down by ~7.7 means current up by ~7.7",
+        "Thick secondary: I²R heating in the welder's leads must be minimised at hundreds of amperes"
+      ],
+      "answer": "The arc demands 30×250 = 7.5 kW, so the mains supplies 7500/230 ≈ 33 A. The transformer trades 33 A at high volts for 250 A at low volts — the same power, re-labelled. That is why the welding leads are fat cables: at 250 A, even 0.01 Ω would waste 600 W as heat, while the 33 A primary flex can afford to be thin."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:transformer-efficiency-measure",
+      "context": "physics-depth:transformer-efficiency-measure:input-vs-output-power",
+      "move": "combine measured winding powers with the loss channels to compute efficiency",
+      "prompt": "A transformer draws 12.6 A at 230 V and delivers 2.60 kW at 13 V. Calculate its efficiency, and name two loss channels responsible for the missing power.",
+      "marks": 4,
+      "scheme": [
+        "Input P = VI = 230×12.6 = 2.90 kW",
+        "η = 2.60/2.90 = 0.90 ≈ 90%",
+        "Losses: winding I²R heating",
+        "Core losses: hysteresis and eddy currents (plus leakage flux reducing linkage)"
+      ],
+      "answer": "Input power is 230×12.6 = 2.90 kW; output 2.60 kW gives 90% efficiency. The lost 0.30 kW is mostly resistive heating of the windings, with the core's hysteresis and eddy currents taking the rest — the same loss list that soft, laminated cores and thick copper are designed to fight."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:lenz-loads-transformer",
+      "context": "physics-depth:lenz-loads-transformer:back-emf-draw",
+      "move": "combine Lenz's law with transformer loading to explain why the primary draws more when the secondary supplies more",
+      "prompt": "A transformer's primary draws little current with the secondary open, but as a load is connected the primary current rises. Explain using Lenz's law.",
+      "marks": 4,
+      "scheme": [
+        "With no load, the secondary emf exists but no current flows — nothing changes in response",
+        "Connected load lets secondary current flow, whose own field opposes the core flux change (Lenz)",
+        "That opposition reduces the flux and would collapse the secondary voltage",
+        "The primary compensates by drawing extra current to restore the flux — power transferred is power drawn"
+      ],
+      "answer": "When the secondary feeds a load, its current's field fights the core flux per Lenz's law. That back-reaction momentarily dims the flux — Faraday's emfs sag — and the primary responds by pulling more current from the mains to restore it. The load announces itself back through the core, and the extra primary current is the mains paying for the power delivered: energy conservation enforced by opposition."
+    }
+  ]
+}

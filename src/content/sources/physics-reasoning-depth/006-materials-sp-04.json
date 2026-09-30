@@ -1,0 +1,145 @@
+{
+  "topic": "materials",
+  "point": 4,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:energy-area-definition",
+      "context": "physics-depth:energy-area-definition:graph-reading",
+      "move": "state that elastic strain energy equals the area under a force-extension graph",
+      "prompt": "State how the elastic strain energy stored in a stretched body is found from its force-extension graph.",
+      "marks": 2,
+      "scheme": [
+        "The strain energy equals the area under the force-extension graph up to the extension reached",
+        "For a Hooke's law body this area is ½Fx"
+      ],
+      "answer": "The elastic strain energy is the area under the force-extension graph up to the given extension; for a body obeying Hooke's law that area is the triangle ½Fx."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:loading-unloading-loop",
+      "context": "physics-depth:loading-unloading-loop:hysteresis",
+      "move": "state what a separation between loading and unloading curves represents in terms of dissipated energy",
+      "prompt": "On a force-extension graph, a material's loading and unloading curves do not coincide. State what the enclosed loop area represents.",
+      "marks": 2,
+      "scheme": [
+        "The enclosed loop is the work done against internal friction over the cycle",
+        "This energy is dissipated, usually as heat, not recovered on unloading"
+      ],
+      "answer": "The loop between the loading and unloading curves is the hysteresis loop: its area is the mechanical energy converted to heat over the load-unload cycle and not returned as elastic energy."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:why-area-is-energy",
+      "context": "physics-depth:why-area-is-energy:constant-force-step",
+      "move": "justify the area under force-extension as work by integrating force over distance",
+      "prompt": "Explain why the area under a force-extension graph gives the work done in stretching a wire, even when the force is not constant.",
+      "marks": 3,
+      "scheme": [
+        "Work by a constant force is force × distance in the force's direction",
+        "Over a sufficiently small extension Δx the force is approximately constant, giving work FΔx",
+        "Summing the work in these narrow strips gives the area under the force-extension graph"
+      ],
+      "answer": "Work is force times distance moved in the force's direction. Because the stretching force rises from zero as the extension grows, the total work is the sum of F×Δx over every small extension step — exactly the area under the force-extension graph. Where Hooke's law holds, that area collapses to ½Fx."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:plastic-work-accounting",
+      "context": "physics-depth:plastic-work-accounting:permanent-set",
+      "move": "explain where the work done goes when a wire is stretched beyond its elastic limit",
+      "prompt": "A wire is stretched beyond its elastic limit so that it stays permanently longer when unloaded. A student says no energy was lost because the wire is now at rest. Explain what happened to the work done during stretching.",
+      "marks": 3,
+      "scheme": [
+        "The work done is still the area under the loading curve",
+        "Only part was returned: the unloading curve lies below the loading curve",
+        "The difference — the hysteresis loop — went into permanently re-arranging the material (plastic work) and heating it"
+      ],
+      "answer": "The work done during stretching equals the area under the loading graph. On unloading only part of it returns (the area under the unloading curve, over the smaller recovered extension). The remainder went into permanently deforming the metal's structure and warming it — it is not stored, just converted."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:trapezium-energy",
+      "context": "physics-depth:trapezium-energy:two-segment-graph",
+      "move": "compute work done from a piecewise-linear force-extension graph",
+      "prompt": "A force-extension graph rises linearly from (0, 0) to (0.030 m, 12 N), then linearly to (0.050 m, 14 N). Calculate the total work done in stretching the body from 0 to 0.050 m.",
+      "marks": 3,
+      "scheme": [
+        "Triangle area = ½ × 0.030 × 12 = 0.18 J",
+        "Trapezium area = ½ × (12 + 14) × (0.050 − 0.030) = 0.26 J",
+        "Total = 0.18 + 0.26 = 0.44 J"
+      ],
+      "answer": "The first region is a triangle of area ½×0.030×12 = 0.18 J; the second a trapezium of area ½×(12+14)×0.020 = 0.26 J. The total work done is 0.44 J."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:hysteresis-cycle-work",
+      "context": "physics-depth:hysteresis-cycle-work:loop-area",
+      "move": "subtract the unloading area from the loading area to find dissipated energy over a cycle",
+      "prompt": "A spring is loaded so the force-extension graph rises linearly from (0,0) to (0.040 m, 20 N), and unloads along a straight line back to (0.040 m, 12 N) to (0,0). Calculate the energy dissipated in the load-unload cycle.",
+      "marks": 3,
+      "scheme": [
+        "Loading work = ½ × 20 × 0.040 = 0.40 J",
+        "Unloading return = ½ × 12 × 0.040 = 0.24 J",
+        "Dissipated = 0.40 − 0.24 = 0.16 J"
+      ],
+      "answer": "Loading stores 0.40 J; unloading returns only 0.24 J. The missing 0.16 J is dissipated in the hysteresis loop during the cycle."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:half-max-fallacy",
+      "context": "physics-depth:half-max-fallacy:max-force-times-extension",
+      "move": "reject F_max × x_max as the work done when force grows from zero",
+      "prompt": "A student calculates the work done stretching a Hooke's law spring to a maximum force of 24 N and extension of 0.060 m as 24 × 0.060 = 1.4 J. Identify the error and give the correct work done.",
+      "marks": 3,
+      "scheme": [
+        "The force does not act at its maximum value throughout the stretch",
+        "Work = ½Fx = ½ × 24 × 0.060",
+        "= 0.72 J"
+      ],
+      "answer": "The force ramps from 0 to 24 N, so its average is half the maximum. The work is ½×24×0.060 = 0.72 J, not 24×0.060 = 1.4 J — the student's figure is exactly twice too large."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:elastic-limit-range-error",
+      "context": "physics-depth:elastic-limit-range-error:proportional-limit",
+      "move": "reject applying ½Fx beyond the proportional limit where the graph is no longer linear",
+      "prompt": "A student stretches a wire past its limit of proportionality and uses ½Fx, with F the final force and x the final extension, to find the work done. Explain why this is incorrect and what to do instead.",
+      "marks": 2,
+      "scheme": [
+        "½Fx assumes a straight force-extension graph through the origin",
+        "Work must instead be found from the actual area under the curved graph, using integration or an area estimate"
+      ],
+      "answer": "½Fx gives the triangular area only for a straight force-extension graph through the origin. Beyond proportionality, use the actual area under the curved graph, for example by counting squares or integrating. The direction of any error in ½Fx depends on the curve's shape."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:trampoline-return",
+      "context": "physics-depth:trampoline-return:bounded-safety",
+      "move": "transfer force-displacement area reasoning to loading and unloading measurements of a trampoline mat",
+      "prompt": "A test rig depresses a trampoline mat by 0.40 m. Its force-displacement loading graph is a straight line from (0 m, 0 N) to (0.40 m, 1000 N). On reversal at 0.40 m, the measured force relaxes to 800 N without displacement. The unloading graph is then a straight line to (0 m, 0 N). Calculate the work supplied, the energy returned and the energy dissipated. Explain the contribution of the force drop at fixed displacement.",
+      "marks": 4,
+      "scheme": [
+        "Loading work = ½ × 1000 × 0.40 = 200 J",
+        "Returned energy = ½ × 800 × 0.40 = 160 J",
+        "Dissipated energy = 200 − 160 = 40 J",
+        "The force drop at fixed displacement contributes no mechanical work because the displacement is zero"
+      ],
+      "answer": "Loading work is the triangular area ½×1000×0.40 = 200 J. The unloading area is the returned energy, ½×800×0.40 = 160 J. The difference, 40 J, is dissipated during the cycle. The vertical force drop contributes no mechanical work because the rig does not move during it."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:safety-net-arrest",
+      "context": "physics-depth:safety-net-arrest:fall-arrest",
+      "move": "include further gravitational work during a Hookean rope's stretch and select the physical quadratic root",
+      "prompt": "In an idealised model, a 60 kg climber falls vertically from rest through 4.0 m before a slack rope becomes taut. The rope then obeys F = kx with k = 4000 N m⁻¹. Treat the climber as a particle and neglect energy losses and rope mass. Find the maximum extension x, including the further fall while the rope stretches. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Gravitational energy lost = mg(4.0 + x), including the extension",
+        "At maximum extension kinetic energy is zero, so mg(4.0 + x) = ½kx²",
+        "Substitution gives 2000x² − 588.6x − 2354.4 = 0",
+        "The positive root is x = 1.24 m (approximately 1.2 m to two significant figures)"
+      ],
+      "answer": "At maximum extension the climber is momentarily at rest. The total gravitational energy lost is mg(4.0+x), equal to the rope's strain energy ½kx². Thus 60×9.81×(4.0+x) = 2000x², or 2000x²−588.6x−2354.4 = 0. The positive root is [588.6+√(588.6²+4×2000×2354.4)]/4000 = 1.242 m. The negative root does not describe the stretched rope. Hence x ≈ 1.2 m to two significant figures."
+    }
+  ]
+}

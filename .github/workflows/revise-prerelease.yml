@@ -1,0 +1,53 @@
+name: Revise pre-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact release candidate commit or ref
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  quality:
+    needs: candidate
+    name: prerelease-quality-and-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.candidate.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prerelease-browser
+          path: playwright-report
+          if-no-files-found: ignore
+  staging:
+    needs: candidate
+    uses: ./.github/workflows/revise-staging.yml
+    with:
+      ref: ${{ needs.candidate.outputs.sha }}
+    secrets: inherit

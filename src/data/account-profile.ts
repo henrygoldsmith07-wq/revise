@@ -1,4 +1,6 @@
 import { COLLECTION_STORES, getProfileDb, type ReviseDB } from "./db";
+import { validateHistoryRecord } from "@/domain/learner-history";
+import { validateTombstone } from "@/domain/sync-tombstone";
 import { REVISE_META_KEYS } from "./storage-namespace";
 import type { OutboxItem, SyncEntity } from "@/domain/types";
 
@@ -109,6 +111,11 @@ export async function initializeAccountProfile(userId: string, adoptLocal: boole
         const key = String(row.key);
         if (key === ADOPTED_BY || key.startsWith(REVISE_META_KEYS.lastPullAt) || key.startsWith(REVISE_META_KEYS.pullCursors)) continue;
         row.key = key.replace("::user:local", `::user:${userId}`);
+        if (key.startsWith("revise.historyRecord.v1:") || key.startsWith("revise.deleted.v1:")) {
+          const history = key.startsWith("revise.historyRecord.v1:");
+          const value = history ? validateHistoryRecord(row.value, userId) : validateTombstone(row.value, userId);
+          await tx.objectStore("outbox").put({ id: crypto.randomUUID(), ownerId: userId, entity: history ? "learnerRecords" : (value as ReturnType<typeof validateTombstone>).entity, op: history ? "upsert" : "delete", payload: value, queuedAt: new Date().toISOString(), attempts: 0, idempotencyKey: crypto.randomUUID() });
+        }
       }
       // Cached marks and pending regrading belong to the original device profile.
       if (store === "aiCache" || store === "aiDlq") continue;

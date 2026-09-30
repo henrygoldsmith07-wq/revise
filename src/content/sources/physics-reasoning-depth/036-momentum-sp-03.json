@@ -1,0 +1,181 @@
+{
+  "topic": "momentum",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:elastic-definition",
+      "context": "physics-depth:elastic-definition:ke-conserved",
+      "move": "define an elastic collision by the quantity it conserves",
+      "prompt": "Define an elastic collision, stating precisely what is conserved and what is not required to be.",
+      "marks": 2,
+      "scheme": [
+        "An elastic collision is one in which total kinetic energy is conserved",
+        "Momentum is conserved in all closed collisions — elasticity adds the KE condition"
+      ],
+      "answer": "An elastic collision is one in which the total kinetic energy is unchanged by the collision. Momentum is conserved regardless; what makes a collision elastic is that no KE is degraded into deformation, heat or sound."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:inelastic-spectrum",
+      "context": "physics-depth:inelastic-spectrum:perfectly-inelastic",
+      "move": "state what happens to kinetic energy in inelastic collisions and define the perfectly inelastic case",
+      "prompt": "State what happens to total kinetic energy in an inelastic collision, and define the special case of a perfectly inelastic collision.",
+      "marks": 3,
+      "scheme": [
+        "Some kinetic energy is converted to other forms — deformation, thermal energy, sound",
+        "The bodies still conserve momentum",
+        "Perfectly inelastic: the bodies stick together and move as one after impact"
+      ],
+      "answer": "In an inelastic collision, momentum survives but kinetic energy falls: some has become crumpled metal, heat and noise. The extreme case — perfectly inelastic — is when the bodies lock together and share one final velocity, which is also the configuration that loses the most kinetic energy."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:macroscopic-none-elastic",
+      "context": "physics-depth:macroscopic-none-elastic:approximation-ladder",
+      "move": "explain why everyday collisions are only approximately elastic",
+      "prompt": "Billiard-ball collisions are called 'almost elastic'. Explain what tiny energy channels make even they fall short of perfect elasticity.",
+      "marks": 4,
+      "scheme": [
+        "Contact deformation is not perfectly restored — some energy heats the balls",
+        "Sound radiated by the click carries away energy",
+        "Rolling and surface friction during contact dissipate a little",
+        "Together these channels are a small fraction of the KE, hence 'almost' elastic"
+      ],
+      "answer": "Even glassy billiard balls flex at contact, and the flexing is not perfectly spring-loaded: a little energy becomes heat. The audible click is energy radiated away. Rolling and surface friction during contact dissipate a little. Together these channels are a small fraction of the kinetic energy, so the collision looks elastic — but perfect elasticity is an ideal that macroscopic bodies only approach."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:ke-loss-audit",
+      "context": "physics-depth:ke-loss-audit:where-it-went",
+      "move": "trace the bookkeeping of kinetic-energy loss through a collision",
+      "prompt": "Two lumps of putty collide and stick. A student says momentum conservation means their motion should continue with all its energy. Explain, with the equations, why some energy must disappear from the kinetic account.",
+      "marks": 4,
+      "scheme": [
+        "Momentum fixes the final velocity: v = p_total/M_total — the bodies must co-move",
+        "With that single velocity forced on them, KE_after = p²/(2M)",
+        "Before, the KE could exceed p²/(2M) when the bodies moved separately — the difference is the loss",
+        "The surplus becomes internal energy: deformation and heating of the putty"
+      ],
+      "answer": "Momentum fixes the final velocity: v = p_total/M_total, so the bodies must co-move. With that single velocity forced on them, KE_after = p²/(2M), while before the crash the same total momentum spread across two independent velocities could contain more kinetic energy. The difference is the loss: the surplus becomes internal energy through deformation and heating of the putty."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:elasticity-classify-compute",
+      "context": "physics-depth:elasticity-classify-compute:two-balls-data",
+      "move": "classify a stated collision as elastic or inelastic by computing both conservation totals",
+      "prompt": "A 0.20 kg puck at 3.0 m s⁻¹ strikes a stationary 0.40 kg puck. Afterwards they move at 1.0 m s⁻¹ and 1.0 m s⁻¹ respectively, in the same direction. Test whether the collision is elastic.",
+      "marks": 4,
+      "scheme": [
+        "Momentum: 0.20×3.0 = 0.6; after: 0.20×1.0 + 0.40×1.0 = 0.6 ✓ conserved",
+        "KE before: ½×0.20×9 = 0.90 J",
+        "KE after: ½×0.20×1 + ½×0.40×1 = 0.10 + 0.20 = 0.30 J",
+        "KE is not conserved: inelastic (only a third survives)"
+      ],
+      "answer": "Momentum checks out at 0.6 kg m s⁻¹ throughout. But kinetic energy collapses from ½×0.2×3² = 0.90 J to 0.30 J — two thirds of it gone into deformation and heat. Conserved momentum plus leaked energy: the collision is inelastic."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:elastic-check-alternative",
+      "context": "physics-depth:elastic-check-alternative:approach-vs-separation",
+      "move": "test elasticity using the equal-magnitude approach and separation speeds rule",
+      "prompt": "For a 1D collision of masses m₁ and m₂ with final speeds v₁ and v₂, show that in an elastic collision the approach speed equals the separation speed, |u₁−u₂| = |v₂−v₁|, and use this to decide: balls at 5.0 and 0 m s⁻¹ separate at 1.0 and 4.0 m s⁻¹.",
+      "marks": 4,
+      "scheme": [
+        "Elastic + momentum conservation together admit only the two-line result u₁+u₂... derived: KE and p conservation reduce to v₂−v₁ = u₁−u₂",
+        "Approach speed here: 5.0 − 0 = 5.0 m s⁻¹",
+        "Separation: 4.0 − 1.0 = 3.0 m s⁻¹",
+        "5.0 ≠ 3.0 → not elastic"
+      ],
+      "answer": "Combining the two conservation equations gives the elastic signature v₂−v₁ = u₁−u₂: the closing speed must equal the separating speed. Here 5.0 m s⁻¹ of approach yields only 3.0 m s⁻¹ of separation, so energy leaked — the collision is inelastic, whatever the individual masses."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:stuck-rest-equals-no-momentum-fallacy",
+      "context": "physics-depth:stuck-rest-equals-no-momentum-fallacy",
+      "move": "reject reading zero final motion as zero momentum transfer",
+      "prompt": "A 2 kg trolley at 1 m s⁻¹ hits a wall and rebounds at 1 m s⁻¹. A student says no momentum was transferred because the speeds were equal. Explain the error.",
+      "marks": 3,
+      "scheme": [
+        "Momentum is a vector: incoming +2 kg m s⁻¹ becomes outgoing −2 kg m s⁻¹",
+        "The trolley's momentum change is −4 kg m s⁻¹",
+        "The wall (and Earth) absorbed +4 kg m s⁻¹ — a real transfer, invisible only because Earth is enormously massive"
+      ],
+      "answer": "Equal speeds are not equal velocities: the trolley's momentum flips from +2 to −2 kg m s⁻¹, a change of 4 kg m s⁻¹ delivered to the wall. The Earth received that momentum — its velocity change is 4/(6×10²⁴) m s⁻¹, which is why the transfer feels like nothing."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:perfectly-inelastic-budget",
+      "context": "physics-depth:perfectly-inelastic-budget:head-on-lock",
+      "move": "compute the energy lost when two bodies lock after a head-on collision",
+      "prompt": "A 3.0 kg mass moving at 4.0 m s⁻¹ meets a 1.0 kg mass moving toward it at 4.0 m s⁻¹ and they stick. Calculate their common velocity and the kinetic energy lost.",
+      "marks": 4,
+      "scheme": [
+        "Momentum (sign-aware): 3.0×4.0 + 1.0×(−4.0) = 8.0 kg m s⁻¹",
+        "v = 8.0/4.0 = 2.0 m s⁻¹ in the heavier mass's direction",
+        "KE before: ½×3×16 + ½×1×16 = 24 + 8 = 32 J",
+        "KE after: ½×4×4 = 8 J; loss = 24 J"
+      ],
+      "answer": "The signed momentum 3×4 − 1×4 = 8 kg m s⁻¹ drives the 4 kg lump at 2.0 m s⁻¹. Kinetic energy falls from 32 J to 8 J: 24 J — three quarters of the motion energy — went into the impact's crush and heat. Momentum conserved, energy very much not."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:scattering-rutherford",
+      "context": "physics-depth:scattering-rutherford:elastic-at-the-core",
+      "move": "transfer elastic-collision reasoning to Rutherford alpha scattering",
+      "prompt": "In Rutherford scattering, alpha particles bounce off gold nuclei and the collisions are treated as elastic even though the paths curve. Explain what 'elastic' means here and why the massive nucleus hardly recoils.",
+      "marks": 3,
+      "scheme": [
+        "Elastic: total kinetic energy is conserved; no internal excitation of the particles",
+        "The Coulomb repulsion is a conservative force — energy stores temporarily as potential and returns",
+        "With M_nucleus ≫ m_alpha, the elastic formulas give the nucleus almost no recoil speed, so the alpha keeps nearly all its KE"
+      ],
+      "answer": "Elastic here means the alpha leaves with the same total kinetic energy it arrived with — the Coulomb force is conservative, parking energy in the field briefly and giving it all back. And because gold is ~50 times heavier, the collision algebra hands the nucleus negligible recoil velocity, leaving the alpha free to bounce at large angles with its energy intact — the signature that revealed the compact nucleus."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:neutron-moderator-matching",
+      "context": "physics-depth:neutron-moderator-matching:max-energy-transfer",
+      "move": "transfer elastic-collision mass ratios to moderator choice in reactors",
+      "prompt": "Reactor moderators slow fast neutrons by elastic collisions with light nuclei. Using the elastic result v₁' = (m₁−m₂)u/(m₁+m₂), explain why hydrogen works better than carbon, and why 'light' is the operative word.",
+      "marks": 4,
+      "scheme": [
+        "For m₂ = m₁ (hydrogen): v₁' = 0 — the neutron can surrender all its KE in one head-on hit",
+        "For m₂ = 12m₁ (carbon): v₁' = (11/13)u ≈ 0.85u, so at most 1 − (11/13)² ≈ 28% is lost per collision",
+        "Average loss per collision grows as the mass ratio approaches 1",
+        "Hydrogen-rich water or graphite-with-hydrogen moderates efficiently"
+      ],
+      "answer": "The elastic rebound formula makes the mass ratio the whole story: against hydrogen (m₂ = m₁) the neutron can stop dead, transferring 100% of its energy; against carbon-12 it can shed only ~19% per hit and keeps rebounding. Moderation is elastic-collision algebra in an engineering coat — match the masses and the slowing down is fast."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:elastic-spring-buffer",
+      "context": "physics-depth:elastic-spring-buffer:temporary-storage",
+      "move": "combine momentum conservation with spring energy storage across an elastic collision",
+      "prompt": "A 2.0 kg trolley at 3.0 m s⁻¹ collides head-on and elastically with a 1.0 kg trolley at 3.0 m s⁻¹ toward it. A light spring buffer compresses during the crash. Calculate the trolleys' momenta at maximum compression and the spring energy stored at that instant.",
+      "marks": 4,
+      "scheme": [
+        "Total momentum: 2×3 − 1×3 = 3.0 kg m s⁻¹",
+        "At maximum compression both share one velocity: v = 3/3 = 1.0 m s⁻¹",
+        "KE at that instant: ½×3×1² = 1.5 J",
+        "Initial KE: ½×2×9 + ½×1×9 = 13.5 J; spring stores 13.5 − 1.5 = 12 J — returned on rebound"
+      ],
+      "answer": "When the spring is fully wound up the pair moves as one at v = p/m = 3/3 = 1.0 m s⁻¹, carrying just 1.5 J of kinetic energy. The other 12 J lives in the spring — temporarily parked, not lost. Elasticity means that store gives everything back, so the final kinetic total matches the first."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:collision-regimes-spectrum",
+      "context": "physics-depth:collision-regimes-spectrum:coefficient-restitution",
+      "move": "combine the elastic limit with a restitution measurement to place collisions on a spectrum",
+      "prompt": "A ball dropped from 2.0 m rebounds to 0.50 m. Calculate the coefficient of restitution e = √(h₂/h₁), the fraction of kinetic energy retained, and state where the collision sits between elastic and perfectly inelastic. (e = 1 elastic; e = 0 perfectly inelastic.)",
+      "marks": 4,
+      "scheme": [
+        "e = √(0.50/2.0) = 0.50",
+        "KE retained = e² = 0.25 — 25% of the impact energy survives",
+        "75% lost to heat, sound, deformation",
+        "e = 0.50: firmly inelastic, halfway to sticking"
+      ],
+      "answer": "Rebound height gives e = √(0.5/2.0) = 0.5, and since KE scales as e², the ball keeps only a quarter of its energy — three quarters burned in the bounce. On the elastic-to-sticky scale, e = 0.5 is decidedly inelastic: a very dead ball, and restitution turns every bounce into a measurement of energy loss."
+    }
+  ]
+}

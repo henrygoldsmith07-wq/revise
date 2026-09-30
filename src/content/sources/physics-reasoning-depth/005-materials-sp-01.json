@@ -1,0 +1,136 @@
+{
+  "topic": "materials",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:units-stress-strain",
+      "context": "physics-depth:units-stress-strain:si-units",
+      "move": "state the SI units of stress, strain and Young modulus and explain why two differ",
+      "prompt": "State the SI unit of tensile stress, of tensile strain, and of the Young modulus. Explain why two of these three have the same unit.",
+      "marks": 4,
+      "scheme": [
+        "Stress is measured in pascals (Pa = N m⁻²)",
+        "Strain is a ratio of two lengths and has no unit",
+        "Young modulus = stress/strain, so it inherits the pascal",
+        "Stress and modulus share the pascal because strain is dimensionless"
+      ],
+      "answer": "Stress is in pascals (N m⁻²); strain is dimensionless because it is a length divided by a length; the Young modulus is stress over strain, so it too is in pascals. Stress and modulus share a unit precisely because strain has none."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:stress-vs-force",
+      "context": "physics-depth:stress-vs-force:equal-load-different-area",
+      "move": "explain why equal tensile loads give different extensions when cross-sectional areas differ",
+      "prompt": "Two wires of the same material and length, but one twice the diameter of the other, are each hung with the same load. Explain why the thinner wire is the more likely to break.",
+      "marks": 3,
+      "scheme": [
+        "The breaking stress of a material is fixed, but the load is spread over the cross-sectional area",
+        "The thinner wire has one quarter the area, so the same load produces four times the stress",
+        "Four times the stress reaches the breaking stress sooner, so the thin wire fails first"
+      ],
+      "answer": "A material breaks at a fixed stress, not a fixed force. The thinner wire has a quarter of the cross-sectional area, so the same load produces four times the stress and exceeds the breaking stress at a quarter of the load."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:extension-from-modulus",
+      "context": "physics-depth:extension-from-modulus:supported-wire",
+      "move": "chain stress-strain-modulus relations to find the extension of a loaded wire",
+      "prompt": "A 2.0 m steel wire of cross-sectional area 1.0×10⁻⁷ m² carries a 50 N load below its elastic limit. The Young modulus of steel is 2.0×10¹¹ Pa. Calculate the extension of the wire.",
+      "marks": 4,
+      "scheme": [
+        "Stress = F/A = 50/(1.0×10⁻⁷) = 5.0×10⁸ Pa",
+        "Strain = stress/E = 5.0×10⁸ / 2.0×10¹¹ = 2.5×10⁻³",
+        "Extension = strain × original length = 2.5×10⁻³ × 2.0",
+        "= 5.0×10⁻³ m (5.0 mm)"
+      ],
+      "answer": "Stress = 50/1.0×10⁻⁷ = 5.0×10⁸ Pa. Strain = 5.0×10⁸/2.0×10¹¹ = 2.5×10⁻³. Extension = 2.5×10⁻³ × 2.0 m = 5.0 mm."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:area-diameter-confusion",
+      "context": "physics-depth:area-diameter-confusion:halving-errors",
+      "move": "reject using diameter directly as area when computing stress",
+      "prompt": "A student calculates the stress in a wire of diameter 0.40 mm under a 20 N load as 20/(0.40×10⁻³) = 5.0×10⁴ Pa. Identify the error and give the correct stress.",
+      "marks": 3,
+      "scheme": [
+        "The student used the diameter, not the cross-sectional area",
+        "Area = π(d/2)² = π × (0.20×10⁻³)² = 1.26×10⁻⁷ m²",
+        "Correct stress = 20/(1.26×10⁻⁷) = 1.6×10⁸ Pa"
+      ],
+      "answer": "The error is using the diameter instead of the cross-sectional area π(d/2)² = 1.26×10⁻⁷ m². The true stress is 20/1.26×10⁻⁷ ≈ 1.6×10⁸ Pa, some three thousand times the student's figure."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:stiffness-strength-confusion",
+      "context": "physics-depth:stiffness-strength-confusion:slope-vs-break",
+      "move": "distinguish stiffness (gradient) from strength (breaking stress) on a stress-strain graph",
+      "prompt": "A student says that the steeper the gradient of a stress-strain graph, the stronger the material. Explain why this is wrong, using the distinction between stiffness and strength.",
+      "marks": 2,
+      "scheme": [
+        "The gradient of the linear stress-strain region is the Young modulus, a measure of material stiffness",
+        "Breaking strength is the stress at fracture; a high Young modulus does not imply a high breaking stress"
+      ],
+      "answer": "The gradient of the linear stress-strain region gives the Young modulus, measuring material stiffness. Breaking strength is the stress at fracture. A material can have a high Young modulus but fracture at a relatively low stress, so the gradient alone cannot establish its breaking strength."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:bone-compression",
+      "context": "physics-depth:bone-compression:leg-under-load",
+      "move": "transfer the stress-strain framework to compression on a leg bone",
+      "prompt": "A 70 kg person lands on one leg, compressing the 0.40 m long femur (effective cross-sectional area 5.0×10⁻⁴ m², Young modulus 1.5×10¹⁰ Pa) by an average force three times body weight. Estimate the shortening of the femur during the landing. (g = 9.81 m s⁻²)",
+      "marks": 4,
+      "scheme": [
+        "Force = 3 × 70 × 9.81 = 2060 N",
+        "Compressive stress = 2060/(5.0×10⁻⁴) = 4.1×10⁶ Pa",
+        "Strain = 4.1×10⁶/1.5×10¹⁰ = 2.8×10⁻⁴",
+        "Shortening = 2.8×10⁻⁴ × 0.40 = 1.1×10⁻⁴ m (about 0.11 mm)"
+      ],
+      "answer": "The landing force is 3×70×9.81 = 2060 N, giving compressive stress 4.1×10⁶ Pa and hence strain 2.8×10⁻⁴. The femur shortens by 2.8×10⁻⁴ × 0.40 ≈ 1.1×10⁻⁴ m — about a tenth of a millimetre."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:cable-safety-factor",
+      "context": "physics-depth:cable-safety-factor:diameter-choice",
+      "move": "use proportional reasoning in the stress relation to size a cable for a safety factor",
+      "prompt": "A uniform steel cable of diameter 4.0 mm reaches its breaking stress under a particular load. A replacement of the same material must support that same load at one fifth of the breaking stress. Determine its minimum diameter, assuming circular cross-sections.",
+      "marks": 3,
+      "scheme": [
+        "Stress = F/A: at fixed load the required area is five times the original area",
+        "Since A is proportional to d², the diameter must increase by a factor of √5",
+        "Required diameter = 4.0√5 = 8.9 mm; accept an equivalent method using absolute areas"
+      ],
+      "answer": "At fixed load, stress = F/A, so reducing stress to one fifth requires five times the cross-sectional area. Since A = πd²/4, the diameter increases by √5. The minimum diameter is 4.0√5 = 8.94 mm, approximately 8.9 mm."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:wire-energy-modulus",
+      "context": "physics-depth:wire-energy-modulus:elastic-store",
+      "move": "combine Young modulus relations with strain energy to find the energy stored in a stretched wire",
+      "prompt": "A 2.0 m copper wire of cross-sectional area 8.0×10⁻⁸ m² extends by 1.6 mm under a load within its proportional limit. The Young modulus of copper is 1.1×10¹¹ Pa. Calculate the elastic strain energy stored in the wire.",
+      "marks": 4,
+      "scheme": [
+        "Strain = 1.6×10⁻³/2.0 = 8.0×10⁻⁴",
+        "Stress = E × strain = 1.1×10¹¹ × 8.0×10⁻⁴ = 8.8×10⁷ Pa",
+        "Energy density = ½ × stress × strain = ½ × 8.8×10⁷ × 8.0×10⁻⁴ = 3.52×10⁴ J m⁻³",
+        "Volume = 2.0 × 8.0×10⁻⁸ = 1.6×10⁻⁷ m³, so energy = 3.52×10⁴ × 1.6×10⁻⁷ = 5.6×10⁻³ J"
+      ],
+      "answer": "Strain is 8.0×10⁻⁴ and stress = E×strain = 8.8×10⁷ Pa. The energy density ½×stress×strain = 3.52×10⁴ J m⁻³, and the wire volume is 1.6×10⁻⁷ m³, so the stored energy is 5.6×10⁻³ J."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:spring-parallel-combination",
+      "context": "physics-depth:spring-parallel-combination:shared-load",
+      "move": "combine Hooke's law for two springs sharing a load with energy storage in the pair",
+      "prompt": "Two identical springs, each of spring constant 200 N m⁻¹, are hung side by side and jointly support a 8.0 N load. Determine the effective spring constant of the pair, the extension of each spring, and the total energy stored, assuming the load is shared equally.",
+      "marks": 4,
+      "scheme": [
+        "Each spring carries 8.0/2 = 4.0 N and extends x = 4.0/200 = 0.020 m",
+        "For the pair, total load 8.0 N at extension 0.020 m gives k_eff = 8.0/0.020 = 400 N m⁻¹",
+        "Energy = ½ k_eff x² = ½ × 400 × 0.020² = 0.080 J",
+        "Alternatively sum per-spring energies: 2 × ½×200×0.020² = 0.080 J"
+      ],
+      "answer": "Each spring takes 4.0 N and extends 0.020 m. The pair behaves as a single spring of constant 8.0/0.020 = 400 N m⁻¹, storing ½×400×0.020² = 0.080 J — the sum of the two individual spring energies."
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "topic": "quantum",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:work-function-definition",
+      "context": "physics-depth:work-function-definition:minimum-energy",
+      "move": "state the meaning of the work function and what supplies it in the photoelectric effect",
+      "prompt": "Define the work function of a metal, and state what must supply it for an electron to escape the surface.",
+      "marks": 2,
+      "scheme": [
+        "The work function φ is the minimum energy needed to release an electron from the metal's surface",
+        "In the photoelectric effect a single photon supplies it: emission requires hf ≥ φ"
+      ],
+      "answer": "The work function φ is the minimum energy an electron needs to escape the metal surface. In the photoelectric effect that energy comes from a single photon, so emission is possible only if hf ≥ φ."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:threshold-frequency-relation",
+      "context": "physics-depth:threshold-frequency-relation:f0-phi",
+      "move": "state the threshold frequency relation and why it is a hard cutoff",
+      "prompt": "State the relation between threshold frequency f₀ and work function φ, and explain why emission is impossible for any frequency below f₀, no matter how intense the light.",
+      "marks": 3,
+      "scheme": [
+        "f₀ = φ/h",
+        "Each photon carries hf; below f₀, hf < φ and one photon cannot free one electron",
+        "Intensity adds photons, not per-photon energy, so no accumulation over time helps"
+      ],
+      "answer": "The threshold frequency is f₀ = φ/h. Below it, every photon carries less than the escape energy, and since one electron absorbs one photon, no electron can ever gain enough — adding more photons (intensity) cannot help because the shortfall is per photon, not total."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:stopping-pd-threshold",
+      "context": "physics-depth:stopping-pd-threshold:retarding-voltage",
+      "move": "explain how a stopping voltage measurement reveals the threshold behaviour",
+      "prompt": "In a photoelectric cell, light of adjustable frequency shines on a cathode and a retarding voltage is increased until the current just stops. Explain how the stopping voltage varies with frequency, and what its zero crossing reveals.",
+      "marks": 3,
+      "scheme": [
+        "The stopping voltage measures KEmax: eV_stop = hf − φ",
+        "As frequency rises, KEmax rises linearly, so V_stop rises linearly with f",
+        "At f = f₀ the stopping voltage reaches zero: below threshold no electrons, and no voltage, exist"
+      ],
+      "answer": "The stopping voltage just cancels the fastest electrons' kinetic energy: eV_stop = KEmax = hf − φ. Raising f raises V_stop in a straight line whose slope is h/e and whose intercept is −φ/h; the line crosses zero exactly at the threshold frequency — below it there is no current to stop at any voltage."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:threshold-from-workfunction",
+      "context": "physics-depth:threshold-from-workfunction:f0-compute",
+      "move": "compute a threshold frequency from a stated work function",
+      "prompt": "Sodium has work function 2.28 eV. Calculate its threshold frequency and the corresponding wavelength. (h = 6.63×10⁻³⁴ J s, 1 eV = 1.60×10⁻¹⁹ J, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "φ = 2.28 × 1.60×10⁻¹⁹ = 3.65×10⁻¹⁹ J",
+        "f₀ = φ/h = 3.65×10⁻¹⁹/6.63×10⁻³⁴ = 5.50×10¹⁴ Hz",
+        "λ₀ = c/f₀ = 3.00×10⁸/5.50×10¹⁴ = 5.45×10⁻⁷ m",
+        "≈ 545 nm — visible yellow-green; sodium responds to most visible light"
+      ],
+      "answer": "φ = 2.28 eV = 3.65×10⁻¹⁹ J, so f₀ = φ/h = 5.50×10¹⁴ Hz, a wavelength of c/f₀ ≈ 545 nm. Any photon redder than this — however bright — frees nothing from sodium."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:photoelectric-balance",
+      "context": "physics-depth:photoelectric-balance:energy-accounting",
+      "move": "apply the photoelectric equation to find a maximum kinetic energy",
+      "prompt": "Light of wavelength 400 nm falls on a metal of work function 1.9 eV. Calculate the maximum kinetic energy of the emitted photoelectrons in joules and in eV. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹, 1 eV = 1.60×10⁻¹⁹ J)",
+      "marks": 4,
+      "scheme": [
+        "Photon energy E = hc/λ = 6.63×10⁻³⁴×3.0×10⁸/4.0×10⁻⁷ = 4.97×10⁻¹⁹ J = 3.11 eV",
+        "KEmax = E − φ = 3.11 − 1.9 = 1.21 eV",
+        "In joules: 1.21 × 1.60×10⁻¹⁹ = 1.94×10⁻¹⁹ J",
+        "≈ 1.9×10⁻¹⁹ J (1.2 eV)"
+      ],
+      "answer": "A 400 nm photon carries E = hc/λ = 4.97×10⁻¹⁹ J = 3.11 eV. Subtracting the 1.9 eV work function leaves KEmax = 1.21 eV = 1.94×10⁻¹⁹ J — the surplus the fastest electron keeps as kinetic energy."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:accumulation-fallacy",
+      "context": "physics-depth:accumulation-fallacy:dim-long-exposure",
+      "move": "reject the idea that a dim long exposure can build up enough energy to emit",
+      "prompt": "A student suggests using a very dim red laser on a metal with a threshold in the blue, shining it for hours so the electrons 'save up' enough energy to escape. Explain why this cannot work.",
+      "marks": 3,
+      "scheme": [
+        "Emission is a one-photon-one-electron event: an electron absorbs one photon and escapes or does not",
+        "A red photon carries hf < φ; the excess above escape is simply never available to that electron",
+        "Energy absorbed disperses as heat/collisions in picoseconds — it cannot be pooled by one electron"
+      ],
+      "answer": "Each absorption is a single photon-single electron event: an electron either gets enough from one photon or it does not. A red photon is individually below the requirement, and any energy an electron does absorb spreads into the lattice as heat within picoseconds — it cannot be saved toward a later photon. Hours of dim red light warm the metal and emit nothing."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:wave-model-prediction",
+      "context": "physics-depth:wave-model-prediction:classical-expectation",
+      "move": "contrast the wave model's wrong prediction with the observed instant emission",
+      "prompt": "According to the classical wave model, what should happen when very dim light hits a metal surface, and how does observation contradict it? Explain what this tells us about light.",
+      "marks": 3,
+      "scheme": [
+        "The wave model spreads its energy continuously over the whole surface; a dim beam should take seconds or minutes to accumulate the escape energy per electron",
+        "Observed: emission (if any) begins immediately, however dim the light above threshold",
+        "Each electron receives its energy all at once from a single photon — light delivers energy in quanta"
+      ],
+      "answer": "Classically, a dim wave spreads its energy thinly, so electrons should wait seconds or minutes to accumulate enough to escape. In reality emission above threshold is immediate at any intensity: each electron gets its whole escape energy in one instant, from one quantum of light. The contradiction is direct evidence that light energy arrives in photons, not continuously."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:solar-panel-material",
+      "context": "physics-depth:solar-panel-material:band-gap-choice",
+      "move": "transfer threshold reasoning to choosing a photodetector material",
+      "prompt": "A photodetector is needed for red laser light of 650 nm. Material A has work function 1.1 eV; material B has work function 2.4 eV. Determine which material responds, and calculate the maximum electron energy it releases.",
+      "marks": 4,
+      "scheme": [
+        "650 nm photon energy = hc/λ = 3.06×10⁻¹⁹ J = 1.91 eV",
+        "Material A: 1.91 > 1.1 eV — responds; KEmax = 1.91 − 1.1 = 0.81 eV",
+        "Material B: 1.91 < 2.4 eV — below threshold, no response at any intensity",
+        "Choose material A"
+      ],
+      "answer": "A 650 nm photon carries 1.91 eV. Material A (φ = 1.1 eV) is below that threshold and emits with KEmax = 0.81 eV; material B (φ = 2.4 eV) demands more than the photon has and stays dark regardless of brightness — the detector must be material A."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:photocell-current",
+      "context": "physics-depth:photocell-current:rate-and-energy",
+      "move": "combine photon flux with per-photon energy accounting to predict a measured current",
+      "prompt": "A photocell cathode of area 2.0×10⁻⁴ m² is illuminated by 450 nm light at 1.2×10⁻² W m⁻². Assuming every photon releases an electron, calculate the photocurrent. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹, e = 1.60×10⁻¹⁹ C)",
+      "marks": 4,
+      "scheme": [
+        "Total power incident = intensity × area = 1.2×10⁻² × 2.0×10⁻⁴ = 2.4×10⁻⁶ W",
+        "Photon energy = hc/λ = 4.42×10⁻¹⁹ J",
+        "Photon rate = 2.4×10⁻⁶/4.42×10⁻¹⁹ = 5.4×10¹² s⁻¹",
+        "Current = rate × e = 5.4×10¹² × 1.60×10⁻¹⁹ = 8.7×10⁻⁷ A ≈ 0.87 μA"
+      ],
+      "answer": "The beam delivers 2.4×10⁻⁶ W onto the cathode. Each 450 nm photon carries 4.42×10⁻¹⁹ J, so photons arrive at 5.4×10¹² s⁻¹; with one electron per photon the current is 5.4×10¹²×1.60×10⁻¹⁹ ≈ 0.87 μA — the photoelectric effect measured in amperes."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:threshold-cross-over",
+      "context": "physics-depth:threshold-cross-over:two-metals-compare",
+      "move": "compute threshold wavelengths and compare emission for two metals under one illumination",
+      "prompt": "Light of wavelength 250 nm falls on both caesium (work function 1.9 eV) and copper (work function 4.7 eV). For each metal, determine whether emission occurs and, if so, the maximum electron speed. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹, e = 1.60×10⁻¹⁹ C, m_e = 9.11×10⁻³¹ kg)",
+      "marks": 5,
+      "scheme": [
+        "Photon energy = hc/λ = 6.63×10⁻³⁴×3.0×10⁸/2.50×10⁻⁷ = 7.96×10⁻¹⁹ J = 4.97 eV",
+        "Caesium: 4.97 > 1.9 eV — emits; KEmax = 3.07 eV = 4.91×10⁻¹⁹ J",
+        "v = √(2×4.91×10⁻¹⁹/9.11×10⁻³¹) = 1.04×10⁶ m s⁻¹",
+        "Copper: 4.97 > 4.7 eV — emits; KEmax = 0.27 eV = 4.3×10⁻²⁰ J, v = 3.1×10⁵ m s⁻¹",
+        "Both emit, but the caesium electrons are far faster (lower work function leaves more surplus)"
+      ],
+      "answer": "The 250 nm photon carries 4.97 eV. Caesium (φ = 1.9 eV) emits with KEmax = 3.07 eV, giving v ≈ 1.0×10⁶ m s⁻¹; copper (φ = 4.7 eV) is just above threshold, emitting slow electrons of KEmax = 0.27 eV (v ≈ 3.1×10⁵ m s⁻¹). The same photon stream frees fast electrons from one metal and barely frees any from the other."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:threshold-grating-crosscheck",
+      "context": "physics-depth:threshold-grating-crosscheck:two-methods-one-quantity",
+      "move": "cross-check a wavelength by both interference and photoelectric measurements",
+      "prompt": "A monochromatic source is first passed through a grating (600 lines mm⁻¹) giving a first-order maximum at 14.5° (sin = 0.250), then used in a photoelectric experiment on a metal of work function 2.20 eV, yielding a stopping voltage of 0.85 V. Show that the two measurements agree, and state what each independently measures.",
+      "marks": 4,
+      "scheme": [
+        "Grating: λ = d sinθ = (1/6.0×10⁵ m⁻¹) × 0.250 = 4.17×10⁻⁷ m = 417 nm",
+        "Photoelectric: E_photon = φ + eV = 2.20 + 0.85 = 3.05 eV = 4.88×10⁻¹⁹ J",
+        "λ = hc/E = 6.63×10⁻³⁴×3.0×10⁸/4.88×10⁻¹⁹ = 4.07×10⁻⁷ m ≈ 410 nm",
+        "The two agree within ~2%: the wave method measures λ from geometry; the quantum method infers it from photon energy"
+      ],
+      "answer": "The grating gives λ = d sinθ = 417 nm. The photoelectric data give the photon energy as φ + eV_stop = 3.05 eV, hence λ = hc/E ≈ 410 nm — agreement within 2%. The same light shows its wave nature in the interference geometry and its quantum nature in the energy balance, and both route to the same wavelength."
+    }
+  ]
+}

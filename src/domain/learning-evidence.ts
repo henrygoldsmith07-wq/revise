@@ -1,5 +1,5 @@
 import type { Attempt, Id, LearningDemand, Mistake, PaperMarkingReview, Question, QuestionPart } from "./types";
-import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperProvenance } from "./physics-content-review";
+import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperProvenance } from "./content-trust";
 import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import { isReasoningTransfer, reasoningNovelty } from "./reasoning-signature";

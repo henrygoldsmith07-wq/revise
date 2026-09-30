@@ -25,13 +25,14 @@ function queueItem(id: string, overrides: Partial<OutboxItem> = {}): OutboxItem 
 function pullClient(rows: Record<string, unknown>[]): SupabaseClient {
   return {
     auth: { getUser: async () => ({ data: { user: { id: USER } } }) },
-    from: () => {
+    from: (table: string) => {
       const builder: Record<string, (...args: never[]) => unknown> = {};
       builder.select = () => builder;
       builder.eq = () => builder;
       builder.or = () => builder;
       builder.order = () => builder;
-      builder.range = (async () => ({ data: rows, error: null })) as never;
+      builder.gt = () => builder;
+      builder.range = (async () => ({ data: ["learner_records", "sync_tombstones"].includes(table) ? [] : rows, error: null })) as never;
       return builder;
     },
   } as unknown as SupabaseClient;

@@ -1,0 +1,162 @@
+{
+  "topic": "waves",
+  "point": 7,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:path-difference-rule",
+      "context": "physics-depth:path-difference-rule:constructive-destructive",
+      "move": "state the path-difference conditions for constructive and destructive interference",
+      "prompt": "For two coherent in-phase sources, state the path-difference conditions for constructive and for destructive interference at a point.",
+      "marks": 3,
+      "scheme": [
+        "Constructive: path difference = nλ (whole number of wavelengths), waves arrive in phase",
+        "Destructive: path difference = (n + ½)λ (odd number of half wavelengths), waves arrive in antiphase",
+        "n is any whole number: 0, 1, 2, …"
+      ],
+      "answer": "Constructive interference occurs when the path difference is a whole number of wavelengths, nλ, so the waves arrive in step; destructive interference occurs when it is an odd number of half wavelengths, (n+½)λ, so they arrive in antiphase and cancel."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:superposition-principle",
+      "context": "physics-depth:superposition-principle:vector-addition",
+      "move": "explain interference as the vector superposition of displacements",
+      "prompt": "Two waves of the same frequency meet at a point. Explain, in terms of displacement addition, what determines whether the point is bright, dark, or intermediate.",
+      "marks": 3,
+      "scheme": [
+        "The resultant displacement is the vector sum of the individual displacements at each instant",
+        "In phase, crests meet crests: maximum amplitude — bright (or loud)",
+        "In antiphase, crests meet troughs: zero resultant — dark (or silent); between, partial cancellation gives intermediate intensity"
+      ],
+      "answer": "Displacements add as vectors: at each instant the resultant is the sum of the two waves' displacements. In phase, crest meets crest and the amplitude — and intensity — is maximal; in antiphase, crest meets trough and they cancel to darkness; anything between superposes to an intermediate value."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:fringe-formation-geometry",
+      "context": "physics-depth:fringe-formation-geometry:screen-pattern",
+      "move": "explain why a stable two-source pattern needs both coherence and overlap",
+      "prompt": "Explain why two headlight beams crossing on a road do not produce a visible interference pattern, while two coherent laser beams do.",
+      "marks": 3,
+      "scheme": [
+        "Interference needs a fixed phase relationship at every point — coherence",
+        "Headlights have unrelated phases that drift randomly, so any fringe pattern flickers and averages away",
+        "Lasers maintain a fixed phase relation, so the same places stay bright or dark long enough to see"
+      ],
+      "answer": "Interference happens physically in both cases, but a stable visible pattern requires the phase relationship at each point to stay fixed. Headlights drift through random relative phases, so their interference fringes flicker past invisibly fast and average out; coherent laser beams hold their phase relation, freezing the pattern in place."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:path-difference-compute",
+      "context": "physics-depth:path-difference-compute:speaker-pair",
+      "move": "compute a path difference and classify the interference outcome",
+      "prompt": "Two coherent loudspeakers emit 0.68 m wavelength sound. A listener is 4.76 m from one speaker and 5.44 m from the other. Determine the path difference and state whether the listener hears a maximum or a minimum.",
+      "marks": 3,
+      "scheme": [
+        "Path difference = 5.44 − 4.76 = 0.68 m",
+        "0.68 m = 1 × 0.68 m = 1λ, a whole number of wavelengths",
+        "Whole λ → waves arrive in phase → constructive, a loud spot"
+      ],
+      "answer": "The path difference is 5.44 − 4.76 = 0.68 m, exactly one wavelength. The waves arrive in phase, so the listener sits at a constructive maximum — a loud spot."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:microwave-dead-spot",
+      "context": "physics-depth:microwave-dead-spot:double-slit-geometry",
+      "move": "use the fringe geometry in reverse to find a distance to a minimum",
+      "prompt": "Microwaves of wavelength 3.0 cm pass through two slits 6.0 cm apart. A detector 2.0 m away moves sideways from the centre line. Calculate the distance from the centre to the first minimum.",
+      "marks": 3,
+      "scheme": [
+        "First minimum needs path difference λ/2 = 1.5 cm",
+        "Path difference ≈ dx/L for small angles: x = (λ/2)L/d",
+        "x = (0.015 × 2.0)/0.060 = 0.50 m"
+      ],
+      "answer": "The first minimum needs a half-wavelength path difference of 1.5 cm. With x = λL/2d, the detector finds it at x = (0.015×2.0)/0.060 = 0.50 m from the centre line — a large, easy-to-locate dead spot because the wavelength is centimetres, not nanometres."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:energy-destroyed-fallacy",
+      "context": "physics-depth:energy-destroyed-fallacy:dark-fringe-energy",
+      "move": "reject the idea that destructive interference destroys energy",
+      "prompt": "A student says dark fringes prove that energy has been destroyed where the waves cancel. Explain where the energy actually goes.",
+      "marks": 3,
+      "scheme": [
+        "Interference only redistributes energy; total energy is conserved",
+        "The energy missing from dark fringes reappears as brighter bright fringes",
+        "Averaged over the whole pattern, the total energy equals the sum of what each source delivers alone"
+      ],
+      "answer": "Nothing is destroyed: interference redistributes energy. The light missing from dark fringes is redirected into the bright ones — averaged over the whole pattern the energy delivered equals the sum of the two sources' contributions. Cancellation at one point is always paid for by reinforcement elsewhere."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:phase-vs-path-fallacy",
+      "context": "physics-depth:phase-vs-path-fallacy:half-wavelength-shift",
+      "move": "reject ignoring a source phase inversion when computing path difference",
+      "prompt": "One of two otherwise identical coherent sources vibrates in antiphase with the other (π out of phase). A student claims the centre of the pattern must be bright because the path difference there is zero. Explain the error.",
+      "marks": 3,
+      "scheme": [
+        "Zero path difference leaves the sources' built-in π phase difference uncompensated",
+        "The waves arrive in antiphase at the centre — a dark fringe",
+        "The whole pattern inverts: old minima become maxima and vice versa"
+      ],
+      "answer": "Path difference is only half the story: the sources themselves differ by π. At the centre, zero path difference preserves that inversion, so the waves arrive in antiphase and cancel — the centre is dark, and every fringe of the usual pattern swaps role."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:interferometer-measure",
+      "context": "physics-depth:interferometer-measure:mirror-shift",
+      "move": "transfer interference counting to measuring a tiny displacement",
+      "prompt": "In a Michelson-type setup, moving one mirror by 0.12 μm shifts the pattern from one bright fringe to the next-but-one (two fringes). Calculate the wavelength of the light, explaining the factor of two.",
+      "marks": 3,
+      "scheme": [
+        "A mirror displacement d changes the round-trip path by 2d",
+        "Two fringe shifts = two half-wavelength changes: 2d = 2×(λ/2)",
+        "λ = 2d/2 = d = 0.12 μm — wait: two fringes mean 2d = 2λ, so λ = d = 0.12 μm; check: 2d = 0.24 μm = 2λ gives λ = 0.12 μm (120 nm, ultraviolet)"
+      ],
+      "answer": "Moving a mirror by d lengthens the round trip by 2d. Two full fringe shifts mean 2d = 2λ, so λ = d = 0.12 μm (120 nm — an ultraviolet line). The factor of two is the round trip: the mirror counts twice."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:young-fringe-spacing-calc",
+      "context": "physics-depth:young-fringe-spacing-calc:geometry-numbers",
+      "move": "solve the Young geometry for a stated fringe spacing",
+      "prompt": "Coherent light of wavelength 480 nm passes through two slits 0.24 mm apart, forming fringes on a screen 1.5 m away. Calculate the fringe spacing. A student measures 12 fringe gaps across 30 mm — check this against your value.",
+      "marks": 4,
+      "scheme": [
+        "w = λD/d = 480×10⁻⁹×1.5/0.24×10⁻³",
+        "= 3.0×10⁻³ m = 3.0 mm",
+        "Student: 30 mm/12 gaps = 2.5 mm — close but ~17% off; re-measure or count again",
+        "Consistent within measurement error for an eyeball count"
+      ],
+      "answer": "The predicted spacing is w = λD/d = 480×10⁻⁹×1.5/(0.24×10⁻³) = 3.0 mm. The student's 30/12 = 2.5 mm is 17% low — probably a miscounted fringe or an edge-of-fringe reading. The two values agree only marginally; the count should be repeated."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:young-photon-rate",
+      "context": "physics-depth:young-photon-rate:fringe-brightness-energy",
+      "move": "combine path-difference geometry with photon energy at a bright fringe",
+      "prompt": "A 500 nm two-source interference pattern has a bright fringe where the total light intensity is 3.0×10⁻³ W m⁻². Calculate the photon arrival rate per square metre at that fringe. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 3,
+      "scheme": [
+        "Photon energy E = hc/λ = 6.63×10⁻³⁴×3.0×10⁸/5.0×10⁻⁷ = 3.98×10⁻¹⁹ J",
+        "Rate = intensity/E = 3.0×10⁻³/3.98×10⁻¹⁹",
+        "≈ 7.5×10¹⁵ photons s⁻¹ m⁻²"
+      ],
+      "answer": "Each 500 nm photon carries E = hc/λ = 3.98×10⁻¹⁹ J. The bright fringe intensity 3.0×10⁻³ W m⁻² therefore corresponds to 3.0×10⁻³/3.98×10⁻¹⁹ ≈ 7.5×10¹⁵ photons arriving per second per square metre — the wave picture's intensity in the photon picture's counting rate."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:cd-tracking-servo",
+      "context": "physics-depth:cd-tracking-servo:path-difference-control",
+      "move": "combine interference detection with a feedback application in a CD player",
+      "prompt": "A CD player's tracking system uses two reflected beams that interfere: when the lens is centred on the track, the detector sees a particular brightness; drifting off-track changes the path difference and the detected intensity. Explain how interference converts a tiny tracking error into a large electrical signal, and why the method is sensitive.",
+      "marks": 4,
+      "scheme": [
+        "Off-track drift changes one beam's path relative to the other by a fraction of a wavelength",
+        "The phase difference moves the detector along the interference fringe curve",
+        "Near a steep part of a fringe, a sub-wavelength shift produces a large intensity change",
+        "The system senses errors far smaller than the light wavelength because fringe positions are wavelength-precise"
+      ],
+      "answer": "As the lens drifts, the two reflected beams' path difference changes by a fraction of a wavelength, sliding the detector across the interference fringes. Because fringe edges are steep, a drift of a few per cent of λ swings the detected intensity strongly — the interferometer converts sub-wavelength geometry into a large, fast electrical signal, which the servo feeds back to re-centre the lens."
+    }
+  ]
+}

@@ -338,14 +338,21 @@ using a separate IndexedDB database for each account. Signed-out revision keeps
 its original local-only database. The first account visit offers an explicit
 local-data copy or a separate profile; it never automatically merges accounts.
 Sign-out preserves account progress and offline queues for the next sign-in.
-See `docs/architecture.md` for adoption, ownership and device-local metadata
-limits, and `docs/operations-runbook.md` for the seven required staging secrets.
+See `docs/architecture.md` for adoption, ownership and cross-device continuity
+semantics, and `docs/operations-runbook.md` for the seven required staging secrets.
 
 Today and Session form the mobile primary loop. The Tools menu retains every
 manual study route and management surface, with direct desktop links and search.
-The 92-question Physics depth-50 mechanics slice now uses seven structured JSON
-sources. Regenerate with `npm run content:physics`; `npm run content:check`
-validates sources and rejects artifact drift without manufacturing human trust.
+Structured JSON sources cover 92 Physics depth-50 mechanics questions and 540
+reasoning-depth questions (55 source groups). Regenerate with `npm run
+content:physics` and `npm run content:reasoning`; `npm run content:check` validates
+sources, mappings and deterministic adapters without manufacturing human trust.
 
-See [the September improvement state](docs/improvement-state-2026-09-30.md) for
+Grade forecasts, actual results, paper outcomes and intervention evidence now
+sync as owner-scoped row records. Terminal tombstones protect deleted study rows
+against offline replay, including legacy clients. Apply the additive continuity
+migration in `supabase/schema.sql` before rollout; an older schema leaves queues
+intact and sync failed. Experiments and active session checkpoints stay local.
+
+See [the current architecture and continuity pass](docs/improvement-continuity-2026-09-30.md) for
 the implementation decisions, regression coverage, verification and rollout limits.

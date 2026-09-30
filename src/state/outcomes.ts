@@ -4,8 +4,7 @@
 //
 // Owns: grade-prediction snapshots, actual results, paper outcomes,
 // intervention outcomes, and their calibration derivations. Reads the snapshot
-// (for weekly prediction logging) and predictions; writes go to local meta
-// storage. Nothing here mutates cards, attempts, or the plan.
+// (for weekly prediction logging) and predictions; writes commit row-level replicas and local projections atomically. Nothing here mutates cards, attempts, or the plan.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
@@ -20,7 +19,7 @@ import type { Id, InterventionOutcomeRecord, TopicMastery } from "@/domain/types
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type { ResponseTimeCalibrationReport } from "@/domain/response-time-calibration";
 import type { Snapshot } from "@/data/repository";
-import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
+import { readReviseMeta } from "@/data/storage-namespace";
 import { type ActualResultRecord, type GradePredictionRecord, gradePredictionSnapshotId } from "@/domain/grade-loop";
 import {
   buildPaperOutcomeRecord,
@@ -31,6 +30,8 @@ import {
 } from "@/domain/paper-outcome";
 import { calibrateInterventions } from "@/domain/intervention-calibration";
 import type { InterventionCalibration } from "@/domain/intervention-calibration";
+import { HISTORY_KINDS, validateHistoryValue } from "@/domain/learner-history";
+import { HISTORY_CHANGED_EVENT, writeLearnerHistory, readLearnerHistory } from "@/data/learner-history";
 import { trustedSnapshotAttempt } from "./trusted-evidence";
 
 export interface Outcomes {
@@ -66,6 +67,7 @@ export interface Outcomes {
 
 export function useOutcomes(input: {
   userId: Id;
+  onError: (message: string) => void;
   snapshot: Snapshot | null;
   predictions: GradePrediction[];
   subjectIds: readonly Id[];
@@ -73,7 +75,7 @@ export function useOutcomes(input: {
   recallMastery: RecallMasteryRow[];
   responseTimeCalibration: ResponseTimeCalibrationReport;
 }): Outcomes {
-  const { userId, snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration } = input;
+  const { userId, onError, snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration } = input;
   const [gradePredictionLog, setGradePredictionLog] = useState<GradePredictionRecord[]>([]);
   const [gradeActuals, setGradeActuals] = useState<ActualResultRecord[]>([]);
   // Sat papers with their sit-time prediction frozen in — the reality check
@@ -82,46 +84,57 @@ export function useOutcomes(input: {
   const [interventionOutcomes, setInterventionOutcomes] = useState<InterventionOutcomeRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Self-loading on mount (in parallel with the snapshot load).
+  // Validate the complete projection before allowing any row into calibration.
+  // Corruption stays on disk for recovery, with a visible error instead of
+  // silently interpreting mixed-owner records as this learner's evidence.
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const [gradePreds, gradeActs, paperOutcomes, savedInterventions] = await Promise.all([
-        readReviseMeta<GradePredictionRecord[]>("gradePredictions"),
-        readReviseMeta<ActualResultRecord[]>("gradeActuals"),
-        readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes"),
-        readReviseMeta<InterventionOutcomeRecord[]>("interventionOutcomes"),
-      ]);
-      if (cancelled) return;
-      setGradePredictionLog(gradePreds ?? []);
-      setGradeActuals(gradeActs ?? []);
-      setPaperOutcomeLog(paperOutcomes ?? []);
-      // The metadata key predates account-scoped storage, so keep other
-      // learners' rows on disk but never let them influence this learner's
-      // calibration or appear in the adaptive planner.
-      setInterventionOutcomes((savedInterventions ?? []).filter((row) => row.userId === userId));
-      setLoaded(true);
-    })();
-    return () => {
-      cancelled = true;
+    const refresh = async () => {
+      try {
+        const rows = await Promise.all(HISTORY_KINDS.map(kind => readLearnerHistory(kind,userId)));
+        const validated = rows.map((values, index) => {
+          if (values !== undefined && !Array.isArray(values)) throw new Error("Malformed learner history.");
+          return (values ?? []).map(value => validateHistoryValue(HISTORY_KINDS[index]!, value, userId));
+        });
+        if (cancelled) return;
+        setGradePredictionLog(validated[0] as unknown as GradePredictionRecord[]);
+        setGradeActuals(validated[1] as unknown as ActualResultRecord[]);
+        setPaperOutcomeLog(validated[2] as unknown as PaperOutcomeRecord[]);
+        setInterventionOutcomes(validated[3] as unknown as InterventionOutcomeRecord[]);
+        setLoaded(true);
+      } catch (error) {
+        if (!cancelled) onError(error instanceof Error ? error.message : "Could not load learner history.");
+      }
     };
-  }, [userId]);
+    const handleChange = () => { void refresh(); };
+    void refresh();
+    window.addEventListener(HISTORY_CHANGED_EVENT, handleChange);
+    return () => { cancelled = true; window.removeEventListener(HISTORY_CHANGED_EVENT, handleChange); };
+  }, [userId, onError]);
+
+  const attempts = snapshot?.attempts;
+  const questions = snapshot?.questions;
+  const examDates = snapshot?.examDates;
+  const targetGrades = snapshot?.settings.targetGrades;
+  const assessment = useMemo(() => attempts && questions && examDates && targetGrades ? { attempts, questions, examDates, targetGrades } : null,
+    [attempts, questions, examDates, targetGrades]);
 
   // Close the grade loop: snapshot predictions weekly so later mocks can be
   // paired against what Revise believed at the time - not retro-fitted.
   useEffect(() => {
-    if (!snapshot || !predictions.length) return;
+    if (!loaded || !assessment || !predictions.length) return;
     void (async () => {
       const existing = (await readReviseMeta<GradePredictionRecord[]>("gradePredictions")) ?? [];
       const week = Math.floor(Date.now() / (7 * 86_400_000));
       let appended = false;
       for (const p of predictions) {
         const snapshotId = gradePredictionSnapshotId(userId, p.subjectId, week);
-        if (existing.some((r) => r.id === snapshotId)) continue;
-        const marked = snapshot.attempts.filter((a) => a.subjectId === p.subjectId &&
-          trustedSnapshotAttempt(a, snapshot.questions, snapshot.attempts)).length;
+        if (existing.some((r) => r.id === snapshotId || r.id.startsWith(`${snapshotId}:`))) continue;
+        const marked = assessment.attempts.filter((a) => a.subjectId === p.subjectId &&
+          trustedSnapshotAttempt(a, assessment.questions, assessment.attempts)).length;
         const record: GradePredictionRecord = {
-          id: snapshotId,
+          // Separate observations from offline devices retain their own frozen truth.
+          id: `${snapshotId}:${crypto.randomUUID()}`,
           anonId: userId,
           subjectId: p.subjectId,
           predictedPercent: p.percent,
@@ -131,17 +144,17 @@ export function useOutcomes(input: {
           confidence: p.confidence,
           evidenceShare: Math.min(1, marked / 40),
           createdAt: new Date().toISOString(),
-          examDate: snapshot.examDates.find((e) => e.subjectId === p.subjectId)?.date ?? null,
+          examDate: assessment.examDates.find((e) => e.subjectId === p.subjectId)?.date ?? null,
         };
         existing.push(record);
         appended = true;
       }
       if (appended) {
-        await writeReviseMeta("gradePredictions", existing.slice(-500));
-        setGradePredictionLog(existing.slice(-500));
+        await writeLearnerHistory("gradePredictions", userId, existing.slice(-500));
+        setGradePredictionLog(await readLearnerHistory("gradePredictions", userId) as unknown as GradePredictionRecord[]);
       }
-    })();
-  }, [predictions, snapshot, userId]);
+    })().catch(error => onError(error instanceof Error ? error.message : "Could not save forecast."));
+  }, [predictions, assessment, userId, loaded, onError]);
 
   // Per-subject multiplier for paper recommendations: >1 when sat papers keep
   // beating their frozen predictions (more headroom than the model sees), <1
@@ -160,12 +173,12 @@ export function useOutcomes(input: {
   );
 
   const farTransferRetests = useMemo(
-    () => delayedFarTransferRetests({ attempts: snapshot?.attempts ?? [], questions: snapshot?.questions ?? [], today: todayIso() }),
-    [snapshot],
+    () => delayedFarTransferRetests({ attempts: attempts ?? [], questions: questions ?? [], today: todayIso() }),
+    [attempts, questions],
   );
 
   const examReadiness = useMemo(() => {
-    if (!snapshot) return [];
+    if (!assessment) return [];
     const predictionBySubject = new Map(predictions.map((prediction) => [prediction.subjectId, prediction] as const));
     return allSubjects()
       .filter((subject) => subjectIds.includes(subject.id))
@@ -180,8 +193,8 @@ export function useOutcomes(input: {
         const recallReviews = recallRows.reduce((sum, row) => sum + row.reviews, 0);
         const retained = recallRows.filter((row) => row.cardsTotal > 0);
         const retentionAverage = retained.length ? retained.reduce((sum, row) => sum + row.currentRetention, 0) / retained.length : null;
-        const timed = snapshot.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0 &&
-          trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
+        const timed = assessment.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0 &&
+          trustedSnapshotAttempt(attempt, assessment.questions, assessment.attempts));
         const available = timed.reduce((sum, attempt) => sum + attempt.max, 0);
         const awarded = timed.reduce((sum, attempt) => sum + Math.max(0, Math.min(attempt.max, attempt.awarded)), 0);
         const pace = responseTimeCalibration.rows.find((row) => row.subjectId === subject.id);
@@ -191,8 +204,8 @@ export function useOutcomes(input: {
         return [buildExamReadiness({
           subject,
           prediction,
-          targetGrade: snapshot.settings.targetGrades[subject.id] ?? null,
-          examDays: daysToExam(snapshot.examDates, subject.id, todayIso()),
+          targetGrade: assessment.targetGrades[subject.id] ?? null,
+          examDays: daysToExam(assessment.examDates, subject.id, todayIso()),
           coverage: { average: coverageAverage, topics: topicRows.length, evidencedTopics },
           retention: { average: retentionAverage, cards: recallCards, reviews: recallReviews },
           timed: { accuracy: available ? awarded / available : null, attempts: timed.length, marks: available },
@@ -204,7 +217,7 @@ export function useOutcomes(input: {
           },
         })];
       });
-  }, [snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
+  }, [assessment, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
 
   const examReadinessSummary = useMemo(() => summariseExamReadiness(examReadiness), [examReadiness]);
 
@@ -234,8 +247,8 @@ export function useOutcomes(input: {
     };
     const log = (await readReviseMeta<ActualResultRecord[]>("gradeActuals")) ?? [];
     const next = [...log.slice(-500), record];
-    await writeReviseMeta("gradeActuals", next);
-    setGradeActuals(next);
+    await writeLearnerHistory("gradeActuals", userId, next);
+    setGradeActuals(await readLearnerHistory("gradeActuals", userId) as unknown as ActualResultRecord[]);
   }, [userId]);
 
   const removeGradeActual = useCallback(async (id: Id) => {
@@ -243,8 +256,8 @@ export function useOutcomes(input: {
     const target = log.find((row) => row.id === id);
     if (!target || target.anonId !== userId) return;
     const next = log.filter((row) => row.id !== id);
-    await writeReviseMeta("gradeActuals", next);
-    setGradeActuals(next);
+    await writeLearnerHistory("gradeActuals", userId, next, [id]);
+    setGradeActuals(await readLearnerHistory("gradeActuals", userId) as unknown as ActualResultRecord[]);
   }, [userId]);
 
   // Paper-outcome loop, part 1: freeze the prediction the moment a recommended
@@ -268,8 +281,8 @@ export function useOutcomes(input: {
     });
     const log = (await readReviseMeta<PaperOutcomeRecord[]>("paperOutcomes")) ?? [];
     const next = [...log.filter((o) => o.id !== record.id), record].slice(-200);
-    await writeReviseMeta("paperOutcomes", next);
-    setPaperOutcomeLog(next);
+    await writeLearnerHistory("paperOutcomes", userId, next);
+    setPaperOutcomeLog(await readLearnerHistory("paperOutcomes", userId) as unknown as PaperOutcomeRecord[]);
   }, [userId]);
 
   // Paper-outcome loop, part 2: close the record with the actual awarded
@@ -284,9 +297,9 @@ export function useOutcomes(input: {
     const target = log.find((o) => o.paperRunId === paperRunId);
     if (!target) return; // no frozen prediction (untimed path or legacy run) — nothing to learn
     const next = [...log.filter((o) => o.id !== target.id), closeStoredPaperOutcome(target, actualMarks, markingReview)].slice(-200);
-    await writeReviseMeta("paperOutcomes", next);
-    setPaperOutcomeLog(next);
-  }, []);
+    await writeLearnerHistory("paperOutcomes", userId, next);
+    setPaperOutcomeLog(await readLearnerHistory("paperOutcomes", userId) as unknown as PaperOutcomeRecord[]);
+  }, [userId]);
 
   const recordInterventionOutcome = useCallback(async (outcome: InterventionOutcomeRecord) => {
     if (outcome.userId !== userId) throw new Error("Cannot record intervention evidence for another user.");
@@ -294,8 +307,8 @@ export function useOutcomes(input: {
     const own = all.filter((row) => row.userId === userId);
     const nextOwn = [...own.filter((row) => row.id !== outcome.id), outcome];
     const nextAll = [...all.filter((row) => row.userId !== userId), ...nextOwn].slice(-2000);
-    await writeReviseMeta("interventionOutcomes", nextAll);
-    setInterventionOutcomes(nextOwn);
+    await writeLearnerHistory("interventionOutcomes", userId, nextAll);
+    setInterventionOutcomes(await readLearnerHistory("interventionOutcomes", userId) as unknown as InterventionOutcomeRecord[]);
   }, [userId]);
 
   return {

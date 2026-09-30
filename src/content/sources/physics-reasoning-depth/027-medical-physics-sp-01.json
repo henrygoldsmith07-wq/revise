@@ -1,0 +1,180 @@
+{
+  "topic": "medical-physics",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:xray-production",
+      "context": "physics-depth:xray-production:bremsstrahlung",
+      "move": "state how X-rays are produced at a metal target",
+      "prompt": "Describe how a medical X-ray tube produces X-rays, including what happens to the electrons at the target.",
+      "marks": 3,
+      "scheme": [
+        "Electrons emitted from a heated cathode accelerate through a large potential difference towards a metal target",
+        "Deceleration of electrons at the target emits a continuous bremsstrahlung X-ray spectrum",
+        "Incident electrons can eject inner-shell electrons; higher-shell electrons fill the vacancies and emit characteristic X-ray photons"
+      ],
+      "answer": "A heated cathode emits electrons, which accelerate through a large potential difference towards a metal target. Their deceleration at the target produces the continuous bremsstrahlung spectrum. They can also eject inner-shell electrons from target atoms; electrons dropping from higher shells into the vacancies emit characteristic X-ray photons."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:attenuation-dependence",
+      "context": "physics-depth:attenuation-dependence:tissue-properties",
+      "move": "state the factors that set X-ray attenuation in tissue",
+      "prompt": "State the three main properties of a material that determine how strongly it attenuates an X-ray beam.",
+      "marks": 4,
+      "scheme": [
+        "The material's thickness",
+        "Its density",
+        "Its effective atomic number (Z)",
+        "Bone wins on all three: high Z (calcium), high density, thickness comparable to soft tissue"
+      ],
+      "answer": "Attenuation grows with the material's thickness, its density and its effective atomic number. Bone — dense and calcium-rich with a high effective Z — attenuates strongly, while soft tissues differ little among themselves, which is exactly why plain films see bone so well and organs so poorly."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:ct-vs-plain-film",
+      "context": "physics-depth:ct-vs-plain-film:projection-vs-slices",
+      "move": "explain how CT overcomes the superposition limit of a single radiograph",
+      "prompt": "A chest radiograph shows overlapping shadows of ribs, heart and lungs. Explain how a CT scanner turns the same physics into a 3D image where structures do not overlap.",
+      "marks": 3,
+      "scheme": [
+        "In a plain radiograph, structures along the same X-ray path contribute to one projection and overlap",
+        "CT collects X-ray attenuation measurements from many directions around the patient",
+        "A computer reconstructs cross-sectional attenuation maps from those projections, locating structures in depth; slices can form a 3D image"
+      ],
+      "answer": "A plain radiograph is one projection: structures along the same ray contribute to the same detector reading and overlap. CT collects attenuation measurements from many directions around the patient. A computer uses these projections to reconstruct cross-sectional attenuation maps, locating structures in depth; the slices can be assembled into a 3D image."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:attenuation-factor-compute",
+      "context": "physics-depth:attenuation-factor-compute:half-value-layer",
+      "move": "apply exponential attenuation with a half-value thickness",
+      "prompt": "A soft-tissue layer transmits half of an X-ray beam per 3.0 cm of thickness. A 12 cm path of the same tissue lies in the beam. Calculate the fraction of the beam transmitted, and the thickness that would leave exactly 1% of the intensity.",
+      "marks": 4,
+      "scheme": [
+        "12 cm = 4 half-value thicknesses",
+        "Transmitted fraction = (1/2)⁴ = 1/16 ≈ 6.25%",
+        "For 1%: (1/2)ⁿ = 0.01 → n = log(0.01)/log(0.5) = 6.64",
+        "Thickness = 6.64 × 3.0 ≈ 20 cm"
+      ],
+      "answer": "Twelve centimetres is four half-value layers, so (½)⁴ = 1/16 ≈ 6.3% of the beam emerges. To leave 1% requires n = ln 0.01/ln 0.5 ≈ 6.64 half-layers, or 20 cm of tissue — the exponential attenuation that makes deep-penetrating (higher-kV) techniques necessary for thick body parts."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:contrast-agent-logic",
+      "context": "physics-depth:contrast-agent-logic:barium-meal",
+      "move": "apply the attenuation factors to explain how a contrast agent works",
+      "prompt": "A barium meal is swallowed before imaging the gut. Explain, using the attenuation factors, why barium makes the digestive tract visible on a plain X-ray.",
+      "marks": 3,
+      "scheme": [
+        "Barium has a very high atomic number (Z = 56) and high density",
+        "It attenuates X-rays far more strongly than the surrounding soft tissue",
+        "The filled gut then appears white against grey tissue — high differential attenuation"
+      ],
+      "answer": "Barium's high Z and density make it attenuate X-rays several times more strongly than soft tissue, which is nearly water. The contrast agent raises the gut's effective Z locally, so differential attenuation — the only thing a radiograph can see — becomes large, and the tract shows up white."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:attenuation-contrast-tradeoff-fallacy",
+      "context": "physics-depth:attenuation-contrast-tradeoff-fallacy:high-kv-choice",
+      "move": "reject higher photon energy as an automatic contrast improvement",
+      "prompt": "A radiographer doubles the tube voltage to 'see more clearly'. Explain why the image may actually lose soft-tissue contrast even though the beam penetrates further.",
+      "marks": 3,
+      "scheme": [
+        "Higher tube voltage produces a spectrum with higher photon energies and greater penetration",
+        "Differences in attenuation between tissues may be smaller at higher photon energies",
+        "Smaller transmission differences reduce subject contrast, so increased penetration alone does not guarantee a clearer image"
+      ],
+      "answer": "Higher tube voltage increases the photon energies and the beam's penetration. However, differences in attenuation between tissues may become smaller, reducing the differences in transmitted intensity that produce subject contrast. Greater penetration alone therefore does not guarantee a clearer image."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:xray-photon-energy",
+      "context": "physics-depth:xray-photon-energy:max-photon",
+      "move": "compute the maximum photon energy from an accelerating voltage",
+      "prompt": "An X-ray tube operates at 80 kV. Calculate the maximum photon energy and its wavelength. (e = 1.60×10⁻¹⁹ C, h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "Maximum energy when the whole 80 keV converts to one photon: E = 80×10³ × 1.60×10⁻¹⁹ = 1.28×10⁻¹⁴ J",
+        "E = hc/λ → λ = hc/E",
+        "λ = (6.63×10⁻³⁴ × 3.00×10⁸)/1.28×10⁻¹⁴",
+        "= 1.55×10⁻¹¹ m (0.0155 nm)"
+      ],
+      "answer": "An electron falling through 80 kV carries 80 keV = 1.28×10⁻¹⁴ J; the most energetic possible photon takes all of it, so λ_min = hc/E = 6.63×10⁻³⁴×3.0×10⁸/1.28×10⁻¹⁴ ≈ 1.6×10⁻¹¹ m. This hard cutoff at the tube voltage is the bremsstrahlung spectrum's short-wave edge."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:ct-dose-length",
+      "context": "physics-depth:ct-dose-length:dose-metrics",
+      "move": "compute absorbed dose and dose-length product for a CT scan",
+      "prompt": "A CT scan delivers a uniform absorbed dose of 15 mGy along an imaged length of 30 cm. State the dose-length product, and compare it with a single chest radiograph of 0.1 mGy over 30 cm.",
+      "marks": 3,
+      "scheme": [
+        "DLP = dose × length = 15 mGy × 30 cm = 450 mGy·cm",
+        "Chest radiograph: 0.1 × 30 = 3 mGy·cm",
+        "CT delivers 150 times the dose-length product of the plain film for the same region"
+      ],
+      "answer": "The dose-length product is 15 mGy×30 cm = 450 mGy·cm; a plain chest film at the same length contributes 3 mGy·cm — a factor of 150. The DLP is the quantity radiologists track because both the intensity and the extent of irradiated tissue matter."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:airport-scanner-physics",
+      "context": "physics-depth:airport-scanner-physics:backscatter",
+      "move": "transfer X-ray attenuation reasoning to a security scanner",
+      "prompt": "A baggage scanner uses X-rays and records how much of the beam survives the suitcase. Explain why a laptop must be separated from a bag, using the same attenuation physics as a radiograph.",
+      "marks": 3,
+      "scheme": [
+        "The laptop's dense metal and electronics attenuate the beam almost completely",
+        "Anything behind it is hidden by its shadow, just as bone hides lung behind it",
+        "Removing dense objects exposes the whole bag's contents to differential attenuation"
+      ],
+      "answer": "A scanner, like a radiograph, reads only transmitted intensity. A laptop's dense metals blot out the beam, casting an opaque shadow that hides everything overlapping it — the same superposition problem bones pose in a chest film. Separating dense items lets every region's attenuation be measured cleanly."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:radiotherapy-fractionation",
+      "context": "physics-depth:radiotherapy-fractionation:dose-split",
+      "move": "transfer dose reasoning to why radiotherapy splits treatment over weeks",
+      "prompt": "A tumour requires a total absorbed dose of 60 Gy. It is delivered in 30 fractions of 2.0 Gy rather than one 60 Gy exposure. Explain the physical and biological reasoning.",
+      "marks": 4,
+      "scheme": [
+        "Normal and tumour tissue repair radiation damage at different rates",
+        "Fractionation lets normal cells recover between doses while tumour cells (poorer repair) accumulate damage",
+        "Smaller fractions also allow re-oxygenation of tumour cells, making them more radiosensitive",
+        "One 60 Gy dose would destroy normal tissue en route to the tumour"
+      ],
+      "answer": "The 60 Gy is split so healthy tissue can repair between fractions while tumour cells, which repair poorly, fall progressively behind. Between doses tumours also re-oxygenate, and oxygen sharpens radiation damage. A single 60 Gy blast would devastate the normal tissue crossing the beam — the fractionation schedule is where physics meets biology."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:xray-spectrum-filter",
+      "context": "physics-depth:xray-spectrum-filter:low-energy-removal",
+      "move": "combine the photon spectrum with dose accounting to justify beam filtration",
+      "prompt": "An unfiltered 100 kV X-ray beam contains many low-energy photons that cannot reach the detector through the patient. Explain why an aluminium filter improves the dose-to-image relationship, and state what is traded away.",
+      "marks": 4,
+      "scheme": [
+        "Bremsstrahlung produces a continuous spectrum with many soft (low-energy) photons",
+        "Soft photons are absorbed in the first millimetres of tissue — dose with no image information",
+        "An aluminium filter removes them before they reach the patient",
+        "Trade-off: total intensity falls, so exposure time or current must rise — but the removed photons contributed dose, not image"
+      ],
+      "answer": "The continuous spectrum carries many low-energy photons that the patient's skin absorbs before they can reach the detector — pure dose, zero image. Filtering them out with aluminium removes exactly the useless part: skin dose falls sharply while useful, penetrating photons survive. The cost is merely more tube current for the same film exposure — a trade every radiographer accepts."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:imaging-chain-comparison",
+      "context": "physics-depth:imaging-chain-comparison:full-cost-benefit",
+      "move": "combine production, attenuation and dose reasoning to compare two modalities for one case",
+      "prompt": "A child needs repeated imaging of a growing hip over several years; both X-ray radiography and MRI could track it. Compare the two modalities on dose, contrast and practical constraints, and recommend one.",
+      "marks": 4,
+      "scheme": [
+        "Radiography: ionising dose each time, excellent bone detail, minutes, cheap, widely available",
+        "MRI: zero ionising dose, excellent soft-tissue and marrow contrast, but long scans need stillness, cost and availability are constrained",
+        "Growing tissue is more radiosensitive, so repeated radiographs accumulate dose over years",
+        "Recommendation: use radiography sparingly at set milestones; MRI for detailed assessment when soft-tissue change is the question"
+      ],
+      "answer": "Radiographs give superb bone detail in seconds but add ionising dose each visit, which matters most in growing children. MRI gives no dose and better soft-tissue contrast but needs minutes of stillness and costs far more. A sensible schedule reserves radiographs for milestone checks and MRI when the clinical question is soft tissue — the modality's physics matched to the patient's biology."
+    }
+  ]
+}

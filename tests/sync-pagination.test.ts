@@ -67,6 +67,7 @@ function pagedClient(options: PagedFakeOptions): { client: SupabaseClient; pages
         return builder;
       }) as never;
       builder.order = () => builder;
+      builder.gt = () => builder;
       builder.range = (async (from: number, to: number) => {
         const page = pages[table] ?? 0;
         pages[table] = page + 1;

@@ -1,5 +1,5 @@
 import { authenticPaperEvidence, independentAttempt, partFamily, trustworthyAttempt } from "./learning-evidence";
-import { requiresWjecContentReview, trustedAssessmentContent } from "./physics-content-review";
+import { requiresWjecContentReview, trustedAssessmentContent } from "./content-trust";
 import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { Attempt, Question } from "./types";

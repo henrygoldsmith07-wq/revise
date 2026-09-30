@@ -100,11 +100,13 @@ describe("a11y scaffolding", () => {
     expect(i18n.DEFAULT_LOCALE).toBe("en-GB");
   });
   it("QuestionRunner: remediation renders the misconception explanation with a fix", async () => {
-    const src = readFileSync(join(process.cwd(), "src/components/QuestionRunner.tsx"), "utf8");
+    const src = readFileSync(join(process.cwd(), "src/components/QuestionMarkedResult.tsx"), "utf8");
     expect(src).toContain("How to fix it");
     expect(src).toContain("misconceptionEntry.explanation");
     expect(src).toContain("misconceptionEntry.correction");
-    expect(src).toContain("planRemediation(");
+    expect(src).toContain("result.remediation");
+    const execution = readFileSync(join(process.cwd(), "src/state/question-execution.ts"), "utf8");
+    expect(execution).toContain("planRemediation(");
   });
   it("misconception search deep-links to the specific entry", async () => {
     const overlay = readFileSync(join(process.cwd(), "src/components/SearchOverlay.tsx"), "utf8");

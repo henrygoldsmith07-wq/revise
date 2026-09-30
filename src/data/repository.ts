@@ -1,3 +1,4 @@
+import { syncWireIdValue } from "./sync-contract";
 import { seedCards, seedQuestions } from "@/content";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
@@ -22,7 +23,9 @@ import {
 import { validatePersistedStores, type PersistenceIssue } from "./persistence-schema";
 import { StorageRecoveryError } from "./storage-recovery";
 import { isRevisionTwinState, type RevisionTwinState } from "@/domain/revision-twin";
-import { COLLECTION_STORES, getAll, getDb, putAll, putOne, removeOne, streamAttempts, streamReviewLogs } from "./db";
+import { COLLECTION_STORES, activeDatabaseProfile, getAll, getDb, putAll, putOne, streamAttempts, streamReviewLogs } from "./db";
+import { deleteReplicaRows } from "./sync-deletions";
+import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import type { CollectionStore } from "./db";
 import { migrateContentIds } from "./content-ids";
 import { enqueue } from "./sync";
@@ -163,12 +166,13 @@ export async function ensureSeeded(userId: Id): Promise<void> {
   const known = new Set(existing.map((c) => c.id));
 
   const wanted = seedCards(allTopics(), userId);
-  const missing = wanted.filter((c) => !known.has(c.id));
+  const deleted = new Set((await (await getDb()).getAll("meta")).filter(row => (row.key.startsWith("revise.deleted.v1:") || row.key.startsWith("revise.deletedWire.v1:"))).map(row => row.key));
+  const missing = wanted.filter((c) => !known.has(c.id) && !deleted.has(tombstoneKey("cards", c.id)) && !deleted.has(wireTombstoneKey("cards", syncWireIdValue(userId, c.id))));
   if (missing.length) await putAll("cards", missing);
 
   const existingQuestions = await getAll<Question>("questions");
   const knownQuestions = new Set(existingQuestions.map((q) => q.id));
-  const missingQuestions = seedQuestions.filter((q) => !knownQuestions.has(q.id));
+  const missingQuestions = seedQuestions.filter((q) => !knownQuestions.has(q.id) && !deleted.has(tombstoneKey("questions", q.id)) && !deleted.has(wireTombstoneKey("questions", syncWireIdValue(userId, q.id))));
   if (missingQuestions.length) await putAll("questions", missingQuestions);
 
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
@@ -401,18 +405,15 @@ export async function saveCards(cards: Card[]): Promise<void> {
 }
 
 export async function deleteCard(id: Id, ownerId?: Id): Promise<void> {
-  await removeOne("cards", id);
-  await enqueue("cards", "delete", ownerId ? { id, userId: ownerId } : { id }, ownerId);
+  const row = await (await getDb()).get("cards", id);
+  await deleteReplicaRows("cards", [id], ownerId ?? row?.userId ?? activeDatabaseProfile());
 }
 
 /** Bulk delete for the browser's multi-select. One transaction, one pass. */
 export async function deleteCards(ids: Id[], ownerId?: Id): Promise<void> {
   if (!ids.length) return;
-  const db = await getDb();
-  const tx = db.transaction("cards", "readwrite");
-  await Promise.all(ids.map((id) => tx.store.delete(id)));
-  await tx.done;
-  for (const id of ids) await enqueue("cards", "delete", ownerId ? { id, userId: ownerId } : { id }, ownerId);
+  const row = await (await getDb()).get("cards", ids[0]!);
+  await deleteReplicaRows("cards", ids, ownerId ?? row?.userId ?? activeDatabaseProfile());
 }
 
 export async function saveReviewLog(log: ReviewLog): Promise<void> {
@@ -438,8 +439,12 @@ export async function saveAttempt(attempt: Attempt): Promise<void> {
 /** Keep an answer, its repair evidence and newly-created cards atomic locally. */
 export async function saveLearningResult(attempt: Attempt, mistakes: Mistake[], cards: Card[]): Promise<void> {
   const db = await getDb();
-  const tx = db.transaction(["attempts", "mistakes", "cards"], "readwrite");
+  const tx = db.transaction(["attempts", "mistakes", "cards", "meta"], "readwrite");
   try {
+    const targets = [["attempts", attempt], ...mistakes.map(row => ["mistakes", row]), ...cards.map(row => ["cards", row])] as const;
+    for (const [entity, row] of targets) {
+      if (await tx.objectStore("meta").get(tombstoneKey(String(entity), (row as Attempt).id)) || await tx.objectStore("meta").get(wireTombstoneKey(String(entity), syncWireIdValue(attempt.userId, (row as Attempt).id)))) throw new Error("Cannot update deleted evidence.");
+    }
     await Promise.all([
       tx.objectStore("attempts").put(attempt),
       ...mistakes.map((mistake) => tx.objectStore("mistakes").put(mistake)),
@@ -481,16 +486,10 @@ export async function replacePlan(userId: Id, sessions: PlannedSession[]): Promi
   const existing = (await db.getAll("plannedSessions")) as PlannedSession[];
   const keep = new Set(sessions.map((s) => s.id));
   const removed = existing.filter((s) => s.userId === userId && !keep.has(s.id));
-  const tx = db.transaction("plannedSessions", "readwrite");
-  await Promise.all(removed.map((s) => tx.store.delete(s.id)));
-  await Promise.all(sessions.map((s) => tx.store.put(s)));
-  await tx.done;
+  await deleteReplicaRows("plannedSessions", removed.map(s => s.id), userId, sessions);
   for (const s of sessions) await enqueue("plannedSessions", "upsert", s);
   // Dropped sessions must also be deleted on the server, or every other
   // device keeps them and a future pull resurrects them locally.
-  for (const s of removed) {
-    await enqueue("plannedSessions", "delete", { id: s.id, userId } as Partial<PlannedSession>, userId);
-  }
 }
 
 export async function saveExamDate(exam: ExamDate): Promise<void> {
@@ -499,8 +498,8 @@ export async function saveExamDate(exam: ExamDate): Promise<void> {
 }
 
 export async function deleteExamDate(id: Id, ownerId?: Id): Promise<void> {
-  await removeOne("examDates", id);
-  await enqueue("examDates", "delete", ownerId ? { id, userId: ownerId } : { id }, ownerId);
+  const row = await (await getDb()).get("examDates", id);
+  await deleteReplicaRows("examDates", [id], ownerId ?? row?.userId ?? activeDatabaseProfile());
 }
 
 export async function saveSettings(settings: UserSettings): Promise<void> {

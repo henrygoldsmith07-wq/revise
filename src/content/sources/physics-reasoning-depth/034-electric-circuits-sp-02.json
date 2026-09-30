@@ -1,0 +1,165 @@
+{
+  "topic": "electric-circuits",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:power-relations-forms",
+      "context": "physics-depth:power-relations-forms:three-forms",
+      "move": "state the three equivalent electrical power formulas and when each suits",
+      "prompt": "State three equivalent formulas for electrical power dissipated in a resistor, and say which is most convenient when you know only current and resistance.",
+      "marks": 3,
+      "scheme": [
+        "P = VI",
+        "P = I²R (best when I and R are known)",
+        "P = V²/R (best when V and R are known)"
+      ],
+      "answer": "Power dissipated is P = VI, equivalently P = I²R or P = V²/R — each obtained by eliminating one variable with V = IR. Given current and resistance, P = I²R is the direct route; given supply voltage and resistance, V²/R avoids finding the current first."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:resistivity-definition",
+      "context": "physics-depth:resistivity-definition:material-property",
+      "move": "state the resistivity relation and distinguish it from resistance",
+      "prompt": "State the formula linking a wire's resistance to the material's resistivity and its dimensions, and explain what resistivity measures that resistance does not.",
+      "marks": 3,
+      "scheme": [
+        "R = ρL/A",
+        "ρ (resistivity) is a material property, independent of shape",
+        "Resistance R depends on both the material and the geometry (length and cross-section)"
+      ],
+      "answer": "R = ρL/A: resistance grows with length, shrinks with area, and scales with the material's resistivity ρ. Resistivity is the intrinsic material property — copper versus nichrome — while resistance is what a particular geometry of that material happens to present. Same wire, doubled length: same ρ, double R."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:voltmeter-ideal-logic",
+      "context": "physics-depth:voltmeter-ideal-logic:loading-circuit",
+      "move": "explain why an ideal voltmeter draws no current and what a real one does",
+      "prompt": "Explain why a voltmeter must have a very high resistance, and what would go wrong if a low-resistance voltmeter were used across a component.",
+      "marks": 3,
+      "scheme": [
+        "A voltmeter connects in parallel and must take negligible current",
+        "A low-resistance meter would provide an alternative path, lowering the resistance of that section",
+        "The circuit's operating conditions change — the measurement alters the result (loading)"
+      ],
+      "answer": "A voltmeter sits in parallel, so any current it draws is current stolen from the component. A low-resistance meter would form a significant parallel branch, dropping the section's resistance, changing the voltages it was meant to measure. High resistance makes the meter a near-open circuit — invisible to the circuit it interrogates."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:resistor-network-solve",
+      "context": "physics-depth:resistor-network-solve:ladder-circuit",
+      "move": "reduce a mixed series-parallel network stepwise and solve for a branch current",
+      "prompt": "A 24 V battery feeds a 12 Ω resistor in series with a parallel pair (6.0 Ω and 3.0 Ω). Calculate the total current from the battery and the current through the 3.0 Ω branch.",
+      "marks": 4,
+      "scheme": [
+        "Parallel pair: (6.0×3.0)/(6.0+3.0) = 2.0 Ω",
+        "Total R = 12 + 2.0 = 14 Ω → I = 24/14 = 1.71 A",
+        "Voltage across pair: 1.71×2.0 = 3.43 V",
+        "Branch: I₃ = 3.43/3.0 = 1.14 A"
+      ],
+      "answer": "The parallel pair reduces to 2.0 Ω, so the loop totals 14 Ω and the battery supplies 1.71 A. That current drops 3.43 V across the pair, and the 3.0 Ω branch accordingly carries 1.14 A — reduce, then expand back out to each branch."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:wire-resistance-compare",
+      "context": "physics-depth:wire-resistance-compare:gauges",
+      "move": "apply R = ρL/A to compare two wires of the same material",
+      "prompt": "Two copper wires have equal lengths. Wire A has diameter 0.50 mm; wire B has diameter 1.0 mm. Calculate the resistance ratio, and the resistance of B if A is 4.0 Ω.",
+      "marks": 3,
+      "scheme": [
+        "R ∝ 1/A ∝ 1/d²",
+        "d_B = 2d_A → A_B = 4A_A → R_B = R_A/4",
+        "R_B = 4.0/4 = 1.0 Ω"
+      ],
+      "answer": "Resistance scales inversely with area, and area with diameter squared: doubling the diameter quadruples the area and quarters the resistance. Wire B reads 4.0/4 = 1.0 Ω — the reason thick cables carry big currents without cooking."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:voltage-current-cause-fallacy",
+      "context": "physics-depth:voltage-current-cause-fallacy:current-measurement",
+      "move": "reject the claim that current is used up by each successive component",
+      "prompt": "A student places an ammeter before and after a lamp and notes the readings differ by 0.02 A due to meter tolerance. He concludes the lamp 'consumes some current'. Explain the error and what is actually consumed.",
+      "marks": 3,
+      "scheme": [
+        "Charge is conserved: in series the current is identical at every point",
+        "The discrepancy is meter tolerance, not a physical difference",
+        "Energy is what gets consumed: charge leaves at lower potential, not in smaller quantity"
+      ],
+      "answer": "Current cannot be consumed — charge is a conserved quantity, and in a series loop the same flow passes every point. The 0.02 A mismatch is the meters' stated tolerance, not physics. What the lamp takes is energy: each coulomb arrives at high potential and leaves lower, the drop powering the light."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:emf-terminal-confusion",
+      "context": "physics-depth:emf-terminal-confusion:open-circuit-reading",
+      "move": "distinguish emf from terminal potential difference under different loads",
+      "prompt": "A battery reads 9.0 V on a voltmeter with nothing connected, but 7.8 V while running a motor. A student says the battery is faulty. Explain both readings.",
+      "marks": 3,
+      "scheme": [
+        "Open-circuit: no current → no internal drop → the reading equals the emf ε = 9.0 V",
+        "Under load: I flows through the internal resistance r, dropping Ir inside",
+        "Terminal V = ε − Ir = 7.8 V; the missing 1.2 V is dissipated inside the battery"
+      ],
+      "answer": "Both readings are honest. With no current there is no internal drop, so the meter reads the emf itself: 9.0 V. Under the motor's load, current through the internal resistance wastes Ir inside the case, leaving V = ε − Ir = 7.8 V at the terminals. The 1.2 V difference is internal heating, not a fault."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:car-lighting-dip",
+      "context": "physics-depth:car-lighting-dip:starter-load",
+      "move": "transfer internal-resistance reasoning to why headlights dim during starting",
+      "prompt": "A car's 12 V battery has internal resistance 0.020 Ω. The starter draws 180 A while the headlights together draw 10 A. Calculate the terminal voltage during cranking and explain why the headlights dim.",
+      "marks": 4,
+      "scheme": [
+        "Total current = 180 + 10 = 190 A",
+        "Internal drop: Ir = 190×0.020 = 3.8 V",
+        "Terminal voltage: 12 − 3.8 = 8.2 V",
+        "The headlights see 8.2 V instead of ~12 V — a 32% voltage cut and a large brightness drop"
+      ],
+      "answer": "Cranking pulls 190 A through the battery, dropping 3.8 V across its 0.020 Ω internal resistance — the terminals sag to 8.2 V. The headlights, wired to those terminals, see a third less voltage and dim visibly. One internal-resistance calculation explains a familiar winter scene."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:strain-gauge-bridge",
+      "context": "physics-depth:strain-gauge-bridge:resistance-to-voltage",
+      "move": "transfer resistivity-geometry reasoning to a strain gauge sensor",
+      "prompt": "A strain gauge is a thin metal foil whose length increases by 0.10% and whose cross-section falls correspondingly when a beam bends. Using R = ρL/A with volume conserved, estimate the percentage change in its resistance.",
+      "marks": 4,
+      "scheme": [
+        "Volume constant: L → 1.001L and A → A/1.001",
+        "R = ρL/A → R multiplies by 1.001 × 1.001 = 1.002",
+        "ΔR/R ≈ +0.20% (two contributions of 0.10% each)",
+        "Tiny changes — hence the gauge sits in a Wheatstone-bridge arrangement to detect them"
+      ],
+      "answer": "With the foil's volume fixed, a 0.10% stretch raises L and lowers A by the same fraction. Resistance goes as L/A, so both changes act together: R rises by about 0.20%. Such a tiny shift is why strain gauges live in bridge circuits that turn milliohm changes into measurable voltages."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:maximum-power-transfer",
+      "context": "physics-depth:maximum-power-transfer:matched-impedance",
+      "move": "combine internal resistance with power relations to find the load that maximises output",
+      "prompt": "A battery of emf 9.0 V and internal resistance 0.50 Ω drives a variable load R. Show that the load power is maximised when R = 0.50 Ω, and calculate that maximum power.",
+      "marks": 4,
+      "scheme": [
+        "P_load = I²R = [ε/(R+r)]² R",
+        "dP/dR = 0 → R = r (matched condition)",
+        "At R = 0.50 Ω: I = 9.0/1.0 = 9.0 A",
+        "P_max = I²R = 81×0.50 = 40.5 W"
+      ],
+      "answer": "Load power is P = [ε/(R+r)]²R; differentiating shows the maximum at R = r — matched resistances. With r = 0.50 Ω the current is 9.0/1.0 = 9.0 A and the load receives 81×0.50 = 40.5 W. Half the battery's power is dissipated internally at this point: maximum transfer, but only 50% efficiency — the trade-off audio engineers call impedance matching."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:household-ring-final",
+      "context": "physics-depth:household-ring-final:cable-derating",
+      "move": "combine resistivity, power and safety limits to size a domestic circuit",
+      "prompt": "A socket is midway around a ring circuit, so two equal 20 m paths of 2.5 mm² copper (ρ = 1.7×10⁻⁸ Ω m) connect it to the consumer unit. A 3.0 kW heater is connected at 230 V and the current splits equally. Calculate the equivalent cable resistance and total power lost in the two paths, giving 2 significant figures.",
+      "marks": 4,
+      "scheme": [
+        "Each path: R = ρL/A = 1.7×10⁻⁸ × 20/(2.5×10⁻⁶) = 0.136 Ω",
+        "Two equal paths in parallel: R_eq = 0.136/2 = 0.068 Ω",
+        "Heater current: I = 3000/230 = 13.0 A",
+        "Cable loss: P = I²R_eq = 13.0²×0.068 = 11.5 W ≈ 12 W"
+      ],
+      "answer": "Each 20 m path has R = 1.7×10⁻⁸×20/2.5×10⁻⁶ = 0.136 Ω. The equal paths are parallel, so R_eq = 0.068 Ω. The heater draws 3000/230 = 13.0 A; the total cable loss is I²R_eq = 13.0²×0.068 = 11.5 W, or 12 W to 2 s.f. (equivalently, 6.5 A in each path and 2×6.5²×0.136 W)."
+    }
+  ]
+}

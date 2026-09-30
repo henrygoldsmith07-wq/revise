@@ -1,3 +1,4 @@
+import { applyTechniqueSteering, applyPhase4Overlays } from "./recommendation-overlays";
 import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { isDue, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
@@ -5,27 +6,11 @@ import { buildRecommendationNarrative } from "./explainability";
 import type { RecallMasteryRow } from "./recall-mastery";
 import type { ApplicationMasteryRow } from "./application-mastery";
 import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue";
-import { timedSessionRecommendation, type KnowledgeAnsweringReport } from "./exam-technique";
+
 import { paperOutcomeGainMultiplier } from "./paper-outcome";
 import { trustedAssessmentMistake } from "./learning-evidence";
 import { localDayOfInstant, todayLocal } from "./local-date";
-import type {
-  ActivityKind,
-  Card,
-  ExamDate,
-  Id,
-  IsoDate,
-  Mistake,
-  PlannedSession,
-  Recommendation,
-  RecommendationExplanation,
-  RecommendationFactors,
-  Topic,
-  TopicMastery,
-  Attempt,
-  Question,
-} from "./types";
-import type { PaperOutcomeRecord } from "./paper-outcome";
+import type { ActivityKind, Card, ExamDate, Id, IsoDate, Mistake, Recommendation, RecommendationExplanation, RecommendationFactors, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
 // "What should I do right now?" — scored as
@@ -39,59 +24,8 @@ import type { PaperOutcomeRecord } from "./paper-outcome";
 // so the UI never paraphrases a number the engine didn't actually compute.
 // ---------------------------------------------------------------------------
 
-export interface OutcomePair {
-  subjectId: Id;
-  topicId?: Id;
-  /** Predicted marks for the outcome window (from simulatePaper or predicted percent scaled). */
-  predicted: number;
-  /** Actual marks later earned on a timed paper covering the same material. */
-  actual: number;
-  date: IsoDate;
-  /** Which recommendation drove the study that produced this outcome, when known. */
-  driverActivity?: ActivityKind;
-}
-
-export interface RecommendInput {
-  topics: Topic[];
-  mastery: TopicMastery[];
-  cards: Card[];
-  mistakes: Mistake[];
-  /** Optional bank/history lookups used to exclude untrusted Physics losses. */
-  questions?: Question[];
-  attempts?: Attempt[];
-  exams: ExamDate[];
-  plan: PlannedSession[];
-  sessionLengthMinutes: number;
-  subjectIds: Id[];
-  now?: Date;
-  marksPerHour?: Map<Id, number>;
-  /** Base recovery fraction for recoverable marks when marksPerHour is absent. */
-  recoverableFraction?: number;
-  /** Real outcome pairs for recommendation-quality benchmarking (synthetic now, real later). */
-  outcomeHistory?: OutcomePair[];
-  /** Per-topic adaptive difficulty offset in [-1, 1] learned from rolling accuracy. */
-  adaptiveDifficultyOffset?: Map<Id, number>;
-  /** Historical per-topic marks-gained-per-hour derived from actual outcomes (overrides marksPerHour when both present). */
-  historicalGain?: Map<Id, number>;
-  /** Knowledge-vs-answering report per subject; steers what kind of work the ranking prefers. */
-  techniqueSplit?: Map<Id, KnowledgeAnsweringReport>;
-  /** Per-topic reports (each topic's own losses aggregated); preferred over the subject report for topic-level recs. */
-  techniqueByTopic?: Map<Id, KnowledgeAnsweringReport>;
-  /** Sat-paper (predicted, actual) outcome records; feeds the paper gain factor back from reality. */
-  paperOutcomes?: PaperOutcomeRecord[];
-  /** Cross-topic total recommendations already issued — drives ε/exploration decay (default 0). */
-  totalRecommendationsIssued?: number;
-  /** Minutes the student has already studied this session — drives fatigue penalties (default 0). */
-  activeMinutes?: number;
-  /** When true, surface an extra exploration candidate among tied topics (default false in deterministic rank). */
-  enableExploration?: boolean;
-  /** RNG for exploration jitter — inject for deterministic tests (default Math.random). */
-  rng?: () => number;
-  /** Recall-only evidence (FSRS strength) per topic; separates "knows it" from "can use it". */
-  recallMastery?: RecallMasteryRow[];
-  /** Application evidence (marked exam answers, recall excluded) per topic. */
-  applicationMastery?: ApplicationMasteryRow[];
-}
+export type { OutcomePair, RecommendInput } from "./recommendation-contract";
+import type { OutcomePair, RecommendInput } from "./recommendation-contract";
 
 /** Days until the exam, or null when no exam is set for that subject. */
 export function daysToExam(exams: ExamDate[], subjectId: Id, today: IsoDate): number | null {
@@ -750,92 +684,6 @@ export function recommend(input: RecommendInput): Recommendation[] {
 // quick-session box the app can run. Mixed or unproven scopes steer nothing:
 // the overlay never invents a direction the evidence cannot support.
 // ---------------------------------------------------------------------------
-
-const TECHNIQUE_PROMOTE = { knowledge: 1.12, answering: 1.1 } as const;
-const TECHNIQUE_DEMOTE = { knowledge: 0.88, answering: 0.9 } as const;
-
-function applyTechniqueSteering(ctx: { out: Recommendation[]; input: RecommendInput; today: IsoDate }): void {
-  const { out, input: recInput } = ctx;
-  const subjectSplit = recInput.techniqueSplit;
-  const topicSplit = recInput.techniqueByTopic;
-  if (!subjectSplit) return;
-
-  for (const r of out) {
-    // Topic recs steer only on their own topic's losses; subject-wide recs
-    // (flashcards, papers, mistake repair) read the subject-level split.
-    const report = r.topicId ? topicSplit?.get(r.topicId) : subjectSplit.get(r.subjectId);
-    if (!report || !report.reliable) continue;
-    if (report.verdict !== "knowledge" && report.verdict !== "answering") continue;
-    const leak = report.verdict;
-
-    const promotes =
-      leak === "knowledge"
-        ? r.activity === "learn" || r.activity === "flashcards" || r.activity === "mistakes"
-        : r.activity === "practice" || r.activity === "paper";
-    const steer = promotes ? TECHNIQUE_PROMOTE[leak] : TECHNIQUE_DEMOTE[leak];
-    r.score *= steer;
-    if (r.factors) r.factors.techniqueSteer = steer;
-    r.techniqueKnowledgeShare = report.knowledgeShare;
-
-    // An answering leak converts the practice rec into a named timed run —
-    // but never overrides the student's own plan (planned sessions keep
-    // their reason, the boost already biasing them is enough).
-    if (leak === "answering" && r.activity === "practice" && !r.plannedSessionId) {
-      const timed = timedSessionRecommendation(report);
-      if (timed) {
-        r.techniqueQuickMinutes = timed.minutes;
-        r.techniqueKnowledgeShare = report.knowledgeShare;
-        r.reason = `Timed run: ${timed.questionCount} questions against the clock — answering is the leak here (~${Math.round(
-          report.answeringShare * 100,
-        )}% of lost marks), not knowledge.`;
-      }
-    }
-  }
-}
-
-/** Phase 4 overlays: historical gain, exploration, tie annotation. Separated so rank invariants remain testable. */
-function applyPhase4Overlays(input: { out: Recommendation[]; input: RecommendInput; today: IsoDate }): void {
-  const { out, input: recInput } = input;
-  const rng = recInput.rng ?? Math.random;
-  const totalIssued = recInput.totalRecommendationsIssued ?? 0;
-  // Historical gain: override recoverable/examGain for practice recs where we have real mph
-  if (recInput.historicalGain && recInput.historicalGain.size > 0) {
-    for (const r of out) {
-      if (r.activity !== "practice" || !r.topicId) continue;
-      const histMph = recInput.historicalGain.get(r.topicId);
-      if (histMph == null) continue;
-      // Only apply when the topic has not already been tuned via marksPerHour (historical is the override)
-      // hist is marks-per-hour; convert back to block gain
-      const histRecoverable = histMph * (r.minutes / 60);
-      r.explanation!.marksPerHour = Math.round(histMph * 10) / 10;
-      r.explanation!.recoverableMarks = Math.round(histRecoverable * 10) / 10;
-      r.explanation!.factors.examGain = Math.round(histRecoverable * 10) / 10;
-      // Small adaptive nudge toward historically rewarding topics (capped)
-      if (histMph > 2) r.score *= 1.04;
-      else if (histMph < 0) r.score *= 0.96;
-    }
-  }
-  // Exploration: ε-greedy and UCB bonus for practice/learn (gated by flag so deterministic tests stay deterministic)
-  if (recInput.enableExploration) {
-    const totalEvidence = out.reduce((a, r) => {
-      const row = recInput.mastery.find((m) => m.topicId === r.topicId);
-      return a + (row ? row.cardsTotal + row.attempts * 2 : 0);
-    }, 0);
-    const eps = Math.max(0.04, 0.14 * Math.exp(-totalIssued / 120));
-    for (const r of out) {
-      if (r.activity !== "practice" && r.activity !== "learn") continue;
-      const row = r.topicId ? recInput.mastery.find((m) => m.topicId === r.topicId) : undefined;
-      const evidence = row ? row.cardsTotal + row.attempts * 2 : 0;
-      const bonus = Math.min(0.9, Math.sqrt(Math.log(Math.max(2, totalEvidence || 8)) / Math.max(1, evidence)) * 0.45);
-      const mult = Math.min(1.14, 1 + bonus * 0.22);
-      // ε-greedy: with prob ε, give this thin-evidence topic an extra jitter
-      if (evidence < 6) {
-        if (rng() < eps) r.score *= mult;
-        else r.score *= 1 + bonus * 0.08; // small persistent UCB even when not sampled
-      }
-    }
-  }
-}
 
 /** Keep the strongest candidate per activity+subject+topic triple. */
 function dedupe(list: Recommendation[]): Recommendation[] {

@@ -1,0 +1,163 @@
+{
+  "topic": "fields",
+  "point": 6,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:magnetic-force-current-form",
+      "context": "physics-depth:magnetic-force-current-form:bil",
+      "move": "state the magnetic force on a current-carrying conductor and each symbol's meaning",
+      "prompt": "State the equation for the magnetic force on a current-carrying wire, defining each symbol and the angle.",
+      "marks": 3,
+      "scheme": [
+        "F = BIl sinθ",
+        "B is the flux density, I the current, l the length of wire inside the field",
+        "θ is the angle between the current direction and the field"
+      ],
+      "answer": "The force is F = BIl sinθ, where B is the magnetic flux density, I the current, l the length of wire lying in the field and θ the angle between the current and the field. Maximum force at 90°; zero when parallel."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:magnetic-force-charge-form",
+      "context": "physics-depth:magnetic-force-charge-form:bqv",
+      "move": "state the magnetic force on a moving charge and its direction rule",
+      "prompt": "State the equation for the magnetic force on a moving charge in a magnetic field, and state what determines its direction.",
+      "marks": 3,
+      "scheme": [
+        "F = BQv when the velocity is perpendicular to the field (F = BQv sinθ in general)",
+        "The force is perpendicular to both the velocity and the field",
+        "Use the right-hand rule: for positive charge, point along v, curl toward B, thumb gives F"
+      ],
+      "answer": "A charge Q moving at speed v at right angles to a field B feels F = BQv, directed perpendicular to both velocity and field — given by the right-hand rule for positive charge (reverse for negative). The force steers but never speeds up or slows down the charge."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:why-perpendicular-only",
+      "context": "physics-depth:why-perpendicular-only:component-logic",
+      "move": "explain why a field-parallel velocity produces no magnetic force",
+      "prompt": "Explain why a charged particle moving parallel to a magnetic field experiences no magnetic force, and what happens when it moves perpendicular instead.",
+      "marks": 3,
+      "scheme": [
+        "The force depends on sinθ: only the velocity component across the field contributes",
+        "Parallel motion gives sinθ = 0, so F = 0",
+        "Perpendicular motion maximises sinθ = 1, giving F = BQv and a circular path"
+      ],
+      "answer": "The magnetic force is proportional to the velocity component cutting across the field, BQv sinθ. Motion along the field lines has no transverse component (sin 0° = 0) and is ignored by the field; perpendicular motion gives the full BQv, which continuously deflects the charge into a circle. At a general angle, the parallel part sails straight while the transverse part curves the path into a helix."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:helix-path-reasoning",
+      "context": "physics-depth:helix-path-reasoning:angled-entry",
+      "move": "explain the helical trajectory of a charge entering at an angle to the field",
+      "prompt": "A non-relativistic charged particle enters a uniform magnetic field at an angle between parallel and perpendicular. Neglect all other forces and radiation losses. Describe its trajectory and explain why the pitch stays constant.",
+      "marks": 3,
+      "scheme": [
+        "The perpendicular velocity component produces circular motion because B|Q|v_perp supplies the centripetal force",
+        "The parallel component is unchanged because there is no magnetic force along the field, producing a helix",
+        "The parallel speed and circular period remain constant, so the distance advanced along the field per turn (pitch) is constant"
+      ],
+      "answer": "Resolve the velocity along and perpendicular to the field. The perpendicular component undergoes circular motion with B|Q|v_perp as the centripetal force. The parallel component has no magnetic force and stays constant, so the combined path is a helix. The period 2πm/(B|Q|) is constant in the uniform field; constant parallel speed times constant period gives constant pitch."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:wire-force-compute",
+      "context": "physics-depth:wire-force-compute:speaker-coil",
+      "move": "apply F = BIl sinθ to find the force on a length of current-carrying wire",
+      "prompt": "A straight wire segment of length 0.050 m carries 3.0 A at 40° to a magnetic field of flux density 0.20 T. Calculate the magnetic force on it. (sin 40° = 0.643)",
+      "marks": 3,
+      "scheme": [
+        "F = BIl sinθ = 0.20 × 3.0 × 0.050 × 0.643",
+        "= 0.019 N",
+        "Direction from the right-hand rule, perpendicular to wire and field"
+      ],
+      "answer": "F = BIl sinθ = 0.20×3.0×0.050×0.643 = 0.019 N, directed perpendicular to both the wire and the field — the principle that moves loudspeaker voice coils."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:cyclotron-radius",
+      "context": "physics-depth:cyclotron-radius:select-speed",
+      "move": "apply F = BQv as a centripetal force to find an orbit radius",
+      "prompt": "A proton (m = 1.67×10⁻²⁷ kg, Q = 1.60×10⁻¹⁹ C) moves at 4.0×10⁶ m s⁻¹ perpendicular to a 0.50 T field. Calculate the radius of its circular path.",
+      "marks": 4,
+      "scheme": [
+        "Magnetic force supplies the centripetal force: BQv = mv²/r",
+        "Rearrange to r = mv/(BQ)",
+        "Substitute r = (1.67×10⁻²⁷ × 4.0×10⁶)/(0.50 × 1.60×10⁻¹⁹)",
+        "Radius = 8.35×10⁻² m, approximately 8.4 cm"
+      ],
+      "answer": "The magnetic force provides the centripetal force: BQv = mv²/r. Cancelling v and rearranging gives r = mv/(BQ). Substituting gives r = (1.67×10⁻²⁷×4.0×10⁶)/(0.50×1.60×10⁻¹⁹) = 8.35×10⁻² m = 8.35 cm, or 8.4 cm to two significant figures."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:magnetic-force-speeds-up-fallacy",
+      "context": "physics-depth:magnetic-force-speeds-up-fallacy:energy-gain",
+      "move": "reject the claim that a magnetic force increases a charge's kinetic energy",
+      "prompt": "A student says the magnetic force accelerates a moving charge and increases its speed. Explain why its speed cannot change, and what does change.",
+      "marks": 3,
+      "scheme": [
+        "The magnetic force is always perpendicular to the velocity",
+        "A perpendicular force does no work: it changes direction, not magnitude",
+        "The charge's speed and kinetic energy stay constant; only its path direction changes"
+      ],
+      "answer": "Because the magnetic force always acts at right angles to the velocity, it does no work on the charge — W = Fd cos90° = 0. Its speed and kinetic energy are untouchable; only the direction of motion turns. Any actual speeding-up requires an electric field."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:third-law-pair-fallacy",
+      "context": "physics-depth:third-law-pair-fallacy:field-on-wire-pair",
+      "move": "reject identifying the force on a wire with a Newton's-third-law pair",
+      "prompt": "A wire in a field experiences F = BIl. A student labels the equal and opposite force as 'the wire pushing back on the field' and draws it on the wire's free-body diagram. Identify both errors.",
+      "marks": 3,
+      "scheme": [
+        "The third-law pair acts on the magnet/source of the field, not on the wire — it belongs on a different body's diagram",
+        "Only forces on the wire itself belong on the wire's free-body diagram",
+        "The pair force is real but must not be double-counted as a second force on the wire"
+      ],
+      "answer": "Both errors are free-body errors. The third-law partner of the field's force on the wire acts on the magnet or current producing the field — it is never an extra force on the wire. A free-body diagram shows only forces applied to the body in question: draw F = BIl on the wire, its reaction elsewhere."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:velocity-selector",
+      "context": "physics-depth:velocity-selector:crossed-fields",
+      "move": "combine electric and magnetic force balance to find a selected velocity",
+      "prompt": "In a velocity selector, a uniform electric field of 2.0×10⁵ V m⁻¹ is crossed with a magnetic field of 0.40 T. Calculate the speed of particles that pass through undeflected, and explain the force balance.",
+      "marks": 3,
+      "scheme": [
+        "Undeflected requires EQ = BQv: electric and magnetic forces balance",
+        "v = E/B = 2.0×10⁵/0.40",
+        "= 5.0×10⁵ m s⁻¹"
+      ],
+      "answer": "The selected particle feels EQ from the plates and BQv from the field in opposite directions; they cancel exactly when v = E/B = 2.0×10⁵/0.40 = 5.0×10⁵ m s⁻¹. Charges of either sign pass — the mass and charge cancel — only the speed is selected."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:mass-spec-momentum",
+      "context": "physics-depth:mass-spec-momentum:radius-from-energy",
+      "move": "combine electric acceleration with magnetic deflection to find a mass-related radius",
+      "prompt": "A singly ionised ion is accelerated from rest through 500 V then enters a 0.080 T field perpendicular to its velocity. Derive the path radius in terms of the ion's mass and evaluate it for mass 1.0×10⁻²⁵ kg. (e = 1.60×10⁻¹⁹ C)",
+      "marks": 4,
+      "scheme": [
+        "Acceleration: eV = ½mv² → v = √(2eV/m)",
+        "In the field: r = mv/(eB)",
+        "Substituting v: r = m√(2eV/m)/(eB) = √(2mV/e)/B",
+        "For m = 1.0×10⁻²⁵ kg: r = √(2×10⁻²⁵×500/1.6×10⁻¹⁹)/0.080 = 0.25 m"
+      ],
+      "answer": "The accelerating voltage gives v = √(2eV/m); the field turns this into r = mv/eB = √(2mV/e)/B. For a 1.0×10⁻²⁵ kg ion at 500 V in 0.080 T, r = √(2×10⁻²⁵×500/1.6×10⁻¹⁹)/0.080 ≈ 0.25 m. The radius grows as √m — heavier ions curve less, which is exactly how a mass spectrometer sorts them."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:cyclotron-frequency",
+      "context": "physics-depth:cyclotron-frequency:independent-of-speed",
+      "move": "combine circular motion with magnetic deflection to derive the cyclotron frequency",
+      "prompt": "Show that the time for one complete circle of a charged particle in a magnetic field is independent of its speed, and calculate the cyclotron frequency for a proton in a 1.2 T field. (m_p = 1.67×10⁻²⁷ kg, e = 1.60×10⁻¹⁹ C)",
+      "marks": 4,
+      "scheme": [
+        "Period T = 2πr/v with r = mv/(BQ)",
+        "T = 2πm/(BQ) — the v cancels completely",
+        "f = BQ/(2πm) = 1.2×1.6×10⁻¹⁹/(2π×1.67×10⁻²⁷)",
+        "≈ 1.8×10⁷ Hz (18 MHz)"
+      ],
+      "answer": "With r = mv/BQ, the period T = 2πr/v = 2πm/BQ — the speed cancels: faster particles travel bigger circles in exactly the same time. The cyclotron frequency is f = BQ/2πm = 1.2×1.6×10⁻¹⁹/(2π×1.67×10⁻²⁷) ≈ 18 MHz, which is why one fixed radiofrequency drives a cyclotron at all speeds."
+    }
+  ]
+}

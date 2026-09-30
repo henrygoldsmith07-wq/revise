@@ -1,0 +1,146 @@
+{
+  "topic": "practical-investigations",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:random-systematic-definitions",
+      "context": "physics-depth:random-systematic-definitions:contrast",
+      "move": "state the defining behaviour of random uncertainty and systematic error",
+      "prompt": "Distinguish random uncertainty from systematic error by stating how each behaves across a set of repeat readings.",
+      "marks": 3,
+      "scheme": [
+        "Random uncertainty scatters readings unpredictably either side of the mean; repeats and averaging reduce it",
+        "Systematic error shifts every reading the same way, leaving the scatter unchanged",
+        "Repeats expose and reduce random effects but leave a systematic shift untouched"
+      ],
+      "answer": "Random uncertainty produces unpredictable scatter about the mean and shrinks with repeats; systematic error displaces every reading by the same amount, preserving the scatter while shifting the mean. Averaging attacks only the first — calibration attacks the second."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:accuracy-precision-definitions",
+      "context": "physics-depth:accuracy-precision-definitions:target-words",
+      "move": "define accuracy and precision as closeness to the true value and to each other",
+      "prompt": "Define accuracy and precision as they apply to a set of measurements.",
+      "marks": 2,
+      "scheme": [
+        "Accuracy is closeness of the measured value to the accepted true value",
+        "Precision is the closeness of repeated readings to each other (small spread), independent of truth"
+      ],
+      "answer": "Accuracy is how close a measurement lies to the true value; precision is how closely repeat readings agree with one another. A precise set can be wholly inaccurate if a systematic error shifts it."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:zero-error-example",
+      "context": "physics-depth:zero-error-example:micrometer",
+      "move": "explain how a zero error shifts results and how to correct it",
+      "prompt": "A micrometer reads 0.02 mm with its jaws fully closed. Explain the effect this has on a series of diameter measurements and state the correction.",
+      "marks": 3,
+      "scheme": [
+        "A closed-jaw offset is a systematic error: every reading is displaced by the same 0.02 mm",
+        "Each measured diameter is 0.02 mm too large (if the offset is positive)",
+        "Subtract the zero reading from every measurement, or recalibrate the instrument to read exactly zero"
+      ],
+      "answer": "A closed-jaw offset of +0.02 mm inflates every diameter by that same 0.02 mm — a systematic shift that no amount of repeating will remove. The fix is to subtract the offset from each reading (or recalibrate so the closed jaws read zero), and to record that this was done."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:identify-error-type",
+      "context": "physics-depth:identify-error-type:classify-scenarios",
+      "move": "classify given experimental problems as random or systematic",
+      "prompt": "Classify each as mainly random or systematic, with a one-line justification: (i) a stopwatch started and stopped by hand; (ii) a ruler whose end is worn away by 0.5 mm; (iii) fluctuating mains voltage altering a heater's output during a trial; (iv) parallax when reading a thermometer from different angles.",
+      "marks": 4,
+      "scheme": [
+        "(i) Random — human reaction time varies start-to-start, scattering results",
+        "(ii) Systematic — the worn end shifts every length by a fixed 0.5 mm",
+        "(iii) Systematic drift over the trial — an uncontrolled influence biases the conditions, hard to separate without monitoring",
+        "(iv) Systematic if the observer keeps the same wrong angle; random if the angle varies — technique-dependent"
+      ],
+      "answer": "(i) Random: reaction-time scatter. (ii) Systematic: fixed −0.5 mm on every reading. (iii) A systematic drift for any single trial (uncontrolled condition), distinguishable only by monitoring the voltage. (iv) Systematic if the viewing angle is consistently wrong, random if it varies — the classification follows whether the error repeats identically."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:precision-from-spread",
+      "context": "physics-depth:precision-from-spread:repeat-readings",
+      "move": "quantify random uncertainty from the spread of repeats",
+      "prompt": "Five repeat timings of a falling object give 0.84 s, 0.86 s, 0.85 s, 0.83 s, 0.87 s. Calculate the mean and estimate the random uncertainty as half the range, quoting the result to an appropriate precision.",
+      "marks": 3,
+      "scheme": [
+        "Mean = (0.84+0.86+0.85+0.83+0.87)/5 = 0.85 s",
+        "Range = 0.87 − 0.83 = 0.04 s; half-range = 0.02 s",
+        "t = 0.85 ± 0.02 s"
+      ],
+      "answer": "The mean is 0.85 s and the spread 0.04 s, so quoting half the range as the random uncertainty gives t = 0.85 ± 0.02 s. The mean may be quoted to the nearest 0.01 s — matching the stopwatch resolution."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:precise-equals-accurate-fallacy",
+      "context": "physics-depth:precise-equals-accurate-fallacy:tight-cluster",
+      "move": "reject tight clustering as evidence of a true value",
+      "prompt": "A student's five readings cluster within 0.1% of each other and she concludes the result must be accurate. Explain why a tight cluster alone does not establish accuracy.",
+      "marks": 2,
+      "scheme": [
+        "Tight clustering demonstrates precision: the readings agree with each other",
+        "A shared systematic error can shift the entire cluster away from the true value, so agreement alone does not establish accuracy"
+      ],
+      "answer": "Close agreement shows only precision — the readings repeat. A single systematic error (a zero offset, a mis-calibrated scale, a consistent parallax angle) displaces the whole cluster together, leaving it tight but wrong. Accuracy requires calibration or comparison against a known standard."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:systematic-error-design",
+      "context": "physics-depth:systematic-error-design:eliminate-by-method",
+      "move": "transfer error taxonomy to designing a method that cancels a systematic shift",
+      "prompt": "To find a wire's extension, a student measures loaded and unloaded lengths with the same ruler, which has a worn zero end. Explain how the differencing method eliminates the ruler's systematic error from the result.",
+      "marks": 3,
+      "scheme": [
+        "Extension = loaded length − unloaded length",
+        "The fixed zero offset appears identically in both readings",
+        "Subtracting cancels the common offset, so the difference is free of that systematic error"
+      ],
+      "answer": "Because both measurements share the same worn-zero offset, subtracting the unloaded from the loaded length removes the common error: the difference depends only on the change, not on the absolute scale. Any systematic error common to both readings cancels in a differencing design — this is the logic behind null methods and reversal techniques."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:parallax-elimination",
+      "context": "physics-depth:parallax-elimination:analogue-scale",
+      "move": "transfer systematic-error reasoning to removing parallax from an analogue meter",
+      "prompt": "An analogue ammeter is read from slightly different angles each time, and the needle's apparent position shifts against the scale. Explain why parallax is systematic here and describe two measures that remove it.",
+      "marks": 3,
+      "scheme": [
+        "Parallax shifts the apparent needle position consistently if the observer's angle drifts the same way each time — a fixed bias per reading",
+        "Read at right angles to the scale, with the needle directly over its mirror image if the meter has an anti-parallax mirror",
+        "Or replace with a digital instrument, or mark a fixed eyeline"
+      ],
+      "answer": "Parallax acts systematically when the viewing angle repeats the same error on each reading — the displacement follows geometry, not chance. The cures: view at exactly 90° to the scale (aligning needle with its mirror image on meters so fitted), or eliminate the analogue scale entirely with a digital readout."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:uncertainty-conclusion-compare",
+      "context": "physics-depth:uncertainty-conclusion-compare:accepted-value-test",
+      "move": "combine computed uncertainty with an accepted value to judge agreement",
+      "prompt": "A student measures g = 9.7 ± 0.3 m s⁻². The accepted value is 9.81 m s⁻². Determine whether the result agrees with the accepted value, and state what the comparison does and does not establish.",
+      "marks": 3,
+      "scheme": [
+        "Difference from accepted: |9.81 − 9.7| = 0.11 m s⁻², less than the ±0.3 uncertainty",
+        "The intervals overlap, so the result is consistent with the accepted value",
+        "Agreement within uncertainty does not prove absence of systematic error — a compensating bias could hide inside the interval"
+      ],
+      "answer": "The gap to the accepted value (0.11 m s⁻²) is smaller than the quoted ±0.3 m s⁻², so the measurement is consistent with 9.81. But consistency is not proof of correctness: a systematic error could be present yet smaller than the random uncertainty, or partially cancel another bias. The comparison establishes no glaring disagreement, nothing more."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:error-budget-design",
+      "context": "physics-depth:error-budget-design:dominant-uncertainty",
+      "move": "combine multiple uncertainty sources to identify the dominant one and target improvement",
+      "prompt": "In a resistivity experiment, R = V/I is measured with V = 5.0 ± 0.1 V and I = 0.50 ± 0.02 A. The wire's cross-sectional area contributes a further 2% uncertainty to the resistivity. Calculate the percentage uncertainty in R, combine all sources for resistivity, and identify where improvement would pay best.",
+      "marks": 4,
+      "scheme": [
+        "Percentage uncertainties: V: 0.1/5.0 = 2%; I: 0.02/0.50 = 4%",
+        "R = V/I: percentage uncertainty adds → 2% + 4% = 6%",
+        "Resistivity ρ = RA/L adds the area's 2% → total ≈ 6% + 2% = 8% (length neglected)",
+        "The current measurement at 4% dominates → improve the ammeter or increase the current"
+      ],
+      "answer": "Voltage contributes 2% and current 4%; their quotient R carries 2%+4% = 6% uncertainty. Resistivity multiplies in the area factor, adding its 2% for about 8% overall. The single largest term is the current measurement, so a better ammeter (or a larger, more measurable current) is where improvement pays best — the error budget points to the fix."
+    }
+  ]
+}

@@ -1,21 +1,23 @@
 "use client";
 
+import { writeLearnerHistory } from "@/data/learner-history";
+import { useAssessmentModels } from "./assessment-models";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { allSubjects, allTopics, getSubject } from "@/domain/curriculum";
+import { allTopics } from "@/domain/curriculum";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content";
-import { predictGrade } from "@/domain/grades";
+
 import type { GradePrediction } from "@/domain/grades";
-import { computeTopicMastery } from "@/domain/mastery";
+
 import {
   evaluateMistakeRetest,
   mistakesFromAttempt,
 } from "@/domain/mistakes";
 import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
-import { computeApplicationMastery } from "@/domain/application-mastery";
+
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
-import { computeRecallMastery } from "@/domain/recall-mastery";
-import { masteryIntervals } from "@/domain/mastery-uncertainty";
+
 import { tallyMisconceptions, type MisconceptionTally } from "@/domain/misconception-library";
 import { rescheduleMissed } from "@/domain/planner";
 import type { PhaseNotice } from "@/domain/phase-notice";
@@ -58,7 +60,7 @@ import { prerequisiteEdges, rootPrerequisiteRemediation as buildRootPrerequisite
 import type { RootPrerequisiteRemediation } from "@/domain/prerequisites";
 import { validateFsrs } from "@/domain/fsrs-tuning";
 import type { FsrsValidation } from "@/domain/fsrs-tuning";
-import { buildResponseTimeCalibration } from "@/domain/response-time-calibration";
+
 import type { ResponseTimeCalibrationReport } from "@/domain/response-time-calibration";
 import type {
   AssessmentInsight,
@@ -89,7 +91,7 @@ import * as repo from "@/data/repository";
 import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { domainEngine } from "@/data/domain-engine";
-import { readReviseMeta, writeReviseMeta } from "@/data/storage-namespace";
+import { readReviseMeta } from "@/data/storage-namespace";
 import { attachDelayedRetentionOutcome, attachTransferOutcome, createInterventionOutcome } from "@/domain/intervention-calibration";
 import type { InterventionCalibration } from "@/domain/intervention-calibration";
 import { type FunnelEvent, type FunnelEventType } from "@/domain/funnel";
@@ -116,9 +118,10 @@ import { useExperiments } from "./experiments";
 import { useOutcomes } from "./outcomes";
 import { useRevisionSessions } from "./sessions";
 import { usePlanning } from "./planning";
+import { useLearnerMastery } from "./learner-mastery";
 import { StoreSubscriptionsProvider, useStoreFields } from "./store-context";
 export { useStore, useStoreFields, useStoreSelector } from "./store-context";
-import { buildPaperCalibrations, previewPaperSimulation } from "./paper-preview";
+import { previewPaperSimulation } from "./paper-preview";
 
 // ---------------------------------------------------------------------------
 // Store composition. Revision data is small (thousands of rows at most), so
@@ -351,93 +354,9 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
 
   // --- derived state -------------------------------------------------------
 
-  // Evidence inputs have their own stable boundary: settings, plan, streak
-  // and sync writes cannot invalidate evidence-only reports.
-  const cards = snapshot?.cards;
-  const reviewLogs = snapshot?.reviewLogs;
-  const attempts = snapshot?.attempts;
-  const mistakes = snapshot?.mistakes;
-  const questions = snapshot?.questions;
-  const evidence = useMemo(() => cards && reviewLogs && attempts && mistakes && questions
-    ? { cards, reviewLogs, attempts, mistakes, questions } : null,
-    [cards, reviewLogs, attempts, mistakes, questions]);
-
-  // Memoised so the identity is stable: every derived value below keys off
-  // this array, and a fresh `[]` each render would recompute all of them.
-  const subjectIds = useMemo(
-    () => snapshot?.settings.subjectIds ?? [],
-    [snapshot?.settings.subjectIds],
-  );
+  const subjectIds = useMemo(() => snapshot?.settings.subjectIds ?? [], [snapshot?.settings.subjectIds]);
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
-
-  const mastery = useMemo(() => {
-    if (!evidence) return [];
-    return computeTopicMastery({
-      topics,
-      cards: evidence.cards,
-      reviewLogs: evidence.reviewLogs,
-      attempts: evidence.attempts,
-      mistakes: evidence.mistakes,
-      questions: evidence.questions,
-      trustedQuestion: trustedAssessmentContent,
-    });
-  }, [evidence, topics]);
-
-  const recallMastery = useMemo(() => {
-    if (!evidence) return [];
-    return computeRecallMastery({
-      topics,
-      cards: evidence.cards,
-      reviewLogs: evidence.reviewLogs,
-    });
-  }, [evidence, topics]);
-
-  const masteryUncertainty = useMemo(() => {
-    if (!evidence) return [];
-
-    const trustedAttempts = evidence.attempts.filter((attempt) => trustedSnapshotAttempt(attempt, evidence.questions, evidence.attempts));
-    const trustedMistakes = evidence.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, evidence.questions, evidence.attempts));
-
-    const cardsByTopic = new Map<Id, Card[]>();
-    for (const card of evidence.cards) {
-      const rows = cardsByTopic.get(card.topicId) ?? [];
-      rows.push(card);
-      cardsByTopic.set(card.topicId, rows);
-    }
-
-    const attemptsByTopic = new Map<Id, Attempt[]>();
-    for (const attempt of trustedAttempts) {
-      for (const topicId of attempt.topicIds) {
-        const rows = attemptsByTopic.get(topicId) ?? [];
-        rows.push(attempt);
-        attemptsByTopic.set(topicId, rows);
-      }
-    }
-
-    const mistakesByTopic = new Map<Id, Mistake[]>();
-    for (const mistake of trustedMistakes) {
-      const rows = mistakesByTopic.get(mistake.topicId) ?? [];
-      rows.push(mistake);
-      mistakesByTopic.set(mistake.topicId, rows);
-    }
-
-    return masteryIntervals({
-      masteryByTopic: new Map(mastery.map((row) => [row.topicId, row.mastery] as const)),
-      cardsByTopic,
-      attemptsByTopic,
-      mistakesByTopic,
-    });
-  }, [evidence, mastery]);
-
-  const applicationMastery = useMemo(() => {
-    if (!evidence) return [];
-    return computeApplicationMastery({
-      topics,
-      questions: evidence.questions,
-      attempts: evidence.attempts,
-      trustedQuestion: trustedAssessmentContent,
-    });
-  }, [evidence, topics]);
+  const { evidence, mastery, recallMastery, applicationMastery, masteryUncertainty } = useLearnerMastery(snapshot, topics);
 
   const dueCards = useMemo(() => {
     if (!evidence) return [];
@@ -575,8 +494,6 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
 
   // Calibration per subject from paper-mode attempts: predicted vs actual.
   // Paper attempts are the only ones with a stable "total marks" denominator.
-  const calibrations = useMemo(() => buildPaperCalibrations(snapshot, mastery, subjectIds),
-    [snapshot, mastery, subjectIds]);
 
   // --- session fatigue tracking ---------------------------------------------
   // The recommender needs time-on-task, but a ref read inside a render-path
@@ -613,25 +530,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     return { bySubject, byTopic };
   }, [evidence, subjectIds]);
 
-  const predictions = useMemo(() => {
-    if (!snapshot) return [];
-    return subjectIds
-      .map((id) => getSubject(id))
-      .filter((s): s is NonNullable<typeof s> => Boolean(s))
-      .map((subject) => predictGrade(subject, mastery, snapshot.attempts, snapshot.examDates, undefined, snapshot.questions));
-  }, [snapshot, mastery, subjectIds]);
-
-  const responseTimeCalibration = useMemo(
-    () =>
-      buildResponseTimeCalibration({
-        attempts: snapshot?.attempts ?? [],
-        questions: snapshot?.questions ?? [],
-        papers: snapshot?.papers ?? [],
-        subjects: allSubjects().filter((subject) => subjectIds.includes(subject.id)),
-        trustedQuestion: trustedAssessmentContent,
-      }),
-    [snapshot, subjectIds],
-  );
+  const { calibrations, predictions, responseTimeCalibration } = useAssessmentModels(snapshot, mastery, subjectIds);
 
   // Assessment outcomes (grade/paper/intervention history) compose here so the
   // ranked recommendations below can read the paper gain factor back.
@@ -652,6 +551,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     closePaperOutcome,
     recordInterventionOutcome,
   } = useOutcomes({
+    onError: setBootError,
     userId,
     snapshot,
     predictions,
@@ -913,7 +813,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
           next = [...current, outcome];
         }
         const nextAll = [...all.filter((row) => row.userId !== attempt.userId), ...next].slice(-2000);
-        await writeReviseMeta("interventionOutcomes", nextAll);
+        await writeLearnerHistory("interventionOutcomes", attempt.userId, nextAll);
         if (attempt.userId === userId) setInterventionOutcomes(next);
       }
       setSnapshot((prev) => {

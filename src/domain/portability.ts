@@ -1,3 +1,6 @@
+import type { SyncTombstone } from "./sync-tombstone";
+import type { LearnerHistoryRecord } from "./learner-history";
+import type { PaperOutcomeRecord } from "./paper-outcome";
 import type { Card, DeckExport, Id, IsoInstant, LessonProgress, Paper, Question, UserSettings } from "./types";
 import { exportDeck } from "./deck-io";
 import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
@@ -62,6 +65,9 @@ export interface PortabilitySnapshot {
   // snapshot (it is reproducible), but the export records its seed version so
   // a restore on a newer app can warn.
   seedVersion: number;
+  paperOutcomes?: PaperOutcomeRecord[];
+  deletions?: SyncTombstone[];
+  learnerHistoryDeletions?: LearnerHistoryRecord[];
   notes?: string[];
 }
 
@@ -82,6 +88,9 @@ export interface PortabilityInput {
   interventionOutcomes?: unknown[];
   settings?: UserSettings | null;
   streak?: unknown | null;
+  paperOutcomes?: PaperOutcomeRecord[];
+  deletions?: SyncTombstone[];
+  learnerHistoryDeletions?: LearnerHistoryRecord[];
   seedVersion?: number;
   now?: Date;
 }
@@ -115,6 +124,9 @@ export function buildPortabilitySnapshot(input: PortabilityInput): PortabilitySn
     gradeActuals: input.gradeActuals ?? [],
     interventionOutcomesCount: input.interventionOutcomes?.length ?? 0,
     interventionOutcomes: input.interventionOutcomes ?? [],
+    paperOutcomes: input.paperOutcomes ?? [],
+    deletions: input.deletions ?? [],
+    learnerHistoryDeletions: input.learnerHistoryDeletions ?? [],
     settings: input.settings ?? null,
     streak: input.streak ?? null,
     seedVersion: input.seedVersion ?? 1,

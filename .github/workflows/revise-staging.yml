@@ -1,6 +1,27 @@
 name: Revise staging sync and RLS
 
 on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: main
+    secrets:
+      REVISE_STAGING_SUPABASE_URL:
+        required: true
+      REVISE_STAGING_SUPABASE_ANON_KEY:
+        required: true
+      REVISE_STAGING_USER_A_EMAIL:
+        required: true
+      REVISE_STAGING_USER_A_PASSWORD:
+        required: true
+      REVISE_STAGING_USER_B_EMAIL:
+        required: true
+      REVISE_STAGING_USER_B_PASSWORD:
+        required: true
+      REVISE_STAGING_DATABASE_URL:
+        required: true
   workflow_dispatch:
   schedule:
     - cron: "47 5 * * 2"
@@ -23,6 +44,8 @@ jobs:
       REVISE_STAGING_USER_B_PASSWORD: ${{ secrets.REVISE_STAGING_USER_B_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

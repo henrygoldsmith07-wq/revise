@@ -1,0 +1,197 @@
+{
+  "topic": "fields",
+  "point": 7,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:faraday-statement",
+      "context": "physics-depth:faraday-statement:emf-proportional-rate",
+      "move": "state Faraday's law of induction in words and identify the proportionality in symbols",
+      "prompt": "State Faraday's law of electromagnetic induction in words, and give its symbolic form.",
+      "marks": 3,
+      "scheme": [
+        "The induced emf is proportional to the rate of change of magnetic flux linkage",
+        "ε = −d(NΦ)/dt (magnitude: ε = NΔΦ/Δt)",
+        "Flux linkage NΦ counts the turns sharing the changing flux"
+      ],
+      "answer": "Faraday's law: the induced emf equals the rate of change of flux linkage, ε = −d(NΦ)/dt. Twice the speed of change gives twice the emf; more turns multiply the same change."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:lenz-statement",
+      "context": "physics-depth:lenz-statement:opposition-to-change",
+      "move": "state Lenz's law and name the conservation principle it enforces",
+      "prompt": "State Lenz's law, and identify the conservation principle it expresses.",
+      "marks": 3,
+      "scheme": [
+        "The induced emf/current acts in a direction that opposes the change in flux that produced it",
+        "This is the minus sign in Faraday's law",
+        "It enforces conservation of energy: induction cannot pay out energy for free"
+      ],
+      "answer": "Lenz's law: the induced effect always opposes the flux change that caused it — the minus sign in ε = −d(NΦ)/dt. It is energy conservation in circuit clothing: were the induced current to aid the change, motion would accelerate itself and energy would appear from nothing."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:magnet-coil-observations",
+      "context": "physics-depth:magnet-coil-observations:three-experiments",
+      "move": "explain the three classic magnet-and-coil observations using the flux-change rule",
+      "prompt": "Explain why: (i) a magnet held still inside a coil registers nothing; (ii) pushing it in produces a momentary deflection; (iii) pulling it out at the same speed gives a deflection the other way.",
+      "marks": 4,
+      "scheme": [
+        "(i) No motion → no change of flux linkage → zero emf",
+        "(ii) Moving in changes the linkage: an emf is induced only during the change",
+        "(iii) Withdrawing reverses the sign of dΦ/dt, so the emf and current reverse",
+        "Equal speeds give equal magnitudes — rate is all that matters"
+      ],
+      "answer": "A stationary magnet leaves the flux untouched: Faraday's law sees a derivative, not a field, so the meter rests. Drive the magnet and the linkage changes — an emf flashes up for exactly as long as it moves. Withdraw it and dΦ/dt flips sign, reversing the deflection. The needle is a speedometer for flux change."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:lenz-steps",
+      "context": "physics-depth:lenz-steps:four-step-method",
+      "move": "work through the four Lenz-law steps to predict a current direction for a stated change",
+      "prompt": "A bar magnet's north pole is pushed toward a horizontal coil viewed from above. List the steps that fix the induced current's direction, and give the result.",
+      "marks": 4,
+      "scheme": [
+        "Step 1: the flux through the coil from the N pole increases",
+        "Step 2: the induced current must oppose the increase",
+        "Step 3: the near face must repel the approaching N → become a north pole",
+        "Step 4: a north-facing face needs anticlockwise current (viewed from above)"
+      ],
+      "answer": "Reason in sequence: the coil's flux is rising; the induction must fight that rise; the face nearest the magnet must therefore repel it — become a north pole; and the grip rule says that demands an anticlockwise current seen from the magnet's side. Lenz's law is a procedure, not a slogan."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:faraday-factor-predict",
+      "context": "physics-depth:faraday-factor-predict:scaling-variables",
+      "move": "predict how emf responds to stated changes in turns, speed and field strength together",
+      "prompt": "A coil of N turns is pulled through a field in time t. State and justify the factor change in induced emf if the turns are doubled, the pull time halved, and the field is also doubled.",
+      "marks": 4,
+      "scheme": [
+        "Induced emf is proportional to number of turns times flux change per unit time; the flux change is proportional to magnetic field strength",
+        "Turns ×2 → emf ×2",
+        "Time halved → rate doubled → another ×2",
+        "B ×2 → flux change ×2 → another ×2; net factor = 8×"
+      ],
+      "answer": "Faraday's law says induced emf is proportional to the number of turns times the flux change per unit time, and the flux change is proportional to magnetic field strength. Turns ×2 gives emf ×2; time halved gives rate doubled for another ×2; B ×2 gives flux change ×2 for another ×2. The net factor is 8×. Faraday's law is a product of knobs, and exam questions change several at once."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:lenz-opposes-motion-fallacy",
+      "context": "physics-depth:lenz-opposes-motion-fallacy:opposes-change",
+      "move": "correct 'the current opposes the motion' into 'the induced effect opposes the flux change'",
+      "prompt": "A student writes 'by Lenz's law the induced current always opposes the motion of the magnet.' Explain why this is at best a coincidence of the common case and give the precise statement.",
+      "marks": 4,
+      "scheme": [
+        "The law targets the change in flux linkage, not the motion itself",
+        "When motion raises the flux, opposing it slows the motion — so they coincide",
+        "But a stationary coil with a growing electromagnet field induces a current though nothing moves",
+        "The general rule must be about the change in flux"
+      ],
+      "answer": "The law targets the change in flux linkage, not the motion itself. When motion raises the flux, resisting it slows the motion, so they coincide in the common case. But a stationary coil with a growing electromagnet field induces a current though nothing moves. The general rule must be about the change in flux: it resists the flux change."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:flux-vs-flux-change-fallacy",
+      "context": "physics-depth:flux-vs-flux-change-fallacy:maximum-flux-zero-emf",
+      "move": "reject equating maximum flux with maximum emf in a rotating coil",
+      "prompt": "A coil spinning in a field has maximum flux when face-on to the field, and zero flux edge-on. A student concludes maximum emf at the face-on position. Explain the error.",
+      "marks": 3,
+      "scheme": [
+        "Emf follows the rate of change of flux, not the flux itself",
+        "Face-on: Φ is maximum but instantaneously flat (dΦ/dt = 0) → emf zero",
+        "Edge-on: Φ = 0 but crossing fastest (|dΦ/dt| maximum) → emf peaks"
+      ],
+      "answer": "The student reads the quantity when the law needs its slope. Face-on the coil holds its peak flux but, for that instant, stops changing it — emf zero. Edge-on, flux passes through zero at its fastest rate — emf at a maximum. The waveform is a quarter-cycle out of step, exactly like a sine and its cosine."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:fluxlinkage-compute",
+      "context": "physics-depth:fluxlinkage-compute:coil-in-field",
+      "move": "compute flux and flux linkage for a stated coil geometry and orientation",
+      "prompt": "A 200-turn coil of area 5.0×10⁻³ m² sits with its plane at 30° to a 0.40 T field. Calculate the flux through one turn and the flux linkage. (Careful: θ in Φ = BA cosθ is to the normal.)",
+      "marks": 3,
+      "scheme": [
+        "Plane at 30° to field → normal at 60° to field",
+        "Φ = BA cos60° = 0.40×5.0×10⁻³×0.5 = 1.0×10⁻³ Wb",
+        "Linkage = NΦ = 200×1.0×10⁻³ = 0.20 Wb-turns"
+      ],
+      "answer": "The plane-to-field angle of 30° is the normal-to-field angle's complement: cos60° = 0.5, so one turn carries Φ = 0.40×5.0×10⁻³×0.5 = 1.0 mWb and the coil links NΦ = 0.20 Wb-turns. Misreading the angle as the plane value is the classic 2× slip."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:mean-emf-flip",
+      "context": "physics-depth:mean-emf-flip:coil-rotation-180",
+      "move": "compute the mean emf when a coil is flipped end over end through a full flux swing",
+      "prompt": "A 120-turn coil of area 8.0×10⁻³ m² is flipped 180° in a 0.25 T field in 0.30 s. Calculate the mean induced emf.",
+      "marks": 4,
+      "scheme": [
+        "Flux reverses: ΔΦ per turn = 2BA = 2×0.25×8.0×10⁻³ = 4.0×10⁻³ Wb",
+        "Linkage change: NΔΦ = 120×4.0×10⁻³ = 0.48 Wb-turns",
+        "ε_mean = 0.48/0.30",
+        "= 1.6 V"
+      ],
+      "answer": "Flipping the coil end over end doesn't zero the flux — it reverses it: each turn's change is 2BA = 4.0 mWb. Over 120 turns the linkage shifts 0.48 Wb-turns in 0.30 s, a mean emf of 1.6 V. The factor 2 is the exam point: reversal is twice the change of vanishing."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:double-sided-meter",
+      "context": "physics-depth:double-sided-meter:zero-centre-proof",
+      "move": "transfer induction direction reasoning to explain why a zero-centre meter shows both signs",
+      "prompt": "Demonstrations of magnet-and-coil induction use a centre-zero galvanometer rather than an ordinary meter. Explain what the two-sided deflection proves that a one-sided meter could not.",
+      "marks": 4,
+      "scheme": [
+        "Induced current can flow either way; a one-sided meter pins at zero instead",
+        "The centre-zero needle separates insertion from withdrawal — opposite signs of dΦ/dt",
+        "It also reveals magnitude changes as swing width",
+        "The two-sided swing is direct visual proof that the induced emf is signed"
+      ],
+      "answer": "The induced current can flow either way. A one-sided meter pins at zero when the sign reverses, whereas the centre-zero needle separates insertion from withdrawal — opposite signs of dΦ/dt — and its swing width reveals magnitude changes. The two-sided swing is direct visual proof that the induced emf is signed, revealing the minus sign in Lenz's law."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:lenz-falling-magnet",
+      "context": "physics-depth:lenz-falling-magnet:tube-braking",
+      "move": "apply Lenz's law to a magnet falling through a copper tube and predict its terminal behaviour",
+      "prompt": "A strong magnet drops slowly through a vertical copper tube, while a plastic bead falls fast. Explain the braking mechanism and why the magnet, if the tube is long enough, reaches a steady speed rather than stopping.",
+      "marks": 4,
+      "scheme": [
+        "The falling magnet changes the flux through each tube section",
+        "Eddy currents arise in the copper and oppose the motion that drives the change",
+        "The drag force grows with speed",
+        "At terminal speed magnetic drag equals weight: net force zero, so it glides, never stalling"
+      ],
+      "answer": "The magnet's own motion keeps changing the tube's flux, and Lenz's answer is a drag that pushes against it. Copper conducts freely, so the eddy currents are strong; plastic cannot host them at all — the bead falls normally. Faster fall, stronger drag; when drag equals weight the forces balance and the magnet floats downward at a steady speed — Lenz's law as a self-regulating brake."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:microphone-transduction",
+      "context": "physics-depth:microphone-transduction:sound-to-electrical",
+      "move": "combine the induction laws with wave physics to explain a moving-coil microphone",
+      "prompt": "A moving-coil microphone has a diaphragm attached to a small coil sitting in a permanent magnet's field. Explain the chain from a sound wave to an electrical signal, and why the output replicates the sound's waveform.",
+      "marks": 4,
+      "scheme": [
+        "Pressure waves drive the diaphragm back and forth at the sound frequency",
+        "The attached coil moves in the field, changing its flux linkage",
+        "Faraday: ε ∝ dΦ/dt ∝ the coil's velocity, which tracks the wave shape",
+        "Lenz fixes the sign so compression and rarefaction give opposite swings — the waveform survives"
+      ],
+      "answer": "Sound is a pressure wave, and the diaphragm turns its back-and-forth into coil motion; the moving coil changes flux linkage, and Faraday's law converts rate-of-change straight into emf. Because the coil's velocity mirrors the acoustic vibration, the voltage does too — and Lenz's sign keeps 'in' opposite to 'out'. Air pressure becomes a faithful electrical copy in four steps."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:regenerative-braking-budget",
+      "context": "physics-depth:regenerative-braking-budget:energy-route",
+      "move": "combine Lenz's law with energy accounting to trace where braking energy ends up",
+      "prompt": "An electric train slows by running its motors as generators, sending current back to the line. Trace the energy route from the train's motion to the grid, naming the law that fixes the braking force's direction and the law that fixes its magnitude scaling.",
+      "marks": 4,
+      "scheme": [
+        "Wheels drive the coils through the field: mechanical energy in",
+        "Lenz's law sets the induced currents to oppose the driving — the machine fights the train: braking force",
+        "Faraday's law sizes the emf: faster motion → bigger change rate → bigger voltage",
+        "The electrical energy delivered equals the work done against the braking force (minus losses) — recovered, not wasted as heat"
+      ],
+      "answer": "The motion that the wheels impose on the machine is answered by Lenz's law with an opposing torque — regeneration brakes precisely because opposing is mandatory. The emf's size, from Faraday's law, scales with the rate of change, so the faster the train the harder it brakes and the richer the delivered power. The energy is conserved en route into the wires instead of into brake-dust heat."
+    }
+  ]
+}

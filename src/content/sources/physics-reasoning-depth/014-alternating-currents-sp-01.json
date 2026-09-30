@@ -1,0 +1,147 @@
+{
+  "topic": "alternating-currents",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:rms-peak-convention",
+      "context": "physics-depth:rms-peak-convention:which-is-quoted",
+      "move": "state which AC quantities instruments and mains ratings quote",
+      "prompt": "UK mains is described as 230 V, 50 Hz. State whether 230 V is the peak, peak-to-peak, or rms voltage, and give the peak-to-peak value.",
+      "marks": 3,
+      "scheme": [
+        "230 V is the rms value — the figure that gives the same heating effect as 230 V DC",
+        "Peak V₀ = √2 × 230 = 325 V",
+        "Peak-to-peak = 2V₀ = 650 V"
+      ],
+      "answer": "The 230 V mains figure is an rms value. The waveform actually swings to V₀ = √2×230 = 325 V each way, a peak-to-peak span of about 650 V."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:rms-why-sqrt2",
+      "context": "physics-depth:rms-why-sqrt2:sine-average",
+      "move": "derive the 1/√2 factor from the time-average of sin²",
+      "prompt": "Explain, by considering the time average of sin²ωt over a cycle, why the rms value of a sinusoid is its peak divided by √2.",
+      "marks": 3,
+      "scheme": [
+        "Instantaneous power in a resistor ∝ v² = V₀²sin²ωt",
+        "The mean of sin²ωt over a full cycle is ½",
+        "So mean power = V₀²/(2R), and equating to V_rms²/R gives V_rms = V₀/√2"
+      ],
+      "answer": "Heating depends on the square of the instantaneous voltage. Over a cycle the mean of sin²ωt is ½, so the mean power is V₀²/2R. Setting V_rms²/R equal to that gives V_rms = V₀/√2 — the 0.707 factor comes entirely from averaging the square."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:ac-direction-meaning",
+      "context": "physics-depth:ac-direction-meaning:current-reversal",
+      "move": "explain how a reversing current still delivers net energy",
+      "prompt": "An alternating current reverses direction many times per second, yet a heater warms up steadily. Explain why the direction reversal does not cancel the energy transfer.",
+      "marks": 3,
+      "scheme": [
+        "Power dissipated is P = i²R, and squaring removes the sign: both directions deliver positive power",
+        "The mean of i² over a cycle is I_rms², never zero",
+        "Energy accumulates regardless of which way the charge flows"
+      ],
+      "answer": "The heating depends on i²R, and squaring makes every half-cycle positive — current in either direction warms the element. Averaging i² over the cycle gives I_rms², so energy flows continuously even though the net charge transferred is zero."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:oscilloscope-timebase",
+      "context": "physics-depth:oscilloscope-timebase:frequency-read",
+      "move": "read both amplitude and period from an oscilloscope trace to get peak and frequency",
+      "prompt": "An oscilloscope displays a sinusoid spanning 5.0 vertical divisions at 5 V per division, with one full cycle covering 4.0 horizontal divisions at 2 ms per division. Calculate the peak voltage, the rms voltage and the frequency.",
+      "marks": 3,
+      "scheme": [
+        "The 5.0-division span is peak-to-peak: V₀ = 5.0 × 5/2 = 12.5 V",
+        "V_rms = 12.5/√2 = 8.8 V",
+        "T = 4.0 × 2 ms = 8.0 ms, f = 1/0.008 = 125 Hz"
+      ],
+      "answer": "The vertical span is peak-to-peak, so V₀ = 25 V/2 = 12.5 V and V_rms = 12.5/√2 ≈ 8.8 V. One cycle takes 4.0×2 = 8.0 ms, giving f = 1/0.0080 = 125 Hz."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:mains-bulb-power",
+      "context": "physics-depth:mains-bulb-power:rms-heating",
+      "move": "derive resistive-load current from average power and Vrms, then report its waveform maximum",
+      "prompt": "A 230 V rms, 50 Hz supply drives a 1.0 kW heater. Calculate the rms current and the peak current.",
+      "marks": 3,
+      "scheme": [
+        "I_rms = P/V_rms = 1000/230 = 4.35 A",
+        "I₀ = √2 × 4.35 = 6.2 A",
+        "The 50 Hz frequency does not enter the calculation"
+      ],
+      "answer": "I_rms = P/V = 1000/230 = 4.3 A. The peak current is I₀ = √2×4.35 ≈ 6.2 A. Frequency is irrelevant here — the rms-to-peak relation alone sets the waveform extremes."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:rms-average-zero-fallacy",
+      "context": "physics-depth:rms-average-zero-fallacy:mean-current",
+      "move": "reject the reasoning that AC averages to zero so delivers nothing",
+      "prompt": "A student argues that because the mean of an alternating current over a cycle is zero, an AC heater receives no net energy. Explain the error.",
+      "marks": 2,
+      "scheme": [
+        "The plain mean of the signed current is zero, but power tracks i², not i",
+        "The mean of i² is I_rms² > 0, so the delivered energy is positive"
+      ],
+      "answer": "It is true the signed current averages to zero, but heating follows i²R, which is positive in both half-cycles. The mean-square is what matters, and it equals I_rms² — not the square of the mean current, which is zero."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:rms-fuse-rating",
+      "context": "physics-depth:rms-fuse-rating:component-protection",
+      "move": "transfer rms reasoning to choosing a fuse from a peak specification",
+      "prompt": "A heater is rated 3.0 kW at 230 V rms. A data sheet notes the supply reaches 325 V peak. Using rms values, determine the current the fuse must carry continuously, and choose the smallest standard fuse from 3 A, 5 A and 13 A.",
+      "marks": 3,
+      "scheme": [
+        "I_rms = P/V_rms = 3000/230 = 13.0 A",
+        "The 325 V peak is a red herring for fuse rating: fuses respond to the heating effect, i.e. rms",
+        "13 A fuse (it must carry 13.0 A continuously)"
+      ],
+      "answer": "The fuse sees the rms heating effect: I = 3000/230 = 13.0 A, so a 13 A fuse is required. The 325 V peak does not set the rating precisely because fuses respond to i²R heating, which is what rms encodes."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:dc-vs-ac-equivalence",
+      "context": "physics-depth:dc-vs-ac-equivalence:equal-heating",
+      "move": "transfer the rms definition to compare DC and AC supplies for the same lamp brightness",
+      "prompt": "A lamp glows identically when run from a 12 V DC supply and from an AC supply. State the AC rms voltage, then calculate the AC peak voltage it must withstand.",
+      "marks": 3,
+      "scheme": [
+        "Equal brightness means equal mean power, so V_rms(AC) = 12 V",
+        "V₀ = √2 × 12 = 17.0 V",
+        "The filament must tolerate 17 V insulation-wise even though the effective voltage is 12 V"
+      ],
+      "answer": "Identical brightness means identical mean power, so the AC rms voltage is also 12 V. The AC supply peaks at √2×12 ≈ 17 V — a reminder that components must survive the peak, not just the rms rating."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:rms-with-resistance-temperature",
+      "context": "physics-depth:rms-with-resistance-temperature:cold-filament",
+      "move": "combine rms power with the resistance-temperature dependence of a filament",
+      "prompt": "A tungsten filament has resistance 30 Ω at room temperature and 380 Ω at operating temperature. It runs from 230 V rms. Compare the rms current at switch-on with its steady operating current, and explain why fuses tolerate the switch-on surge briefly.",
+      "marks": 4,
+      "scheme": [
+        "Switch-on current (cold): I = 230/30 = 7.7 A",
+        "Operating current (hot): I = 230/380 = 0.61 A",
+        "The surge is about 12.6 times the steady current, because tungsten's resistance rises steeply with temperature",
+        "Fuses are thermal devices with slow response; the momentary i²R heating does not reach the melting point in the brief surge"
+      ],
+      "answer": "Cold, the filament draws 230/30 = 7.7 A; hot, only 230/380 = 0.61 A — a 12-fold inrush as tungsten resistance climbs with temperature. The fuse survives because it melts by sustained heating: the short-lived surge warms it only briefly before the filament resistance rises and the current collapses to normal."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:rms-measurement-chain",
+      "context": "physics-depth:rms-measurement-chain:full-instrument-chain",
+      "move": "combine peak reading, rms conversion and power with a stated measurement uncertainty",
+      "prompt": "An oscilloscope's vertical calibration is stated as 2.0 V per division ± 5%. A sinusoid spans exactly 7.0 divisions. Calculate the rms voltage and the mean power in a 100 Ω resistor, and propagate the calibration uncertainty into the power.",
+      "marks": 4,
+      "scheme": [
+        "V₀ = 7.0 × 2.0/2 = 7.0 V; V_rms = 7.0/√2 = 4.95 V",
+        "P = V_rms²/R = 4.95²/100 = 0.245 W",
+        "Voltage uncertainty ±5% → power uncertainty ±10% (power ∝ V²)",
+        "P = 0.25 W ± 10% (±0.02 W)"
+      ],
+      "answer": "V₀ = 7 divisions × 2 V/div ÷ 2 = 7.0 V, so V_rms = 7.0/√2 = 4.95 V and P = V_rms²/R = 0.245 W. Because power scales as V², the ±5% calibration error doubles to ±10% in power: P = 0.25 ± 0.02 W."
+    }
+  ]
+}

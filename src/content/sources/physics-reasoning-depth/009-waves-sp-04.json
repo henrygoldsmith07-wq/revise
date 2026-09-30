@@ -1,0 +1,147 @@
+{
+  "topic": "waves",
+  "point": 4,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:tir-conditions",
+      "context": "physics-depth:tir-conditions:denser-to-less-dense",
+      "move": "state both conditions required for total internal reflection",
+      "prompt": "State the two conditions that must both be satisfied for total internal reflection to occur at a boundary.",
+      "marks": 2,
+      "scheme": [
+        "The light must be travelling from a more optically dense medium toward a less dense one (higher to lower refractive index)",
+        "The angle of incidence must exceed the critical angle for that boundary"
+      ],
+      "answer": "Total internal reflection needs (1) light going from a higher to a lower refractive index medium, and (2) an angle of incidence greater than the critical angle. Both must hold — either alone is not enough."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:critical-angle-relation",
+      "context": "physics-depth:critical-angle-relation:sin-c-equals-one-over-n",
+      "move": "state the critical-angle relation for a medium of refractive index n",
+      "prompt": "A medium has refractive index n relative to air. State the formula for its critical angle C at an interface with air.",
+      "marks": 2,
+      "scheme": [
+        "sin C = 1/n",
+        "So C = arcsin(1/n); e.g. n = 1.50 gives C ≈ 41.8°"
+      ],
+      "answer": "The critical angle satisfies sin C = 1/n, so C = sin⁻¹(1/n). For glass of n = 1.50 this gives C ≈ 41.8°."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:tir-why-beyond-critical",
+      "context": "physics-depth:tir-why-beyond-critical:refracted-ray-gone",
+      "move": "explain the disappearance of the refracted ray using Snell's law beyond the critical angle",
+      "prompt": "Use Snell's law to explain why no refracted ray emerges once the angle of incidence exceeds the critical angle.",
+      "marks": 3,
+      "scheme": [
+        "Snell's law: n₁ sinθ₁ = n₂ sinθ₂ with n₁ > n₂",
+        "Rearranged, sinθ₂ = (n₁/n₂) sinθ₁; since n₁/n₂ > 1, sinθ₂ grows past 1 as θ₁ rises",
+        "At the critical angle sinθ₂ = 1 (θ₂ = 90°); beyond it no real θ₂ exists, so all energy is reflected"
+      ],
+      "answer": "Snell's law gives n₁sinθ₁ = n₂sinθ₂. Going from dense to less dense (n₁ > n₂), sinθ₂ = (n₁/n₂)sinθ₁ exceeds 1 once θ₁ passes the critical angle — there is no real transmission angle, so the boundary reflects all the light."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:fibre-cladding-purpose",
+      "context": "physics-depth:fibre-cladding-purpose:protect-tir",
+      "move": "explain how cladding protects the total-internal-reflection condition in an optical fibre",
+      "prompt": "An optical fibre has a glass core surrounded by cladding of lower refractive index. Explain why the cladding is needed for the light to be guided, rather than the fibre operating bare in air.",
+      "marks": 3,
+      "scheme": [
+        "Guiding needs TIR at the core boundary, which requires the surrounding medium to have a lower refractive index",
+        "Cladding guarantees this condition permanently and reproducibly, unlike an unclad fibre touching arbitrary materials",
+        "Cladding also prevents light leaking out where the core touches a higher-index surface and gives mechanical and chemical protection"
+      ],
+      "answer": "Light is guided by total internal reflection at the core boundary, which requires the outer medium to have a strictly lower refractive index than the core. Cladding fixes that condition permanently (bare glass in contact with water or a fingertip could lose the TIR condition), prevents scratches and signal leakage, and defines a precise critical angle for the fibre design."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:critical-angle-compute",
+      "context": "physics-depth:critical-angle-compute:diamond-air",
+      "move": "apply sin C = 1/n to find a critical angle and decide whether a given ray reflects totally",
+      "prompt": "Diamond has refractive index 2.42. Calculate its critical angle at a diamond–air boundary, and state whether a ray meeting the boundary at 30° is totally internally reflected.",
+      "marks": 3,
+      "scheme": [
+        "sin C = 1/n = 1/2.42 = 0.413",
+        "C = sin⁻¹(0.413) = 24.4°",
+        "30° > 24.4°, so the ray is totally internally reflected"
+      ],
+      "answer": "The critical angle is C = sin⁻¹(1/2.42) = 24.4°. A ray at 30° exceeds this, so it is totally internally reflected — the origin of diamond's sparkle."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:acceptance-angle-fibre",
+      "context": "physics-depth:acceptance-angle-fibre:entry-refraction",
+      "move": "combine refraction at the fibre entry face with the internal critical angle to find the acceptance condition",
+      "prompt": "The core of an optical fibre has refractive index 1.48 and is surrounded by cladding of index 1.44. Light enters the flat end of the fibre from air and reflects off the core–cladding boundary at the critical angle. Calculate the refracted angle inside the core at entry, and hence the angle of incidence at the core–cladding boundary.",
+      "marks": 4,
+      "scheme": [
+        "Critical angle at core–cladding: sinθ_c = 1.44/1.48 = 0.973, θ_c = 76.7°",
+        "The boundary angle for TIR is measured from the normal at the side wall; for a ray along the fibre this equals 90° − (refracted entry angle)",
+        "90° − r = 76.7° gives r = 13.3°",
+        "By Snell's law at entry: sin i = 1.48 sin 13.3° = 0.340, i = 19.9° is the maximum acceptance angle (half-angle) in air"
+      ],
+      "answer": "The core–cladding critical angle is sin⁻¹(1.44/1.48) = 76.7°. For the marginal ray, the complement of the boundary incidence equals the internal refracted angle: r = 90° − 76.7° = 13.3°. Snell's law at the entry face then gives sin i = 1.48 × sin 13.3°, an acceptance half-angle of about 20° in air."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:tir-at-any-angle",
+      "context": "physics-depth:tir-at-any-angle:angle-threshold",
+      "move": "reject total internal reflection below the critical angle",
+      "prompt": "A student claims that light travelling inside glass toward air is totally internally reflected whatever the angle, because glass is denser. Explain the error with a calculation for n = 1.50.",
+      "marks": 3,
+      "scheme": [
+        "TIR needs the incidence angle to exceed the critical angle",
+        "For n = 1.50, C = sin⁻¹(1/1.50) = 41.8°",
+        "Below 41.8° most light refracts out; only above C is reflection total"
+      ],
+      "answer": "Density alone does not give total internal reflection. For n = 1.50 the critical angle is 41.8°: below it light refracts out of the glass (with partial reflection); only beyond 41.8° is the reflection total."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:periscope-prism",
+      "context": "physics-depth:periscope-prism:45-degree-prism",
+      "move": "transfer the critical-angle test to a 45° prism used as a mirror",
+      "prompt": "A periscope uses a right-angled glass prism (n = 1.52) with light meeting the hypotenuse face at 45°. Explain why this arrangement reflects the light better than a silvered mirror of the same size.",
+      "marks": 3,
+      "scheme": [
+        "Critical angle: C = sin⁻¹(1/1.52) = 41.1°",
+        "45° > 41.1°, so the hypotenuse face totally internally reflects",
+        "TIR reflects 100% of the light (no silvering to absorb or tarnish), unlike an ordinary mirror"
+      ],
+      "answer": "The critical angle is sin⁻¹(1/1.52) = 41.1°. Light strikes the hypotenuse at 45°, beyond critical, so it is totally internally reflected — with none of the absorption or ageing losses of a silvered coating, and no multiple images."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:fibre-bandwidth-distance",
+      "context": "physics-depth:fibre-bandwidth-distance:multimodal-delay",
+      "move": "combine the acceptance geometry with the straight-path travel time to find modal dispersion delay",
+      "prompt": "An optical fibre of length 2.0 km has core index 1.48 and cladding index 1.44. Compare the travel time of a ray along the fibre axis with a ray bouncing at the critical angle. (c = 3.00×10⁸ m s⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "Critical angle: sinθ_c = 1.44/1.48 → θ_c = 76.7°, so the bouncing ray makes angle 90° − 76.7° = 13.3° with the axis",
+        "Axial speed along fibre: v = c/1.48; axial-path time t₁ = 2000 × 1.48/c = 9.87 μs",
+        "Bouncing ray path per metre of fibre is 1/cos13.3° = 1.028 times longer: t₂ = 9.87 × 1.028 = 10.1 μs",
+        "Modal dispersion delay Δt ≈ 10.1 − 9.87 = 0.27 μs per 2 km"
+      ],
+      "answer": "The axial ray takes 2000×1.48/c = 9.87 μs. The critical ray travels at 13.3° to the axis, a path longer by 1/cos13.3° = 2.8%, taking 10.1 μs. The 0.27 μs spread per 2 km is the modal dispersion that limits simple step-index fibre bandwidth — the reason graded-index or single-mode designs exist."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:prism-dispersion-tir",
+      "context": "physics-depth:prism-dispersion-tir:two-refractions",
+      "move": "combine Snell's law at entry and exit with the internal geometry to trace a ray through a prism",
+      "prompt": "A ray meets one face of a glass prism (n = 1.50) at 40°, refracts inside, and exits through the second face. The apex angle between the faces is 60°. Trace the ray: find the internal angle at the first face, the internal angle at the second face, and the exit angle. (sin 40° = 0.643, sin 25.4° = 0.429, sin 27.1° = 0.455)",
+      "marks": 4,
+      "scheme": [
+        "Entry: sin r₁ = sin 40°/1.50 = 0.429, r₁ = 25.4°",
+        "Geometry: r₁ + r₂ = apex angle 60°, so r₂ = 34.6°",
+        "Exit: sinθ_exit = 1.50 × sin 34.6° = 1.50 × 0.568 = 0.852, θ_exit = 58.4°",
+        "Deviation = (40° − 25.4°) + (58.4° − 34.6°) = 38.4° toward the base"
+      ],
+      "answer": "At entry, r₁ = sin⁻¹(0.643/1.50) = 25.4°. The prism geometry gives r₂ = 60° − 25.4° = 34.6° at the second face. Snell's law on exit: θ = sin⁻¹(1.50×0.568) = 58.4°. The total deviation is 14.6° + 23.8° = 38.4°, bending toward the prism base."
+    }
+  ]
+}

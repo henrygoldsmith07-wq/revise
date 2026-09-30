@@ -1,0 +1,147 @@
+{
+  "topic": "thermal",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:internal-energy-definition",
+      "context": "physics-depth:internal-energy-definition:random-energies",
+      "move": "state what internal energy sums over for the particles of a substance",
+      "prompt": "Define the internal energy of a substance in terms of its molecules.",
+      "marks": 2,
+      "scheme": [
+        "Internal energy is the sum of the randomly distributed kinetic and potential energies of the molecules",
+        "Kinetic energy reflects temperature; potential energy reflects state and separation"
+      ],
+      "answer": "The internal energy is the total of the randomly distributed kinetic and potential energies of all the molecules — kinetic energy set by temperature, potential energy by the molecular separation (and so by the state of the substance)."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:state-change-energy",
+      "context": "physics-depth:state-change-energy:kinetic-vs-potential",
+      "move": "state which molecular energy component changes during melting at constant temperature",
+      "prompt": "During melting at constant temperature, state whether the average kinetic energy, the potential energy, or both of the molecules change.",
+      "marks": 2,
+      "scheme": [
+        "Constant temperature means constant average kinetic energy",
+        "Melting increases the average potential energy as molecules move apart into a less-bound arrangement"
+      ],
+      "answer": "At constant temperature the average kinetic energy stays fixed; melting increases the molecules' average potential energy as bonds loosen and separations grow. That potential-energy increase is the latent heat."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:internal-energy-components",
+      "context": "physics-depth:internal-energy-components:identify-change",
+      "move": "identify which component of internal energy a described change alters",
+      "prompt": "For each of (i) heating a liquid, (ii) boiling it at constant temperature, and (iii) compressing a gas quickly so its temperature rises, state whether the change is to molecular kinetic energy, potential energy, or both.",
+      "marks": 3,
+      "scheme": [
+        "(i) Heating a liquid raises molecular kinetic energy (and slightly potential as expansion occurs)",
+        "(ii) Boiling at constant T increases only potential energy",
+        "(iii) Fast compression does work on the gas, raising kinetic energy — temperature rises"
+      ],
+      "answer": "(i) Heating a liquid mainly raises molecular kinetic energy. (ii) Boiling at constant temperature adds only potential energy — the latent heat of vaporisation. (iii) Rapid compression does work on the gas, increasing molecular kinetic energy directly, so the temperature rises."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:temperature-energy-bookkeeping",
+      "context": "physics-depth:temperature-energy-bookkeeping:mixed-change",
+      "move": "split a supplied energy into latent and sensible parts across a state change",
+      "prompt": "A 0.020 kg ice cube at 0 °C receives 9.0 kJ of energy. The specific latent heat of fusion of ice is 3.34×10⁵ J kg⁻¹ and c_water = 4200 J kg⁻¹ K⁻¹. Determine whether the ice fully melts and, if so, the final water temperature.",
+      "marks": 4,
+      "scheme": [
+        "Energy to melt fully: Q_melt = mL = 0.020 × 3.34×10⁵ = 6680 J",
+        "Remaining energy = 9000 − 6680 = 2320 J",
+        "This heats the meltwater: ΔT = Q/(mc) = 2320/(0.020×4200) = 27.6 K",
+        "The ice fully melts and reaches about 27.6 °C"
+      ],
+      "answer": "Melting the whole cube needs mL = 0.020×3.34×10⁵ = 6680 J, leaving 2320 J. That warms the 0 °C meltwater by ΔT = 2320/(0.020×4200) ≈ 27.6 K, so the final water is at about 28 °C — all latent heat first, then sensible heat."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:temperature-internal-energy-confusion",
+      "context": "physics-depth:temperature-internal-energy-confusion:big-cold-object",
+      "move": "reject equating higher temperature with more internal energy",
+      "prompt": "A student argues a boiling kettle has more internal energy than the swimming pool next door because it is hotter. Explain the error, distinguishing temperature from internal energy.",
+      "marks": 3,
+      "scheme": [
+        "Temperature measures the average kinetic energy per molecule",
+        "Internal energy is the total over all molecules — it also scales with the amount of substance",
+        "The pool's enormously greater molecule count gives it far more internal energy despite lower temperature"
+      ],
+      "answer": "Temperature measures the average kinetic energy per molecule; internal energy is the total over every molecule. The pool contains orders of magnitude more molecules, so its total internal energy dwarfs the kettle's even though each molecule carries less energy on average."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:heat-temperature-swap",
+      "context": "physics-depth:heat-temperature-swap:phase-change-constant-t",
+      "move": "reject the claim that energy flow must change temperature",
+      "prompt": "A student says: 'Energy is flowing into the ice steadily, so its temperature must be rising steadily.' Explain why the thermometer can hold still while energy flows in.",
+      "marks": 2,
+      "scheme": [
+        "During a state change the supplied energy increases molecular potential energy, not kinetic energy",
+        "Temperature depends on average kinetic energy only, so it stays constant while bonds are loosened"
+      ],
+      "answer": "While the ice melts, the supplied energy goes into increasing the molecules' potential energy — loosening the lattice — not their kinetic energy. Since temperature tracks average kinetic energy alone, it holds at 0 °C even as the internal energy rises."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:evaporative-cooling",
+      "context": "physics-depth:evaporative-cooling:sweat",
+      "move": "transfer internal-energy reasoning to evaporative cooling of sweat",
+      "prompt": "Sweat evaporating from skin cools the body even though no temperature difference drives the process. Explain, using internal energy and latent heat, why evaporation cools the remaining liquid.",
+      "marks": 3,
+      "scheme": [
+        "The fastest molecules (highest kinetic energy) escape the liquid surface first",
+        "Their departure lowers the average kinetic energy of the molecules left behind",
+        "Average kinetic energy is temperature, so the remaining sweat — and the skin under it — cools"
+      ],
+      "answer": "Evaporation selectively removes the highest-energy molecules from the surface. The average kinetic energy of those remaining falls, and lower average kinetic energy means lower temperature: the remaining sweat cools, drawing heat from the skin to re-establish its own energy distribution."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:thermal-contact-mixing",
+      "context": "physics-depth:thermal-contact-mixing:hot-cold-blocks",
+      "move": "transfer internal energy accounting to two blocks reaching a common temperature",
+      "prompt": "A 0.50 kg aluminium block at 100 °C (c = 900 J kg⁻¹ K⁻¹) is placed in 1.5 kg of water at 20 °C (c = 4200 J kg⁻¹ K⁻¹). Ignoring losses to the surroundings, find the final temperature, and explain the internal-energy bookkeeping.",
+      "marks": 4,
+      "scheme": [
+        "Energy lost by aluminium = energy gained by water: 0.50×900×(100−T) = 1.5×4200×(T−20)",
+        "450(100−T) = 6300(T−20)",
+        "45000 − 450T = 6300T − 126000",
+        "T = 171000/6750 = 25.3 °C; the drop in the block's internal energy equals the rise in the water's"
+      ],
+      "answer": "Setting the internal energy lost by the aluminium equal to that gained by the water: 450(100−T) = 6300(T−20) gives T ≈ 25 °C. The block's internal energy fell by the same amount the water's rose — energy is transferred, not lost, when the surroundings are excluded."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:kinetic-temperature-link",
+      "context": "physics-depth:kinetic-temperature-link:mean-square-speed",
+      "move": "combine internal energy with the kinetic theory relation between temperature and mean kinetic energy",
+      "prompt": "Helium gas at 300 K has molar mass 4.0×10⁻³ kg mol⁻¹. Using ½m⟨c²⟩ = (3/2)kT, calculate the root-mean-square speed of a helium atom. (k = 1.38×10⁻²³ J K⁻¹, N_A = 6.02×10²³ mol⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "m = 4.0×10⁻³/6.02×10²³ = 6.64×10⁻²⁷ kg",
+        "½m⟨c²⟩ = (3/2)kT → ⟨c²⟩ = 3kT/m",
+        "⟨c²⟩ = 3×1.38×10⁻²³×300/6.64×10⁻²⁷ = 1.87×10⁶ m² s⁻²",
+        "c_rms = √⟨c²⟩ = 1.37×10³ m s⁻¹"
+      ],
+      "answer": "One helium atom weighs 4.0×10⁻³/6.02×10²³ = 6.64×10⁻²⁷ kg. From ½m⟨c²⟩ = (3/2)kT, ⟨c²⟩ = 3kT/m = 3×1.38×10⁻²³×300/6.64×10⁻²⁷ = 1.87×10⁶ m² s⁻², so c_rms ≈ 1.4×10³ m s⁻¹ — internal kinetic energy made visible as molecular speed."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:pressure-temperature-internal",
+      "context": "physics-depth:pressure-temperature-internal:constant-volume-rise",
+      "move": "combine internal energy with the ideal gas relation at constant volume to find a pressure change",
+      "prompt": "A fixed 2.0×10⁻³ m³ vessel holds 0.10 mol of an ideal gas at 300 K. The temperature rises to 360 K while the volume stays constant. Calculate the initial and final pressures, and state what happens to the gas's internal energy. (R = 8.31 J mol⁻¹ K⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "p₁ = nRT/V = 0.10×8.31×300/2.0×10⁻³ = 1.25×10⁵ Pa",
+        "At constant V, p ∝ T: p₂ = 1.25×10⁵ × (360/300) = 1.49×10⁵ Pa",
+        "Internal kinetic energy ∝ T, so it rises by 20%",
+        "The potential energy of an ideal gas is zero, so total internal energy rises by 20% too"
+      ],
+      "answer": "p₁ = nRT₁/V = 0.10×8.31×300/(2.0×10⁻³) = 1.25×10⁵ Pa; at constant volume p ∝ T, so p₂ = 1.25×10⁵×360/300 = 1.49×10⁵ Pa. The molecular kinetic energy — all of an ideal gas's internal energy — rises in proportion to T, by 20%."
+    }
+  ]
+}

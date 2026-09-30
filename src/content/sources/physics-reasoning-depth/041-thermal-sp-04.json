@@ -1,0 +1,198 @@
+{
+  "topic": "thermal",
+  "point": 4,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:kinetic-model-assumptions",
+      "context": "physics-depth:kinetic-model-assumptions:ideal-gas-list",
+      "move": "list the kinetic-theory assumptions that make the pressure derivation valid",
+      "prompt": "List four assumptions of the kinetic theory model of an ideal gas.",
+      "marks": 4,
+      "scheme": [
+        "The gas is a huge number of identical molecules in continuous random motion",
+        "Molecule volumes are negligible compared with the container volume",
+        "Collisions are elastic; no intermolecular forces except during collisions",
+        "Collisions with walls are the only impulse transfers to the container"
+      ],
+      "answer": "The model assumes vast numbers of identical point-like molecules in random motion, colliding elastically with each other and the walls, with no forces acting except during those collisions and negligible total molecular volume. Every kinetic result — pressure, temperature scaling, Boyle's law — is those assumptions made arithmetic."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:pressure-equation-form",
+      "context": "physics-depth:pressure-equation-form:one-third-nmc-squared",
+      "move": "state the kinetic pressure equation and define each symbol",
+      "prompt": "State the kinetic theory equation linking pressure to molecular motion for N molecules of mass m in volume V, defining each quantity.",
+      "marks": 3,
+      "scheme": [
+        "p = (1/3)(N/V)m⟨c²⟩ — equivalently pV = (1/3)Nm⟨c²⟩",
+        "N: number of molecules; m: each molecule's mass",
+        "⟨c²⟩: mean square speed (the average of the squared speeds)"
+      ],
+      "answer": "Pressure is p = ⅓(N/V)m⟨c²⟩: number density times molecular mass times the mean of the squared speeds, all over three. The ⅓ apportions the motion equally among three dimensions, and it is the mean square — never the square of the mean — that appears."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:momentum-flux-derivation",
+      "context": "physics-depth:momentum-flux-derivation:one-molecule-step",
+      "move": "derive pressure from a single molecule's momentum change at a wall and its collision rate",
+      "prompt": "A molecule of mass m moves with x-velocity cₓ in a cubical box of side L. Derive the average pressure contribution of this one molecule, p = mcₓ²/V.",
+      "marks": 4,
+      "scheme": [
+        "Each wall hit reverses the x-momentum: impulse per bounce = 2mcₓ",
+        "Time between hits on one wall: 2L/cₓ (out and back)",
+        "Force on that wall = impulse/rate = 2mcₓ ÷ (2L/cₓ) = mcₓ²/L",
+        "Pressure = force/area = (mcₓ²/L)/L² = mcₓ²/V; sum over all molecules gives ⟨cₓ²⟩ = ⟨c²⟩/3"
+      ],
+      "answer": "One molecule delivers 2mcₓ at each strike and strikes every 2L/cₓ seconds — a continuous force mcₓ²/L on a face of area L², hence p = mcₓ²/V. Sum N molecules, replace cₓ² with its average ⟨c²⟩/3 (motion is isotropic), and the ⅓ appears from the three dimensions."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:isotropy-thirds-logic",
+      "context": "physics-depth:isotropy-thirds-logic:three-equal-shares",
+      "move": "explain the factor ⅓ from equal sharing of mean-square speed among three axes",
+      "prompt": "Explain why ⟨cₓ²⟩ = ⟨c²⟩/3 for a gas at rest, and what would break that equality in a gas streaming through a pipe.",
+      "marks": 4,
+      "scheme": [
+        "c² = cₓ² + c_y² + c_z² (Pythagoras per molecule, then averaged)",
+        "Random, isotropic motion makes the three mean-square components equal",
+        "So each is a third of the total mean-square speed",
+        "Bulk flow adds ordered velocity in one direction — the axes stop being equal and the ⅓ fails for the total"
+      ],
+      "answer": "Squaring and averaging the velocity components gives ⟨cₓ²⟩+⟨c_y²⟩+⟨c_z²⟩ = ⟨c²⟩, and random isotropic motion forces the three shares to be identical — hence the ⅓. A gas streaming down a pipe breaks the symmetry: one axis carries the ordered flow, and only the thermal part obeys the equal-thirds rule."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:pressure-from-density-compute",
+      "context": "physics-depth:pressure-from-density-compute:plug-and-chug",
+      "move": "compute pressure from number density, molecular mass and mean-square speed",
+      "prompt": "A gas has number density 2.5×10²⁵ m⁻³, molecular mass 5.0×10⁻²⁶ kg and mean square speed 2.4×10⁵ m² s⁻². Calculate the pressure.",
+      "marks": 4,
+      "scheme": [
+        "p = (1/3)(N/V)m⟨c²⟩",
+        "= ⅓ × 2.5×10²⁵ × 5.0×10⁻²⁶ × 2.4×10⁵",
+        "= ⅓ × 3.0×10⁵",
+        "≈ 1.0×10⁵ Pa — atmospheric"
+      ],
+      "answer": "p = ⅓n m⟨c²⟩ = ⅓×2.5×10²⁵×5.0×10⁻²⁶×2.4×10⁵ = 1.0×10⁵ Pa. A textbook atmosphere, recovered from nothing but molecules bouncing."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:vrms-from-pv",
+      "context": "physics-depth:vrms-from-pv:one-mole-inversion",
+      "move": "invert the pressure equation to extract rms speed from macroscopic pV",
+      "prompt": "One mole of air (mass 0.029 kg) occupies 0.024 m³ at 1.01×10⁵ Pa. Use pV = (1/3)Nm⟨c²⟩ to calculate the rms speed of its molecules.",
+      "marks": 4,
+      "scheme": [
+        "Nm = total mass M = 0.029 kg",
+        "⟨c²⟩ = 3pV/M = 3×1.01×10⁵×0.024/0.029",
+        "= 7272/0.029 = 2.51×10⁵ m² s⁻²",
+        "c_rms = √⟨c²⟩ ≈ 500 m s⁻¹"
+      ],
+      "answer": "The whole gas's mass is M = Nm, so ⟨c²⟩ = 3pV/M = 3×1.01×10⁵×0.024/0.029 ≈ 2.5×10⁵, giving c_rms ≈ 500 m s⁻¹ — supersonic for air molecules, and exactly the speed of sound's neighbourhood."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:molecule-collisions-pressure-fallacy",
+      "context": "physics-depth:molecule-collisions-pressure-fallacy:wall-only-force",
+      "move": "reject the claim that inter-molecule collisions cause the pressure",
+      "prompt": "A student says gas pressure comes from molecules colliding with each other. Explain why only wall collisions count, and what molecule–molecule collisions actually do.",
+      "marks": 3,
+      "scheme": [
+        "Pressure is force per area on the container wall — only wall impacts transfer momentum to the wall",
+        "Inter-molecule collisions merely redistribute momentum between molecules",
+        "They do not change the total momentum arriving at the walls and are even skippable in the simplest derivation"
+      ],
+      "answer": "The wall only feels what strikes it: pressure is momentum delivery rate to the wall, and molecule–molecule collisions involve no wall at all. Those collisions reshuffle who moves where, but the total flux of momentum onto the walls — and hence the pressure — is set entirely by wall impacts. The derivation is happy to ignore the others."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:square-of-mean-fallacy",
+      "context": "physics-depth:square-of-mean-fallacy:wrong-average-order",
+      "move": "reject using the square of the mean speed where mean-square speed is required",
+      "prompt": "Three molecules have speeds 1, 1 and 5 m s⁻¹. A student uses (mean speed)² = 5.4 m² s⁻² in the pressure equation. Calculate the correct mean-square value and explain why the order of averaging and squaring matters.",
+      "marks": 4,
+      "scheme": [
+        "Mean speed = 7/3 = 2.33 m s⁻¹; its square = 5.44",
+        "Mean square = (1+1+25)/3 = 9.0 m² s⁻²",
+        "Squaring first weights fast molecules by v² — they hit walls with both more momentum and higher frequency",
+        "The equation demands ⟨c²⟩; the two orders are never equal when speeds vary"
+      ],
+      "answer": "The true ⟨c²⟩ is (1²+1²+5²)/3 = 9.0, not 2.33² = 5.4. Squaring first lets the fast molecules count for the double share their collisions deliver — momentum and rate both grow with speed. Averaging first and squaring after lets the slow majority dominate, which is physically wrong: mean-square, in that order, is the only quantity the pressure equation wants."
+    },
+    {
+      "demand": "calculation",
+      "family": "physics-depth:beam-flux-force",
+      "context": "physics-depth:beam-flux-force:molecular-gun",
+      "move": "compute a wall's force from a molecular beam's momentum delivery rate",
+      "prompt": "A molecular beam sends 1.0×10²² oxygen molecules per second at 400 m s⁻¹ onto a wall, and they bounce back elastically. Calculate the force on the wall. (Molecular mass 5.3×10⁻²⁶ kg)",
+      "marks": 3,
+      "scheme": [
+        "Δp per molecule = 2mv = 2×5.3×10⁻²⁶×400 = 4.24×10⁻²³ kg m s⁻¹",
+        "Force = rate of momentum delivery = 4.24×10⁻²³ × 1.0×10²²",
+        "≈ 0.42 N"
+      ],
+      "answer": "Each rebound reverses 2mv = 4.2×10⁻²³ kg m s⁻¹; ten sextillion such events per second give F = 0.42 N. The whole kinetic theory of pressure is this one calculation multiplied by ⅓ for direction-randomness."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:boyle-kinetic",
+      "context": "physics-depth:boyle-kinetic:compression-flux",
+      "move": "transfer momentum-flux reasoning to explain Boyle's law microscopically",
+      "prompt": "Use the kinetic model to explain why compressing an ideal gas to half its volume at constant temperature doubles its pressure.",
+      "marks": 4,
+      "scheme": [
+        "Constant temperature means the molecules keep the same mean-square speed",
+        "Halving V doubles the number density N/V",
+        "The collision flux onto each wall area doubles: momentum is delivered twice as fast",
+        "p = ⅓(N/V)m⟨c²⟩ doubles with density — Boyle's law"
+      ],
+      "answer": "Temperature pins the molecular speed; the squeeze doubles how many molecules there are per square metre of wall. Each wall patch is hit twice as often, so momentum arrives twice per second — the pressure equation p = ⅓(N/V)m⟨c²⟩ just did Boyle's law in one line. Macroscopic gas laws as molecular bookkeeping."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:brownian-evidence",
+      "context": "physics-depth:brownian-evidence:jostling-pollen",
+      "move": "transfer the impact-flux model to Brownian motion as evidence for molecular momentum",
+      "prompt": "A pollen grain jiggles randomly in water. Explain what this shows about water molecules, in terms of the momentum-transfer model behind gas pressure.",
+      "marks": 4,
+      "scheme": [
+        "The grain is bombarded by water molecules from all sides",
+        "In any instant the numbers striking each direction fluctuate — impacts don't cancel exactly",
+        "The resultant imbalance of momentum kicks the visible grain",
+        "Random, never-stopping jitter is direct evidence of molecular motion and momentum transfer"
+      ],
+      "answer": "The grain is buffeted by countless water-molecule strikes. Averages would cancel, but the actual count each way fluctuates randomly — statistical imbalance gives net kicks, and the pollen dances. The same momentum transfer that presses on a container wall is here made visible, a microscope image of molecular reality."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:helium-rms-link",
+      "context": "physics-depth:helium-rms-link:pressure-meets-temperature",
+      "move": "combine the kinetic pressure equation with the ideal gas law to find rms speed at temperature",
+      "prompt": "By equating pV = (1/3)Nm⟨c²⟩ with pV = NkT, derive ½m⟨c²⟩ = (3/2)kT and calculate the rms speed of helium atoms (m = 6.64×10⁻²⁷ kg) at 300 K. (k = 1.38×10⁻²³ J K⁻¹)",
+      "marks": 4,
+      "scheme": [
+        "Divide by N and set equal: (1/3)m⟨c²⟩ = kT → ½m⟨c²⟩ = 3/2 kT",
+        "⟨c²⟩ = 3kT/m = 3×1.38×10⁻²³×300/6.64×10⁻²⁷",
+        "= 1.87×10⁶ m² s⁻²",
+        "c_rms ≈ 1.37×10³ m s⁻¹"
+      ],
+      "answer": "Marriage of the two pV expressions kills the pressure and leaves ½m⟨c²⟩ = 3/2kT — temperature is mean kinetic energy. At 300 K helium's ⟨c²⟩ = 3kT/m = 1.87×10⁶, so c_rms ≈ 1.4 km s⁻¹: light atoms race, and the two equations share a child."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:atmosphere-escape",
+      "context": "physics-depth:atmosphere-escape:rms-versus-escape-speed",
+      "move": "combine rms molecular speed with gravitational escape speed to explain planetary atmospheres",
+      "prompt": "Hydrogen molecules at 1000 km altitude have c_rms ≈ 3.9 km s⁻¹; Earth's escape speed there is ~10.9 km s⁻¹. Explain why Earth still loses its hydrogen over time, while oxygen (c_rms ≈ 0.33 km s⁻¹) stays.",
+      "marks": 4,
+      "scheme": [
+        "A Maxwell–Boltzmann distribution means some molecules far exceed the rms speed",
+        "Roughly 1/500th of hydrogen molecules top escape speed at a time; the distribution refills the tail",
+        "Over millions of years hydrogen leaks away; oxygen's tail is exponentially negligible at 0.33 km s⁻¹",
+        "The rule of thumb: planets shed gases whose rms exceeds ~1/6 of escape speed over solar-system ages"
+      ],
+      "answer": "RMS speed is the distribution's middle, not its ceiling: hydrogen's tail of fast molecules already contains thousands past escape speed, and the tail refills as the rest equilibrate — a slow but ceaseless leak. Oxygen at a tenth the rms speed has an essentially empty escape tail. That is why Earth keeps its air but never holds its hydrogen, and why Mars' thin atmosphere is mostly CO₂ left over."
+    }
+  ]
+}

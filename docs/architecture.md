@@ -164,9 +164,10 @@ claim limits adoption to one account; retries and concurrent tabs adopting into 
 Existing account databases, unknown-owner queues and mixed-owner local data
 cannot be adopted. A copy may combine with the same account's cloud history
 under the existing merge rules; the student explicitly chooses that copy. It
-never auto-copies account A into account B. Account metadata remains device-local
-unless already represented by a synced entity; adoption does not add new sync
-tables for outcome/experiment histories. E2EE keys remain local and need export
+never auto-copies account A into account B. Grade forecasts, actual results, paper outcomes and intervention histories sync
+as owner-scoped `learner_records`. Adoption queues offline history and deletion
+markers as well as study collections. Experiments and transient checkpoints
+remain local. E2EE keys remain local and need export
 on another device. New local work after adoption remains in local mode.
 
 `src/state/store.tsx` composes revision state with planning, sessions, outcomes,
@@ -178,9 +179,12 @@ values publish from a layout effect; React consumers use `useStoreFields` or
 selections retain their identities, so sync status cannot invalidate card views,
 marking cannot invalidate experiment-only views, and settings do not invalidate
 raw histories. Application consumers select their fields explicitly;
-`useStore` remains a compatibility API. Evidence-only reports share a stable input boundary, so settings, planning and
-streak writes do not invalidate their calculations. Derived models still calculate centrally,
-and multi-field orchestration views intentionally subscribe to their full inputs.
+`useStore` remains a compatibility API. `learner-mastery.ts` owns evidence/mastery derivation: recall depends only on
+cards/reviews, application only on questions/attempts. `assessment-models.ts`
+owns grade predictions, paper calibration and response-time derivation with
+explicit field dependencies. Settings/theme and plan edits cannot invalidate
+these models. The provider composes them; multi-field orchestration views
+intentionally subscribe to their full inputs.
 
 ### Structured educational source
 
@@ -198,7 +202,11 @@ The path is structured source → schema/provenance/spec mapping → exact-finge
 human trust ledger → runtime `Question[]`. Generation cannot approve a question.
 Release-set membership and human verification remain separate gates in the bank.
 `npm run content:check` blocks CI on malformed sources or generated-artifact drift.
-The remaining large TypeScript banks are deliberately not migrated in this pass.
+A further 540 reasoning-depth questions now use 48 specification-group sources
+under `src/content/sources/physics-reasoning-depth`. `content:reasoning` validates
+actual capability IDs as well as specification IDs. The generated import adapter
+retains the original authoring transformation; all 540 original fingerprints
+are pinned. Other large banks remain candidates for later bounded migrations.
 
 ### `src/components` and `src/app`
 
@@ -380,3 +388,66 @@ contains every manual route and the secondary Readiness, Schedule, Library and
 Settings surfaces. Desktop keeps direct routes grouped under Choose your own
 and Plan & progress; keyboard shortcuts and search remain available. No new
 recommender, tutor or mastery model is introduced.
+
+
+### Domain and execution ownership
+
+`adaptive-session.ts` is the public composition API. `adaptive-plan.ts` selects a
+topic, `adaptive-sequence.ts` assembles steps and `adaptive-replan.ts` reacts to
+submitted evidence. All receive capability nodes as data. Editorial registration
+lives in `content/capability-registry.ts`; the generic registry validates subject
+identity and duplicates, copies graphs and returns an empty graph for unmapped
+subjects. Their existing topic path remains available without claiming detailed
+capability evidence.
+
+`question-execution.ts` owns answers, hints, grading and persisted evidence.
+`QuestionRunner` owns inputs and `QuestionMarkedResult` renders the stored
+remediation calculation. Regrading refreshes that calculation. The existing
+lesson runner continues to own recall/check gates; the roadmap puts optional
+recall/practice actions inside each outline. Subject correctness lives in
+separate Maths/Biology/Chemistry validators with shared substantive gates and
+lexical evidence. Marking separates lexical coverage from numeric matching;
+recommendation overlays consume a shared contract independently of ranking.
+
+`content-trust.ts` owns exact fingerprints and human attestations. Audits compose
+that primitive rather than being imported into it. This removes the former
+learning-depth → evidence → review → learning-depth/capability cycle. Fatigue
+owns the effective-minutes curve, removing planner → recommender → fatigue →
+planner. A bundled runtime dependency-graph regression checks these boundaries.
+
+### Cross-device continuity and terminal intent
+
+| Data | Ownership and continuity |
+| --- | --- |
+| Grade forecasts and actual results | Row replicas; immutable forecast fields; actual result deletion is terminal |
+| Paper outcomes | Row replicas; sit-time prediction stays frozen; later marking closes the record |
+| Intervention outcomes | Row replicas; absent trust/transfer/time evidence remains absent |
+| Recommendation experiments | Device-local assignment and consent; no cross-device randomisation change |
+| Revision/adaptive checkpoints and drafts | Device-local execution state; existing validated resume paths |
+| Derived calibration | Recomputed locally from synced evidence; no derived cache replication |
+| AI cache, DLQ and E2EE keys | Device-local; keys require explicit transfer |
+
+Row envelopes and deleted IDs live in existing IndexedDB metadata; local
+projection + logical clock + outbox commit atomically. Old arrays migrate before
+remote merge. Missing/mixed-owner/malformed data fails without draining queues
+or entering calibration. Forecast IDs distinguish independent offline devices;
+weekly grouping remains a reporting convention, never a sync ordering rule.
+
+`learner_records` uses Lamport/device ordering. Both it and `sync_tombstones`
+allocate `change_seq` under an account transaction advisory lock, so committed
+feed order does not depend on student wall clocks. Owner-scoped cursors advance
+only after a whole validated page. Deleted row IDs remain terminal regardless
+of a later timestamp or logical counter. An account may intentionally create a
+new ID; ordinary upserts cannot undelete an existing ID.
+
+Legacy collection tables retain their existing bounded timestamp conflict rules
+and gain write suppression plus direct-delete retention. Encrypted legacy
+payloads produce wire-only markers; clients suppress the matching wire UUID
+without decrypting educational IDs. Authenticated clients cannot erase history
+or rewrite/delete markers. Account deletion still cascades through owned data.
+
+Portable v2 exports add optional paper histories and deletion metadata; old v2
+exports remain readable. Restore preserves existing terminal intent and rejects
+stale deleted IDs/frozen forecast rewrites atomically. Wire-only hashes remain
+bound to their source account when importing into a different owner. Local
+adoption, as before, remaps explicit ownership rather than educational IDs.

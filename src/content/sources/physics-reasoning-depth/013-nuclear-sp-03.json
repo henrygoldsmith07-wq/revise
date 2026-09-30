@@ -1,0 +1,145 @@
+{
+  "topic": "nuclear",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:activity-definition",
+      "context": "physics-depth:activity-definition:becquerel",
+      "move": "state the definitions of activity and the becquerel",
+      "prompt": "Define the activity of a radioactive sample and state the meaning of one becquerel.",
+      "marks": 2,
+      "scheme": [
+        "Activity is the number of nuclei that decay per unit time",
+        "1 Bq = one decay per second"
+      ],
+      "answer": "The activity is the rate at which nuclei decay in a sample. One becquerel is one decay every second."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:halflife-decayconstant",
+      "context": "physics-depth:halflife-decayconstant:ln2-relation",
+      "move": "state the relation between half-life and decay constant",
+      "prompt": "State the equation linking half-life t½ and decay constant λ.",
+      "marks": 2,
+      "scheme": [
+        "t½ = ln 2 / λ",
+        "So λ = ln 2 / t½ ≈ 0.693/t½"
+      ],
+      "answer": "The half-life and decay constant are related by t½ = ln 2 / λ, so λ = 0.693/t½ — a longer half-life means a smaller decay constant."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:activity-from-count",
+      "context": "physics-depth:activity-from-count:uncorrected-rate",
+      "move": "apply A = λN to find the activity of a known number of nuclei",
+      "prompt": "A source contains 2.0×10¹⁸ nuclei of a nuclide with half-life 1.2×10⁵ s. Calculate its activity.",
+      "marks": 3,
+      "scheme": [
+        "λ = ln2/t½ = 0.693/1.2×10⁵ = 5.78×10⁻⁶ s⁻¹",
+        "A = λN = 5.78×10⁻⁶ × 2.0×10¹⁸",
+        "= 1.2×10¹³ Bq"
+      ],
+      "answer": "λ = ln2/t½ = 0.693/(1.2×10⁵ s) = 5.8×10⁻⁶ s⁻¹. The activity is A = λN = 5.8×10⁻⁶×2.0×10¹⁸ = 1.2×10¹³ Bq — twelve trillion decays per second."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:remaining-fraction",
+      "context": "physics-depth:remaining-fraction:whole-halflives",
+      "move": "use the exponential decay law to find nuclei remaining after a stated time",
+      "prompt": "A sample initially has 8.0×10¹⁰ nuclei of a nuclide whose half-life is 5.0 years. Calculate the number remaining after 15 years.",
+      "marks": 3,
+      "scheme": [
+        "15 years = 3 half-lives",
+        "Remaining fraction = (1/2)³ = 1/8",
+        "N = 8.0×10¹⁰ × 1/8 = 1.0×10¹⁰ nuclei"
+      ],
+      "answer": "Fifteen years is exactly three half-lives, so the sample falls to (½)³ = 1/8 of its original size: N = 8.0×10¹⁰/8 = 1.0×10¹⁰ nuclei."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:halflife-in-exponential",
+      "context": "physics-depth:halflife-in-exponential:lambda-substitution",
+      "move": "reject substituting the half-life for the decay constant in the exponential law",
+      "prompt": "A student writes N = N₀e^(−t/t½) with t½ = 100 s and evaluates N at t = 100 s as N₀e⁻¹. Explain the error and give the correct remaining fraction at one half-life.",
+      "marks": 3,
+      "scheme": [
+        "The exponent needs the decay constant λ, not the half-life: N = N₀e^(−λt)",
+        "λ = ln2/t½, so at t = t½ the exponent is −λt½ = −ln 2",
+        "N/N₀ = e^(−ln2) = ½, as the name half-life demands"
+      ],
+      "answer": "The exponential law is N = N₀e^(−λt) with λ = ln2/t½, not e^(−t/t½). At one half-life the correct exponent is −ln2, giving exactly N₀/2. The student's e⁻¹ would leave about 37%, contradicting the definition of half-life."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:decay-constant-myth",
+      "context": "physics-depth:decay-constant-myth:nuclei-slow-down",
+      "move": "reject the picture that decay constant reflects nuclei 'ageing' toward decay",
+      "prompt": "A student says an undecayed nucleus becomes more likely to decay the longer it survives. Explain, in terms of the decay constant, why each nucleus's probability per second stays fixed.",
+      "marks": 2,
+      "scheme": [
+        "The decay constant λ is a constant decay probability per unit time: probability approximately λΔt in a sufficiently short interval Δt",
+        "For an undecayed nucleus this probability does not increase with its age; surviving longer does not change λ"
+      ],
+      "answer": "The constant λ gives the decay probability per unit time: in a sufficiently short interval Δt the probability is approximately λΔt. For an undecayed nucleus it is independent of how long the nucleus has survived. Decay is random and memoryless; survival does not make the next interval more dangerous."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:carbon-dating",
+      "context": "physics-depth:carbon-dating:archaeology",
+      "move": "transfer half-life reasoning to radiocarbon dating of an artefact",
+      "prompt": "Living wood has a carbon-14 activity of 0.25 Bq per gram of carbon. An archaeological sample of 20 g of carbon shows a carbon-14 activity of 1.5 Bq. Carbon-14 has a half-life of 5730 years. Calculate the sample's age.",
+      "marks": 4,
+      "scheme": [
+        "Sample's original activity = 0.25 × 20 = 5.0 Bq; now 1.5 Bq",
+        "Remaining fraction = 1.5/5.0 = 0.30",
+        "n half-lives from (1/2)ⁿ = 0.30: n = ln 0.30/ln 0.5 = 1.74",
+        "Age = 1.74 × 5730 ≈ 9970 years"
+      ],
+      "answer": "The sample began at 0.25 Bq per gram × 20 g = 5.0 Bq and now reads 1.5 Bq — 30% remaining. Since (½)ⁿ = 0.30 gives n = 1.74 half-lives, the wood is about 1.74×5730 ≈ 10 000 years old."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:medical-isotope-dose",
+      "context": "physics-depth:medical-isotope-dose:hospital-timing",
+      "move": "transfer decay accounting to scheduling a medical isotope delivery",
+      "prompt": "A hospital needs a technetium-99m sample of activity 8.0×10⁸ Bq at 4:00 pm. It is supplied at 8:00 am with an activity chosen so it will have decayed to exactly the required value. Tc-99m has a half-life of 6.0 hours. Calculate the activity that must be supplied at 8:00 am.",
+      "marks": 3,
+      "scheme": [
+        "Elapsed 8 h = 1.5 half-lives",
+        "Remaining fraction = (1/2)^1.5 = 1/(2√2) = 0.354",
+        "Supply activity = 8.0×10⁸/0.354 = 2.26×10⁹ Bq"
+      ],
+      "answer": "The 8-hour gap is 1.5 half-lives, leaving (½)^1.5 = 0.354 of the supplied activity. To have 8.0×10⁸ Bq at 4:00 pm, the morning supply must be 8.0×10⁸/0.354 ≈ 2.3×10⁹ Bq."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:decay-mass-energy",
+      "context": "physics-depth:decay-mass-energy:power-output",
+      "move": "combine activity with per-decay energy release to find a source's power",
+      "prompt": "A source undergoes 4.0×10¹⁰ decays per second, each releasing 5.0 MeV of energy. Calculate the power output in watts. (1 eV = 1.60×10⁻¹⁹ J)",
+      "marks": 3,
+      "scheme": [
+        "Energy per decay = 5.0×10⁶ × 1.60×10⁻¹⁹ = 8.0×10⁻¹³ J",
+        "Power = activity × energy per decay = 4.0×10¹⁰ × 8.0×10⁻¹³",
+        "= 3.2×10⁻² W"
+      ],
+      "answer": "Each decay releases 5.0 MeV = 5.0×10⁶×1.60×10⁻¹⁹ = 8.0×10⁻¹³ J. With 4.0×10¹⁰ decays each second, the power output is 4.0×10¹⁰×8.0×10⁻¹³ = 3.2×10⁻² W — small in watts but radiologically large."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:alpha-spectrum-clock",
+      "context": "physics-depth:alpha-spectrum-clock:parent-daughter",
+      "move": "combine two coupled decay chains to reason about a daughter isotope's growth",
+      "prompt": "A pure parent isotope P (half-life 10 days) decays into a daughter D (half-life 2 days), which decays to a stable isotope. A sample initially contains only P. Explain why the amount of D in the sample first rises and then falls, and sketch the reasoning for the timing of the maximum.",
+      "marks": 4,
+      "scheme": [
+        "Initially D is produced rapidly from the abundant parent P",
+        "D itself decays faster (shorter half-life), so as P declines, D's production rate falls",
+        "D peaks when its production rate equals its decay rate",
+        "Thereafter both decline: D follows P down, with D always decaying faster per nucleus"
+      ],
+      "answer": "Early on, plentiful P feeds D faster than D decays, so D accumulates. As P decays away (slower half-life), D's production rate falls below its own fast decay rate: D peaks when production and decay momentarily balance, then follows the parent into decline — a transient equilibrium characteristic of coupled decay chains."
+    }
+  ]
+}

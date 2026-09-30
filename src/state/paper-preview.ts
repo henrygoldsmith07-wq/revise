@@ -22,7 +22,7 @@ import type {
 
 /** Calibration per subject from paper-mode attempts: predicted vs actual. */
 export function buildPaperCalibrations(
-  snapshot: Snapshot | null,
+  snapshot: Pick<Snapshot, "attempts" | "questions"> | null,
   mastery: TopicMastery[],
   subjectIds: Id[],
 ): Map<Id, Calibration> {

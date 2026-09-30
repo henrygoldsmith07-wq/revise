@@ -17,6 +17,7 @@ export type SyncEntity =
   | "examDates"
   | "settings"
   | "streak"
+  | "learnerRecords"
   | "lessonProgress";
 
 export interface OutboxItem {
@@ -30,10 +31,8 @@ export interface OutboxItem {
   attempts: number;
   lastError?: string;
   /**
-   * UUID idempotency key, minted once per logical mutation. The server
-   * records it in `sync_writes` and rejects a duplicate, so a hung request
-   * retried by the browser or service worker can never double-count a
-   * review or double-award accuracy metrics.
+   * UUID per logical mutation for the best-effort delivery ledger.
+   * Stable row keys and replay-safe merges make entity retries idempotent.
    */
   idempotencyKey?: string;
   /** Logical timestamp captured when the item was queued, for causal ordering. */

@@ -1,0 +1,167 @@
+{
+  "topic": "quantum",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "physics-depth:q-photon-relation",
+      "context": "physics-depth:q-photon-relation:define",
+      "move": "state the photon energy relation and the meaning of each symbol",
+      "prompt": "State the equation relating photon energy to frequency, and define each symbol.",
+      "marks": 2,
+      "scheme": [
+        "E = hf (or hc/λ)",
+        "h is Planck's constant, f is the frequency"
+      ],
+      "answer": "A photon's energy is E = hf = hc/λ, where h is Planck's constant and f is the frequency."
+    },
+    {
+      "demand": "recall",
+      "family": "physics-depth:q-eV",
+      "context": "physics-depth:q-eV:conversion",
+      "move": "state the electronvolt and its joule equivalence",
+      "prompt": "Define the electronvolt and state its value in joules.",
+      "marks": 2,
+      "scheme": [
+        "1 eV is the energy gained by an electron through 1 V",
+        "1 eV = 1.60 × 10⁻¹⁹ J"
+      ],
+      "answer": "One electronvolt is the energy an electron gains accelerating through 1 V, equal to 1.60 × 10⁻¹⁹ J."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:q-threshold",
+      "context": "physics-depth:q-threshold:why-cutoff",
+      "move": "explain the threshold frequency from the one-photon energy balance",
+      "prompt": "Explain, in terms of photons, why no electrons are emitted below a metal's threshold frequency regardless of intensity.",
+      "marks": 3,
+      "scheme": [
+        "A photon must supply at least the work function to free an electron",
+        "Below threshold hf < φ so no single photon can liberate an electron",
+        "Extra intensity adds photons but not per-photon energy"
+      ],
+      "answer": "Emission needs hf ≥ φ. Below the threshold frequency each photon carries less than the work function, so no electron is freed however intense the light, because one electron absorbs one photon."
+    },
+    {
+      "demand": "explanation",
+      "family": "physics-depth:q-max-ke",
+      "context": "physics-depth:q-max-ke:excess-energy",
+      "move": "explain why only the fastest electrons have the maximum kinetic energy",
+      "prompt": "Explain why emitted photoelectrons have a range of kinetic energies up to a maximum value.",
+      "marks": 2,
+      "scheme": [
+        "KEmax = hf − φ is the energy left after escape",
+        "Electrons from deeper in the metal lose extra energy, so they emerge slower"
+      ],
+      "answer": "KEmax = hf − φ is the surplus after the least-bound surface electron escapes; electrons from below lose further energy on the way out, so most emerge with less than the maximum."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:q-frequency-swap",
+      "context": "physics-depth:q-frequency-swap:ke-change",
+      "move": "apply E = hf to a frequency change and take the difference in maximum kinetic energy",
+      "prompt": "Light on a metal changes from 6.0×10¹⁴ Hz to 8.0×10¹⁴ Hz. Calculate the increase in the maximum photoelectron kinetic energy. (h = 6.63×10⁻³⁴ J s)",
+      "marks": 2,
+      "scheme": [
+        "ΔE = hΔf = 6.63e-34 × (8.0e14 − 6.0e14)",
+        "= 1.33 × 10⁻¹⁹ J increase in KEmax"
+      ],
+      "answer": "Raising the frequency by 2.0×10¹⁴ Hz adds hΔf = 6.63×10⁻³⁴ × 2.0×10¹⁴ = 1.33×10⁻¹⁹ J to the maximum kinetic energy."
+    },
+    {
+      "demand": "application",
+      "family": "physics-depth:q-wavelength-energy",
+      "context": "physics-depth:q-wavelength-energy:photon-j",
+      "move": "convert a wavelength to photon energy with E = hc/λ",
+      "prompt": "Calculate the energy of a 500 nm photon in joules. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 2,
+      "scheme": [
+        "E = hc/λ = 6.63e-34 × 3.0e8 / 500e-9",
+        "= 3.98 × 10⁻¹⁹ J"
+      ],
+      "answer": "E = hc/λ = (6.63×10⁻³⁴ × 3.0×10⁸)/(500×10⁻⁹) = 3.98×10⁻¹⁹ J."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:q-intensity",
+      "context": "physics-depth:q-intensity:energy-vs-number",
+      "move": "separate photon energy (frequency) from photon rate (intensity)",
+      "prompt": "A student doubles the intensity of above-threshold light and expects the fastest electrons to double in kinetic energy. Explain the error and predict what changes.",
+      "marks": 2,
+      "scheme": [
+        "Intensity changes the number of photons per second, not each photon's energy",
+        "Photon energy depends only on frequency, so KEmax is unchanged by intensity"
+      ],
+      "answer": "Brighter light sends more photons each second, releasing more electrons, but each photon's energy hf is unchanged, so the maximum kinetic energy does not rise."
+    },
+    {
+      "demand": "misconception",
+      "family": "physics-depth:q-all-electrons",
+      "context": "physics-depth:q-all-electrons:not-every-photon",
+      "move": "reject the idea that every incident photon ejects an electron",
+      "prompt": "A student claims every photon above the threshold frequency ejects an electron. Explain why emission efficiency is below 100%.",
+      "marks": 2,
+      "scheme": [
+        "Above threshold not every photon causes emission; some pass through or miss electrons",
+        "Intensity above threshold raises the rate but the efficiency is below 100%"
+      ],
+      "answer": "Even above the threshold, only a fraction of photons eject electrons; increasing intensity raises the emission rate proportionally but never makes every photon successful."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:q-led",
+      "context": "physics-depth:q-led:threshold-voltage",
+      "move": "transfer the photon-energy model to an LED to estimate Planck's constant",
+      "prompt": "An LED emits 620 nm light when electrons cross a 1.9 V junction. Estimate Planck's constant from these values. (e = 1.60×10⁻¹⁹ C, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 3,
+      "scheme": [
+        "At threshold eV ≈ hc/λ",
+        "Rearrange h = eVλ/c = 1.60e-19 × 1.9 × 620e-9 / 3.0e8",
+        "h ≈ 6.3 × 10⁻³⁴ J s"
+      ],
+      "answer": "Setting eV = hc/λ gives h = eVλ/c = (1.60×10⁻¹⁹ × 1.9 × 620×10⁻⁹)/(3.0×10⁸) ≈ 6.3×10⁻³⁴ J s."
+    },
+    {
+      "demand": "transfer",
+      "family": "physics-depth:q-solar",
+      "context": "physics-depth:q-solar:photon-flux",
+      "move": "apply photon energy to a power budget to find photons per second",
+      "prompt": "A 2.0 W beam of 620 nm light falls on a surface. Calculate how many photons arrive per second. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹)",
+      "marks": 3,
+      "scheme": [
+        "Energy per photon E = hc/λ = 3.21e-19 J (620 nm)",
+        "Photons per second = power / E = 2.0 / 3.21e-19",
+        "= 6.2 × 10¹⁸ photons s⁻¹"
+      ],
+      "answer": "Each 620 nm photon carries 3.21×10⁻¹⁹ J, so a 2.0 W beam delivers 2.0/3.21×10⁻¹⁹ = 6.2×10¹⁸ photons each second."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:q-photo-then-stop",
+      "context": "physics-depth:q-photo-then-stop:stopping-potential",
+      "move": "combine the photoelectric balance with eVs = KEmax to find the stopping potential",
+      "prompt": "Light of frequency 1.0×10¹⁵ Hz falls on a metal of work function 3.0×10⁻¹⁹ J. Calculate the stopping potential. (h = 6.63×10⁻³⁴ J s, e = 1.60×10⁻¹⁹ C)",
+      "marks": 3,
+      "scheme": [
+        "KEmax = hf − φ = 6.63e-34×1.0e15 − 3.0e-19 = 3.63e-19 J",
+        "eVs = KEmax so Vs = 3.63e-19 / 1.60e-19",
+        "Vs = 2.3 V"
+      ],
+      "answer": "KEmax = hf − φ = 6.63×10⁻¹⁹ − 3.0×10⁻¹⁹ = 3.63×10⁻¹⁹ J. The stopping potential is Vs = KEmax/e = 3.63×10⁻¹⁹/1.60×10⁻¹⁹ = 2.3 V."
+    },
+    {
+      "demand": "synoptic",
+      "family": "physics-depth:q-energy-levels",
+      "context": "physics-depth:q-energy-levels:emitted-photon",
+      "move": "link a level difference to a photon energy then to its wavelength",
+      "prompt": "An atomic transition releases 3.0 eV. Calculate the wavelength of the emitted photon. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹, 1 eV = 1.60×10⁻¹⁹ J)",
+      "marks": 3,
+      "scheme": [
+        "Photon energy = level difference = 3.0 eV = 4.80e-19 J",
+        "λ = hc/E = 6.63e-34×3.0e8 / 4.80e-19",
+        "λ = 4.1 × 10⁻⁷ m (414 nm)"
+      ],
+      "answer": "A 3.0 eV transition emits a 4.80×10⁻¹⁹ J photon; λ = hc/E = (6.63×10⁻³⁴×3.0×10⁸)/4.80×10⁻¹⁹ = 4.1×10⁻⁷ m, about 414 nm."
+    }
+  ]
+}

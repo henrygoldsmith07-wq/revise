@@ -1,3 +1,4 @@
+import { effectiveMinutes } from "./fatigue";
 import { countdownGuidance } from "./exam-countdown";
 import { daysToExam, examUrgency } from "./recommender";
 import { valueNextAction } from "./next-best-action";
@@ -670,25 +671,7 @@ export interface PlanRealismReport {
  *
  * Returns an effective-minutes value — multiply by nominal marks/hour.
  */
-export function effectiveMinutes(minutes: number): number {
-  if (minutes <= 0) return 0;
-  let eff = 0;
-  const segments: Array<{ cap: number; factor: number }> = [
-    { cap: 25, factor: 1 },
-    { cap: 25, factor: 0.75 },
-    { cap: 40, factor: 0.55 },
-    { cap: Infinity, factor: 0.35 },
-  ];
-  let remaining = minutes;
-  for (const seg of segments) {
-    const take = Math.min(remaining, seg.cap);
-    eff += take * seg.factor;
-    remaining -= take;
-    if (remaining <= 0) break;
-  }
-  return Math.round(eff * 10) / 10;
-}
-
+export { effectiveMinutes } from "./fatigue";
 export function diminishingReturnsFactor(minutes: number): number {
   if (minutes <= 0) return 1;
   return Math.round((effectiveMinutes(minutes) / minutes) * 100) / 100;
