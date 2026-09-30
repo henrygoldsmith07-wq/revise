@@ -5,7 +5,7 @@ import { allQualifications, allSubjects, availableBoards, getBoard, gradesFor } 
 import { todayIso } from "@/domain/scheduling";
 import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Field, Panel, Pill, ProgressBar, cx } from "./ui";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
@@ -37,7 +37,7 @@ interface SubjectRow {
 }
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
-  const store = useStore();
+  const store = useStoreFields("regeneratePlan", "updateSettings", "upsertExamDate", "userId");
   const [phase, setPhase] = useState(0);
   const [boardId, setBoardId] = useState<Id | null>(null);
   const [subjectIds, setSubjectIds] = useState<Id[]>([]);

@@ -13,7 +13,7 @@ import {
   type QuickSessionMinutes,
 } from "@/domain/quick-session";
 import type { Attempt, Question } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { QuestionRunner } from "./QuestionRunner";
 import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
 import { ICON_SIZE, TimerIcon } from "./icons";
@@ -35,7 +35,7 @@ export function QuickSessionMode({
   topicId: string;
   onExit: () => void;
 }) {
-  const store = useStore();
+  const store = useStoreFields("attempts", "mastery", "questions");
   const subject = getSubject(subjectId);
   const [questionIds] = useState(() => {
     const pool = store.questions.filter(

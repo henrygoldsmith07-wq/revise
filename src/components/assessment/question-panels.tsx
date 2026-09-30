@@ -3,12 +3,12 @@
 import { getTopic } from "@/domain/curriculum";
 import { QUESTION_DIFFICULTY_MIN_SAMPLES } from "@/domain/knowledge-tracing";
 import type { QuestionDiscriminationBand } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, SectionHeading } from "../ui";
 import { EmptyHint } from "./shared";
 
 export function DifficultyAndSubtopics() {
-  const store = useStore();
+  const store = useStoreFields("assessment", "difficultyCalibration", "questionTraces", "questions");
   const insight = store.assessment;
   const questionTraces = store.questionTraces;
   const calibration = store.difficultyCalibration;
@@ -126,7 +126,7 @@ function discriminationLabel(band: QuestionDiscriminationBand): string {
 }
 
 export function QuestionDiscriminationCard() {
-  const store = useStore();
+  const store = useStoreFields("assessment", "questions");
   const rows = (store.assessment?.questionDiscrimination ?? [])
     .filter((measurement) => measurement.sampleSize > 0)
     .slice(0, 8);

@@ -6,7 +6,7 @@ import { buildDailySessionPlan, MAX_SESSION_MINUTES } from "@/domain/daily-sessi
 import { capabilitySentence } from "@/domain/capability-mastery";
 import { deriveCapabilityProfiles } from "@/domain/capability-source";
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, cx } from "./ui";
 import { PlayIcon, ICON_SIZE } from "./icons";
 
@@ -25,7 +25,7 @@ const PHASE_TONE: Record<string, string> = {
 };
 
 export function DailySessionCard({ subjectIds }: { subjectIds: string[] }) {
-  const store = useStore();
+  const store = useStoreFields("applicationMastery", "attempts", "cards", "mastery", "mistakes", "questions", "recallMastery", "settings");
   const masteryByTopic = useMemo(() => {
     const map = new Map<string, number>();
     for (const m of store.mastery) map.set(m.topicId, m.mastery);

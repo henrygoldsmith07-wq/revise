@@ -6,7 +6,7 @@ import { seedMisconceptions } from "@/content";
 import { allTopics } from "@/domain/curriculum";
 import { buildSearchIndex, searchIndex } from "@/domain/search";
 import type { SearchResult } from "@/domain/search";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { useFocusTrap } from "./useFocusTrap";
 import { cx, Pill } from "./ui";
 
@@ -14,7 +14,7 @@ import { cx, Pill } from "./ui";
  *  locally, so it works offline and returns within a keystroke. */
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const { cards, questions, settings } = useStore();
+  const { cards, questions, settings } = useStoreFields("cards", "questions", "settings");
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

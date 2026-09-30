@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { allSubjects, allTopics, getSubject } from "@/domain/curriculum";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content";
@@ -116,6 +116,8 @@ import { useExperiments } from "./experiments";
 import { useOutcomes } from "./outcomes";
 import { useRevisionSessions } from "./sessions";
 import { usePlanning } from "./planning";
+import { StoreSubscriptionsProvider, useStoreFields } from "./store-context";
+export { useStore, useStoreFields, useStoreSelector } from "./store-context";
 import { buildPaperCalibrations, previewPaperSimulation } from "./paper-preview";
 
 // ---------------------------------------------------------------------------
@@ -136,7 +138,7 @@ import { buildPaperCalibrations, previewPaperSimulation } from "./paper-preview"
 export type { SyncStatus };
 export { nextLessonStreak };
 
-interface StoreValue extends Snapshot {
+export interface StoreValue extends Snapshot {
   ready: boolean;
   /** True until the student has been through (or skipped) onboarding. */
   needsOnboarding: boolean;
@@ -233,19 +235,11 @@ interface StoreValue extends Snapshot {
   recordInterventionOutcome(outcome: InterventionOutcomeRecord): Promise<void>;
 }
 
-const StoreContext = createContext<StoreValue | null>(null);
-
-export function useStore(): StoreValue {
-  const value = useContext(StoreContext);
-  if (!value) throw new Error("useStore must be used inside <StoreProvider>");
-  return value;
-}
-
 // Session clock, lesson streak, evidence trust, and sync coordination now
 // live in ./session-clock, ./lesson-streak, ./trusted-evidence and
 // ./sync-engine (pure moves + responsibility modules).
 
-export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: ReactNode; userId?: Id }) {
+export function StoreProvider({ children, userId }: { children: ReactNode; userId: Id }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [storageQuota, setStorageQuota] = useState<StorageQuota>(() => ({
     usageBytes: null,
@@ -255,6 +249,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     checkedAt: new Date().toISOString(),
   }));
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [bootLoaded, setBootLoaded] = useState(false);
   const bootstrapped = useRef(false);
   // Boot must never fail silently. If IndexedDB or a migration rejects, keep
   // the reason visible so the student can retry instead of staring at a
@@ -294,7 +289,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         startHydration();
         // Import legacy localStorage lesson progress into the synced row once,
         // so the switch to cross-device storage never resets a student.
-        const legacy = legacyLessonProgress();
+        const legacy = userId === LOCAL_USER_ID ? legacyLessonProgress() : null;
         if (legacy && Object.keys(loaded.lessonProgress.completed).length === 0) {
           const migrated: LessonProgress = {
             ...loaded.lessonProgress,
@@ -316,7 +311,9 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
           await repo.savePlan(healed);
           setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
         }
+        setBootLoaded(true);
       } catch (error) {
+        setBootLoaded(false);
         console.error("[store] boot failed", error);
         bootstrapped.current = false;
         setBootError(error instanceof Error ? error.message : "Could not load your revision data.");
@@ -354,6 +351,17 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   // --- derived state -------------------------------------------------------
 
+  // Evidence inputs have their own stable boundary: settings, plan, streak
+  // and sync writes cannot invalidate evidence-only reports.
+  const cards = snapshot?.cards;
+  const reviewLogs = snapshot?.reviewLogs;
+  const attempts = snapshot?.attempts;
+  const mistakes = snapshot?.mistakes;
+  const questions = snapshot?.questions;
+  const evidence = useMemo(() => cards && reviewLogs && attempts && mistakes && questions
+    ? { cards, reviewLogs, attempts, mistakes, questions } : null,
+    [cards, reviewLogs, attempts, mistakes, questions]);
+
   // Memoised so the identity is stable: every derived value below keys off
   // this array, and a fresh `[]` each render would recompute all of them.
   const subjectIds = useMemo(
@@ -363,35 +371,35 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
 
   const mastery = useMemo(() => {
-    if (!snapshot) return [];
+    if (!evidence) return [];
     return computeTopicMastery({
       topics,
-      cards: snapshot.cards,
-      reviewLogs: snapshot.reviewLogs,
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
-      questions: snapshot.questions,
+      cards: evidence.cards,
+      reviewLogs: evidence.reviewLogs,
+      attempts: evidence.attempts,
+      mistakes: evidence.mistakes,
+      questions: evidence.questions,
       trustedQuestion: trustedAssessmentContent,
     });
-  }, [snapshot, topics]);
+  }, [evidence, topics]);
 
   const recallMastery = useMemo(() => {
-    if (!snapshot) return [];
+    if (!evidence) return [];
     return computeRecallMastery({
       topics,
-      cards: snapshot.cards,
-      reviewLogs: snapshot.reviewLogs,
+      cards: evidence.cards,
+      reviewLogs: evidence.reviewLogs,
     });
-  }, [snapshot, topics]);
+  }, [evidence, topics]);
 
   const masteryUncertainty = useMemo(() => {
-    if (!snapshot) return [];
+    if (!evidence) return [];
 
-    const trustedAttempts = snapshot.attempts.filter((attempt) => trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts));
-    const trustedMistakes = snapshot.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, snapshot.questions, snapshot.attempts));
+    const trustedAttempts = evidence.attempts.filter((attempt) => trustedSnapshotAttempt(attempt, evidence.questions, evidence.attempts));
+    const trustedMistakes = evidence.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, evidence.questions, evidence.attempts));
 
     const cardsByTopic = new Map<Id, Card[]>();
-    for (const card of snapshot.cards) {
+    for (const card of evidence.cards) {
       const rows = cardsByTopic.get(card.topicId) ?? [];
       rows.push(card);
       cardsByTopic.set(card.topicId, rows);
@@ -419,23 +427,23 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
       attemptsByTopic,
       mistakesByTopic,
     });
-  }, [snapshot, mastery]);
+  }, [evidence, mastery]);
 
   const applicationMastery = useMemo(() => {
-    if (!snapshot) return [];
+    if (!evidence) return [];
     return computeApplicationMastery({
       topics,
-      questions: snapshot.questions,
-      attempts: snapshot.attempts,
+      questions: evidence.questions,
+      attempts: evidence.attempts,
       trustedQuestion: trustedAssessmentContent,
     });
-  }, [snapshot, topics]);
+  }, [evidence, topics]);
 
   const dueCards = useMemo(() => {
-    if (!snapshot) return [];
+    if (!evidence) return [];
     const today = todayIso();
-    return snapshot.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
-  }, [snapshot, subjectIds]);
+    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
+  }, [evidence, subjectIds]);
 
   // --- heavy analytics, off the main thread --------------------------------
   //
@@ -449,30 +457,30 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   // needs.
   const attemptsByQuestion = useMemo(() => {
     const map = new Map<Id, Attempt[]>();
-    for (const attempt of snapshot?.attempts ?? []) {
-      if (snapshot && !trustedSnapshotAttempt(attempt, snapshot.questions, snapshot.attempts)) continue;
+    for (const attempt of evidence?.attempts ?? []) {
+      if (evidence && !trustedSnapshotAttempt(attempt, evidence.questions, evidence.attempts)) continue;
       const rows = map.get(attempt.questionId) ?? [];
       rows.push(attempt);
       map.set(attempt.questionId, rows);
     }
     return map;
-  }, [snapshot]);
+  }, [evidence]);
 
   useEffect(() => {
-    if (!snapshot) return;
+    if (!evidence) return;
     let cancelled = false;
     (async () => {
-      const questionsById = new Map(snapshot.questions.map((q) => [q.id, q] as const));
+      const questionsById = new Map(evidence.questions.map((q) => [q.id, q] as const));
       const nextAssessment =
-        snapshot.attempts.length || snapshot.mistakes.length
+        evidence.attempts.length || evidence.mistakes.length
           ? await domainEngine.assess({
-              attempts: snapshot.attempts,
-              mistakes: snapshot.mistakes,
+              attempts: evidence.attempts,
+              mistakes: evidence.mistakes,
               mastery,
               questionsById,
             })
           : null;
-      const traces = await domainEngine.trace({ questions: snapshot.questions, attemptsByQuestion });
+      const traces = await domainEngine.trace({ questions: evidence.questions, attemptsByQuestion });
       if (cancelled) return;
       setAssessment(nextAssessment);
       setQuestionTraces(traces);
@@ -480,11 +488,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     return () => {
       cancelled = true;
     };
-    // mastery is intentionally excluded: it is recomputed from the same
-    // snapshot in the same pass, and including it would double-fire the
-    // effect on every grade.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot, attemptsByQuestion]);
+  }, [evidence, attemptsByQuestion, mastery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -498,48 +502,48 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   }, [questionTraces]);
 
   useEffect(() => {
-    if (!snapshot) return;
+    if (!evidence) return;
     let cancelled = false;
     (async () => {
-      const validated = await domainEngine.validate({ cards: snapshot.cards, logs: snapshot.reviewLogs });
+      const validated = await domainEngine.validate({ cards: evidence.cards, logs: evidence.reviewLogs });
       if (!cancelled) setForgettingCalibration(validated);
     })();
     return () => {
       cancelled = true;
     };
-  }, [snapshot]);
+  }, [evidence]);
   const calculationMastery = useMemo(() => {
-    if (!snapshot) return calculateCalculationMastery({ questions: [], attempts: [], mistakes: [] });
+    if (!evidence) return calculateCalculationMastery({ questions: [], attempts: [], mistakes: [] });
     return calculateCalculationMastery({
-      questions: snapshot.questions,
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
+      questions: evidence.questions,
+      attempts: evidence.attempts,
+      mistakes: evidence.mistakes,
       trustedQuestion: trustedAssessmentContent,
     });
-  }, [snapshot]);
+  }, [evidence]);
   const sparseEvidenceConfidence = useMemo(() => {
-    if (!snapshot) return buildSparseEvidenceConfidence({ topics: [], mastery: [], cards: [], attempts: [], mistakes: [] });
+    if (!evidence) return buildSparseEvidenceConfidence({ topics: [], mastery: [], cards: [], attempts: [], mistakes: [] });
     return buildSparseEvidenceConfidence({
       topics,
       mastery,
-      cards: snapshot.cards,
-      attempts: snapshot.attempts,
-      mistakes: snapshot.mistakes,
-      questions: snapshot.questions,
+      cards: evidence.cards,
+      attempts: evidence.attempts,
+      mistakes: evidence.mistakes,
+      questions: evidence.questions,
     });
-  }, [snapshot, topics, mastery]);
+  }, [evidence, topics, mastery]);
   const predictionOutcome = useMemo(() => {
-    if (!snapshot) return predictionOutcomeReport([]);
-    return predictionOutcomeReport(buildPredictionOutcomePairs({ attempts: snapshot.attempts, questions: snapshot.questions }));
-  }, [snapshot]);
+    if (!evidence) return predictionOutcomeReport([]);
+    return predictionOutcomeReport(buildPredictionOutcomePairs({ attempts: evidence.attempts, questions: evidence.questions }));
+  }, [evidence]);
   const adaptiveDifficulty = useMemo(() => {
-    if (!snapshot) return adaptiveDifficultyCalibration({ questions: [], traces: [] });
-    return adaptiveDifficultyCalibration({ questions: snapshot.questions, traces: questionTraces });
-  }, [snapshot, questionTraces]);
+    if (!evidence) return adaptiveDifficultyCalibration({ questions: [], traces: [] });
+    return adaptiveDifficultyCalibration({ questions: evidence.questions, traces: questionTraces });
+  }, [evidence, questionTraces]);
   const questionExposure = useMemo(() => {
-    if (!snapshot) return questionExposureReport({ questions: [], attempts: [] });
-    return questionExposureReport({ questions: snapshot.questions, attempts: snapshot.attempts });
-  }, [snapshot]);
+    if (!evidence) return questionExposureReport({ questions: [], attempts: [] });
+    return questionExposureReport({ questions: evidence.questions, attempts: evidence.attempts });
+  }, [evidence]);
 
   const marksPerHour = useMemo(() => {
     if (!assessment) return new Map<Id, number>();
@@ -562,11 +566,11 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
 
   const recurringMisconceptions = useMemo(
     () => {
-      if (!snapshot) return [];
-      const mistakes = snapshot.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, snapshot.questions, snapshot.attempts));
+      if (!evidence) return [];
+      const mistakes = evidence.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, evidence.questions, evidence.attempts));
       return tallyMisconceptions(mistakes, seedMisconceptions);
     },
-    [snapshot],
+    [evidence],
   );
 
   // Calibration per subject from paper-mode attempts: predicted vs actual.
@@ -586,28 +590,28 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const techniqueReports = useMemo(() => {
     const bySubject = new Map<Id, KnowledgeAnsweringReport>();
     const byTopic = new Map<Id, KnowledgeAnsweringReport>();
-    if (!snapshot) return { bySubject, byTopic };
+    if (!evidence) return { bySubject, byTopic };
     for (const subjectId of subjectIds) {
       bySubject.set(
         subjectId,
         knowledgeVsAnswering({
           subjectId,
-          mistakes: snapshot.mistakes,
-          questions: snapshot.questions,
-          attempts: snapshot.attempts,
+          mistakes: evidence.mistakes,
+          questions: evidence.questions,
+          attempts: evidence.attempts,
         }),
       );
       for (const row of knowledgeVsAnsweringByTopic({
         subjectId,
-        mistakes: snapshot.mistakes,
-        questions: snapshot.questions,
-        attempts: snapshot.attempts,
+        mistakes: evidence.mistakes,
+        questions: evidence.questions,
+        attempts: evidence.attempts,
       })) {
         byTopic.set(row.topicId, row.report);
       }
     }
     return { bySubject, byTopic };
-  }, [snapshot, subjectIds]);
+  }, [evidence, subjectIds]);
 
   const predictions = useMemo(() => {
     if (!snapshot) return [];
@@ -1026,7 +1030,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
   const value: StoreValue | null = useMemo(() => {
     // First paint waits for the snapshot AND every module's mount load, which
     // is exactly what boot's single Promise.all guaranteed before the split.
-    if (!snapshot || !experimentsLoaded || !outcomesLoaded || !sessionsLoaded) return null;
+    if (!bootLoaded || !snapshot || !experimentsLoaded || !outcomesLoaded || !sessionsLoaded) return null;
     return {
       ...snapshot,
       ready: true,
@@ -1112,6 +1116,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     };
   }, [
     snapshot,
+    bootLoaded,
     needsOnboarding,
     completeOnboarding,
     userId,
@@ -1202,6 +1207,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
         error={new Error(bootError)}
         onRetry={() => {
           setBootError(null);
+          setBootLoaded(false);
           bootstrapped.current = false;
           setBootAttempt((attempt) => attempt + 1);
         }}
@@ -1209,7 +1215,7 @@ export function StoreProvider({ children, userId = LOCAL_USER_ID }: { children: 
     );
   }
   if (!value) return <BootScreen />;
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+  return <StoreSubscriptionsProvider value={value}>{children}</StoreSubscriptionsProvider>;
 }
 
 function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () => void } = {}) {
@@ -1241,6 +1247,6 @@ function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () =>
 
 /** Subjects the student is taking, in curriculum order (derived, not stored). */
 export function useSubjects() {
-  const { settings } = useStore();
+  const { settings } = useStoreFields("settings");
   return useMemo(() => subjectsForSettings(settings), [settings]);
 }

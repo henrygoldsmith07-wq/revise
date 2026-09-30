@@ -1,11 +1,11 @@
 "use client";
 
 import { revisionActivityLabel } from "@/domain/revision-checkpoint";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, ButtonLink, Panel, Pill, ProgressBar } from "@/components/ui";
 
 export function ResumeRevisionCard() {
-  const store = useStore();
+  const store = useStoreFields("clearRevisionCheckpoint", "revisionCheckpoint");
   const checkpoint = store.revisionCheckpoint;
 
   if (!checkpoint) return null;

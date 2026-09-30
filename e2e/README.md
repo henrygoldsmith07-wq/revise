@@ -17,8 +17,10 @@ PLAYWRIGHT_ALL_BROWSERS=1 npm run test:e2e:ci  # CI matrix
 
 ## CI vs local
 
-CI runs the Playwright job only when `package.json` has `@playwright/test` installed (see `.github/workflows/revise.yml`); otherwise `npm run test:e2e` is skipped and the node smoke is the gate. Visual snapshots are uploaded as artefacts rather than hard-failing CI — a reviewer confirms intentional visual changes.
+CI requires Playwright and runs the Chromium journey suite unconditionally (see `.github/workflows/revise.yml`). Visual snapshots are uploaded as artefacts rather than hard-failing CI — a reviewer confirms intentional visual changes.
 
 ## Process contract
 
 Snapshots live at `e2e/__screenshots__/`. Do not hand-edit them. If a snapshot fails, inspect the diff image, decide whether the visual change is intentional, and re-baseline with `--update-snapshots` in the same branch.
+
+Managed environments can use an already installed Chromium with `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. The default continues to use Playwright's pinned binary. Videos and screenshots remain enabled in both cases.

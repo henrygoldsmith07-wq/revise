@@ -5,7 +5,7 @@ import { useState } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { ACTIVITY_LABEL } from "@/domain/recommender";
 import { REVISION_TWIN_MINUTES, type RevisionTwinChoice } from "@/domain/revision-twin";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import type { ActivityKind } from "@/domain/types";
 import { Button, ButtonLink, Panel, Pill, cx } from "./ui";
 
@@ -56,7 +56,7 @@ function confidenceCopy(sampleSize: number): { label: string; tone: "neutral" | 
 }
 
 function ChoiceList({ compact }: { compact: boolean }) {
-  const store = useStore();
+  const store = useStoreFields("revisionTwinChoices", "revisionTwinReport", "startRevisionTwinSession");
   const [starting, setStarting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const active = store.revisionTwinReport.activeSession;
@@ -141,7 +141,7 @@ function ChoiceList({ compact }: { compact: boolean }) {
 }
 
 export function RevisionTwinCard({ compact = false }: { compact?: boolean }) {
-  const store = useStore();
+  const store = useStoreFields("revisionTwinChoices", "revisionTwinReport", "startRevisionTwinSession");
   const active = store.revisionTwinReport.activeSession;
   const checks = store.revisionTwinReport.checks;
   const minutes = active?.plannedMinutes ?? store.revisionTwinChoices[0]?.plannedMinutes ?? REVISION_TWIN_MINUTES;

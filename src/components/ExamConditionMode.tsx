@@ -13,7 +13,7 @@ import {
 } from "@/domain/exam-conditions";
 import { markMcq } from "@/domain/marking";
 import type { Attempt, MarkedPart, Paper, PaperSpec, Question } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { RichText } from "./RichText";
 import { Button, Panel, Pill, ProgressBar, SectionHeading, cx } from "./ui";
 import { ICON_SIZE, TimerIcon } from "./icons";
@@ -36,7 +36,7 @@ const FALLBACK_PAPER_SPEC: PaperSpec = {
 };
 
 export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () => void }) {
-  const store = useStore();
+  const store = useStoreFields("addPaper", "beginPaperOutcome", "closePaperOutcome", "previewPaper", "questions", "recordAttempt", "userId");
   const subject = getSubject(paper.subjectId);
   const initialPaperSpecId = paper.paperSpecId && subject?.papers.some((candidate) => candidate.id === paper.paperSpecId)
     ? paper.paperSpecId

@@ -9,7 +9,7 @@ import { PaceForecastLine } from "@/components/PaceForecast";
 import { ExamOutlook } from "@/components/ExamOutlook";
 import { CountdownPhaseBanner } from "@/components/CountdownPhaseBanner";
 import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
 import { TodayOverview } from "@/components/TodayOverview";
@@ -30,7 +30,7 @@ const TodayRoadmap = dynamic(() => import("@/components/TodayRoadmap"), {
 // precedence so the student never loses their place.
 
 export default function TodayPage() {
-  const store = useStore();
+  const store = useStoreFields("adaptiveSession", "examDates", "experimentArm", "mastery", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
   const {
     settings,
     recordFunnel,
@@ -126,7 +126,7 @@ function TodayWelcome({ name, greeting, hasSession = true }: { name: string; gre
         {salutation}{name ? ", " + name : ""}
       </h1>
       <p className="relative z-10 mt-2 max-w-xl text-sm leading-6 text-ink2 sm:text-base">
-        {hasSession ? "Start with a short session, or choose a subject you feel like exploring." : "Choose a lesson that interests you, or make a plan for your exams."}
+        {hasSession ? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
       </p>
     </header>
   );

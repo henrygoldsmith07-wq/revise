@@ -40,7 +40,7 @@ export function useSyncEngine(input: {
   setBootError: Dispatch<SetStateAction<string | null>>;
 }): SyncEngine {
   const { userId, snapshot, setSnapshot, setBootError } = input;
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => initialSyncStatus());
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => ({ ...initialSyncStatus(), enabled: isSupabaseConfigured && userId !== "local" }));
 
   // --- progressive history hydration ---------------------------------------
   //
@@ -87,7 +87,7 @@ export function useSyncEngine(input: {
   }, [hydrateHistory, setBootError]);
 
   const syncNow = useCallback(async () => {
-    if (!isSupabaseConfigured || syncInFlight) return;
+    if (!isSupabaseConfigured || userId === "local" || syncInFlight) return;
     syncInFlight = true;
     setSyncStatus((s) => ({ ...s, syncing: true }));
     try {
@@ -98,7 +98,9 @@ export function useSyncEngine(input: {
           ? "Some changes are still waiting to sync. We’ll keep trying."
           : result.skipped === "signed-out"
             ? "Sign in to sync across devices. Your data is still saved here."
-            : null;
+            : result.skipped === "account-mismatch" || result.skipped === "owner-unknown"
+              ? "Sync stopped because the account and saved data do not match. Reopen your account profile."
+              : null;
       setSyncStatus((s) => ({
         ...s,
         syncing: false,
@@ -148,7 +150,7 @@ export function useSyncEngine(input: {
   // Local writes enqueue after IndexedDB succeeds. Reflect that immediately so
   // offline work is visibly safe instead of waiting for the next retry timer.
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured || userId === "local") return;
     const refreshPending = () => {
       void Promise.all([outboxSize(userId), failedOutboxItems(userId)]).then(([pending, failedItems]) =>
         setSyncStatus((s) => ({ ...s, pending, failed: failedItems.length }))
@@ -202,7 +204,7 @@ export function useSyncEngine(input: {
   }, [setSnapshot]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !snapshot || !syncStatus.online) return;
+    if (!isSupabaseConfigured || userId === "local" || !snapshot || !syncStatus.online) return;
     // Debounced rather than per-write: snapshot changes on every graded card,
     // and a full drain+pull cycle per keystroke would hammer the network while
     // a session runs. The interval covers quiet periods.
@@ -212,7 +214,7 @@ export function useSyncEngine(input: {
       clearTimeout(first);
       clearInterval(timer);
     };
-  }, [snapshot, syncNow, syncStatus.online]);
+  }, [snapshot, syncNow, syncStatus.online, userId]);
 
   return { syncStatus, syncNow, startHydration };
 }

@@ -1,0 +1,191 @@
+{
+  "topic": "nuclear",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:nuclear1:observations",
+      "context": "depth50:nuclear1:observations:gold-foil",
+      "move": "recall the three key observations of alpha scattering",
+      "prompt": "State the main observations from Rutherford's alpha-particle scattering experiment.",
+      "marks": 2,
+      "scheme": [
+        "Most alpha particles passed straight through or were only slightly deflected",
+        "A small fraction were deflected through large angles, with a very tiny fraction backscattered"
+      ],
+      "answer": "Most alpha particles passed through with little deflection. A small number were deflected through large angles and a very small fraction were backscattered."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:nuclear1:model",
+      "context": "depth50:nuclear1:model:atom",
+      "move": "state the nuclear model features inferred from scattering",
+      "prompt": "What did Rutherford infer about the size, charge and mass distribution of the atom's nucleus?",
+      "marks": 2,
+      "scheme": [
+        "The nucleus is very small compared with the atom and contains nearly all the mass",
+        "It carries positive charge and is surrounded by mostly empty space"
+      ],
+      "answer": "The nucleus is tiny, positively charged and contains nearly all the atomic mass; most of the atom is empty space."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:nuclear1:empty-space",
+      "context": "depth50:nuclear1:empty-space:foil",
+      "move": "explain why undeflected alpha particles imply mostly empty atomic volume",
+      "prompt": "Explain why the large number of undeflected alpha particles supports the conclusion that atoms are mostly empty space.",
+      "marks": 2,
+      "scheme": [
+        "Most alpha particles encounter no strong electric field while crossing an atom",
+        "Therefore the region containing significant charge and mass occupies only a tiny fraction of the atomic volume"
+      ],
+      "answer": "Most alpha particles feel no strong deflection, so they pass through regions with little charge. Significant charge and mass must therefore occupy only a small part of the atom, leaving mostly empty space."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:nuclear1:backscatter",
+      "context": "depth50:nuclear1:backscatter:alpha",
+      "move": "explain large-angle scattering from a concentrated repulsive charge",
+      "prompt": "Why could a few alpha particles be scattered backwards even though an alpha particle is much heavier than an electron?",
+      "marks": 2,
+      "scheme": [
+        "A close approach to a small, concentrated positive nucleus gives a very strong electrostatic repulsion",
+        "The nucleus has a much larger mass than the alpha particle, so it can provide a large deflection without recoiling far"
+      ],
+      "answer": "Near the concentrated positive nucleus, electrostatic repulsion is very strong. Because the nucleus is far more massive than the alpha particle, it can reverse the alpha direction while moving very little itself."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:nuclear1:scattering-angle",
+      "context": "depth50:nuclear1:scattering-angle:screen",
+      "move": "infer a model consequence from a measured angular distribution",
+      "prompt": "An experiment records many more alpha particles at 2° than at 60°. What does this distribution say about the range of impact parameters?",
+      "marks": 2,
+      "scheme": [
+        "Small-angle events are much more common because most particles pass far from the nucleus",
+        "Large-angle events require a close approach with a small impact parameter"
+      ],
+      "answer": "The abundance of 2° events shows that most particles pass at large impact parameters. A 60° deflection needs a much closer encounter with the nucleus."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:nuclear1:energy",
+      "context": "depth50:nuclear1:energy:foil",
+      "move": "predict how alpha energy changes the scattering pattern",
+      "prompt": "If the alpha-particle energy is increased while the foil and geometry stay the same, how should the large-angle scattering rate change? Explain.",
+      "marks": 2,
+      "scheme": [
+        "Higher kinetic energy makes the alpha less strongly deflected for a given closest approach",
+        "The fraction scattered through a specified large angle decreases"
+      ],
+      "answer": "Higher-energy alpha particles are harder to deflect, so fewer are scattered through a specified large angle; the large-angle fraction decreases."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:nuclear1:electron-deflection",
+      "context": "depth50:nuclear1:electron-deflection:atom",
+      "move": "reject the plum-pudding explanation for backscattering",
+      "prompt": "A student says electrons in a diffuse positive sphere can account for alpha particles being reflected backwards. Explain why this fails.",
+      "marks": 2,
+      "scheme": [
+        "A diffuse positive charge would exert only weak forces spread through the atom",
+        "Backscattering requires a strong, concentrated repulsive field, which implies a compact nucleus"
+      ],
+      "answer": "A diffuse positive sphere cannot supply a strong enough force over a short distance to reverse an alpha particle. Backscattering requires concentrated positive charge in a small nucleus."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:nuclear1:neutral-nucleus",
+      "context": "depth50:nuclear1:neutral-nucleus:charge",
+      "move": "correct the claim that the nucleus is neutral because neutrons exist",
+      "prompt": "A student concludes the nucleus has no net charge because it contains neutrons. Correct the reasoning.",
+      "marks": 2,
+      "scheme": [
+        "The nucleus contains positively charged protons as well as neutral neutrons",
+        "Its net charge is positive; electrons outside the nucleus provide overall atomic neutrality"
+      ],
+      "answer": "Neutrons are neutral, but protons are positive, so the nucleus has a positive net charge. Electrons outside it make the whole atom neutral."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:nuclear1:inverse-square",
+      "context": "depth50:nuclear1:inverse-square:alpha",
+      "move": "use inverse-square scaling to compare electrostatic force at two separations",
+      "prompt": "The electrostatic force on an alpha particle at 1.0 × 10⁻¹⁴ m from a nucleus is F. What is the force at 2.0 × 10⁻¹⁴ m, assuming the same charges?",
+      "marks": 2,
+      "scheme": [
+        "Coulomb force varies as 1/r²",
+        "Doubling r gives F₂ = F/4"
+      ],
+      "answer": "Since F ∝ 1/r², doubling the separation reduces the force to F/4."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:nuclear1:count-rate",
+      "context": "depth50:nuclear1:count-rate:detector",
+      "move": "correct a scattering count for geometric exposure",
+      "prompt": "A detector records 240 large-angle events in 6.0 min. A second run uses twice the alpha beam current for 3.0 min with the same geometry. Predict the event count if the target is unchanged.",
+      "marks": 3,
+      "scheme": [
+        "First rate = 240/6.0 = 40 events min⁻¹ at the original current",
+        "The second run has twice the current, so rate = 80 events min⁻¹",
+        "Count = 80 × 3.0 = 240 events"
+      ],
+      "answer": "The first rate is 40 events per minute. Doubling current doubles the rate to 80 per minute; in 3.0 minutes the expected count is 240."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:nuclear1:proton-probe",
+      "context": "depth50:nuclear1:proton-probe:scattering",
+      "move": "transfer scattering inference to a different charged probe",
+      "prompt": "A proton-scattering experiment on a thin target also shows rare large-angle events. Which nuclear conclusion transfers directly, and which observation must be rechecked because the probe charge differs?",
+      "marks": 2,
+      "scheme": [
+        "Rare large-angle events still support a small concentrated centre containing most of the mass",
+        "The quantitative scattering angle/rate must be recalculated because the proton charge and mass change the Coulomb interaction and motion"
+      ],
+      "answer": "The inference of a compact massive centre transfers. Numerical angles and rates cannot be copied because a proton has different charge and mass from an alpha particle."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:nuclear1:neutron",
+      "context": "depth50:nuclear1:neutron:scattering",
+      "move": "distinguish nuclear-size evidence from Coulomb-scattering evidence",
+      "prompt": "Why would a beam of neutrons be useful for probing nuclear size but unable to reproduce Rutherford's Coulomb scattering pattern?",
+      "marks": 2,
+      "scheme": [
+        "Neutrons can interact with the short-range nuclear force and so can reveal nuclear dimensions",
+        "They have no electric charge, so there is no long-range Coulomb repulsion and no Rutherford angular distribution"
+      ],
+      "answer": "Neutrons can probe the nucleus through the short-range nuclear force, but their zero charge removes the long-range Coulomb repulsion that produces Rutherford's pattern."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:nuclear1:radius",
+      "context": "depth50:nuclear1:radius:scaling",
+      "move": "link scattering resolution to nuclear-radius scaling",
+      "prompt": "Explain why increasing alpha-particle energy can improve the spatial resolution of a scattering experiment, but does not by itself prove the nuclear radius relation r ∝ A^(1/3).",
+      "marks": 3,
+      "scheme": [
+        "Higher momentum gives a shorter de Broglie wavelength and permits closer probing",
+        "A radius relation requires comparing scattering from nuclei with different nucleon number",
+        "The measured angular/energy data must be fitted to a model rather than inferred from one target"
+      ],
+      "answer": "Higher momentum means a shorter de Broglie wavelength and finer probe resolution. To test r ∝ A^(1/3), scattering data from several nuclei must be compared and fitted; one high-energy target is insufficient."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:nuclear1:energy-loss",
+      "context": "depth50:nuclear1:energy-loss:detector",
+      "move": "combine energy conservation with scattering evidence",
+      "prompt": "An alpha particle approaches a nucleus head-on and momentarily stops before moving away. What energy transfer has occurred in the ideal elastic model, and what would a lower exit energy indicate?",
+      "marks": 3,
+      "scheme": [
+        "At closest approach its kinetic energy has been converted into electrostatic potential energy",
+        "In an elastic encounter it regains the same kinetic energy as it recedes",
+        "A lower exit energy would indicate energy transferred to nuclear excitation, recoil or other non-elastic channels"
+      ],
+      "answer": "At the turning point the alpha's kinetic energy is stored as electrostatic potential energy. An elastic event returns the same kinetic energy; a lower exit energy signals recoil, excitation or another inelastic transfer."
+    }
+  ]
+}

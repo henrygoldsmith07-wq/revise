@@ -4,7 +4,7 @@ import { useState } from "react";
 import { topicsFor } from "@/domain/curriculum";
 import { buryCard, normaliseTags, setSuspended, unburyCard } from "@/domain/scheduling";
 import type { Card } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, cx } from "./ui";
 import { DeleteIcon, ICON_SIZE } from "./icons";
 
@@ -21,7 +21,7 @@ export function BulkActions({
   onDone: () => void;
   onExport: (cards: Card[]) => void;
 }) {
-  const store = useStore();
+  const store = useStoreFields("removeCards", "updateCards");
   const [mode, setMode] = useState<"tag" | "untag" | "move" | null>(null);
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<string | null>(null);

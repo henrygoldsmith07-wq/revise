@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Panel, Pill, ProgressBar, SectionHeading, StatTile } from "../ui";
 import { EmptyHint } from "./shared";
 
 export function PaperSimulationCard() {
-  const store = useStore();
+  const store = useStoreFields("previewPaper", "questions", "settings");
   const subjects = store.settings.subjectIds.map((id) => {
     const s = getSubject(id);
     return s ? { id: s.id, name: s.name, papers: s.papers } : null;
@@ -73,7 +73,7 @@ export function PaperSimulationCard() {
 }
 
 export function CalibrationCard() {
-  const store = useStore();
+  const store = useStoreFields("calibrations");
   const rows = [...store.calibrations.values()].filter((c) => c.sampleSize > 0);
   return (
     <Panel>

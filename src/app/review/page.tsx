@@ -11,7 +11,7 @@ import type { Card, Question, RecallGrade } from "@/domain/types";
 import { pickExamQuestionForCard } from "@/domain/card-question";
 import { classifyMistake } from "@/domain/mistake-classification";
 import { buildRepairPlan, repairProgress } from "@/domain/mistake-repair";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
@@ -39,7 +39,7 @@ export default function ReviewPage() {
 
 function ReviewSession() {
   const params = useSearchParams();
-  const store = useStore();
+  const store = useStoreFields("attempts", "cards", "clearRevisionCheckpoint", "mistakes", "questions", "reviewCard", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "updateCards", "userId");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjectId = params.get("subject");
   const topicId = params.get("topic");
@@ -78,7 +78,8 @@ function ReviewSession() {
     if (mode !== "custom" || typeof sessionStorage === "undefined") return null;
     try {
       const raw = sessionStorage.getItem(CUSTOM_STUDY_KEY);
-      return raw ? (JSON.parse(raw) as { ids: string[]; preview: boolean }) : null;
+      const saved = raw ? (JSON.parse(raw) as { userId?: string; ids: string[]; preview: boolean }) : null;
+      return saved?.userId === store.userId ? saved : null;
     } catch {
       return null;
     }
@@ -564,7 +565,7 @@ function SessionSummary({
   sessionId: string | null;
   returnHref: string | null;
 }) {
-  const store = useStore();
+  const store = useStoreFields("adaptiveSession", "completeSession");
   const logged = useRef(false);
 
   useEffect(() => {

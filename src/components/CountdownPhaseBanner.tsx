@@ -18,7 +18,7 @@ import { getSubject } from "@/domain/curriculum";
 import { countdownGuidance } from "@/domain/exam-countdown";
 import { daysToExam } from "@/domain/recommender";
 import { todayLocal } from "@/domain/local-date";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Pill } from "@/components/ui";
 
 /** Application phase and closer: weak-topic work and timed practice step up. */
@@ -40,7 +40,7 @@ function toneFor(days: number): BannerRow["tone"] {
 }
 
 export function CountdownPhaseBanner() {
-  const store = useStore();
+  const store = useStoreFields("examDates", "settings");
 
   const rows = useMemo<BannerRow[]>(() => {
     const today = todayLocal();

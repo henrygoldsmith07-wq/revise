@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { nextGradeTarget } from "@/domain/grades";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, ProgressBar, SectionHeading } from "../ui";
 import { EmptyHint } from "./shared";
 
 export function NextGradeView() {
-  const store = useStore();
+  const store = useStoreFields("predictions");
   const rows = store.predictions
     .map((prediction) => {
       const subject = getSubject(prediction.subjectId);
@@ -125,7 +125,7 @@ export function NextGradeView() {
 }
 
 export function ExpectedMarksCard() {
-  const store = useStore();
+  const store = useStoreFields("assessment");
   const insight = store.assessment;
   if (!insight || !insight.expectedMarksPerHour.length) {
     return (
@@ -181,7 +181,7 @@ export function ExpectedMarksCard() {
 }
 
 function TimingBreakdown() {
-  const store = useStore();
+  const store = useStoreFields("mistakes");
   const byTiming: Record<string, number> = { ok: 0, rushed: 0, slow: 0, unknown: 0 };
   for (const m of store.mistakes.filter((x) => !x.resolved)) byTiming[m.timing ?? "unknown"] = (byTiming[m.timing ?? "unknown"] ?? 0) + m.marksLost;
   const total = (byTiming.rushed ?? 0) + (byTiming.slow ?? 0) + (byTiming.ok ?? 0);
@@ -197,7 +197,7 @@ function TimingBreakdown() {
 }
 
 export function MarksLostByCause() {
-  const insight = useStore().assessment;
+  const insight = useStoreFields("assessment").assessment;
   if (!insight) return null;
   const byCategory = [
     ...Object.entries(insight.byMisconception).filter(([, v]) => (v as number) > 0).sort((a, b) => (b[1] as number) - (a[1] as number)),

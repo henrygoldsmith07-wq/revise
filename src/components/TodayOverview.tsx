@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getBoard, getQualification, getSubject } from "@/domain/curriculum";
 import type { ActivityKind, ExamDate, PlannedSession, Subject } from "@/domain/types";
 import { todayLocal } from "@/domain/local-date";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink } from "./ui";
 import { CreditedIcon, ForwardIcon, LessonsIcon, LibraryIcon, PlanIcon, PracticeIcon, ReviewIcon } from "./icons";
 
@@ -87,7 +87,7 @@ function RevisionPlanner({ exam, nextBlock, today }: { exam?: ExamDate; nextBloc
 }
 
 export function TodayOverview() {
-  const { settings, examDates, plannedSessions, lessonProgress, reviewLogs, attempts } = useStore();
+  const { settings, examDates, plannedSessions, lessonProgress, reviewLogs, attempts } = useStoreFields("settings", "examDates", "plannedSessions", "lessonProgress", "reviewLogs", "attempts");
   const subjects = settings.subjectIds
     .map((id) => getSubject(id))
     .filter((subject): subject is Subject => Boolean(subject));

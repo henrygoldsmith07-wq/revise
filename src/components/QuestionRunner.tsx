@@ -36,7 +36,7 @@ import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
 import { isErrorCategory } from "@/domain/error-taxonomy";
 import type { ErrorCategory } from "@/domain/error-taxonomy";
 import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { AnswerInput } from "./AnswerInput";
 import { RichText } from "./RichText";
 import { Button, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
@@ -151,7 +151,7 @@ export function QuestionRunner({
 }) {
   const needsWjecHumanReview =
     requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question);
-  const store = useStore();
+  const store = useStoreFields("attempts", "questions", "recordAttempt", "recordFunnel", "settings", "userId");
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
   const [choice, setChoice] = useState<number | null>(() => draft?.choice ?? null);
   const [marking, setMarking] = useState(false);

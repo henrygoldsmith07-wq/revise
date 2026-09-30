@@ -12,7 +12,7 @@ import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import type { Attempt, Mistake, Question } from "@/domain/types";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
@@ -40,7 +40,7 @@ export default function PracticePage() {
 
 function Practice() {
   const params = useSearchParams();
-  const store = useStore();
+  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
   const topicParam = params.get("topic");

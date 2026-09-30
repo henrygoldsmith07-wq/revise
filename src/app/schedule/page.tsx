@@ -7,7 +7,7 @@ import { getSubject, getTopic } from "@/domain/curriculum";
 import { formatTime } from "@/domain/planner";
 import type { ActivityKind, ExamDate, PlannedSession } from "@/domain/types";
 import { addLocalDays, todayLocal, toLocalDateKey } from "@/domain/local-date";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import { Button, EmptyState, Pill, SectionHeading } from "@/components/ui";
 
 // The personalised schedule: the planner's output over the whole remaining
@@ -60,7 +60,7 @@ function hrefForSession(session: PlannedSession): string {
 }
 
 export default function SchedulePage() {
-  const store = useStore();
+  const store = useStoreFields("examDates", "planChangelog", "plannedSessions", "regeneratePlan", "settings");
   const subjects = useSubjects();
   const [rebuilding, setRebuilding] = useState(false);
   const autoBuilt = useRef(false);

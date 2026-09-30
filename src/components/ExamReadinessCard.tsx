@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { getSubject } from "@/domain/curriculum";
 import type { ExamReadiness, ExamReadinessStatus, ReadinessAction, ReadinessSignalStatus } from "@/domain/exam-readiness";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, ProgressBar, SectionHeading, StatTile, cx } from "./ui";
 
 const STATUS_LABEL: Record<ExamReadinessStatus, string> = {
@@ -138,7 +138,7 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
 }
 
 export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
-  const store = useStore();
+  const store = useStoreFields("examReadiness", "examReadinessSummary");
   const rows = store.examReadiness;
   const summary = store.examReadinessSummary;
   const weakest = rows.length ? [...rows].sort((a, b) => a.score - b.score)[0] : null;

@@ -6,11 +6,14 @@ import { traceTransition } from "@/domain/adaptive-trace";
 const ROOT = join(__dirname, "..");
 
 describe("product hierarchy", () => {
-  it("keeps one primary loop: Today first, six thumb-reach items, secondary subordinate", () => {
+  it("keeps one primary loop: Today first, Today and Session with manual tools, secondary subordinate", () => {
     const shell = readFileSync(join(ROOT, "src/components/AppShell.tsx"), "utf8");
-    // Six primary items render in the mobile bar's single-row grid.
-    expect(shell).toContain("grid-cols-6");
+    // Two direct primary actions and one Tools menu.
+    expect(shell).toContain("grid-cols-3");
     expect(shell).toContain('label: "Today"');
+    expect(shell).toContain('href: "/adaptive-session", label: "Session"');
+    expect((shell.match(/primary: true/g) ?? [])).toHaveLength(2);
+    expect(shell).toContain("Tools");
     const todayIndex = shell.indexOf('label: "Today"');
     const reviewIndex = shell.indexOf('label: "Review"');
     expect(todayIndex).toBeGreaterThanOrEqual(0);

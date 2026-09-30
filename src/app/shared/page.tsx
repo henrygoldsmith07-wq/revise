@@ -6,7 +6,7 @@ import { allTopics, topicsFor } from "@/domain/curriculum";
 import { materialiseDeck } from "@/domain/deck-io";
 import { decodeDeckFromLink } from "@/domain/sharing";
 import type { DeckExport } from "@/domain/types";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
 import { Button, EmptyState, Field, Panel, Pill, SectionHeading } from "@/components/ui";
 
@@ -23,7 +23,7 @@ const noFragment = () => "";
 
 export default function SharedDeckPage() {
   const router = useRouter();
-  const store = useStore();
+  const store = useStoreFields("addCards", "cards", "userId");
   const subjects = useSubjects();
 
   const rawFragment = useSyncExternalStore(NO_SUBSCRIBE, readFragment, noFragment);

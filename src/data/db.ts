@@ -86,13 +86,44 @@ interface ReviseSchema extends DBSchema {
 export type ReviseDB = IDBPDatabase<ReviseSchema>;
 
 let dbPromise: Promise<ReviseDB> | null = null;
+let profileId = "local";
+const profileConnections = new Map<string, Promise<ReviseDB>>();
+
+/** Pin storage for the lifetime of the document. Auth changes reload the boundary,
+ * so pending callbacks can only ever write to their original profile. */
+export function bindDatabaseProfile(userId: string): void {
+  if (dbPromise && profileId !== userId) throw new Error("Profile changes require a fresh application boundary.");
+  profileId = userId;
+}
+
+export function activeDatabaseProfile(): string { return profileId; }
+
+export function profileDatabaseName(userId: string): string {
+  return userId === "local" ? DB_NAME : `${DB_NAME}:account:${encodeURIComponent(userId)}`;
+}
+
+export function getProfileDb(userId: string): Promise<ReviseDB> {
+  const existing = profileConnections.get(userId);
+  if (existing) return existing;
+  const opening = openProfileDb(userId).catch((error) => {
+    profileConnections.delete(userId);
+    throw error;
+  });
+  profileConnections.set(userId, opening);
+  return opening;
+}
 
 export function getDb(): Promise<ReviseDB> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(new Error("IndexedDB unavailable — this must run in the browser."));
   }
   if (dbPromise) return dbPromise;
-  const opening = openDB<ReviseSchema>(DB_NAME, DB_VERSION, {
+  dbPromise = getProfileDb(profileId);
+  return dbPromise;
+}
+
+function openProfileDb(userId: string): Promise<ReviseDB> {
+  const opening = openDB<ReviseSchema>(profileDatabaseName(userId), DB_VERSION, {
     async upgrade(db, oldVersion, _newVersion, tx) {
       // Migrations are strictly monotonic and idempotent. A single upgrade
       // transaction can jump from any historical version to the current one;
@@ -190,27 +221,28 @@ export function getDb(): Promise<ReviseDB> {
       });
     },
   });
-  dbPromise = opening.catch((error) => {
+  return opening.catch((error) => {
     dbPromise = null;
     captureTelemetry("migration.failure", { status: "failed", schemaVersion: DB_VERSION, errorClass: errorClass(error) });
     throw error;
   });
-  return dbPromise;
 }
 
 /** Let recovery flows retry after a closed or failed connection. */
 export function resetDbConnection(): void {
   dbPromise = null;
+  profileConnections.delete(profileId);
 }
 
 /** Delete local data only after an explicit recovery/reset choice. */
 export async function deleteLocalDatabase(): Promise<void> {
   const current = dbPromise ? await dbPromise.catch(() => undefined) : undefined;
   current?.close();
+  profileConnections.delete(profileId);
   dbPromise = null;
   if (typeof indexedDB === "undefined") return;
   await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(DB_NAME);
+    const request = indexedDB.deleteDatabase(profileDatabaseName(profileId));
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error ?? new Error("Could not delete local database."));
     request.onblocked = () => reject(new Error("Close other Revise tabs before resetting local data."));

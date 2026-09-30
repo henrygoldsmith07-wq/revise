@@ -37,7 +37,7 @@ export function CustomStudyDialog({
     // browser restart the way a stored session would.
     sessionStorage.setItem(
       CUSTOM_STUDY_KEY,
-      JSON.stringify({ ids: result.cards.map((c) => c.id), preview: result.isPreview, createdAt: Date.now() }),
+      JSON.stringify({ userId: result.cards[0]?.userId, ids: result.cards.map((c) => c.id), preview: result.isPreview, createdAt: Date.now() }),
     );
     router.push("/review?mode=custom");
   }

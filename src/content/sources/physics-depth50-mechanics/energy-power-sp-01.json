@@ -1,0 +1,165 @@
+{
+  "topic": "energy-power",
+  "point": 1,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:work:formula",
+      "context": "depth50:work:formula:tow-rope",
+      "move": "state work as the component of force parallel to displacement and give its unit",
+      "prompt": "State the equation for work done by a constant force at an angle to the displacement, and give the SI unit of work.",
+      "marks": 2,
+      "scheme": [
+        "W = F s cos θ, where θ is the angle between force and displacement",
+        "The SI unit is the joule (J)"
+      ],
+      "answer": "For a constant force F acting through displacement s at angle θ, W = Fs cos θ. Work is measured in joules (J)."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:work:sign",
+      "context": "depth50:work:sign:push",
+      "move": "classify work from the angle between a force and displacement",
+      "prompt": "State when a force does positive, zero and negative work, using the angle between the force and the displacement.",
+      "marks": 2,
+      "scheme": [
+        "Positive work when the force has a component in the displacement direction (θ < 90°)",
+        "Zero work when perpendicular; negative work when opposite (θ = 90° or θ > 90°)"
+      ],
+      "answer": "A component along the displacement gives positive work. A perpendicular force does zero work, while a component opposite the displacement gives negative work."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:work:normal",
+      "context": "depth50:work:normal:level-floor",
+      "move": "explain zero work from a perpendicular contact force",
+      "prompt": "A box moves horizontally across a level floor. Explain why the normal contact force does no work on the box, even though it is large.",
+      "marks": 2,
+      "scheme": [
+        "The normal force is vertical while the displacement is horizontal",
+        "Its component along the displacement is zero, so W = Fs cos 90° = 0"
+      ],
+      "answer": "The normal force is at right angles to the horizontal displacement. Its parallel component is zero, so it does zero work: Fs cos 90° = 0."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:work:drag",
+      "context": "depth50:work:drag:coast-down",
+      "move": "interpret negative work as a reduction in mechanical energy",
+      "prompt": "A cyclist coasts uphill while air resistance acts backwards. Explain the sign of the work done by air resistance and where the corresponding mechanical energy goes.",
+      "marks": 2,
+      "scheme": [
+        "Air resistance is opposite to the displacement, so it does negative work",
+        "Mechanical energy is transferred mainly to internal energy of the air, bicycle and surroundings"
+      ],
+      "answer": "The resistive force opposes the cyclist's displacement, so its work is negative. The mechanical energy is transferred to thermal energy and turbulence in the bicycle, air and surroundings."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:work:angled-crate",
+      "context": "depth50:work:angled-crate:warehouse",
+      "move": "resolve a pulling force before calculating work",
+      "prompt": "A crate is pulled 6.0 m along a level floor by an 80 N rope at 25° above the horizontal. Calculate the work done by the rope.",
+      "marks": 2,
+      "scheme": [
+        "Use the parallel component: W = 80 × 6.0 × cos 25°",
+        "W = 4.35 × 10² J (435 J)"
+      ],
+      "answer": "Only the horizontal component does work: W = 80(6.0)cos25° = 4.35 × 10² J, about 435 J."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:work:braking",
+      "context": "depth50:work:braking:tram",
+      "move": "use negative work to account for a braking force",
+      "prompt": "A 1.2 × 10³ kg tram travels 15 m while a constant 18 kN braking force acts opposite its motion. Calculate the work done by the brakes.",
+      "marks": 2,
+      "scheme": [
+        "The angle between braking force and displacement is 180°",
+        "W = 18 000 × 15 × cos 180° = −2.70 × 10⁵ J"
+      ],
+      "answer": "The braking force is opposite the displacement, so W = 18 000(15)cos180° = −2.70 × 10⁵ J."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:work:static-wall",
+      "context": "depth50:work:static-wall:push",
+      "move": "reject force-times-time or force magnitude as work without displacement",
+      "prompt": "A student pushes a rigid wall with 300 N for 20 s and says they do 6000 J of work on the wall. Correct the claim.",
+      "marks": 2,
+      "scheme": [
+        "The wall has no displacement in the direction of the force",
+        "Work on the wall is zero, W = Fs = 0; the person's body still transfers chemical energy internally"
+      ],
+      "answer": "The wall does not move, so its displacement is zero and the work done on it is 0 J. The person's muscles may use chemical energy, but that is not work delivered to the stationary wall."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:work:force-magnitude",
+      "context": "depth50:work:force-magnitude:rope",
+      "move": "distinguish a nonzero force from its component doing work",
+      "prompt": "A student says a 500 N vertical cable force must do positive work while a load moves horizontally. Explain why the force magnitude alone is insufficient.",
+      "marks": 2,
+      "scheme": [
+        "Work depends on the component parallel to displacement, not the total force",
+        "A vertical force and horizontal displacement are perpendicular, so its work is zero"
+      ],
+      "answer": "The 500 N magnitude is not enough information. Work uses the component parallel to the displacement; here the cable force is perpendicular to the horizontal motion, so it does zero work."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:work:buoyancy",
+      "context": "depth50:work:buoyancy:diver",
+      "move": "assign signs to work by opposing forces during constant-speed motion",
+      "prompt": "A diver rises 4.0 m at constant speed. Buoyancy is 900 N upward and weight is 900 N downward. State the work done by each force and the net work.",
+      "marks": 3,
+      "scheme": [
+        "Buoyancy does +900 × 4.0 = +3600 J",
+        "Weight does −900 × 4.0 = −3600 J",
+        "Net work is zero because kinetic energy is unchanged"
+      ],
+      "answer": "Buoyancy acts along the upward displacement and does +3600 J. Weight opposes it and does −3600 J. The net work is zero, consistent with constant speed."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:work:orbit",
+      "context": "depth50:work:orbit:circular",
+      "move": "use a changing direction of displacement to explain zero work by a centripetal force",
+      "prompt": "A satellite moves in a circular orbit under gravity alone. Explain why gravity does no work over the ideal orbit even though it continually supplies the centripetal force.",
+      "marks": 2,
+      "scheme": [
+        "At each instant gravity is radial while the small displacement is tangential",
+        "The force is perpendicular to the displacement, so speed and kinetic energy remain constant"
+      ],
+      "answer": "Gravity points towards the centre while the instantaneous orbital displacement is tangential. The force is perpendicular to the motion, so it does no work and the satellite's speed remains constant in the ideal circular orbit."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:work:rough-ramp",
+      "context": "depth50:work:rough-ramp:cart",
+      "move": "combine gravitational potential energy with negative friction work to find speed",
+      "prompt": "A 2.0 kg cart starts from rest and descends a 3.0 m vertical drop. Friction does 12 J of negative work. Calculate its speed at the bottom, neglecting other losses. Take g = 9.81 m s⁻².",
+      "marks": 3,
+      "scheme": [
+        "Initial gravitational energy is mgh = 2.0 × 9.81 × 3.0 = 58.9 J",
+        "Final kinetic energy is 58.9 − 12 = 46.9 J",
+        "½mv² = 46.9 gives v = 6.85 m s⁻¹ (6.8 m s⁻¹)"
+      ],
+      "answer": "The fall supplies mgh = 58.9 J. After 12 J is dissipated, 46.9 J remains as kinetic energy. Thus ½(2.0)v² = 46.9 and v = 6.85 m s⁻¹, about 6.8 m s⁻¹."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:work:winch",
+      "context": "depth50:work:winch:lift",
+      "move": "compare work delivered by a force with useful gravitational energy",
+      "prompt": "A winch raises a 60 kg load through 8.0 m at constant speed. Its cable tension is 700 N. Calculate the work done by the tension and the useful increase in gravitational potential energy, then state the difference.",
+      "marks": 3,
+      "scheme": [
+        "Work by tension = 700 × 8.0 = 5600 J",
+        "Useful gravitational energy = mgh = 60 × 9.81 × 8.0 = 4709 J (4.7 kJ)",
+        "The difference, about 0.89 kJ, is dissipated in the mechanism"
+      ],
+      "answer": "The tension does 700(8.0) = 5600 J. The load gains mgh = 60(9.81)(8.0) = 4709 J. The difference, about 0.89 kJ, is transferred to internal energy because the winch is not ideal."
+    }
+  ]
+}

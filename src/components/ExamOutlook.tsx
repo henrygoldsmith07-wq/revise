@@ -13,10 +13,10 @@
 import { getSubject } from "@/domain/curriculum";
 import { MIN_OUTLOOK_ATTEMPTS, outlookRows } from "@/domain/exam-outlook";
 import { formatExamDate } from "@/domain/pace-forecast";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 
 export function ExamOutlook() {
-  const store = useStore();
+  const store = useStoreFields("attempts", "examDates", "predictions", "questions", "settings");
   const { predictions, attempts, questions, examDates, settings } = store;
 
   // The original two-argument outlookRows(predictions, attempts) contract is

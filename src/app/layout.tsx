@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { PwaInstallProvider } from "@/components/PwaInstall";
 import { ShortcutProvider } from "@/components/shortcuts";
-import { StoreProvider } from "@/state/store";
+import { AccountBoundary } from "@/state/account";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
@@ -44,11 +44,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${inter.variable} antialiased`}>
         <PwaInstallProvider>
-          <StoreProvider>
+          <AccountBoundary>
             <ShortcutProvider>
               <AppShell>{children}</AppShell>
             </ShortcutProvider>
-          </StoreProvider>
+          </AccountBoundary>
         </PwaInstallProvider>
         <ServiceWorker />
       </body>

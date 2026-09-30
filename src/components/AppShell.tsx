@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { cx } from "./ui";
 import {
   ICON_SIZE,
@@ -28,6 +28,7 @@ import { SearchOverlay } from "./SearchOverlay";
 import { useShortcuts } from "./shortcuts";
 import { Onboarding } from "./Onboarding";
 
+// Today and Session are the primary loop; manual tools keep direct routes.
 // Navigation is verb-first: every destination is something the student does,
 // not a noun they browse. "Today" is always first because the product's whole
 // claim is that it knows what you should do next.
@@ -41,14 +42,15 @@ type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolea
 
 const TODAY_NAV: NavItem[] = [
   { href: "/", label: "Today", Icon: TodayIcon, primary: true },
+  { href: "/adaptive-session", label: "Session", Icon: PracticeIcon, primary: true },
 ];
 
 const STUDY_NAV: NavItem[] = [
-  { href: "/review", label: "Review", Icon: ReviewIcon, primary: true },
-  { href: "/study", label: "Study", Icon: ModesIcon, primary: true },
-  { href: "/lesson", label: "Lessons", Icon: LessonsIcon, primary: true },
-  { href: "/practice", label: "Practice", Icon: PracticeIcon, primary: true },
-  { href: "/papers", label: "Past papers", Icon: PapersIcon, primary: true },
+  { href: "/review", label: "Review", Icon: ReviewIcon },
+  { href: "/study", label: "Study", Icon: ModesIcon },
+  { href: "/lesson", label: "Lessons", Icon: LessonsIcon },
+  { href: "/practice", label: "Practice", Icon: PracticeIcon },
+  { href: "/papers", label: "Past papers", Icon: PapersIcon },
 ];
 
 const MANAGEMENT_NAV: NavItem[] = [
@@ -61,14 +63,14 @@ const MANAGEMENT_NAV: NavItem[] = [
 const NAV = [...TODAY_NAV, ...STUDY_NAV, ...MANAGEMENT_NAV];
 const DESKTOP_NAV_GROUPS = [
   { label: null, items: TODAY_NAV },
-  { label: "Study tools", items: STUDY_NAV },
+  { label: "Choose your own", items: STUDY_NAV },
   { label: "Plan & progress", items: MANAGEMENT_NAV },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { settings, dueCards, streak, syncStatus, syncNow, updateSettings, needsOnboarding, completeOnboarding } = useStore();
+  const { settings, dueCards, streak, syncStatus, syncNow, updateSettings, needsOnboarding, completeOnboarding } = useStoreFields("settings", "dueCards", "streak", "syncStatus", "syncNow", "updateSettings", "needsOnboarding", "completeOnboarding");
   const [searchOpen, setSearchOpen] = useState(false);
 
   const syncNotice = !syncStatus.online
@@ -270,7 +272,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line elev-nav pb-safe"
         aria-label="Primary sections (mobile)"
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-3">
           {NAV.filter((item) => item.primary).map((item) => (
             <Link
               key={item.href}
@@ -288,6 +290,22 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : null}
             </Link>
           ))}
+          <details className="relative group">
+            <summary className="list-none cursor-pointer flex flex-col items-center gap-0.5 py-2 min-h-12 text-[10px] font-medium text-ink3">
+              <ModesIcon size={ICON_SIZE.lg} aria-hidden />
+              Tools
+            </summary>
+            <div className="absolute bottom-full right-2 mb-2 w-56 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
+              <p className="px-3 py-2 text-xs text-ink3">Choose your own</p>
+              {[...STUDY_NAV, ...MANAGEMENT_NAV].map((item) => (
+                <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
+                  aria-current={isActive(item.href) ? "page" : undefined}
+                  className="flex items-center gap-2 px-3 py-3 rounded-lg text-sm hover:bg-surface2">
+                  <item.Icon size={ICON_SIZE.md} aria-hidden />{item.label}
+                </Link>
+              ))}
+            </div>
+          </details>
         </div>
       </nav>
 
@@ -297,7 +315,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function StatusStrip() {
-  const { syncStatus, syncNow, streak } = useStore();
+  const { syncStatus, syncNow, streak } = useStoreFields("syncStatus", "syncNow", "streak");
   const lastSynced = syncStatus.lastSyncedAt
     ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
     : null;

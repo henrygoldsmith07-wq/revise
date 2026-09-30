@@ -62,3 +62,52 @@ recovery copy.
   isolated staging users.
 - `revise-curriculum-freshness` writes a machine-readable report weekly and
   fails when any specification is older than the configured freshness window.
+
+## Required staging verification
+
+The `Revise staging sync and RLS` workflow always fails when infrastructure is
+missing; regular local Vitest runs may leave the live suite skipped. Required
+GitHub repository secrets are exactly:
+
+- `REVISE_STAGING_SUPABASE_URL`: HTTPS URL of a dedicated staging project.
+- `REVISE_STAGING_SUPABASE_ANON_KEY`: that project's public anonymous key.
+- `REVISE_STAGING_USER_A_EMAIL` and `REVISE_STAGING_USER_A_PASSWORD`.
+- `REVISE_STAGING_USER_B_EMAIL` and `REVISE_STAGING_USER_B_PASSWORD`.
+- `REVISE_STAGING_DATABASE_URL`: TLS PostgreSQL connection string for a
+  read-only catalog inspection identity. It must be reachable from the GitHub
+  runner, e.g. the project's session pooler with `sslmode=verify-full` and a
+  trusted certificate. Never disable certificate verification.
+
+Provision two distinct confirmed password users dedicated to the suite, with
+empty settings/streak/lesson-progress rows. The suite creates and cleans up only
+its fixtures; a failed cleanup must be repaired before the next run. Apply
+`supabase/schema.sql`, including its keyset indexes, to staging first. Do not use
+production users or a production database. No service-role key is needed.
+The database connection only reads catalogs; all fixture writes use the anon
+key and the two users' JWTs, so they exercise RLS.
+
+`npm run test:staging` checks all required secrets, deployed tables, column types,
+primary keys, owner policies, RLS flags, enabled insert/update triggers and
+keyset indexes. Live tests independently authenticate A, B and a duplicate A
+client; test all sync tables for cross-account read/insert/update/delete and
+ownership rewrite denial; reject stale and equal writes; clamp future timestamps;
+page equal-timestamp rows; and run the actual app sync across independent
+IndexedDB devices with namespaced curriculum ids. A mismatch cannot drain a
+queue. Failure labels distinguish infrastructure, authentication, schema-drift,
+RLS and application-sync. Always-uploaded staging JSON artifacts preserve
+schema and test diagnostics. Credentials never appear in those artifacts.
+
+A local missing-credential check is evidence that the runner fails closed, not
+proof that deployed staging RLS works. Live staging must pass before rollout.
+
+## Account recovery
+
+Sign-out opens the separate local profile and preserves the account database.
+Sign back into the same account to recover its queue and study history. Other
+accounts see separate seeded cards, metadata and settings. The profile choice
+copies local revision once, with explicit student consent, and leaves its local
+source available. Existing account databases are never overwritten by adoption.
+Mixed-owner local data needs an ownership-aware export/recovery before copying;
+choosing a separate profile remains available. A browser reset affects only the
+active profile database; account databases are not a remote backup of unsynced
+metadata. Export before clearing data.

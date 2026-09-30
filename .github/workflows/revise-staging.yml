@@ -12,7 +12,9 @@ jobs:
   staging-sync:
     name: revise-staging-sync
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
+      REVISE_STAGING_DATABASE_URL: ${{ secrets.REVISE_STAGING_DATABASE_URL }}
       REVISE_STAGING_SUPABASE_URL: ${{ secrets.REVISE_STAGING_SUPABASE_URL }}
       REVISE_STAGING_SUPABASE_ANON_KEY: ${{ secrets.REVISE_STAGING_SUPABASE_ANON_KEY }}
       REVISE_STAGING_USER_A_EMAIL: ${{ secrets.REVISE_STAGING_USER_A_EMAIL }}
@@ -29,3 +31,9 @@ jobs:
       - run: npm ci
       - name: Verify staging schema and RLS
         run: npm run test:staging
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revise-staging-diagnostics
+          path: artifacts/staging-*.json
+          if-no-files-found: error

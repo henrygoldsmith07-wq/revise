@@ -10,7 +10,7 @@ import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
 import { RichText } from "./RichText";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { useLessonRunner } from "./use-lesson-runner";
 
 const STEP_META = {
@@ -60,7 +60,7 @@ export function LessonMode({
     [initialTopicId, lessons],
   );
 
-  const store = useStore();
+  const store = useStoreFields("completeLesson", "lessonProgress", "settings");
   const { lessonProgress, completeLesson } = store;
   const completed = lessonProgress.completed;
   const streak = lessonProgress.streak;

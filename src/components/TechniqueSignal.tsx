@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { knowledgeVsAnswering, timedSessionRecommendation } from "@/domain/exam-technique";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Panel, Pill, SectionHeading } from "./ui";
 
 /**
@@ -14,7 +14,7 @@ import { Button, Panel, Pill, SectionHeading } from "./ui";
  * has at least one marked loss, so the index never invents a signal.
  */
 export function TechniqueSignal({ subjectId }: { subjectId: string }) {
-  const store = useStore();
+  const store = useStoreFields("attempts", "mistakes", "questions");
   const report = useMemo(
     () =>
       knowledgeVsAnswering({

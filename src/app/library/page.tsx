@@ -12,7 +12,7 @@ import { createCard } from "@/domain/scheduling";
 import { buildCloze, normaliseCloze } from "@/domain/cloze";
 import { classifyTopic } from "@/domain/topic-status";
 import type { Card, Topic } from "@/domain/types";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
 import { KnowledgeMap } from "@/components/KnowledgeMap";
 import { TechniqueSignal } from "@/components/TechniqueSignal";
@@ -36,7 +36,7 @@ export default function LibraryPage() {
 function Library() {
   const params = useSearchParams();
   const subjects = useSubjects();
-  const store = useStore();
+  const store = useStoreFields("attempts", "cards", "examDates", "mastery", "mistakes", "predictions", "questions", "settings");
   const topicParam = params.get("topic");
   const subjectParam = params.get("subject");
   const misconceptionParam = params.get("misconception");
@@ -227,7 +227,7 @@ function TopicDetail({
   onBack: () => void;
   highlightMisconceptionId?: string;
 }) {
-  const store = useStore();
+  const store = useStoreFields("addCards", "attempts", "cards", "mastery", "mistakes", "questions", "removeCard", "userId");
   const [explanation, setExplanation] = useState<{
     data: ExplainResponse;
     source: "ai" | "fallback";
@@ -517,7 +517,7 @@ function TopicDetail({
 }
 
 function ManualCard({ subjectId }: { subjectId: string }) {
-  const store = useStore();
+  const store = useStoreFields("addCards", "userId");
   const topics = subjectId ? topicsFor(subjectId) : [];
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
   const [kind, setKind] = useState<"basic" | "cloze">("basic");

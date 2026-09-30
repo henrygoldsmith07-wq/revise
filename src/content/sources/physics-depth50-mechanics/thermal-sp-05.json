@@ -1,0 +1,191 @@
+{
+  "topic": "thermal",
+  "point": 5,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:thermal5:relation",
+      "context": "depth50:thermal5:relation:gas",
+      "move": "state the mean kinetic-energy temperature relation",
+      "prompt": "State the kinetic-theory relation linking mean molecular kinetic energy to absolute temperature.",
+      "marks": 2,
+      "scheme": [
+        "½m⟨c²⟩ = 3/2 kT",
+        "T is absolute temperature in kelvin and ⟨c²⟩ is the mean square molecular speed"
+      ],
+      "answer": "The relation is ½m⟨c²⟩ = 3/2 kT, with T in kelvin and ⟨c²⟩ the mean square molecular speed."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:thermal5:kelvin",
+      "context": "depth50:thermal5:kelvin:thermometer",
+      "move": "identify absolute temperature as the scale required by kinetic theory",
+      "prompt": "Why must temperature be expressed in kelvin in the kinetic-theory equation?",
+      "marks": 2,
+      "scheme": [
+        "The equation relates kinetic energy to absolute temperature measured from the zero-energy limit",
+        "A Celsius reading must be converted using T/K = θ/°C + 273.15"
+      ],
+      "answer": "Kinetic theory uses absolute temperature, measured from the zero-energy limit. Convert Celsius by adding 273.15 to obtain kelvin."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:thermal5:pressure-speed",
+      "context": "depth50:thermal5:pressure-speed:sealed-vessel",
+      "move": "explain pressure increase from greater molecular momentum transfer",
+      "prompt": "A sealed rigid container is heated. Explain, using molecular collisions, why its pressure rises.",
+      "marks": 2,
+      "scheme": [
+        "Heating raises the mean molecular kinetic energy and speed",
+        "Faster molecules change momentum more rapidly and transfer more momentum to the fixed walls per second, increasing force per area"
+      ],
+      "answer": "Heating increases molecular speeds. Collisions then change momentum more often and by larger amounts, so the force on the fixed walls per area, the pressure, increases."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:thermal5:temperature-meaning",
+      "context": "depth50:thermal5:temperature-meaning:mixture",
+      "move": "explain temperature as an average over random molecular motion",
+      "prompt": "Two samples of the same gas have equal temperature but different numbers of molecules. Explain what is equal and what is not.",
+      "marks": 2,
+      "scheme": [
+        "Equal temperature means equal mean translational kinetic energy per molecule",
+        "The larger sample has more total internal kinetic energy because it contains more molecules"
+      ],
+      "answer": "Temperature fixes the mean kinetic energy per molecule. A sample with more molecules has the same average but a larger total molecular kinetic energy."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:thermal5:gas-heating",
+      "context": "depth50:thermal5:gas-heating:piston",
+      "move": "predict a pressure change from temperature and fixed volume",
+      "prompt": "A gas in a rigid vessel is warmed from 300 K to 450 K. If its initial pressure is 1.20 × 10⁵ Pa, calculate the new pressure.",
+      "marks": 2,
+      "scheme": [
+        "At fixed volume p/T is constant",
+        "p₂ = 1.20×10⁵ × 450/300 = 1.80×10⁵ Pa"
+      ],
+      "answer": "Since p/T is constant, p₂ = 1.20×10⁵(450/300) = 1.80×10⁵ Pa."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:thermal5:mean-speed",
+      "context": "depth50:thermal5:mean-speed:helium",
+      "move": "use the kinetic-energy relation to find a molecular speed",
+      "prompt": "Estimate the root-mean-square speed of helium atoms at 300 K. Take helium atom mass as 6.64 × 10⁻²⁷ kg and k = 1.38 × 10⁻²³ J K⁻¹.",
+      "marks": 3,
+      "scheme": [
+        "½m⟨c²⟩ = 3/2 kT, so crms = √(3kT/m)",
+        "crms = √(3 × 1.38×10⁻²³ × 300 / 6.64×10⁻²⁷)",
+        "crms = 1.37 × 10³ m s⁻¹"
+      ],
+      "answer": "crms = √(3kT/m) = √(3×1.38×10⁻²³×300 / 6.64×10⁻²⁷) = 1.37×10³ m s⁻¹."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:thermal5:temperature-speed",
+      "context": "depth50:thermal5:temperature-speed:gas",
+      "move": "reject equality of every molecular speed at one temperature",
+      "prompt": "A student says all molecules in a gas at 300 K move at exactly the same speed. Correct the statement.",
+      "marks": 2,
+      "scheme": [
+        "Temperature specifies a mean (or mean-square) kinetic energy, not one speed for every molecule",
+        "Molecules have a distribution of speeds and collide continually"
+      ],
+      "answer": "At 300 K the mean-square kinetic energy is fixed, but individual molecules have a range of speeds. Temperature does not make every molecule move at one identical speed."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:thermal5:zero-celsius",
+      "context": "depth50:thermal5:zero-celsius:freezer",
+      "move": "distinguish Celsius zero from the zero-energy limit",
+      "prompt": "Why is 0 °C not the temperature at which molecular motion stops?",
+      "marks": 2,
+      "scheme": [
+        "0 °C corresponds to 273.15 K, not 0 K",
+        "The kinetic-theory zero-energy limit is absolute zero at 0 K (an unattainable ideal limit)"
+      ],
+      "answer": "0 °C is 273.15 K. Molecular kinetic energy would approach its minimum only as absolute temperature approaches 0 K, not at the Celsius ice point."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:thermal5:particle-energy",
+      "context": "depth50:thermal5:particle-energy:neon",
+      "move": "compare mean translational energies per particle for two gases at one temperature",
+      "prompt": "At 350 K, compare the mean translational kinetic energy per neon atom with that per helium atom. Calculate each value and state the ratio. Take k = 1.38 × 10⁻²³ J K⁻¹.",
+      "marks": 2,
+      "scheme": [
+        "For either ideal gas the mean translational energy per particle is 3/2 kT = 7.25 × 10⁻²¹ J",
+        "The values are equal, so the neon-to-helium ratio is 1:1; molecular mass changes speed distribution, not mean energy at fixed T"
+      ],
+      "answer": "For both gases Ē = 3/2 kT = 1.5(1.38×10⁻²³)(350) = 7.25×10⁻²¹ J per atom. The ratio is 1:1; at fixed temperature mass changes the speed distribution, not the mean energy per particle."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:thermal5:temperature-from-speed",
+      "context": "depth50:thermal5:temperature-from-speed:argon",
+      "move": "invert the kinetic-theory relation to find absolute temperature",
+      "prompt": "Argon atoms of mass 6.63 × 10⁻²⁶ kg have an rms speed of 420 m s⁻¹. Estimate their temperature using k = 1.38 × 10⁻²³ J K⁻¹.",
+      "marks": 3,
+      "scheme": [
+        "Use ½mcrms² = 3/2 kT, so T = mcrms²/(3k)",
+        "T = 6.63×10⁻²⁶ × 420² /(3 × 1.38×10⁻²³)",
+        "T = 282 K (2.8 × 10² K)"
+      ],
+      "answer": "T = mcrms²/(3k) = (6.63×10⁻²⁶)(420²)/(3×1.38×10⁻²³) = 282 K."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:thermal5:planetary",
+      "context": "depth50:thermal5:planetary:atmosphere",
+      "move": "transfer the temperature-energy relation to a different planetary atmosphere",
+      "prompt": "At the same temperature, nitrogen molecules on Mars and Earth have the same mean translational kinetic energy. What differs if the atmospheric pressure is lower on Mars?",
+      "marks": 2,
+      "scheme": [
+        "Same T gives the same mean kinetic energy per molecule for the same molecular species",
+        "Lower pressure can result from fewer molecules per unit volume and/or different volume density, not lower energy per molecule"
+      ],
+      "answer": "For the same nitrogen species and T, 3/2 kT is the same per molecule. Mars can have lower pressure because it has fewer molecules per unit volume, not because each molecule has less mean energy."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:thermal5:ultrasound",
+      "context": "depth50:thermal5:ultrasound:diagnostic",
+      "move": "connect random molecular energy with a temperature-dependent material property",
+      "prompt": "Why can the speed of sound in a gas change when the gas is heated, even at the same pressure?",
+      "marks": 2,
+      "scheme": [
+        "Heating changes the mean molecular speed and therefore how rapidly pressure disturbances are transmitted",
+        "The detailed speed also depends on the gas compressibility and density; temperature is not simply a change in wave frequency"
+      ],
+      "answer": "Heating raises molecular speeds, so pressure disturbances are transmitted faster. The exact sound speed also depends on the gas density and compressibility."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:thermal5:engine-cycle",
+      "context": "depth50:thermal5:engine-cycle:diesel",
+      "move": "link molecular pressure work to macroscopic engine power",
+      "prompt": "In a piston engine, hot gas expands and pushes the piston. Explain how the kinetic-theory picture accounts for positive work during this stroke.",
+      "marks": 3,
+      "scheme": [
+        "Heating gives molecules greater mean kinetic energy and more energetic wall collisions",
+        "The gas pressure acts over the piston displacement, doing positive work on the piston",
+        "The gas's internal energy decreases if the work output exceeds heat supplied during the stroke"
+      ],
+      "answer": "Hotter molecules collide with the piston more energetically, producing pressure. Pressure acting through the piston displacement does positive work; if that work exceeds heat input, the gas internal energy falls."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:thermal5:thermal-uncertainty",
+      "context": "depth50:thermal5:thermal-uncertainty:experiment",
+      "move": "combine a temperature measurement uncertainty with a kinetic-energy conclusion",
+      "prompt": "A gas thermometer reads 300 ± 6 K. What percentage uncertainty should be assigned to the mean molecular kinetic energy inferred from 3/2 kT?",
+      "marks": 2,
+      "scheme": [
+        "Mean kinetic energy is directly proportional to T",
+        "Percentage uncertainty = 6/300 × 100 = 2%"
+      ],
+      "answer": "Because Ēk = 3/2 kT is proportional to T, the percentage uncertainty is (6/300)×100 = 2%."
+    }
+  ]
+}

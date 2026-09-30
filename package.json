@@ -10,7 +10,7 @@
     "lint:check": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm run curriculum:freshness -- --fail-on-stale && npm run docs:integrity --silent && npm run wjec:authoring:check --silent && npm run wjec:trust:check --silent && npm test -- --run && npm run build && npm run perf:budget",
+    "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm run curriculum:freshness -- --fail-on-stale && npm run content:check && npm run docs:integrity --silent && npm run wjec:authoring:check --silent && npm run wjec:trust:check --silent && npm test -- --run && npm run build && npm run perf:budget",
     "perf:budget": "node scripts/check-client-performance.mjs --require-build",
     "docs:integrity": "node scripts/check-docs-integrity.mjs",
     "content:capacitors": "node scripts/generate-content.mjs capacitors",
@@ -39,7 +39,9 @@
     "test:e2e": "playwright test --reporter=list",
     "test:e2e:ci": "playwright test --reporter=github,html",
     "test:staging": "node scripts/run-staging-tests.mjs",
-    "type-check:strict": "tsc --noEmit -p tsconfig.strict.json"
+    "type-check:strict": "tsc --noEmit -p tsconfig.strict.json",
+    "content:physics": "node scripts/generate-structured-physics.mjs",
+    "content:check": "node scripts/generate-content.mjs capacitors --check && node scripts/generate-structured-physics.mjs --check"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
@@ -70,6 +72,7 @@
     "eslint-config-next": "16.3.6",
     "fake-indexeddb": "^6.2.5",
     "fast-check": "^4.9.0",
+    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.4"

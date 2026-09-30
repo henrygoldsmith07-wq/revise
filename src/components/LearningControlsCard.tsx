@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { getTopic } from "@/domain/curriculum";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Panel, Pill, SectionHeading, StatTile } from "./ui";
 
 function percent(value: number | null): string {
@@ -16,7 +16,7 @@ function signedPercent(value: number | null): string {
 }
 
 export function LearningControlsCard() {
-  const store = useStore();
+  const store = useStoreFields("adaptiveDifficulty", "forgettingCalibration", "predictionOutcome", "questionExposure", "questions", "rootPrerequisiteRemediation", "sparseEvidenceConfidence");
   const confidence = store.sparseEvidenceConfidence;
   const prediction = store.predictionOutcome;
   const forgetting = store.forgettingCalibration;

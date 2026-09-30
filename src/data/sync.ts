@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
 import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { remapContentIds } from "./content-ids";
+import { SYNC_TABLES, syncPrimaryKey, syncWireId } from "./sync-contract";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { readReviseUserMeta, writeReviseUserMeta } from "./storage-namespace";
@@ -32,26 +33,13 @@ import { captureTelemetry, errorClass } from "@/lib/observability";
 // progress, and the next pull resumes from the persisted cursor. Merges are
 // keyed puts, so re-fetched pages are idempotent and never duplicate writes.
 //
-// Delivery: every mutation is queued under a UUID idempotency key. The server
-// records keys in `sync_writes` and rejects duplicates (see supabase/schema.sql),
-// so a hung request retried by the browser or service worker cannot double-count
-// a review.
+// Delivery: stable row keys and replay-safe merges make retries idempotent.
+// Delivered mutation UUIDs are recorded in `sync_writes` best-effort; that
+// ledger is not transactional with the entity write and does not gate delivery.
 // ---------------------------------------------------------------------------
 
 /** Domain entity → Postgres table. Keeps snake_case confined to this module. */
-const TABLES: Record<SyncEntity, string> = {
-  cards: "cards",
-  reviewLogs: "review_logs",
-  attempts: "attempts",
-  mistakes: "mistakes",
-  questions: "questions",
-  papers: "papers",
-  plannedSessions: "planned_sessions",
-  examDates: "exam_dates",
-  settings: "user_settings",
-  streak: "streaks",
-  lessonProgress: "lesson_progress",
-};
+const TABLES = SYNC_TABLES;
 
 export const SYNC_QUEUE_EVENT = "revise:sync-queue";
 
@@ -71,8 +59,8 @@ export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload:
     queuedAt: new Date().toISOString(),
     attempts: 0,
     ...(resolvedOwner ? { ownerId: resolvedOwner } : {}),
-    // One UUID per *logical* mutation: the server's sync_writes ledger rejects
-    // a second delivery of the same key, so retries can never double-write.
+    // One UUID per logical mutation for the best-effort delivery ledger.
+    // Retry correctness comes from stable row keys and replay-safe merges.
     idempotencyKey: crypto.randomUUID(),
     lamport,
     deviceId,
@@ -217,7 +205,8 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
   const e2ee = await e2eeEnabledFor(userId);
   const allItems = (await db.getAll("outbox")) as OutboxItem[];
   const items = allItems.filter((item) => isOwnedBy(item, userId));
-  const hasUnknownOwner = userId !== "local" && allItems.some((item) => ownerFor(item) === null);
+  const hasUnknownOwner = userId !== "local" && allItems.some((item) => ownerFor(item) === null ||
+    (ownerFor(item) === userId && payloadRecord(item.payload)?.userId !== undefined && payloadRecord(item.payload)?.userId !== userId));
   let pushed = 0;
   let failed = 0;
 
@@ -270,12 +259,13 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
   for (const [entity, list] of deletes) {
     const identity = await authIdentity(supabase, userId);
     if (identity !== "ok") return { pushed, failed, skipped: identity };
-    const ids = [...new Set(list.map((i) => rowId(i.payload)))].filter(Boolean);
+    const localIds = [...new Set(list.map((i) => rowId(i.payload)))].filter(Boolean);
+    const ids = await Promise.all(localIds.map((id) => syncWireId(userId, id)));
     if (!ids.length) {
       for (const item of list) await db.delete("outbox", item.id);
       continue;
     }
-    const { error } = await supabase.from(TABLES[entity]).delete().eq("user_id", userId).in("id", ids);
+    const { error } = await supabase.from(TABLES[entity]).delete().eq("user_id", userId).in(pkFor(entity), ids);
     if (error) {
       failed += list.length;
       // Mirror the upsert path: record the failure so it is diagnosable and
@@ -416,6 +406,7 @@ async function pullEntity(
   for (let page = 0; page < SYNC_PULL_MAX_PAGES; page++) {
     const identity = await authIdentity(supabase, userId);
     if (identity !== "ok") return { pulled, failed, skipped: identity, maxObservedUpdatedAt };
+    const cursorColumn = pkFor(entity);
     let data: Array<Record<string, unknown>> | null;
     let error: { message: string } | null;
     try {
@@ -423,9 +414,11 @@ async function pullEntity(
         .from(table)
         .select("*")
         .eq("user_id", userId)
-        .or(`updated_at.gt.${cursor.updatedAt},and(updated_at.eq.${cursor.updatedAt},id.gt.${cursor.id})`)
+         .or(cursor.id === CURSOR_SENTINEL_ID
+          ? `updated_at.gt.${cursor.updatedAt}`
+          : `updated_at.gt.${cursor.updatedAt},and(updated_at.eq.${cursor.updatedAt},${cursorColumn}.gt.${cursor.id})`)
         .order("updated_at", { ascending: true })
-        .order("id", { ascending: true })
+        .order(cursorColumn, { ascending: true })
         .range(0, SYNC_PULL_PAGE_SIZE - 1);
       data = (response.data ?? null) as Array<Record<string, unknown>> | null;
       error = (response.error ?? null) as { message: string } | null;
@@ -441,7 +434,7 @@ async function pullEntity(
     // Belt-and-braces: the server already keyset-filters, but never process a
     // row at or behind the cursor — that is what makes resume duplicate-free.
     const fresh = rows.filter((row) => cursorAfter(
-      { updatedAt: String(row.updated_at ?? ""), id: String(row.id ?? "") },
+      { updatedAt: String(row.updated_at ?? ""), id: String(row[cursorColumn] ?? "") },
       cursor,
     ));
     if (!fresh.length) break;
@@ -453,6 +446,7 @@ async function pullEntity(
     let rowFailures = 0;
     for (const row of fresh) {
       try {
+        if (row.user_id !== userId) throw new Error("Mixed-owner sync row.");
         incomingRows.push(await fromRow(entity, row));
       } catch {
         // One unreadable row (E2EE key mismatch) must not abort its siblings:
@@ -490,7 +484,7 @@ async function pullEntity(
       break;
     }
     const last = fresh[fresh.length - 1]!;
-    cursor = { updatedAt: String(last.updated_at ?? ""), id: String(last.id ?? "") };
+    cursor = { updatedAt: String(last.updated_at ?? ""), id: String(last[cursorColumn] ?? "") };
     if (instantOf(cursor.updatedAt) > instantOf(maxObservedUpdatedAt)) maxObservedUpdatedAt = cursor.updatedAt;
     if (rows.length < SYNC_PULL_PAGE_SIZE) break;
   }
@@ -551,8 +545,8 @@ function mergeForEntity(
 }
 
 /**
- * Record delivered idempotency keys in the server-side ledger so any replay
- * of the same mutation is rejected at the table level.
+ * Record delivered mutation keys for diagnostics. This best-effort ledger
+ * neither gates entity writes nor makes them transactional.
  */
 async function claimIdempotencyKeys(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: Id, keys: string[]): Promise<void> {
   if (!keys.length) return;
@@ -581,7 +575,7 @@ function keyFor(entity: SyncEntity, row: Record<string, unknown>): string {
 }
 
 function pkFor(entity: SyncEntity): string {
-  return entity === "settings" || entity === "streak" || entity === "lessonProgress" ? "user_id" : "id";
+  return syncPrimaryKey(entity);
 }
 
 function rowId(payload: unknown): string {
@@ -614,6 +608,8 @@ function ownerFor(item: OutboxItem): Id | null {
 
 function isOwnedBy(item: OutboxItem, userId: Id): boolean {
   const owner = ownerFor(item);
+  const payloadOwner = payloadRecord(item.payload)?.userId;
+  if (payloadOwner !== undefined && payloadOwner !== userId) return false;
   return owner === userId || (owner === null && userId === "local");
 }
 
@@ -651,11 +647,12 @@ function chunks<T>(items: T[], size: number): T[][] {
  */
 async function toRow(entity: SyncEntity, payload: unknown, userId: Id, opts?: { e2ee?: boolean }): Promise<Record<string, unknown>> {
   const row = payload as Record<string, unknown>;
+  if (row.userId !== undefined && row.userId !== userId) throw new Error("Mixed-owner sync payload.");
   const updatedAt = (row.updatedAt as string) ?? (row.createdAt as string) ?? new Date().toISOString();
   const e2ee = opts?.e2ee ?? (await e2eeEnabledFor(userId));
   const data = e2ee ? await encryptPayload(row) : row;
   return {
-    id: rowId(payload),
+    id: await syncWireId(userId, rowId(payload)),
     user_id: userId,
     subject_id: row.subjectId ?? null,
     topic_id: row.topicId ?? null,
@@ -694,13 +691,15 @@ async function fromRow(entity: SyncEntity, row: Record<string, unknown>): Promis
   if (isEncryptedPayload(raw)) {
     try {
       const data = await decryptPayload<Record<string, unknown>>(raw);
-      return remap({ ...data, userId: row.user_id ?? data.userId });
+      if (data.userId !== undefined && data.userId !== row.user_id) throw new Error("Mixed-owner sync payload.");
+      return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: row.updated_at } : {}) });
     } catch (error) {
       throw new Error(`E2EE decrypt failed for a synced row: ${error instanceof Error ? error.message : "unknown"}`);
     }
   }
   const data = (raw ?? {}) as Record<string, unknown>;
-  return remap({ ...data, userId: row.user_id ?? data.userId });
+  if (data.userId !== undefined && data.userId !== row.user_id) throw new Error("Mixed-owner sync payload.");
+  return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: row.updated_at } : {}) });
 }
 
 function isNewer(incoming: Record<string, unknown>, existing: unknown): boolean {

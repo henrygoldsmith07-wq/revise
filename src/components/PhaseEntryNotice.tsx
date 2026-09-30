@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 
 // ---------------------------------------------------------------------------
 // One-time exam-phase notice for Today.
@@ -17,7 +17,7 @@ import { useStore } from "@/state/store";
 // ---------------------------------------------------------------------------
 
 export function PhaseEntryNotice() {
-  const store = useStore();
+  const store = useStoreFields("dismissExamPhaseNotice", "examPhaseNotice");
   const notice = store.examPhaseNotice;
   if (!notice) return null;
   return (

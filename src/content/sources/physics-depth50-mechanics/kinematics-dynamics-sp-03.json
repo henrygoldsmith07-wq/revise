@@ -1,0 +1,181 @@
+{
+  "topic": "kinematics-dynamics",
+  "point": 3,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:kin3:equations",
+      "context": "depth50:kin3:equations:train",
+      "move": "state the constant-acceleration equations and their variable conditions",
+      "prompt": "State two equations of motion that apply when acceleration is constant, and identify the condition they share.",
+      "marks": 2,
+      "scheme": [
+        "For example v = u + at and s = ut + ½at² (or an equivalent SUVAT equation)",
+        "They require one-dimensional motion with constant acceleration and a consistent sign convention"
+      ],
+      "answer": "Two valid equations are v = u + at and s = ut + ½at². They assume one-dimensional constant acceleration with a fixed sign convention."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:kin3:signs",
+      "context": "depth50:kin3:signs:lift",
+      "move": "define signed displacement and acceleration before using a motion equation",
+      "prompt": "What must be decided about signs before applying a constant-acceleration equation to a lift that reverses direction?",
+      "marks": 2,
+      "scheme": [
+        "Choose a positive direction and assign u, v, a and s signs relative to it",
+        "Use signed displacement rather than distance; do not change the convention part-way through"
+      ],
+      "answer": "Choose one positive direction first. Give u, v, a and s signs relative to it and keep the convention throughout; s is displacement, not always a positive distance."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:kin3:constant-assumption",
+      "context": "depth50:kin3:constant-assumption:car",
+      "move": "explain why SUVAT cannot be used across changing acceleration",
+      "prompt": "A car's acceleration falls as its speed rises. Explain why a single SUVAT calculation over the whole journey is invalid.",
+      "marks": 2,
+      "scheme": [
+        "The SUVAT equations are derived for constant acceleration",
+        "Here acceleration changes, so one value of a cannot represent every instant; use small intervals or a measured graph instead"
+      ],
+      "answer": "SUVAT assumes a is constant. Since the car's acceleration changes with speed, one value cannot describe the whole journey; the motion must be modelled in intervals or from data."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:kin3:turning-point",
+      "context": "depth50:kin3:turning-point:stone",
+      "move": "interpret zero instantaneous velocity without claiming zero acceleration",
+      "prompt": "A stone thrown upward has zero velocity at its highest point. Explain why its acceleration is still non-zero there.",
+      "marks": 2,
+      "scheme": [
+        "Zero velocity is an instantaneous condition at the turning point",
+        "Gravity still acts downward, so acceleration remains approximately 9.81 m s⁻² downward"
+      ],
+      "answer": "The velocity is zero only at that instant. Gravity has not disappeared, so the acceleration is still about 9.81 m s⁻² downward."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:kin3:runway",
+      "context": "depth50:kin3:runway:jet",
+      "move": "use a displacement equation to find take-off speed",
+      "prompt": "A jet starts from rest and accelerates uniformly at 3.2 m s⁻² along a 240 m runway. Calculate its speed at the end.",
+      "marks": 2,
+      "scheme": [
+        "Use v² = u² + 2as with u = 0",
+        "v = √(2 × 3.2 × 240) = 39.2 m s⁻¹"
+      ],
+      "answer": "v² = 0 + 2(3.2)(240), so v = 39.2 m s⁻¹."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:kin3:reaction",
+      "context": "depth50:kin3:reaction:cyclist",
+      "move": "separate reaction travel from uniformly decelerated travel",
+      "prompt": "A cyclist travels at 12 m s⁻¹ for a 0.60 s reaction time, then brakes uniformly at 4.0 m s⁻² to rest. Find the total stopping distance.",
+      "marks": 3,
+      "scheme": [
+        "Reaction distance = vt = 12 × 0.60 = 7.2 m",
+        "Braking distance from v² = u² + 2as: 0 = 12² + 2(−4.0)s, so s = 18 m",
+        "Total distance = 25.2 m (25 m)"
+      ],
+      "answer": "The reaction distance is 12(0.60) = 7.2 m. During braking, 0 = 12² − 8s gives s = 18 m. Total stopping distance is 25.2 m, about 25 m."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:kin3:average-speed",
+      "context": "depth50:kin3:average-speed:shuttle",
+      "move": "distinguish average speed from the mean of endpoint speeds",
+      "prompt": "A shuttle accelerates from 4 m s⁻¹ to 20 m s⁻¹ and then stops. A student uses (4 + 20)/2 for the whole trip's average speed. Explain the error.",
+      "marks": 2,
+      "scheme": [
+        "Average speed is total distance divided by total time, including the stopping segment",
+        "The mean of two speeds is valid only for a specified constant-acceleration interval, not for the entire changing journey"
+      ],
+      "answer": "Average speed must use total distance over total time. (4 + 20)/2 could describe one constant-acceleration interval, but it ignores the later stop and cannot be the whole-trip average."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:kin3:negative-acceleration",
+      "context": "depth50:kin3:negative-acceleration:reverse",
+      "move": "reject the claim that negative acceleration always means slowing",
+      "prompt": "A trolley moves in the negative direction with a negative acceleration. Is it necessarily slowing down? Explain.",
+      "marks": 2,
+      "scheme": [
+        "It is speeding up because velocity and acceleration have the same sign",
+        "Slowing occurs when acceleration is opposite to the current velocity"
+      ],
+      "answer": "No. With both velocity and acceleration negative, the speed increases. An object slows only when acceleration has the opposite sign to its velocity."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:kin3:reverse-suvat",
+      "context": "depth50:kin3:reverse-suvat:braking",
+      "move": "solve a constant-acceleration equation for an initial speed from distance and final speed",
+      "prompt": "A runner slows uniformly at 1.5 m s⁻² over 18 m to a speed of 3.0 m s⁻¹. Calculate the speed at the start of the slowing interval.",
+      "marks": 3,
+      "scheme": [
+        "Use v² = u² + 2as with v = 3.0, a = −1.5 and s = 18",
+        "u² = v² − 2as = 9.0 + 54 = 63",
+        "u = 7.94 m s⁻¹ (7.9 m s⁻¹)"
+      ],
+      "answer": "3.0² = u² + 2(−1.5)(18), so u² = 63 and u = 7.94 m s⁻¹, about 7.9 m s⁻¹."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:kin3:downhill",
+      "context": "depth50:kin3:downhill:cart",
+      "move": "transfer sign-aware SUVAT to motion down an incline",
+      "prompt": "A cart is released from rest and accelerates at 0.80 m s⁻² down a slope. How far does it travel in 5.0 s, and what speed does it reach?",
+      "marks": 3,
+      "scheme": [
+        "s = ½at² = ½ × 0.80 × 5.0² = 10 m",
+        "v = at = 0.80 × 5.0 = 4.0 m s⁻¹",
+        "Both results use the same chosen downhill positive direction and constant acceleration"
+      ],
+      "answer": "With downhill positive, s = ½(0.80)(5.0²) = 10 m and v = 0.80(5.0) = 4.0 m s⁻¹."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:kin3:variable-gravity",
+      "context": "depth50:kin3:variable-gravity:moon",
+      "move": "adapt a constant-acceleration model when the local field strength changes",
+      "prompt": "A probe falls a short distance near the Moon's surface, where g is 1.62 m s⁻². State which SUVAT result changes from an Earth calculation and why.",
+      "marks": 2,
+      "scheme": [
+        "Use the local acceleration a = 1.62 m s⁻² rather than 9.81 m s⁻²",
+        "The kinematic form is unchanged for a short interval because the lunar field is approximately uniform there"
+      ],
+      "answer": "Replace a by the local lunar value 1.62 m s⁻². The same SUVAT form applies over a short height because the acceleration is approximately constant locally."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:kin3:projectile",
+      "context": "depth50:kin3:projectile:cliff",
+      "move": "combine vertical SUVAT with horizontal uniform motion",
+      "prompt": "A ball rolls horizontally off a 20 m cliff at 8.0 m s⁻¹. Calculate its flight time and horizontal range, taking g = 9.81 m s⁻².",
+      "marks": 3,
+      "scheme": [
+        "Vertical motion: 20 = ½gt², so t = √(40/9.81) = 2.02 s",
+        "Horizontal velocity remains 8.0 m s⁻¹",
+        "Range = 8.0 × 2.02 = 16.2 m"
+      ],
+      "answer": "Vertically, 20 = ½(9.81)t² gives t = 2.02 s. Horizontal range is 8.0(2.02) = 16.2 m."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:kin3:newton-energy",
+      "context": "depth50:kin3:newton-energy:lift",
+      "move": "link a resultant force to acceleration and kinetic-energy change",
+      "prompt": "A 1200 kg lift has an upward cable force of 15.0 kN and weight 11.8 kN. Find its acceleration and the rate at which its kinetic energy is increasing when it moves upward at 2.0 m s⁻¹.",
+      "marks": 4,
+      "scheme": [
+        "Resultant upward force = 15.0 − 11.8 = 3.2 kN",
+        "a = F/m = 3200/1200 = 2.67 m s⁻² upward",
+        "Rate of kinetic-energy increase is power of resultant force Fv",
+        "P = 3200 × 2.0 = 6.4 kW"
+      ],
+      "answer": "The resultant is 3.2 kN upward, so a = 3200/1200 = 2.67 m s⁻². The kinetic-energy rate is Fv = 3200(2.0) = 6.4 kW."
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import { useAccount } from "@/state/account";
+
 const ARM_LABELS: Record<string, string> = {
   revise: "Revise recommendations",
   "baseline-mastery": "Weakest-topic-first baseline",
@@ -30,14 +32,14 @@ import {
   retryFailedOutboxItem,
   type FailedOutboxItemSummary,
 } from "@/data/sync";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export default function SettingsPage() {
-  const store = useStore();
+  const store = usePageStore();
   const { settings, updateSettings } = store;
   const [ai, setAi] = useState<{ available: boolean; name: string | null } | null>(null);
   const [keyRevealed, setKeyRevealed] = useState(false);
@@ -481,16 +483,11 @@ export default function SettingsPage() {
 }
 
 function Account() {
-  const store = useStore();
+  const profile = useAccount();
+  const store = usePageStore();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [user, setUser] = useState<string | null>(null);
-
-  useEffect(() => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    void supabase.auth.getUser().then(({ data }) => setUser(data.user?.email ?? null));
-  }, []);
+  const user = profile.kind === "account" ? profile.email ?? profile.userId : null;
 
   if (!isSupabaseConfigured) {
     return (
@@ -540,9 +537,8 @@ function Account() {
   }
 
   async function signOut() {
-    await getSupabase()?.auth.signOut();
-    setUser(null);
-    setMessage("Signed out. Your data stays on this device until you erase it.");
+    const result = await getSupabase()?.auth.signOut();
+    if (result?.error) setMessage(result.error.message);
   }
 
   return (
@@ -580,7 +576,7 @@ function Account() {
 }
 
 function FailedSyncRecovery() {
-  const store = useStore();
+  const store = usePageStore();
   const [items, setItems] = useState<FailedOutboxItemSummary[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -703,7 +699,7 @@ function FailedSyncRecovery() {
 }
 
 function DataControls() {
-  const store = useStore();
+  const store = usePageStore();
   const filename = portabilityFilename(store.userId);
   const [pendingRestore, setPendingRestore] = useState<PortabilitySnapshot | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
@@ -821,7 +817,7 @@ function DataControls() {
   );
 }
 
-function exportDataPortable(store: ReturnType<typeof useStore>, filename: string) {
+function exportDataPortable(store: ReturnType<typeof usePageStore>, filename: string) {
   const snap = buildPortabilitySnapshot({
     userId: store.userId,
     displayName: store.settings.displayName,
@@ -855,7 +851,7 @@ function exportDataPortable(store: ReturnType<typeof useStore>, filename: string
   URL.revokeObjectURL(url);
 }
 
-function exportDataLegacy(store: ReturnType<typeof useStore>) {
+function exportDataLegacy(store: ReturnType<typeof usePageStore>) {
   const payload = {
     exportedAt: new Date().toISOString(),
     settings: store.settings,
@@ -878,4 +874,8 @@ function exportDataLegacy(store: ReturnType<typeof useStore>) {
   link.download = `revise-export-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function usePageStore() {
+  return useStoreFields("attempts", "cards", "examDates", "experimentArm", "gradeActuals", "gradePredictionLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
 }

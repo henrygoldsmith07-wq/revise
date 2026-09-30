@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "files": [
+    "energy-power-sp-01.json",
+    "energy-power-sp-02.json",
+    "energy-power-sp-06.json",
+    "kinematics-dynamics-sp-03.json",
+    "circular-shm-sp-04.json",
+    "thermal-sp-05.json",
+    "nuclear-sp-01.json"
+  ]
+}

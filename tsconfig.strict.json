@@ -20,7 +20,15 @@
     "src/domain/grade-loop.ts",
     "src/domain/funnel.ts",
     "src/domain/working-analysis.ts",
-    "src/domain/mistake-classification.ts"
+    "src/domain/mistake-classification.ts",
+    "src/data/account-profile.ts",
+    "src/data/sync-contract.ts",
+    "src/state/subscriptions.ts"
   ],
-  "exclude": ["node_modules", "e2e", "tests", ".next"]
+  "exclude": [
+    "node_modules",
+    "e2e",
+    "tests",
+    ".next"
+  ]
 }

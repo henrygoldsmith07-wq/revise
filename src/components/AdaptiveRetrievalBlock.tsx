@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { previewIntervals } from "@/domain/scheduling";
 import type { Card, Id, RecallGrade } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Panel, Pill, ProgressBar } from "./ui";
 import { RichText } from "./RichText";
 import { SpeakButton } from "./SpeakButton";
@@ -33,7 +33,7 @@ export function AdaptiveRetrievalBlock({
   cards: Card[];
   onComplete: (outcome: RetrievalOutcome) => void | Promise<void>;
 }) {
-  const store = useStore();
+  const store = useStoreFields("reviewCard");
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);

@@ -8,7 +8,7 @@ import {
   type ActualResultRecord,
   type PredictionOutcome,
 } from "@/domain/grade-loop";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, StatTile } from "./ui";
 
 const RESULT_KIND_LABEL: Record<ActualResultRecord["kind"], string> = {
@@ -50,7 +50,7 @@ function outcomeByActualId(outcomes: PredictionOutcome[]): Map<string, Predictio
 }
 
 export function GradePredictionRealityPanel() {
-  const store = useStore();
+  const store = useStoreFields("gradeActuals", "gradePredictionLog", "recordGradeActual", "removeGradeActual", "settings", "userId");
   const ownPredictions = useMemo(
     () => store.gradePredictionLog.filter((row) => row.anonId === store.userId),
     [store.gradePredictionLog, store.userId],

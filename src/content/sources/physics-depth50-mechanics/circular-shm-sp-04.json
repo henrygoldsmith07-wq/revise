@@ -1,0 +1,191 @@
+{
+  "topic": "circular-shm",
+  "point": 4,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:shm4:definitions",
+      "context": "depth50:shm4:definitions:oscillator",
+      "move": "state the defining acceleration-displacement relation for SHM",
+      "prompt": "State the defining condition for simple harmonic motion in terms of acceleration and displacement.",
+      "marks": 2,
+      "scheme": [
+        "Acceleration is proportional to displacement from equilibrium",
+        "It is directed towards equilibrium: a = −ω²x"
+      ],
+      "answer": "In SHM, a is proportional to x and directed towards equilibrium, so a = −ω²x."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:shm4:period",
+      "context": "depth50:shm4:period:spring",
+      "move": "state angular-frequency and period relations",
+      "prompt": "State the relations between period T, frequency f and angular frequency ω for an oscillator.",
+      "marks": 2,
+      "scheme": [
+        "f = 1/T",
+        "ω = 2πf = 2π/T"
+      ],
+      "answer": "Frequency is f = 1/T and angular frequency is ω = 2πf = 2π/T."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:shm4:phase",
+      "context": "depth50:shm4:phase:mass-spring",
+      "move": "explain why velocity is greatest at equilibrium and zero at extremes",
+      "prompt": "Explain the phase relationship between displacement and velocity for an ideal SHM oscillator.",
+      "marks": 2,
+      "scheme": [
+        "At an extreme x = ±A, the oscillator reverses so v = 0",
+        "At equilibrium x = 0, the restoring acceleration is zero and speed is maximum"
+      ],
+      "answer": "The mass stops momentarily at ±A before reversing, so v = 0 there. It passes equilibrium fastest; at x = 0 the restoring acceleration is zero and speed is maximum."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:shm4:acceleration-phase",
+      "context": "depth50:shm4:acceleration-phase:pendulum",
+      "move": "relate acceleration direction and magnitude to displacement",
+      "prompt": "Why is the magnitude of acceleration largest at the ends of an SHM oscillation?",
+      "marks": 2,
+      "scheme": [
+        "For SHM |a| = ω²|x|",
+        "The displacement magnitude is A at an end, so the restoring acceleration is maximum and points inward"
+      ],
+      "answer": "Because |a| = ω²|x|, the largest displacement A gives the largest acceleration. Its direction is back towards equilibrium."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:shm4:amplitude-speed",
+      "context": "depth50:shm4:amplitude-speed:cart",
+      "move": "use v_max = ωA for a specified amplitude and period",
+      "prompt": "An oscillator has amplitude 0.080 m and period 0.40 s. Calculate its maximum speed.",
+      "marks": 2,
+      "scheme": [
+        "ω = 2π/T = 2π/0.40 = 15.7 rad s⁻¹",
+        "vmax = ωA = 15.7 × 0.080 = 1.26 m s⁻¹"
+      ],
+      "answer": "ω = 2π/0.40 = 15.7 rad s⁻¹, so vmax = ωA = 15.7(0.080) = 1.26 m s⁻¹."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:shm4:acceleration",
+      "context": "depth50:shm4:acceleration:platform",
+      "move": "calculate restoring acceleration at a known displacement",
+      "prompt": "A platform oscillates with angular frequency 5.0 rad s⁻¹. Find the acceleration when its displacement is +0.12 m from equilibrium.",
+      "marks": 2,
+      "scheme": [
+        "Use a = −ω²x",
+        "a = −5.0² × 0.12 = −3.0 m s⁻², towards equilibrium"
+      ],
+      "answer": "a = −ω²x = −(5.0)²(0.12) = −3.0 m s⁻², so the acceleration is towards equilibrium."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:shm4:zero-acceleration",
+      "context": "depth50:shm4:zero-acceleration:equilibrium",
+      "move": "reject the claim that zero acceleration means zero speed in SHM",
+      "prompt": "A student says an oscillator must be stationary whenever its acceleration is zero. Correct the statement for SHM.",
+      "marks": 2,
+      "scheme": [
+        "In SHM a = 0 at equilibrium x = 0",
+        "The speed is greatest there; zero acceleration does not mean zero velocity"
+      ],
+      "answer": "Acceleration is zero at equilibrium because x = 0, but the oscillator is moving fastest at that point. Zero acceleration is not zero velocity."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:shm4:period-amplitude",
+      "context": "depth50:shm4:period-amplitude:pendulum",
+      "move": "identify the small-angle condition behind amplitude-independent period",
+      "prompt": "A student says doubling the amplitude of every pendulum leaves its period unchanged. State the limitation.",
+      "marks": 2,
+      "scheme": [
+        "The amplitude-independent period is an approximation for small angular amplitudes",
+        "At large amplitude the small-angle model fails and the period changes slightly"
+      ],
+      "answer": "The result is only the small-angle approximation. At larger amplitudes the pendulum is not exactly SHM and its period changes slightly."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:shm4:energy-speed",
+      "context": "depth50:shm4:energy-speed:spring",
+      "move": "combine SHM energy with a spring constant to find maximum speed",
+      "prompt": "A 0.40 kg mass on a spring has amplitude 0.15 m and spring constant 160 N m⁻¹. Calculate its maximum speed.",
+      "marks": 3,
+      "scheme": [
+        "Total energy = ½kA² = ½ × 160 × 0.15² = 1.80 J",
+        "At equilibrium this is kinetic energy: ½mvmax² = 1.80 J",
+        "vmax = √(2 × 1.80/0.40) = 3.00 m s⁻¹"
+      ],
+      "answer": "The total energy is ½(160)(0.15²) = 1.80 J. At equilibrium ½(0.40)v² = 1.80, giving vmax = 3.00 m s⁻¹."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:shm4:period-from-mass",
+      "context": "depth50:shm4:period-from-mass:spring",
+      "move": "infer the period from mass and stiffness rather than from displacement data",
+      "prompt": "A 0.25 kg mass is attached to a spring of stiffness 100 N m⁻¹. Calculate the period of its small oscillations.",
+      "marks": 2,
+      "scheme": [
+        "ω = √(k/m) = √(100/0.25) = 20 rad s⁻¹",
+        "T = 2π/ω = 0.314 s"
+      ],
+      "answer": "ω = √(100/0.25) = 20 rad s⁻¹, so T = 2π/20 = 0.314 s."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:shm4:electrical-analogy",
+      "context": "depth50:shm4:electrical-analogy:lc",
+      "move": "transfer the displacement-restoring-force pattern to an LC oscillator",
+      "prompt": "An ideal LC circuit oscillates between capacitor electric energy and inductor magnetic energy. Explain the SHM analogy for charge q and current I.",
+      "marks": 2,
+      "scheme": [
+        "Charge q plays the role of displacement and current I = dq/dt the role of velocity",
+        "The circuit equation gives d²q/dt² = −q/(LC), so acceleration in q is proportional and opposite to q"
+      ],
+      "answer": "Charge q is analogous to displacement and current dq/dt to velocity. The LC equation d²q/dt² = −q/(LC) has the SHM form, so energy swaps between capacitor and inductor."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:shm4:vertical-spring",
+      "context": "depth50:shm4:vertical-spring:gravity",
+      "move": "recognise equilibrium shift without changing the angular frequency",
+      "prompt": "A mass oscillates vertically on a light spring. Explain why adding gravity changes the equilibrium position but not the period in the ideal model.",
+      "marks": 2,
+      "scheme": [
+        "Gravity shifts the point where spring force balances weight",
+        "For displacement measured from the new equilibrium, the restoring equation is still a = −(k/m)x, so T = 2π√(m/k)"
+      ],
+      "answer": "Weight moves the equilibrium until spring force balances it. Measuring x from that new point leaves a = −(k/m)x, so the ideal period remains 2π√(m/k)."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:shm4:energy-graph",
+      "context": "depth50:shm4:energy-graph:oscillator",
+      "move": "interpret complementary kinetic and potential energy maxima over a cycle",
+      "prompt": "Describe how kinetic and elastic potential energy vary as a mass completes one ideal SHM cycle, and identify their values at equilibrium and at an extreme.",
+      "marks": 3,
+      "scheme": [
+        "At an extreme speed is zero, so elastic potential energy is maximum and kinetic energy zero",
+        "At equilibrium displacement is zero, so elastic potential energy is zero and kinetic energy maximum",
+        "The total mechanical energy remains constant while the two stores exchange"
+      ],
+      "answer": "At each extreme v = 0: elastic energy is maximum and kinetic energy is zero. At equilibrium x = 0: elastic energy is zero and kinetic energy is maximum. Their sum stays constant."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:shm4:driven-resonance",
+      "context": "depth50:shm4:driven-resonance:bridge",
+      "move": "connect natural frequency and damping to a real oscillating structure",
+      "prompt": "A footbridge vibrates when a crowd walks at a regular step frequency. Explain why resonance is possible and why damping reduces the risk.",
+      "marks": 3,
+      "scheme": [
+        "Large response occurs when the driving frequency is close to the bridge's natural frequency",
+        "Energy is supplied coherently each cycle, increasing amplitude",
+        "Damping removes mechanical energy and broadens/reduces the resonance peak"
+      ],
+      "answer": "When the step frequency approaches the bridge's natural frequency, successive inputs add coherently and amplitude grows. Damping transfers energy to the surroundings, lowering and broadening the resonance response."
+    }
+  ]
+}

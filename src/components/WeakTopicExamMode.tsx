@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { buildWeakTopicExam, type WeakTopicExam } from "@/domain/weak-topic-exam";
 import type { Attempt, Question } from "@/domain/types";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { QuestionRunner } from "./QuestionRunner";
 import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
 
@@ -15,7 +15,7 @@ import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./
 // ---------------------------------------------------------------------------
 
 export function WeakTopicExamMode({ onExit }: { onExit: () => void }) {
-  const store = useStore();
+  const store = useStoreFields("mistakes", "questions");
   const [exam] = useState<WeakTopicExam>(() =>
     buildWeakTopicExam({ mistakes: store.mistakes, questions: store.questions }),
   );

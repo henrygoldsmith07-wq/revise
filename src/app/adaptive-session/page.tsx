@@ -23,7 +23,7 @@ import { reviewedWjecTopicEdges, wjecCapabilities } from "@/content/capabilities
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { AdaptiveRetrievalBlock, type RetrievalOutcome } from "@/components/AdaptiveRetrievalBlock";
 import { AdaptiveQuestionBlock } from "@/components/AdaptiveQuestionBlock";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
@@ -61,7 +61,7 @@ export default function AdaptiveSessionPage() {
 
 function AdaptiveSession() {
   const params = useSearchParams();
-  const store = useStore();
+  const store = usePageStore();
   const requestedTopicId = params.get("topic");
   const startRequested = params.get("start") === "1";
   const resumeRequested = params.get("resume") === "1";
@@ -410,7 +410,7 @@ function StepPanel({
 }: {
   step: AdaptiveSessionStep;
   plan: AdaptiveSessionPlan;
-  store: ReturnType<typeof useStore>;
+  store: ReturnType<typeof usePageStore>;
   replanReason: string | null;
   onDone: (record: AdaptiveStepRecord) => void;
   onRetrievalComplete: (outcome: RetrievalOutcome) => void | Promise<void>;
@@ -769,7 +769,7 @@ function AdaptiveComplete({
 }: {
   plan: AdaptiveSessionPlan;
   run: AdaptiveRunState;
-  store: ReturnType<typeof useStore>;
+  store: ReturnType<typeof usePageStore>;
   onRestart: () => void;
 }) {
   const subject = getSubject(plan.subjectId);
@@ -841,7 +841,7 @@ function SummarySection({ title, lines }: { title: string; lines: string[] }) {
 /** Build the tutor's next-step verdict from the freshest stored evidence. */
 function replanWithCurrentEvidence(
   plan: AdaptiveSessionPlan,
-  store: ReturnType<typeof useStore>,
+  store: ReturnType<typeof usePageStore>,
   topics: Topic[],
   completed: AdaptiveStepRecord[],
 ): AdaptiveReplan | null {
@@ -890,4 +890,8 @@ function replanWithCurrentEvidence(
     prereq,
     interventionOutcomes: store.interventionOutcomes,
   });
+}
+
+function usePageStore() {
+  return useStoreFields("adaptiveSession", "applicationMastery", "attempts", "cards", "clearRevisionCheckpoint", "examDates", "examReadiness", "interventionOutcomes", "mastery", "mistakes", "questions", "recallMastery", "recordInterventionOutcome", "reviewLogs", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "updateCards", "userId");
 }

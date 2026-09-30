@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { analyseFunnel } from "@/domain/funnel";
 import { Panel, SectionHeading } from "./ui";
 
@@ -16,7 +16,7 @@ function goalTone(meets: boolean | null): string {
 }
 
 export function FunnelPanel() {
-  const store = useStore();
+  const store = useStoreFields("attempts", "funnelEvents", "mistakes", "userId");
 
   const report = useMemo(() => {
     const userId = store.userId;

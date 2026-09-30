@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { LessonMode } from "@/components/LessonMode";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import { allSubjects, allTopics } from "@/domain/curriculum";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Pill } from "@/components/ui";
 
 // /lesson — learn a topic from zero. Lists topics for the selected subject and
@@ -19,7 +19,7 @@ export default function LessonPage() {
 }
 
 function LessonBrowser() {
-  const store = useStore();
+  const store = useStoreFields("settings", "updateSettings");
   const params = useSearchParams();
   const subjects = useMemo(
     () => allSubjects().filter((s) => store.settings.subjectIds.includes(s.id)),

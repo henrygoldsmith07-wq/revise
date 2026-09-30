@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { getSubject } from "@/domain/curriculum";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
 import { GradePredictionRealityPanel } from "@/components/GradePredictionRealityPanel";
 import {
@@ -15,7 +15,7 @@ import {
 import { ButtonLink, Panel } from "@/components/ui";
 
 export default function ReadinessPage() {
-  const store = useStore();
+  const store = useStoreFields("examReadinessSummary");
   const weakest = store.examReadinessSummary.weakestSubjectId;
   const weakestSubject = weakest ? getSubject(weakest) : null;
 

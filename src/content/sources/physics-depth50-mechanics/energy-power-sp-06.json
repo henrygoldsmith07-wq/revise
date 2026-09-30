@@ -1,0 +1,164 @@
+{
+  "topic": "energy-power",
+  "point": 6,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:nonconservative:efficiency-definition",
+      "context": "depth50:nonconservative:efficiency-definition:machine",
+      "move": "state efficiency as useful output divided by total input",
+      "prompt": "State the definition of efficiency for a machine and give its value as a percentage.",
+      "marks": 2,
+      "scheme": [
+        "Efficiency = useful energy (or power) output divided by total energy (or power) input",
+        "Percentage efficiency is this ratio multiplied by 100 and cannot exceed 100% for a passive machine"
+      ],
+      "answer": "Efficiency is useful output divided by total input. As a percentage, multiply the ratio by 100; a passive machine cannot exceed 100%."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:nonconservative:mechanical-energy",
+      "context": "depth50:nonconservative:mechanical-energy:brake",
+      "move": "identify a non-conservative force by path-dependent mechanical work",
+      "prompt": "What makes friction a non-conservative force in an energy calculation?",
+      "marks": 2,
+      "scheme": [
+        "Its work depends on the path length, not only the initial and final positions",
+        "It transfers mechanical energy to internal energy of the bodies and surroundings"
+      ],
+      "answer": "Friction is non-conservative because its work depends on the path taken. It transfers mechanical energy into internal energy rather than returning it as mechanical energy."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:nonconservative:hysteresis",
+      "context": "depth50:nonconservative:hysteresis:rubber",
+      "move": "explain a lower return path as dissipative internal work",
+      "prompt": "A rubber band is stretched and then released. Explain why the unloading curve does not retrace the loading curve and how this affects the returned energy.",
+      "marks": 2,
+      "scheme": [
+        "The loading and unloading force-extension paths differ because internal molecular friction causes hysteresis",
+        "The area between the curves is energy transferred to internal energy, so less work is returned"
+      ],
+      "answer": "Internal friction produces hysteresis, so unloading follows a different force-extension path. The enclosed area is energy converted to internal energy and the band returns less work than was supplied."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:nonconservative:terminal-power",
+      "context": "depth50:nonconservative:terminal-power:parachute",
+      "move": "link constant-speed power balance to a non-conservative transfer",
+      "prompt": "A parachutist falls at terminal speed. Explain why the gravitational power input is equal to the rate of thermal energy transfer to the air.",
+      "marks": 2,
+      "scheme": [
+        "At terminal speed the kinetic energy is constant, so resultant force and rate of mechanical-energy change are zero",
+        "The weight power is balanced by drag power, which transfers energy to internal energy of the air and parachute"
+      ],
+      "answer": "At terminal speed the kinetic energy does not change. The power supplied by weight is therefore balanced by the drag power, which transfers that energy to internal energy of the air and parachute."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:nonconservative:braking",
+      "context": "depth50:nonconservative:braking:bus",
+      "move": "calculate dissipated energy from a constant braking force and distance",
+      "prompt": "A 900 kg bus is brought to rest by a constant 6.0 kN braking force over 25 m. Calculate the energy transferred to internal energy by the brakes.",
+      "marks": 2,
+      "scheme": [
+        "Work done by the brakes has magnitude Fs = 6000 × 25",
+        "Dissipated energy = 1.50 × 10^5 J"
+      ],
+      "answer": "The brakes do negative work of magnitude Fs = 6000(25) = 1.50 × 10^5 J, so 1.50 × 10^5 J is transferred to internal energy."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:nonconservative:device-efficiency",
+      "context": "depth50:nonconservative:device-efficiency:pump",
+      "move": "apply efficiency to infer useful power from an input rating",
+      "prompt": "A pump takes 2.4 kW of electrical power and has an efficiency of 72%. Calculate its useful fluid power output.",
+      "marks": 2,
+      "scheme": [
+        "Useful output power = efficiency × input power = 0.72 × 2400 W",
+        "Useful output power = 1.73 kW (1.7 kW)"
+      ],
+      "answer": "The useful output is 0.72 × 2400 = 1728 W, or 1.73 kW (about 1.7 kW)."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:nonconservative:overunity",
+      "context": "depth50:nonconservative:overunity:generator",
+      "move": "reject an efficiency above unity using conservation of energy",
+      "prompt": "A student calculates a generator efficiency of 135% and says the extra energy comes from the rotating shaft. Diagnose the error.",
+      "marks": 2,
+      "scheme": [
+        "Useful output cannot exceed total input in this passive system, so 135% indicates an arithmetic or unit error",
+        "The rotating shaft is part of the input energy, not an additional source hidden outside the denominator"
+      ],
+      "answer": "An efficiency of 135% is impossible for this passive generator. The shaft energy is already an input; a unit or arithmetic error has made the output exceed the total input."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:nonconservative:lost-energy-language",
+      "context": "depth50:nonconservative:lost-energy-language:cycling",
+      "move": "replace lost-energy wording with a complete energy-store account",
+      "prompt": "A rider says 2.0 kJ of energy is 'lost' to air resistance. State the physically complete interpretation.",
+      "marks": 2,
+      "scheme": [
+        "The rider's mechanical energy decreases by 2.0 kJ because drag does negative work",
+        "Approximately 2.0 kJ is transferred to internal energy and turbulent motion of the air, rider and bicycle"
+      ],
+      "answer": "Drag removes 2.0 kJ from the rider's mechanical stores. That energy is transferred mainly to internal energy and turbulence in the air, rider and bicycle; it is not destroyed."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:nonconservative:friction-energy",
+      "context": "depth50:nonconservative:friction-energy:sledge",
+      "move": "combine a potential-energy gain with a measured dissipative loss",
+      "prompt": "A 40 kg sledge is pulled up a 5.0 m vertical rise. The pulling work is 3.0 kJ and friction transfers 0.80 kJ to internal energy. Find the change in the sledge's kinetic energy, assuming it starts and ends on the same speed.",
+      "marks": 3,
+      "scheme": [
+        "Gravitational potential gain = mgh = 40 × 9.81 × 5.0 = 1962 J",
+        "Energy balance: pulling work = gravitational gain + friction loss + change in kinetic energy",
+        "Change in kinetic energy = 3000 − 1962 − 800 = 238 J"
+      ],
+      "answer": "The rise gains 40(9.81)(5.0) = 1962 J. Thus ΔEk = 3000 − 1962 − 800 = 238 J."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:nonconservative:efficiency-chain",
+      "context": "depth50:nonconservative:efficiency-chain:wind-turbine",
+      "move": "propagate two efficiencies through an energy conversion chain",
+      "prompt": "A wind turbine receives 18 MJ of wind energy. Aerodynamic conversion is 40% efficient and the generator is 85% efficient. Calculate the electrical energy delivered.",
+      "marks": 3,
+      "scheme": [
+        "After aerodynamic conversion: 0.40 × 18 MJ = 7.2 MJ",
+        "Electrical output = 0.85 × 7.2 MJ",
+        "Electrical energy delivered = 6.12 MJ (6.1 MJ)"
+      ],
+      "answer": "The mechanical energy is 0.40(18) = 7.2 MJ. The generator delivers 0.85(7.2) = 6.12 MJ, about 6.1 MJ."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:nonconservative:thermal-mixing",
+      "context": "depth50:nonconservative:thermal-mixing:coffee",
+      "move": "transfer dissipative energy accounting to thermal mixing",
+      "prompt": "A hot metal block cools in water with no change in total energy. Explain which transfer is non-conservative from the block's mechanical viewpoint and what a calorimetry balance should include.",
+      "marks": 2,
+      "scheme": [
+        "The block's organised/thermal energy is transferred irreversibly to the water and container, so the mechanical viewpoint has a non-conservative loss",
+        "The balance includes heat gained by every warmed component, not just the water"
+      ],
+      "answer": "Energy leaves the block and is shared irreversibly with the water and container. A correct calorimetry balance includes the heat gained by all warmed components; total energy is still conserved."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:nonconservative:regenerative",
+      "context": "depth50:nonconservative:regenerative:train",
+      "move": "compare a regenerative pathway with a dissipative brake using energy stores",
+      "prompt": "An electric train brakes downhill and sends energy back to its battery. Compare this transfer with a conventional friction brake and identify why neither is perfectly efficient.",
+      "marks": 2,
+      "scheme": [
+        "Regenerative braking transfers some kinetic/gravitational energy into the battery's chemical store instead of mainly heating brake pads",
+        "Motor, battery and electrical resistance still dissipate part of the energy as internal energy"
+      ],
+      "answer": "Regeneration stores part of the energy chemically, whereas a friction brake transfers most of it directly to heat in the pads and surroundings. Motor, battery and cable losses mean the regenerative route is still below 100% efficient."
+    }
+  ]
+}

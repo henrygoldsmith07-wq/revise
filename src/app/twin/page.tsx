@@ -8,7 +8,7 @@ import {
   revisionTwinKey,
 } from "@/domain/revision-twin";
 import { activityHref } from "@/lib/activity";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { RevisionTwinCard, revisionSessionTitle, formatMarks } from "@/components/RevisionTwinCard";
 import { Button, ButtonLink, Panel, Pill, SectionHeading, StatTile, cx } from "@/components/ui";
 
@@ -24,7 +24,7 @@ function formatWhen(value: string): string {
 }
 
 export default function RevisionTwinPage() {
-  const store = useStore();
+  const store = useStoreFields("abandonRevisionTwinSession", "attempts", "completeRevisionTwinSessionFromAttempt", "finishRevisionTwinSession", "questions", "revisionTwinReport");
   const report = store.revisionTwinReport;
   const active = report.activeSession;
   const [clock, setClock] = useState(() => Date.now());

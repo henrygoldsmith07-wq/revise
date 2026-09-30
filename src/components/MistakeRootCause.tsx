@@ -10,7 +10,7 @@ import {
   type RootCauseConfidence,
   type RootCauseQuality,
 } from "@/domain/mistake-root-cause";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Panel, Pill, ProgressBar, SectionHeading, StatTile } from "./ui";
 
 const QUALITY_COPY: Record<RootCauseQuality, { label: string; tone: "neutral" | "review" | "success" }> = {
@@ -78,7 +78,7 @@ function CauseRow({ cause }: { cause: MistakeRootCause }) {
 }
 
 export function MistakeRootCausePanel() {
-  const store = useStore();
+  const store = useStoreFields("attempts", "mistakes", "questions", "settings");
   const topics = useMemo(() => allTopics(store.settings.subjectIds), [store.settings.subjectIds]);
   const report = useMemo(
     () => buildMistakeRootCauseReport({

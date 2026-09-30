@@ -58,22 +58,36 @@ function safeErrorClass(value: unknown): string | undefined {
 
 /** Strip every field not explicitly allowed in `TelemetryFields`. */
 export function safeTelemetryFields(fields: TelemetryFields): TelemetryFields {
+  const safe0 = finite(fields.attempts);
+  const safe1 = finite(fields.durationMs, 0, 86_400_000);
+  const safe2 = finite(fields.failed);
+  const safe3 = finite(fields.percent, 0, 100);
+  const safe4 = finite(fields.pulled);
+  const safe5 = finite(fields.pushed);
+  const safe6 = finite(fields.queueDepth);
+  const safe7 = finite(fields.quotaBytes);
+  const safe8 = finite(fields.schemaVersion, 0, 999);
+  const safe9 = finite(fields.usageBytes);
+  const safe10 = safeErrorClass(fields.errorClass);
+  const safe11 = safeLabel(fields.entity, MAX_ENTITY);
+  const safe12 = safeLabel(fields.provider, MAX_TASK);
+  const safe13 = safeLabel(fields.task, MAX_TASK);
   return {
     ...(fields.status ? { status: fields.status } : {}),
-    ...(safeErrorClass(fields.errorClass) ? { errorClass: safeErrorClass(fields.errorClass) } : {}),
-    ...(safeLabel(fields.entity, MAX_ENTITY) ? { entity: safeLabel(fields.entity, MAX_ENTITY) } : {}),
-    ...(safeLabel(fields.task, MAX_TASK) ? { task: safeLabel(fields.task, MAX_TASK) } : {}),
-    ...(fields.provider === null ? { provider: null } : safeLabel(fields.provider, MAX_TASK) ? { provider: safeLabel(fields.provider, MAX_TASK) } : {}),
-    ...(finite(fields.schemaVersion, 0, 999) != null ? { schemaVersion: finite(fields.schemaVersion, 0, 999) } : {}),
-    ...(finite(fields.durationMs, 0, 86_400_000) != null ? { durationMs: finite(fields.durationMs, 0, 86_400_000) } : {}),
-    ...(finite(fields.pushed) != null ? { pushed: finite(fields.pushed) } : {}),
-    ...(finite(fields.pulled) != null ? { pulled: finite(fields.pulled) } : {}),
-    ...(finite(fields.failed) != null ? { failed: finite(fields.failed) } : {}),
-    ...(finite(fields.queueDepth) != null ? { queueDepth: finite(fields.queueDepth) } : {}),
-    ...(finite(fields.attempts) != null ? { attempts: finite(fields.attempts) } : {}),
-    ...(finite(fields.usageBytes) != null ? { usageBytes: finite(fields.usageBytes) } : {}),
-    ...(finite(fields.quotaBytes) != null ? { quotaBytes: finite(fields.quotaBytes) } : {}),
-    ...(finite(fields.percent, 0, 100) != null ? { percent: finite(fields.percent, 0, 100) } : {}),
+    ...(safe10 ? { errorClass: safe10 } : {}),
+    ...(safe11 ? { entity: safe11 } : {}),
+    ...(safe13 ? { task: safe13 } : {}),
+    ...(fields.provider === null ? { provider: null } : safe12 ? { provider: safe12 } : {}),
+    ...(safe8 != null ? { schemaVersion: safe8 } : {}),
+    ...(safe1 != null ? { durationMs: safe1 } : {}),
+    ...(safe5 != null ? { pushed: safe5 } : {}),
+    ...(safe4 != null ? { pulled: safe4 } : {}),
+    ...(safe2 != null ? { failed: safe2 } : {}),
+    ...(safe6 != null ? { queueDepth: safe6 } : {}),
+    ...(safe0 != null ? { attempts: safe0 } : {}),
+    ...(safe9 != null ? { usageBytes: safe9 } : {}),
+    ...(safe7 != null ? { quotaBytes: safe7 } : {}),
+    ...(safe3 != null ? { percent: safe3 } : {}),
   };
 }
 

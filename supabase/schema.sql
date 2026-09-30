@@ -362,3 +362,16 @@ begin
   end loop;
 end;
 $$;
+
+-- Keyset pulls sort by (updated_at, id) within one owner.
+create index if not exists cards_sync_keyset_idx on public.cards (user_id, updated_at, id);
+create index if not exists review_logs_sync_keyset_idx on public.review_logs (user_id, updated_at, id);
+create index if not exists questions_sync_keyset_idx on public.questions (user_id, updated_at, id);
+create index if not exists attempts_sync_keyset_idx on public.attempts (user_id, updated_at, id);
+create index if not exists mistakes_sync_keyset_idx on public.mistakes (user_id, updated_at, id);
+create index if not exists papers_sync_keyset_idx on public.papers (user_id, updated_at, id);
+create index if not exists planned_sessions_sync_keyset_idx on public.planned_sessions (user_id, updated_at, id);
+create index if not exists exam_dates_sync_keyset_idx on public.exam_dates (user_id, updated_at, id);
+create index if not exists user_settings_sync_keyset_idx on public.user_settings (user_id, updated_at, id);
+create index if not exists streaks_sync_keyset_idx on public.streaks (user_id, updated_at, id);
+create index if not exists lesson_progress_sync_keyset_idx on public.lesson_progress (user_id, updated_at, id);

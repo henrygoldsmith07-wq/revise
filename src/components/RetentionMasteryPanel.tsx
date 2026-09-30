@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { retentionMasteryLabel, retentionMasteryReport } from "@/domain/retention-mastery";
 import type { RetentionMasteryBand, RetentionTrend } from "@/domain/retention-mastery";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Panel, Pill, ProgressBar, SectionHeading, cx } from "./ui";
 
 const CHECKPOINT_LABELS = new Map([[1, "1 day"], [7, "7 days"], [30, "30 days"]]);
 
 export function RetentionMasteryPanel() {
-  const store = useStore();
+  const store = useStoreFields("cards", "reviewLogs", "settings");
   const report = useMemo(() => {
     const subjectIds = new Set(store.settings.subjectIds);
     const cards = store.cards.filter((card) => subjectIds.has(card.subjectId));

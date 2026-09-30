@@ -6,7 +6,7 @@
                     ┌──────────────────────────────────────────┐
    browser          │  src/app  (Next.js App Router, client)   │
                     └───────────────┬──────────────────────────┘
-                                    │ useStore()
+                                    │ useStoreFields(...)
                     ┌───────────────▼──────────────────────────┐
                     │  src/state/store.tsx                     │
                     │  in-memory snapshot + derived values     │
@@ -98,11 +98,12 @@ IndexedDB is the primary store. A write lands there and is durable before the UI
 updates; the same change is then queued in an outbox. `sync()` drains the outbox
 in batches per entity, then pulls anything newer.
 
-**Conflict rule: last write wins per row, on `updated_at`.** Revision data is
-append-mostly and single-author, so a CRDT would be a great deal of machinery
-for a case that barely arises. The one genuinely mergeable thing — FSRS card
-state — resolves to the row with the later review, which is also the row with
-more information in it.
+**Conflict rules:** plain entities use last-write-wins on `updated_at`; FSRS
+cards union/replay causally stamped review operations, and lesson progress and
+streaks merge their grow-only evidence. Server triggers clamp future timestamps
+and reject stale/equal writes atomically. Pull uses bounded per-table keysets using `id` for collections and `user_id` for singletons;
+cursors only advance after successfully processed pages. These rules preserve
+review history across duplicate devices rather than choosing one whole card.
 
 The wire format keeps the whole domain object in a `data` jsonb column and lifts
 out only what the server indexes or secures on. A new domain field therefore
@@ -132,21 +133,76 @@ UI → src/ai/client.ts → POST /api/ai → src/ai/tasks.ts → src/ai/provider
 - The one exception is OCR: there is no offline handwriting recogniser, so it
   returns empty text with an explanation, and typing and dictation stay open.
 
-Rate limiting is a per-process token bucket. Behind multiple instances this
-wants a shared limiter; the interface is deliberately the same shape so that
-swap is local.
+AI quotas use the atomic Supabase `consume_ai_quota` function when configured,
+with an explicitly controlled development fallback. Production fails closed
+when the shared limiter is unavailable.
 
-### `src/state` — one store
+### Account and state boundaries
 
-Revision data is small (thousands of rows), so the whole snapshot is held in
-memory and every derived value — mastery, recommendations, predictions, due
-counts — is recomputed with `useMemo` on change. That makes them consistent by
-construction instead of by cache invalidation, which is the class of bug that
-would otherwise show a stale predicted grade next to fresh marks.
+`src/state/account.tsx` resolves the canonical profile before mounting any study
+state: signed out uses `local`; an authenticated session uses its Supabase UUID.
+Cached sessions restore magic-link and offline account identity; sync rechecks
+server auth before every push/pull stage. An auth identity change hides the old
+study tree and reloads the document. Storage is pinned for a document's lifetime,
+so late async callbacks cannot write into a different user's database.
+
+The original `revise` IndexedDB database remains the signed-out local profile.
+Each account has a separate `revise:account:<UUID>` database, including public
+seed cards, private questions, settings, metadata, outbox, checkpoints,
+experiments, outcomes, AI cache and regrading queue. Teacher workspace browser
+storage is scoped too; custom review queues carry an owner. Settings apply only
+after that profile loads. Sign-out preserves account rows and queued writes;
+signing in again resumes them. Device privacy still requires an OS/browser
+profile on shared computers: IndexedDB is not an encrypted local vault.
+
+On first use of an account on a device, the boundary offers **Copy local
+revision** or **Keep profiles separate** when eligible local data exists. Copy
+preserves the original local database, remaps only ownership fields and scoped
+metadata keys, and atomically commits account rows plus a complete sync outbox.
+It preserves educational ids, histories and trust fingerprints. A durable local
+claim limits adoption to one account; retries and concurrent tabs adopting into that account are idempotent.
+Existing account databases, unknown-owner queues and mixed-owner local data
+cannot be adopted. A copy may combine with the same account's cloud history
+under the existing merge rules; the student explicitly chooses that copy. It
+never auto-copies account A into account B. Account metadata remains device-local
+unless already represented by a synced entity; adoption does not add new sync
+tables for outcome/experiment histories. E2EE keys remain local and need export
+on another device. New local work after adoption remains in local mode.
+
+`src/state/store.tsx` composes revision state with planning, sessions, outcomes,
+experiments and sync modules and derives learning reports using domain functions.
+`src/state/subscriptions.ts` owns a stable subscription channel;
+`src/state/store-context.tsx` owns the React selector boundary. Committed store
+values publish from a layout effect; React consumers use `useStoreFields` or
+`useStoreSelector` with equality caching via `useSyncExternalStore`. Unchanged
+selections retain their identities, so sync status cannot invalidate card views,
+marking cannot invalidate experiment-only views, and settings do not invalidate
+raw histories. Application consumers select their fields explicitly;
+`useStore` remains a compatibility API. Evidence-only reports share a stable input boundary, so settings, planning and
+streak writes do not invalidate their calculations. Derived models still calculate centrally,
+and multi-field orchestration views intentionally subscribe to their full inputs.
+
+### Structured educational source
+
+The capacitor JSON pipeline continues unchanged. A second representative slice
+moves 92 WJEC Physics mechanics/thermal/nuclear questions into seven small
+specification-group JSON files under
+`src/content/sources/physics-depth50-mechanics`, ordered by a manifest.
+`npm run content:physics` runs strict source-schema checks, provenance validation,
+actual specification-point checks and runtime question validation, then emits a
+deterministic typed adapter using the existing authoring helper. The public
+module export remains stable. Pre-migration exact question ids and fingerprints
+are pinned in `tests/fixtures/physics-depth50-mechanics-fingerprints.json`.
+
+The path is structured source → schema/provenance/spec mapping → exact-fingerprint
+human trust ledger → runtime `Question[]`. Generation cannot approve a question.
+Release-set membership and human verification remain separate gates in the bank.
+`npm run content:check` blocks CI on malformed sources or generated-artifact drift.
+The remaining large TypeScript banks are deliberately not migrated in this pass.
 
 ### `src/components` and `src/app`
 
-`playwright.config.ts` + `e2e/offline.spec.ts` + `e2e/visual.spec.ts` form the offline-first E2E harness: build → start → Chromium by default (Firefox/WebKit via `PLAYWRIGHT_ALL_BROWSERS=1`), visual snapshots at `e2e/__screenshots__/` (see `e2e/README.md` for the process contract). CI runs it only when `@playwright/test` is installed, otherwise the node smoke in `tests/sync.test.ts` is the gate (`.github/workflows/revise.yml`).
+`playwright.config.ts` + `e2e/offline.spec.ts` + `e2e/visual.spec.ts` form the offline-first E2E harness: build → start → Chromium by default (Firefox/WebKit via `PLAYWRIGHT_ALL_BROWSERS=1`), visual snapshots at `e2e/__screenshots__/` (see `e2e/README.md` for the process contract). CI requires the Playwright dependency and runs Chromium E2E unconditionally (`.github/workflows/revise.yml`).
 
 The Le Studio design system (`src/app/le-studio.css`) carries all colour through
 CSS custom properties that flip themselves for dark mode, so components carry no
@@ -315,3 +371,12 @@ from ordinary pending work. Settings → Sync recovery exposes safe metadata onl
 (entity, operation, attempts, queued time and error), with explicit actions to
 retry, export the private recovery record, or discard only the queued server
 mutation after confirmation. Payload/answer content is never shown by default.
+
+### Product hierarchy
+
+Today presents the adaptive session or resume action before collapsed plan,
+pace and outlook details. Mobile has Today, Session and a Tools menu. Tools
+contains every manual route and the secondary Readiness, Schedule, Library and
+Settings surfaces. Desktop keeps direct routes grouped under Choose your own
+and Plan & progress; keyboard shortcuts and search remain available. No new
+recommender, tutor or mastery model is introduced.

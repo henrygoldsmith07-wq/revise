@@ -330,3 +330,22 @@ Human review attestations require a full timezone-bearing ISO instant and reject
 Prerequisite edges remain hypotheses until separately reviewed. `npm run wjec:prerequisite:batch -- <subject> <new-directory> --limit=20` exports a focused packet; `npm run wjec:prerequisite:apply -- <returned-directory> --dry-run` validates qualified approved/rejected decisions before the same command without `--dry-run` atomically records them in the source-controlled prerequisite ledger. No command creates an approval automatically.
 
 Focused review batches emit `release-set-proposal.json`. `npm run wjec:release:check -- <proposal>` validates a proposal without writing; `npm run wjec:release:apply -- <proposal>` atomically updates only the editorial release-candidate manifest. Proposals must carry the generated `resultingQuestionIds` snapshot so stale proposals fail closed. Release selection never creates or changes human approvals.
+
+### Account profiles and simpler navigation
+
+The account boundary mounts the store with the authenticated Supabase UUID,
+using a separate IndexedDB database for each account. Signed-out revision keeps
+its original local-only database. The first account visit offers an explicit
+local-data copy or a separate profile; it never automatically merges accounts.
+Sign-out preserves account progress and offline queues for the next sign-in.
+See `docs/architecture.md` for adoption, ownership and device-local metadata
+limits, and `docs/operations-runbook.md` for the seven required staging secrets.
+
+Today and Session form the mobile primary loop. The Tools menu retains every
+manual study route and management surface, with direct desktop links and search.
+The 92-question Physics depth-50 mechanics slice now uses seven structured JSON
+sources. Regenerate with `npm run content:physics`; `npm run content:check`
+validates sources and rejects artifact drift without manufacturing human trust.
+
+See [the September improvement state](docs/improvement-state-2026-09-30.md) for
+the implementation decisions, regression coverage, verification and rollout limits.

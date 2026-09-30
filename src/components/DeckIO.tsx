@@ -5,7 +5,7 @@ import { allTopics, topicsFor } from "@/domain/curriculum";
 import { exportDeck, materialiseDeck, parseDeckFile, serialiseDeck } from "@/domain/deck-io";
 import type { ImportReport } from "@/domain/deck-io";
 import type { Card, Id } from "@/domain/types";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading } from "./ui";
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
 }
 
 export function ImportDeckPanel({ onImported }: { onImported?: (count: number) => void }) {
-  const store = useStore();
+  const store = useStoreFields("addCards", "cards", "userId");
   const subjects = useSubjects();
   const fileInput = useRef<HTMLInputElement>(null);
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { getSubject, getTopic } from "@/domain/curriculum";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { Button, Panel, Pill, ProgressBar, SectionHeading, StatTile } from "../ui";
 import { EmptyHint, UncertaintyGlyph } from "./shared";
 
@@ -11,7 +11,7 @@ function accuracyLabel(accuracy: number | null): string {
 }
 
 export function CalculationMasteryCard() {
-  const store = useStore();
+  const store = useStoreFields("calculationMastery");
   const report = store.calculationMastery;
   const tone = report.status === "secure" ? "success" : report.status === "developing" ? "review" : "neutral";
   const statusLabel = report.status === "secure" ? "Secure" : report.status === "developing" ? "Developing" : "Needs evidence";
@@ -89,7 +89,7 @@ const TECHNIQUE_DRIVER_LABELS: Record<string, string> = {
 };
 
 export function TechniqueVsKnowledgeCard() {
-  const insight = useStore().assessment;
+  const insight = useStoreFields("assessment").assessment;
   const split = insight?.techniqueVsKnowledge;
   if (!split) return null;
 
@@ -159,7 +159,7 @@ export function TechniqueVsKnowledgeCard() {
 }
 
 export function RecallMasteryCard() {
-  const store = useStore();
+  const store = useStoreFields("recallMastery");
   const rows = store.recallMastery.filter((row) => row.cardsTotal > 0);
   if (!rows.length) {
     return (
@@ -231,7 +231,7 @@ export function RecallMasteryCard() {
 }
 
 export function ApplicationMasteryCard() {
-  const store = useStore();
+  const store = useStoreFields("applicationMastery");
   const rows = store.applicationMastery.filter((row) => row.attempts > 0);
   if (!rows.length) {
     return (
@@ -304,7 +304,7 @@ export function ApplicationMasteryCard() {
 }
 
 export function MasteryUncertaintyCard() {
-  const store = useStore();
+  const store = useStoreFields("masteryUncertainty");
   const rows = store.masteryUncertainty;
   if (!rows.length) return null;
 
@@ -372,7 +372,7 @@ export function MasteryUncertaintyCard() {
 }
 
 export function RecurringMisconceptions() {
-  const store = useStore();
+  const store = useStoreFields("recurringMisconceptions");
   const rows = store.recurringMisconceptions;
   if (!rows.length) {
     return (

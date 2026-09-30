@@ -148,3 +148,27 @@ because the content is complete and verified. Revise's moat is the question
 and proven against real outcomes. Every item above either removes a content gap
 competitors already close, or strengthens the recommendation engine they don't
 have.
+
+## Account correctness and maintainability pass — 30 September 2026
+
+Implemented canonical local/authenticated profile resolution, per-account
+IndexedDB isolation, explicit one-account local adoption, document-bound account
+switching and ownership-safe queue preservation. Sync now encodes non-UUID
+curriculum ids into stable per-account UUID wire keys while preserving exact
+payload ids, and uses valid first-pull/singleton keysets. All UI consumers select
+store fields through a stable subscription channel. Mobile prioritizes Today
+and Session, keeping manual and management routes in Tools.
+
+Structured-source migration covers 92 Physics questions in seven groups, with
+pre-migration fingerprints pinned and deterministic validation enforced in CI.
+Staging now has mandatory catalog checks and live all-table RLS, conflict,
+timestamp and independent-device sync tests. Local unit tests do not establish
+live staging success; run the required credentialed workflow before rollout.
+
+Deferred: remaining giant question banks; finer per-field derived-model computation;
+device-local outcome/experiment/checkpoint metadata replication; transactional
+remote deletes/tombstones; an encrypted local vault; and signed-in browser E2E
+against a real configured Supabase project. Browser tests exercise the actual
+account boundary with a simulated auth transport, including adoption, cached
+session restoration, sign-out and switching. Human verification and real learner
+outcomes remain external evidence requirements, never generated approvals.

@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import { buildRoadmapLessons, type RoadmapLessonEntry } from "@/content/lessons";
-import { useStore } from "@/state/store";
+import { useStoreFields } from "@/state/store";
 import { ButtonLink, Pill, ProgressBar, cx } from "@/components/ui";
 
 /**
@@ -16,7 +16,7 @@ import { ButtonLink, Pill, ProgressBar, cx } from "@/components/ui";
  * system.
  */
 export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectId?: string }) {
-  const { settings, lessonProgress } = useStore();
+  const { settings, lessonProgress } = useStoreFields("settings", "lessonProgress");
   const enrolledSubjectIds = settings.subjectIds;
 
   const subjectId = useMemo(() => {

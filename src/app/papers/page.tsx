@@ -11,7 +11,7 @@ import { tokenise } from "@/domain/marking";
 import { analysePaperWeakness } from "@/domain/paper-weakness";
 import { selectNextPaper, type PaperCandidate } from "@/domain/exam-paper-selection";
 import type { Paper, Question } from "@/domain/types";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import { PaperWeaknessPanel } from "@/components/PaperWeaknessPanel";
 import { MockStudyPlan } from "@/components/MockStudyPlan";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
@@ -35,7 +35,7 @@ export default function PapersPage() {
 
 function Papers() {
   const params = useSearchParams();
-  const store = useStore();
+  const store = useStoreFields("attempts", "mastery", "mistakes", "papers", "questions", "revisionCheckpoint", "settings");
   const subjects = useSubjects();
   const [subjectId, setSubjectId] = useState(params.get("subject") ?? subjects[0]?.id ?? "");
   const resumeCheckpoint =
@@ -296,7 +296,7 @@ function Papers() {
 }
 
 function UploadPaper({ subjectId }: { subjectId: string }) {
-  const store = useStore();
+  const store = useStoreFields("addPaper", "addQuestions", "userId");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [markScheme, setMarkScheme] = useState("");
@@ -492,7 +492,7 @@ function PaperSession({
   onExit: () => void;
 }) {
   const router = useRouter();
-  const store = useStore();
+  const store = useStoreFields("adaptiveSession", "addPaper", "attempts", "clearRevisionCheckpoint", "mistakes", "previewPaper", "questions", "saveRevisionCheckpoint");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const questions = useMemo(
     () => paper.questionIds.map((id) => store.questions.find((q) => q.id === id)).filter((q): q is Question => Boolean(q)),

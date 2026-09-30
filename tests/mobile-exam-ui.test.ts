@@ -51,11 +51,11 @@ describe("mobile exam UI contracts", () => {
     }
   });
 
-  it("keeps all six primary mobile nav items on one row", () => {
+  it("keeps Today, Session and Tools on one row", () => {
     const shell = read("src/components/AppShell.tsx");
     const primaryCount = (shell.match(/primary: true/g) ?? []).length;
-    expect(primaryCount).toBe(6);
-    expect(shell).toContain("grid grid-cols-6");
+    expect(primaryCount).toBe(2);
+    expect(shell).toContain("grid grid-cols-3");
     expect(shell).not.toContain("grid grid-cols-5");
   });
 });

@@ -37,7 +37,7 @@ export default defineConfig({
     timeout: 300_000,
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"], ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } } : {}) } },
     // Firefox/Safari run only in CI matrix when browsers are installed; local defaults to Chromium.
     ...(process.env.PLAYWRIGHT_ALL_BROWSERS
       ? [

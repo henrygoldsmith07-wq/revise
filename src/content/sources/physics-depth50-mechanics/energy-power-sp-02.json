@@ -1,0 +1,179 @@
+{
+  "topic": "energy-power",
+  "point": 2,
+  "parts": [
+    {
+      "demand": "recall",
+      "family": "depth50:energy:ke-form",
+      "context": "depth50:energy:ke-form:skater",
+      "move": "state kinetic and gravitational potential energy formulae with variable meanings",
+      "prompt": "State the equations for kinetic energy and gravitational potential energy near Earth's surface, defining each symbol.",
+      "marks": 2,
+      "scheme": [
+        "Kinetic energy Ek = ½mv²",
+        "Gravitational potential energy change ΔEp = mgΔh, with m mass, v speed, g field strength and Δh height change"
+      ],
+      "answer": "Ek = ½mv². Near Earth's surface the change in gravitational potential energy is ΔEp = mgΔh, where m is mass, v speed, g gravitational field strength and Δh vertical height change."
+    },
+    {
+      "demand": "recall",
+      "family": "depth50:energy:reference",
+      "context": "depth50:energy:reference:lift",
+      "move": "identify the arbitrary reference level in gravitational energy",
+      "prompt": "Why can a gravitational potential energy value be negative, and what determines the zero level used in a calculation?",
+      "marks": 2,
+      "scheme": [
+        "Only differences in gravitational potential energy affect predictions",
+        "The zero is an arbitrary chosen reference level; a point below it has negative value"
+      ],
+      "answer": "The zero of gravitational potential energy is a chosen reference. A point below that level can have a negative value; the physically relevant quantity is the change between states."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:energy:speed-square",
+      "context": "depth50:energy:speed-square:cycling",
+      "move": "explain why doubling speed quadruples kinetic energy",
+      "prompt": "Explain why doubling a cyclist's speed requires four times as much kinetic energy, if the mass is unchanged.",
+      "marks": 2,
+      "scheme": [
+        "Kinetic energy is proportional to v²",
+        "Replacing v by 2v gives Ek' = ½m(2v)² = 4Ek"
+      ],
+      "answer": "Because Ek = ½mv², the square of the speed is the controlling factor. Replacing v by 2v gives ½m(2v)² = 4Ek."
+    },
+    {
+      "demand": "explanation",
+      "family": "depth50:energy:reference-path",
+      "context": "depth50:energy:reference-path:rollercoaster",
+      "move": "explain path independence of gravitational potential energy in a uniform field",
+      "prompt": "Two roller-coaster tracks take identical cars to the same final height, one steep and one shallow. Explain why their gravitational potential energy gains are equal in the ideal model.",
+      "marks": 2,
+      "scheme": [
+        "Near Earth's surface ΔEp = mgΔh depends only on vertical height change",
+        "The path length or slope does not change the final gravitational energy"
+      ],
+      "answer": "Both cars have the same m and vertical height increase, so ΔEp = mgΔh is the same. Gravitational potential energy is path independent in this uniform-field model."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:energy:drop-speed",
+      "context": "depth50:energy:drop-speed:ball",
+      "move": "equate gravitational potential loss to kinetic energy for a drop",
+      "prompt": "A ball is dropped from rest through 2.4 m. Neglecting air resistance, calculate its speed just before impact. Take g = 9.81 m s⁻².",
+      "marks": 2,
+      "scheme": [
+        "mgh = ½mv², so v = √(2gh)",
+        "v = √(2 × 9.81 × 2.4) = 6.86 m s⁻¹"
+      ],
+      "answer": "Conservation gives mgh = ½mv², so v = √(2gh) = √(2×9.81×2.4) = 6.86 m s⁻¹."
+    },
+    {
+      "demand": "application",
+      "family": "depth50:energy:launch-height",
+      "context": "depth50:energy:launch-height:vertical",
+      "move": "include initial kinetic energy when finding a maximum height",
+      "prompt": "A 0.50 kg stone is launched vertically upwards at 12 m s⁻¹. Ignoring air resistance, find the additional height reached before it stops.",
+      "marks": 2,
+      "scheme": [
+        "Initial kinetic energy ½mv² becomes mgh",
+        "h = v²/(2g) = 144/(19.62) = 7.34 m"
+      ],
+      "answer": "At the top ½mv² = mgh, so h = v²/(2g) = 12²/(2×9.81) = 7.34 m."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:energy:mass-speed",
+      "context": "depth50:energy:mass-speed:vacuum",
+      "move": "reject the claim that mass changes the ideal falling speed from one height",
+      "prompt": "A student says a heavier object must hit the ground faster when both objects fall from the same height in a vacuum. Correct the claim using energy.",
+      "marks": 2,
+      "scheme": [
+        "mgh = ½mv² and the mass cancels",
+        "Both have v = √(2gh) in the same gravitational field; air resistance could change a real result"
+      ],
+      "answer": "For an ideal drop, mgh = ½mv² and m cancels, giving v = √(2gh) for either mass. Air resistance can make real objects differ, but not the vacuum model."
+    },
+    {
+      "demand": "misconception",
+      "family": "depth50:energy:lost-energy",
+      "context": "depth50:energy:lost-energy:rough-track",
+      "move": "replace the phrase lost energy with a conserved-system transfer",
+      "prompt": "A student says friction 'destroys' 500 J of mechanical energy on a rough track. Explain what the energy accounting should say.",
+      "marks": 2,
+      "scheme": [
+        "Total energy is conserved; friction transfers mechanical energy to internal energy",
+        "The surroundings gain about 500 J, so it is dissipated rather than destroyed"
+      ],
+      "answer": "Friction does not destroy energy. It transfers about 500 J from mechanical stores to internal energy of the track, object and surroundings; total energy is conserved."
+    },
+    {
+      "demand": "calculation",
+      "family": "depth50:energy:two-stage",
+      "context": "depth50:energy:two-stage:ski-jump",
+      "move": "subtract an identified loss before converting remaining gravitational energy to speed",
+      "prompt": "A 75 kg skier descends 18 m and loses 2.0 kJ to friction. Calculate the speed at the bottom from rest, taking g = 9.81 m s⁻².",
+      "marks": 3,
+      "scheme": [
+        "Potential energy lost = 75 × 9.81 × 18 = 13 244 J",
+        "Kinetic energy = 13 244 − 2000 = 11 244 J",
+        "½(75)v² = 11 244 gives v = 17.3 m s⁻¹"
+      ],
+      "answer": "The gravitational loss is 75(9.81)(18) = 13 244 J. After friction, 11 244 J is kinetic, so ½(75)v² = 11 244 and v = 17.3 m s⁻¹."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:energy:pendulum",
+      "context": "depth50:energy:pendulum:amplitude",
+      "move": "transfer conservation between kinetic and gravitational stores to an oscillating system",
+      "prompt": "A pendulum bob is released from a point 0.20 m above its lowest point. Explain where its energy is stored at release and at the lowest point, ignoring air resistance.",
+      "marks": 2,
+      "scheme": [
+        "At release the excess energy is gravitational potential energy",
+        "At the lowest point it has become kinetic energy, with the same total mechanical energy"
+      ],
+      "answer": "At release the bob has extra gravitational potential energy relative to the lowest point. As it falls that store becomes kinetic energy; at the bottom the kinetic energy is maximum and total mechanical energy is unchanged."
+    },
+    {
+      "demand": "transfer",
+      "family": "depth50:energy:hydro",
+      "context": "depth50:energy:hydro:efficiency",
+      "move": "chain gravitational energy flow through a non-ideal generator",
+      "prompt": "Water of mass 2.0 × 10⁴ kg falls 30 m each second through a hydroelectric turbine. If the electrical output is 4.0 MW, calculate the efficiency of the gravitational-to-electrical transfer.",
+      "marks": 3,
+      "scheme": [
+        "Input power = mgh per second = 2.0×10⁴ × 9.81 × 30 = 5.89 MW",
+        "Efficiency = output/input = 4.0/5.89",
+        "Efficiency ≈ 0.679, or 68%"
+      ],
+      "answer": "The gravitational input power is 2.0×10⁴(9.81)(30) = 5.89 MW. Efficiency = 4.0/5.89 = 0.679, about 68%."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:energy:braking-distance",
+      "context": "depth50:energy:braking-distance:car",
+      "move": "use kinetic energy and a limiting friction work to predict braking distance",
+      "prompt": "A 1200 kg car travels at 20 m s⁻¹. The tyres can provide a maximum total braking force of 7.2 kN on a dry road. Estimate the shortest stopping distance, assuming the force remains constant.",
+      "marks": 3,
+      "scheme": [
+        "Initial kinetic energy = ½ × 1200 × 20² = 2.40×10⁵ J",
+        "Braking work is Fs, so s = Ek/F = 2.40×10⁵/7200",
+        "Stopping distance = 33.3 m"
+      ],
+      "answer": "The car starts with 2.40×10⁵ J. The brakes remove energy at 7200s joules, so 7200s = 2.40×10⁵ and s = 33.3 m."
+    },
+    {
+      "demand": "synoptic",
+      "family": "depth50:energy:efficiency-chain",
+      "context": "depth50:energy:efficiency-chain:lift",
+      "move": "separate useful gravitational output from input energy in a powered lift",
+      "prompt": "A lift raises a 500 kg cabin and load through 12 m. The motor takes 90 kJ from the supply and the lift starts and finishes at rest. Calculate the useful efficiency.",
+      "marks": 3,
+      "scheme": [
+        "Useful output = mgh = 500 × 9.81 × 12 = 58 860 J",
+        "Efficiency = useful output/input = 58 860/90 000",
+        "Efficiency = 0.654, or 65%"
+      ],
+      "answer": "The useful gravitational gain is 500(9.81)(12) = 58 860 J. Dividing by the 90 000 J input gives an efficiency of 0.654, about 65%."
+    }
+  ]
+}

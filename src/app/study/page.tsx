@@ -6,7 +6,7 @@ import { browse } from "@/domain/browser";
 import { isDiagramCard } from "@/domain/diagrams";
 import { allTopics, getSubject, topicsFor } from "@/domain/curriculum";
 import type { StudyMode } from "@/domain/study-modes";
-import { useStore, useSubjects } from "@/state/store";
+import { useStoreFields, useSubjects } from "@/state/store";
 import type { Card } from "@/domain/types";
 import { DiagramMode } from "@/components/modes/DiagramMode";
 import { LearnMode } from "@/components/modes/LearnMode";
@@ -89,7 +89,7 @@ export default function StudyPage() {
 
 function Study() {
   const params = useSearchParams();
-  const store = useStore();
+  const store = useStoreFields("cards", "clearRevisionCheckpoint", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
   const subjectOptions = useMemo(
