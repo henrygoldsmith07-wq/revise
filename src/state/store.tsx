@@ -875,10 +875,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const addQuestions = useCallback<StoreValue["addQuestions"]>(
     async (questions) => {
       if (!questions.length) return;
-      await repo.saveQuestions(questions);
+      await repo.saveQuestions(questions, userId);
       patch((prev) => ({ ...prev, questions: [...prev.questions, ...questions] }));
     },
-    [patch],
+    [patch, userId],
   );
 
   const addPaper = useCallback<StoreValue["addPaper"]>(

@@ -2,6 +2,7 @@ import { COLLECTION_STORES, getProfileDb, type ReviseDB } from "./db";
 import { validateHistoryRecord } from "@/domain/learner-history";
 import { validateTombstone } from "@/domain/sync-tombstone";
 import { REVISE_META_KEYS } from "./storage-namespace";
+import { isPrivateQuestion } from "./question-ownership";
 import type { OutboxItem, SyncEntity } from "@/domain/types";
 
 export const LOCAL_PROFILE = "local";
@@ -86,7 +87,15 @@ export async function initializeAccountProfile(userId: string, adoptLocal: boole
     for (const entry of rows[PROFILE_STORES.indexOf("outbox")] ?? []) {
       const item = entry as OutboxItem;
       const payload = item.payload as { userId?: unknown } | null;
-      if (!item.ownerId && payload?.userId !== LOCAL_PROFILE) throw new Error("Unknown-owner local mutations cannot be adopted.");
+      if (!item.ownerId && payload?.userId !== LOCAL_PROFILE) {
+        const questions = rows[PROFILE_STORES.indexOf("questions")] ?? [];
+        if (item.entity !== "questions" || item.op !== "upsert" || !isPrivateQuestion(item.payload) ||
+            (payload?.userId !== undefined && payload.userId !== LOCAL_PROFILE) ||
+            !questions.some(row => isPrivateQuestion(row) && row.id === (item.payload as { id: string }).id)) {
+          throw new Error("Unknown-owner local mutations cannot be adopted.");
+        }
+        item.ownerId = LOCAL_PROFILE;
+      }
     }
     adopted = rows.map((entries) => entries.map((row) => adoptOwner(row, userId)));
   } catch (error) {
@@ -122,7 +131,7 @@ export async function initializeAccountProfile(userId: string, adoptLocal: boole
       await tx.objectStore(store).put(row as never);
       // Queue the complete adopted state, including data created without a backend.
       // Seed questions are public curriculum content and have no userId.
-      if (store !== "outbox" && store !== "meta" && row.userId === userId) {
+      if (store !== "outbox" && store !== "meta" && (row.userId === userId || (store === "questions" && isPrivateQuestion(row)))) {
         const entity = entities[store] ?? store as SyncEntity;
         const item: OutboxItem = {
           id: crypto.randomUUID(), entity, op: "upsert", payload: row, ownerId: userId,

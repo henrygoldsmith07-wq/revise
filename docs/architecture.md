@@ -451,3 +451,19 @@ exports remain readable. Restore preserves existing terminal intent and rejects
 stale deleted IDs/frozen forecast rewrites atomically. Wire-only hashes remain
 bound to their source account when importing into a different owner. Local
 adoption, as before, remaps explicit ownership rather than educational IDs.
+
+Private questions acquire an explicit outbox owner when saved, adopted or
+restored. Legacy ownerless question mutations can be repaired only in their
+pinned account database when the corresponding private question exists; foreign,
+shared-curriculum and other unknown-owner mutations remain blocked.
+
+Cross-account portable copies re-key private UUID study records into stable
+`copy:<source-owner>:<uuid>` local IDs and update linked identity fields. Existing
+wire keys, same-account restore IDs and shared curriculum IDs remain unchanged.
+Question part IDs, answers and authored prose are preserved. Imported custom
+questions join the restore queue; public seed questions remain local.
+
+Failed continuity pulls report the count of rows already committed and notify
+history consumers in a finalizer. The page cursor remains pinned for replay,
+while the sync engine reloads committed deletions even when a later row fails.
+Open question feedback accepts a grading retry only for its exact attempt ID.

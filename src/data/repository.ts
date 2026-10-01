@@ -421,14 +421,14 @@ export async function saveReviewLog(log: ReviewLog): Promise<void> {
   await enqueue("reviewLogs", "upsert", log);
 }
 
-export async function saveQuestion(question: Question): Promise<void> {
+export async function saveQuestion(question: Question, ownerId: Id = activeDatabaseProfile()): Promise<void> {
   await putOne("questions", question);
-  await enqueue("questions", "upsert", question);
+  await enqueue("questions", "upsert", question, ownerId);
 }
 
-export async function saveQuestions(questions: Question[]): Promise<void> {
+export async function saveQuestions(questions: Question[], ownerId: Id = activeDatabaseProfile()): Promise<void> {
   await putAll("questions", questions);
-  for (const q of questions) await enqueue("questions", "upsert", q);
+  for (const q of questions) await enqueue("questions", "upsert", q, ownerId);
 }
 
 export async function saveAttempt(attempt: Attempt): Promise<void> {

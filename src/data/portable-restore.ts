@@ -23,6 +23,8 @@ import { portabilityRestorePreview } from "@/domain/portability";
 import { getDb } from "./db";
 import { validatePersistedStores, type PersistenceIssue } from "./persistence-schema";
 import { REVISE_META_KEYS } from "./storage-namespace";
+import { remapPortableRecordIds } from "@/domain/portable-record-ids";
+import { isPrivateQuestion } from "./question-ownership";
 
 export interface PortableRestoreValidation {
   ok: boolean;
@@ -153,6 +155,12 @@ function snapshotOwnershipIssues(snapshot: PortabilitySnapshot): PersistenceIssu
   for (const [store, rows] of ownedStores) {
     issues.push(...ownershipIssues(store, rows, sourceUserId));
   }
+  for (const question of snapshot.questions ?? []) {
+    const owner = (question as Question & Owned)?.userId;
+    if (owner !== undefined && owner !== sourceUserId) {
+      issues.push(customIssue("questions", rowId(question), "userId", "does not match the snapshot owner"));
+    }
+  }
   if (snapshot.settings) issues.push(...ownershipIssues("settings", [snapshot.settings], sourceUserId));
   if (snapshot.streak) issues.push(...ownershipIssues("streak", [snapshot.streak], sourceUserId));
   if (snapshot.lessonProgress) issues.push(...ownershipIssues("lessonProgress", [snapshot.lessonProgress], sourceUserId));
@@ -167,7 +175,7 @@ function buildRows(snapshot: PortabilitySnapshot, targetUserId: Id) {
   const mistakes = remapOwned<Mistake>(snapshot.mistakes ?? [], sourceUserId, targetUserId);
   const plannedSessions = remapOwned<PlannedSession>(snapshot.plannedSessions ?? [], sourceUserId, targetUserId);
   const examDates = remapOwned<ExamDate>(snapshot.examDates ?? [], sourceUserId, targetUserId);
-  const questions = snapshot.questions ?? [];
+  const questions = remapOwned<Question & Owned>(snapshot.questions ?? [], sourceUserId, targetUserId);
   const papers = remapOwned<Paper>(snapshot.papers ?? [], sourceUserId, targetUserId);
   const settings = snapshot.settings
     ? ({ ...snapshot.settings, userId: targetUserId } as UserSettings)
@@ -198,6 +206,7 @@ export async function validatePortableRestore(
   snapshot: PortabilitySnapshot,
   targetUserId: Id,
 ): Promise<PortableRestoreValidation> {
+  snapshot = remapPortableRecordIds(snapshot, targetUserId);
   const preview = portabilityRestorePreview(snapshot);
   if (!preview.fullRestoreSupported) {
     return {
@@ -308,6 +317,7 @@ export async function restorePortableSnapshot(
   snapshot: PortabilitySnapshot,
   targetUserId: Id,
 ): Promise<PortableRestoreResult> {
+  snapshot = remapPortableRecordIds(snapshot, targetUserId);
   const validation = await validatePortableRestore(snapshot, targetUserId);
   if (!validation.ok) {
     const first = validation.issues[0];
@@ -447,6 +457,7 @@ export async function restorePortableSnapshot(
         await outbox.put({id:crypto.randomUUID(),entity,op,payload,ownerId:targetUserId,queuedAt:new Date().toISOString(),attempts:0,idempotencyKey:crypto.randomUUID()});
       };
       for (const store of ["cards","reviewLogs","attempts","mistakes","papers","plannedSessions","examDates"] as const) for (const row of rows[store]) await queue(store,"upsert",row);
+      for (const question of rows.questions) if (isPrivateQuestion(question)) await queue("questions", "upsert", question);
       for (const entry of await meta.getAll()) {
         if (entry.key.startsWith("revise.deleted.v1:")) {
           const marker=validateTombstone(entry.value,targetUserId); await queue(marker.entity,"delete",marker);

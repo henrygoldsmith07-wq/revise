@@ -135,6 +135,7 @@ export function useQuestionExecution({
   const [choice, setChoice] = useState<number | null>(() => draft?.choice ?? null);
   const [marking, setMarking] = useState(false);
   const [result, setResult] = useState<{
+    attemptId: Id;
     marked: MarkedPart[];
     feedback: string;
     source: "ai" | "fallback";
@@ -189,7 +190,8 @@ export function useQuestionExecution({
     if (!result) return; // nothing to upgrade until a mark exists
     function onResolved(event: Event) {
       const detail = (event as CustomEvent<AiDlqResolvedDetail>).detail;
-      if (!detail || detail.questionId !== question.id || dlqResolvedRef.current) return;
+      if (!detail || detail.questionId !== question.id || detail.attemptId !== result?.attemptId ||
+          detail.attempt.id !== result.attemptId || dlqResolvedRef.current) return;
       dlqResolvedRef.current = true;
       const upgraded = detail.attempt;
       setResult((prev) =>
@@ -387,6 +389,7 @@ export function useQuestionExecution({
       void enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" });
     }
     setResult({
+      attemptId: persistedAttempt.id,
       marked,
       feedback,
       source,

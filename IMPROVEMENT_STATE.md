@@ -1,4 +1,9 @@
-# Current improvement state — 30 September 2026
+# Current improvement state — 1 October 2026
+
+The [reliability follow-up](docs/reliability-fixes-2026-10-01.md) addresses the
+five reproduced review findings: private-question ownership, restored question
+replication, cross-account UUID collisions, grading retries for the wrong
+attempt and stale views after partially committed continuity pulls.
 
 The current architecture/continuity pass is recorded in
 [the implementation report](docs/improvement-continuity-2026-09-30.md).

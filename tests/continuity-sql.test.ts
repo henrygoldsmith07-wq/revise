@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { createCard } from "@/domain/scheduling";
+import { buildPortabilitySnapshot } from "@/domain/portability";
+import { remapPortableRecordIds } from "@/domain/portable-record-ids";
+import { syncWireIdValue } from "@/data/sync-contract";
 
 // @ts-expect-error Native ESM tooling is shared with the credentialed runner.
 import { STAGING_CATALOG_SQL, STAGING_TABLES, validateStagingCatalog, validateStagingFunctions } from "../scripts/staging-contract.mjs";
@@ -28,6 +32,17 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe("actual PostgreSQL continuity contract", () => {
+  it("permits a cross-account UUID copy without colliding with or changing the source row", async () => {
+    const card = createCard({ id: crypto.randomUUID(), userId: A, subjectId: "reference", topicId: "topic", front: "Source", back: "Answer" });
+    const snapshot = buildPortabilitySnapshot({ userId: A, cards: [card], attempts: [], reviewLogs: [], mistakes: [], plannedSessions: [], examDates: [] });
+    const copied = remapPortableRecordIds(snapshot, B).cardRecords![0]!;
+    await db.query("insert into cards(id,user_id,data) values($1,$2,$3)", [syncWireIdValue(A, card.id), A, card]);
+    await owner(B);
+    await db.query("insert into cards(id,user_id,data) values($1,$2,$3) on conflict(id) do update set data=excluded.data", [syncWireIdValue(B, copied.id), B, { ...copied, userId: B }]);
+    expect((await db.query<{data:{id:string}}>("select data from cards")).rows[0].data.id).toBe(copied.id);
+    await owner();
+    expect((await db.query<{data:{id:string}}>("select data from cards where id=$1", [syncWireIdValue(A, card.id)])).rows[0].data.id).toBe(card.id);
+  });
   it("makes RPC deletion terminal against later legacy writes and protects markers", async () => {
     const id = "33333333-3333-4333-8333-333333333333";
     await db.query("insert into cards(id,user_id,data) values($1,$2,$3)", [id,A,{id:"content:original"}]);

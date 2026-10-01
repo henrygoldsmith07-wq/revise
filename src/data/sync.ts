@@ -4,7 +4,8 @@ import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
 import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { remapContentIds } from "./content-ids";
 import { SYNC_TABLES, syncPrimaryKey, syncWireId, syncWireIdValue } from "./sync-contract";
-import { pullContinuity } from "./sync-continuity";
+import { pullContinuity, ContinuityPullError } from "./sync-continuity";
+import { repairQuestionOutboxOwners } from "./question-ownership";
 import { deletionIsKnown, sendReplicaDeletion } from "./sync-deletions";
 import { migrateLearnerHistory } from "./learner-history";
 import { historyFrozenFingerprint, validateHistoryRecord } from "@/domain/learner-history";
@@ -189,6 +190,7 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
     if (!supabase) return finish({ pushed: 0, pulled: 0, failed: 0, skipped: "unconfigured" });
     const identity = await authIdentity(supabase, userId);
     if (identity !== "ok") return finish({ pushed: 0, pulled: 0, failed: 0, skipped: identity });
+    await repairQuestionOutboxOwners(userId);
 
     // Mandatory v2 schema: never drain an offline stale upsert before learning
     // which ids another device intentionally deleted.
@@ -197,7 +199,8 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
       continuityPulled += await pullContinuity(supabase, userId, "sync_tombstones");
       await migrateLearnerHistory(userId);
       continuityPulled += await pullContinuity(supabase, userId, "learner_records");
-    } catch {
+    } catch (error) {
+      if (error instanceof ContinuityPullError) continuityPulled += error.applied;
       const changed = await authIdentity(supabase, userId);
       if (changed !== "ok") return finish({ pushed: 0, pulled: continuityPulled, failed: 0, skipped: changed });
       return finish({ pushed: 0, pulled: continuityPulled, failed: 1 });
@@ -208,7 +211,10 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
     try {
       continuityPulled += await pullContinuity(supabase, userId, "learner_records");
       continuityPulled += await pullContinuity(supabase, userId, "sync_tombstones");
-    } catch { pulled.failed++; }
+    } catch (error) {
+      if (error instanceof ContinuityPullError) continuityPulled += error.applied;
+      pulled.failed++;
+    }
     return finish({ pushed: pushed.pushed, pulled: pulled.pulled + continuityPulled, failed: pushed.failed + pulled.failed, ...(pulled.skipped ? { skipped: pulled.skipped } : {}) });
   } catch (error) {
     captureTelemetry("sync.failure", {

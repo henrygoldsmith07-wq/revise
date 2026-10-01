@@ -356,3 +356,7 @@ intact and sync failed. Experiments and active session checkpoints stay local.
 
 See [the current architecture and continuity pass](docs/improvement-continuity-2026-09-30.md) for
 the implementation decisions, regression coverage, verification and rollout limits.
+
+The [October reliability follow-up](docs/reliability-fixes-2026-10-01.md) fixes
+private-question ownership and restore replication, cross-account UUID copies,
+grading-retry identity and refreshes after partially failed continuity pulls.

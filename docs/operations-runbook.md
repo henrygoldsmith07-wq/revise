@@ -141,3 +141,23 @@ for retry.
 History corruption now uses the existing recovery screen instead of feeding
 calibration or hanging boot. Download the raw recovery copy before repair.
 History load errors never manufacture a replacement result or attestation.
+
+## Private-question and restore repairs
+
+The October reliability fixes require no additional SQL migration. Private
+question saves/adoption/restores now queue explicit owners. Old ownerless
+question queues repair automatically only inside their pinned account with a
+matching private question. An unknown owner on another entity still requires
+ownership-aware recovery; never assign the current account indiscriminately.
+
+Same-account restores retain all IDs. Cross-account UUID copies receive stable
+new private keys with their references updated, leaving existing remote keys
+and shared content intact. For a cross-account restore performed by an older
+client that already produced UUID conflicts, preserve the current recovery
+export and original source archive before restoring into a clean destination
+profile with the fixed client. Frozen prediction conflicts are still rejected;
+the client does not guess provenance or rewrite those observations.
+
+A failed continuity page can have committed valid rows before the failure. The
+client now refreshes those changes and retains the cursor and pending work for
+replay. A visible retry error does not imply that every row was rolled back.
