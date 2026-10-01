@@ -149,6 +149,25 @@ describe("marks at risk", () => {
     expect(report.recurring[0]).toMatchObject({ key: "tag:units", count: 2, marks: 3, questionCount: 2 });
   });
 
+  it("flags a pattern that has cost marks across several paper sittings, and ranks it first", () => {
+    const report = buildMarksAtRisk({
+      mistakes: [
+        mistake("m1", { misconception: "terminology", marksLost: 1, attemptId: "p1" }),
+        mistake("m2", { misconception: "terminology", marksLost: 1, attemptId: "p2" }),
+        mistake("m3", { misconception: "units", marksLost: 3, attemptId: "p3" }),
+        mistake("m4", { misconception: "units", marksLost: 3, attemptId: "p3" }),
+      ],
+      attempts: [
+        attempt("p1", "q-algebra-1", "algebra", 0, 3, { mode: "paper", paperRunId: "run-a" }),
+        attempt("p2", "q-algebra-2", "algebra", 0, 3, { mode: "paper", paperRunId: "run-b" }),
+        attempt("p3", "q-algebra-3", "algebra", 0, 3, { mode: "paper", paperRunId: "run-a" }),
+      ],
+      questions: bank,
+      now: NOW,
+    });
+    expect(report.recurring.map((row) => [row.key, row.paperCount])).toEqual([["tag:terminology", 2], ["tag:units", 1]]);
+  });
+
   it("measures the recent loss rate from trusted attempts only", () => {
     const report = buildMarksAtRisk({
       mistakes: [mistake("m1")],

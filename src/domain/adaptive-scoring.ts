@@ -20,6 +20,9 @@ import {
 } from "./capability-mastery";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import { localDayOfInstant } from "./local-date";
+import { exposureWeights } from "./evidence-weights";
+import { buildTopicValue, type TopicValue } from "./marks-value";
+import type { TopicProof } from "./proof-of-improvement";
 import { requiresWjecContentReview } from "./physics-content-review";
 import { ADAPTIVE_SESSION_MINUTES } from "./adaptive-budget";
 import type {
@@ -70,6 +73,10 @@ export interface AdaptiveEvidence {
   focus: Capability;
   focusState: CapabilityState;
   factors: AdaptiveScoreFactors;
+  /** What the topic is worth to the exam and how well that is proven; drives the explanation. */
+  value?: TopicValue;
+  /** Whether this topic's gains have been proven on new questions after a delay. */
+  proof?: Pick<TopicProof, "status" | "provableFrom" | "proofDue" | "gain" | "illusory">;
 }
 
 export interface AdaptiveTopicCandidate {
@@ -141,6 +148,8 @@ export function scoreAdaptiveTopic(input: {
     profile,
     today,
     now,
+    exposure: exposureWeights(input.attempts),
+    attemptedQuestionIds: new Set(input.attempts.map((attempt) => attempt.questionId)),
   });
 }
 
@@ -155,6 +164,13 @@ export interface ScoreData {
   profile: CapabilityProfile;
   today: IsoDate;
   now: Date;
+  /** The topic's share of its subject's assessed content (default: the only topic). */
+  share?: number;
+  topicsInSubject?: number;
+  /** Attempt weights over the full history, so repeats are recognised. Defaults to this topic's attempts. */
+  exposure?: ReadonlyMap<Id, number>;
+  attemptedQuestionIds?: ReadonlySet<Id>;
+  proof?: TopicProof;
 }
 
 export function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
@@ -203,9 +219,20 @@ export function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandida
         : Math.min(1, daysSinceStudy / 30),
   );
   const capabilityGap = focusEvidence.score == null ? 0 : 1 - clamp01(focusEvidence.score);
-  const evidence = input.reviewLogs.length +
-    Math.max(input.attempts.length, input.mastery?.attempts ?? 0) * 2 +
-    input.cards.filter((card) => card.reps > 0).length;
+  const value = buildTopicValue({
+    topic,
+    share: input.share ?? 1,
+    topicsInSubject: input.topicsInSubject ?? 1,
+    attempts: input.attempts,
+    exposure: input.exposure ?? exposureWeights(input.attempts),
+    questions: input.questions,
+    attemptedQuestionIds: input.attemptedQuestionIds ?? new Set(input.attempts.map((attempt) => attempt.questionId)),
+    daysToExam: daysTo,
+    measured,
+  });
+  // Different questions are the evidence; a question answered five times is one.
+  const questionEvidence = Math.max(value.proven.effectiveQuestions, input.mastery?.distinctQuestions ?? input.mastery?.attempts ?? 0);
+  const evidence = input.reviewLogs.length + questionEvidence * 2 + input.cards.filter((card) => card.reps > 0).length;
   const uncertainty = clamp01(1 - evidence / 8);
   const factors: AdaptiveScoreFactors = {
     fsrs,
@@ -216,6 +243,9 @@ export function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandida
     capabilityGap,
     uncertainty,
   };
+  const unprovenSuccess = measured && value.proven.rate >= 0.6 && value.proven.independentQuestions < 3;
+  // A delayed unseen test that is due, or a topic that only looks learned, needs a new question now.
+  const proofNeeded = Boolean(input.proof?.proofDue || input.proof?.illusory);
   const policy = valueNextAction({
     id: topic.id, kind: "adaptive-session", subjectId: topic.subjectId,
     topicId: topic.id, minutes: ADAPTIVE_SESSION_MINUTES,
@@ -223,13 +253,16 @@ export function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandida
       weakness: Math.max(masteryPressure, capabilityGap),
       forgettingRisk: forgetting, retrievalPressure: fsrs,
       mistakePressure, examUrgency: examProximity,
-      examWeighting: 1, learningBenefit: Math.max(masteryPressure, capabilityGap),
+      // 1 for an average topic, lower for a thin one; saturates so a heavy topic cannot buy urgency.
+      examWeighting: clamp01(0.5 + 0.5 * value.relativeWeight),
+      learningBenefit: Math.max(masteryPressure, capabilityGap),
       retentionBenefit: fsrs, diagnosticValue: focusState === "unknown" ? 1 : uncertainty,
-      transferNeed: focusState === "secure" ? 0.8 : 0,
+      // Doing well on few different questions is not yet transferable: ask for a new one.
+      transferNeed: focusState === "secure" || proofNeeded ? 0.8 : unprovenSuccess ? 0.6 : 0,
       evidenceConfidence: 1 - uncertainty,
     },
   });
-  const score = policy.score;
+  const score = policy.score * value.stakesFactor * value.supplyFactor * value.phaseFactor;
 
   return {
     topicId: topic.id,
@@ -258,6 +291,10 @@ export function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandida
       focus,
       focusState,
       factors,
+      value,
+      ...(input.proof
+        ? { proof: { status: input.proof.status, provableFrom: input.proof.provableFrom, proofDue: input.proof.proofDue, gain: input.proof.gain, illusory: input.proof.illusory } }
+        : {}),
     },
   };
 }

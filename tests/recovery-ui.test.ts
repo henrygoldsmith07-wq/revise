@@ -5,11 +5,10 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 describe("marks recovery surfaces", () => {
-  it("shows marks at risk on Readiness, Practice and the collapsed Today overview", () => {
+  it("shows marks at risk on Readiness and Practice, and leaves Today to the single next-best-action hero", () => {
     expect(read("src/app/readiness/page.tsx")).toContain("<MarksAtRiskPanel />");
     expect(read("src/app/practice/page.tsx")).toContain("<RecoverMarksCard />");
-    const today = read("src/app/page.tsx");
-    expect(today.indexOf("<RecoverMarksCard />")).toBeGreaterThan(today.indexOf("Plan, pace and outlook"));
+    expect(read("src/app/page.tsx")).not.toContain("RecoverMarksCard");
   });
 
   it("opens recovery, autopsy and repair sessions from practice URLs, including same-page links", () => {

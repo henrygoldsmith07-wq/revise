@@ -35,6 +35,8 @@ export interface TopicRisk extends RiskRow {
 
 export interface RecurringRisk extends RiskRow {
   questionCount: number;
+  /** Separate paper sittings this pattern has cost marks in; 2 or more means it is not a one-paper accident. */
+  paperCount: number;
 }
 
 export interface MarksAtRiskReport {
@@ -168,7 +170,7 @@ export function buildMarksAtRisk(input: MarksAtRiskInput): MarksAtRiskReport {
   const errorTypes = new Map<string, { label: string; marks: number; count: number }>();
   const papers = new Map<string, { label: string; marks: number; count: number }>();
   const questionTypes = new Map<string, { label: string; marks: number; count: number }>();
-  const recurring = new Map<string, { label: string; marks: number; count: number; questions: Set<Id> }>();
+  const recurring = new Map<string, { label: string; marks: number; count: number; questions: Set<Id>; sittings: Set<Id> }>();
 
   for (const mistake of open) {
     bump(topics, mistake.topicId, getTopic(mistake.topicId)?.title ?? mistake.topicId, mistake.marksLost);
@@ -189,10 +191,11 @@ export function buildMarksAtRisk(input: MarksAtRiskInput): MarksAtRiskReport {
     bump(questionTypes, question?.kind ?? "unknown", question ? KIND_LABELS[question.kind] : "Question type unknown", mistake.marksLost);
 
     const pattern = recurringKey(mistake);
-    const row = recurring.get(pattern.key) ?? { label: pattern.label, marks: 0, count: 0, questions: new Set<Id>() };
+    const row = recurring.get(pattern.key) ?? { label: pattern.label, marks: 0, count: 0, questions: new Set<Id>(), sittings: new Set<Id>() };
     row.marks += mistake.marksLost;
     row.count += 1;
     if (mistake.questionId) row.questions.add(mistake.questionId);
+    if (attempt?.mode === "paper" && attempt.paperRunId) row.sittings.add(attempt.paperRunId);
     recurring.set(pattern.key, row);
   }
 
@@ -217,8 +220,10 @@ export function buildMarksAtRisk(input: MarksAtRiskInput): MarksAtRiskReport {
       count: row.count,
       share: total ? round(row.marks / total, 3) : 0,
       questionCount: row.questions.size,
+      paperCount: row.sittings.size,
     }))
-    .sort((a, b) => b.marks - a.marks || b.count - a.count || a.label.localeCompare(b.label));
+    // A pattern that has cost marks on several papers is the clearest signal there is.
+    .sort((a, b) => Number(b.paperCount >= 2) - Number(a.paperCount >= 2) || b.marks - a.marks || b.count - a.count || a.label.localeCompare(b.label));
 
   const subjects = input.subjectIds ? new Set(input.subjectIds) : null;
   const attemptsConsidered = input.attempts.filter(

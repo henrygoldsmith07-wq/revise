@@ -5,6 +5,7 @@ import { getSubject } from "@/domain/curriculum";
 import { useStoreFields } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
 import { MarksAtRiskPanel } from "@/components/MarksAtRiskPanel";
+import { ProofPanel } from "@/components/ProofPanel";
 import { GradePredictionRealityPanel } from "@/components/GradePredictionRealityPanel";
 import {
   ApplicationMasteryCard,
@@ -31,6 +32,8 @@ export default function ReadinessPage() {
       </header>
 
       <ExamReadinessCard />
+
+      <ProofPanel />
 
       <MarksAtRiskPanel />
 

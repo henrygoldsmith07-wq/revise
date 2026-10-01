@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 import { forecastUntouched } from "@/domain/pace-forecast";
 import { AdaptiveSessionHero } from "@/components/AdaptiveSessionHero";
 import { PaceForecastLine } from "@/components/PaceForecast";
-import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
 import { ExamOutlook } from "@/components/ExamOutlook";
 import { CountdownPhaseBanner } from "@/components/CountdownPhaseBanner";
 import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
@@ -31,7 +30,7 @@ const TodayRoadmap = dynamic(() => import("@/components/TodayRoadmap"), {
 // precedence so the student never loses their place.
 
 export default function TodayPage() {
-  const store = useStoreFields("adaptiveSession", "examDates", "experimentArm", "mastery", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "examDates", "experimentArm", "mastery", "proofLedger", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
   const {
     settings,
     recordFunnel,
@@ -40,6 +39,7 @@ export default function TodayPage() {
     reviewLogs,
     mastery,
     adaptiveSession,
+    proofLedger,
   } = store;
   const greetingLabel = useGreeting();
 
@@ -96,7 +96,7 @@ export default function TodayPage() {
         <ResumeRevisionCard />
       ) : (
         <div className="today-focus card p-5 sm:p-7">
-          <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" />
+          <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" proof={proofLedger} />
         </div>
       )}
       <details className="card p-4 sm:p-5">
@@ -105,7 +105,6 @@ export default function TodayPage() {
         </summary>
         <div className="mt-4 space-y-5">
           <TodayOverview />
-          <RecoverMarksCard />
           <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />

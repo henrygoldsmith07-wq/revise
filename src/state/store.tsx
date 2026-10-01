@@ -23,6 +23,7 @@ import { rescheduleMissed } from "@/domain/planner";
 import type { PhaseNotice } from "@/domain/phase-notice";
 import { recommend } from "@/domain/recommender";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
+import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { reviewedWjecTopicEdges } from "@/content/capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import {
@@ -154,6 +155,8 @@ export interface StoreValue extends Snapshot {
   recommendations: Recommendation[];
   /** One ranked, bounded sequence for the next focused learning window. */
   adaptiveSession: AdaptiveSessionPlan | null;
+  /** Gains proven on new questions after a delay, by topic. */
+  proofLedger: ProofLedger;
   predictions: GradePrediction[];
   dueCards: Card[];
   assessment: AssessmentInsight | null;
@@ -636,6 +639,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const {
     loaded: sessionsLoaded,
     adaptiveSession,
+    proofLedger,
     revisionCheckpoint,
     revisionTwin: twinState,
     revisionTwinChoices,
@@ -943,6 +947,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       recallMastery,
       recommendations: experimentRecs,
       adaptiveSession,
+      proofLedger,
       predictions,
       dueCards,
       assessment,
@@ -1027,6 +1032,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     experimentRecs,
     predictions,
     adaptiveSession,
+    proofLedger,
     dueCards,
     assessment,
     marksPerHour,

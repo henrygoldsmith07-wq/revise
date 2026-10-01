@@ -46,8 +46,10 @@ export function summariseAdaptiveRun(input: {
   plan: AdaptiveSessionPlan;
   completed: AdaptiveStepRecord[];
   openMistakeIds: Id[];
+  /** Where this topic stands on proof, from the proof ledger. */
+  proofNote?: string;
 }): AdaptiveRunSummary {
-  const { plan, completed, openMistakeIds } = input;
+  const { plan, completed, openMistakeIds, proofNote } = input;
   const questionRecords = completed.filter((record) => QUESTION_STEP_KINDS.has(record.kind));
   const questionPasses = questionRecords.filter((record) => record.result === "passed-independent");
   const assistedPasses = questionRecords.filter((record) => record.result === "passed-assisted");
@@ -117,6 +119,9 @@ export function summariseAdaptiveRun(input: {
   } else {
     later.push("A delayed retrieval check is the next scheduled event for this topic.");
   }
+
+  // Same-session marks are not proof: say what would be.
+  if (proofNote) later.unshift(proofNote);
 
   if (!improved.length && !repairedLines.length && !questionMisses.length) {
     improved.push("This session's work is recorded; no new marks were earned or lost.");

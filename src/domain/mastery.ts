@@ -1,5 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { hintEvidenceMultiplier } from "./hint-tiers";
+import { exposureWeights } from "./evidence-weights";
 import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
 import { todayLocal } from "./local-date";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
@@ -78,6 +79,9 @@ function mean(values: number[], fallback = 0): number {
 export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
   const now = input.now ?? new Date();
   const today = todayLocal(now);
+  // Repeats of a question are discounted: only first exposures measure a new question.
+  const exposure = exposureWeights(input.attempts);
+  const weightOf = (attempt: Attempt) => exposure.get(attempt.id) ?? 1;
 
   const cardsByTopic = groupBy(input.cards, (c) => c.topicId);
   const attemptsByTopic = new Map<Id, Attempt[]>();
@@ -112,15 +116,18 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
     // Right-now retention from the forgetting curve.
     const retention = cards.length ? mean(cards.map((c) => retrievability(c, now))) : 0;
     // Exam performance: marks earned as a share of marks available.
-    const marksMax = attempts.reduce((a, x) => a + x.max, 0);
-    const accuracy = marksMax ? attempts.reduce((a, x) => a + x.awarded * hintEvidenceMultiplier(x.hintTier ?? null), 0) / marksMax : 0;
+    const marksMax = attempts.reduce((a, x) => a + x.max * weightOf(x), 0);
+    const accuracy = marksMax
+      ? attempts.reduce((a, x) => a + x.awarded * hintEvidenceMultiplier(x.hintTier ?? null) * weightOf(x), 0) / marksMax
+      : 0;
 
     const reviewedCardIds = new Set(logs.map((log) => log.cardId));
     const reviewedCards = cards.filter((card) => card.reps > 0 || reviewedCardIds.has(card.id));
     // Evidence strength discounts assisted/viewed attempts: a hinted success
     // cannot establish mastery as though it were independent exam evidence.
-    // Independent counts 2, assisted 1, viewed-solution 0.3 toward FULL_EVIDENCE.
-    const attemptEvidence = attempts.reduce((sum, attempt) => sum + hintEvidenceMultiplier(attempt.hintTier ?? null) * 2, 0);
+    // Independent counts 2, assisted 1, viewed-solution 0.3 toward FULL_EVIDENCE;
+    // repeats of the same question count for progressively less (see evidence-weights).
+    const attemptEvidence = attempts.reduce((sum, attempt) => sum + hintEvidenceMultiplier(attempt.hintTier ?? null) * 2 * weightOf(attempt), 0);
     const evidence = reviewedCards.length + attemptEvidence;
     const weight = Math.min(1, evidence / FULL_EVIDENCE);
 
@@ -174,6 +181,7 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
       cardsTotal: cards.length,
       cardsDue: cards.filter((c) => isDue(c, today)).length,
       attempts: attempts.length,
+      distinctQuestions: new Set(attempts.map((attempt) => attempt.questionId)).size,
       accuracy,
       lastStudiedAt,
       weak: mastery < WEAK_THRESHOLD && evidence > 0,
