@@ -28,6 +28,7 @@ These exist today and are the foundation the roadmap builds on:
 | Deck import (Revise JSON, Anki/Quizlet CSV/TSV) | `src/domain/deck-io.ts` |
 | OCR of handwritten working | answer input + AI layer |
 | IndexedDB-first offline + durable outbox, installable PWA | `src/data/`, `public/sw.js` |
+| Marks at risk, recovery sets, paper autopsy, equivalent retests, guided answer rewrites, 5–60 minute sprints, specification evidence | `docs/marks-recovery-2026-10-01.md` |
 
 ## 1. Content volume & coverage
 

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { forecastUntouched } from "@/domain/pace-forecast";
 import { AdaptiveSessionHero } from "@/components/AdaptiveSessionHero";
 import { PaceForecastLine } from "@/components/PaceForecast";
+import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
 import { ExamOutlook } from "@/components/ExamOutlook";
 import { CountdownPhaseBanner } from "@/components/CountdownPhaseBanner";
 import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
@@ -104,6 +105,7 @@ export default function TodayPage() {
         </summary>
         <div className="mt-4 space-y-5">
           <TodayOverview />
+          <RecoverMarksCard />
           <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />

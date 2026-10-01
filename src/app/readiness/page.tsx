@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getSubject } from "@/domain/curriculum";
 import { useStoreFields } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
+import { MarksAtRiskPanel } from "@/components/MarksAtRiskPanel";
 import { GradePredictionRealityPanel } from "@/components/GradePredictionRealityPanel";
 import {
   ApplicationMasteryCard,
@@ -30,6 +31,8 @@ export default function ReadinessPage() {
       </header>
 
       <ExamReadinessCard />
+
+      <MarksAtRiskPanel />
 
       <GradePredictionRealityPanel />
 
@@ -76,6 +79,7 @@ export default function ReadinessPage() {
 
       <nav aria-label="Readiness follow-up" className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink3">
         <Link href="/practice" className="hover:text-ink hover:underline">Practise the highest-yield gap →</Link>
+        <Link href="/readiness/spec" className="hover:text-ink hover:underline">See the evidence behind every specification statement →</Link>
         <Link href="/schedule" className="hover:text-ink hover:underline">Adjust the plan →</Link>
       </nav>
     </div>

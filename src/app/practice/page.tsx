@@ -23,6 +23,8 @@ import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
 import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
 import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionMode";
+import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
+import { PaperAutopsyView, PaperRepairMode, RecoverMarksMode } from "@/components/RecoveryModes";
 import { RichText } from "@/components/RichText";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 
@@ -81,6 +83,18 @@ function Practice() {
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
   const [weakExam, setWeakExam] = useState(() => params.get("weak") === "1");
+  const recoverParam = params.get("recover") === "1";
+  const autopsyParam = params.get("autopsy");
+  const autopsyStep = params.get("step");
+  const [recover, setRecover] = useState(recoverParam);
+  const [autopsyRun, setAutopsyRun] = useState(autopsyParam);
+  // Links from this same page (the recovery card, repair steps) change the URL without remounting.
+  const [seenParams, setSeenParams] = useState({ recoverParam, autopsyParam });
+  if (seenParams.recoverParam !== recoverParam || seenParams.autopsyParam !== autopsyParam) {
+    setSeenParams({ recoverParam, autopsyParam });
+    setRecover(recoverParam);
+    setAutopsyRun(autopsyParam);
+  }
   const weakExamPlan = useMemo(
     () => buildWeakTopicExam({ mistakes: store.mistakes, questions: store.questions }),
     [store.mistakes, store.questions],
@@ -350,6 +364,15 @@ function Practice() {
     return <WeakTopicExamMode onExit={() => setWeakExam(false)} />;
   }
 
+  if (recover) {
+    return <RecoverMarksMode subjectId={subjectParam ?? undefined} onExit={() => setRecover(false)} />;
+  }
+
+  if (autopsyRun) {
+    const exit = () => setAutopsyRun(null);
+    return autopsyStep ? <PaperRepairMode runId={autopsyRun} step={autopsyStep} onExit={exit} /> : <PaperAutopsyView runId={autopsyRun} onExit={exit} />;
+  }
+
   if (quickMinutes) {
     return (
       <QuickSessionMode
@@ -444,6 +467,8 @@ function Practice() {
           </button>
         </section>
       ) : null}
+
+      <RecoverMarksCard />
 
       <QuickSessionPicker onSelect={setQuickMinutes} />
 
