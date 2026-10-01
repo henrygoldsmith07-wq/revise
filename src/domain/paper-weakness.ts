@@ -107,22 +107,19 @@ function addTopic(
   }
 }
 
-/**
- * Analyse one paper sitting, not the learner's all-time history. Callers can
- * pass paperRunId to keep a resit separate from earlier attempts on the same
- * questions. Missing paperRunId is treated as no evidence for a run-scoped
- * report rather than silently mixing historical practice into the result.
- */
-export function analysePaperWeakness(input: {
+export interface PaperWeaknessInput {
   paper: Pick<Paper, "id" | "title" | "subjectId" | "questionIds">;
   attempts: Attempt[];
   questions: Question[];
   mistakes?: Mistake[];
   paperRunId?: Id;
-}): PaperWeaknessAnalysis {
+}
+
+/** The attempts a paper report may rely on: this sitting, trusted marks, and authenticated evidence where required. */
+export function paperEvidenceAttempts(input: PaperWeaknessInput): Attempt[] {
   const questionIds = new Set(input.paper.questionIds);
   const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
-  const relevantAttempts = input.attempts.filter(
+  return input.attempts.filter(
     (attempt) => {
       if (attempt.mode !== "paper" || attempt.subjectId !== input.paper.subjectId || !trustworthyAttempt(attempt) ||
         !questionIds.has(attempt.questionId) || (input.paperRunId && attempt.paperRunId !== input.paperRunId)) return false;
@@ -135,6 +132,17 @@ export function analysePaperWeakness(input: {
       return true;
     },
   );
+}
+
+/**
+ * Analyse one paper sitting, not the learner's all-time history. Callers can
+ * pass paperRunId to keep a resit separate from earlier attempts on the same
+ * questions. Missing paperRunId is treated as no evidence for a run-scoped
+ * report rather than silently mixing historical practice into the result.
+ */
+export function analysePaperWeakness(input: PaperWeaknessInput): PaperWeaknessAnalysis {
+  const questionsById = new Map(input.questions.map((question) => [question.id, question] as const));
+  const relevantAttempts = paperEvidenceAttempts(input);
   const attemptsById = new Map(relevantAttempts.map((attempt) => [attempt.id, attempt] as const));
   const capabilities = new Map<Id, { capabilityId: Id; marksLost: number; marksAvailable: number }>();
   for (const attempt of attemptsById.values()) {

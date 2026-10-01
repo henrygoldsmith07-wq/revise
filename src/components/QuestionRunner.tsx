@@ -211,7 +211,14 @@ export function QuestionRunner({
         ) : null}
       </Panel>
 
-      {result ? <MarkedResult question={question} result={result} awarded={awarded} /> : null}
+      {result ? (
+        <MarkedResult
+          question={question}
+          result={result}
+          awarded={awarded}
+          improvableAnswers={mode === "practice" && !farTransfer && !retestMistake ? answers : undefined}
+        />
+      ) : null}
     </div>
   );
 }

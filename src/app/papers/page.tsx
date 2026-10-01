@@ -8,17 +8,18 @@ import { toBase64 } from "@/components/AnswerInput";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { tokenise } from "@/domain/marking";
-import { analysePaperWeakness } from "@/domain/paper-weakness";
+import { buildPaperAutopsy } from "@/domain/paper-autopsy";
 import { selectNextPaper, type PaperCandidate } from "@/domain/exam-paper-selection";
 import type { Paper, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
+import { PaperAutopsyPanel, autopsyHref } from "@/components/PaperAutopsyPanel";
 import { PaperWeaknessPanel } from "@/components/PaperWeaknessPanel";
 import { MockStudyPlan } from "@/components/MockStudyPlan";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { ExamConditionMode } from "@/components/ExamConditionMode";
-import { Button, EmptyState, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { ICON_SIZE, PhotoIcon, TimerIcon } from "@/components/icons";
 
 // Past papers: upload, extract, map to topics, practise by topic, or sit a
@@ -53,6 +54,18 @@ function Papers() {
     () => store.papers.filter((p) => !subjectId || p.subjectId === subjectId),
     [store.papers, subjectId],
   );
+
+  // The most recent sitting of each paper, so its autopsy stays reachable after the paper ends.
+  const latestRun = useMemo(() => {
+    const latest = new Map<string, { runId: string; at: number }>();
+    for (const attempt of store.attempts) {
+      if (attempt.mode !== "paper" || !attempt.paperId || !attempt.paperRunId) continue;
+      const at = Date.parse(attempt.createdAt);
+      const known = latest.get(attempt.paperId);
+      if (!known || at > known.at) latest.set(attempt.paperId, { runId: attempt.paperRunId, at });
+    }
+    return new Map([...latest].map(([paperId, row]) => [paperId, row.runId] as const));
+  }, [store.attempts]);
 
   // Which paper to sit next — ranked on coverage, weakness, difficulty,
   // recency, previous exposure and predicted mark gain. Pure derivation over
@@ -256,6 +269,11 @@ function Papers() {
                   </div>
                   <Pill className="self-start sm:self-auto" tone={paper.status === "practised" ? "success" : undefined}>{paper.status}</Pill>
                   <div className="grid grid-cols-1 sm:flex justify-end gap-1.5 w-full sm:w-auto">
+                    {latestRun.get(paper.id) ? (
+                      <ButtonLink size="sm" variant="secondary" className="w-full sm:w-auto" href={autopsyHref(latestRun.get(paper.id)!)}>
+                        Autopsy
+                      </ButtonLink>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -528,16 +546,18 @@ function PaperSession({
     () => store.attempts.filter((attempt) => attempt.paperRunId === paperRunId),
     [paperRunId, store.attempts],
   );
-  const weaknessAnalysis = useMemo(
+  const autopsy = useMemo(
     () =>
-      analysePaperWeakness({
+      buildPaperAutopsy({
         paper,
         attempts: paperAttempts,
         questions,
         mistakes: store.mistakes,
         paperRunId,
+        bank: store.questions,
+        history: store.attempts,
       }),
-    [paper, paperAttempts, paperRunId, questions, store.mistakes],
+    [paper, paperAttempts, paperRunId, questions, store.attempts, store.mistakes, store.questions],
   );
   const current = questions[index];
   const totalAwarded = paperAttempts.reduce((a, attempt) => a + attempt.awarded, 0);
@@ -607,7 +627,8 @@ function PaperSession({
         extra={
           <div className="space-y-3">
             {calibration ? <p>{calibration} See Progress for the updated calibration.</p> : null}
-            <PaperWeaknessPanel analysis={weaknessAnalysis} />
+            <PaperWeaknessPanel analysis={autopsy.analysis} />
+            <PaperAutopsyPanel autopsy={autopsy} onNavigate={(href) => void finish(href)} />
           </div>
         }
         actions={

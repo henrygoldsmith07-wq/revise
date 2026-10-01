@@ -1,5 +1,9 @@
 # Current improvement state — 1 October 2026
 
+The [marks-recovery pass](docs/marks-recovery-2026-10-01.md) adds marks at risk, recovery sets,
+paper autopsy with equivalent retests, guided answer rewrites, 5–60 minute sprints and a
+specification evidence page.
+
 The [reliability follow-up](docs/reliability-fixes-2026-10-01.md) addresses the
 five reproduced review findings: private-question ownership, restored question
 replication, cross-account UUID collisions, grading retries for the wrong

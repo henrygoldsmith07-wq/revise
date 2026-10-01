@@ -10,6 +10,7 @@ import type { RemediationPlan } from "@/domain/remediation";
 
 import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/domain/types";
 
+import { ImproveAnswer } from "./ImproveAnswer";
 import { RichText } from "./RichText";
 import { Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
@@ -18,8 +19,11 @@ export function MarkedResult({
   question,
   result,
   awarded,
+  improvableAnswers,
 }: {
   question: Question;
+  /** Original answers by part id. When set, parts that lost marks offer a guided rewrite. */
+  improvableAnswers?: Record<string, string>;
   result: {
     marked: MarkedPart[];
     feedback: string;
@@ -210,6 +214,9 @@ export function MarkedResult({
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {improvableAnswers && part && question.kind !== "mcq" && marked.awarded < marked.max ? (
+                <ImproveAnswer question={question} part={part} marked={marked} original={improvableAnswers[part.id] ?? ""} />
               ) : null}
               {marked.comment ? <p className="text-xs text-ink3 mt-1.5">{marked.comment}</p> : null}
               {marked.evidence?.length ? (

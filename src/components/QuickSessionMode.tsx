@@ -8,7 +8,9 @@ import {
   secondsRemaining,
 } from "@/domain/exam-conditions";
 import {
+  QUICK_SESSION_MINUTES,
   selectQuickSessionQuestions,
+  quickSessionMarkBudget,
   quickSessionQuestionLimit,
   type QuickSessionMinutes,
 } from "@/domain/quick-session";
@@ -139,12 +141,15 @@ export function QuickSessionMode({
             </div>
             <div className="card card-2 p-3">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Question set</p>
-              <p className="text-xl font-semibold mt-1">{quickSessionQuestionLimit(minutes)} max</p>
+              <p className="text-xl font-semibold mt-1">{queue.length} · {queue.reduce((sum, question) => sum + question.totalMarks, 0)} marks</p>
             </div>
           </div>
 
           <div className="card card-2 p-3 text-sm text-ink2">
-            <p><span className="font-semibold">Selected for you:</span> unseen questions and weaker topics first.</p>
+            <p>
+              <span className="font-semibold">Selected for you:</span> unseen questions and weaker topics first.
+              {minutes > 10 ? ` Topics are mixed and the set fits about ${quickSessionMarkBudget(minutes)} marks.` : ""}
+            </p>
             <p className="mt-1.5"><span className="font-semibold">How it works:</span> answer one question, see the marking, then move on. Only completed answers count.</p>
           </div>
 
@@ -257,6 +262,7 @@ function QuickSessionSummary({
           </div>
         </div>
         <ProgressBar value={queue.length ? attempts.length / queue.length : 0} label={`${attempts.length} of ${queue.length} questions completed`} />
+        <p className="text-xs text-ink2">Marks earned: {awarded}/{maximum}</p>
         <p className="text-xs text-ink3">
           {result.reason === "timed-out"
             ? "The clock ended the sprint. Your completed answers have still been marked and added to your review history."
@@ -271,9 +277,9 @@ function QuickSessionSummary({
 export function QuickSessionPicker({ onSelect }: { onSelect: (minutes: QuickSessionMinutes) => void }) {
   return (
     <section>
-      <SectionHeading title="Short on time?" hint="A focused set with a real clock. No setup beyond choosing your minutes." />
-      <div className="grid sm:grid-cols-2 gap-3">
-        {([5, 10] as const).map((minutes) => (
+      <SectionHeading title="Short on time?" hint="Pick 5 to 60 minutes. Revise builds the best set that fits, with a real clock." />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {QUICK_SESSION_MINUTES.map((minutes) => (
           <button
             key={minutes}
             type="button"
@@ -283,7 +289,10 @@ export function QuickSessionPicker({ onSelect }: { onSelect: (minutes: QuickSess
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-ink">I Have {minutes} Minutes</p>
-                <p className="text-xs text-ink3 mt-1">Up to {quickSessionQuestionLimit(minutes)} focused questions · stops at {minutes}:00</p>
+                <p className="text-xs text-ink3 mt-1">
+                  Up to {quickSessionQuestionLimit(minutes)} focused questions
+                  {minutes > 10 ? ` · about ${quickSessionMarkBudget(minutes)} marks` : ""} · stops at {minutes}:00
+                </p>
               </div>
               <Pill tone="accent"><TimerIcon size={ICON_SIZE.sm} aria-hidden /> {minutes}m</Pill>
             </div>
