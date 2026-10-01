@@ -42,6 +42,13 @@ lives:
 - `mastery.ts` turns raw history into a 0–1 number per topic, damped by how much
   evidence exists. Unmeasured is reported as zero, never as a prior — a topic
   the student has never opened must not inflate a predicted grade.
+- `evidence-weights.ts`, `topic-weight.ts`, `marks-value.ts`,
+  `proof-of-improvement.ts` and `session-explanation.ts` make the optimiser's
+  choice about marks and proof: repeats count for less, topics are weighted by
+  how much of the exam they carry, performance on unseen questions is an
+  interval, and a gain is "proven" only on different questions, answered
+  unaided, after a delay. Each recommendation is explained from the same
+  evidence it was scored on (see `docs/marks-value-and-proof-2026-10-01.md`).
 - `recall-mastery.ts` keeps a recall-only score separate from exam performance,
   combining card stability and current FSRS retrievability, while exposing
   observed review outcomes and due-card pressure for `/readiness`.

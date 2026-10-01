@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { useMemo } from "react";
 import { getSubject } from "@/domain/curriculum";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
+import type { ProofLedger } from "@/domain/proof-of-improvement";
+import { explainSession } from "@/domain/session-explanation";
 import { ButtonLink, Pill } from "./ui";
 import { ForwardIcon, TodayIcon } from "./icons";
 
@@ -10,12 +14,18 @@ export function AdaptiveSessionHero({
   session,
   displayName,
   greeting,
+  proof,
 }: {
   session: AdaptiveSessionPlan;
   displayName: string;
   greeting: string;
+  /** Overall proof state, shown as one line when there is something true to say. */
+  proof?: ProofLedger;
 }) {
   const subject = getSubject(session.subjectId);
+  const explanation = useMemo(() => explainSession(session, proof?.conversion), [session, proof?.conversion]);
+  // Today stays calm: mention proof only when something is shown or a test is due, not while it is merely waiting.
+  const proofHeadline = proof && (proof.proven || proof.declined || proof.illusory || proof.due) ? proof.headline : null;
 
   return (
     <section aria-label="Suggested study session" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,21rem)] lg:gap-8">
@@ -32,9 +42,7 @@ export function AdaptiveSessionHero({
         </h2>
         <p className="mt-2 text-base font-medium text-ink sm:text-lg">{subject?.name ?? session.subjectId} · {session.topicTitle}</p>
 
-        {session.evidence.factors.uncertainty >= 0.65 ? (
-          <p className="mt-2 text-sm text-ink2">Evidence is still limited. This session will help find the right level.</p>
-        ) : null}
+        <p className="mt-1 text-sm text-ink2">{explanation.stakes}</p>
 
         {session.stoppedEarly ? (
           <p className="mt-2 text-sm text-ink2" role="note">{session.stoppedEarly.reason}</p>
@@ -59,11 +67,32 @@ export function AdaptiveSessionHero({
             ))}
           </ol>
         </details>
-        {session.reason ? (
-          <details className="mt-3 max-w-2xl">
-            <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Why this session?</summary>
-            <p className="mt-2 text-sm leading-6 text-ink2">{session.reason}</p>
-          </details>
+        <details className="mt-3 max-w-2xl">
+          <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Why this session?</summary>
+          <ul className="mt-2 space-y-1.5" aria-label="Evidence behind this session">
+            {/* A mapped skill action carries its own reason (which gap, why now); otherwise the evidence lines cover it. */}
+            {session.learningPolicy && session.reason ? (
+              <li className="flex gap-2 text-sm leading-6 text-ink2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+                <span className="min-w-0 font-medium text-ink">{session.reason}</span>
+              </li>
+            ) : null}
+            {explanation.lines.map((line) => (
+              <li key={line.text} className="flex gap-2 text-sm leading-6 text-ink2">
+                <span
+                  className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${line.tone === "gap" ? "bg-review" : line.tone === "proof" ? "bg-speak" : "bg-ink3"}`}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0">{line.text}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+        {proofHeadline ? (
+          <p className="mt-3 max-w-2xl text-sm text-ink2" role="note">
+            {proofHeadline}{" "}
+            <Link href="/readiness#proof" className="font-medium text-ink underline underline-offset-2">See the proof</Link>
+          </p>
         ) : null}
       </div>
 

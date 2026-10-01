@@ -161,6 +161,9 @@ export interface TopicMastery {
   cardsTotal: number;
   cardsDue: number;
   attempts: number;
+  /** Different questions behind `attempts`; repeats of one question add evidence only at a discount. */
+  distinctQuestions?: number;
+  /** Mark-weighted accuracy with repeats of a question discounted. */
   accuracy: number;
   lastStudiedAt: IsoInstant | null;
   /** True when this topic is costing the most marks per minute of revision. */

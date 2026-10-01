@@ -12,6 +12,7 @@ import { buildAdaptiveSession } from "@/domain/adaptive-session";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { ExamReadiness } from "@/domain/exam-readiness";
+import { buildProofLedger, type ProofLedger } from "@/domain/proof-of-improvement";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type {
   Attempt,
@@ -45,6 +46,8 @@ export interface RevisionSessions {
   loaded: boolean;
   /** The one best sequence for the next bounded study window (null pre-plan). */
   adaptiveSession: AdaptiveSessionPlan | null;
+  /** Which gains are proven on new questions after a delay; shared by Today, Readiness and the planner. */
+  proofLedger: ProofLedger;
   revisionCheckpoint: RevisionCheckpoint | null;
   revisionTwin: RevisionTwinState;
   revisionTwinChoices: RevisionTwinChoice[];
@@ -161,9 +164,15 @@ export function useRevisionSessions(input: {
   // sequence for the winning topic. Today and /adaptive-session consume this
   // exact value so the hero cannot drift from the route it opens. Readiness
   // gates adaptive stopping, so the optimiser reads the computed rows.
+  const proofLedger = useMemo(
+    () => buildProofLedger({ topics, attempts, questions, reviewLogs }),
+    [topics, attempts, questions, reviewLogs],
+  );
+
   const adaptiveSession = useMemo(() => {
     if (!topics.length) return null;
     return buildAdaptiveSession({
+      proofLedger,
       topics,
       cards,
       reviewLogs,
@@ -180,7 +189,7 @@ export function useRevisionSessions(input: {
       targetMinutes: 20,
     });
   }, [topics, cards, reviewLogs, questions, attempts, mistakes, mastery, exams,
-    subjectIds, recallMastery, applicationMastery, readiness, interventionOutcomes]);
+    subjectIds, recallMastery, applicationMastery, readiness, interventionOutcomes, proofLedger]);
 
   // The Twin audits Today's decision rather than introducing a second planner.
   // Prefer the selected topic, then the selected subject, and use the exact
@@ -202,6 +211,7 @@ export function useRevisionSessions(input: {
   return {
     loaded,
     adaptiveSession,
+    proofLedger,
     revisionCheckpoint,
     revisionTwin: twinState,
     revisionTwinChoices,

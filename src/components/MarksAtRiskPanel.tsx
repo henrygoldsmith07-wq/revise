@@ -96,7 +96,7 @@ export function MarksAtRiskPanel({ subjectId }: { subjectId?: string }) {
                   {report.recurring.slice(0, 4).map((row) => (
                     <li key={row.key} className="flex items-start justify-between gap-3 text-xs">
                       <span className="text-ink2">{row.label}</span>
-                      <Pill tone="danger" className="shrink-0">{row.count}× · {row.marks} marks</Pill>
+                      <Pill tone="danger" className="shrink-0">{row.count}× · {row.marks} marks{row.paperCount >= 2 ? ` · across ${row.paperCount} papers` : ""}</Pill>
                     </li>
                   ))}
                 </ul>

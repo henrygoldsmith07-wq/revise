@@ -1,5 +1,6 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { hintEvidenceMultiplier } from "./hint-tiers";
+import { exposureWeights } from "./evidence-weights";
 import { authenticPaperEvidence, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Id, IsoInstant, Question, Topic } from "./types";
 
@@ -8,7 +9,7 @@ export type ApplicationEvidence = "unmeasured" | "emerging" | "reliable";
 export interface ApplicationMasteryRow {
   topicId: Id;
   subjectId: Id;
-  /** Mark-weighted application accuracy; recall-mode and provisional marks are excluded. */
+  /** Mark-weighted application accuracy; recall-mode and provisional marks are excluded and repeats of a question are discounted. */
   mastery: number;
   accuracy: number;
   recentAccuracy: number | null;
@@ -32,6 +33,9 @@ export interface ApplicationMasteryInput {
 interface Observation {
   awarded: number;
   max: number;
+  /** Exposure-weighted copies: a repeat of the same question counts for less. */
+  weightedAwarded: number;
+  weightedMax: number;
   createdAt: IsoInstant;
   difficulty: Question["difficulty"] | null;
   questionId: Id;
@@ -40,6 +44,8 @@ interface Observation {
 interface Accumulator {
   awarded: number;
   max: number;
+  weightedAwarded: number;
+  weightedMax: number;
   observations: Observation[];
 }
 
@@ -48,6 +54,7 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
   const questionById = new Map(input.questions.map((question) => [question.id, question]));
   const byTopic = new Map<Id, Accumulator>();
   const trustedQuestion = input.trustedQuestion ?? (() => true);
+  const exposure = exposureWeights(input.attempts);
 
   for (const attempt of input.attempts) {
     if (!trustworthyAttempt(attempt) || attempt.mode === "recall" || attempt.max <= 0 || attempt.markEscalation?.status === "pending") continue;
@@ -64,13 +71,18 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
     // Hint-assisted marks count at the hint tier's evidence weight, so
     // hint-gaming cannot inflate application mastery.
     const credit = hintEvidenceMultiplier(attempt.hintTier ?? null);
+    const repeat = exposure.get(attempt.id) ?? 1;
     for (const topicId of topicIds) {
-      const row = byTopic.get(topicId) ?? { awarded: 0, max: 0, observations: [] };
+      const row = byTopic.get(topicId) ?? { awarded: 0, max: 0, weightedAwarded: 0, weightedMax: 0, observations: [] };
       row.awarded += attempt.awarded * share * credit;
       row.max += attempt.max * share;
+      row.weightedAwarded += attempt.awarded * share * credit * repeat;
+      row.weightedMax += attempt.max * share * repeat;
       row.observations.push({
         awarded: attempt.awarded * share * credit,
         max: attempt.max * share,
+        weightedAwarded: attempt.awarded * share * credit * repeat,
+        weightedMax: attempt.max * share * repeat,
         createdAt: attempt.createdAt,
         difficulty: question?.difficulty ?? null,
         questionId: attempt.questionId,
@@ -84,10 +96,12 @@ export function computeApplicationMastery(input: ApplicationMasteryInput): Appli
     const observations = [...(row?.observations ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const marksAvailable = round(row?.max ?? 0);
     const marksAwarded = round(row?.awarded ?? 0);
-    const accuracy = marksAvailable ? round(marksAwarded / marksAvailable) : 0;
+    // Accuracy discounts repeats of a question; the mark totals stay literal.
+    const weightedMax = row?.weightedMax ?? 0;
+    const accuracy = weightedMax ? round((row?.weightedAwarded ?? 0) / weightedMax) : 0;
     const recent = observations.slice(-5);
-    const recentMax = recent.reduce((sum, observation) => sum + observation.max, 0);
-    const recentAccuracy = recent.length && recentMax ? round(recent.reduce((sum, observation) => sum + observation.awarded, 0) / recentMax) : null;
+    const recentMax = recent.reduce((sum, observation) => sum + observation.weightedMax, 0);
+    const recentAccuracy = recent.length && recentMax ? round(recent.reduce((sum, observation) => sum + observation.weightedAwarded, 0) / recentMax) : null;
     const difficultyRows = observations.filter((observation) => observation.difficulty != null);
     const lastAttemptAt = observations.at(-1)?.createdAt ?? null;
 

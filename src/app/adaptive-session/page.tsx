@@ -23,6 +23,7 @@ import { reviewedWjecTopicEdges, wjecCapabilities } from "@/content/capabilities
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
+import { proofLine } from "@/domain/proof-of-improvement";
 import { useStoreFields } from "@/state/store";
 import { AdaptiveRetrievalBlock, type RetrievalOutcome } from "@/components/AdaptiveRetrievalBlock";
 import { AdaptiveQuestionBlock } from "@/components/AdaptiveQuestionBlock";
@@ -777,14 +778,15 @@ function AdaptiveComplete({
     const open = store.mistakes
       .filter((mistake) => !mistake.resolved && mistake.topicId === plan.topicId)
       .map((mistake) => mistake.id);
-    return summariseAdaptiveRun({ plan, completed: run.completed, openMistakeIds: open });
-  }, [plan, run.completed, store.mistakes]);
+    const proofNote = proofLine(store.proofLedger.topics.find((row) => row.topicId === plan.topicId));
+    return summariseAdaptiveRun({ plan, completed: run.completed, openMistakeIds: open, proofNote });
+  }, [plan, run.completed, store.mistakes, store.proofLedger]);
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
       <div role="status" aria-live="polite">
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Session complete</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink mt-1">The gain is now tested.</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink mt-1">Done. Now the gain has to hold.</h1>
         <p className="text-sm text-ink3 mt-1">{subject?.name ?? plan.subjectId} — {plan.topicTitle}</p>
       </div>
 
@@ -893,5 +895,5 @@ function replanWithCurrentEvidence(
 }
 
 function usePageStore() {
-  return useStoreFields("adaptiveSession", "applicationMastery", "attempts", "cards", "clearRevisionCheckpoint", "examDates", "examReadiness", "interventionOutcomes", "mastery", "mistakes", "questions", "recallMastery", "recordInterventionOutcome", "reviewLogs", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "updateCards", "userId");
+  return useStoreFields("adaptiveSession", "applicationMastery", "attempts", "cards", "clearRevisionCheckpoint", "examDates", "examReadiness", "interventionOutcomes", "mastery", "mistakes", "proofLedger", "questions", "recallMastery", "recordInterventionOutcome", "reviewLogs", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "updateCards", "userId");
 }

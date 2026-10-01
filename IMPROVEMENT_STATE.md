@@ -1,5 +1,9 @@
 # Current improvement state — 1 October 2026
 
+The [marks-value and proof pass](docs/marks-value-and-proof-2026-10-01.md) ranks revision by what
+the exam is worth, discounts repeated questions in mastery, and measures gains only on new,
+unaided questions after a delay.
+
 The [marks-recovery pass](docs/marks-recovery-2026-10-01.md) adds marks at risk, recovery sets,
 paper autopsy with equivalent retests, guided answer rewrites, 5–60 minute sprints and a
 specification evidence page.

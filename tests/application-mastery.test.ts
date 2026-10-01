@@ -132,3 +132,19 @@ describe("application mastery", () => {
     expect(row?.mastery).toBeCloseTo(0.575, 5);
   });
 });
+
+describe("application mastery discounts repeated questions", () => {
+  it("keeps literal mark totals but weights accuracy toward first exposures", () => {
+    const topic = { id: "t", subjectId: "s", unitId: "u", title: "T", order: 1, intrinsicDifficulty: 3, summary: "", keyPoints: [], commonErrors: [] } as Topic;
+    const make = (id: string, questionId: string, awarded: number, day: number): Attempt => ({
+      id, userId: "u", questionId, subjectId: "s", topicIds: ["t"], answers: {}, marked: [], awarded, max: 4,
+      feedback: "", markedBy: "rubric", elapsedMs: 1, mode: "practice", createdAt: new Date(Date.UTC(2026, 0, day)).toISOString(),
+    });
+    const attempts = [make("a", "q1", 0, 1), make("b", "q1", 4, 2), make("c", "q1", 4, 3), make("d", "q1", 4, 4)];
+    const [row] = computeApplicationMastery({ topics: [topic], questions: [], attempts });
+    expect(row!.marksAvailable).toBe(16);
+    expect(row!.marksAwarded).toBe(12);
+    expect(row!.accuracy).toBeLessThan(0.5);
+    expect(row!.questionsAttempted).toBe(1);
+  });
+});

@@ -27,11 +27,14 @@ function strongCard(topicId: string, id: string): Card {
   };
 }
 
-function attempt(topicId: string, awarded: number, max: number): Attempt {
+let questionCounter = 0;
+
+/** Each call is a different question, as the exam would ask; pass `questionId` to repeat one. */
+function attempt(topicId: string, awarded: number, max: number, questionId = `q${questionCounter++}`): Attempt {
   return {
     id: crypto.randomUUID(),
     userId: "u",
-    questionId: "q",
+    questionId,
     subjectId: "subject",
     topicIds: [topicId],
     answers: {},
@@ -211,5 +214,34 @@ describe("weakTopics / untouchedTopics / subjectMastery", () => {
     expect(average).toBeGreaterThan(0);
     expect(average).toBeLessThan(1);
     expect(subjectMastery(rows, "other")).toBe(0);
+  });
+});
+
+describe("repeated questions are not proof of mastery", () => {
+  const input = { topics: [topic("a")], cards: [], reviewLogs: [], mistakes: [], now: NOW };
+  const at = (day: number) => new Date(Date.UTC(2025, 4, day, 9)).toISOString();
+  const on = (questionId: string, awarded: number, day: number): Attempt => ({ ...attempt("a", awarded, 4, questionId), createdAt: at(day) });
+
+  it("scores one question answered six times far below the same marks across six different questions", () => {
+    const sameQuestion = computeTopicMastery({ ...input, attempts: [1, 2, 3, 4, 5, 6].map((day) => on("only", 4, day)) })[0]!;
+    const distinct = computeTopicMastery({ ...input, attempts: [1, 2, 3, 4, 5, 6].map((day) => on(`q${day}`, 4, day)) })[0]!;
+    expect(distinct.mastery).toBeGreaterThan(sameQuestion.mastery + 0.2);
+    expect(sameQuestion.distinctQuestions).toBe(1);
+    expect(distinct.distinctQuestions).toBe(6);
+    expect(sameQuestion.attempts).toBe(6);
+  });
+
+  it("does not let a failed question be memorised into mastery", () => {
+    const failedOnce = computeTopicMastery({ ...input, attempts: [on("q", 0, 1)] })[0]!;
+    const memorised = computeTopicMastery({ ...input, attempts: [on("q", 0, 1), ...[2, 3, 4, 5].map((day) => on("q", 4, day))] })[0]!;
+    const learned = computeTopicMastery({ ...input, attempts: [on("q", 0, 1), ...[2, 3, 4, 5].map((day) => on(`new${day}`, 4, day))] })[0]!;
+    expect(memorised.mastery).toBeLessThan(0.55);
+    expect(learned.mastery).toBeGreaterThan(memorised.mastery + 0.2);
+    expect(memorised.mastery).toBeGreaterThanOrEqual(failedOnce.mastery);
+  });
+
+  it("still lets the first, unseen answer count in full", () => {
+    const single = computeTopicMastery({ ...input, attempts: [on("q", 3, 1)] })[0]!;
+    expect(single.accuracy).toBeCloseTo(0.75, 5);
   });
 });

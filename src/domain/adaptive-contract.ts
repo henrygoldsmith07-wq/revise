@@ -4,6 +4,7 @@ import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
 import type { ExamReadiness } from "./exam-readiness";
 import type { AdaptiveEvidence } from "./adaptive-scoring";
+import type { ProofLedger } from "./proof-of-improvement";
 import type { Attempt, Card, ExamDate, Id, Mistake, Question, ReviewLog, Topic, TopicMastery, InterventionAttemptContext, InterventionOutcomeRecord } from "./types";
 
 export type AdaptiveStepKind =
@@ -104,6 +105,8 @@ export interface AdaptiveSessionInput {
   topicId?: Id;
   /** Observed intervention chains used to replace policy priors. */
   interventionOutcomes?: InterventionOutcomeRecord[];
+  /** Proof state per topic; a topic whose delayed unseen test is due is prioritised. */
+  proofLedger?: ProofLedger;
 }
 
 export type AdaptiveStepResult =

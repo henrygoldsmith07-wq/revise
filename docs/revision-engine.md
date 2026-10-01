@@ -54,6 +54,15 @@ there would mean a student who had never opened a topic saw 40% mastery on it,
 and every predicted grade would be inflated before they did any work. A unit
 test pins this.
 
+**Repeats are not evidence.** `src/domain/evidence-weights.ts` weights each
+attempt by how many times that learner has already seen the question: the first
+exposure counts 1, then 0.35, 0.15 and 0.05. The weights apply to both question
+accuracy and the evidence count above, and to application mastery's accuracy
+(its mark totals stay literal). Before this, one question answered correctly six
+times scored 1.00 and six different questions at 50% scored 0.50. The weights are
+product defaults, not fitted to data. See
+[marks-value-and-proof-2026-10-01.md](marks-value-and-proof-2026-10-01.md).
+
 **Weak ≠ unmeasured.** A topic is weak only if it is below 0.55 *and* has some
 evidence behind it. Topics with no evidence are routed to a first-pass "learn"
 activity instead of remediation, which is a different thing to do.

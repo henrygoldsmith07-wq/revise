@@ -13,6 +13,8 @@ import type { Attempt, Id, Question } from "./types";
 import type { AdaptiveSessionInput, AdaptiveSessionPlan } from "./adaptive-contract";
 import { buildSteps, learningActionStep, reasonFor } from "./adaptive-sequence";
 import { scoreTopic, trustedAdaptiveEvidence } from "./adaptive-scoring";
+import { exposureWeights } from "./evidence-weights";
+import { topicShares } from "./topic-weight";
 
 /** Build the one best sequence for the next bounded study window. */
 export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessionPlan | null {
@@ -55,8 +57,22 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   const mistakesByTopic = groupBy(trustedEvidence.mistakes.filter((mistake) => !mistake.resolved), (mistake) => mistake.topicId);
   const masteryByTopic = new Map(input.mastery.map((row) => [row.topicId, row] as const));
 
+  // Weight, repeat-recognition and supply are computed once over the whole history.
+  const shares = topicShares(topics);
+  const topicsPerSubject = new Map<Id, number>();
+  for (const topic of topics) topicsPerSubject.set(topic.subjectId, (topicsPerSubject.get(topic.subjectId) ?? 0) + 1);
+  const exposure = exposureWeights(input.attempts);
+  const attemptedQuestionIds = new Set(input.attempts.map((attempt) => attempt.questionId));
+
+  const proofByTopic = new Map((input.proofLedger?.topics ?? []).map((row) => [row.topicId, row] as const));
+
   const candidates = topics.map((topic) =>
     scoreTopic(topic, {
+      proof: proofByTopic.get(topic.id),
+      share: shares.get(topic.id) ?? 0,
+      topicsInSubject: topicsPerSubject.get(topic.subjectId) ?? 1,
+      exposure,
+      attemptedQuestionIds,
       cards: cardsByTopic.get(topic.id) ?? [],
       reviewLogs: logsByTopic.get(topic.id) ?? [],
       questions: questionsByTopic.get(topic.id) ?? [],
