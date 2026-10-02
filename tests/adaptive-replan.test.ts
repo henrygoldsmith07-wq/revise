@@ -314,6 +314,36 @@ describe("continuous adaptation", () => {
     expect(repair!.params?.hintBudget).toBe(0); // repair is an independent retest
   });
 
+  it("a recurring technique error is practised on a different question, not re-taught or retested", () => {
+    const technique = (id: string, questionId: string): Mistake => ({
+      ...mistake(id, { questionId }), category: "arithmetic", workingErrorKind: "unit-error",
+      createdAt: id === "m1" ? "2026-09-02T12:00:00.000Z" : "2026-09-04T12:00:00.000Z",
+    });
+    const fresh = question("fresh-q", 3);
+    const result = replan(
+      [record({ stepId: `${TOPIC}:independent-application`, kind: "independent-application", result: "missed", itemId: qIndep.id })],
+      { questions: [qSupport, qIndep, qTransfer, fresh], mistakes: [technique("m1", qIndep.id), technique("m2", qSupport.id)] },
+    );
+    const step = result.steps.find((candidate) => candidate.kind === "misconception-repair");
+    expect(step?.focus).toBe("technique");
+    expect(step?.label).toBe("Fix the exam technique");
+    expect(step?.questionIds).not.toContain(qIndep.id);
+    expect(step?.mistakeIds).toEqual([]);
+    expect(step?.params?.hintBudget).toBe(0);
+    expect(result.reason).toMatch(/technique error has recurred/);
+  });
+
+  it("a single technique slip still uses the ordinary repair", () => {
+    const one: Mistake = { ...mistake("m1", { questionId: qIndep.id }), category: "arithmetic" };
+    const result = replan(
+      [record({ stepId: `${TOPIC}:independent-application`, kind: "independent-application", result: "missed", itemId: qIndep.id })],
+      { questions: [qSupport, qIndep, qTransfer], mistakes: [one] },
+    );
+    const step = result.steps.find((candidate) => candidate.kind === "misconception-repair");
+    expect(step?.focus).toBeUndefined();
+    expect(step?.mistakeIds).toContain("m1");
+  });
+
   it("repeated failure triggers a bounded prerequisite detour when one exists", () => {
     const prereqQ = question("p1", 1, PREREQ);
     const result = replan(

@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { getSubject } from "@/domain/curriculum";
+import { getSubject, topicsFor, unitsFor } from "@/domain/curriculum";
+import { buildPaperReadiness } from "@/domain/paper-readiness";
+import { buildTodayBrief } from "@/domain/today-brief";
+import { useStoreFields } from "@/state/store";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { explainSession } from "@/domain/session-explanation";
@@ -23,6 +26,13 @@ export function AdaptiveSessionHero({
   proof?: ProofLedger;
 }) {
   const subject = getSubject(session.subjectId);
+  const store = useStoreFields("attempts", "mistakes", "questions", "examDates");
+  const brief = useMemo(() => {
+    const papers = subject
+      ? buildPaperReadiness({ subject, topics: topicsFor(subject.id), units: unitsFor(subject.id), questions: store.questions, attempts: store.attempts, mistakes: store.mistakes, examDates: store.examDates })
+      : [];
+    return buildTodayBrief({ plan: session, papers, examDates: store.examDates, mistakes: store.mistakes });
+  }, [subject, session, store.questions, store.attempts, store.mistakes, store.examDates]);
   const explanation = useMemo(() => explainSession(session, proof?.conversion), [session, proof?.conversion]);
   // Today stays calm: mention proof only when something is shown or a test is due, not while it is merely waiting.
   const proofHeadline = proof && (proof.proven || proof.declined || proof.illusory || proof.due) ? proof.headline : null;
@@ -42,7 +52,16 @@ export function AdaptiveSessionHero({
         </h2>
         <p className="mt-2 text-base font-medium text-ink sm:text-lg">{subject?.name ?? session.subjectId} · {session.topicTitle}</p>
 
+        <p className="mt-1 text-sm text-ink2">
+          {[brief.paperName, brief.examLabel].filter(Boolean).join(" · ") || "No exam date set"}
+          {brief.marksAtRisk ? ` · ${brief.marksAtRisk} marks at risk here` : ""}
+        </p>
         <p className="mt-1 text-sm text-ink2">{explanation.stakes}</p>
+        {brief.produces.length ? (
+          <p className="mt-1 text-sm text-ink2">
+            This will produce: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
+          </p>
+        ) : null}
 
         {session.stoppedEarly ? (
           <p className="mt-2 text-sm text-ink2" role="note">{session.stoppedEarly.reason}</p>
@@ -77,6 +96,18 @@ export function AdaptiveSessionHero({
                 <span className="min-w-0 font-medium text-ink">{session.reason}</span>
               </li>
             ) : null}
+            {session.intervention ? (
+              <li className="flex gap-2 text-sm leading-6 text-ink2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+                <span className="min-w-0 font-medium text-ink">Best fit: {session.intervention.headline}.</span>
+              </li>
+            ) : null}
+            {session.intervention?.lines.map((line) => (
+              <li key={`i-${line}`} className="flex gap-2 text-sm leading-6 text-ink2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-ink3" aria-hidden="true" />
+                <span className="min-w-0">{line}</span>
+              </li>
+            ))}
             {explanation.lines.map((line) => (
               <li key={line.text} className="flex gap-2 text-sm leading-6 text-ink2">
                 <span

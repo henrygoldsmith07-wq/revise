@@ -13,6 +13,7 @@ adds a new store, migration or sync row.
 | **Improve my answer** | under any non-MCQ part that lost marks in ordinary practice | `src/domain/answer-improvement.ts` |
 | **Exam sprints** of 5, 10, 20, 30, 45 and 60 minutes | `/practice` ("Short on time?") | `src/domain/quick-session.ts` |
 | **Specification evidence** and map | `/readiness/spec` | `src/domain/specification-evidence.ts` |
+| **Trusted coverage** (reviewers) | `/readiness/coverage`, `npm run wjec:coverage` | `src/domain/trusted-coverage.ts`, `src/domain/coverage-queue.ts` |
 
 ## Design decisions
 

@@ -527,7 +527,13 @@ function StepPanel({
 
       {step.kind === "misconception-repair" ? (
         <div className="space-y-3">
-          {mistake ? (
+          {step.focus === "technique" ? (
+            <div className="rounded-[8px] border border-review/40 bg-reviewsoft px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-wide text-review font-semibold">Exam technique</p>
+              <p className="text-sm text-ink mt-1">{step.description}</p>
+              <p className="text-xs text-ink3 mt-1">This is a new question on purpose: the technique only counts as fixed when it works somewhere different.</p>
+            </div>
+          ) : mistake ? (
             <div className="rounded-[8px] border border-danger/30 bg-dangersoft/40 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-wide text-danger font-semibold">The skill to repair</p>
               <p className="text-sm text-ink mt-1">{mistake.description}</p>
