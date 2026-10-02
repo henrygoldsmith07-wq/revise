@@ -28,13 +28,19 @@ export interface CoverageRow {
   topic: string;
   recall: number;
   application: number;
+  /** Trusted application questions at difficulty 4 or above (a subset of `application`). */
+  hardApplication: number;
   transfer: number;
   synoptic: number;
+  /** Trusted questions built to expose a known misconception. */
+  misconception: number;
   authored: number;
   reviewed: number;
   trustedFamilies: number;
   verification: "unverified" | "checked" | "verified";
   missing: string[];
+  /** Strength of the student's own evidence for this statement; "unknown" when not supplied. */
+  studentEvidence: string;
   reviewStatus: StatementReviewStatus;
   lastChecked: string | null;
   fullyCovered: boolean;
@@ -58,6 +64,8 @@ export interface CoverageInput {
   trusted?: (question: Question) => boolean;
   /** Questions that belong to the release set; a statement is release-ready only if all its release items are trusted. */
   release?: (question: Question) => boolean;
+  /** Student evidence status per statement id (from the specification map); optional. */
+  studentEvidence?: ReadonlyMap<Id, string>;
   /** Unit title → paper id, when known. Absent means the paper stays null. */
   paperForUnit?: (unit: Unit) => string | null;
 }
@@ -98,13 +106,16 @@ export function buildCoverageRows(input: CoverageInput): CoverageRow[] {
         topic: topic.title,
         recall: count("recall"),
         application: count("application"),
+        hardApplication: good.filter((q) => q.difficulty >= 4 && depth.get(q.id)?.get(point.id)?.has("application")).length,
         transfer: count("transfer"),
         synoptic: count("synoptic"),
+        misconception: count("misconception"),
         authored: mapped.length,
         reviewed: good.length,
         trustedFamilies: families.size,
         verification,
         missing,
+        studentEvidence: input.studentEvidence?.get(point.id) ?? "unknown",
         reviewStatus: !mapped.length ? "none-authored" : !good.length ? "unreviewed" : good.length < mapped.length ? "partly-reviewed" : "fully-reviewed",
         lastChecked: input.subject.spec?.lastChecked ?? null,
         fullyCovered: missing.length === 0,
@@ -129,7 +140,7 @@ export function coverageMetrics(rows: readonly CoverageRow[]): CoverageMetrics {
 
 /** Header + rows as CSV for reviewers; fields never contain commas or quotes after quoting. */
 export function coverageCsv(rows: readonly CoverageRow[]): string {
-  const head = ["statement", "subject", "unit", "paper", "topic", "recall", "application", "transfer", "synoptic", "authored", "reviewed", "families", "verification", "missing", "review", "lastChecked", "fullyCovered", "releaseReady"];
+  const head = ["statement", "subject", "unit", "paper", "topic", "recall", "application", "hardApplication", "transfer", "misconception", "synoptic", "authored", "reviewed", "families", "verification", "missing", "studentEvidence", "review", "lastChecked", "fullyCovered", "releaseReady"];
   const q = (v: string | number | boolean | null) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  return [head.join(","), ...rows.map((r) => [r.ref, r.subjectId, r.unit, r.paper, r.topic, r.recall, r.application, r.transfer, r.synoptic, r.authored, r.reviewed, r.trustedFamilies, r.verification, r.missing.join(" "), r.reviewStatus, r.lastChecked, r.fullyCovered, r.releaseReady].map(q).join(","))].join("\n");
+  return [head.join(","), ...rows.map((r) => [r.ref, r.subjectId, r.unit, r.paper, r.topic, r.recall, r.application, r.hardApplication, r.transfer, r.misconception, r.synoptic, r.authored, r.reviewed, r.trustedFamilies, r.verification, r.missing.join(" "), r.studentEvidence, r.reviewStatus, r.lastChecked, r.fullyCovered, r.releaseReady].map(q).join(","))].join("\n");
 }

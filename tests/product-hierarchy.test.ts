@@ -6,23 +6,28 @@ import { traceTransition } from "@/domain/adaptive-trace";
 const ROOT = join(__dirname, "..");
 
 describe("product hierarchy", () => {
-  it("keeps one primary loop: Today first, Today and Session with manual tools, secondary subordinate", () => {
+  it("keeps three destinations: Today first, then Subjects and Progress, with manual tools subordinate", () => {
     const shell = readFileSync(join(ROOT, "src/components/AppShell.tsx"), "utf8");
-    // Two direct primary actions and one Tools menu.
-    expect(shell).toContain("grid-cols-3");
+    // Three direct destinations and one Tools menu.
+    expect(shell).toContain("grid-cols-4");
     expect(shell).toContain('label: "Today"');
-    expect(shell).toContain('href: "/adaptive-session", label: "Session"');
-    expect((shell.match(/primary: true/g) ?? [])).toHaveLength(2);
+    expect(shell).toContain('href: "/library", label: "Subjects"');
+    expect(shell).toContain('href: "/readiness", label: "Progress"');
+    expect((shell.match(/primary: true/g) ?? [])).toHaveLength(3);
+    // Session stays reachable but is no longer a top-level destination.
+    expect(shell).not.toMatch(/label: "Session", Icon: [A-Za-z]+, primary: true/);
     expect(shell).toContain("Tools");
     const todayIndex = shell.indexOf('label: "Today"');
     const reviewIndex = shell.indexOf('label: "Review"');
     expect(todayIndex).toBeGreaterThanOrEqual(0);
     expect(todayIndex).toBeLessThan(reviewIndex);
     // Secondary systems exist but are not primary thumb-reach actions.
-    for (const label of ["Readiness", "Schedule", "Library", "Settings"]) {
+    for (const label of ["Session", "Review", "Study", "Lessons", "Practice", "Past papers", "Schedule", "Settings"]) {
       expect(shell).toContain(`label: "${label}"`);
     }
-    expect(shell).not.toMatch(/label: "Readiness", Icon: [A-Za-z]+, primary: true/);
+    for (const label of ["Review", "Practice", "Schedule", "Settings"]) {
+      expect(shell).not.toMatch(new RegExp(`label: "${label}", Icon: [A-Za-z]+, primary: true`));
+    }
   });
 
   it("renders the highest-value task before analytics on Today", () => {

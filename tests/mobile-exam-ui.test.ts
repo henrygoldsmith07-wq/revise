@@ -51,11 +51,11 @@ describe("mobile exam UI contracts", () => {
     }
   });
 
-  it("keeps Today, Session and Tools on one row", () => {
+  it("keeps Today, Subjects, Progress and Tools on one row", () => {
     const shell = read("src/components/AppShell.tsx");
     const primaryCount = (shell.match(/primary: true/g) ?? []).length;
-    expect(primaryCount).toBe(2);
-    expect(shell).toContain("grid grid-cols-3");
+    expect(primaryCount).toBe(3);
+    expect(shell).toContain("grid grid-cols-4");
     expect(shell).not.toContain("grid grid-cols-5");
   });
 });

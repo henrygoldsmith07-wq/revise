@@ -1,3 +1,5 @@
+import { diagnoseAttemptErrors } from "./error-diagnosis-plan";
+import { ERROR_CONFIDENCE_THRESHOLD } from "./error-taxonomy";
 import { matchMisconception } from "./misconception-library";
 import { createCard } from "./scheduling";
 import { advanceMistakeRepair, repairTargetParts, REPAIR_STAGE_LABELS } from "./repair-evidence";
@@ -132,6 +134,7 @@ export function mistakesFromAttempt(
   const drafts: MistakeDraft[] = [];
   const topicId = question.topicIds[0] ?? attempt.topicIds[0];
   if (!topicId) return drafts;
+  const diagnosis = diagnoseAttemptErrors({ question, marked: attempt.marked, answers: attempt.answers });
 
   for (const marked of attempt.marked) {
     if (marked.awarded >= marked.max) continue;
@@ -153,6 +156,9 @@ export function mistakesFromAttempt(
         ? [{ attemptId: attempt.id, questionId: question.id, at: attempt.createdAt, stage: "diagnosed" as const }]
         : []),
     ];
+    // Keep the cause only when the diagnosis is confident; ambiguous errors stay broad.
+    const diagnosed = diagnosis.parts.find((row) => row.partId === marked.partId);
+    const confidentCause = diagnosed && diagnosed.category !== "other" && diagnosed.confidence >= ERROR_CONFIDENCE_THRESHOLD ? diagnosed : null;
     const mistake: Mistake = {
       id: mistakeId,
       userId: attempt.userId,
@@ -168,6 +174,7 @@ export function mistakesFromAttempt(
       misconception: detectMisconception(marked.missedPoints),
       ...(misconceptionMatch ? { misconceptionEntryId: misconceptionMatch.entry.id } : {}),
       ...(ao ? { ao } : {}),
+      ...(confidentCause ? { errorCategory: confidentCause.category, errorConfidence: Math.round(confidentCause.confidence * 100) / 100 } : {}),
       difficultyAtLoss: question.difficulty,
       marksLost,
       ...(attempt.elapsedMs ? { secondsSpent: Math.round(attempt.elapsedMs / Math.max(1, attempt.marked.length) / 1000) } : {}),

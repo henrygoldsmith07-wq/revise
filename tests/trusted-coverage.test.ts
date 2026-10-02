@@ -41,6 +41,17 @@ describe("trusted coverage", () => {
     const gated = buildCoverageRows({ subject, topics, units, questions: bank, trusted: all, release: all })[0]!;
     expect(gated.releaseReady).toBe(true);
   });
+  it("counts misconception and harder-application coverage only from trusted items", () => {
+    const extra = [...bank, q("m", "misconception", "f5"), { ...q("h", "application", "f6"), difficulty: 4 } as Question, { ...q("h2", "application", "f7"), difficulty: 4 } as Question];
+    const onlyTrusted = buildCoverageRows({ subject, topics, units, questions: extra, trusted: (x) => ["m", "h"].includes(x.id) })[0]!;
+    expect(onlyTrusted).toMatchObject({ misconception: 1, hardApplication: 1, application: 1 });
+    expect(buildCoverageRows({ subject, topics, units, questions: extra, trusted: () => false })[0]).toMatchObject({ misconception: 0, hardApplication: 0 });
+  });
+  it("reports student evidence per statement and leaves it unknown when absent", () => {
+    const withEvidence = buildCoverageRows({ subject, topics, units, questions: bank, trusted: () => true, studentEvidence: new Map([["sp1", "secure"]]) });
+    expect(withEvidence[0]!.studentEvidence).toBe("secure");
+    expect(withEvidence[1]!.studentEvidence).toBe("unknown");
+  });
   it("exports a quoted CSV", () => {
     const csv = coverageCsv(rows(() => true));
     expect(csv.split("\n")).toHaveLength(3);

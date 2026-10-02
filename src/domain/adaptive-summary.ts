@@ -31,6 +31,10 @@ export interface AdaptiveRunSummary {
   bestNext: string;
   /** Marks earned across the run's question rungs (0/0 when none ran). */
   marks: { awarded: number; max: number };
+  /** How strong this session's success is as evidence, by kind. Counts, never a score. */
+  evidenceStrength: { independent: number; hinted: number; missed: number; unfamiliar: number; scheduledDelay: boolean; line: string };
+  /** What happens next, as a machine-readable kind for the closure screen. */
+  next: "repair-mistakes" | "revisit-fragile" | "unfamiliar-check" | "delayed-retest" | "move-on";
 }
 
 const RUNG_LABELS: Partial<Record<AdaptiveStepKind, string>> = {
@@ -143,5 +147,25 @@ export function summariseAdaptiveRun(input: {
     bestNext = "Move to the next best topic — this one has earned a delay before more practice.";
   }
 
-  return { improved, fragile, repaired: repairedLines, later, learned, bestNext, marks };
+  const unfamiliar = questionPasses.filter((record) => record.kind === "transfer").length;
+  const scheduledDelay = scheduledLater.length > 0;
+  const parts = [
+    questionPasses.length ? `${questionPasses.length} unaided success${questionPasses.length === 1 ? "" : "es"}` : "",
+    assistedPasses.length ? `${assistedPasses.length} with a hint (weaker evidence)` : "",
+    questionMisses.length ? `${questionMisses.length} missed` : "",
+    unfamiliar ? `${unfamiliar} on an unfamiliar question` : "",
+  ].filter(Boolean);
+  const line = parts.length
+    ? `${parts.join(", ")}. ${scheduledDelay ? "A delayed check is scheduled." : "No delayed check yet, so nothing is proven."}`
+    : "No questions were answered, so this session adds no new evidence.";
+
+  const next: AdaptiveRunSummary["next"] = openMistakeIds.length ? "repair-mistakes"
+    : fragiles.length ? "revisit-fragile"
+    : !unfamiliar && questionPasses.length ? "unfamiliar-check"
+    : !scheduledDelay ? "delayed-retest" : "move-on";
+
+  return {
+    improved, fragile, repaired: repairedLines, later, learned, bestNext, marks, next,
+    evidenceStrength: { independent: questionPasses.length, hinted: assistedPasses.length, missed: questionMisses.length, unfamiliar, scheduledDelay, line },
+  };
 }

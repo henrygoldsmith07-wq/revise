@@ -8,6 +8,7 @@
 // explanation or re-answering the same question never counts.
 // ---------------------------------------------------------------------------
 
+import type { ErrorCategory } from "./error-taxonomy";
 import { independentAttempt, questionFamilies } from "./learning-evidence";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
@@ -20,6 +21,8 @@ export type RootCause =
   | "insufficient-explanation"
   | "poor-evaluation"
   | "incomplete-working"
+  | "command-word-error"
+  | "poor-application"
   | "misread-question"
   | "timing"
   | "prerequisite-weakness"
@@ -34,6 +37,8 @@ export const ROOT_CAUSE_LABEL: Record<RootCause, string> = {
   "insufficient-explanation": "correct ideas without enough explanation or linking",
   "poor-evaluation": "weak evaluation",
   "incomplete-working": "incomplete working",
+  "command-word-error": "not doing what the command word asks",
+  "poor-application": "knowing the idea but not applying it to the question",
   "misread-question": "misreading the question",
   timing: "running short of time",
   "prerequisite-weakness": "a weak prerequisite",
@@ -51,6 +56,8 @@ const INTERVENTION_FOR: Record<RootCause, PatternIntervention> = {
   "insufficient-explanation": "technique-intervention",
   "poor-evaluation": "technique-intervention",
   "incomplete-working": "technique-intervention",
+  "command-word-error": "technique-intervention",
+  "poor-application": "independent-set",
   "misread-question": "technique-intervention",
   timing: "timed-sprint",
   "prerequisite-weakness": "prerequisite-repair",
@@ -58,6 +65,32 @@ const INTERVENTION_FOR: Record<RootCause, PatternIntervention> = {
 };
 
 const EVALUATIVE = new Set(["evaluate", "assess", "discuss", "justify", "compare"]);
+
+const FROM_ERROR_CATEGORY: Partial<Record<ErrorCategory, RootCause>> = {
+  "knowledge-gap": "missing-knowledge",
+  misconception: "misunderstood-concept",
+  "formula-selection": "wrong-method",
+  calculation: "arithmetic-slip",
+  "unit-error": "unit-error",
+  terminology: "insufficient-explanation",
+  "insufficient-detail": "insufficient-explanation",
+  "command-word": "command-word-error",
+  application: "poor-application",
+  reasoning: "insufficient-explanation",
+  "careless-error": "arithmetic-slip",
+};
+
+// Tags come from keyword matching on every mistake ("other" by default), so only
+// "conceptual" or a matched library entry means a real misconception.
+const FROM_TAG: Partial<Record<NonNullable<Mistake["misconception"]>, RootCause>> = {
+  units: "unit-error",
+  "significant-figures": "arithmetic-slip",
+  rearrangement: "wrong-method",
+  "substitution-slips": "wrong-method",
+  "method-skipped": "incomplete-working",
+  "misread-command": "misread-question",
+  conceptual: "misunderstood-concept",
+};
 
 export function rootCauseOf(mistake: Mistake, opts: { prerequisiteWeakTopics?: ReadonlySet<Id> } = {}): RootCause {
   switch (mistake.workingErrorKind) {
@@ -70,7 +103,11 @@ export function rootCauseOf(mistake: Mistake, opts: { prerequisiteWeakTopics?: R
     case "contradictory-working": return "incomplete-working";
     default: break;
   }
-  if (mistake.misconception || mistake.misconceptionEntryId) return "misunderstood-concept";
+  const diagnosed = mistake.errorCategory ? FROM_ERROR_CATEGORY[mistake.errorCategory] : undefined;
+  if (diagnosed) return diagnosed;
+  if (mistake.misconceptionEntryId) return "misunderstood-concept";
+  const tagged = mistake.misconception ? FROM_TAG[mistake.misconception] : undefined;
+  if (tagged) return tagged;
   if (opts.prerequisiteWeakTopics?.has(mistake.topicId) && (mistake.category === "recall" || mistake.category === "method")) return "prerequisite-weakness";
   switch (mistake.category) {
     case "recall": return "missing-knowledge";
