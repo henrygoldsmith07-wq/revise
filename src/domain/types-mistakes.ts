@@ -2,6 +2,7 @@
 //
 // Part of the domain model (see ./types.ts barrel). Split by bounded
 // context for ownership; every name is re-exported from "@/domain/types".
+import type { ErrorCategory } from "./error-taxonomy";
 import type { Id, IsoInstant } from "./types-base";
 import type { AoCode } from "./types-curriculum";
 import type { MistakeRepairState } from "./types-questions";
@@ -48,6 +49,9 @@ export interface Mistake {
   /** Physics working diagnosis, when a calculation response was analysable. */
   firstIncorrectStep?: number;
   workingErrorKind?: WorkingErrorKind;
+  /** Why the mark was lost, from the error diagnosis; only stored when the diagnosis was confident. */
+  errorCategory?: ErrorCategory;
+  errorConfidence?: number;
   cardId?: Id;
   resolved: boolean;
   createdAt: IsoInstant;

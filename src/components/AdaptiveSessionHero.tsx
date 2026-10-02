@@ -56,7 +56,7 @@ export function AdaptiveSessionHero({
           {[brief.paperName, brief.examLabel].filter(Boolean).join(" · ") || "No exam date set"}
           {brief.marksAtRisk ? ` · ${brief.marksAtRisk} marks at risk here` : ""}
         </p>
-        <p className="mt-1 text-sm text-ink2">{explanation.stakes}</p>
+        {brief.provisional ? <p className="mt-1 text-sm text-ink2" role="note">{brief.provisional}</p> : <p className="mt-1 text-sm text-ink2">{explanation.stakes}</p>}
         {brief.produces.length ? (
           <p className="mt-1 text-sm text-ink2">
             This will produce: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}

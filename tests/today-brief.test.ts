@@ -41,6 +41,14 @@ describe("today brief", () => {
     expect(b.produces).toHaveLength(4);
     expect(b.doesNotProve).toBeNull();
   });
+  it("is honest that a pick with no marked answers is provisional, and says what it was based on", () => {
+    const cold = { ...plan("overdue-retrieval"), evidence: { attempts: 0 } } as AdaptiveSessionPlan;
+    expect(buildTodayBrief({ plan: cold, papers: [paper(18)], now: NOW }).provisional).toMatch(/exam date and how much of the specification/);
+    expect(buildTodayBrief({ plan: cold, now: NOW }).provisional).toMatch(/chosen from how much of the specification/);
+    const evidenced = { ...plan("overdue-retrieval"), evidence: { attempts: 6 } } as AdaptiveSessionPlan;
+    expect(buildTodayBrief({ plan: evidenced, now: NOW }).provisional).toBeNull();
+    expect(buildTodayBrief({ plan: cold, mistakes: [mistake(2)], now: NOW }).provisional).toBeNull();
+  });
   it("labels past and same-day exams", () => {
     expect(countdownLabel(-2)).toBe("Exam date has passed");
     expect(countdownLabel(0)).toBe("Exam today");

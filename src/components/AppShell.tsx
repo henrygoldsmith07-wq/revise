@@ -28,7 +28,7 @@ import { SearchOverlay } from "./SearchOverlay";
 import { useShortcuts } from "./shortcuts";
 import { Onboarding } from "./Onboarding";
 
-// Today and Session are the primary loop; manual tools keep direct routes.
+// Today, Subjects and Progress are the three destinations; manual tools keep direct routes.
 // Navigation is verb-first: every destination is something the student does,
 // not a noun they browse. "Today" is always first because the product's whole
 // claim is that it knows what you should do next.
@@ -42,10 +42,13 @@ type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolea
 
 const TODAY_NAV: NavItem[] = [
   { href: "/", label: "Today", Icon: TodayIcon, primary: true },
-  { href: "/adaptive-session", label: "Session", Icon: PracticeIcon, primary: true },
+  { href: "/library", label: "Subjects", Icon: LibraryIcon, primary: true },
+  { href: "/readiness", label: "Progress", Icon: ProgressIcon, primary: true },
 ];
 
+// Manual tools stay one tap away but no longer compete with the three destinations.
 const STUDY_NAV: NavItem[] = [
+  { href: "/adaptive-session", label: "Session", Icon: PracticeIcon },
   { href: "/review", label: "Review", Icon: ReviewIcon },
   { href: "/study", label: "Study", Icon: ModesIcon },
   { href: "/lesson", label: "Lessons", Icon: LessonsIcon },
@@ -54,17 +57,15 @@ const STUDY_NAV: NavItem[] = [
 ];
 
 const MANAGEMENT_NAV: NavItem[] = [
-  { href: "/readiness", label: "Readiness", Icon: ProgressIcon },
   { href: "/schedule", label: "Schedule", Icon: PlanIcon },
-  { href: "/library", label: "Library", Icon: LibraryIcon },
   { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
 const NAV = [...TODAY_NAV, ...STUDY_NAV, ...MANAGEMENT_NAV];
 const DESKTOP_NAV_GROUPS = [
   { label: null, items: TODAY_NAV },
-  { label: "Choose your own", items: STUDY_NAV },
-  { label: "Plan & progress", items: MANAGEMENT_NAV },
+  { label: "More tools", items: STUDY_NAV },
+  { label: null, items: MANAGEMENT_NAV },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -176,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 px-2" aria-label="Main">
           {DESKTOP_NAV_GROUPS.map((group, groupIndex) => (
-            <div key={group.label ?? "today"} className={groupIndex ? "mt-4" : ""}>
+            <div key={group.label ?? `group-${groupIndex}`} className={groupIndex ? "mt-4" : ""}>
               {group.label ? (
                 <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3">
                   {group.label}
@@ -272,7 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line elev-nav pb-safe"
         aria-label="Primary sections (mobile)"
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {NAV.filter((item) => item.primary).map((item) => (
             <Link
               key={item.href}
@@ -296,7 +297,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Tools
             </summary>
             <div className="absolute bottom-full right-2 mb-2 w-56 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
-              <p className="px-3 py-2 text-xs text-ink3">Choose your own</p>
+              <p className="px-3 py-2 text-xs text-ink3">More tools</p>
               {[...STUDY_NAV, ...MANAGEMENT_NAV].map((item) => (
                 <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
                   aria-current={isActive(item.href) ? "page" : undefined}

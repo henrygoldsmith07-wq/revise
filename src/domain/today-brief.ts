@@ -21,6 +21,8 @@ export interface TodayBrief {
   /** What finishing the session will, and will not, prove. */
   produces: string[];
   doesNotProve: string | null;
+  /** Set when the pick is not yet backed by this learner's own marked answers. */
+  provisional: string | null;
 }
 
 const EVIDENCE: Partial<Record<AdaptiveStepKind, string>> = {
@@ -69,7 +71,15 @@ export function buildTodayBrief(input: {
   const produces = [...new Set(plan.steps.map((step) => EVIDENCE[step.kind]).filter((text): text is string => !!text))];
   const guidedOnly = kinds.has("supported-practice") && !kinds.has("independent-application") && !kinds.has("transfer");
 
+  const basis = daysToExam !== null && daysToExam >= 0
+    ? "the exam date and how much of the specification this topic covers"
+    : "how much of the specification this topic covers";
+  const provisional = plan.evidence.attempts === 0 && open.length === 0
+    ? `Provisional: you have no marked answers on this topic yet, so it was chosen from ${basis}. Your answers will sharpen the next suggestion.`
+    : null;
+
   return {
+    provisional,
     paperName: owning?.name ?? null,
     daysToExam,
     examLabel: countdownLabel(daysToExam),
