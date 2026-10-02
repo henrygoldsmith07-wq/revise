@@ -11,6 +11,7 @@ import { trustedAssessmentContent } from "./physics-content-review";
 import type { Attempt, Id, Question } from "./types";
 
 import type { AdaptiveSessionInput, AdaptiveSessionPlan } from "./adaptive-contract";
+import { chooseIntervention, interventionContextFor } from "./adaptive-intervention";
 import { buildSteps, learningActionStep, reasonFor } from "./adaptive-sequence";
 import { scoreTopic, trustedAdaptiveEvidence } from "./adaptive-scoring";
 import { exposureWeights } from "./evidence-weights";
@@ -124,6 +125,10 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
   assertBudgetNotExceeded(steps, targetMinutes, `buildAdaptiveSession:${topic.id}`);
   const startHref = `/adaptive-session?topic=${encodeURIComponent(topic.id)}&start=1`;
   const key = `${today}:${topic.id}`;
+  const intervention = chooseIntervention(interventionContextFor({
+    topic, selected, profile, questions, attempts, mistakes, share: shares.get(topic.id) ?? 0,
+    allAttempts: input.attempts, reviewLogs: input.reviewLogs, now,
+  }), targetMinutes);
 
   return {
     key,
@@ -137,6 +142,7 @@ export function buildAdaptiveSession(input: AdaptiveSessionInput): AdaptiveSessi
     evidence: selected.evidence,
     steps,
     startHref,
+    ...(intervention ? { intervention } : {}),
     ...(mapped ? { learningPolicy: "capability-evidence-v1" as const } : {}),
     ...(stop.stop && stop.reason ? { stoppedEarly: { reason: stop.reason } } : {}),
   };

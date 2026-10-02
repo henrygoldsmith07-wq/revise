@@ -153,3 +153,41 @@ export function fatigueLock(minutesIntoSession: number): { locked: boolean; mess
   if (minutesIntoSession <= FATIGUE_LOCK_MINUTES) return null;
   return { locked: true, message: FATIGUE_MESSAGE };
 }
+
+/** A gap longer than this ends the current study block. */
+export const SESSION_GAP_MINUTES = 30;
+
+/**
+ * Minutes of continuous study ending now, from timed attempts and card reviews.
+ * Only the latest unbroken block counts; a block that ended over a gap of
+ * SESSION_GAP_MINUTES before `now` means the learner is fresh.
+ */
+export function recentActiveMinutes(
+  events: ReadonlyArray<{ at: string; elapsedMs: number }>,
+  now: Date,
+): number {
+  const gap = SESSION_GAP_MINUTES * 60_000;
+  const points = events
+    .map((e) => ({ end: Date.parse(e.at), ms: Number.isFinite(e.elapsedMs) ? Math.max(0, e.elapsedMs) : 0 }))
+    .filter((e) => Number.isFinite(e.end) && e.end <= now.getTime())
+    .sort((a, b) => b.end - a.end);
+  if (!points.length || now.getTime() - points[0]!.end > gap) return 0;
+  let total = 0;
+  let previousStart = now.getTime();
+  for (const p of points) {
+    if (previousStart - p.end > gap) break;
+    total += p.ms;
+    previousStart = p.end - p.ms;
+  }
+  return total / 60_000;
+}
+
+/** 0–1 fatigue from this block's length and the local hour, compounding. */
+export function currentFatigue(
+  events: ReadonlyArray<{ at: string; elapsedMs: number }>,
+  now: Date,
+): number {
+  const s = sessionFatigue(recentActiveMinutes(events, now));
+  const c = circadianFatigue(now.getHours());
+  return Math.round((1 - (1 - s) * (1 - c)) * 100) / 100;
+}

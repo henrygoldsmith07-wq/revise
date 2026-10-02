@@ -5,6 +5,9 @@ import { getSubject } from "@/domain/curriculum";
 import { useStoreFields } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
 import { MarksAtRiskPanel } from "@/components/MarksAtRiskPanel";
+import { PaperReadinessPanel } from "@/components/PaperReadinessPanel";
+import { MistakePatternsPanel } from "@/components/MistakePatternsPanel";
+import { RecommendationAuditPanel } from "@/components/RecommendationAuditPanel";
 import { ProofPanel } from "@/components/ProofPanel";
 import { GradePredictionRealityPanel } from "@/components/GradePredictionRealityPanel";
 import {
@@ -33,9 +36,15 @@ export default function ReadinessPage() {
 
       <ExamReadinessCard />
 
+      <PaperReadinessPanel />
+
       <ProofPanel />
 
+      <RecommendationAuditPanel />
+
       <MarksAtRiskPanel />
+
+      <MistakePatternsPanel />
 
       <GradePredictionRealityPanel />
 
@@ -66,10 +75,13 @@ export default function ReadinessPage() {
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
             <ButtonLink href="/twin" size="sm" variant="primary">Open Digital Twin</ButtonLink>
+            <ButtonLink href="/diagnostic" size="sm">Starting diagnostic</ButtonLink>
             {weakestSubject ? <ButtonLink href={`/practice?subject=${encodeURIComponent(weakestSubject.id)}`} size="sm">Practise {weakestSubject.name}</ButtonLink> : null}
           </div>
         </div>
       </Panel>
+
+      <p className="text-xs text-ink3">Reviewing content? See <Link href="/readiness/coverage" className="underline">trusted coverage</Link>.</p>
 
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer text-sm font-semibold text-ink">How the passport is scored</summary>

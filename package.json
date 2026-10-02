@@ -24,6 +24,7 @@
     "wjec:review:apply": "node scripts/apply-wjec-review-ledger.mjs",
     "wjec:prerequisite:batch": "node scripts/export-wjec-prerequisite-batch.mjs",
     "wjec:prerequisite:apply": "node scripts/apply-wjec-prerequisite-ledger.mjs",
+    "wjec:coverage": "node scripts/report-trusted-coverage.mjs",
     "wjec:trust:report": "node scripts/report-flagship-trust.mjs",
     "wjec:trust:check": "node scripts/report-flagship-trust.mjs --check",
     "wjec:authoring:gaps": "node scripts/report-wjec-authoring-gaps.mjs",

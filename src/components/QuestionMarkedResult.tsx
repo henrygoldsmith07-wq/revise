@@ -11,6 +11,7 @@ import type { RemediationPlan } from "@/domain/remediation";
 import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/domain/types";
 
 import { ImproveAnswer } from "./ImproveAnswer";
+import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { RichText } from "./RichText";
 import { Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
@@ -20,7 +21,10 @@ export function MarkedResult({
   result,
   awarded,
   improvableAnswers,
+  answers,
 }: {
+  /** Submitted answers by part id, used for long-answer feedback. */
+  answers?: Record<string, string>;
   question: Question;
   /** Original answers by part id. When set, parts that lost marks offer a guided rewrite. */
   improvableAnswers?: Record<string, string>;
@@ -214,6 +218,16 @@ export function MarkedResult({
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {answers && part && question.kind !== "mcq" && marked.max >= 4 ? (
+                <LongAnswerFeedbackCard
+                  question={question}
+                  part={part}
+                  marked={marked}
+                  answer={answers[part.id] ?? ""}
+                  markConfidence={result.confidence}
+                  escalated={Boolean(result.escalation)}
+                />
               ) : null}
               {improvableAnswers && part && question.kind !== "mcq" && marked.awarded < marked.max ? (
                 <ImproveAnswer question={question} part={part} marked={marked} original={improvableAnswers[part.id] ?? ""} />

@@ -9,6 +9,7 @@ import type { HintTier } from "./hints";
 import type { Id, Question, RecallGrade, InterventionAttemptContext } from "./types";
 
 import { STEP_LABELS, DONE_REASON_BUDGET, DONE_REASON_EVIDENCE, DONE_REASON_CAPPED, type AdaptiveReplanInput, type AdaptiveReplan, type AdaptiveStepResult, type AdaptiveStepKind, type AdaptiveSessionPlan, type AdaptiveSessionStep } from "./adaptive-contract";
+import { buildMistakePatterns } from "./mistake-patterns";
 import { learningActionStep, practiceHref } from "./adaptive-sequence";
 import { trustedAdaptiveEvidence } from "./adaptive-scoring";
 
@@ -298,17 +299,34 @@ export function replanAdaptiveSession(input: AdaptiveReplanInput): AdaptiveRepla
     // resolve it. Otherwise it runs as a supported re-application that re-tests
     // the same idea in a new attempt; contrast copy still precedes it.
     const target = openWithoutRepair[0];
-    const sourceQuestion = target?.questionId
-      ? ordered.find((candidate) => candidate.id === target.questionId)
-      : undefined;
-    const question = sourceQuestion ?? pickQuestion("supported", "retry");
-    const canResolve = Boolean(sourceQuestion);
-    pushQuestionStep("misconception-repair", repairRecords.length + 1, question, {
-      support: "independent",
-      hintBudget: 0,
-      ...(canResolve && target ? { mistakeId: target.id } : {}),
-    });
-    reason = "A dropped mark exposed a misconception — contrast it and re-earn the point independently before anything new.";
+    // Recurring technique errors (units, working, linking, command words) are not
+    // fixed by re-teaching content: practise the technique on a different question.
+    const technique = buildMistakePatterns({ mistakes: openWithoutRepair, attempts, questions })
+      .find((row) => row.recurring && row.intervention === "technique-intervention" && target && row.mistakeIds.includes(target.id));
+    const techniqueQuestion = technique ? pickQuestion("independent", "fresh") ?? pickQuestion("supported", "fresh") : undefined;
+    if (technique && techniqueQuestion) {
+      pushQuestionStep("misconception-repair", repairRecords.length + 1, techniqueQuestion, { support: "independent", hintBudget: 0 });
+      const step = steps.at(-1);
+      if (step) {
+        step.focus = "technique";
+        step.label = "Fix the exam technique";
+        step.description = technique.headline;
+        step.why = "The same technique error keeps costing marks across questions. Re-teaching the content would not fix it; a different question will test whether it has.";
+      }
+      reason = "The same technique error has recurred — practise it on a different question instead of re-teaching the content.";
+    } else {
+      const sourceQuestion = target?.questionId
+        ? ordered.find((candidate) => candidate.id === target.questionId)
+        : undefined;
+      const question = sourceQuestion ?? pickQuestion("supported", "retry");
+      const canResolve = Boolean(sourceQuestion);
+      pushQuestionStep("misconception-repair", repairRecords.length + 1, question, {
+        support: "independent",
+        hintBudget: 0,
+        ...(canResolve && target ? { mistakeId: target.id } : {}),
+      });
+      reason = "A dropped mark exposed a misconception — contrast it and re-earn the point independently before anything new.";
+    }
   }
 
   // --- C. Repeated failure on this topic ⇒ short prerequisite detour.

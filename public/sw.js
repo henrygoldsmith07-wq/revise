@@ -16,6 +16,7 @@ const APP_SHELL = [
   "/papers",
   "/practice",
   "/readiness",
+  "/diagnostic",
   "/review",
   "/schedule",
   "/settings",

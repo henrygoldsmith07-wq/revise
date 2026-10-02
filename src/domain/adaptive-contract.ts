@@ -4,6 +4,7 @@ import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
 import type { ExamReadiness } from "./exam-readiness";
 import type { AdaptiveEvidence } from "./adaptive-scoring";
+import type { PlanIntervention } from "./adaptive-intervention";
 import type { ProofLedger } from "./proof-of-improvement";
 import type { Attempt, Card, ExamDate, Id, Mistake, Question, ReviewLog, Topic, TopicMastery, InterventionAttemptContext, InterventionOutcomeRecord } from "./types";
 
@@ -57,6 +58,8 @@ export interface AdaptiveSessionStep {
   /** How this rung must be run (hints on/off); independent rungs carry 0 budget. */
   params?: AdaptiveStepParams;
   capabilityId?: Id;
+  /** Set when the block targets a recurring exam-technique error rather than content. */
+  focus?: "technique";
   teaching?: boolean;
   /** Evidence context attached to the attempt for effect calibration. */
   intervention?: InterventionAttemptContext;
@@ -78,6 +81,8 @@ export interface AdaptiveSessionPlan {
   startHref: string;
   /** Set when readiness evidence already proves this topic — core rungs dropped. */
   stoppedEarly?: { reason: string };
+  /** Ranked intervention for this topic, with a student-facing explanation. */
+  intervention?: PlanIntervention;
   /** Replan one mapped skill action after every submitted answer. */
   learningPolicy?: "capability-evidence-v1";
 }
