@@ -89,7 +89,7 @@ export default function ReadinessPage() {
         </div>
       </Panel>
 
-      <p className="text-xs text-ink3">Reviewing content? See <Link href="/readiness/coverage" className="underline">trusted coverage</Link>.</p>
+      <p className="text-xs text-ink3">Reviewing content? See <Link href="/readiness/trusted-coverage" className="underline">trusted coverage</Link>.</p>
 
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer text-sm font-semibold text-ink">How the passport is scored</summary>
