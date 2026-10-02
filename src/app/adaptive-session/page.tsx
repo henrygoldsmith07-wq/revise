@@ -804,6 +804,7 @@ function AdaptiveComplete({
             tone="accent"
           />
         ) : null}
+        <SummarySection title="Evidence strength" lines={[summary.evidenceStrength.line]} />
         <SummarySection title="Improved" lines={summary.improved} />
         <SummarySection title="Still fragile" lines={summary.fragile} />
         <SummarySection title="Repaired" lines={summary.repaired} />

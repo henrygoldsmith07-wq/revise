@@ -19,11 +19,34 @@ const att = (id: string, questionId: string, awarded: number, o: Partial<Attempt
 describe("root causes", () => {
   it("maps working errors, misconceptions and categories", () => {
     expect(rootCauseOf(mk("a", { workingErrorKind: "unit-error" }))).toBe("unit-error");
-    expect(rootCauseOf(mk("a", { misconception: "units" as Mistake["misconception"] }))).toBe("misunderstood-concept");
+    expect(rootCauseOf(mk("a", { misconception: "units" }))).toBe("unit-error");
+    expect(rootCauseOf(mk("a", { misconception: "conceptual" }))).toBe("misunderstood-concept");
+    expect(rootCauseOf(mk("a", { misconceptionEntryId: "lib-1" }))).toBe("misunderstood-concept");
     expect(rootCauseOf(mk("a", { category: "communication", command: "evaluate" }))).toBe("poor-evaluation");
     expect(rootCauseOf(mk("a", { category: "communication", command: "explain" }))).toBe("insufficient-explanation");
     expect(rootCauseOf(mk("a", { category: "unclassified", timing: "rushed" }))).toBe("timing");
     expect(rootCauseOf(mk("a", { category: "recall" }), { prerequisiteWeakTopics: new Set(["t1"]) })).toBe("prerequisite-weakness");
+  });
+});
+
+describe("root cause from real mistake data", () => {
+  it("does not read the default 'other' tag as a misconception", () => {
+    expect(rootCauseOf(mk("a", { misconception: "other", category: "recall" }))).toBe("missing-knowledge");
+    expect(rootCauseOf(mk("a", { misconception: "other", category: "method" }))).toBe("wrong-method");
+  });
+  it("prefers a confident stored diagnosis over keyword tags", () => {
+    expect(rootCauseOf(mk("a", { misconception: "units", errorCategory: "command-word", category: "method" }))).toBe("command-word-error");
+    expect(rootCauseOf(mk("a", { errorCategory: "application", category: "recall" }))).toBe("poor-application");
+    expect(rootCauseOf(mk("a", { errorCategory: "knowledge-gap", category: "method" }))).toBe("missing-knowledge");
+  });
+  it("routes command-word and application causes to different interventions", () => {
+    const patterns = buildMistakePatterns({
+      mistakes: [mk("1", { errorCategory: "command-word", questionId: "x1" }), mk("2", { errorCategory: "command-word", questionId: "x2", createdAt: "2026-09-04T10:00:00.000Z" }),
+        mk("3", { errorCategory: "application", questionId: "x3" })],
+      attempts: [], questions: [],
+    });
+    expect(patterns.find((row) => row.cause === "command-word-error")).toMatchObject({ intervention: "technique-intervention", recurring: true });
+    expect(patterns.find((row) => row.cause === "poor-application")?.intervention).toBe("independent-set");
   });
 });
 
