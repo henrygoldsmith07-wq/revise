@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { classifyTopic } from "@/domain/topic-status";
+import { LEARNER_STATE_TONE } from "@/domain/learner-state";
 import type { TopicMastery } from "@/domain/types";
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
@@ -71,16 +72,17 @@ describe("classifyTopic — plain language, not just FSRS numbers", () => {
 describe("Library per-topic rows", () => {
   const source = src("src/app/library/page.tsx");
 
-  it("every topic row leads with the plain-language tag and keeps numbers as detail", () => {
-    expect(source).toContain("TopicStatusTag");
-    expect(source).toContain("classifyTopic(mastery)");
-    expect(source).toContain("status.explanation");
+  it("every topic row leads with one of the six learner words and keeps the reason on tap", () => {
+    expect(source).toContain("LearnerStateTag");
+    expect(source).toContain("stateByTopic.get(row.id)");
+    expect(source).toContain("topicLifecycle(");
+    expect(src("src/components/LearnerStateTag.tsx")).toContain("title={view.detail}");
   });
 
-  it("untouched topics no longer render as a red 0% bar", () => {
-    // The row only shows the mastery number/bar once there is evidence.
-    expect(source).toContain("const studied = Boolean(mastery && mastery.attempts > 0)");
-    expect(source).toContain("{studied ? (");
+  it("shows no unexplained mastery percentage or bar in the topic list, and unchecked topics are never red", () => {
+    expect(source).not.toContain("studied ? (");
+    expect(source).not.toMatch(/Math\.round\(\(mastery\?\.mastery \?\? 0\) \* 100\)\}%/);
+    expect(LEARNER_STATE_TONE["not-checked"]).toBe("neutral");
   });
 });
 

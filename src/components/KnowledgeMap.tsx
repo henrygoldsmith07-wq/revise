@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { GRAPH_LEVELS, type ConceptNode, type SubjectGraph, type TopicGraph } from "@/domain/knowledge-graph";
 import type { KnowledgeAnsweringReport } from "@/domain/exam-technique";
+import { LearnerStateTag } from "./LearnerStateTag";
 import { TopicStatusTag } from "./TopicStatusTag";
+import type { LearnerStateView } from "@/domain/learner-state";
 import { Panel, Pill } from "./ui";
 
 // ---------------------------------------------------------------------------
@@ -152,7 +154,7 @@ function topicChain(topic: TopicGraph, graph: SubjectGraph): ChainNode[] {
   ];
 }
 
-function TopicRow({ topic, graph }: { topic: TopicGraph; graph: SubjectGraph }) {
+function TopicRow({ topic, graph, state }: { topic: TopicGraph; graph: SubjectGraph; state?: LearnerStateView | undefined }) {
   const [open, setOpen] = useState(false);
   const nodes = topicChain(topic, graph);
   const { conceptTotals, questions, unmapped } = topic;
@@ -167,7 +169,7 @@ function TopicRow({ topic, graph }: { topic: TopicGraph; graph: SubjectGraph }) 
       >
         <div className="flex items-baseline justify-between gap-3">
           <p className="text-sm text-ink truncate">{topic.topicTitle}</p>
-          <TopicStatusTag status={topic.topicStatus.status} explanation={topic.topicStatus.explanation} />
+          {state ? <LearnerStateTag view={state} /> : <TopicStatusTag status={topic.topicStatus.status} explanation={topic.topicStatus.explanation} />}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1 text-[11px] text-ink3">
           {topic.specRef ? <span className="font-mono">{topic.specRef}</span> : null}
@@ -245,8 +247,11 @@ function TopicRow({ topic, graph }: { topic: TopicGraph; graph: SubjectGraph }) 
 export function KnowledgeMap({
   graph,
   technique,
+  states,
 }: {
   graph: SubjectGraph;
+  /** The six learner words per topic id; when given they replace the older covered/shaky chip. */
+  states?: ReadonlyMap<string, LearnerStateView>;
   /** Knowledge-vs-answering split for this subject; rendered in the subject header when evidence exists. */
   technique?: KnowledgeAnsweringReport;
 }) {
@@ -400,7 +405,7 @@ export function KnowledgeMap({
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">{unit.title}</p>
           <ul className="card divide-y divide-line cv-list">
             {unit.topics.map((topic) => (
-              <TopicRow key={topic.topicId} topic={topic} graph={graph} />
+              <TopicRow key={topic.topicId} topic={topic} graph={graph} state={states?.get(topic.topicId)} />
             ))}
           </ul>
         </section>
