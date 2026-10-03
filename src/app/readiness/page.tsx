@@ -28,10 +28,10 @@ export default function ReadinessPage() {
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Proof layer</p>
+        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">How you are doing</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Progress</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          A subject is not ready because a dashboard says so. It is ready when the grade forecast, recall, timing and unfamiliar-context performance agree.
+          Where you stand, what is costing marks, and whether revision is actually working. Numbers appear only when there is evidence behind them.
         </p>
       </header>
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { nextGradeTarget } from "@/domain/grades";
+import { confidenceWord, EVIDENCE_CONFIDENCE } from "@/domain/plain-numbers";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, ProgressBar, SectionHeading } from "../ui";
 import { EmptyHint } from "./shared";
@@ -50,7 +51,7 @@ export function NextGradeView() {
                     <ul className="mt-1 list-disc pl-4 space-y-1">
                       {prediction.uncertaintySources.map((reason) => <li key={reason}>{reason}</li>)}
                     </ul>
-                    <p className="mt-1">Model centre: about {prediction.percent}% · confidence {confidence}%.</p>
+                    <p className="mt-1">Model centre: about {prediction.percent}% · {confidenceWord(prediction.confidence, EVIDENCE_CONFIDENCE)} confidence.</p>
                   </details>
                 ) : null}
 

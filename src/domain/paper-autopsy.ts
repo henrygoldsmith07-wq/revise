@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { getTopic } from "./curriculum";
+import { buildMistakePatterns } from "./mistake-patterns";
 import {
   analysePaperWeakness,
   paperEvidenceAttempts,
@@ -65,7 +66,19 @@ export interface EquivalentRetest {
   summary: string;
 }
 
+/** The three-line summary and one next action shown above the autopsy detail. */
+export interface AutopsyHeadline {
+  lost: number;
+  /** Marks on questions that already have both a repair step and an unseen equivalent ready. */
+  recoverable: number;
+  recurring: { marks: number; patterns: number };
+  /** The first repair step, in whole marks; null when there is no repair to start. */
+  next: { marks: number; stepId: string; topicId: Id } | null;
+  lines: string[];
+}
+
 export interface PaperAutopsy {
+  headline: AutopsyHeadline;
   paperId: Id;
   paperRunId?: Id;
   title: string;
@@ -202,6 +215,7 @@ export function buildPaperAutopsy(input: PaperAutopsyInput): PaperAutopsy {
   const equivalentRetest = buildEquivalentRetest({ lostQuestions, byId, bank: input.bank, history, paperQuestionIds: new Set(input.paper.questionIds) });
 
   return {
+    headline: buildHeadline({ lost: totalLost, lostQuestions, repairPlan, equivalentRetest, input, evidenceIds }),
     paperId: input.paper.id,
     paperRunId: input.paperRunId,
     title: input.paper.title,
@@ -220,6 +234,42 @@ export function buildPaperAutopsy(input: PaperAutopsyInput): PaperAutopsy {
     repairPlan,
     equivalentRetest,
   };
+}
+
+function buildHeadline(context: {
+  lost: number;
+  lostQuestions: PaperWeaknessQuestion[];
+  repairPlan: RepairStep[];
+  equivalentRetest: EquivalentRetest;
+  input: PaperAutopsyInput;
+  evidenceIds: Set<Id>;
+}): AutopsyHeadline {
+  const { lost, lostQuestions, repairPlan, equivalentRetest, input, evidenceIds } = context;
+  const repairable = new Set(repairPlan.flatMap((step) => step.resitIds));
+  const hasEquivalent = new Set(equivalentRetest.pairs.map((pair) => pair.sourceQuestionId));
+  const recoverable = round(lostQuestions
+    .filter((question) => repairable.has(question.questionId) && hasEquivalent.has(question.questionId))
+    .reduce((sum, question) => sum + question.marksLost, 0));
+
+  // Recurring = the same root cause behind losses on two or more different questions of this paper.
+  const paperQuestions = new Set(lostQuestions.map((question) => question.questionId));
+  const questionOfAttempt = new Map(input.attempts.map((attempt) => [attempt.id, attempt.questionId] as const));
+  const sitting = (input.mistakes ?? [])
+    .filter((mistake) => mistake.attemptId !== undefined && evidenceIds.has(mistake.attemptId))
+    .map((mistake) => ({ ...mistake, questionId: mistake.questionId ?? questionOfAttempt.get(mistake.attemptId!) }))
+    .filter((mistake) => mistake.questionId !== undefined && paperQuestions.has(mistake.questionId));
+  const patterns = buildMistakePatterns({ mistakes: sitting, attempts: [], questions: [] }).filter((row) => row.questions >= 2);
+  const recurring = { marks: round(patterns.reduce((sum, row) => sum + row.marksLost, 0)), patterns: patterns.length };
+
+  const first = repairPlan[0];
+  const next = first ? { marks: Math.max(1, Math.round(first.marksToRecover)), stepId: first.id, topicId: first.topicId } : null;
+  const lines: string[] = [];
+  if (lost > 0) {
+    lines.push(`You lost ${lost} mark${lost === 1 ? "" : "s"}.`);
+    if (recoverable > 0) lines.push(`${recoverable} of them have a repair and a new question ready.`);
+    if (recurring.patterns > 0) lines.push(`${recurring.marks} came from ${recurring.patterns === 1 ? "one recurring weakness" : `${recurring.patterns} recurring weaknesses`}.`);
+  }
+  return { lost, recoverable, recurring, next, lines };
 }
 
 interface PlanContext {

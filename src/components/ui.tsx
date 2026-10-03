@@ -136,10 +136,13 @@ export function ProgressBar({
   value,
   label,
   tone = "accent",
+  showValue = true,
 }: {
   value: number;
   label?: string;
   tone?: "accent" | "success" | "review" | "danger";
+  /** Set false when the surrounding text already gives a deliberately coarse figure. */
+  showValue?: boolean;
 }) {
   const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
   const fill =
@@ -149,7 +152,7 @@ export function ProgressBar({
       {label ? (
         <div className="flex justify-between text-xs text-ink3 mb-1">
           <span>{label}</span>
-          <span className="tabular-nums">{pct}%</span>
+          {showValue ? <span className="tabular-nums">{pct}%</span> : null}
         </div>
       ) : null}
       <div

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { forecastUntouched } from "@/domain/pace-forecast";
 import { AdaptiveSessionHero } from "@/components/AdaptiveSessionHero";
 import { PaceForecastLine } from "@/components/PaceForecast";
+import { LazyBoundary } from "@/components/LazyBoundary";
 import { ExamOutlook } from "@/components/ExamOutlook";
 import { CountdownPhaseBanner } from "@/components/CountdownPhaseBanner";
 import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
@@ -23,6 +24,16 @@ const TodayRoadmap = dynamic(() => import("@/components/TodayRoadmap"), {
   ssr: false,
   loading: () => <TodayRoadmapLoading />,
 });
+
+// A lazy chunk that was never cached cannot load offline. Contain that here so
+// the rest of Today keeps working instead of the whole app showing an error page.
+function SafeTodayRoadmap({ preferredSubjectId }: { preferredSubjectId?: string }) {
+  return (
+    <LazyBoundary fallback={<TodayRoadmapUnavailable />}>
+      <TodayRoadmap preferredSubjectId={preferredSubjectId} />
+    </LazyBoundary>
+  );
+}
 
 // Today still leads with one recommended session. The subject tiles and planner
 // below make it easier to find a course or see the exam run-up without competing
@@ -105,7 +116,7 @@ export default function TodayPage() {
         </summary>
         <div className="mt-4 space-y-5">
           <TodayOverview />
-          <TodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
+          <SafeTodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />
         </div>
@@ -150,10 +161,21 @@ function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; 
         </div>
       </div>
       <TodayOverview />
-      <TodayRoadmap />
+      <SafeTodayRoadmap />
       {pace ? <PaceForecastLine forecast={pace} /> : null}
       <ExamOutlook />
     </div>
+  );
+}
+
+function TodayRoadmapUnavailable() {
+  return (
+    <section aria-label="Today's learning roadmap" className="card p-4 sm:p-5">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-ink3 font-bold">Learning roadmap</p>
+      <p className="mt-1 text-sm text-ink3" role="status">
+        The roadmap could not load. It is available again once you are back online; revision still works.
+      </p>
+    </section>
   );
 }
 

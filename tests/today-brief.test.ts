@@ -3,6 +3,7 @@ import { buildTodayBrief, countdownLabel } from "@/domain/today-brief";
 import type { AdaptiveSessionPlan, AdaptiveStepKind } from "@/domain/adaptive-contract";
 import type { PaperReadiness } from "@/domain/paper-readiness";
 import type { Mistake } from "@/domain/types";
+import type { TopicLifecycle } from "@/domain/proof-lifecycle";
 
 const plan = (...kinds: AdaptiveStepKind[]): AdaptiveSessionPlan => ({
   key: "k", subjectId: "s", topicId: "t", topicTitle: "T", targetMinutes: 20, totalMinutes: 20, score: 1, reason: "", evidence: {} as AdaptiveSessionPlan["evidence"], startHref: "/x",
@@ -48,6 +49,12 @@ describe("today brief", () => {
     const evidenced = { ...plan("overdue-retrieval"), evidence: { attempts: 6 } } as AdaptiveSessionPlan;
     expect(buildTodayBrief({ plan: evidenced, now: NOW }).provisional).toBeNull();
     expect(buildTodayBrief({ plan: cold, mistakes: [mistake(2)], now: NOW }).provisional).toBeNull();
+  });
+  it("carries the proof state so a good session is never shown as mastery", () => {
+    const looks = { topicId: "t", stage: "looks-learned", label: "Looks learned", line: "not proof yet", claim: null, dueNow: false, memorised: false } as TopicLifecycle;
+    expect(buildTodayBrief({ plan: plan("transfer"), lifecycle: looks, now: NOW }).lifecycle).toEqual({ label: "Looks learned", line: "not proof yet", dueNow: false });
+    expect(buildTodayBrief({ plan: plan("transfer"), lifecycle: { ...looks, stage: "not-started" }, now: NOW }).lifecycle).toBeNull();
+    expect(buildTodayBrief({ plan: plan("transfer"), now: NOW }).lifecycle).toBeNull();
   });
   it("labels past and same-day exams", () => {
     expect(countdownLabel(-2)).toBe("Exam date has passed");

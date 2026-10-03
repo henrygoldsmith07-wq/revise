@@ -8,6 +8,7 @@
 
 import type { AdaptiveSessionPlan, AdaptiveStepKind } from "./adaptive-contract";
 import type { PaperReadiness } from "./paper-readiness";
+import type { TopicLifecycle } from "./proof-lifecycle";
 import type { ExamDate, Id, Mistake } from "./types";
 
 export interface TodayBrief {
@@ -23,6 +24,8 @@ export interface TodayBrief {
   doesNotProve: string | null;
   /** Set when the pick is not yet backed by this learner's own marked answers. */
   provisional: string | null;
+  /** Where this topic stands on proof, so a good session is never mistaken for mastery. */
+  lifecycle: { label: string; line: string; dueNow: boolean } | null;
 }
 
 const EVIDENCE: Partial<Record<AdaptiveStepKind, string>> = {
@@ -46,6 +49,7 @@ export function buildTodayBrief(input: {
   papers?: readonly PaperReadiness[];
   examDates?: readonly ExamDate[];
   mistakes?: readonly Mistake[];
+  lifecycle?: TopicLifecycle;
   now?: Date;
 }): TodayBrief {
   const { plan } = input;
@@ -80,6 +84,7 @@ export function buildTodayBrief(input: {
 
   return {
     provisional,
+    lifecycle: input.lifecycle && input.lifecycle.stage !== "not-started" ? { label: input.lifecycle.label, line: input.lifecycle.line, dueNow: input.lifecycle.dueNow } : null,
     paperName: owning?.name ?? null,
     daysToExam,
     examLabel: countdownLabel(daysToExam),

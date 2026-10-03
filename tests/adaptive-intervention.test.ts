@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAdaptiveSession } from "@/domain/adaptive-session";
-import { chooseIntervention, interventionContextFor } from "@/domain/adaptive-intervention";
+import { chooseIntervention, gapExtrasFor, interventionContextFor } from "@/domain/adaptive-intervention";
 import { emptyProfile } from "@/domain/capability-mastery";
 import type { AdaptiveTopicCandidate } from "@/domain/adaptive-scoring";
 import type { Question, Topic, TopicMastery } from "@/domain/types";
@@ -65,5 +65,46 @@ describe("study fatigue from history", () => {
   });
   it("ignores future and malformed events", () => {
     expect(recentActiveMinutes([{ at: "nope", elapsedMs: 1 }, ev(-10, 30)], now)).toBe(0);
+  });
+});
+
+
+describe("evidence gap on the plan", () => {
+  const at = (id: string, o: Partial<import("@/domain/types").Attempt> = {}): import("@/domain/types").Attempt => ({
+    id, userId: "u", questionId: id, subjectId: "s", topicIds: ["t"], answers: {}, marked: [], awarded: 2, max: 3, feedback: "", markedBy: "rubric", elapsedMs: 1000, mode: "practice",
+    createdAt: "2026-09-01T00:00:00.000Z", ...o,
+  });
+  const NOW = new Date("2026-10-01T00:00:00Z");
+
+  it("counts independent, distinct, timed and low-confidence evidence from the learner's history", () => {
+    const extras = gapExtrasFor({
+      questions: [q("a")], daysToExam: 12, now: NOW,
+      attempts: [at("a"), at("a", { id: "a2" }), at("b", { hintTier: "cue" }), at("c", { mode: "paper" }), at("d", { markedBy: "ai", markConfidence: 0.3 })],
+    });
+    expect(extras).toMatchObject({ distinctIndependent: 2, independentAttempts: 3, timedPaperAttempts: 1, lowConfidenceMarks: 1, daysToExam: 12, daysSinceEvidence: 30 });
+  });
+  it("reports no evidence age when nothing was answered unaided", () => {
+    expect(gapExtrasFor({ questions: [], attempts: [at("b", { hintTier: "cue" })], daysToExam: null, now: NOW }).daysSinceEvidence).toBeNull();
+  });
+  it("attaches the top gap to the chosen intervention", () => {
+    const selected = { topicId: "t", subjectId: "s", score: 1, evidence: { attempts: 6, mastery: 0.6, daysToExam: 40, dueCount: 0, factors: { forgetting: 0 }, openMistakeIds: [] } } as unknown as AdaptiveTopicCandidate;
+    const ctx = interventionContextFor({ topic, selected, profile: emptyProfile(), questions: [q("a")], attempts: [], mistakes: [] });
+    const withGap = chooseIntervention({ ...ctx, recall: 0.8, application: null, evidenceAttempts: 6, unseen: { recall: 1, application: 3, transfer: 0 } }, 20, {
+      daysSinceEvidence: 2, distinctIndependent: 4, independentAttempts: 4, timedPaperAttempts: 0, trustedQuestions: 5, lowConfidenceMarks: 0, daysToExam: 40,
+    });
+    expect(withGap?.gap).toMatchObject({ label: "Test application", minutes: 6 });
+    expect(chooseIntervention({ ...ctx, recall: 0.8, application: null, unseen: { recall: 1, application: 3, transfer: 0 } }, 20)?.gap).toBeNull();
+  });
+});
+
+describe("headline minutes match the session", () => {
+  it("uses the planned session length, not the intervention's own default", () => {
+    const selected = { topicId: "t", subjectId: "s", score: 1, evidence: { attempts: 6, mastery: 0.6, daysToExam: 40, dueCount: 0, factors: { forgetting: 0 }, openMistakeIds: [] } } as unknown as AdaptiveTopicCandidate;
+    const ctx = { ...interventionContextFor({ topic, selected, profile: emptyProfile(), questions: [q("a")], attempts: [], mistakes: [] }), recall: 0.8, application: 0.4, unseen: { recall: 1, application: 3, transfer: 0 } };
+    const own = chooseIntervention(ctx, 25);
+    const shown = chooseIntervention(ctx, 25, undefined, 19.2);
+    expect(own!.minutes).not.toBe(20);
+    expect(shown!.minutes).toBe(20);
+    expect(shown!.headline).toMatch(/^20-minute /);
   });
 });
