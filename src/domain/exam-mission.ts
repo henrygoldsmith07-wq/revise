@@ -14,6 +14,7 @@ import { INTERVENTION_MINUTES, type InterventionKind } from "./intervention-rank
 import { type MarkRecovery, type RecoveryTotals } from "./mark-recovery";
 import { buildMistakePatterns, ROOT_CAUSE_LABEL, rootCauseOf, type MistakePattern, type RootCause } from "./mistake-patterns";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
+import { evidenceLimits, limitsSentence, proofBlocked, MIN_PROVABLE_QUESTIONS, type EvidenceLimitNote, type TopicSupply } from "./supply";
 import type { Id, Mistake } from "./types";
 
 export type MissionStageKind = "diagnose" | "repair" | "practise" | "apply" | "delayed-proof" | "complete";
@@ -58,9 +59,13 @@ export interface ExamMission {
   /** Plain lines: marks lost, causes, strength, what is missing. */
   evidence: string[];
   recovery: RecoveryTotals;
-  /** Unseen trusted questions available to prove it on. */
+  /** Unseen verified questions available to prove it on. */
   unseenAvailable: number;
   proofPossible: boolean;
+  /** Why proof is limited, in plain language; empty when nothing limits it. */
+  evidenceLimits: EvidenceLimitNote[];
+  /** One honest sentence when proof is blocked, else null. */
+  limitsSentence: string | null;
   /** When the delayed check can first count, if a success has happened. */
   proofDueAt?: string;
   completionCondition: string;
@@ -73,8 +78,10 @@ export interface MissionInput {
   recovery: MarkRecovery;
   patterns?: readonly MistakePattern[];
   daysToExam: number | null;
-  /** Unseen trusted questions per topic. Missing topics count as zero. */
+  /** Unseen verified questions per topic. Missing topics count as zero. Ignored when `supplyByTopic` is given. */
   unseenByTopic: Readonly<Record<Id, number>>;
+  /** Richer supply (verified vs practice-only, transfer). Preferred over `unseenByTopic`. */
+  supplyByTopic?: Readonly<Record<Id, TopicSupply>>;
   /** Paper titles for paper-origin missions. */
   paperTitles?: Readonly<Record<Id, string>>;
   topicTitle?: (topicId: Id) => string;
@@ -86,7 +93,7 @@ export interface MissionInput {
 
 export const DEFAULT_MAX_MISSIONS = 3;
 /** Fewer unseen questions than this cannot support a retest plus a delayed check. */
-export const MIN_UNSEEN_FOR_PROOF = 2;
+export const MIN_UNSEEN_FOR_PROOF = MIN_PROVABLE_QUESTIONS;
 const DELAYED_PROOF_DAY = 5;
 
 const defaultTitle = (id: Id) => getTopic(id)?.title ?? id;
@@ -119,10 +126,15 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
   const topicIds = [...new Set(scope.mistakes.map((m) => m.topicId))].sort();
   const mistakeIds = scope.mistakes.map((m) => m.id).sort();
   const recovery = input.recovery.forMistakes(mistakeIds);
-  const unseenAvailable = topicIds.reduce((s, t) => s + (input.unseenByTopic[t] ?? 0), 0);
+  const supply: TopicSupply = topicIds.reduce<TopicSupply>((acc, t) => {
+    const row = input.supplyByTopic?.[t] ?? { provable: input.unseenByTopic[t] ?? 0, practiceOnly: 0, transfer: input.unseenByTopic[t] ?? 0 };
+    return { provable: acc.provable + row.provable, practiceOnly: acc.practiceOnly + row.practiceOnly, transfer: acc.transfer + row.transfer };
+  }, { provable: 0, practiceOnly: 0, transfer: 0 });
+  const unseenAvailable = supply.provable;
   const days = input.daysToExam;
   const proofFits = days === null || days > MIN_PROOF_DELAY_DAYS;
-  const proofPossible = unseenAvailable >= MIN_UNSEEN_FOR_PROOF && proofFits;
+  const limits = evidenceLimits({ supply, daysToExam: days, minProofDays: MIN_PROOF_DELAY_DAYS, trustedAttempts: recovery.evidence === "none" ? 0 : recovery.evidence === "thin" ? 2 : 3, delayedChecked: recovery.proven > 0 });
+  const proofPossible = !proofBlocked(limits);
 
   const causes = scope.mistakes.map((m) => rootCauseOf(m));
   const unclassified = causes.filter((c) => c === "unclassified").length / Math.max(1, causes.length);
@@ -136,7 +148,7 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
     ...(scope.cause && scope.cause !== "unclassified" ? [`${recurring ? "recurring " : ""}${ROOT_CAUSE_LABEL[scope.cause]}`] : []),
     ...(lost >= 4 && recallLost / lost <= 0.2 && recovery.evidence === "adequate" ? ["recall does not look like the problem"] : []),
     ...(recovery.evidence !== "adequate" ? ["evidence is still thin"] : []),
-    ...(!proofPossible ? [unseenAvailable < MIN_UNSEEN_FOR_PROOF ? "too few unseen questions to prove improvement" : "too close to the exam for a delayed check"] : []),
+    ...(!proofPossible ? [unseenAvailable < MIN_UNSEEN_FOR_PROOF ? (supply.practiceOnly > 0 && supply.provable === 0 ? "only unverified unseen questions remain, which cannot prove improvement" : "too few unseen questions to prove improvement") : "too close to the exam for a delayed check"] : []),
     ...(recovery.proven === 0 && recovery.provisional === 0 ? ["no proof yet"] : []),
   ];
 
@@ -198,6 +210,8 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
     recovery,
     unseenAvailable,
     proofPossible,
+    evidenceLimits: limits,
+    limitsSentence: limitsSentence(limits),
     ...(proofDueAt ? { proofDueAt } : {}),
     completionCondition,
     marksAtStake: Math.round((recovery.open + recovery.awaitingProof + recovery.provisional) * 10) / 10,
@@ -205,49 +219,60 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
 }
 
 /** Missions in priority order: most marks at stake first, recurring causes ahead of one-off topics. */
-export function buildExamMissions(input: MissionInput): ExamMission[] {
-  const live = input.mistakes.filter((m) => m.marksLost > 0 && (!input.subjectId || m.subjectId === input.subjectId));
-  const patterns = input.patterns ?? buildMistakePatterns({ mistakes: live, attempts: [], questions: [] });
-  const withPatterns = { ...input, patterns };
-  const taken = new Set<Id>();
-  const scopes: Scope[] = [];
+/** A mistake belongs in a mission until it is proven, so a resolved retest still leaves the delayed check owed. */
+function missionMembers(input: MissionInput, subjectId?: Id): Mistake[] {
+  const state = new Map(input.recovery.items.map((i) => [i.mistakeId, i.state] as const));
+  return input.mistakes.filter((m) => m.marksLost > 0 && (!subjectId || m.subjectId === subjectId) &&
+    !(m.resolved && (state.get(m.id) ?? "open") === "open"));
+}
 
-  for (const p of patterns) {
-    if (p.cause === "unclassified" || !p.recurring) continue;
-    const members = live.filter((m) => p.mistakeIds.includes(m.id) && !m.resolved);
-    if (members.length < 2) continue;
-    scopes.push({ origin: "pattern", key: p.cause, cause: p.cause, mistakes: members });
-    members.forEach((m) => taken.add(m.id));
-  }
-  const byTopic = new Map<Id, Mistake[]>();
-  for (const m of live) if (!m.resolved && !taken.has(m.id)) byTopic.set(m.topicId, [...(byTopic.get(m.topicId) ?? []), m]);
-  for (const [topicId, members] of byTopic) {
-    const causes = new Map<RootCause, number>();
-    for (const m of members) causes.set(rootCauseOf(m), (causes.get(rootCauseOf(m)) ?? 0) + m.marksLost);
-    const top = [...causes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    scopes.push({ origin: "topic", key: topicId, cause: top, mistakes: members });
-  }
+function dominantCause(members: readonly Mistake[]): RootCause | null {
+  const causes = new Map<RootCause, number>();
+  for (const m of members) causes.set(rootCauseOf(m), (causes.get(rootCauseOf(m)) ?? 0) + m.marksLost);
+  return [...causes.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+}
 
-  const missions = scopes.map((s) => buildMission(s, withPatterns));
-  // Already-proven or regressed missions are worth showing; they come from the ledger below.
-  const regressed = input.recovery.items.filter((i) => i.state === "regressed").map((i) => i.mistakeId);
-  if (regressed.length) {
-    const members = live.filter((m) => regressed.includes(m.id) && !scopes.some((s) => s.mistakes.some((x) => x.id === m.id)));
-    if (members.length) missions.push(buildMission({ origin: "topic", key: `regressed:${members[0].topicId}`, cause: null, mistakes: members }, withPatterns));
+/**
+ * Missions across every subject, ranked together. Scopes are built per subject
+ * (a recurring cause in Maths and in Physics are two missions) and the result
+ * never depends on the order subjects or mistakes arrive in.
+ */
+export function buildExamMissions(input: MissionInput & { includeProven?: boolean }): ExamMission[] {
+  const all = missionMembers(input, input.subjectId);
+  const subjects = [...new Set(all.map((m) => m.subjectId))].sort();
+  const missions: ExamMission[] = [];
+  for (const subjectId of subjects) {
+    const live = all.filter((m) => m.subjectId === subjectId);
+    const patterns = buildMistakePatterns({ mistakes: live, attempts: [], questions: [] });
+    const withPatterns = { ...input, patterns };
+    const taken = new Set<Id>();
+    const scopes: Scope[] = [];
+    for (const p of patterns) {
+      if (p.cause === "unclassified" || !p.recurring) continue;
+      const members = live.filter((m) => p.mistakeIds.includes(m.id));
+      if (members.length < 2) continue;
+      scopes.push({ origin: "pattern", key: `${p.cause}:${subjectId}`, cause: p.cause, mistakes: members });
+      members.forEach((m) => taken.add(m.id));
+    }
+    const byTopic = new Map<Id, Mistake[]>();
+    for (const m of live) if (!taken.has(m.id)) byTopic.set(m.topicId, [...(byTopic.get(m.topicId) ?? []), m]);
+    for (const [topicId, members] of byTopic) scopes.push({ origin: "topic", key: topicId, cause: dominantCause(members), mistakes: members });
+    for (const scope of scopes) missions.push(buildMission(scope, withPatterns));
   }
   const weight = (m: ExamMission) => input.repairWeight?.(m.stages.find((s) => s.kind === "repair")?.intervention ?? "mistake-recovery") ?? 1;
   const rank = (m: ExamMission) => (m.status === "regressed" ? 1000 : 0) + (m.marksAtStake + (m.origin === "pattern" ? 2 : 0)) * weight(m);
-  return missions.sort((a, b) => rank(b) - rank(a) || a.id.localeCompare(b.id)).slice(0, input.max ?? DEFAULT_MAX_MISSIONS);
+  return missions
+    .filter((m) => input.includeProven || m.status !== "proven")
+    .sort((a, b) => rank(b) - rank(a) || a.id.localeCompare(b.id))
+    .slice(0, input.max ?? DEFAULT_MAX_MISSIONS);
 }
 
 /** A mission that begins from one paper's autopsy: every open loss on that paper. */
 export function buildPaperMission(paperId: Id, input: MissionInput): ExamMission | null {
   const paperMistakeIds = new Set(input.recovery.items.filter((i) => i.paperId === paperId).map((i) => i.mistakeId));
-  const members = input.mistakes.filter((m) => paperMistakeIds.has(m.id) && m.marksLost > 0);
+  const members = missionMembers(input).filter((m) => paperMistakeIds.has(m.id));
   if (!members.length) return null;
-  const causes = new Map<RootCause, number>();
-  for (const m of members) causes.set(rootCauseOf(m), (causes.get(rootCauseOf(m)) ?? 0) + m.marksLost);
-  const cause = [...causes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const cause = dominantCause(members);
   return buildMission({ origin: "paper", key: paperId, cause, paperId, mistakes: members }, { ...input, patterns: input.patterns ?? buildMistakePatterns({ mistakes: members, attempts: [], questions: [] }) });
 }
 
@@ -263,7 +288,7 @@ export interface MissionNextAction {
   proof: string;
   stage: MissionStageKind;
   blocked: boolean;
-  /** Existing route that runs this stage: repair/diagnose recover marks, later stages use unseen questions. */
+  /** Mission session route: the practice page rebuilds this stage's questions from the mission id. */
   href: string;
 }
 
@@ -281,8 +306,6 @@ export function missionNextAction(mission: ExamMission): MissionNextAction {
     proof: mission.completionCondition,
     stage: stage.kind,
     blocked: Boolean(stage.blockedBy) || mission.status === "blocked",
-    href: stage.kind === "practise" || stage.kind === "apply" || stage.kind === "delayed-proof"
-      ? `/adaptive-session?topic=${encodeURIComponent(mission.topicIds[0] ?? "")}&start=1`
-      : `/practice?recover=1&subject=${encodeURIComponent(mission.subjectId)}`,
+    href: `/practice?mission=${encodeURIComponent(mission.id)}&stage=${encodeURIComponent(stage.kind)}`,
   };
 }

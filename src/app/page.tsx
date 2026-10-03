@@ -13,8 +13,10 @@ import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
+import { BestNextStep } from "@/components/BestNextStep";
 import { CommandCentreCard } from "@/components/CommandCentreCard";
-import { MissionCard } from "@/components/MissionCard";
+import { useRevisionPlan } from "@/components/recovery-evidence";
+import { WeekLine } from "@/components/RecoverySummary";
 import { TodayOverview } from "@/components/TodayOverview";
 import { todayLocal } from "@/domain/local-date";
 
@@ -55,6 +57,9 @@ export default function TodayPage() {
     proofLedger,
   } = store;
   const greetingLabel = useGreeting();
+  // The Next Best Action engine ranks missions, paper recovery, proof checks, reviews and the
+  // adaptive session together; Today shows only its winner.
+  const { plan } = useRevisionPlan();
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -109,15 +114,20 @@ export default function TodayPage() {
         <ResumeRevisionCard />
       ) : (
         <div className="today-focus card p-5 sm:p-7">
-          <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" proof={proofLedger} />
+          {plan.top && plan.top.route.href !== adaptiveSession.startHref ? (
+            <BestNextStep action={plan.top} plan={plan} />
+          ) : (
+            <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" proof={proofLedger} />
+          )}
         </div>
       )}
-      {revisionCheckpoint ? null : <><CommandCentreCard /><MissionCard /></>}
+      {revisionCheckpoint ? null : <WeekLine />}
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
           Plan, pace and outlook
         </summary>
         <div className="mt-4 space-y-5">
+          <CommandCentreCard />
           <TodayOverview />
           <SafeTodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}

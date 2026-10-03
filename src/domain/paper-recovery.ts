@@ -7,6 +7,7 @@
 // ledger and the root-cause patterns; no scoring of its own.
 // ---------------------------------------------------------------------------
 
+import { independentAttempt } from "./learning-evidence";
 import type { MarkRecovery, MistakeRecovery, RecoveryTotals } from "./mark-recovery";
 import { buildMistakePatterns, ROOT_CAUSE_LABEL, rootCauseOf, type MistakePattern, type PatternIntervention, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Mistake, Question } from "./types";
@@ -39,6 +40,22 @@ export interface PaperLoss {
   proven: boolean;
 }
 
+export interface PaperDiagnosis {
+  /** The costliest losses first. */
+  highestValue: Array<{ topicId: Id; marks: number; causeLabel: string }>;
+  knowledgeMarks: number;
+  techniqueMarks: number;
+  /** Slips that are not about what you know: arithmetic, units, misreading, missing working. */
+  carelessMarks: number;
+  /** Causes that also cost marks on other papers. */
+  repeatedAcrossPapers: Array<{ causeLabel: string; otherPapers: number; marks: number }>;
+  /** Topics answered fully on this paper but with little independent evidence elsewhere. */
+  weaklyEvidencedTopics: Id[];
+}
+
+const KNOWLEDGE = new Set<RootCause>(["missing-knowledge", "misunderstood-concept", "prerequisite-weakness", "wrong-method", "poor-application"]);
+const CARELESS = new Set<RootCause>(["arithmetic-slip", "unit-error", "misread-question", "incomplete-working"]);
+
 export interface PaperRecovery {
   paperId: Id;
   title: string;
@@ -49,6 +66,7 @@ export interface PaperRecovery {
   stage: PaperRecoveryStage;
   /** Why the paper is not closed yet, or why it is. */
   stageReason: string;
+  diagnosis: PaperDiagnosis;
 }
 
 export interface PaperRecoveryInput {
@@ -108,5 +126,29 @@ export function buildPaperRecovery(input: PaperRecoveryInput): PaperRecovery | n
     stageReason = losses.length ? "Losses are identified but not yet repaired." : "No marks were lost on this paper.";
   }
   if (!losses.length) stage = "closed";
-  return { paperId: input.paperId, title: input.title, score, max, totals, losses, stage, stageReason };
+
+  const bySize = [...losses].sort((a, b) => b.marksLost - a.marksLost || a.mistakeId.localeCompare(b.mistakeId));
+  const sumMarks = (pick: (l: PaperLoss) => boolean) => Math.round(losses.filter(pick).reduce((n, l) => n + l.marksLost, 0) * 10) / 10;
+  const otherPaperCauses = new Map<RootCause, Set<Id>>();
+  for (const item of input.recovery.items) {
+    if (!item.paperId || item.paperId === input.paperId) continue;
+    const m = mistakeById.get(item.mistakeId);
+    if (!m) continue;
+    const c = rootCauseOf(m);
+    otherPaperCauses.set(c, (otherPaperCauses.get(c) ?? new Set()).add(item.paperId));
+  }
+  const repeated = [...new Set(losses.map((l) => l.cause))].filter((c) => c !== "unclassified" && otherPaperCauses.has(c)).map((c) => ({
+    causeLabel: ROOT_CAUSE_LABEL[c], otherPapers: otherPaperCauses.get(c)!.size, marks: sumMarks((l) => l.cause === c),
+  })).sort((a, b) => b.marks - a.marks || a.causeLabel.localeCompare(b.causeLabel));
+  const fullTopics = [...new Set(attemptsOnPaper.filter((a) => a.max > 0 && a.awarded / a.max >= 0.9).flatMap((a) => a.topicIds))].sort();
+  const weakly = fullTopics.filter((t) => input.attempts.filter((a) => a.topicIds.includes(t) && !(a.paperId === input.paperId || a.paperSpecId === input.paperId) && independentAttempt(a)).length < 2);
+  const diagnosis: PaperDiagnosis = {
+    highestValue: bySize.slice(0, 3).map((l) => ({ topicId: l.topicId, marks: l.marksLost, causeLabel: l.causeLabel })),
+    knowledgeMarks: sumMarks((l) => KNOWLEDGE.has(l.cause)),
+    techniqueMarks: sumMarks((l) => !KNOWLEDGE.has(l.cause) && l.cause !== "unclassified"),
+    carelessMarks: sumMarks((l) => CARELESS.has(l.cause)),
+    repeatedAcrossPapers: repeated,
+    weaklyEvidencedTopics: weakly,
+  };
+  return { paperId: input.paperId, title: input.title, score, max, totals, losses, stage, stageReason, diagnosis };
 }

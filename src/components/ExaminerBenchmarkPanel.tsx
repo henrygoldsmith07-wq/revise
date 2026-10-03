@@ -1,5 +1,6 @@
 "use client";
 
+import { EvidenceClassNote } from "./EvidenceClassNote";
 import { useMemo } from "react";
 import { HUMAN_MARKING_CORPUS } from "@/domain/human-marking-corpus";
 import {
@@ -46,6 +47,7 @@ export function ExaminerBenchmarkPanel() {
 
   return (
     <section className="space-y-3">
+      <EvidenceClassNote kind="engineering-validation" />
       <SectionHeading title="Examiner benchmark" hint="Four blind markers; the human ceiling is the yardstick" />
       <Panel>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

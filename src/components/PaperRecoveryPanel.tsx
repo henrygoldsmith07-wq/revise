@@ -4,6 +4,7 @@
 // verification → Closed. A paper stays open until its important losses are proven.
 
 import { useMemo } from "react";
+import { LEARNER_STATE_LABEL, LEARNER_STATE_TONE, recoveryLearnerState } from "@/domain/learner-state";
 import { buildMistakePatterns } from "@/domain/mistake-patterns";
 import { buildPaperRecovery, PAPER_STAGE_LABEL, PAPER_STAGE_ORDER, type PaperRecovery } from "@/domain/paper-recovery";
 import { useStoreFields } from "@/state/store";
@@ -11,7 +12,6 @@ import { PaperMission } from "./MissionCard";
 import { useRecoveryEvidence } from "./recovery-evidence";
 import { Pill } from "./ui";
 
-const STATE_LABEL = { open: "Open", targeted: "Revised", provisional: "Early success", "awaiting-proof": "Awaiting proof", proven: "Proven", regressed: "Regressed" } as const;
 
 export function usePaperRecovery(paperId: string, title: string): PaperRecovery | null {
   const ev = useRecoveryEvidence();
@@ -57,6 +57,17 @@ export function PaperRecoveryPanel({ paperId, title, withMission = false }: { pa
       <p className="text-xs text-ink2">{r.stageReason}</p>
       {r.losses.length ? (
         <details>
+          <summary className="cursor-pointer select-none text-sm text-ink2">What this paper shows</summary>
+          <ul className="mt-2 space-y-1 text-xs text-ink2">
+            {r.diagnosis.highestValue.map((h) => <li key={`${h.topicId}:${h.causeLabel}`}>Biggest loss: {ev.topicTitle(h.topicId)}, {h.marks} mark{h.marks === 1 ? "" : "s"} ({h.causeLabel}).</li>)}
+            <li>{r.diagnosis.knowledgeMarks} marks look like knowledge or understanding, {r.diagnosis.techniqueMarks} like technique ({r.diagnosis.carelessMarks} of those careless or procedural).</li>
+            {r.diagnosis.repeatedAcrossPapers.map((p) => <li key={p.causeLabel}>{p.causeLabel} also cost marks on {p.otherPapers} other paper{p.otherPapers === 1 ? "" : "s"}.</li>)}
+            {r.diagnosis.weaklyEvidencedTopics.length ? <li>Correct here but little evidence elsewhere: {r.diagnosis.weaklyEvidencedTopics.map(ev.topicTitle).join(", ")}.</li> : null}
+          </ul>
+        </details>
+      ) : null}
+      {r.losses.length ? (
+        <details>
           <summary className="cursor-pointer select-none text-sm text-ink2">Every loss and its cause</summary>
           <ul className="mt-2 divide-y divide-line">
             {r.losses.map((l) => (
@@ -65,7 +76,7 @@ export function PaperRecoveryPanel({ paperId, title, withMission = false }: { pa
                   <p className="font-medium text-ink">{ev.topicTitle(l.topicId)}: {l.marksLost} mark{l.marksLost === 1 ? "" : "s"}</p>
                   <p>Likely cause: {l.causeLabel}. {l.recurring ? "Recurring." : "Isolated so far."}</p>
                 </div>
-                <Pill tone={l.proven ? "success" : l.recovery === "regressed" ? "danger" : "neutral"}>{STATE_LABEL[l.recovery]}</Pill>
+                <Pill tone={LEARNER_STATE_TONE[recoveryLearnerState(l.recovery)]}>{LEARNER_STATE_LABEL[recoveryLearnerState(l.recovery)]}</Pill>
               </li>
             ))}
           </ul>

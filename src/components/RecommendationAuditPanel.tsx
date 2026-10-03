@@ -1,5 +1,6 @@
 "use client";
 
+import { EvidenceClassNote } from "./EvidenceClassNote";
 import { useMemo } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { auditRecommendations } from "@/domain/recommendation-audit";
@@ -13,6 +14,7 @@ export function RecommendationAuditPanel() {
   if (!audit.shown) return null;
   return (
     <section aria-labelledby="rec-audit-heading" className="space-y-3">
+      <EvidenceClassNote kind="real-world-evidence" />
       <SectionHeading title="Have the suggestions helped?" hint="An audit of your own history, not a test of cause and effect." />
       <h2 id="rec-audit-heading" className="sr-only">Recommendation audit</h2>
       <Panel className="space-y-2">

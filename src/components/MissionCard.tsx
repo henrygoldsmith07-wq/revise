@@ -4,14 +4,10 @@
 // sit behind a disclosure so Today stays calm.
 
 import { useMemo } from "react";
-import { buildExamMissions, buildPaperMission, MISSION_STATUS_LABEL, missionNextAction, type ExamMission } from "@/domain/exam-mission";
-import { COMMAND_CENTRE_DAYS } from "@/domain/pre-exam-plan";
+import { buildPaperMission, missionNextAction, type ExamMission } from "@/domain/exam-mission";
+import { LEARNER_STATE_LABEL, LEARNER_STATE_TONE, missionLearnerState } from "@/domain/learner-state";
 import { ButtonLink, Pill } from "./ui";
 import { useRecoveryEvidence } from "./recovery-evidence";
-
-const TONE: Record<ExamMission["status"], "neutral" | "success" | "review" | "danger" | "accent"> = {
-  "not-started": "neutral", active: "accent", "awaiting-proof": "review", proven: "success", regressed: "danger", blocked: "review",
-};
 
 export function MissionView({ mission }: { mission: ExamMission }) {
   const action = missionNextAction(mission);
@@ -20,7 +16,7 @@ export function MissionView({ mission }: { mission: ExamMission }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Exam mission</p>
-        <Pill tone={TONE[mission.status]}>{MISSION_STATUS_LABEL[mission.status]}</Pill>
+        <Pill tone={LEARNER_STATE_TONE[missionLearnerState(mission.status)]}>{LEARNER_STATE_LABEL[missionLearnerState(mission.status)]}</Pill>
       </div>
       <div>
         <p className="text-base font-semibold text-ink">{mission.title}</p>
@@ -51,24 +47,11 @@ export function MissionView({ mission }: { mission: ExamMission }) {
   );
 }
 
-export function MissionCard() {
-  const ev = useRecoveryEvidence();
-  const mission = useMemo(
-    () => (ev.mistakes.some((m) => m.marksLost > 0)
-      ? buildExamMissions({ mistakes: ev.mistakes, recovery: ev.recovery, patterns: ev.patterns, daysToExam: ev.daysToExam, unseenByTopic: ev.unseenByTopic, topicTitle: ev.topicTitle, repairWeight: ev.repairWeight, max: 1 })[0] ?? null
-      : null),
-    [ev],
-  );
-  // Inside the countdown window the command centre leads and names the mission itself.
-  if (!mission || (ev.daysToExam !== null && ev.daysToExam <= COMMAND_CENTRE_DAYS)) return null;
-  return <section aria-label="Exam mission" className="card p-4 sm:p-5"><MissionView mission={mission} /></section>;
-}
-
 /** The mission that starts from one paper's autopsy. */
 export function PaperMission({ paperId, title }: { paperId: string; title: string }) {
   const ev = useRecoveryEvidence();
   const mission = useMemo(
-    () => buildPaperMission(paperId, { mistakes: ev.mistakes, recovery: ev.recovery, patterns: ev.patterns, daysToExam: ev.daysToExam, unseenByTopic: ev.unseenByTopic, topicTitle: ev.topicTitle, repairWeight: ev.repairWeight, paperTitles: { [paperId]: title } }),
+    () => buildPaperMission(paperId, { mistakes: ev.mistakes, recovery: ev.recovery, patterns: ev.patterns, daysToExam: ev.daysToExam, unseenByTopic: ev.unseenByTopic, supplyByTopic: ev.supplyByTopic, topicTitle: ev.topicTitle, repairWeight: ev.repairWeight, paperTitles: { [paperId]: title } }),
     [ev, paperId, title],
   );
   if (!mission) return null;

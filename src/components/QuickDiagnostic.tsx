@@ -10,10 +10,12 @@ import { quickDiagnosticReport, selectQuickDiagnostic, type QuickProbe } from "@
 import { QuestionRunner } from "./QuestionRunner";
 import { ButtonLink, Button, Panel } from "./ui";
 import { useStoreFields } from "@/state/store";
+import { useRevisionPlan } from "./recovery-evidence";
 import type { Attempt } from "@/domain/types";
 
 export function QuickDiagnostic({ subjectId }: { subjectId: string }) {
   const store = useStoreFields("questions", "attempts", "mistakes");
+  const { plan } = useRevisionPlan();
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState<Attempt[]>([]);
   const [selection] = useState(() => {
@@ -56,11 +58,16 @@ export function QuickDiagnostic({ subjectId }: { subjectId: string }) {
         <ul className="text-sm text-ink space-y-1">{report.lines.found.map((l) => <li key={l}>{l}</li>)}</ul>
         <div>
           <p className="text-sm font-semibold text-ink">Best next step</p>
-          <p className="text-sm text-ink2">{report.lines.next}</p>
-          {report.firstMission ? <p className="text-xs text-ink3 mt-1">{report.firstMission.reason}</p> : null}
+          {plan.top ? (
+            <>
+              <p className="text-sm text-ink2">{plan.top.title} · {Math.ceil(plan.top.minutes)} min</p>
+              <p className="text-xs text-ink3 mt-1">{plan.top.explanation.why}</p>
+            </>
+          ) : <p className="text-sm text-ink2">{report.lines.next}</p>}
         </div>
         <p className="text-xs text-ink3">{report.caveat}</p>
-        <ButtonLink href="/" variant="primary">Back to Today</ButtonLink>
+        <ButtonLink href={plan.top?.route.href ?? "/"} variant="primary">{plan.top ? "Start session" : "Back to Today"}</ButtonLink>
+        {plan.top ? <ButtonLink href="/" variant="secondary">Back to Today</ButtonLink> : null}
       </Panel>
     );
   }

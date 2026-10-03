@@ -108,6 +108,7 @@ export function useQuestionExecution({
   externalHintTier,
   repairTeachingSeen = false,
   intervention,
+  mission,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -127,6 +128,7 @@ export function useQuestionExecution({
   externalHintTier?: HintTier | null;
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
+  mission?: Attempt["mission"];
 }) {
   const needsWjecHumanReview =
     requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question);
@@ -297,6 +299,7 @@ export function useQuestionExecution({
       ...(copiedAnswer ? { copiedAnswer: true } : {}),
       ...(workingAnalysis.length ? { workingAnalysis } : {}),
       ...(intervention ? { intervention } : {}),
+      ...(mission ? { mission } : {}),
 
       elapsedMs,
       mode,

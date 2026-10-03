@@ -65,7 +65,8 @@ describe("exam missions", () => {
       attempt("a3", "q-a3", 3, 3, "2026-09-30T09:00:00.000Z"),
       attempt("a5", "q-g3", 3, 3, "2026-09-30T10:00:00.000Z", { topicIds: ["geometry"] }),
     ];
-    const done = buildExamMissions(input(proof))[0];
+    const done = buildExamMissions({ ...input(proof), includeProven: true })[0];
+    expect(buildExamMissions(input(proof))).toHaveLength(0);
     expect(done.status).toBe("proven");
     expect(done.current.kind).toBe("complete");
     expect(done.recovery.proven).toBe(6);
@@ -122,9 +123,9 @@ describe("exam missions", () => {
     expect(action.why).toMatch(/6 marks/);
     expect(action.after).toMatch(/^Next,/);
     expect(action.proof).toMatch(/different question/);
-    expect(action.href).toMatch(/^\/practice\?recover=1/);
+    expect(action.href).toMatch(/^\/practice\?mission=/);
     const later = buildExamMissions(input([...paperAttempts, attempt("a1", "q-a2", 3, 3, "2026-09-25T09:00:00.000Z")]))[0];
-    expect(missionNextAction(later).href).toMatch(/^\/adaptive-session\?topic=/);
+    expect(missionNextAction(later).href).toMatch(/stage=(practise|apply|delayed-proof)/);
   });
 });
 

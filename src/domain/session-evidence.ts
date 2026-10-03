@@ -24,6 +24,8 @@ export interface SessionEvidence {
   stillWeak: string[];
   evidence: { independent: number; correct: number; trusted: number; delayedProof: boolean; lines: string[] };
   next: string;
+  /** The standing position on lost marks after this session; empty when none were ever lost. */
+  marks: string[];
 }
 
 const marks = (n: number) => `${Math.round(n * 10) / 10} mark${n === 1 ? "" : "s"}`;
@@ -65,5 +67,13 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
   else if (after.open > 0) next = "Next, another repair on the open mistakes, then a different question.";
   else next = after.proven > 0 ? "Nothing open here. Revise will keep a light delayed check scheduled." : "Revise needs more answers before it can plan a check.";
 
-  return { changed, stillWeak, evidence: { independent: independent.length, correct: correct.length, trusted: trusted.length, delayedProof, lines }, next };
+  const marksLines = after.previouslyLost > 0 ? [
+    `${marks(after.previouslyLost)} previously lost`,
+    `${marks(after.targeted)} targeted`,
+    `${marks(Math.max(0, after.provisional - after.awaitingProof))} provisionally recovered`,
+    `${marks(after.awaitingProof)} awaiting delayed proof`,
+    `${marks(after.proven)} proven recovered`,
+    ...(after.regressed > 0 ? [`${marks(after.regressed)} lost again`] : []),
+  ] : [];
+  return { marks: marksLines, changed, stillWeak, evidence: { independent: independent.length, correct: correct.length, trusted: trusted.length, delayedProof, lines }, next };
 }
