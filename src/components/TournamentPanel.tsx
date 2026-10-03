@@ -1,5 +1,6 @@
 "use client";
 
+import { EvidenceClassNote } from "./EvidenceClassNote";
 import { useMemo } from "react";
 import { runTournament, type ParticipantTrajectory } from "@/domain/recommender-tournament";
 import { Panel, SectionHeading } from "./ui";
@@ -56,6 +57,7 @@ export function TournamentPanel() {
 
   return (
     <section className="space-y-3">
+      <EvidenceClassNote kind="engineering-validation" />
       <SectionHeading title="Recommender tournament" hint="Ten policies replayed over trajectories" />
       <Panel>
         <table className="w-full text-xs">

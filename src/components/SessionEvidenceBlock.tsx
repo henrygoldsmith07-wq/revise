@@ -36,6 +36,7 @@ export function SessionEvidenceBlock({ attempts }: { attempts: readonly Attempt[
       <Section title="Still weak" lines={evidence.stillWeak} />
       <Section title="Evidence created" lines={evidence.evidence.lines} />
       <Section title="What happens next" lines={[evidence.next]} />
+      <Section title="Marks recovered so far" lines={evidence.marks} />
     </div>
   );
 }

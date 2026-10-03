@@ -18,7 +18,7 @@
 // One successful repeat never proves a mark. Pure domain: no clock, no storage.
 // ---------------------------------------------------------------------------
 
-import { independentAttempt, questionFamilies, trustworthyAttempt } from "./learning-evidence";
+import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
@@ -43,6 +43,16 @@ export interface MistakeRecovery {
   proofDueAt?: string;
   /** Why this state, in plain English. */
   reason: string;
+  /** When revision first touched this loss. */
+  targetedAt?: string;
+  /** The attempt that first succeeded after the loss. */
+  firstSuccessAttemptId?: Id;
+  /** When the delayed independent success happened. */
+  provenAt?: string;
+  provenAttemptId?: Id;
+  regressedAt?: string;
+  /** Success counts as proof only on verified content; otherwise it stays provisional. */
+  unverifiedOnly?: boolean;
 }
 
 export interface RecoveryTotals {
@@ -92,27 +102,37 @@ export function classifyMistake(
   const after = attempts
     .filter((a) => a.createdAt > mistake.createdAt && a.topicIds.includes(mistake.topicId) && trustworthyAttempt(a))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const targeted = (mistake.retestCount ?? 0) > 0 || after.some((a) => a.retestMistakeId === mistake.id);
+  const bank = [...questionsById.values()];
+  const verified = (a: Attempt) => trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank);
+  // Revision "targets" a loss only when it is a retest of it or a mission attempt aimed at it. A later
+  // attempt that merely happens to be on the same topic, including the one that lost other marks, is not.
+  const aimed = after.filter((a) => a.retestMistakeId === mistake.id || a.mission?.sourceMistakeIds.includes(mistake.id));
+  const targeted = (mistake.retestCount ?? 0) > 0 || aimed.length > 0;
   const successes = after.filter((a) => ratio(a) >= SUCCESS_RATIO);
   const first = successes[0];
+  const targetedAt = [aimed[0]?.createdAt, first?.createdAt].filter((t): t is string => Boolean(t)).sort()[0];
   const different = (a: Attempt): boolean => {
     if (a.questionId === mistake.questionId) return false;
     const q = questionsById.get(a.questionId);
     return !!q && !questionFamilies(q).some((f) => sourceFamilies.has(f));
   };
   const independentDifferent = successes.filter((a) => independentAttempt(a) && different(a));
+  const provable = independentDifferent.filter(verified);
   if (!first) {
-    return { ...base, state: targeted || after.length ? "targeted" : "open", reason: targeted
-      ? "Revised, but no successful answer on this yet." : after.length ? "Practised nearby without a success on this yet." : "Not revisited since the mark was lost." };
+    return { ...base, ...(targetedAt ? { targetedAt } : {}), state: targeted ? "targeted" : "open", reason: targeted
+      ? "Revised, but no successful answer on this yet." : "Not revisited since the mark was lost." };
   }
   const proofDueAt = new Date(Date.parse(first.createdAt) + MIN_PROOF_DELAY_DAYS * DAY_MS).toISOString();
-  const common = { ...base, firstSuccessAt: first.createdAt, proofDueAt };
+  const common = { ...base, firstSuccessAt: first.createdAt, firstSuccessAttemptId: first.id, proofDueAt, ...(targetedAt ? { targetedAt } : {}) };
   if (!independentDifferent.length) {
     return { ...common, state: "provisional", reason: "Succeeded, but on the same question, with help, or on a near-identical one. That is not proof." };
   }
+  if (!provable.length) {
+    return { ...common, state: "provisional", unverifiedOnly: true, reason: "Succeeded on a different question, but only on content that has not been human-verified, so it cannot count as proof." };
+  }
   const firstFamilies = new Set(questionsById.has(first.questionId) ? questionFamilies(questionsById.get(first.questionId)!) : []);
   // The delayed check must also be new relative to the success it follows.
-  const delayed = independentDifferent.find((a) => daysBetween(first.createdAt, a.createdAt) >= MIN_PROOF_DELAY_DAYS &&
+  const delayed = provable.find((a) => daysBetween(first.createdAt, a.createdAt) >= MIN_PROOF_DELAY_DAYS &&
     a.questionId !== first.questionId && !questionFamilies(questionsById.get(a.questionId)!).some((f) => firstFamilies.has(f)));
   if (!delayed) {
     const due = Date.parse(proofDueAt) <= now.getTime();
@@ -122,9 +142,9 @@ export function classifyMistake(
   }
   const later = after.filter((a) => a.createdAt > delayed.createdAt && independentAttempt(a)).at(-1);
   if (later && ratio(later) < REGRESSION_RATIO) {
-    return { ...common, state: "regressed", reason: "Was proven, but a later independent attempt on this topic lost marks again." };
+    return { ...common, state: "regressed", regressedAt: later.createdAt, provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Was proven, but a later independent attempt on this topic lost marks again." };
   }
-  return { ...common, state: "proven", reason: "Answered independently on a different question after a delay." };
+  return { ...common, state: "proven", provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Answered independently on a different question after a delay." };
 }
 
 export interface MarkRecovery {

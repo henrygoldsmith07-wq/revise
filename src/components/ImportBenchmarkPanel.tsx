@@ -1,5 +1,6 @@
 "use client";
 
+import { EvidenceClassNote } from "./EvidenceClassNote";
 import { useMemo } from "react";
 import {
   IMPORT_PHASE_1_PAPERS,
@@ -45,6 +46,7 @@ export function ImportBenchmarkPanel() {
 
   return (
     <section className="space-y-3">
+      <EvidenceClassNote kind="engineering-validation" />
       <SectionHeading title="Paper-import benchmark" hint="Segmentation F1, mapping accuracy, and confidence-aware import" />
       <Panel>
         <div className="grid grid-cols-3 gap-2 text-xs">

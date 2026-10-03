@@ -5,6 +5,17 @@
 import type { Id, IsoInstant } from "./types-base";
 import type { MarkedPart, MarkEscalation, FarTransferAttemptLink, PaperMarkingReview } from "./types-marking";
 
+/** Which Exam Mission, stage and weakness an attempt was made for, so its effect can be measured later. */
+export interface MissionAttemptContext {
+  missionId: string;
+  stage: "diagnose" | "repair" | "practise" | "apply" | "transfer" | "delayed-proof";
+  /** The repair/practice method used, e.g. "technique-intervention". */
+  intervention: string | null;
+  /** Root cause the mission targets, e.g. "unit-error". */
+  targetCause: string | null;
+  sourceMistakeIds: Id[];
+}
+
 export interface Attempt {
   id: Id;
   userId: Id;
@@ -36,6 +47,8 @@ export interface Attempt {
   workingAnalysis?: AttemptWorkingEvidence[];
   /** The adaptive intervention that produced this immediate observation. */
   intervention?: InterventionAttemptContext;
+  /** Set when the attempt was made inside an Exam Mission session. */
+  mission?: MissionAttemptContext;
   elapsedMs: number;
   mode: "practice" | "paper" | "recall";
   /** Optional provenance for attempts completed inside a paper sitting. */

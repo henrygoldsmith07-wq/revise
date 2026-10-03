@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
 import { remapContentIdString } from "@/data/content-ids";
@@ -13,6 +13,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
+import { MissionSessionMode } from "@/components/MissionSessionMode";
 import { SessionEvidenceBlock } from "@/components/SessionEvidenceBlock";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
@@ -43,6 +44,7 @@ export default function PracticePage() {
 
 function Practice() {
   const params = useSearchParams();
+  const router = useRouter();
   const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
@@ -361,6 +363,11 @@ function Practice() {
   }
 
   const topics = subjectId ? topicsFor(subjectId) : [];
+
+  const missionParam = params.get("mission");
+  if (missionParam) {
+    return <MissionSessionMode missionId={missionParam} stage={params.get("stage")} onExit={() => router.push("/")} />;
+  }
 
   if (weakExam) {
     return <WeakTopicExamMode onExit={() => setWeakExam(false)} />;

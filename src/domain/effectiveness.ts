@@ -7,9 +7,15 @@
 // from three different families (see durableOutcomeScore).
 // ---------------------------------------------------------------------------
 
+
 import { durableOutcomeScore } from "./intervention-calibration";
 import type { InterventionKind as RankedKind } from "./intervention-ranking";
 import type { InterventionKind, InterventionOutcomeRecord } from "./types";
+import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
+import { independentAttempt, trustedAssessmentAttempt } from "./learning-evidence";
+import { INTERVENTION_LABEL } from "./intervention-ranking";
+import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
+import type { Attempt, Mistake, Question } from "./types";
 
 /** Which recorded outcome type measures each ranked intervention. */
 export function outcomeKindFor(kind: RankedKind): InterventionKind | null {
@@ -119,4 +125,129 @@ export function effectivenessReport(records: readonly InterventionOutcomeRecord[
 export function effectivenessWeight(report: readonly EffectivenessRow[], kind: InterventionKind, capabilityKey?: string): number {
   const exact = capabilityKey ? report.find((r) => r.key === capabilityKey && r.reliable) : undefined;
   return (exact ?? report.find((r) => r.key === kind && r.reliable))?.weight ?? 1;
+}
+
+// ---------------------------------------------------------------------------
+// Mission-attributed effectiveness. Attempts made inside a mission session
+// carry the mission, stage, repair method and target cause, so a chain
+// (baseline → supported → different question → delayed) can be rebuilt from
+// attempts alone, at the level of the actual method rather than "guided".
+// ---------------------------------------------------------------------------
+
+
+export interface MissionChain {
+  missionId: string;
+  intervention: string;
+  cause: string | null;
+  subjectId: string;
+  baseline: number | null;
+  immediate: number | null;
+  differentQuestion: number | null;
+  transfer: number | null;
+  delayed: number | null;
+  delayedMarks: number;
+  minutes: number;
+  /** Independent different-question success, then an independent verified delayed answer at least the proof delay later. */
+  durable: boolean;
+  /** Gain on the delayed check over the original baseline, in share of marks. */
+  gain: number | null;
+}
+
+const DAY = 86_400_000;
+const rate = (rows: readonly Attempt[]): number | null => {
+  const max = rows.reduce((s, a) => s + a.max, 0);
+  return max > 0 ? rows.reduce((s, a) => s + a.awarded, 0) / max : null;
+};
+
+export function missionChains(input: { attempts: readonly Attempt[]; mistakes: readonly Mistake[]; questions: readonly Question[] }): MissionChain[] {
+  const byMission = new Map<string, Attempt[]>();
+  for (const a of input.attempts) if (a.mission) byMission.set(a.mission.missionId, [...(byMission.get(a.mission.missionId) ?? []), a]);
+  const attemptById = new Map(input.attempts.map((a) => [a.id, a] as const));
+  const qById = new Map(input.questions.map((q) => [q.id, q] as const));
+  const out: MissionChain[] = [];
+  for (const [missionId, rows] of [...byMission].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const sorted = [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const stage = (...s: string[]) => sorted.filter((a) => s.includes(a.mission!.stage));
+    const intervention = sorted.find((a) => a.mission!.stage === "repair" && a.mission!.intervention)?.mission!.intervention ??
+      sorted.find((a) => a.mission!.intervention)?.mission!.intervention ?? null;
+    if (!intervention) continue;
+    const ids = new Set(sorted.flatMap((a) => a.mission!.sourceMistakeIds));
+    const sourceAttempts = input.mistakes.filter((m) => ids.has(m.id) && m.attemptId).map((m) => attemptById.get(m.attemptId!)).filter((a): a is Attempt => Boolean(a));
+    const independent = (a: Attempt) => independentAttempt(a) && trustedAssessmentAttempt(a, qById.get(a.questionId), input.attempts, input.questions);
+    const apply = stage("apply").filter(independent);
+    const delayed = stage("delayed-proof").filter(independent);
+    const transfer = stage("transfer").filter(independent);
+    const baseline = rate(sourceAttempts);
+    const delayedRate = rate(delayed);
+    const firstApply = apply[0]?.createdAt;
+    const gapOk = firstApply !== undefined && delayed.some((a) => Date.parse(a.createdAt) - Date.parse(firstApply) >= MIN_PROOF_DELAY_DAYS * DAY);
+    const durable = apply.length > 0 && delayed.length > 0 && gapOk && rate(apply) !== null;
+    out.push({
+      missionId, intervention, cause: sorted[0]!.mission!.targetCause, subjectId: sorted[0]!.subjectId,
+      baseline, immediate: rate(stage("repair", "practise", "diagnose")), differentQuestion: rate(apply), transfer: rate(transfer), delayed: delayedRate,
+      delayedMarks: delayed.reduce((s, a) => s + a.max, 0),
+      minutes: Math.round(sorted.reduce((s, a) => s + a.elapsedMs, 0) / 60_000 * 10) / 10,
+      durable, gain: durable && baseline !== null && delayedRate !== null ? delayedRate - baseline : null,
+    });
+  }
+  return out;
+}
+
+export interface EffectivenessQuery { kind: RankedKind; cause?: string | null }
+export type EvidenceLevel = "learner-cause" | "learner" | "outcome-chains" | "population" | "neutral";
+export interface EffectivenessEstimate {
+  weight: number;
+  level: EvidenceLevel;
+  samples: number;
+  uncertainty: "none" | "high" | "moderate" | "low";
+}
+
+export interface EffectivenessEvidence {
+  chains?: readonly MissionChain[];
+  /** Coarse outcome-chain report (guided / independent / transfer / retention). */
+  report?: readonly EffectivenessRow[];
+  /** Population default weight per method, supplied only when one has been measured. */
+  population?: Partial<Record<RankedKind, number>>;
+}
+
+const clampWeight = (w: number) => Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, w));
+const weightFrom = (gains: readonly number[]) => {
+  const mean = gains.reduce((a, b) => a + b, 0) / gains.length;
+  return clampWeight(1 + mean * 1.5 * Math.min(1, gains.length / 10));
+};
+const uncertaintyFor = (n: number): EffectivenessEstimate["uncertainty"] => (n === 0 ? "none" : n < MIN_CHAINS_FOR_WEIGHT ? "high" : n < 10 ? "moderate" : "low");
+
+/**
+ * Learner + cause + method, then learner + method, then coarse outcome chains,
+ * then a measured population default, then neutral. Falls through whenever a
+ * level has fewer durable chains than MIN_CHAINS_FOR_WEIGHT, so a tiny sample
+ * never personalises.
+ */
+export function estimateEffectiveness(ev: EffectivenessEvidence, q: EffectivenessQuery): EffectivenessEstimate {
+  const durable = (ev.chains ?? []).filter((c) => c.durable && c.gain !== null && c.intervention === q.kind);
+  const withCause = q.cause ? durable.filter((c) => c.cause === q.cause) : [];
+  if (withCause.length >= MIN_CHAINS_FOR_WEIGHT) return { weight: weightFrom(withCause.map((c) => c.gain!)), level: "learner-cause", samples: withCause.length, uncertainty: uncertaintyFor(withCause.length) };
+  if (durable.length >= MIN_CHAINS_FOR_WEIGHT) return { weight: weightFrom(durable.map((c) => c.gain!)), level: "learner", samples: durable.length, uncertainty: uncertaintyFor(durable.length) };
+  const coarse = ev.report ? rankedWeight(ev.report, q.kind) : 1;
+  const coarseRow = ev.report?.find((r) => r.kind === outcomeKindFor(q.kind) && r.reliable);
+  if (coarseRow && coarse !== 1) return { weight: coarse, level: "outcome-chains", samples: coarseRow.durableChains, uncertainty: uncertaintyFor(coarseRow.durableChains) };
+  const pop = ev.population?.[q.kind];
+  if (pop !== undefined) return { weight: clampWeight(pop), level: "population", samples: 0, uncertainty: "high" };
+  return { weight: 1, level: "neutral", samples: durable.length, uncertainty: durable.length ? "high" : "none" };
+}
+
+/** A comparative claim, only when two methods each have enough durable chains and clearly differ. */
+export function effectivenessClaims(chains: readonly MissionChain[]): string[] {
+  const claims: string[] = [];
+  const causes = [...new Set(chains.filter((c) => c.durable && c.cause).map((c) => c.cause!))].sort();
+  for (const cause of causes) {
+    const rows = [...new Set(chains.filter((c) => c.cause === cause && c.durable).map((c) => c.intervention))].sort().map((kind) => {
+      const gains = chains.filter((c) => c.cause === cause && c.durable && c.intervention === kind && c.gain !== null).map((c) => c.gain!);
+      return { kind, n: gains.length, mean: gains.reduce((a, b) => a + b, 0) / Math.max(1, gains.length) };
+    }).filter((r) => r.n >= MIN_CHAINS_FOR_WEIGHT).sort((a, b) => b.mean - a.mean);
+    if (rows.length < 2 || rows[0]!.mean - rows.at(-1)!.mean < 0.15) continue;
+    const label = (k: string) => INTERVENTION_LABEL[k as RankedKind] ?? k;
+    claims.push(`For ${ROOT_CAUSE_LABEL[cause as RootCause] ?? cause}, you tend to do better after ${label(rows[0]!.kind)} than after ${label(rows.at(-1)!.kind)} (${rows[0]!.n} and ${rows.at(-1)!.n} completed chains).`);
+  }
+  return claims;
 }

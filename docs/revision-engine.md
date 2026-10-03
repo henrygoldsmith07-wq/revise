@@ -339,3 +339,45 @@ The streak has a **one-day grace**: a gap of two days holds the streak without
 incrementing it. Losing a month's streak to one missed evening is how students
 quit, and the streak is meant to support the habit rather than punish a life
 event.
+
+
+## 7. Next Best Action
+
+`src/domain/revision-engine.ts`
+
+Exam Missions, paper recovery, proof checks, regression recovery, due reviews,
+untouched content, the pre-exam command centre and the adaptive topic optimiser
+do not decide what the student does next. They each emit candidate actions in
+one shape, and the engine ranks them together, per action, across every
+enrolled subject. Today shows the winner.
+
+```
+score = sqrt(expected marks × marks per minute × 20)
+        × exam urgency × phase fit × topic weighting × (0.6 + 0.4 × confidence)
+```
+
+- **expected marks**: marks at stake × the share a step like this can recover × the
+  learner's measured effectiveness for the method.
+- **exam urgency**: `1 + 1.5 × how close that subject's exam is`, from that subject's
+  own date. Subject order in settings never affects the result (tested).
+- **phase fit**: a gentle multiplier from the countdown phase, never a hard category
+  priority. Delayed-proof stages are dropped when the delay cannot fit before the exam.
+- **confidence**: how much trusted evidence backs the estimate.
+
+Regression recovery gates new work on the same topic; one lost mark is planned once
+(overlapping actions are parked with the reason). Every action carries why, why now,
+why before the others, the evidence, what happens after and what proves it worked.
+
+Missions run as real sessions (`mission-session.ts`): questions are chosen for the
+mission's target weakness across all its topics, support is set by stage, and every
+attempt carries `mission` (mission, stage, method, target cause, source mistakes).
+Effectiveness (`effectiveness.ts`) is rebuilt from those attempts and falls back
+learner+cause → learner → coarse outcome chains → population → neutral, never
+personalising from fewer than five durable chains.
+
+Proof needs verified, unseen questions (`supply.ts`). Where they do not exist the
+engine says so and offers practice instead of proof.
+
+Validation evidence is kept apart: `evidence-class.ts` separates engineering
+validation (fixtures, benchmarks) from real-world evidence, and only the latter is
+counted in the "how much real evidence says this works?" panel.

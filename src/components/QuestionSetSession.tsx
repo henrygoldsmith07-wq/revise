@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
-import type { Attempt, Id, Question } from "@/domain/types";
+import type { Attempt, Id, MissionAttemptContext, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { QuestionRunner } from "./QuestionRunner";
 import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
@@ -20,6 +20,9 @@ export function QuestionSetSession({
   emptyBody,
   onExit,
   renderSummary,
+  hintBudgetFor,
+  contextFor,
+  exitLabel = "Back to practice",
 }: {
   title: string;
   hint: string;
@@ -29,6 +32,11 @@ export function QuestionSetSession({
   emptyBody: string;
   onExit: () => void;
   renderSummary?: (attempts: Attempt[], queue: Question[]) => ReactNode;
+  /** Per-question hint budget; 0 keeps the answer unaided so it counts as independent evidence. */
+  hintBudgetFor?: Record<Id, number | undefined>;
+  /** Mission attribution carried on each attempt. */
+  contextFor?: Record<Id, MissionAttemptContext>;
+  exitLabel?: string;
 }) {
   const store = useStoreFields("questions");
   const questionsById = useMemo(
@@ -85,7 +93,7 @@ export function QuestionSetSession({
             Every answer was marked and saved. Marks still dropped stay in your mistake queue, and only a delayed retest closes them.
           </p>
         </Panel>
-        <Button variant="primary" className="w-full" onClick={onExit}>Back to practice</Button>
+        <Button variant="primary" className="w-full" onClick={onExit}>{exitLabel}</Button>
       </div>
     );
   }
@@ -138,6 +146,8 @@ export function QuestionSetSession({
             key={current.id}
             question={current}
             mode="practice"
+            hintBudget={hintBudgetFor?.[current.id]}
+            mission={contextFor?.[current.id]}
             onFinished={(attempt) => setAttempts((previous) => [...previous, attempt])}
           />
           <Button

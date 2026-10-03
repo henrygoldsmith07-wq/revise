@@ -10,6 +10,7 @@ import { PaperReadinessPanel } from "@/components/PaperReadinessPanel";
 import { MistakePatternsPanel } from "@/components/MistakePatternsPanel";
 import { RecommendationAuditPanel } from "@/components/RecommendationAuditPanel";
 import { ProofPanel } from "@/components/ProofPanel";
+import { RealWorldEvidencePanel, RecoverySummaryPanel } from "@/components/RecoverySummary";
 import { GradePredictionRealityPanel } from "@/components/GradePredictionRealityPanel";
 import {
   ApplicationMasteryCard,
@@ -42,6 +43,8 @@ export default function ReadinessPage() {
       <PaperReadinessPanel />
 
       <ProofPanel />
+      <RecoverySummaryPanel />
+      <RealWorldEvidencePanel />
 
       <RecommendationAuditPanel />
 

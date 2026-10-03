@@ -1,5 +1,6 @@
 "use client";
 
+import { EvidenceClassNote } from "./EvidenceClassNote";
 import { useMemo, useState } from "react";
 import { getSubject } from "@/domain/curriculum";
 import {
@@ -120,6 +121,7 @@ export function GradePredictionRealityPanel() {
 
   return (
     <section aria-label="Prediction reality check" className="space-y-4">
+      <EvidenceClassNote kind="real-world-evidence" />
       <SectionHeading
         title="Prediction reality check"
         hint="Close the loop with real mocks, timed papers and final results. Revise only compares an outcome with a forecast that existed before you sat it."

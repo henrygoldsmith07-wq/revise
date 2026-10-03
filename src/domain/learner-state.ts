@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { independentAttempt, isTransferQuestion, questionFamily } from "./learning-evidence";
+import type { RecoveryState } from "./mark-recovery";
 import type { LifecycleStage, TopicLifecycle } from "./proof-lifecycle";
 import type { Attempt, Id, Question } from "./types";
 
@@ -76,3 +77,17 @@ export function learnerState(lifecycle: TopicLifecycle, evidence?: TopicEvidence
   }
   return { state, label: LEARNER_STATE_LABEL[state], detail };
 }
+
+/** The same six words for a mission's status. "Blocked" is not a state of the learner: it is Needs work with a stated limit. */
+export function missionLearnerState(status: "not-started" | "active" | "awaiting-proof" | "proven" | "regressed" | "blocked"): LearnerState {
+  return ({ "not-started": "needs-work", active: "improving", "awaiting-proof": "awaiting-proof", proven: "proven", regressed: "regressed", blocked: "needs-work" } as const)[status];
+}
+
+/** The same six words for one lost mark's recovery state. */
+export function recoveryLearnerState(state: RecoveryState): LearnerState {
+  return ({ open: "needs-work", targeted: "needs-work", provisional: "improving", "awaiting-proof": "awaiting-proof", proven: "proven", regressed: "regressed" } as const)[state];
+}
+
+export const LEARNER_STATE_TONE: Record<LearnerState, "neutral" | "success" | "review" | "danger" | "accent"> = {
+  "not-checked": "neutral", "needs-work": "danger", improving: "accent", "awaiting-proof": "review", proven: "success", regressed: "danger",
+};

@@ -40,6 +40,7 @@ export function QuestionRunner({
   externalHintTier,
   repairTeachingSeen = false,
   intervention,
+  mission,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -59,8 +60,9 @@ export function QuestionRunner({
   externalHintTier?: HintTier | null;
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
+  mission?: Attempt["mission"];
 }) {
-  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention });
+  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
   return (
     <div className="space-y-4">
       <Panel>

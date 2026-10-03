@@ -1,5 +1,15 @@
 # Changelog
 
+## One next best action — 2026-10-03
+
+**One engine decides.** Missions, paper recovery, proof checks, regressions, due reviews, untouched topics, paper sections and the adaptive session now compete in a single ranking across all your subjects. Today shows only the winner, with why, why now, why before the others, what it is based on, what happens after and what would prove it worked. The order of subjects in Settings no longer matters.
+
+**Missions run as real sessions.** A mission step picks questions for its weakness across every topic it touches, with the right amount of help, and every answer is tagged with the mission, stage and method so Revise can measure whether it worked. Proof stages only use verified, unseen questions; when there are none, Revise says it cannot prove the improvement yet.
+
+**Marks recovered, over time.** Progress shows this week's marks targeted, provisionally recovered, proven and regressed, and where they came from (subject, topic, paper, cause, skill, method). Session endings show the standing position.
+
+**Also:** papers get a diagnosis (knowledge versus technique, repeats across papers, weakly evidenced topics); the quick diagnostic ends with the one best next step; missions and paper losses use the same six learner words; the command centre now reads the same plan and no longer favours the first subject; a panel separates real-world evidence from benchmark validation.
+
 ## Exam missions and marks recovered — 2026-10-03
 
 **Exam Missions.** Today now shows one mission built from your lost marks: a recurring cause, a weak topic, or a whole paper. Each stage (diagnose, repair, practise, apply, delayed proof) says why it exists. A mission only completes when a different question, answered independently after a delay, proves the marks are back. Finishing tasks never completes one.

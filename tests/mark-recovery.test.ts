@@ -11,9 +11,13 @@ describe("marks recovered", () => {
     expect(run().state).toBe("open");
   });
 
-  it("counts a revisit without success as targeted, not recovered", () => {
-    const r = run([attempt("a1", "q-a2", 1, 3, "2026-09-21T09:00:00.000Z")]);
+  it("counts an aimed revisit without success as targeted, not recovered", () => {
+    const r = run([attempt("a1", "q-a2", 1, 3, "2026-09-21T09:00:00.000Z", { retestMistakeId: "m1" })]);
     expect(r.state).toBe("targeted");
+  });
+
+  it("does not treat an unrelated later attempt on the same topic as revision of this loss", () => {
+    expect(run([attempt("a1", "q-a2", 1, 3, "2026-09-21T09:00:00.000Z")]).state).toBe("open");
   });
 
   it("treats a repeat of the same question as provisional, never proof", () => {
