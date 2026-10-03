@@ -4,13 +4,45 @@
 > engine is strong, but the established competitors have much greater content
 > volume, editorial trust and user scale.
 
-**Goal: match competitors on content quality, then beat them with
-"what should I revise next?" intelligence.**
+**Goal: make the strongest adaptive features work end to end on trusted content
+for the four WJEC flagships, then beat competitors with "what should I revise
+next?" intelligence.**
 
-This is a living backlog of the gaps that matter most, grouped by theme. Items
-marked *(extend)* already have a working baseline in the engine and need depth
-rather than a new subsystem. Nothing here is sequenced — the order within each
-group is not priority order.
+The backlog below is grouped by theme. Items marked *(extend)* already have a
+working baseline in the engine and need depth rather than a new subsystem. The
+order within each group is not priority order; use "Priorities now" above.
+
+## Priorities now
+
+The engine is ahead of its content. The bottleneck is trusted question supply
+and learner simplicity, not another mode, score or recommender. In order:
+
+1. **Trusted flagship content.** Move authored WJEC Maths, Biology, Chemistry
+   and Physics questions through unverified → checked → verified
+   ([`docs/review-workflow.md`](docs/review-workflow.md)), in the order
+   `npm run wjec:review:priorities` gives. Today no flagship question is
+   trusted, so proof is blocked everywhere in the flagships.
+2. **Question diversity and transfer supply.** At least 2 genuinely distinct
+   trusted questions and 1 trusted transfer question per topic, plus
+   data/practical questions where a topic needs them. Where the priorities
+   report says "needs new or revised", author or repair rather than review.
+3. **Trusted cold-start diagnostic.** Five topics per flagship with a trusted,
+   short question unlock the 5–10 minute quick check (`cold-start-diagnostic`
+   in the priorities report). The loop is built; it needs reviewed supply.
+4. **Real learner validation.** Use the core-value outcomes in
+   `src/domain/product-outcomes.ts` (diagnostic completion, recommendation
+   start, recovered marks, delayed-proof completion, time from first loss to
+   proof, proof blocked by supply) with real learners before tuning the engine.
+5. **Mobile learner-flow simplification.** Today → Start → Answer → Feedback →
+   Continue; keep removing duplicated recommendations, scores and engine
+   vocabulary from the first viewport.
+6. **Marking accuracy validation.** Double-marked corpora and human marking
+   agreement before trusting automated marks further.
+7. **Content breadth.** More subjects and boards, only after the flagships can
+   prove improvement.
+
+Everything below this section is the longer backlog and is **not** in priority
+order; speculative feature expansion sits below the seven items above.
 
 ## Baseline already shipped
 

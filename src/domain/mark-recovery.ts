@@ -20,6 +20,7 @@
 
 import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
+import { isShallowReskin } from "./reskin";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
 export type RecoveryState = "open" | "targeted" | "provisional" | "awaiting-proof" | "proven" | "regressed";
@@ -114,7 +115,7 @@ export function classifyMistake(
   const different = (a: Attempt): boolean => {
     if (a.questionId === mistake.questionId) return false;
     const q = questionsById.get(a.questionId);
-    return !!q && !questionFamilies(q).some((f) => sourceFamilies.has(f));
+    return !!q && !questionFamilies(q).some((f) => sourceFamilies.has(f)) && !(sourceQuestion && isShallowReskin(q, sourceQuestion));
   };
   const independentDifferent = successes.filter((a) => independentAttempt(a) && different(a));
   const provable = independentDifferent.filter(verified);
@@ -128,12 +129,13 @@ export function classifyMistake(
     return { ...common, state: "provisional", reason: "Succeeded, but on the same question, with help, or on a near-identical one. That is not proof." };
   }
   if (!provable.length) {
-    return { ...common, state: "provisional", unverifiedOnly: true, reason: "Succeeded on a different question, but only on content that has not been human-verified, so it cannot count as proof." };
+    return { ...common, state: "provisional", unverifiedOnly: true, reason: "You improved here, but Revise does not yet have enough reviewed new questions to prove it." };
   }
   const firstFamilies = new Set(questionsById.has(first.questionId) ? questionFamilies(questionsById.get(first.questionId)!) : []);
   // The delayed check must also be new relative to the success it follows.
   const delayed = provable.find((a) => daysBetween(first.createdAt, a.createdAt) >= MIN_PROOF_DELAY_DAYS &&
-    a.questionId !== first.questionId && !questionFamilies(questionsById.get(a.questionId)!).some((f) => firstFamilies.has(f)));
+    a.questionId !== first.questionId && !questionFamilies(questionsById.get(a.questionId)!).some((f) => firstFamilies.has(f)) &&
+    (!questionsById.has(first.questionId) || !isShallowReskin(questionsById.get(a.questionId)!, questionsById.get(first.questionId)!)));
   if (!delayed) {
     const due = Date.parse(proofDueAt) <= now.getTime();
     return { ...common, state: "awaiting-proof", reason: due

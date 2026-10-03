@@ -333,11 +333,11 @@ export function statement(m: InterventionMeasurement): OutcomeStatement {
   const label = labelOf(m.kind);
   const n = m.gain.sample;
   if (m.delayedIndependent.sample === 0) {
-    return { level: "too-early", text: `Too early to tell for ${label}: there is no unaided check on new questions at least ${MIN_PROOF_DELAY_DAYS} days later yet. Help-assisted answers don't count as proof.` };
+    return { level: "too-early", text: `Too early to tell for ${label}. No later check on new questions has been completed yet (it needs an unaided check at least ${MIN_PROOF_DELAY_DAYS} days after revising).` };
   }
   if (n < MIN_DELAYED_CHECKS) {
     const shown = m.delayedIndependent.sample;
-    return { level: n === 0 ? "too-early" : "early-signs", text: `Early signs only for ${label}: ${checks(shown)} so far, and we need ${MIN_DELAYED_CHECKS} before saying whether it works for you. It could easily be chance.` };
+    return { level: n === 0 ? "too-early" : "early-signs", text: `Too early to tell for ${label}. ${shown} later ${shown === 1 ? "check" : "checks"} completed; ${MIN_DELAYED_CHECKS - shown} more later ${MIN_DELAYED_CHECKS - shown === 1 ? "check" : "checks"} needed before Revise can judge this reliably.` };
   }
   const base = pct(m.baselineShare.value ?? 0), later = pct(m.delayedIndependent.value ?? 0);
   if (m.gain.low > 0) {

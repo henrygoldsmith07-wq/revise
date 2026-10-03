@@ -1,5 +1,10 @@
 # Current improvement state — 3 October 2026
 
+The [review-workflow pass](docs/review-workflow.md) makes trusted supply the explicit bottleneck: an
+auditable unverified → checked → verified workflow, a priority queue driven by the supply audit,
+reskin-proof independent evidence and a product-level learner journey test. Flagship questions
+remain untrusted until real reviewers approve them; see the [roadmap](docs/roadmap.md).
+
 The [learner-experience pass](docs/learner-experience-2026-10-03.md) adds a skippable cold-start quick check,
 a six-answer Today, one paper result block, exact mission resume, evidence-based session summaries,
 conservative outcome measurement and the [question supply audit](docs/question-supply-audit.md).

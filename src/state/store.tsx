@@ -349,7 +349,8 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const completeOnboarding = useCallback(async () => {
     await repo.markOnboarded(userId);
     setNeedsOnboarding(false);
-  }, [userId]);
+    void recordFunnel("onboarding_completed").catch(() => undefined);
+  }, [userId, recordFunnel]);
 
   const patch = useCallback((updater: (prev: Snapshot) => Snapshot) => {
     setSnapshot((prev) => (prev ? updater(prev) : prev));

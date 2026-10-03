@@ -27,6 +27,14 @@ export type FunnelEventType =
   | "app_opened"
   | "recommendation_displayed"
   | "recommendation_accepted"
+  | "onboarding_completed"
+  | "diagnostic_started"
+  | "diagnostic_completed"
+  | "diagnostic_skipped"
+  /** Detail = the action type Today led with (e.g. "quick-check", "mission"). */
+  | "next_action_shown"
+  /** Detail = the topic whose proof is blocked by too few trusted questions. */
+  | "proof_blocked_by_supply"
   | "feedback_read";
 
 export interface FunnelEvent {

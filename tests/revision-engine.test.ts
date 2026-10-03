@@ -186,7 +186,7 @@ describe("thin evidence and evidence gaps", () => {
   it("explains each way proof can be limited", () => {
     const notes = evidenceLimits({ supply: { provable: 0, practiceOnly: 3, transfer: 0 }, daysToExam: 2, minProofDays: 3, trustedAttempts: 1, delayedChecked: false });
     expect(notes.map((n) => n.kind)).toEqual(expect.arrayContaining(["only-unverified", "no-transfer", "exam-too-close", "thin-evidence", "no-delayed-evidence"]));
-    expect(limitsSentence(notes)).toMatch(/not human-verified/);
+    expect(limitsSentence(notes)).toMatch(/have not been reviewed/);
     expect(evidenceLimits({ supply: { provable: 1, practiceOnly: 0, transfer: 1 }, daysToExam: 40, minProofDays: 3, trustedAttempts: 5, delayedChecked: true }).map((n) => n.kind)).toEqual(["one-unseen-verified"]);
     expect(limitsSentence([])).toBeNull();
   });
@@ -243,7 +243,7 @@ describe("mission sessions", () => {
     const mis = buildExamMissions({ mistakes: ms, recovery, daysToExam: 30, unseenByTopic: {} })[0]!;
     const apply = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "apply");
     expect(apply.questionIds).toEqual([]);
-    expect(apply.limit).toMatch(/cannot prove|no unseen/i);
+    expect(apply.limit).toMatch(/cannot (currently )?prove|enough reviewed new questions/i);
   });
 
   it("builds a delayed check from questions unlike anything answered so far", () => {

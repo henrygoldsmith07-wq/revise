@@ -3,6 +3,7 @@ import { requiresWjecContentReview, trustedAssessmentContent, verifiedWjecPaperP
 import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import { isReasoningTransfer, reasoningNovelty } from "./reasoning-signature";
+import { isShallowReskin } from "./reskin";
 
 function normaliseAnswer(text: string): string {
   return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
@@ -243,7 +244,9 @@ export function unseenQuestion(question: Question, history: readonly Attempt[], 
   const byId = new Map(questions.map((q) => [q.id, q]));
   const families = new Set(questionFamilies(question));
   const previous = history.flatMap(a => byId.has(a.questionId) ? [byId.get(a.questionId)!] : []);
-  return !history.some((a) => a.questionId === question.id ||
+  // A number, noun or same-reasoning reskin of something already answered is not new evidence.
+  const reskin = previous.some((seen) => seen.subjectId === question.subjectId && seen.topicIds.some((t) => question.topicIds.includes(t)) && isShallowReskin(question, seen));
+  return !reskin && !history.some((a) => a.questionId === question.id ||
     (byId.has(a.questionId) && questionFamilies(byId.get(a.questionId)!).some((family) => families.has(family)))) &&
     (question.subjectId !== "wjec-alevel-physics" || !questionReasoningMoves(question).length ||
       questionFreshness(question, previous).newReasoning);

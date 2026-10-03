@@ -387,15 +387,41 @@ from ordinary pending work. Settings → Sync recovery exposes safe metadata onl
 retry, export the private recovery record, or discard only the queued server
 mutation after confirmation. Payload/answer content is never shown by default.
 
-### Product hierarchy
+### Product loop and hierarchy
 
-Today presents the adaptive session or resume action before collapsed plan,
-pace and outlook details. Mobile has Today, Session and a Tools menu. Tools
-contains every manual route and the secondary Readiness, Schedule, Library and
-Settings surfaces. Desktop keeps direct routes grouped under Choose your own
-and Plan & progress; keyboard shortcuts and search remain available. No new
-recommender, tutor or mastery model is introduced.
+One loop: **Diagnose → Learn/Repair → Practise → Prove → Revisit**. The Next Best
+Action engine (`revision-engine.ts`) ranks every candidate step (quick check,
+missions, paper repair, proof checks, reviews, adaptive session) and Today shows
+the winner with one Start button, so the learner journey is Today → Start →
+Answer → Feedback → Continue. The main navigation is Today, Subjects, Progress
+and Tools; Tools holds every manual route (Session, Review, Study, Lessons,
+Practice, Past papers, Schedule, Settings). Collapsed plan, pace and outlook
+sit below the action. No second recommender, tutor or mastery model exists.
 
+Learner-facing evidence uses six states (Not checked, Needs work, Improving,
+Awaiting proof, Proven, Regressed). Intervals, recurrence and trust counts stay
+behind "Why?"/"Evidence" disclosures; low-data outcome wording is "Too early to
+tell … N later checks completed; M more needed".
+
+### Trusted supply and the review workflow
+
+Proof needs trusted, unseen, genuinely different questions.
+
+- `content-trust.ts` – exact content fingerprint and the single trust predicate.
+- `human-verification-ledger.ts` – the committed ledger the runtime applies.
+- `review-workflow.ts` – unverified → checked → verified over an append-only,
+  hash-chained audit log; promotion to the ledger only from a verified chain.
+- `review-gates.ts` – content quality gates (mark scheme, totals, spec links,
+  spec version, transfer/data labels, provenance).
+- `reskin.ts` – number/noun/same-reasoning reskin detection, used by the supply
+  audit, by "unseen" supply and by proof classification.
+- `supply-audit.ts` – source of truth for what counts as trusted supply.
+- `review-priority.ts` – what to review next, by product capability unlocked.
+- `product-outcomes.ts` – core-value outcome measures from funnel events,
+  attempts and the recovery ledger.
+
+See [`review-workflow.md`](review-workflow.md) and
+[`question-supply-audit.md`](question-supply-audit.md).
 
 ### Domain and execution ownership
 

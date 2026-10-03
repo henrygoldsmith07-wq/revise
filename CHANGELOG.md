@@ -1,5 +1,13 @@
 # Changelog
 
+## Trusted-content workflow, review priorities and reskin-proof evidence — 2026-10-03
+
+**Review is now a workflow, not a gap.** Questions move unverified → checked → verified through an append-only, hash-chained audit log (reviewer, role, qualification, date, six checks, comments). A question becomes trusted only after two different reviewers approve its exact content; any edit sends it back for re-review. `npm run wjec:review:priorities`, `:queue`, `:import`, `:promote` and `:gates` cover ranking, reviewer packs, external return files, promotion and the release gate. No flagship question is trusted yet: no review has been performed.
+
+**Reskins never count as proof.** Number swaps, noun swaps and same-reasoning rewordings are now excluded from unseen supply and from independent/delayed proof, not only from the audit.
+
+**Cold start and simpler wording.** The quick check needs several topics on flagship subjects and never reuses a seen question family; low-data outcome text reads "Too early to tell … 1 later check completed; 4 more needed"; trust is mentioned only when it limits a claim; recovery details sit behind "Evidence"/"Why?". Core-value funnel events (onboarding, diagnostic start/complete/skip, next action shown, accepted, proof blocked by supply) and `npm run wjec:quality:report` support internal measurement.
+
 ## A simpler first minute, honest summaries and a paper result you can act on — 2026-10-03
 
 **New students get a first step, not a pile of cards.** With no trusted answers yet, Today leads with a short, skippable quick check on the subject with the nearest exam. Its answers become normal attempts, so the next recommendation comes from what was actually lost.
