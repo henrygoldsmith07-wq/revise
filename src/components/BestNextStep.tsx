@@ -5,6 +5,9 @@
 // Everything that explains the ranking sits behind a disclosure.
 
 import { getSubject } from "@/domain/curriculum";
+import { describeFocus } from "@/domain/today-focus";
+import { useStoreFields } from "@/state/store";
+import { Button } from "./ui";
 import { LEARNER_STATE_LABEL } from "@/domain/learner-state";
 import type { RevisionAction, RevisionPlan } from "@/domain/revision-engine";
 import { ButtonLink, Pill } from "./ui";
@@ -12,38 +15,40 @@ import { ForwardIcon, TodayIcon } from "./icons";
 
 const TONE = { "not-checked": "neutral", "needs-work": "danger", improving: "accent", "awaiting-proof": "review", proven: "success", regressed: "danger" } as const;
 
-function stakes(a: RevisionAction): string | null {
-  if (a.marksRecoverable && a.marksRecoverable > 0) return `${a.marksRecoverable} mark${a.marksRecoverable === 1 ? "" : "s"} at stake`;
-  return null;
-}
-
-function examLine(a: RevisionAction): string {
-  if (a.daysToExam === null) return "No exam date set";
-  return a.daysToExam === 0 ? "Exam today" : `Exam in ${a.daysToExam} day${a.daysToExam === 1 ? "" : "s"}`;
-}
-
 export function BestNextStep({ action, plan }: { action: RevisionAction; plan: RevisionPlan }) {
   const subject = getSubject(action.subjectId)?.name ?? action.subjectId;
   const queued = plan.actions.slice(1, 4);
   const waiting = plan.deferred.filter((d) => /Waiting for the delay/.test(d.reason)).slice(0, 2);
   const e = action.explanation;
+  const focus = describeFocus(action, subject);
+  const { settings, updateSettings } = useStoreFields("settings", "updateSettings");
   return (
     <section aria-label="Best next step" className="grid gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="today-focus-icon" aria-hidden="true"><TodayIcon size={18} /></span>
           <p className="text-sm font-semibold text-speak">Your best next step</p>
-          {action.proofStatus ? <Pill tone={TONE[action.proofStatus]}>{LEARNER_STATE_LABEL[action.proofStatus]}</Pill> : null}
-          <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">About {Math.ceil(action.minutes)} min</span>
+          {action.proofStatus && action.proofStatus !== "not-checked" ? <Pill tone={TONE[action.proofStatus]}>{LEARNER_STATE_LABEL[action.proofStatus]}</Pill> : null}
+          <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">{focus.duration}</span>
         </div>
-        <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">{action.title}</h2>
-        <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{subject}</p>
-        <p className="mt-1 text-sm text-ink2">{[examLine(action), stakes(action)].filter(Boolean).join(" · ")}</p>
-        <ButtonLink href={action.route.href} variant="primary" size="md" className="mt-4 min-h-[3rem] w-full text-base sm:w-auto">
-          {action.route.label} <ForwardIcon size={17} aria-hidden />
+        <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">{focus.title}</h2>
+        <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{focus.subject}</p>
+        <p className="mt-1 text-sm text-ink2">{focus.examLine} · {focus.stake}</p>
+        <ButtonLink href={focus.cta.href} variant="primary" size="md" className="mt-4 min-h-[3rem] w-full text-base sm:w-auto">
+          {focus.cta.label} <ForwardIcon size={17} aria-hidden />
         </ButtonLink>
-        <p className="mt-3 max-w-2xl text-sm text-ink2">{e.why}</p>
-        <p className="mt-1 max-w-2xl text-sm text-ink2">{e.after}</p>
+        {focus.skippable ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 w-full sm:ml-2 sm:w-auto"
+            onClick={() => void updateSettings({ quickCheckSkipped: [...new Set([...(settings.quickCheckSkipped ?? []), ...settings.subjectIds])] })}
+          >
+            Skip, just start revising
+          </Button>
+        ) : null}
+        <p className="mt-3 max-w-2xl text-sm text-ink2">{focus.why}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink2"><span className="font-medium text-ink">Then:</span> {focus.after}</p>
         <details className="mt-4 max-w-2xl">
           <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Why this, and why now?</summary>
           <dl className="mt-2 space-y-2 text-sm leading-6 text-ink2" aria-label="Why this recommendation">

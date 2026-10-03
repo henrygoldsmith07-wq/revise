@@ -13,6 +13,10 @@ async function openToday(page: import("@playwright/test").Page) {
 test("Today leads with one start action, and the three destinations are reachable", async ({ page }) => {
   await openToday(page);
   const main = page.locator("main#main");
+  // A new student's one start action is the optional quick check; skipping it leads to the planned session.
+  await expect(main.getByRole("link", { name: /^Start/ })).toHaveCount(1);
+  await expect(main.getByRole("link", { name: "Start quick check" })).toBeVisible();
+  await main.getByRole("button", { name: /Skip, just start revising/ }).click();
   const start = main.getByRole("link", { name: "Start session", exact: true });
   await expect(start).toBeVisible();
   await expect(main.getByText(/Provisional:|marks at risk|day|No exam date set/i).first()).toBeVisible();

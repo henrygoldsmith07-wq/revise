@@ -13,15 +13,15 @@ import { useStoreFields } from "@/state/store";
 import { useRevisionPlan } from "./recovery-evidence";
 import type { Attempt } from "@/domain/types";
 
-export function QuickDiagnostic({ subjectId }: { subjectId: string }) {
+export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: string; autoStart?: boolean }) {
   const store = useStoreFields("questions", "attempts", "mistakes");
   const { plan } = useRevisionPlan();
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(autoStart);
   const [done, setDone] = useState<Attempt[]>([]);
   const [selection] = useState(() => {
     const seen = new Set(store.attempts.map((a) => a.questionId));
     const pool = store.questions.filter((q) => q.subjectId === subjectId && !seen.has(q.id));
-    const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))];
+    const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
     return { ...selectQuickDiagnostic({ questions: pool, topicIds }), topicIds };
   });
   const title = (id: string) => getTopic(id)?.title ?? id;

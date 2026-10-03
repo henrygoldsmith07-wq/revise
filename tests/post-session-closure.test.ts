@@ -24,7 +24,7 @@ describe("post-session closure", () => {
     expect(closure.detail).toContain("5 marks");
   });
 
-  it("keeps a strong completed session pointed at useful continuation", () => {
+  it("keeps a strong completed session honest: well done is not proven", () => {
     const closure = buildPostSessionClosure({
       session: "paper",
       attempted: 12,
@@ -41,7 +41,8 @@ describe("post-session closure", () => {
       minutes: 44,
       nextAction: "practice",
     });
-    expect(closure.headline).toContain("Strong");
+    expect(closure.headline).toContain("not proven yet");
+    expect(closure.detail).not.toMatch(/congrat|momentum|great/i);
   });
 
   it("handles review sessions without marks and never reports zero minutes", () => {
@@ -93,7 +94,7 @@ describe("post-session closure", () => {
 
     expect(component).toContain('role="status"');
     expect(component).toContain('aria-live="polite"');
-    expect(component).toContain("Close the loop");
+    expect(component).toContain("What this session shows");
     expect(review).toContain("PostSessionClosure");
     expect(practice).toContain("finishSession");
     expect(practice).toContain("PostSessionClosure");

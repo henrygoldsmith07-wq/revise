@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import type { Attempt, Id, MissionAttemptContext, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { QuestionRunner } from "./QuestionRunner";
-import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
+import { ButtonLink, Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
 
 // A fixed, untimed set of questions with an explained purpose. Recovery,
 // paper-repair and equivalent-retest sessions all share it: the caller picks
@@ -23,6 +23,10 @@ export function QuestionSetSession({
   hintBudgetFor,
   contextFor,
   exitLabel = "Back to practice",
+  nextStep,
+  resume,
+  onProgress,
+  onFinished,
 }: {
   title: string;
   hint: string;
@@ -37,6 +41,13 @@ export function QuestionSetSession({
   /** Mission attribution carried on each attempt. */
   contextFor?: Record<Id, MissionAttemptContext>;
   exitLabel?: string;
+  /** The next best action, computed from the evidence this session just created. */
+  nextStep?: { href: string; label: string; detail: string } | null;
+  /** Continue a session interrupted by a refresh: skip the intro, start at `index`, keep the answers already given. */
+  resume?: { index: number; attempts: Attempt[] };
+  /** Called with the first unanswered position whenever it changes while the session runs. */
+  onProgress?: (position: number, attempts: Attempt[]) => void;
+  onFinished?: () => void;
 }) {
   const store = useStoreFields("questions");
   const questionsById = useMemo(
@@ -47,10 +58,19 @@ export function QuestionSetSession({
     () => questionIds.map((id) => questionsById.get(id)).filter((question): question is Question => Boolean(question)),
     [questionIds, questionsById],
   );
-  const [index, setIndex] = useState(0);
-  const [attempts, setAttempts] = useState<Attempt[]>([]);
-  const [started, setStarted] = useState(false);
-  const [finished, setFinished] = useState(false);
+  const [index, setIndex] = useState(() => Math.min(resume?.index ?? 0, Math.max(0, queue.length - 1)));
+  const [attempts, setAttempts] = useState<Attempt[]>(() => resume?.attempts ?? []);
+  const [started, setStarted] = useState(Boolean(resume));
+  const [finished, setFinished] = useState(() => Boolean(resume && queue.length > 0 && resume.index >= queue.length));
+  const position = useMemo(() => {
+    const next = queue.findIndex((question) => !attempts.some((attempt) => attempt.questionId === question.id));
+    return next === -1 ? queue.length : next;
+  }, [attempts, queue]);
+  useEffect(() => {
+    if (!started || !queue.length) return;
+    if (finished) onFinished?.();
+    else onProgress?.(position, attempts);
+  }, [attempts, finished, onFinished, onProgress, position, queue.length, started]);
   const [exitRequested, setExitRequested] = useState(false);
 
   const current = queue[index];
@@ -93,7 +113,15 @@ export function QuestionSetSession({
             Every answer was marked and saved. Marks still dropped stay in your mistake queue, and only a delayed retest closes them.
           </p>
         </Panel>
-        <Button variant="primary" className="w-full" onClick={onExit}>{exitLabel}</Button>
+        {nextStep ? (
+          <div className="space-y-2">
+            <p className="text-sm text-ink2"><span className="font-medium text-ink">Next:</span> {nextStep.detail}</p>
+            <ButtonLink href={nextStep.href} variant="primary" className="w-full">{nextStep.label}</ButtonLink>
+            <Button className="w-full" onClick={onExit}>{exitLabel}</Button>
+          </div>
+        ) : (
+          <Button variant="primary" className="w-full" onClick={onExit}>{exitLabel}</Button>
+        )}
       </div>
     );
   }

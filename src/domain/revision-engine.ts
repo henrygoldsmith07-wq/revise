@@ -23,6 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import type { AdaptiveSessionPlan } from "./adaptive-contract";
+import type { ColdStartPlan } from "./cold-start";
 import { estimateEffectiveness, type EffectivenessEstimate, type EffectivenessEvidence } from "./effectiveness";
 import { APPLICATION_DAYS, countdownGuidance, FINAL_DAYS, TECHNIQUE_DAYS, type CountdownPhase } from "./exam-countdown";
 import { buildExamMissions, buildPaperMission, missionNextAction, type ExamMission, type MissionInput, type MissionStageKind } from "./exam-mission";
@@ -37,13 +38,15 @@ import type { Attempt, ExamDate, Id, Mistake, Question } from "./types";
 
 export type ActionType =
   | "proof-check" | "regression-recovery" | "mission" | "paper-repair" | "recurring-error" | "exam-urgent"
-  | "weak-topic" | "learn-untouched" | "due-reviews" | "exam-section" | "full-paper" | "adaptive-session" | "evidence-gap";
+  | "weak-topic" | "learn-untouched" | "due-reviews" | "exam-section" | "full-paper" | "adaptive-session" | "evidence-gap" | "quick-check";
 
 export interface ActionExplanation {
   why: string;
   whyNow: string;
   /** Filled in by the ranking: why this beats the next-best alternative. */
   whyBefore: string;
+  /** What is at stake, in one plain sentence. */
+  stake: string;
   evidence: string[];
   after: string;
   proves: string;
@@ -103,6 +106,8 @@ export interface EngineInput {
   effectiveness?: EffectivenessEvidence;
   /** Share of its exam, and weight relative to an average topic (1 = average). */
   topicWeight?: (topicId: Id) => { share: number; relative: number };
+  /** Set only while the learner has too little evidence to rank anything; see cold-start.ts. */
+  coldStart?: ColdStartPlan | null;
 }
 
 export interface DeferredAction { action: RevisionAction; reason: string }
@@ -214,7 +219,7 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
         : stage.kind === "delayed-proof" ? "Enough time has passed that a check on a different question now counts as proof."
         : mission.status === "not-started" ? "These marks are open and nothing has been done about them yet."
         : "The previous stage is done, so this is the next thing the evidence needs.",
-      whyBefore: "",
+      whyBefore: "", stake: regressed ? `${shown} marks you had recovered are lost again.` : stage.kind === "delayed-proof" ? `${shown} marks only count as recovered once they hold on a new question.` : shown > 0 ? `${shown} mark${shown === 1 ? "" : "s"} you lost are still open.` : "Nothing is at stake yet; this builds the evidence.",
       evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
       after: next.after,
       proves: mission.completionCondition,
@@ -244,7 +249,7 @@ function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput): Draft {
     explanation: {
       why: plan.reason,
       whyNow: ev.daysToExam !== null ? `Your exam is ${ev.daysToExam} day${ev.daysToExam === 1 ? "" : "s"} away.` : "It is the best-evidenced gap right now.",
-      whyBefore: "",
+      whyBefore: "", stake: ev.marksLost > 0 ? `${ev.marksLost} marks already lost in ${topic}.` : untouched ? `About ${Math.round(tw.share * 100)}% of the exam, not started yet.` : `${topic} is not secure yet.`,
       evidence: [
         ev.marksLost > 0 ? `${ev.marksLost} marks already lost in ${topic}` : "",
         ev.dueCount > 0 ? `${ev.dueCount} card${ev.dueCount === 1 ? "" : "s"} due` : "",
@@ -254,6 +259,26 @@ function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput): Draft {
       proves: "Independent success on different questions, then a later check on a new one.",
     },
     route: { href: plan.startHref, label: "Start session" },
+  };
+}
+
+function quickCheckDraft(plan: ColdStartPlan, input: EngineInput): Draft {
+  const name = input.subjectName?.(plan.subjectId) ?? plan.subjectId;
+  const days = daysToNearestExam(input.examDates, plan.subjectId, input.now);
+  return {
+    id: `action:quick-check:${plan.subjectId}`, type: "quick-check", title: `Find where to start in ${name}`,
+    subjectId: plan.subjectId, topicIds: [], specPoints: [], minutes: Math.max(3, plan.minutes),
+    marksRecoverable: null, examWeight: null, daysToExam: days, evidenceStrength: 0.1, confidence: 0.3,
+    expectedLearningGain: 0.3, expectedMarks: 1.5, proofStatus: "not-checked", requiredFirst: false, effectiveness: null, mistakeIds: [],
+    explanation: {
+      why: `Revise has no answers from you in ${name} yet, so ${plan.questions} short questions will show what to work on first.`,
+      whyNow: "Every later recommendation is better with a few real answers behind it.",
+      whyBefore: "", stake: "Without a few real answers, Revise is guessing what you need.",
+      evidence: [`${plan.questions} reviewed questions across ${plan.topics} topic${plan.topics === 1 ? "" : "s"}`, "no hints, so the answers count as unaided evidence"],
+      after: "Your best next step is chosen from what you get wrong, and anything you lose becomes a recovery plan.",
+      proves: "Nothing yet. This is a first impression, not a grade.",
+    },
+    route: { href: `/diagnostic?subject=${encodeURIComponent(plan.subjectId)}`, label: "Start quick check" },
   };
 }
 
@@ -272,7 +297,7 @@ function finalise(draft: Draft, input: EngineInput): RevisionAction {
 /** Why `a` beats `b`, from the factor that separates them most. */
 export function explainVersus(a: RevisionAction, b: RevisionAction): string {
   const ratios: Array<[string, number]> = [
-    [`it is worth more expected marks per minute (${a.expectedMarksPerMinute} against ${b.expectedMarksPerMinute})`, a.expectedMarksPerMinute / Math.max(1e-6, b.expectedMarksPerMinute)],
+    ["it should win back more marks for the time it takes", a.expectedMarksPerMinute / Math.max(1e-6, b.expectedMarksPerMinute)],
     ["its exam is closer", a.urgency / b.urgency],
     ["it suits this stage of your revision better", a.factors.phaseFit / b.factors.phaseFit],
     ["it is backed by more trusted evidence", a.factors.confidenceFactor / b.factors.confidenceFactor],
@@ -296,7 +321,7 @@ function commandCentreDrafts(input: EngineInput, enrolled: ReadonlySet<Id>, esti
         id: `action:section:${subjectId}`, type: "exam-section", title: `Sit a timed ${name} paper section`, subjectId, topicIds: [], specPoints: [], minutes: 35,
         marksRecoverable: null, examWeight: null, daysToExam: days, evidenceStrength: 0.5, confidence: 0.5, expectedLearningGain: 0.25,
         expectedMarks: round(Math.max(2, stakes * 0.25), 2), proofStatus: null, requiredFirst: false, effectiveness: estimate("paper-section", null), mistakeIds: [],
-        explanation: { why: "Timed exam practice shows where marks really go.", whyNow: `Your ${name} exam is ${days} days away.`, whyBefore: "", evidence: [paper.title], after: "Marks lost become a recovery mission automatically.", proves: "A later paper in the same weak areas." },
+        explanation: { why: "Timed exam practice shows where marks really go.", whyNow: `Your ${name} exam is ${days} days away.`, whyBefore: "", stake: stakes > 0 ? `${round(stakes, 1)} marks are still open.` : "A real paper shows where marks are really lost.", evidence: [paper.title], after: "Marks lost become a recovery mission automatically.", proves: "A later paper in the same weak areas." },
         route: { href: `/papers?subject=${encodeURIComponent(subjectId)}`, label: "Start session" },
       });
     }
@@ -305,7 +330,7 @@ function commandCentreDrafts(input: EngineInput, enrolled: ReadonlySet<Id>, esti
         id: `action:paper:${subjectId}`, type: "full-paper", title: `Sit a full ${name} paper`, subjectId, topicIds: [], specPoints: [], minutes: 90,
         marksRecoverable: null, examWeight: null, daysToExam: days, evidenceStrength: 0.5, confidence: 0.5, expectedLearningGain: 0.3,
         expectedMarks: round(Math.max(4, stakes * 0.3 + 3), 2), proofStatus: null, requiredFirst: false, effectiveness: estimate("full-paper", null), mistakeIds: [],
-        explanation: { why: "A full paper checks timing and stamina as well as knowledge.", whyNow: `Your ${name} exam is ${days} days away.`, whyBefore: "", evidence: [paper.title], after: "An autopsy and recovery mission follow.", proves: "The same weak areas on the next paper." },
+        explanation: { why: "A full paper checks timing and stamina as well as knowledge.", whyNow: `Your ${name} exam is ${days} days away.`, whyBefore: "", stake: stakes > 0 ? `${round(stakes, 1)} marks are still open.` : "A real paper shows timing and stamina as well as knowledge.", evidence: [paper.title], after: "An autopsy and recovery mission follow.", proves: "The same weak areas on the next paper." },
         route: { href: `/papers?subject=${encodeURIComponent(subjectId)}`, label: "Start session" },
       });
     }
@@ -316,7 +341,7 @@ function commandCentreDrafts(input: EngineInput, enrolled: ReadonlySet<Id>, esti
         marksRecoverable: stakes > 0 ? round(stakes, 1) : null, examWeight: null, daysToExam: days, evidenceStrength: 0.5, confidence: 0.55, expectedLearningGain: 0.25,
         expectedMarks: round(Math.max(1.5, stakes * 0.2), 2), proofStatus: null, requiredFirst: false, effectiveness: null, mistakeIds: [],
         explanation: {
-          why: plan.reason, whyNow: `Your ${name} exam is ${days} day${days === 1 ? "" : "s"} away.`, whyBefore: "",
+          why: plan.reason, whyNow: `Your ${name} exam is ${days} day${days === 1 ? "" : "s"} away.`, whyBefore: "", stake: stakes > 0 ? `${round(stakes, 1)} marks are still open.` : "The exam is close, so every minute should go to what can still change.",
           evidence: plan.steps.map((s) => `${s.minutes} min: ${s.label}`),
           after: days <= FINAL_DAYS ? "Nothing new is started this close to the exam." : "Revise keeps ranking what is left.",
           proves: days <= FINAL_DAYS ? "Not claimed: there is no time left for a delayed check." : "A later check on a different question.",
@@ -364,8 +389,8 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       expectedMarks: round(Math.min(row.count, 40) * 0.02 + Math.min(row.overdue, 40) * 0.03, 2), proofStatus: null, requiredFirst: false, effectiveness: null, mistakeIds: [],
       explanation: {
         why: `${row.count} card${row.count === 1 ? " is" : "s are"} due and spaced repetition only works when cards are done on time.`,
-        whyNow: row.overdue > 0 ? `${row.overdue} are already overdue.` : "They are due today.", whyBefore: "", evidence: [`${row.count} due`],
-        after: "Cards are rescheduled by how well you recall them.", proves: "Recall holds at the scheduled interval.",
+        whyNow: row.overdue > 0 ? `${row.overdue} are already overdue.` : "They are due today.", whyBefore: "", stake: `${row.count} card${row.count === 1 ? "" : "s"} due; the later they are done, the more you forget.`, evidence: [`${row.count} due`],
+        after: "Each card is rescheduled by how well you remember it; what you miss comes back sooner.", proves: "Recall holds at the scheduled interval.",
       },
       route: { href: `/review?subject=${encodeURIComponent(row.subjectId)}`, label: "Start session" },
     });
@@ -381,7 +406,7 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       proofStatus: "not-checked", requiredFirst: false, effectiveness: null, mistakeIds: [],
       explanation: {
         why: `${t.label} carries about ${Math.round(share * 100)}% of the exam and you have not started it.`,
-        whyNow: days !== null ? `Your exam is ${days} day${days === 1 ? "" : "s"} away.` : "Coverage comes before depth.", whyBefore: "",
+        whyNow: days !== null ? `Your exam is ${days} day${days === 1 ? "" : "s"} away.` : "Coverage comes before depth.", whyBefore: "", stake: `About ${Math.round(share * 100)}% of the exam, not started yet.`,
         evidence: ["no answers recorded", "unknown, not weak"], after: "Revise will check it with questions and schedule a delayed retrieval.",
         proves: "Independent success on different questions, then a later check.",
       },
@@ -393,6 +418,7 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
     } else drafts.push(draft);
   }
   drafts.push(...commandCentreDrafts(scoped, enrolled, estimate));
+  if (input.coldStart && enrolled.has(input.coldStart.subjectId)) drafts.push(quickCheckDraft(input.coldStart, scoped));
 
   let actions = drafts.map((d) => finalise(d, scoped));
 
@@ -408,6 +434,10 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
   });
 
   actions.sort((a, b) => b.score - a.score || a.minutes - b.minutes || a.id.localeCompare(b.id));
+  // With no marks-based evidence anywhere, the quick check is the only step that creates any, so it leads.
+  const evidenceBased: ActionType[] = ["proof-check", "regression-recovery", "mission", "paper-repair", "recurring-error", "evidence-gap"];
+  const check = actions.find((a) => a.type === "quick-check");
+  if (check && !actions.some((a) => evidenceBased.includes(a.type))) actions = [check, ...actions.filter((a) => a !== check)];
 
   // One loss is planned once: park actions mostly covered by a better one.
   const covered = new Set<Id>();

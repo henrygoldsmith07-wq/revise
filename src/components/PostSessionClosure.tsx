@@ -50,7 +50,7 @@ export function PostSessionClosure({
         <ProgressBar value={closure.completionPercent / 100} label="Session completion" tone={closure.completionPercent === 100 ? "success" : "review"} />
 
         <div className="rounded-[10px] bg-accentsoft border border-accent/15 px-3.5 py-3">
-          <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Close the loop</p>
+          <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">What this session shows</p>
           <p className="text-sm text-ink2 mt-1">{closure.detail}</p>
           {closure.recommended ? <p className="text-sm text-ink2 mt-2">Next: {closure.recommended.reason}</p> : null}
         </div>

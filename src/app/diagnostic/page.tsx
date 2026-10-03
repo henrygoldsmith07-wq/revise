@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { diagnosticFinished, diagnosticReport, nextProbe, type ProbeRecord } from "@/domain/adaptive-diagnostic";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { diagnosticItems, probeFromAttempt } from "@/domain/diagnostic-items";
@@ -20,9 +21,19 @@ const ACTION_TEXT = {
 } as const;
 
 export default function DiagnosticPage() {
+  return (
+    <Suspense fallback={null}>
+      <Diagnostic />
+    </Suspense>
+  );
+}
+
+function Diagnostic() {
+  const params = useSearchParams();
   const store = useStoreFields("questions", "attempts", "settings");
   const subjectIds = store.settings.subjectIds;
-  const [subjectId, setSubjectId] = useState<string | null>(null);
+  const requested = params.get("subject");
+  const [subjectId, setSubjectId] = useState<string | null>(requested && subjectIds.includes(requested) ? requested : null);
   const [quick, setQuick] = useState(true);
   const [records, setRecords] = useState<ProbeRecord[]>([]);
   const [pending, setPending] = useState<Attempt | null>(null);
@@ -52,7 +63,7 @@ export default function DiagnosticPage() {
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{quick ? "Optional · 5–10 minutes" : "Optional · 15–25 minutes"}</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Starting diagnostic</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          A short adaptive set that adds real evidence for the recommender. It is not a grade prediction and does not test everything. No hints are offered, so the answers count as unaided evidence.
+          A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered, so your answers count as unaided evidence.
         </p>
       </header>
 
@@ -74,7 +85,7 @@ export default function DiagnosticPage() {
       {!active ? (
         <Panel><p className="text-sm text-ink3">Choose a subject in Settings first.</p></Panel>
       ) : quick && !records.length ? (
-        <QuickDiagnostic key={active} subjectId={active} />
+        <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} />
       ) : items.length === 0 ? (
         <Panel><p className="text-sm text-ink3">There are no reviewed questions for this subject yet, so Revise will not run a diagnostic on unverified content.</p></Panel>
       ) : pending ? (
