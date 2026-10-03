@@ -241,8 +241,9 @@ function Practice() {
     return query ? `/practice?${query}` : "/practice?resume=1";
   }, [mode, retestId, sessionId, subjectId, topicId]);
 
-  // A mission session runs its own questions; the generic queue behind it must not save a resume point.
-  const missionActive = Boolean(params.get("mission"));
+  // Mission, recovery, paper-repair, weak-topic and quick modes run their own question sets; the generic
+  // queue behind them must not save a resume point for questions the student never opened.
+  const missionActive = Boolean(params.get("mission")) || recover || Boolean(autopsyRun) || weakExam || quickMinutes !== null;
   useEffect(() => {
     if (missionActive) return;
     if (closed || !current) {

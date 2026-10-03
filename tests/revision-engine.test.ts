@@ -501,7 +501,7 @@ describe("mission sessions do not leave a stale resume point", () => {
   it("keeps the generic practice queue from saving a checkpoint while a mission runs", async () => {
     const { readFileSync } = await import("fs");
     const src = readFileSync("src/app/practice/page.tsx", "utf8");
-    expect(src).toContain('const missionActive = Boolean(params.get("mission"));');
+    expect(src).toContain('const missionActive = Boolean(params.get("mission")) || recover || Boolean(autopsyRun) || weakExam || quickMinutes !== null;');
     expect(src).toMatch(/if \(missionActive\) return;\s+if \(closed \|\| !current\)/);
   });
 });

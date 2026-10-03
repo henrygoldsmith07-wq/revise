@@ -1,5 +1,11 @@
 # Changelog
 
+## Mission session fixes — 2026-10-03
+
+**No stale resume card.** Finishing a mission, recovery, paper-repair, weak-topic or quick session no longer leaves Today offering to resume a question list you never opened.
+
+**Today reads better on a phone.** The Start button now sits straight under the task title, the shown minutes match the session you will actually get, and a mission only reads as Improving once something has succeeded. The marks-recovered line says "No marks recovered yet" rather than an empty range.
+
 ## One next best action — 2026-10-03
 
 **One engine decides.** Missions, paper recovery, proof checks, regressions, due reviews, untouched topics, paper sections and the adaptive session now compete in a single ranking across all your subjects. Today shows only the winner, with why, why now, why before the others, what it is based on, what happens after and what would prove it worked. The order of subjects in Settings no longer matters.
