@@ -9,6 +9,8 @@ import { CUSTOM_STUDY_KEY } from "@/components/CustomStudyDialog";
 import { useShortcuts } from "@/components/shortcuts";
 import type { Card, Question, RecallGrade } from "@/domain/types";
 import { pickExamQuestionForCard } from "@/domain/card-question";
+import { diagnoseLoss } from "@/domain/loss-diagnosis";
+import { buildMistakePatterns } from "@/domain/mistake-patterns";
 import { classifyMistake } from "@/domain/mistake-classification";
 import { buildRepairPlan, repairProgress } from "@/domain/mistake-repair";
 import { useStoreFields } from "@/state/store";
@@ -144,6 +146,13 @@ function ReviewSession() {
   // nine-way mark-scheme-aware class is derived live from the stored attempt
   // and question, so the label and reason always match the current evidence
   // (and pre-existing rows fall back to their capture-time category honestly).
+  const lossDiagnosis = useMemo(() => {
+    if (mode !== "mistakes" || !current?.sourceMistakeId) return null;
+    const sourceMistake = store.mistakes.find((m) => m.id === current.sourceMistakeId);
+    if (!sourceMistake) return null;
+    const patterns = buildMistakePatterns({ mistakes: store.mistakes, attempts: store.attempts, questions: store.questions });
+    return diagnoseLoss(sourceMistake, patterns);
+  }, [current, mode, store.attempts, store.mistakes, store.questions]);
   const mistakeClass = useMemo(() => {
     if (mode !== "mistakes" || !current?.sourceMistakeId) return null;
     const sourceMistake = store.mistakes.find((m) => m.id === current.sourceMistakeId);
@@ -371,6 +380,14 @@ function ReviewSession() {
           </span>
         </div>
 
+        {mode === "mistakes" && lossDiagnosis ? (
+          <dl className="mb-3 rounded-lg border border-line bg-surface2/40 px-3 py-2 text-xs leading-relaxed text-ink2 space-y-1" aria-label="Why marks were lost">
+            <div><dt className="inline font-semibold text-ink">What happened: </dt><dd className="inline">{lossDiagnosis.whatHappened}</dd></div>
+            <div><dt className="inline font-semibold text-ink">Why Revise thinks that: </dt><dd className="inline">{lossDiagnosis.why}</dd></div>
+            {lossDiagnosis.pattern ? <div><dt className="inline font-semibold text-ink">Pattern: </dt><dd className="inline">{lossDiagnosis.pattern}</dd></div> : null}
+            <div><dt className="inline font-semibold text-ink">Best fix: </dt><dd className="inline">{lossDiagnosis.bestFix}</dd></div>
+          </dl>
+        ) : null}
         {mode === "mistakes" && mistakeClass ? (
           <div className="mb-3 rounded-lg border border-line bg-surface2/40 px-3 py-2" role="note">
             <p className="text-xs leading-relaxed text-ink2">
