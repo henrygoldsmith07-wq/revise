@@ -1,6 +1,18 @@
-import type { Id, IsoInstant } from "./types";
+import type { Id, IsoInstant, MissionAttemptContext } from "./types";
 
 export type RevisionActivity = "practice" | "review" | "paper" | "study" | "adaptive";
+
+/** The exact questions, support and attribution of a mission step, so a refresh resumes that step rather than rebuilding it. */
+export interface MissionCheckpointState {
+  missionId: Id;
+  /** Normalised stage route parameter, or "" when the route carried none. */
+  stage: string;
+  startedAt: IsoInstant;
+  questionIds: Id[];
+  /** null = full hint ladder. */
+  hintBudgetFor: Record<Id, number | null>;
+  contextFor: Record<Id, MissionAttemptContext>;
+}
 
 export interface RevisionCheckpointInput {
   activity: RevisionActivity;
@@ -15,6 +27,7 @@ export interface RevisionCheckpointInput {
   paperRunId?: Id;
   retestMistakeId?: Id;
   repeatCount?: number;
+  mission?: MissionCheckpointState;
 }
 
 export interface RevisionCheckpoint extends RevisionCheckpointInput {
@@ -62,8 +75,17 @@ export function isRevisionCheckpoint(value: unknown): value is RevisionCheckpoin
     checkpoint.total >= 0 &&
     (checkpoint.queueIds === undefined || (Array.isArray(checkpoint.queueIds) && checkpoint.queueIds.every((id) => typeof id === "string"))) &&
     (checkpoint.repeatCount === undefined || Number.isInteger(checkpoint.repeatCount)) &&
+    (checkpoint.mission === undefined || isMissionCheckpointState(checkpoint.mission)) &&
     typeof checkpoint.updatedAt === "string"
   );
+}
+
+function isMissionCheckpointState(value: unknown): value is MissionCheckpointState {
+  if (!value || typeof value !== "object") return false;
+  const m = value as Partial<MissionCheckpointState>;
+  return typeof m.missionId === "string" && typeof m.stage === "string" && typeof m.startedAt === "string" &&
+    Array.isArray(m.questionIds) && m.questionIds.every((id) => typeof id === "string") &&
+    Boolean(m.hintBudgetFor) && typeof m.hintBudgetFor === "object" && Boolean(m.contextFor) && typeof m.contextFor === "object";
 }
 
 export function isLocalRoute(href: unknown): href is string {

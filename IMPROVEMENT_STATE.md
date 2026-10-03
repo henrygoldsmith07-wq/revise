@@ -1,4 +1,8 @@
-# Current improvement state — 1 October 2026
+# Current improvement state — 3 October 2026
+
+The [learner-experience pass](docs/learner-experience-2026-10-03.md) adds a skippable cold-start quick check,
+a six-answer Today, one paper result block, exact mission resume, evidence-based session summaries,
+conservative outcome measurement and the [question supply audit](docs/question-supply-audit.md).
 
 The [marks-value and proof pass](docs/marks-value-and-proof-2026-10-01.md) ranks revision by what
 the exam is worth, discounts repeated questions in mastery, and measures gains only on new,

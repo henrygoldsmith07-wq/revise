@@ -4,7 +4,10 @@
 // came from. Everything is derived from the recovery ledger.
 
 import { useMemo, useState } from "react";
-import { getSubject } from "@/domain/curriculum";
+import { getSubject, topicsFor } from "@/domain/curriculum";
+import { efficiencyStatement, measureOutcomes, recurrenceStatement, statement } from "@/domain/outcome-measurement";
+import { unseenSupplyByTopic } from "@/domain/supply";
+import { trustTier, type TrustTier } from "@/domain/trust-label";
 import { realWorldEvidence } from "@/domain/evidence-class";
 import { recoveryBreakdown, recoveryWindow, weekLines, type BreakdownBy } from "@/domain/marks-progress";
 import { useStoreFields } from "@/state/store";
@@ -69,11 +72,19 @@ export function RecoverySummaryPanel() {
 
 /** How much real learner evidence exists that Revise works, separate from benchmarks. */
 export function RealWorldEvidencePanel() {
-  const store = useStoreFields("attempts", "interventionOutcomes", "mistakes", "paperOutcomeLog", "questions");
+  const store = useStoreFields("attempts", "interventionOutcomes", "mistakes", "paperOutcomeLog", "questions", "settings");
   const report = useMemo(
     () => realWorldEvidence({ attempts: store.attempts, mistakes: store.mistakes, questions: store.questions, interventionOutcomes: store.interventionOutcomes ?? [], paperOutcomes: store.paperOutcomeLog ?? [] }),
     [store.attempts, store.interventionOutcomes, store.mistakes, store.paperOutcomeLog, store.questions],
   );
+  const outcome = useMemo(() => measureOutcomes({ attempts: store.attempts, mistakes: store.mistakes, questions: store.questions }).learners[0]?.overall ?? null, [store.attempts, store.mistakes, store.questions]);
+  const coverage = useMemo(() => store.settings.subjectIds.map((subjectId) => {
+    const topics = topicsFor(subjectId);
+    const supply = unseenSupplyByTopic(new Set(topics.map((t) => t.id)), store.questions, store.attempts);
+    const tiers: Record<TrustTier, number> = { trusted: 0, reference: 0, unverified: 0, insufficient: 0 };
+    for (const t of topics) tiers[trustTier({ subjectId, provable: supply[t.id]?.provable ?? 0, practiceOnly: supply[t.id]?.practiceOnly ?? 0 })]++;
+    return { subjectId, topics: topics.length, tiers };
+  }), [store.attempts, store.questions, store.settings.subjectIds]);
   return (
     <details className="card p-4 sm:p-5">
       <summary className="cursor-pointer select-none text-sm font-medium text-ink2">How much real evidence says this works?</summary>
@@ -81,6 +92,24 @@ export function RealWorldEvidencePanel() {
         <EvidenceClassNote kind="real-world-evidence" />
         <p className="text-sm text-ink2">{report.statement}</p>
         <ul className="text-xs text-ink2 space-y-0.5">{report.rows.map((r) => <li key={r.key}>{r.label}: {r.count} of {r.needed}</li>)}</ul>
+        {outcome && outcome.chains > 0 ? (
+          <div className="space-y-1" aria-label="What your own results show">
+            <p className="text-sm font-medium text-ink">What your own results show</p>
+            <p className="text-sm text-ink2">{statement(outcome).text}</p>
+            <p className="text-xs text-ink3">{recurrenceStatement(outcome).text}</p>
+            <p className="text-xs text-ink3">{efficiencyStatement(outcome).text}</p>
+          </div>
+        ) : null}
+        <div className="space-y-1" aria-label="Where Revise can prove improvement">
+          <p className="text-sm font-medium text-ink">Where Revise can prove improvement</p>
+          <ul className="text-xs text-ink2 space-y-0.5">
+            {coverage.map((c) => (
+              <li key={c.subjectId}>
+                {getSubject(c.subjectId)?.name ?? c.subjectId}: {c.tiers.trusted > 0 ? `${c.tiers.trusted} of ${c.topics} topics have enough checked questions` : c.tiers.reference === c.topics ? "reference material, not human-reviewed against the specification" : "no topic has enough checked questions to prove improvement yet"}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </details>
   );

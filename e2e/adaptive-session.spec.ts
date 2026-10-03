@@ -8,6 +8,8 @@ test("Today presents one adaptive 20-minute sequence and starts its runner", asy
   }
 
   const main = page.locator("main#main");
+  // A new student is first offered the optional quick check; skipping it goes straight to the planned session.
+  await main.getByRole("button", { name: /Skip, just start revising/ }).click();
   await expect(main).toContainText("Your next session is ready");
   const start = main.getByRole("link", { name: "Start session", exact: true });
   await expect(start).toHaveAttribute("href", /\/adaptive-session\?topic=/);
@@ -25,6 +27,7 @@ test("the next session remains usable on a phone viewport", async ({ page }) => 
     await completeOnboarding(page, { skipExamDates: true });
   }
 
+  await page.locator("main#main").getByRole("button", { name: /Skip, just start revising/ }).click();
   const start = page.locator("main#main").getByRole("link", { name: "Start session", exact: true });
   await expect(start).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

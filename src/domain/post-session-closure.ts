@@ -49,23 +49,23 @@ export function buildPostSessionClosure(input: PostSessionClosureInput): PostSes
 
   let headline = "Session closed";
   if (attempted === 0) headline = "Nothing to close yet";
-  else if (scorePercent != null && scorePercent >= 85) headline = "Strong close — keep the gain";
-  else if (scorePercent != null && scorePercent >= 70) headline = "Solid close — keep the momentum";
-  else if (scorePercent != null) headline = "Useful close — the gaps are clear";
+  else if (scorePercent != null && scorePercent >= 85) headline = "Went well, not proven yet";
+  else if (scorePercent != null && scorePercent >= 70) headline = "Still fragile";
+  else if (scorePercent != null) headline = "Marks dropped: repair before moving on";
 
   let detail: string;
   if (attempted === 0) {
     detail = "No work was recorded, so nothing has been changed.";
   } else if (needsRepair && missedMarks > 0) {
-    detail = `You dropped ${missedMarks} mark${missedMarks === 1 ? "" : "s"}. Review the mistakes while they are still fresh.`;
+    detail = `You dropped ${missedMarks} mark${missedMarks === 1 ? "" : "s"}. They stay open until you succeed on a different question without help, and again after a delay.`;
   } else if (retryCount > 0) {
     detail = `${retryCount} card${retryCount === 1 ? "" : "s"} needed another pass. Review them again before they fade.`;
   } else if (scorePercent != null) {
-    detail = `You secured ${awardedMarks}/${availableMarks} marks. Keep the momentum with one more focused practice block.`;
+    detail = `You secured ${awardedMarks}/${availableMarks} marks. One session is not proof: Revise will check this again later on a different question.`;
   } else if (input.session === "review") {
-    detail = "Your cards have been rescheduled from the grades you gave them.";
+    detail = "Your cards have been rescheduled from the grades you gave them. What you missed comes back sooner.";
   } else {
-    detail = "Your work is recorded. Choose a focused next step while the session is still fresh.";
+    detail = "Your work is recorded. Revise has updated your next step from it.";
   }
 
   return {
@@ -168,7 +168,7 @@ export function buildTutorClosure(
       ? "Convert today's gain: a transfer question in a new context."
       : base.nextAction === "mistakes"
         ? "Clear the mistakes queue before starting anything new."
-        : "Bank the streak: tomorrow's due reviews come first.";
+        : "Tomorrow's due reviews come first, then a delayed check on what you got right.";
 
   return { base, improved, stillWeak, learned, nextBestAction };
 }

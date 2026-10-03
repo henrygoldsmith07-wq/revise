@@ -370,7 +370,7 @@ function Practice() {
 
   const missionParam = params.get("mission");
   if (missionParam) {
-    return <MissionSessionMode missionId={missionParam} stage={params.get("stage")} onExit={() => router.push("/")} />;
+    return <MissionSessionMode key={`${missionParam}:${params.get("stage") ?? ""}`} missionId={missionParam} stage={params.get("stage")} onExit={() => router.push("/")} />;
   }
 
   if (weakExam) {

@@ -137,6 +137,8 @@ export interface UserSettings {
   examNotices?: Record<string, string>;
   /** When on, a subject entering the timed-paper fortnight also fires a browser notification. */
   examNotifications?: boolean;
+  /** Subjects the learner chose to skip the optional first quick check for. */
+  quickCheckSkipped?: Id[];
   updatedAt: IsoInstant;
 }
 

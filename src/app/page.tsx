@@ -100,7 +100,7 @@ export default function TodayPage() {
     void recordExperimentEvent("shown", { taskId, activity: "adaptive", topicId: adaptiveSession.topicId });
   }, [adaptiveSession, experimentArm, recordExperimentEvent, recordFunnel]);
 
-  if (!adaptiveSession) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} />;
+  if (!adaptiveSession && !plan.top) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} />;
 
   // Hierarchy: the next session (or resume) dominates the first viewport.
   // Everything else — overview, roadmap, pace, outlook — sits one tap away
@@ -114,10 +114,10 @@ export default function TodayPage() {
         <ResumeRevisionCard />
       ) : (
         <div className="today-focus card p-5 sm:p-7">
-          {plan.top && plan.top.route.href !== adaptiveSession.startHref ? (
+          {plan.top && (!adaptiveSession || plan.top.route.href !== adaptiveSession.startHref) ? (
             <BestNextStep action={plan.top} plan={plan} />
           ) : (
-            <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" proof={proofLedger} />
+            <AdaptiveSessionHero session={adaptiveSession!} displayName={settings.displayName} greeting="" proof={proofLedger} />
           )}
         </div>
       )}
@@ -129,7 +129,7 @@ export default function TodayPage() {
         <div className="mt-4 space-y-5">
           <CommandCentreCard />
           <TodayOverview />
-          <SafeTodayRoadmap preferredSubjectId={adaptiveSession.subjectId} />
+          <SafeTodayRoadmap preferredSubjectId={adaptiveSession?.subjectId ?? plan.top?.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />
         </div>

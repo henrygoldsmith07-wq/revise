@@ -4,6 +4,7 @@ import { getTopic } from "@/domain/curriculum";
 import type { PaperAutopsy } from "@/domain/paper-autopsy";
 import { BreakdownList, type BreakdownRow } from "./BreakdownList";
 import { PaperRecoveryPanel } from "./PaperRecoveryPanel";
+import { PaperResultCard } from "./PaperResultCard";
 import { Button, ButtonLink, Panel, Pill, SectionHeading, StatTile } from "./ui";
 
 const asRows = (rows: PaperAutopsy["byTopic"]): BreakdownRow[] =>
@@ -44,12 +45,16 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
       <SectionHeading title="Paper autopsy" hint="Exactly where this paper lost marks, and the plan to win them back." />
       <Panel className="space-y-5">
         <h2 id="paper-autopsy-heading" className="sr-only">Paper autopsy: {autopsy.title}</h2>
+        {autopsy.paperId ? <PaperResultCard paperId={autopsy.paperId} title={autopsy.title} onNavigate={onNavigate} /> : null}
+        <details className="group">
+          <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Full breakdown and other ways to repair</summary>
+          <div className="mt-4 space-y-5">
         {autopsy.headline.lines.length ? (
-          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-[8px] border border-line px-3 py-3 flex flex-wrap items-center justify-between gap-3">
             <ul className="min-w-0 space-y-0.5 text-sm text-ink">
               {autopsy.headline.lines.map((line, index) => <li key={line} className={index === 0 ? "font-semibold" : "text-ink2"}>{line}</li>)}
             </ul>
-            {autopsy.headline.next && runId ? action(autopsyHref(runId, autopsy.headline.next.stepId), `Recover the next ${autopsy.headline.next.marks} mark${autopsy.headline.next.marks === 1 ? "" : "s"}`, "primary") : null}
+            {autopsy.headline.next && runId ? action(autopsyHref(runId, autopsy.headline.next.stepId), `Recover the next ${autopsy.headline.next.marks} mark${autopsy.headline.next.marks === 1 ? "" : "s"}`, "secondary") : null}
           </div>
         ) : null}
         <div className="grid grid-cols-3 gap-3">
@@ -57,7 +62,7 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
           <StatTile label="Marks lost" value={autopsy.marksLost} tone={autopsy.marksLost ? "danger" : "success"} />
           <StatTile label="Questions with losses" value={autopsy.lostQuestions.length} />
         </div>
-        {autopsy.paperId ? <PaperRecoveryPanel paperId={autopsy.paperId} title={autopsy.title} withMission /> : null}
+        {autopsy.paperId ? <PaperRecoveryPanel paperId={autopsy.paperId} title={autopsy.title} /> : null}
 
         {autopsy.marksLost ? (
           <div className="grid gap-5 md:grid-cols-2">
@@ -101,9 +106,11 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
               <p className="text-xs text-ink2 mt-1">{retest.summary}</p>
               {retest.available ? <p className="text-[11px] text-ink3 mt-1">Different questions matched on topic, marks and difficulty. Sit it after the repair steps, ideally a couple of days later.</p> : null}
             </div>
-            {retest.available && runId ? action(autopsyHref(runId, "retest"), "Start retest", "primary") : null}
+            {retest.available && runId ? action(autopsyHref(runId, "retest"), "Start retest", "secondary") : null}
           </div>
         ) : null}
+          </div>
+        </details>
       </Panel>
     </section>
   );

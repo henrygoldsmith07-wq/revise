@@ -5,6 +5,7 @@
 // session's own trusted attempts.
 // ---------------------------------------------------------------------------
 
+import type { LearnerState } from "./learner-state";
 import { independentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { RecoveryTotals } from "./mark-recovery";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
@@ -17,6 +18,8 @@ export interface SessionEvidenceInput {
   after: RecoveryTotals;
   topicTitle?: (id: Id) => string;
   now?: Date;
+  /** Earliest moment a delayed check on a different question can count, when one is waiting. */
+  nextCheckAt?: string;
 }
 
 export interface SessionEvidence {
@@ -24,6 +27,8 @@ export interface SessionEvidence {
   stillWeak: string[];
   evidence: { independent: number; correct: number; trusted: number; delayedProof: boolean; lines: string[] };
   next: string;
+  /** One honest verdict for the session, in the learner's six words plus a plain sentence. */
+  headline: { state: LearnerState; text: string };
   /** The standing position on lost marks after this session; empty when none were ever lost. */
   marks: string[];
 }
@@ -62,7 +67,12 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
   if (trusted.length > independent.length) lines.push(`${trusted.length - independent.length} answer${trusted.length - independent.length === 1 ? "" : "s"} used help and count as practice only`);
 
   let next: string;
-  if (after.awaitingProof > 0) next = `Revise will check this again on a different question at least ${MIN_PROOF_DELAY_DAYS} days after your first success.`;
+  const waitDays = input.nextCheckAt && input.now ? Math.ceil((Date.parse(input.nextCheckAt) - input.now.getTime()) / 86_400_000) : null;
+  if (after.awaitingProof > 0 && waitDays !== null && Number.isFinite(waitDays)) {
+    next = waitDays > 0
+      ? `Revise will check this again on a different question in ${waitDays} day${waitDays === 1 ? "" : "s"}.`
+      : "Revise can check this on a different question now. It will be your next step.";
+  } else if (after.awaitingProof > 0) next = `Revise will check this again on a different question at least ${MIN_PROOF_DELAY_DAYS} days after your first success.`;
   else if (after.provisional > 0) next = "Next, a different question on this topic to turn early success into evidence.";
   else if (after.open > 0) next = "Next, another repair on the open mistakes, then a different question.";
   else next = after.proven > 0 ? "Nothing open here. Revise will keep a light delayed check scheduled." : "Revise needs more answers before it can plan a check.";
@@ -75,5 +85,15 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
     `${marks(after.proven)} proven recovered`,
     ...(after.regressed > 0 ? [`${marks(after.regressed)} lost again`] : []),
   ] : [];
-  return { marks: marksLines, changed, stillWeak, evidence: { independent: independent.length, correct: correct.length, trusted: trusted.length, delayedProof, lines }, next };
+  const failedIndependent = independent.length - correct.length;
+  let headline: SessionEvidence["headline"];
+  if (after.regressed > before.regressed) headline = { state: "regressed", text: "Regressed: marks you had recovered were lost again." };
+  else if (after.proven > before.proven) headline = { state: "proven", text: "Proven: the delayed check on a different question held." };
+  else if (!trusted.length) headline = { state: "not-checked", text: "Nothing was marked, so nothing has changed." };
+  else if (!independent.length) headline = { state: "needs-work", text: "Needs another independent attempt: every answer used help, so it counts as practice only." };
+  else if (correct.length && after.awaitingProof > before.awaitingProof) headline = { state: "awaiting-proof", text: "Repaired for now. Awaiting proof on a different question later." };
+  else if (correct.length && failedIndependent === 0) headline = { state: "improving", text: "Improving, but not proven yet." };
+  else if (correct.length) headline = { state: "improving", text: "Still fragile: some independent answers were right, some were not." };
+  else headline = { state: "needs-work", text: "Still needs work: the independent answers did not hold up." };
+  return { headline, marks: marksLines, changed, stillWeak, evidence: { independent: independent.length, correct: correct.length, trusted: trusted.length, delayedProof, lines }, next };
 }

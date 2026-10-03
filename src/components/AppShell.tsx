@@ -64,14 +64,14 @@ const MANAGEMENT_NAV: NavItem[] = [
 const NAV = [...TODAY_NAV, ...STUDY_NAV, ...MANAGEMENT_NAV];
 const DESKTOP_NAV_GROUPS = [
   { label: null, items: TODAY_NAV },
-  { label: "More tools", items: STUDY_NAV },
+  { label: "Choose your own", items: STUDY_NAV },
   { label: null, items: MANAGEMENT_NAV },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { settings, dueCards, streak, syncStatus, syncNow, updateSettings, needsOnboarding, completeOnboarding } = useStoreFields("settings", "dueCards", "streak", "syncStatus", "syncNow", "updateSettings", "needsOnboarding", "completeOnboarding");
+  const { settings, dueCards, syncStatus, syncNow, updateSettings, needsOnboarding, completeOnboarding } = useStoreFields("settings", "dueCards", "syncStatus", "syncNow", "updateSettings", "needsOnboarding", "completeOnboarding");
   const [searchOpen, setSearchOpen] = useState(false);
 
   const syncNotice = !syncStatus.online
@@ -227,9 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
             <div>
               <p className="text-sm font-semibold tracking-tight">Revise</p>
-              <p className="text-[11px] text-ink3">
-                {streak.current > 0 ? `${streak.current}-day streak` : "Start your streak today"}
-              </p>
+              <p className="text-[11px] text-ink3">Exam revision</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -297,7 +295,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Tools
             </summary>
             <div className="absolute bottom-full right-2 mb-2 w-56 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
-              <p className="px-3 py-2 text-xs text-ink3">More tools</p>
+              <p className="px-3 py-2 text-xs text-ink3">Choose your own</p>
               {[...STUDY_NAV, ...MANAGEMENT_NAV].map((item) => (
                 <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
                   aria-current={isActive(item.href) ? "page" : undefined}
@@ -316,16 +314,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function StatusStrip() {
-  const { syncStatus, syncNow, streak } = useStoreFields("syncStatus", "syncNow", "streak");
+  const { syncStatus, syncNow } = useStoreFields("syncStatus", "syncNow");
   const lastSynced = syncStatus.lastSyncedAt
     ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
     : null;
   return (
     <div className="text-[11px] text-ink3 space-y-1">
-      <div className="flex items-center justify-between">
-        <span>{streak.current > 0 ? `${streak.current}-day streak` : "No streak yet"}</span>
-        <span className="tabular-nums">{streak.xp} XP</span>
-      </div>
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5">
           <span

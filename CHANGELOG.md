@@ -1,5 +1,17 @@
 # Changelog
 
+## A simpler first minute, honest summaries and a paper result you can act on — 2026-10-03
+
+**New students get a first step, not a pile of cards.** With no trusted answers yet, Today leads with a short, skippable quick check on the subject with the nearest exam. Its answers become normal attempts, so the next recommendation comes from what was actually lost.
+
+**Today answers six questions.** What to do, why, how long, what is at stake, what happens after, and one Start button. Ranking numbers are gone, and the streak/XP text with them.
+
+**A paper result you can act on.** Marks lost, where, the likely reason, what is still to win back, one next button and one of the six state words. Detail sits below.
+
+**Sessions continue and resume exactly.** A finished mission step offers the next best action; a refresh mid-step restores the same questions and support level. Summaries say Improving, Still fragile, Awaiting proof, Proven or Regressed and when Revise will check again, with no generic praise.
+
+**Outcome measurement and supply audit.** Conservative per-method outcomes with 90% bands (needs 5 delayed checks to say a method works well for you), and `npm run wjec:supply:audit` for the four WJEC flagship subjects. See [learner-experience-2026-10-03.md](docs/learner-experience-2026-10-03.md).
+
 ## One vocabulary in the Library, and a proof journey in the browser — 2026-10-03
 
 **The Library uses the same six words.** Topics now read Not checked, Needs work, Improving, Awaiting proof, Proven or Regressed, with the reason on tap, instead of covered/shaky plus an unexplained mastery percentage and bar. A topic you have not checked is neutral, never red.

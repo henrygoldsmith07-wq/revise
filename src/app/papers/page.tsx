@@ -17,6 +17,7 @@ import { PaperWeaknessPanel } from "@/components/PaperWeaknessPanel";
 import { MockStudyPlan } from "@/components/MockStudyPlan";
 import { SessionEvidenceBlock } from "@/components/SessionEvidenceBlock";
 import { PaperRecoveryPanel } from "@/components/PaperRecoveryPanel";
+import { PaperResultCard } from "@/components/PaperResultCard";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
@@ -190,7 +191,7 @@ function Papers() {
             {papers.filter((p) => latestRun.has(p.id)).map((p) => (
               <details key={p.id} className="p-4">
                 <summary className="cursor-pointer select-none text-sm font-medium text-ink">{p.title}</summary>
-                <div className="mt-3"><PaperRecoveryPanel paperId={p.id} title={p.title} withMission /></div>
+                <div className="mt-3 space-y-3"><PaperResultCard paperId={p.id} title={p.title} /><PaperRecoveryPanel paperId={p.id} title={p.title} /></div>
               </details>
             ))}
           </div>

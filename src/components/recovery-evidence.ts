@@ -10,6 +10,7 @@ import { effectivenessReport, estimateEffectiveness, missionChains, type Effecti
 import { selectNextPaper } from "@/domain/exam-paper-selection";
 import type { InterventionKind } from "@/domain/intervention-ranking";
 import { todayLocal } from "@/domain/local-date";
+import { planColdStart } from "@/domain/cold-start";
 import { buildMarkRecovery, type MarkRecovery } from "@/domain/mark-recovery";
 import { buildMistakePatterns, type MistakePattern } from "@/domain/mistake-patterns";
 import { daysToNearestExam, rankRevisionActions, type RevisionPlan } from "@/domain/revision-engine";
@@ -58,7 +59,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
 /** The single ranked plan Today, the command centre, the diagnostic and mission routes all read. */
 export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvidence } {
   const evidence = useRecoveryEvidence();
-  const store = useStoreFields("adaptiveSession", "attempts", "cards", "examDates", "mastery", "mistakes", "papers", "questions", "settings");
+  const store = useStoreFields("adaptiveSession", "attempts", "cards", "examDates", "mastery", "mistakes", "papers", "questions", "reviewLogs", "settings");
   const plan = useMemo(() => {
     const now = new Date();
     const today = todayLocal();
@@ -89,13 +90,18 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
       const paper = pick ? store.papers.find((p) => p.id === pick.paperId) : undefined;
       return paper ? [{ subjectId, paperId: paper.id, title: paper.title }] : [];
     });
+    const coldStart = planColdStart({
+      subjectIds, attempts: store.attempts, mistakes: store.mistakes, reviewLogs: store.reviewLogs, questions: store.questions, examDates: store.examDates,
+      skipped: store.settings.quickCheckSkipped, topicSubject: (id) => getTopic(id)?.subjectId, now,
+    });
     return rankRevisionActions({
+      coldStart,
       now, subjectIds, subjectName: (id) => getSubject(id)?.name ?? id, topicTitle: evidence.topicTitle,
       mistakes: evidence.mistakes, attempts: store.attempts, questions: store.questions, recovery: evidence.recovery, examDates: store.examDates,
       adaptive: store.adaptiveSession, supplyByTopic: evidence.supplyByTopic, effectiveness: evidence.effectiveness, topicWeight, papers, untouched,
       dueReviews: [...due].map(([subjectId, v]) => ({ subjectId, ...v })),
       paperTitles: Object.fromEntries(store.papers.map((p) => [p.id, p.title])),
     });
-  }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.settings.subjectIds, store.settings.targetGrades]);
+  }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.reviewLogs, store.settings.quickCheckSkipped, store.settings.subjectIds, store.settings.targetGrades]);
   return { plan, evidence };
 }

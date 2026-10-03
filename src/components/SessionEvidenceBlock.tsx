@@ -9,6 +9,8 @@ import { buildSessionEvidence } from "@/domain/session-evidence";
 import { useStoreFields } from "@/state/store";
 import type { Attempt } from "@/domain/types";
 import { getTopic } from "@/domain/curriculum";
+import { LEARNER_STATE_LABEL } from "@/domain/learner-state";
+import { Pill } from "./ui";
 
 function Section({ title, lines }: { title: string; lines: string[] }) {
   if (!lines.length) return null;
@@ -26,12 +28,15 @@ export function SessionEvidenceBlock({ attempts }: { attempts: readonly Attempt[
       mistakes: mistakes.filter((m) => !m.attemptId || !ids.has(m.attemptId)),
       attempts: store.attempts.filter((a) => !ids.has(a.id)), questions: store.questions,
     }).totals;
-    const after = buildMarkRecovery({ mistakes, attempts: store.attempts, questions: store.questions }).totals;
-    return buildSessionEvidence({ attempts, before, after, topicTitle: (id) => getTopic(id)?.title ?? id });
+    const now = new Date();
+    const afterRecovery = buildMarkRecovery({ mistakes, attempts: store.attempts, questions: store.questions, now });
+    const waiting = afterRecovery.items.filter((i) => i.state === "awaiting-proof" && i.proofDueAt).map((i) => i.proofDueAt!).sort();
+    return buildSessionEvidence({ attempts, before, after: afterRecovery.totals, topicTitle: (id) => getTopic(id)?.title ?? id, now, nextCheckAt: waiting[0] });
   }, [attempts, store.attempts, store.mistakes, store.questions, store.settings.subjectIds]);
   if (!evidence) return null;
   return (
     <div className="space-y-2 text-xs text-ink2 text-left" aria-label="What this session did">
+      <div className="flex flex-wrap items-center gap-2"><Pill tone={evidence.headline.state === "proven" ? "success" : evidence.headline.state === "regressed" || evidence.headline.state === "needs-work" ? "danger" : "review"}>{LEARNER_STATE_LABEL[evidence.headline.state]}</Pill><p className="font-semibold text-ink text-sm">{evidence.headline.text}</p></div>
       <Section title="What changed" lines={evidence.changed} />
       <Section title="Still weak" lines={evidence.stillWeak} />
       <Section title="Evidence created" lines={evidence.evidence.lines} />

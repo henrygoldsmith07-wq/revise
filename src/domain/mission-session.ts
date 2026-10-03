@@ -13,6 +13,7 @@ import { trustedAssessmentContent } from "./content-trust";
 import type { ExamMission, MissionStageKind } from "./exam-mission";
 import { isTransferQuestion, partLearningMetadata, questionFamilies, unseenQuestion } from "./learning-evidence";
 import type { RootCause } from "./mistake-patterns";
+import type { MissionCheckpointState, RevisionCheckpointInput } from "./revision-checkpoint";
 import type { Attempt, Id, MissionAttemptContext, Mistake, Question } from "./types";
 
 export type MissionStepKind = MissionAttemptContext["stage"];
@@ -177,4 +178,43 @@ export function stageForRoute(value: string | null): MissionStageKind | undefine
 
 export function missionHref(missionId: string, stage: MissionStageKind): string {
   return `/practice?mission=${encodeURIComponent(missionId)}&stage=${encodeURIComponent(stage)}`;
+}
+
+/** Position a resumed mission step continues from: the first question without an answer from this run. */
+export function missionResumePosition(questionIds: readonly Id[], attempts: readonly Attempt[], startedAt: string): number {
+  const answered = new Set(attempts.filter((a) => a.createdAt >= startedAt).map((a) => a.questionId));
+  const next = questionIds.findIndex((id) => !answered.has(id));
+  return next === -1 ? questionIds.length : next;
+}
+
+export function missionCheckpoint(session: MissionSession, route: { stage: string | null }, startedAt: string, position: number): RevisionCheckpointInput {
+  const stage = route.stage ?? "";
+  return {
+    activity: "practice",
+    title: session.title,
+    href: `/practice?mission=${encodeURIComponent(session.missionId)}${stage ? `&stage=${encodeURIComponent(stage)}` : ""}`,
+    position,
+    total: session.questionIds.length,
+    queueIds: session.questionIds,
+    mission: {
+      missionId: session.missionId, stage, startedAt, questionIds: [...session.questionIds],
+      hintBudgetFor: Object.fromEntries(session.questionIds.map((id) => [id, session.hintBudgetFor[id] ?? null])),
+      contextFor: Object.fromEntries(session.questionIds.flatMap((id) => (session.contextFor[id] ? [[id, session.contextFor[id]!]] : []))),
+    },
+  };
+}
+
+/**
+ * The saved step, when it is for this mission and stage and every question still exists.
+ * Otherwise null, so the caller builds a fresh session instead of guessing.
+ */
+export function restoreMissionSession(session: MissionSession, saved: MissionCheckpointState | undefined, route: { missionId: string; stage: string | null }, questionExists: (id: Id) => boolean): MissionSession | null {
+  if (!saved || saved.missionId !== route.missionId || saved.stage !== (route.stage ?? "")) return null;
+  if (!saved.questionIds.length || !saved.questionIds.every(questionExists)) return null;
+  return {
+    ...session,
+    questionIds: [...saved.questionIds],
+    hintBudgetFor: Object.fromEntries(saved.questionIds.map((id) => [id, saved.hintBudgetFor[id] ?? undefined])),
+    contextFor: { ...saved.contextFor },
+  };
 }
