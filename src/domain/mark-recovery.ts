@@ -173,6 +173,7 @@ export function summariseRecovery(items: readonly MistakeRecovery[], trustedAtte
   const recovered = { low: proven, high: round(proven + provisional) };
   let statement: string;
   if (previouslyLost === 0) statement = "No lost marks recorded yet.";
+  else if (proven === 0 && recovered.high === 0) statement = `No marks recovered yet: ${plural(open, "mark")} still open.`;
   else if (evidence !== "adequate") statement = `Evidence is incomplete: ${plural(proven, "mark")} proven recovered, up to ${plural(recovered.high, "mark")} if early signs hold.`;
   else if (recovered.low === recovered.high) statement = `${plural(proven, "mark")} proven recovered out of ${plural(previouslyLost, "mark")} lost.`;
   else statement = `${plural(proven, "mark")} proven recovered; ${plural(provisional, "more mark")} look recovered but are not proven yet.`;

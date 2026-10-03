@@ -36,14 +36,14 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
           {action.proofStatus ? <Pill tone={TONE[action.proofStatus]}>{LEARNER_STATE_LABEL[action.proofStatus]}</Pill> : null}
           <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">About {Math.ceil(action.minutes)} min</span>
         </div>
-        <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{action.title}</h2>
-        <p className="mt-2 text-base font-medium text-ink sm:text-lg">{subject}</p>
+        <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">{action.title}</h2>
+        <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{subject}</p>
         <p className="mt-1 text-sm text-ink2">{[examLine(action), stakes(action)].filter(Boolean).join(" · ")}</p>
-        <p className="mt-2 max-w-2xl text-sm text-ink2">{e.why}</p>
-        <p className="mt-1 max-w-2xl text-sm text-ink2"><span className="font-medium text-ink">Then:</span> {e.after}</p>
-        <ButtonLink href={action.route.href} variant="primary" size="md" className="mt-5 min-h-[3rem] w-full text-base sm:w-auto">
+        <ButtonLink href={action.route.href} variant="primary" size="md" className="mt-4 min-h-[3rem] w-full text-base sm:w-auto">
           {action.route.label} <ForwardIcon size={17} aria-hidden />
         </ButtonLink>
+        <p className="mt-3 max-w-2xl text-sm text-ink2">{e.why}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink2">{e.after}</p>
         <details className="mt-4 max-w-2xl">
           <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Why this, and why now?</summary>
           <dl className="mt-2 space-y-2 text-sm leading-6 text-ink2" aria-label="Why this recommendation">

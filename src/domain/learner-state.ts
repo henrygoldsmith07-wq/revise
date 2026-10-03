@@ -78,8 +78,16 @@ export function learnerState(lifecycle: TopicLifecycle, evidence?: TopicEvidence
   return { state, label: LEARNER_STATE_LABEL[state], detail };
 }
 
-/** The same six words for a mission's status. "Blocked" is not a state of the learner: it is Needs work with a stated limit. */
-export function missionLearnerState(status: "not-started" | "active" | "awaiting-proof" | "proven" | "regressed" | "blocked"): LearnerState {
+/**
+ * The same six words for a mission's status. "Blocked" is not a state of the learner: it is Needs work
+ * with a stated limit. An active mission only reads as Improving once something has actually succeeded;
+ * being worked on, and failing, is still Needs work.
+ */
+export function missionLearnerState(
+  status: "not-started" | "active" | "awaiting-proof" | "proven" | "regressed" | "blocked",
+  recovery?: { provisional: number; awaitingProof: number; proven: number },
+): LearnerState {
+  if (status === "active" && recovery && recovery.provisional + recovery.awaitingProof + recovery.proven === 0) return "needs-work";
   return ({ "not-started": "needs-work", active: "improving", "awaiting-proof": "awaiting-proof", proven: "proven", regressed: "regressed", blocked: "needs-work" } as const)[status];
 }
 

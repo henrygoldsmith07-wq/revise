@@ -16,7 +16,7 @@ export function MissionView({ mission }: { mission: ExamMission }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Exam mission</p>
-        <Pill tone={LEARNER_STATE_TONE[missionLearnerState(mission.status)]}>{LEARNER_STATE_LABEL[missionLearnerState(mission.status)]}</Pill>
+        <Pill tone={LEARNER_STATE_TONE[missionLearnerState(mission.status, mission.recovery)]}>{LEARNER_STATE_LABEL[missionLearnerState(mission.status, mission.recovery)]}</Pill>
       </div>
       <div>
         <p className="text-base font-semibold text-ink">{mission.title}</p>

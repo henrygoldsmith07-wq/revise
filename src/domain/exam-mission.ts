@@ -302,7 +302,7 @@ export function missionNextAction(mission: ExamMission): MissionNextAction {
     title: mission.status === "not-started" ? `Start: ${mission.title}` : `Continue: ${mission.title}`,
     minutes: stage.minutes,
     why: `${stage.reason} ${marks} mark${marks === 1 ? "" : "s"} are attached to this.`,
-    after: next ? `Next, ${next.title.toLowerCase()} ${when(next.dayOffset)}.` : mission.status === "proven" ? "Proven. Nothing more needed here." : "Revise will check again when new evidence arrives.",
+    after: next ? `After this: ${next.title.charAt(0).toLowerCase()}${next.title.slice(1)} ${when(next.dayOffset)}.` : mission.status === "proven" ? "Proven. Nothing more needed here." : "Revise will check again when new evidence arrives.",
     proof: mission.completionCondition,
     stage: stage.kind,
     blocked: Boolean(stage.blockedBy) || mission.status === "blocked",

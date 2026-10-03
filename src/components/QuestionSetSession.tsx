@@ -61,7 +61,7 @@ export function QuestionSetSession({
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <SectionHeading title={title} hint={hint} />
-        <EmptyState title="Nothing to practise yet" body={emptyBody} action={<Button onClick={onExit}>Back to practice</Button>} />
+        <EmptyState title="Nothing to practise yet" body={emptyBody} action={<Button onClick={onExit}>{exitLabel}</Button>} />
       </div>
     );
   }
@@ -116,7 +116,7 @@ export function QuestionSetSession({
           </ul>
           <div className="card card-2 p-3 text-sm text-ink2 space-y-1.5">{intro}</div>
           <div className="flex flex-col-reverse sm:flex-row gap-2">
-            <Button className="w-full sm:w-auto" onClick={onExit}>Back to practice</Button>
+            <Button className="w-full sm:w-auto" onClick={onExit}>{exitLabel}</Button>
             <Button variant="primary" className="w-full sm:flex-1 sm:min-w-48" onClick={() => setStarted(true)}>{startLabel}</Button>
           </div>
         </Panel>

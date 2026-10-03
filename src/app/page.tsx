@@ -150,7 +150,7 @@ function TodayWelcome({ name, greeting, hasSession = true }: { name: string; gre
       <h1 className="relative z-10 mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
         {salutation}{name ? ", " + name : ""}
       </h1>
-      <p className="relative z-10 mt-2 max-w-xl text-sm leading-6 text-ink2 sm:text-base">
+      <p className="relative z-10 mt-2 hidden max-w-xl text-sm leading-6 text-ink2 sm:block sm:text-base">
         {hasSession ? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
       </p>
     </header>

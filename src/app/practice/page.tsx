@@ -241,7 +241,10 @@ function Practice() {
     return query ? `/practice?${query}` : "/practice?resume=1";
   }, [mode, retestId, sessionId, subjectId, topicId]);
 
+  // A mission session runs its own questions; the generic queue behind it must not save a resume point.
+  const missionActive = Boolean(params.get("mission"));
   useEffect(() => {
+    if (missionActive) return;
     if (closed || !current) {
       if (resumeRequested && !current) void clearRevisionCheckpoint();
       return;
@@ -259,7 +262,7 @@ function Practice() {
       queueIds: retestMistake ? [current.id] : order,
       retestMistakeId: retestMistake?.id,
     });
-  }, [checkpointHref, clearRevisionCheckpoint, closed, current, index, mode, order, queue.length, resumeRequested, retestMistake, saveRevisionCheckpoint]);
+  }, [checkpointHref, clearRevisionCheckpoint, closed, current, index, missionActive, mode, order, queue.length, resumeRequested, retestMistake, saveRevisionCheckpoint]);
 
   function resetSession() {
     setSessionAttempts([]);

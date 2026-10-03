@@ -29,7 +29,7 @@ import { buildExamMissions, buildPaperMission, missionNextAction, type ExamMissi
 import type { InterventionKind } from "./intervention-ranking";
 import { missionLearnerState, type LearnerState } from "./learner-state";
 import type { MarkRecovery } from "./mark-recovery";
-import { missionHref } from "./mission-session";
+import { buildMissionSession, missionHref } from "./mission-session";
 import { ROOT_CAUSE_LABEL } from "./mistake-patterns";
 import { timeBoxPlan, type TimeBox, type TimeBoxPlan } from "./pre-exam-plan";
 import type { TopicSupply } from "./supply";
@@ -197,15 +197,17 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     : mission.origin === "paper" ? mission.title
     : `${shown > 0 ? `Recover ${shown} marks: ` : ""}${mission.title}`;
   const share = STAGE_SHARE[stage.kind];
+  // The time shown must be the time the session takes, so it comes from the questions it will run.
+  const sessionMinutes = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, stage.kind).minutes;
   return {
     id: `action:${mission.id}:${stage.kind}`,
     type, title, subjectId: mission.subjectId, topicIds: mission.topicIds, specPoints: [],
-    minutes: Math.max(3, stage.minutes || 8), marksRecoverable: round(marks, 1),
+    minutes: Math.max(3, Math.ceil(sessionMinutes) || stage.minutes || 8), marksRecoverable: round(marks, 1),
     examWeight: shares.length === 1 ? shares[0]!.share : null,
     daysToExam: daysToNearestExam(input.examDates, mission.subjectId, input.now),
     evidenceStrength: r.evidence === "adequate" ? 0.8 : r.evidence === "thin" ? 0.5 : 0.2,
     confidence, expectedLearningGain: share, expectedMarks: round(marks * share * weight, 2),
-    proofStatus: missionLearnerState(mission.status), requiredFirst: regressed, effectiveness: eff, mistakeIds: mission.mistakeIds,
+    proofStatus: missionLearnerState(mission.status, mission.recovery), requiredFirst: regressed, effectiveness: eff, mistakeIds: mission.mistakeIds,
     explanation: {
       why: `${lost} mark${lost === 1 ? "" : "s"} were lost${where}${cause ? `, mainly through ${cause}` : ""}. ${stage.reason}`,
       whyNow: regressed ? "Marks you had recovered were lost again, so they are the most likely to cost you in the exam."
