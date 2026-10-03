@@ -6,6 +6,7 @@
 //
 //   rounding-error          value agrees after re-rounding
 //   unit-error              same magnitude, wrong or missing unit
+//   conversion-error        one value out by a power of ten (a prefix converted the wrong way)
 //   arithmetic-slip         digits largely match, small numeric drift
 //   incorrect-rearrangement equation flipped or solved on the wrong side
 //   substitution-error      values placed correctly, evaluation wrong
@@ -20,6 +21,7 @@ export type StepErrorKind =
   | "none"
   | "rounding-error"
   | "unit-error"
+  | "conversion-error"
   | "arithmetic-slip"
   | "incorrect-rearrangement"
   | "substitution-error"
@@ -138,6 +140,26 @@ function looksLikeRearrangementFlip(student: string, expected: string): boolean 
   );
 }
 
+/**
+ * Exactly one value differs from the scheme and the ratio is a power of ten
+ * (k != 0, |k| <= 9); every other value agrees. Returns the exponent, or null.
+ */
+export function powerOfTenSlip(student: number[], expected: number[]): number | null {
+  if (!student.length || student.length !== expected.length) return null;
+  let exponent: number | null = null;
+  for (let i = 0; i < student.length; i++) {
+    const s = student[i]!;
+    const e = expected[i]!;
+    if (s === e) continue;
+    if (exponent !== null || s === 0 || e === 0 || Math.sign(s) !== Math.sign(e)) return null;
+    const k = Math.log10(Math.abs(s / e));
+    const rounded = Math.round(k);
+    if (rounded === 0 || Math.abs(rounded) > 9 || Math.abs(k - rounded) > 1e-9) return null;
+    exponent = rounded;
+  }
+  return exponent;
+}
+
 /** Exported for tests. */
 export function isRoundingOf(student: number, expected: number): boolean {
   if (!Number.isFinite(student) || !Number.isFinite(expected)) return false;
@@ -178,6 +200,20 @@ export function diagnoseStep(
     });
     if (paired && !sameNumbers(trimmed, expectedStep))
       return { kind: "rounding-error", note: "Right value, rounded differently.", similarity };
+  }
+
+  // 1b. Conversion: one value is a power of ten out, which is how a unit prefix
+  //     goes wrong (3.2 mA used as 0.032 A instead of 0.0032 A).
+  // A model step may show the unconverted value first (3.2 mA = 0.0032 A), so the
+  // student's values are also compared with the last values of the step.
+  const slip = powerOfTenSlip(sn, en) ?? (sn.length && sn.length < en.length ? powerOfTenSlip(sn, en.slice(-sn.length)) : null);
+  if (slip !== null) {
+    const factor = `${10 ** Math.abs(slip)}`;
+    return {
+      kind: "conversion-error",
+      note: `One value is ${slip > 0 ? "too large" : "too small"} by a factor of ${factor}. Check the power of ten and any unit prefix conversion.`,
+      similarity,
+    };
   }
 
   // 2. Units: same digits, wrong or missing unit prefix/family.
@@ -262,6 +298,7 @@ function summarise(kind: StepErrorKind, errIdx: number | null, modelCount: numbe
   switch (kind) {
     case "rounding-error": return "Correct method with a rounding difference.";
     case "unit-error": return "Correct method; the unit went wrong.";
+    case "conversion-error": return "Correct method; a unit prefix was converted the wrong way.";
     case "arithmetic-slip": return "Correct method with an arithmetic slip.";
     case "incorrect-rearrangement": return "Rearranged the wrong way round.";
     default: return `First divergence at step ${errIdx + 1} of ${modelCount}.`;

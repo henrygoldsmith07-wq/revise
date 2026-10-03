@@ -52,6 +52,7 @@ export interface Attempt {
 export type WorkingErrorKind =
   | "none"
   | "rounding-error"
+  | "conversion-error"
   | "unit-error"
   | "arithmetic-slip"
   | "incorrect-rearrangement"

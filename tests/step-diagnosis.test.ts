@@ -3,6 +3,7 @@ import {
   diagnoseStep,
   diagnoseWorking,
   isRoundingOf,
+  powerOfTenSlip,
 } from "@/domain/step-diagnosis";
 
 describe("isRoundingOf", () => {
@@ -12,6 +13,44 @@ describe("isRoundingOf", () => {
     expect(isRoundingOf(9.81, 9.8)).toBe(true); // both round to 9.8 at 1dp
     expect(isRoundingOf(42, 43)).toBe(false);
     expect(isRoundingOf(0, 5)).toBe(false);
+  });
+});
+
+describe("powerOfTenSlip", () => {
+  it("finds exactly one value out by a power of ten", () => {
+    expect(powerOfTenSlip([0.032], [0.0032])).toBe(1);
+    expect(powerOfTenSlip([3.2, 5], [0.0032, 5])).toBe(3);
+    expect(powerOfTenSlip([0.0032], [0.032])).toBe(-1);
+  });
+  it("rejects anything else", () => {
+    expect(powerOfTenSlip([], [])).toBeNull();
+    expect(powerOfTenSlip([4], [4])).toBeNull();
+    expect(powerOfTenSlip([3, 6], [0.3, 0.7])).toBeNull();
+    expect(powerOfTenSlip([0.3, 60], [3, 6])).toBeNull();
+    expect(powerOfTenSlip([32], [0.0035])).toBeNull();
+    expect(powerOfTenSlip([-3.2], [0.32])).toBeNull();
+    expect(powerOfTenSlip([0], [3])).toBeNull();
+    expect(powerOfTenSlip([1, 2], [1])).toBeNull();
+  });
+});
+
+describe("conversion errors", () => {
+  it("names a prefix slip, then leaves unit-only and rounding diagnoses alone", () => {
+    const slip = diagnoseStep("I = 0.032 A", "I = 0.0032 A");
+    expect(slip.kind).toBe("conversion-error");
+    expect(slip.note).toMatch(/too large by a factor of 10\b/);
+    expect(diagnoseStep("I = 3.2 mA", "I = 0.0032 A").note).toMatch(/factor of 1000/);
+    expect(diagnoseStep("KE = 240 kJ", "KE = 240 J").kind).toBe("unit-error");
+    expect(diagnoseStep("v = 19.798 m/s", "v = 19.8 m/s").kind).toBe("rounding-error");
+  });
+  it("is reported as the first error of a working", () => {
+    const d = diagnoseWorking({
+      modelSteps: ["I = 3.2 mA = 0.0032 A", "V = IR = 0.0032 x 500 = 1.6 V"],
+      answer: "I = 0.032 A\nV = IR = 0.032 x 500 = 16 V",
+      similarityFn: () => 0,
+    });
+    expect(d.kind).toBe("conversion-error");
+    expect(d.summary).toMatch(/unit prefix was converted the wrong way/);
   });
 });
 

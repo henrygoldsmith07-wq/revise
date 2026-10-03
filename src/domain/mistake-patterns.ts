@@ -94,7 +94,8 @@ const FROM_TAG: Partial<Record<NonNullable<Mistake["misconception"]>, RootCause>
 
 export function rootCauseOf(mistake: Mistake, opts: { prerequisiteWeakTopics?: ReadonlySet<Id> } = {}): RootCause {
   switch (mistake.workingErrorKind) {
-    case "unit-error": return "unit-error";
+    case "unit-error":
+    case "conversion-error": return "unit-error";
     case "arithmetic-slip":
     case "rounding-error": return "arithmetic-slip";
     case "incorrect-rearrangement":

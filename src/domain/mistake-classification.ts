@@ -155,6 +155,7 @@ const CONTEXT_MARKERS =
 const WORKING_ERROR_LABEL: Record<Exclude<WorkingErrorKind, "none">, string> = {
   "rounding-error": "rounding error",
   "unit-error": "unit error",
+  "conversion-error": "unit conversion error",
   "arithmetic-slip": "arithmetic slip",
   "incorrect-rearrangement": "incorrect rearrangement",
   "substitution-error": "substitution error",
