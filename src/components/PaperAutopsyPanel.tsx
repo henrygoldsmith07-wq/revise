@@ -3,6 +3,7 @@
 import { getTopic } from "@/domain/curriculum";
 import type { PaperAutopsy } from "@/domain/paper-autopsy";
 import { BreakdownList, type BreakdownRow } from "./BreakdownList";
+import { PaperRecoveryPanel } from "./PaperRecoveryPanel";
 import { Button, ButtonLink, Panel, Pill, SectionHeading, StatTile } from "./ui";
 
 const asRows = (rows: PaperAutopsy["byTopic"]): BreakdownRow[] =>
@@ -56,6 +57,7 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
           <StatTile label="Marks lost" value={autopsy.marksLost} tone={autopsy.marksLost ? "danger" : "success"} />
           <StatTile label="Questions with losses" value={autopsy.lostQuestions.length} />
         </div>
+        {autopsy.paperId ? <PaperRecoveryPanel paperId={autopsy.paperId} title={autopsy.title} withMission /> : null}
 
         {autopsy.marksLost ? (
           <div className="grid gap-5 md:grid-cols-2">

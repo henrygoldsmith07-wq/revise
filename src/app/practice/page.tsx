@@ -13,6 +13,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
+import { SessionEvidenceBlock } from "@/components/SessionEvidenceBlock";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
@@ -303,6 +304,7 @@ function Practice() {
     return (
       <PostSessionClosure
         closure={closure}
+        extra={<SessionEvidenceBlock attempts={sessionAttempts} />}
         hint="Your answers are recorded and dropped marks are available in the mistake queue."
         secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise another topic" }}
       />

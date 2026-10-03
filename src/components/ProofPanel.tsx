@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { allTopics, getSubject, getTopic } from "@/domain/curriculum";
 import { evidenceGapReport, type SubjectGapSummary } from "@/domain/marks-value";
+import { learnerState, topicEvidenceSummary, type LearnerState } from "@/domain/learner-state";
+import { topicLifecycle } from "@/domain/proof-lifecycle";
 import { shortDate, type ProofStatus, type TopicProof } from "@/domain/proof-of-improvement";
 import { topicShares } from "@/domain/topic-weight";
 import { useStoreFields } from "@/state/store";
@@ -17,6 +19,10 @@ const STATUS: Record<ProofStatus, { label: string; tone: "success" | "review" | 
   declined: { label: "Slipped", tone: "danger" },
   "awaiting-proof": { label: "Awaiting proof", tone: "review" },
   untested: { label: "Not tested", tone: "neutral" },
+};
+
+const STATE_TONE: Record<LearnerState, "success" | "review" | "danger" | "neutral" | "accent"> = {
+  "not-checked": "neutral", "needs-work": "danger", improving: "accent", "awaiting-proof": "review", proven: "success", regressed: "danger",
 };
 
 const pct = (value: number | null) => (value === null ? "" : `${Math.round(value * 100)}%`);
@@ -65,6 +71,10 @@ export function ProofPanel() {
     const status = STATUS[row.status];
     const topic = getTopic(row.topicId);
     const act = row.proofDue || row.illusory;
+    const view = learnerState(
+      topicLifecycle({ topic: { id: row.topicId, title: topic?.title ?? row.topicId }, proof: row, attempts: store.attempts, questions: store.questions }),
+      topicEvidenceSummary(row.topicId, store.attempts, store.questions),
+    );
     return (
       <li key={row.topicId} className="py-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -72,11 +82,14 @@ export function ProofPanel() {
             {topic?.title ?? row.topicId}
             <span className="ml-2 text-xs font-normal text-ink3">{getSubject(row.subjectId)?.name}</span>
           </p>
-          <p className="text-xs text-ink2 mt-0.5">{detail(row)}</p>
+          <p className="text-xs text-ink2 mt-0.5">{view.detail}</p>
+          <details className="mt-1">
+            <summary className="cursor-pointer select-none text-[11px] text-ink3">Show the numbers</summary>
+            <p className="text-xs text-ink3 mt-1">{detail(row)} ({status.label.toLowerCase()} by the evidence ledger)</p>
+          </details>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {row.illusory ? <Pill tone="danger">Looks learned</Pill> : null}
-          <Pill tone={status.tone}>{status.label}{row.markPoints ? ` ${row.markPoints > 0 ? "+" : ""}${row.markPoints}` : ""}</Pill>
+          <Pill tone={STATE_TONE[view.state]}>{view.label}</Pill>
           {act ? <ButtonLink href={startHref(row.topicId)} size="sm" variant="primary">Prove it</ButtonLink> : null}
         </div>
       </li>

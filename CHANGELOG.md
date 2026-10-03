@@ -1,5 +1,13 @@
 # Changelog
 
+## Exam missions and marks recovered — 2026-10-03
+
+**Exam Missions.** Today now shows one mission built from your lost marks: a recurring cause, a weak topic, or a whole paper. Each stage (diagnose, repair, practise, apply, delayed proof) says why it exists. A mission only completes when a different question, answered independently after a delay, proves the marks are back. Finishing tasks never completes one.
+
+**Marks recovered.** Lost marks are tracked as open, targeted, provisional, awaiting proof, proven or regressed. A repeat of the same question or a hinted answer is never proof, and thin evidence is shown as a range.
+
+**Also added.** Learner states (Not checked, Needs work, Improving, Awaiting proof, Proven, Regressed) with the evidence one tap away; a 5-10 minute starting diagnostic; a pre-exam command centre on Today with 5 to 60 minute plans that change with the countdown; paper recovery (Paper, Autopsy, Repair, Equivalent retest, Delayed verification, Closed) on Papers and in each autopsy; a what-happened / why / pattern / best-fix explanation on mistake cards; and a four-part session closure. Mission order now also reflects what has worked for you: once enough delayed, different-question results exist for a type of repair, it moves up or down. Pre-exam plans leave out repair when nothing needs repairing.
+
 ## Marks value and proof — 2026-10-01
 
 **Revise now ranks by marks, and says what it can prove.** Today weighs how much of the exam a topic carries and how you do on questions you have not seen, and "Why this session?" lists the evidence behind the choice. A new student sees that evidence is limited rather than an invented number.

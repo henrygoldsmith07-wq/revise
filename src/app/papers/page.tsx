@@ -15,6 +15,8 @@ import { useStoreFields, useSubjects } from "@/state/store";
 import { PaperAutopsyPanel, autopsyHref } from "@/components/PaperAutopsyPanel";
 import { PaperWeaknessPanel } from "@/components/PaperWeaknessPanel";
 import { MockStudyPlan } from "@/components/MockStudyPlan";
+import { SessionEvidenceBlock } from "@/components/SessionEvidenceBlock";
+import { PaperRecoveryPanel } from "@/components/PaperRecoveryPanel";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
@@ -179,6 +181,20 @@ function Papers() {
             ))}
           </ul>
         </Panel>
+      ) : null}
+
+      {latestRun.size ? (
+        <section aria-label="Paper recovery">
+          <SectionHeading title="Paper recovery" hint="A paper stays open until its important losses are proven recovered on different questions, after a delay." />
+          <div className="card divide-y divide-line">
+            {papers.filter((p) => latestRun.has(p.id)).map((p) => (
+              <details key={p.id} className="p-4">
+                <summary className="cursor-pointer select-none text-sm font-medium text-ink">{p.title}</summary>
+                <div className="mt-3"><PaperRecoveryPanel paperId={p.id} title={p.title} withMission /></div>
+              </details>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       <section>
@@ -626,6 +642,7 @@ function PaperSession({
         hint={paper.title}
         extra={
           <div className="space-y-3">
+            <SessionEvidenceBlock attempts={paperAttempts} />
             {calibration ? <p>{calibration} See Progress for the updated calibration.</p> : null}
             <PaperWeaknessPanel analysis={autopsy.analysis} />
             <PaperAutopsyPanel autopsy={autopsy} onNavigate={(href) => void finish(href)} />

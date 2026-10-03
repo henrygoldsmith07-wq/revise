@@ -13,6 +13,8 @@ import { PhaseEntryNotice } from "@/components/PhaseEntryNotice";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink } from "@/components/ui";
 import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
+import { CommandCentreCard } from "@/components/CommandCentreCard";
+import { MissionCard } from "@/components/MissionCard";
 import { TodayOverview } from "@/components/TodayOverview";
 import { todayLocal } from "@/domain/local-date";
 
@@ -110,6 +112,7 @@ export default function TodayPage() {
           <AdaptiveSessionHero session={adaptiveSession} displayName={settings.displayName} greeting="" proof={proofLedger} />
         </div>
       )}
+      {revisionCheckpoint ? null : <><CommandCentreCard /><MissionCard /></>}
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
           Plan, pace and outlook
