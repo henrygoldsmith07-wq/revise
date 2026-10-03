@@ -24,6 +24,7 @@ import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { proofLine } from "@/domain/proof-of-improvement";
+import { buildTopicLifecycles } from "@/domain/proof-lifecycle";
 import { useStoreFields } from "@/state/store";
 import { AdaptiveRetrievalBlock, type RetrievalOutcome } from "@/components/AdaptiveRetrievalBlock";
 import { AdaptiveQuestionBlock } from "@/components/AdaptiveQuestionBlock";
@@ -787,6 +788,10 @@ function AdaptiveComplete({
     const proofNote = proofLine(store.proofLedger.topics.find((row) => row.topicId === plan.topicId));
     return summariseAdaptiveRun({ plan, completed: run.completed, openMistakeIds: open, proofNote });
   }, [plan, run.completed, store.mistakes, store.proofLedger]);
+  const lifecycle = useMemo(
+    () => buildTopicLifecycles({ topics: [{ id: plan.topicId, title: plan.topicTitle }], ledger: store.proofLedger, attempts: store.attempts, questions: store.questions })[0],
+    [plan.topicId, plan.topicTitle, store.proofLedger, store.attempts, store.questions],
+  );
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
@@ -805,6 +810,7 @@ function AdaptiveComplete({
           />
         ) : null}
         <SummarySection title="Evidence strength" lines={[summary.evidenceStrength.line]} />
+        {lifecycle ? <SummarySection title="Where this topic stands" lines={[`${lifecycle.label}. ${lifecycle.line}`, ...(lifecycle.claim ? [lifecycle.claim] : [])]} /> : null}
         <SummarySection title="Improved" lines={summary.improved} />
         <SummarySection title="Still fragile" lines={summary.fragile} />
         <SummarySection title="Repaired" lines={summary.repaired} />

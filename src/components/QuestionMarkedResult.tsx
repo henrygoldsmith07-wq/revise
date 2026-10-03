@@ -10,6 +10,7 @@ import type { RemediationPlan } from "@/domain/remediation";
 
 import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/domain/types";
 
+import { confidenceWord } from "@/domain/plain-numbers";
 import { ImproveAnswer } from "./ImproveAnswer";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { RichText } from "./RichText";
@@ -105,7 +106,7 @@ export function MarkedResult({
           ) : null}
           {result.source === "ai" ? (
             <Pill tone={result.escalation ? "review" : "success"}>
-              {result.confidence === null ? "AI confidence unavailable" : `AI confidence ${Math.round(result.confidence * 100)}%`}
+              {result.confidence === null ? "AI confidence unavailable" : `AI confidence: ${confidenceWord(result.confidence)}`}
             </Pill>
           ) : null}
           {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}

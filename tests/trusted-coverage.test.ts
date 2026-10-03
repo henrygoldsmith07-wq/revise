@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCoverageRows, coverageCsv, coverageMetrics } from "@/domain/trusted-coverage";
+import { buildCoverageRows, coverageCsv, coverageMetrics, independentGroups } from "@/domain/trusted-coverage";
 import type { Question, Subject, Topic, Unit } from "@/domain/types";
 
 const subject = { id: "s", qualificationId: "q", name: "S", papers: [], gradeBoundaries: [], spec: { version: "1", releaseDate: "2024-01-01", lastChecked: "2026-08-01", url: "" } } as Subject;
@@ -51,6 +51,29 @@ describe("trusted coverage", () => {
     const withEvidence = buildCoverageRows({ subject, topics, units, questions: bank, trusted: () => true, studentEvidence: new Map([["sp1", "secure"]]) });
     expect(withEvidence[0]!.studentEvidence).toBe("secure");
     expect(withEvidence[1]!.studentEvidence).toBe("unknown");
+  });
+  it("counts a reskinned question once, even under different family ids", () => {
+    const base = "A student heats a metal block of mass 2.5 kg and measures the temperature rise over several minutes using a thermometer";
+    const reskin = base.replace("2.5", "3.1").replace("metal block", "metal block");
+    const mk = (id: string, stem: string, family: string): Question => ({ ...q(id, "application", family), stem, parts: [{ id: `${id}:a`, label: "", prompt: "Explain why the temperature of the block rises more slowly than expected", marks: 2, markScheme: ["a"], modelAnswer: "m", specPointIds: ["sp1"] }] }) as Question;
+    expect(independentGroups([mk("x1", base, "fa"), mk("x2", reskin, "fb")])).toBe(1);
+    const different = mk("x3", "Describe how a capacitor stores energy when connected across a battery and what limits the final charge stored", "fc");
+    expect(independentGroups([mk("x1", base, "fa"), mk("x2", reskin, "fb"), different])).toBe(2);
+    expect(independentGroups([])).toBe(0);
+  });
+  it("merges questions that share a family and ignores similarity on very short prompts", () => {
+    expect(independentGroups([q("a", "recall", "same"), q("b", "recall", "same")])).toBe(1);
+    expect(independentGroups([q("a", "recall", "f1"), q("b", "recall", "f2")])).toBe(2);
+  });
+  it("does not let near-duplicates satisfy the independent-group requirement", () => {
+    const stem = "A student heats a metal block of mass 2.5 kg and measures the temperature rise over several minutes using a thermometer";
+    const mk = (id: string, demand: string, n: string): Question => ({ ...q(id, demand, id), stem: stem.replace("2.5", n), parts: [{ id: `${id}:a`, label: "", prompt: "Explain why the temperature of the block rises more slowly than expected", marks: 2, markScheme: ["a"], modelAnswer: "m", specPointIds: ["sp1"] }] }) as Question;
+    const dupes = [mk("r", "recall", "1.1"), mk("a", "application", "2.2"), mk("t", "transfer", "3.3"), mk("a2", "application", "4.4")];
+    const row = buildCoverageRows({ subject, topics, units, questions: dupes, trusted: () => true })[0]!;
+    expect(row.trustedFamilies).toBe(4);
+    expect(row.independentGroups).toBe(1);
+    expect(row.fullyCovered).toBe(false);
+    expect(row.missing).toContain("2-more-families");
   });
   it("exports a quoted CSV", () => {
     const csv = coverageCsv(rows(() => true));

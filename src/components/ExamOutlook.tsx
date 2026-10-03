@@ -10,6 +10,7 @@
 // answers never shows a number, and one with none at all reads exactly that.
 // ---------------------------------------------------------------------------
 
+import { confidenceWord, EVIDENCE_CONFIDENCE } from "@/domain/plain-numbers";
 import { getSubject } from "@/domain/curriculum";
 import { MIN_OUTLOOK_ATTEMPTS, outlookRows } from "@/domain/exam-outlook";
 import { formatExamDate } from "@/domain/pace-forecast";
@@ -58,7 +59,7 @@ export function ExamOutlook() {
           const provisional = row.provisional ? "Provisional estimate" : "Estimate";
           return (
             <p key={row.subjectId}>
-              {provisional}: you&apos;re most likely to score {row.low}–{row.high}%{when} (n={row.independentAttempts} independent, confidence {Math.round(row.confidence * 100)}%).
+              {provisional}: you&apos;re most likely to score {row.low}–{row.high}%{when} (n={row.independentAttempts} independent, {confidenceWord(row.confidence, EVIDENCE_CONFIDENCE)} confidence).
             </p>
           );
         })}

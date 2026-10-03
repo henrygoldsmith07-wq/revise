@@ -43,6 +43,14 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
       <SectionHeading title="Paper autopsy" hint="Exactly where this paper lost marks, and the plan to win them back." />
       <Panel className="space-y-5">
         <h2 id="paper-autopsy-heading" className="sr-only">Paper autopsy: {autopsy.title}</h2>
+        {autopsy.headline.lines.length ? (
+          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+            <ul className="min-w-0 space-y-0.5 text-sm text-ink">
+              {autopsy.headline.lines.map((line, index) => <li key={line} className={index === 0 ? "font-semibold" : "text-ink2"}>{line}</li>)}
+            </ul>
+            {autopsy.headline.next && runId ? action(autopsyHref(runId, autopsy.headline.next.stepId), `Recover the next ${autopsy.headline.next.marks} mark${autopsy.headline.next.marks === 1 ? "" : "s"}`, "primary") : null}
+          </div>
+        ) : null}
         <div className="grid grid-cols-3 gap-3">
           <StatTile label="Scored" value={`${autopsy.marksGained}/${autopsy.marksAvailable}`} sub={autopsy.accuracy !== null ? `${Math.round(autopsy.accuracy * 100)}%` : undefined} />
           <StatTile label="Marks lost" value={autopsy.marksLost} tone={autopsy.marksLost ? "danger" : "success"} />

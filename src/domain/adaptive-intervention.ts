@@ -4,9 +4,10 @@
 
 import { capabilityState, type CapabilityProfile } from "./capability-mastery";
 import { classifyDepth } from "./flagship";
+import { evidenceGaps, type GapExtras } from "./evidence-gaps";
 import { currentFatigue } from "./fatigue";
 import { examPhase, explainIntervention, INTERVENTION_LABEL, rankInterventions, type InterventionContext, type InterventionKind } from "./intervention-ranking";
-import { questionFamilies } from "./learning-evidence";
+import { independentAttempt, questionFamilies, trustworthyAttempt } from "./learning-evidence";
 import { buildMistakePatterns } from "./mistake-patterns";
 import { trustedAssessmentContent } from "./physics-content-review";
 import type { AdaptiveTopicCandidate } from "./adaptive-scoring";
@@ -17,6 +18,8 @@ export interface PlanIntervention {
   minutes: number;
   headline: string;
   lines: string[];
+  /** The most useful missing measurement, as a bounded action; null when evidence is broad. */
+  gap: { text: string; label: string; minutes: number } | null;
 }
 
 const score = (profile: CapabilityProfile, key: "recall" | "application" | "transfer"): number | null =>
@@ -89,11 +92,38 @@ export function interventionContextFor(input: {
   };
 }
 
-export function chooseIntervention(ctx: InterventionContext, maxMinutes?: number): PlanIntervention | null {
+/** Counts behind the evidence-gap messages; all derived from the learner's own history. */
+export function gapExtrasFor(input: {
+  questions: readonly Question[];
+  attempts: readonly Attempt[];
+  daysToExam: number | null;
+  now?: Date;
+}): GapExtras {
+  const now = (input.now ?? new Date()).getTime();
+  const independent = input.attempts.filter(independentAttempt);
+  const last = independent.reduce((max, attempt) => Math.max(max, Date.parse(attempt.createdAt)), 0);
+  return {
+    daysSinceEvidence: last > 0 ? Math.max(0, Math.floor((now - last) / 86_400_000)) : null,
+    distinctIndependent: new Set(independent.map((attempt) => attempt.questionId)).size,
+    independentAttempts: independent.length,
+    timedPaperAttempts: input.attempts.filter((attempt) => attempt.mode === "paper").length,
+    trustedQuestions: input.questions.filter(trustedAssessmentContent).length,
+    lowConfidenceMarks: input.attempts.filter((attempt) => attempt.markedBy === "ai" && !trustworthyAttempt(attempt)).length,
+    daysToExam: input.daysToExam,
+  };
+}
+
+/** `sessionMinutes` is the planned session length, so the headline never contradicts the length shown on Today. */
+export function chooseIntervention(ctx: InterventionContext, maxMinutes?: number, extras?: GapExtras, sessionMinutes?: number): PlanIntervention | null {
   const pick = rankInterventions([ctx], { maxMinutes })[0];
+  const gap = extras ? evidenceGaps(ctx, extras)[0] : undefined;
   if (!pick) return null;
-  const explained = explainIntervention(ctx, pick);
-  return { kind: pick.kind, minutes: pick.minutes, headline: explained.headline, lines: explained.lines };
+  const minutes = sessionMinutes !== undefined ? Math.max(1, Math.ceil(sessionMinutes)) : pick.minutes;
+  const explained = explainIntervention(ctx, { kind: pick.kind, minutes });
+  return {
+    kind: pick.kind, minutes, headline: explained.headline, lines: explained.lines,
+    gap: gap ? { text: gap.text, label: gap.action.label, minutes: gap.action.minutes } : null,
+  };
 }
 
 export { examPhase, INTERVENTION_LABEL };

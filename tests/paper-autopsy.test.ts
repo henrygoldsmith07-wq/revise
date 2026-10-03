@@ -83,6 +83,38 @@ function autopsy(overrides: Partial<Parameters<typeof buildPaperAutopsy>[0]> = {
   return buildPaperAutopsy({ paper, attempts, questions: paperQuestions, mistakes, paperRunId: "run-1", bank, history: attempts, ...overrides });
 }
 
+describe("paper autopsy headline", () => {
+  it("states what was lost, what has a repair and new question ready, and the first action", () => {
+    const { headline } = autopsy();
+    expect(headline.lost).toBe(6);
+    expect(headline.lines[0]).toBe("You lost 6 marks.");
+    expect(headline.recoverable).toBe(6);
+    expect(headline.lines[1]).toBe("6 of them have a repair and a new question ready.");
+    expect(headline.next).toMatchObject({ marks: 3, stepId: "repair-1", topicId: "algebra" });
+  });
+  it("counts only losses with an unseen equivalent as ready, never every lost mark", () => {
+    const seenEverything = [...attempts, ...bank.filter((row) => row.id.startsWith("n-")).map((row, i) => attempt("p1", 1, 1, { id: `old-${i}`, questionId: row.id, mode: "practice", paperRunId: undefined }))];
+    const { headline } = autopsy({ history: seenEverything });
+    expect(headline.lost).toBe(6);
+    expect(headline.recoverable).toBe(0);
+    expect(headline.lines.join(" ")).not.toMatch(/ready/);
+  });
+  it("finds recurring weaknesses only when one cause hits two different questions", () => {
+    const none = autopsy().headline;
+    expect(none.recurring).toEqual({ marks: 0, patterns: 0 });
+    const twice = autopsy({ mistakes: [mistake("m1", "att-p1", "algebra", 3, "method"), mistake("m2", "att-p3", "stats", 2, "method")] }).headline;
+    expect(twice.recurring).toEqual({ marks: 5, patterns: 1 });
+    expect(twice.lines).toContain("5 came from one recurring weakness.");
+    const sameQuestion = autopsy({ mistakes: [mistake("m1", "att-p1", "algebra", 3, "method"), mistake("m3", "att-p1", "algebra", 1, "method")] }).headline;
+    expect(sameQuestion.recurring.patterns).toBe(0);
+  });
+  it("says nothing when no marks were lost or no trusted evidence exists", () => {
+    const perfect = autopsy({ attempts: [attempt("p1", 2, 2), attempt("p2", 2, 2), attempt("p3", 2, 2)], mistakes: [] }).headline;
+    expect(perfect).toMatchObject({ lost: 0, lines: [], next: null });
+    expect(autopsy({ attempts: attempts.map((row) => ({ ...row, markedBy: "self" as const })) }).headline.lines).toEqual([]);
+  });
+});
+
 describe("paper autopsy", () => {
   it("accounts for every lost mark in each breakdown", () => {
     const result = autopsy();

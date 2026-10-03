@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { confidenceWord, EVIDENCE_CONFIDENCE } from "@/domain/plain-numbers";
 import { getSubject } from "@/domain/curriculum";
 import type { ExamReadiness, ExamReadinessStatus, ReadinessAction, ReadinessSignalStatus } from "@/domain/exam-readiness";
 import { useStoreFields } from "@/state/store";
@@ -95,7 +96,7 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
       </div>
 
       <div className="mt-3">
-        <ProgressBar value={row.score} label={`${subject?.name ?? row.subjectId} readiness`} tone={statusTone(row.status) === "danger" ? "danger" : statusTone(row.status) === "review" ? "review" : statusTone(row.status) === "success" ? "success" : "accent"} />
+        <ProgressBar value={row.score} showValue={row.confidence >= 0.35} label={`${subject?.name ?? row.subjectId} readiness`} tone={statusTone(row.status) === "danger" ? "danger" : statusTone(row.status) === "review" ? "review" : statusTone(row.status) === "success" ? "success" : "accent"} />
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
@@ -128,7 +129,7 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-line">
-        <p className="text-[11px] text-ink3">Evidence confidence {Math.round(row.confidence * 100)}% · {row.evidence.attempts} marked answers · {row.evidence.transferChecks} transfer checks</p>
+        <p className="text-[11px] text-ink3">Evidence confidence: {confidenceWord(row.confidence, EVIDENCE_CONFIDENCE)} · {row.evidence.attempts} marked answers · {row.evidence.transferChecks} transfer checks</p>
         <ButtonLink href={actionHref(row.subjectId, action.action)} size="sm" variant={row.status === "at-risk" ? "primary" : "secondary"}>
           {action.label}
         </ButtonLink>
@@ -164,7 +165,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
               <span className="font-semibold text-ink2">{scoreLabel(summary.score, summary.confidence)} overall readiness</span>
               <span className="text-ink3">{summary.subjectCount ? `${summary.readyCount}/${summary.subjectCount} ready` : "No subjects"}</span>
             </div>
-            <ProgressBar value={summary.score} label="Overall exam readiness" tone={statusTone(summary.status) === "danger" ? "danger" : statusTone(summary.status) === "review" ? "review" : statusTone(summary.status) === "success" ? "success" : "accent"} />
+            <ProgressBar value={summary.score} showValue={summary.confidence >= 0.35} label="Overall exam readiness" tone={statusTone(summary.status) === "danger" ? "danger" : statusTone(summary.status) === "review" ? "review" : statusTone(summary.status) === "success" ? "success" : "accent"} />
             <p className="text-[11px] text-ink3 mt-2">{readinessSummaryText(summary)}</p>
           </div>
           {weakest ? (
@@ -193,11 +194,11 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
           </div>
           <div className="grid grid-cols-2 gap-2 shrink-0">
             <StatTile label="Subjects" value={summary.subjectCount} sub={`${summary.readyCount} ready`} />
-            <StatTile label="Evidence" value={`${Math.round(summary.confidence * 100)}%`} sub="confidence" tone={summary.confidence >= 0.65 ? "success" : summary.confidence >= 0.35 ? "review" : undefined} />
+            <StatTile label="Evidence" value={(confidenceWord(summary.confidence, EVIDENCE_CONFIDENCE) ?? "unknown").replace(/^./, (c) => c.toUpperCase())} sub="evidence confidence" tone={summary.confidence >= 0.65 ? "success" : summary.confidence >= 0.35 ? "review" : undefined} />
           </div>
         </div>
         <div className="mt-4">
-          <ProgressBar value={summary.score} label="Overall exam readiness" tone={statusTone(summary.status) === "danger" ? "danger" : statusTone(summary.status) === "review" ? "review" : statusTone(summary.status) === "success" ? "success" : "accent"} />
+          <ProgressBar value={summary.score} showValue={summary.confidence >= 0.35} label="Overall exam readiness" tone={statusTone(summary.status) === "danger" ? "danger" : statusTone(summary.status) === "review" ? "review" : statusTone(summary.status) === "success" ? "success" : "accent"} />
         </div>
       </Panel>
 

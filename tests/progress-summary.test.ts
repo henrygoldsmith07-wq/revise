@@ -50,6 +50,29 @@ describe("progress summary", () => {
     expect(s.next).toMatch(/application session/);
   });
 
+  it("surfaces due checks, memorised topics, slips and only ledger-backed claims", () => {
+    const win = (rate: number) => ({ rate, low: rate - 0.1, high: rate + 0.1, questions: 4, from: day(30), to: day(20) });
+    const ledger = { topics: [
+      proof("t1", { status: "proven-gain", before: win(0.46), after: win(0.72), markPoints: 2 }),
+      proof("t2", { status: "awaiting-proof", proofDue: true }),
+      proof("t3", { status: "proven-gain", illusory: true, before: win(0.3), after: win(0.9), markPoints: 5 }),
+      proof("t4", { status: "declined" }),
+    ] } as ProofLedger;
+    const topics = ["t1", "t2", "t3", "t4"].map((id) => topic(id));
+    const s = buildProgressSummary({ subjectIds: ["maths"], topics, attempts: [], questions: [], mistakes: [], ledger, now: NOW });
+    expect(s.lifecycle.claims).toEqual(["Your unseen-question performance in Topic t1 improved from about 45% to about 70% after revision."]);
+    expect(s.lifecycle.dueNow.map((row) => row.topicId)).toEqual(["t2"]);
+    expect(s.lifecycle.memorised.map((row) => row.topicId)).toEqual(["t3"]);
+    expect(s.lifecycle.slipped.map((row) => row.topicId)).toEqual(["t4"]);
+    expect(s.lifecycle.counts).toMatchObject({ proven: 1, "awaiting-proof": 1, "looks-learned": 1, slipped: 1 });
+  });
+
+  it("has an empty lifecycle with no evidence", () => {
+    const s = buildProgressSummary({ subjectIds: ["maths"], topics: [topic("t1")], attempts: [], questions: [], mistakes: [], now: NOW });
+    expect(s.lifecycle).toMatchObject({ dueNow: [], memorised: [], slipped: [], claims: [] });
+    expect(s.lifecycle.counts["not-started"]).toBe(1);
+  });
+
   it("ignores subjects the learner is not taking", () => {
     const s = buildProgressSummary({ subjectIds: ["maths"], topics: [topic("t1"), topic("z", "other")], attempts: [], questions: [], mistakes: [], now: NOW });
     expect(Object.values(s.stageCounts).reduce((a, b) => a + b, 0)).toBe(1);

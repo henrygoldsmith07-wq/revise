@@ -59,7 +59,7 @@ export default function TrustedCoveragePage() {
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Reviewers and developers</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Trusted coverage</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          Counts only questions that have passed human verification. Authored, generated or unreviewed items add nothing here. A statement is fully covered with trusted recall, application and transfer items, at least four trusted items in total, and at least three question families.
+          Counts only questions that have passed human verification. Authored, generated or unreviewed items add nothing here. A statement is fully covered with trusted recall, application and transfer items, at least four trusted items in total, and at least three independent question groups (reskins and near-duplicates count once).
         </p>
       </header>
 
@@ -117,7 +117,7 @@ export default function TrustedCoveragePage() {
           <table className="w-full text-xs">
             <thead className="text-left text-ink3">
               <tr>
-                {["Statement", "Unit / paper", "Topic", "Recall", "Appl.", "Hard appl.", "Transfer", "Misconc.", "Synoptic", "Authored", "Reviewed", "Families", "Verification", "Student evidence", "Review", "Missing", "Checked", "Release"].map((h) => (
+                {["Statement", "Unit / paper", "Topic", "Recall", "Appl.", "Hard appl.", "Transfer", "Misconc.", "Synoptic", "Authored", "Reviewed", "Families", "Independent", "Verification", "Student evidence", "Review", "Missing", "Checked", "Release"].map((h) => (
                   <th key={h} scope="col" className="px-2 py-2 font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -137,6 +137,7 @@ export default function TrustedCoveragePage() {
                   <td className="px-2 py-1.5 tabular-nums">{row.authored}</td>
                   <td className="px-2 py-1.5 tabular-nums">{row.reviewed}</td>
                   <td className="px-2 py-1.5 tabular-nums">{row.trustedFamilies}</td>
+                  <td className="px-2 py-1.5 tabular-nums">{row.independentGroups}</td>
                   <td className="px-2 py-1.5">{row.verification}</td>
                   <td className="px-2 py-1.5">{row.studentEvidence.replace(/-/g, " ")}</td>
                   <td className="px-2 py-1.5">{row.reviewStatus.replace(/-/g, " ")}</td>

@@ -13,6 +13,7 @@
 import { buildMarksAtRisk } from "./marks-at-risk";
 import { masteryStages, STAGE_LABEL, type MasteryStage } from "./mastery-stage";
 import { buildMistakePatterns, type MistakePattern } from "./mistake-patterns";
+import { buildTopicLifecycles, type LifecycleStage } from "./proof-lifecycle";
 import type { ProofLedger } from "./proof-of-improvement";
 import type { Attempt, Id, Mistake, Question, Topic } from "./types";
 
@@ -27,6 +28,17 @@ export interface ProgressSummary {
   stageCounts: Record<MasteryStage, number>;
   losing: { totalMarks: number; topics: LosingTopic[]; patterns: MistakePattern[] };
   proven: { topics: ProvenTopic[]; declined: number; awaiting: number; markPoints: number };
+  /** Where topics stand on proof: states shown to students, never a score. */
+  lifecycle: {
+    counts: Record<LifecycleStage, number>;
+    /** A delayed check on new questions can be taken now. */
+    dueNow: Array<{ topicId: Id; title: string }>;
+    /** Strong on questions already seen, weaker on new ones. */
+    memorised: Array<{ topicId: Id; title: string }>;
+    slipped: Array<{ topicId: Id; title: string }>;
+    /** Evidence-backed "improved from X to Y" sentences; empty unless the ledger supports them. */
+    claims: string[];
+  };
   next: string | null;
 }
 
@@ -74,7 +86,24 @@ export function buildProgressSummary(input: {
     .sort((a, b) => b.markPoints - a.markPoints || a.topicId.localeCompare(b.topicId))
     .map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId, markPoints: row.markPoints }));
 
+  const lifecycles = buildTopicLifecycles({
+    topics, ledger: input.ledger, attempts: input.attempts, questions: input.questions,
+    reviewedTopicIds: input.reviewedTopicIds, now: input.now,
+  });
+  const lifecycleCounts = Object.fromEntries(
+    (["not-started", "weak", "practising", "looks-learned", "awaiting-proof", "proven", "holding", "no-clear-improvement", "slipped", "fading"] as LifecycleStage[]).map((stage) => [stage, 0]),
+  ) as Record<LifecycleStage, number>;
+  for (const row of lifecycles) lifecycleCounts[row.stage] += 1;
+  const named = (rows: typeof lifecycles) => rows.map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId }));
+
   return {
+    lifecycle: {
+      counts: lifecycleCounts,
+      dueNow: named(lifecycles.filter((row) => row.dueNow)),
+      memorised: named(lifecycles.filter((row) => row.memorised)),
+      slipped: named(lifecycles.filter((row) => row.stage === "slipped")),
+      claims: lifecycles.flatMap((row) => (row.claim ? [row.claim] : [])),
+    },
     coldStart: stageCounts.practised + stageCounts.secure + stageCounts.proven + stageCounts.fading === 0,
     strong,
     stageCounts,

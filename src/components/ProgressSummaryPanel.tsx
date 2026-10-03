@@ -6,6 +6,7 @@ import { allTopics } from "@/domain/curriculum";
 import { STAGE_LABEL, STAGE_MEANING, type MasteryStage } from "@/domain/mastery-stage";
 import { buildProgressSummary } from "@/domain/progress-summary";
 import { useStoreFields } from "@/state/store";
+import { ExamOutlook } from "./ExamOutlook";
 import { ButtonLink, Panel, Pill } from "./ui";
 
 const TONE: Record<MasteryStage, "neutral" | "review" | "success" | "accent" | "danger"> = {
@@ -34,6 +35,10 @@ export function ProgressSummaryPanel() {
     <section aria-labelledby="progress-summary-heading" className="space-y-3">
       <h2 id="progress-summary-heading" className="sr-only">Your progress at a glance</h2>
       <div className="grid gap-4 md:grid-cols-2">
+        <Panel className="space-y-2 md:col-span-2">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Where am I?</p>
+          <ExamOutlook />
+        </Panel>
         <Panel className="space-y-2">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What am I strong at?</p>
           {summary.strong.length ? (
@@ -62,14 +67,17 @@ export function ProgressSummaryPanel() {
 
         <Panel className="space-y-2">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What has been proven?</p>
-          {summary.proven.topics.length ? (
-            <>
-              <p className="text-sm text-ink">{summary.proven.topics.length} topic{summary.proven.topics.length === 1 ? "" : "s"} improved on new questions after a delay: {summary.proven.topics.map((row) => row.title).join(", ")}.</p>
-              {summary.proven.declined ? <p className="text-xs text-ink2">{summary.proven.declined} declined and need another look.</p> : null}
-            </>
+          {summary.lifecycle.claims.length ? (
+            <ul className="space-y-1 text-sm text-ink">{summary.lifecycle.claims.slice(0, 3).map((claim) => <li key={claim}>{claim}</li>)}</ul>
+          ) : summary.proven.topics.length ? (
+            <p className="text-sm text-ink">{summary.proven.topics.length} topic{summary.proven.topics.length === 1 ? "" : "s"} improved on new questions after a delay: {summary.proven.topics.map((row) => row.title).join(", ")}.</p>
           ) : (
-            <p className="text-sm text-ink2">No improvement is proven yet. It counts only when you do better on new questions after a delay.{summary.proven.awaiting ? ` ${summary.proven.awaiting} topic${summary.proven.awaiting === 1 ? " is" : "s are"} due a check.` : ""}</p>
+            <p className="text-sm text-ink2">No improvement is proven yet. It counts only when you do better on new questions after a delay.</p>
           )}
+          {summary.lifecycle.dueNow.length ? <p className="text-sm text-ink">A delayed check is ready for {summary.lifecycle.dueNow.slice(0, 3).map((row) => row.title).join(", ")}.</p> : null}
+          {summary.lifecycle.memorised.length ? <p className="text-xs text-ink2">Looks memorised rather than learned: {summary.lifecycle.memorised.slice(0, 3).map((row) => row.title).join(", ")}. New questions will show whether it transfers.</p> : null}
+          {summary.lifecycle.slipped.length ? <p className="text-xs text-ink2">Slipped since revision: {summary.lifecycle.slipped.slice(0, 3).map((row) => row.title).join(", ")}.</p> : null}
+          {summary.proven.declined && !summary.lifecycle.slipped.length ? <p className="text-xs text-ink2">{summary.proven.declined} declined and need another look.</p> : null}
         </Panel>
 
         <Panel className="space-y-2 border-accent">

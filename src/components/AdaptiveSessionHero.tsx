@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { getSubject, topicsFor, unitsFor } from "@/domain/curriculum";
+import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";
 import { buildPaperReadiness } from "@/domain/paper-readiness";
+import { buildTopicLifecycles } from "@/domain/proof-lifecycle";
 import { buildTodayBrief } from "@/domain/today-brief";
 import { useStoreFields } from "@/state/store";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
@@ -31,8 +32,12 @@ export function AdaptiveSessionHero({
     const papers = subject
       ? buildPaperReadiness({ subject, topics: topicsFor(subject.id), units: unitsFor(subject.id), questions: store.questions, attempts: store.attempts, mistakes: store.mistakes, examDates: store.examDates })
       : [];
-    return buildTodayBrief({ plan: session, papers, examDates: store.examDates, mistakes: store.mistakes });
-  }, [subject, session, store.questions, store.attempts, store.mistakes, store.examDates]);
+    const topic = getTopic(session.topicId);
+    const lifecycle = topic
+      ? buildTopicLifecycles({ topics: [topic], ledger: proof, attempts: store.attempts, questions: store.questions })[0]
+      : undefined;
+    return buildTodayBrief({ plan: session, papers, examDates: store.examDates, mistakes: store.mistakes, lifecycle });
+  }, [subject, session, proof, store.questions, store.attempts, store.mistakes, store.examDates]);
   const explanation = useMemo(() => explainSession(session, proof?.conversion), [session, proof?.conversion]);
   // Today stays calm: mention proof only when something is shown or a test is due, not while it is merely waiting.
   const proofHeadline = proof && (proof.proven || proof.declined || proof.illusory || proof.due) ? proof.headline : null;
@@ -57,6 +62,11 @@ export function AdaptiveSessionHero({
           {brief.marksAtRisk ? ` · ${brief.marksAtRisk} marks at risk here` : ""}
         </p>
         {brief.provisional ? <p className="mt-1 text-sm text-ink2" role="note">{brief.provisional}</p> : <p className="mt-1 text-sm text-ink2">{explanation.stakes}</p>}
+        {brief.lifecycle ? (
+          <p className="mt-1 text-sm text-ink2">
+            <span className="font-medium text-ink">{brief.lifecycle.label}.</span> {brief.lifecycle.line}
+          </p>
+        ) : null}
         {brief.produces.length ? (
           <p className="mt-1 text-sm text-ink2">
             This will produce: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
@@ -100,6 +110,12 @@ export function AdaptiveSessionHero({
               <li className="flex gap-2 text-sm leading-6 text-ink2">
                 <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
                 <span className="min-w-0 font-medium text-ink">Best fit: {session.intervention.headline}.</span>
+              </li>
+            ) : null}
+            {session.intervention?.gap ? (
+              <li className="flex gap-2 text-sm leading-6 text-ink2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-review" aria-hidden="true" />
+                <span className="min-w-0">{session.intervention.gap.text} <span className="font-medium text-ink">{session.intervention.gap.label} — {session.intervention.gap.minutes} min.</span></span>
               </li>
             ) : null}
             {session.intervention?.lines.map((line) => (
