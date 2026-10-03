@@ -10,13 +10,14 @@ import { knowledgeVsAnswering } from "@/domain/exam-technique";
 import { buildSubjectGraph } from "@/domain/knowledge-graph";
 import { createCard } from "@/domain/scheduling";
 import { buildCloze, normaliseCloze } from "@/domain/cloze";
-import { classifyTopic } from "@/domain/topic-status";
+import { learnerState, topicEvidenceSummary, type LearnerStateView } from "@/domain/learner-state";
+import { topicLifecycle } from "@/domain/proof-lifecycle";
 import type { Card, Topic } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
 import { KnowledgeMap } from "@/components/KnowledgeMap";
 import { TechniqueSignal } from "@/components/TechniqueSignal";
-import { TopicStatusTag } from "@/components/TopicStatusTag";
+import { LearnerStateTag } from "@/components/LearnerStateTag";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, ProgressBar, SectionHeading, Segmented, SourceBadge } from "@/components/ui";
 import { BackIcon, CreditedIcon, DeleteIcon, ICON_SIZE, MissedIcon } from "@/components/icons";
 
@@ -36,7 +37,7 @@ export default function LibraryPage() {
 function Library() {
   const params = useSearchParams();
   const subjects = useSubjects();
-  const store = useStoreFields("attempts", "cards", "examDates", "mastery", "mistakes", "predictions", "questions", "settings");
+  const store = useStoreFields("attempts", "cards", "examDates", "mastery", "mistakes", "predictions", "proofLedger", "questions", "settings");
   const topicParam = params.get("topic");
   const subjectParam = params.get("subject");
   const misconceptionParam = params.get("misconception");
@@ -94,6 +95,18 @@ function Library() {
     [subjectId, store.attempts, store.mistakes, store.questions],
   );
 
+  // The same six words used on Today, missions and Progress. Detail is one tap away, not a percentage.
+  const stateByTopic = useMemo(() => {
+    const out = new Map<string, LearnerStateView>();
+    const proofs = new Map(store.proofLedger.topics.map((row) => [row.topicId, row] as const));
+    const reviewed = new Set(store.cards.filter((c) => c.lastReviewedAt).map((c) => c.topicId));
+    for (const row of topicsFor(subjectId)) {
+      const lifecycle = topicLifecycle({ topic: row, proof: proofs.get(row.id), attempts: store.attempts, questions: store.questions, cardsReviewed: reviewed.has(row.id) });
+      out.set(row.id, learnerState(lifecycle, topicEvidenceSummary(row.id, store.attempts, store.questions)));
+    }
+    return out;
+  }, [subjectId, store.proofLedger, store.cards, store.attempts, store.questions]);
+
   if (topic) {
     return <TopicDetail topic={topic} onBack={() => setTopicId("")} highlightMisconceptionId={misconceptionParam ?? ""} />;
   }
@@ -145,7 +158,7 @@ function Library() {
       </div>
 
       {view === "map" && subjectGraph ? (
-        <KnowledgeMap graph={subjectGraph} technique={technique} />
+        <KnowledgeMap graph={subjectGraph} technique={technique} states={stateByTopic} />
       ) : (
         <>
           <TechniqueSignal subjectId={subjectId} />
@@ -158,8 +171,7 @@ function Library() {
                   {topics.map((row) => {
                     const mastery = masteryById.get(row.id);
                     const cards = cardCountByTopic.get(row.id) ?? 0;
-                    const status = classifyTopic(mastery);
-                    const studied = Boolean(mastery && mastery.attempts > 0);
+                    const state = stateByTopic.get(row.id);
                     return (
                       <li key={row.id}>
                         <button
@@ -170,12 +182,7 @@ function Library() {
                           <div className="flex items-baseline justify-between gap-3">
                             <p className="text-sm text-ink truncate">{row.title}</p>
                             <div className="flex items-center gap-2 shrink-0">
-                              <TopicStatusTag status={status.status} explanation={status.explanation} />
-                              {studied ? (
-                                <span className="text-[11px] text-ink3 tabular-nums">
-                                  {Math.round((mastery?.mastery ?? 0) * 100)}%
-                                </span>
-                              ) : null}
+                              {state ? <LearnerStateTag view={state} /> : null}
                             </div>
                           </div>
                           <p className="text-[11px] text-ink3 mt-0.5 truncate">
@@ -184,20 +191,6 @@ function Library() {
                             {row.intrinsicDifficulty}/5
                             {row.specRef ? ` · ${row.specRef}` : ""}
                           </p>
-                          {studied ? (
-                            <div className="mt-1.5">
-                              <ProgressBar
-                                value={mastery?.mastery ?? 0}
-                                tone={
-                                  (mastery?.mastery ?? 0) >= 0.8
-                                    ? "success"
-                                    : (mastery?.mastery ?? 0) >= 0.55
-                                      ? "accent"
-                                      : "review"
-                                }
-                              />
-                            </div>
-                          ) : null}
                         </button>
                       </li>
                     );

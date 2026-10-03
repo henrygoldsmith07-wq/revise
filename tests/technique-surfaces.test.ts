@@ -28,7 +28,7 @@ describe("Knowledge-vs-answering split — Knowledge map subject header", () => 
 
   it("threads the technique report from the Library page into the map", () => {
     expect(page()).toContain('import { knowledgeVsAnswering } from "@/domain/exam-technique";');
-    expect(page()).toContain("<KnowledgeMap graph={subjectGraph} technique={technique} />");
+    expect(page()).toContain("<KnowledgeMap graph={subjectGraph} technique={technique} states={stateByTopic} />");
   });
 
   it("renders the split in the specification node only when losses exist", () => {

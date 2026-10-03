@@ -1,5 +1,11 @@
 # Changelog
 
+## One vocabulary in the Library, and a proof journey in the browser — 2026-10-03
+
+**The Library uses the same six words.** Topics now read Not checked, Needs work, Improving, Awaiting proof, Proven or Regressed, with the reason on tap, instead of covered/shaky plus an unexplained mastery percentage and bar. A topic you have not checked is neutral, never red.
+
+**Proof is tested end to end in the browser.** A seeded earlier success, then a correct answer on a different question after the delay, turns the marks Proven, shows "delayed proof passed" at the end of the session, and Today stops offering the proof check.
+
 ## Mission session fixes — 2026-10-03
 
 **No stale resume card.** Finishing a mission, recovery, paper-repair, weak-topic or quick session no longer leaves Today offering to resume a question list you never opened.
