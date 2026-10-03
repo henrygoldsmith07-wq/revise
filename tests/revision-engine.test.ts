@@ -451,6 +451,9 @@ describe("evidence classes and vocabulary", () => {
     expect(recoveryLearnerState("provisional")).toBe("improving");
     expect(recoveryLearnerState("targeted")).toBe("needs-work");
     expect(missionLearnerState("blocked")).toBe("needs-work");
+    // Worked on but nothing has succeeded: not "improving".
+    expect(missionLearnerState("active", { provisional: 0, awaitingProof: 0, proven: 0 })).toBe("needs-work");
+    expect(missionLearnerState("active", { provisional: 3, awaitingProof: 0, proven: 0 })).toBe("improving");
   });
 
   it("closes a session with the standing marks position", async () => {
@@ -476,5 +479,29 @@ describe("due reviews are not a second decision", () => {
     expect(rankRevisionActions({ ...base, dueReviews: [{ subjectId: "biology", count: 22, overdue: 0 }] }).top!.type).not.toBe("due-reviews");
     expect(backlog.top!.type).toBe("due-reviews");
     expect(rankRevisionActions(base).top!.route.href).toBe("/adaptive-session?topic=cells&start=1");
+  });
+});
+
+describe("honest copy and consistent minutes", () => {
+  it("says no marks are recovered yet instead of an empty range", () => {
+    const r = buildMarkRecovery({ mistakes: [mkMistake("m1")], attempts: [], questions: [mkQuestion("q-a1", "algebra")], now: NOW }).totals;
+    expect(r.statement).toBe("No marks recovered yet: 3 marks still open.");
+  });
+
+  it("shows the minutes the mission session will actually take", () => {
+    const s = scenario();
+    const input = engine({ ...s, subjectIds: ["physics"] });
+    const top = rankRevisionActions(input).top!;
+    const mission = collectMissions(input).find((x) => x.id === top.mission!.id)!;
+    expect(top.minutes).toBe(Math.max(3, Math.ceil(buildMissionSession(mission, { questions: s.questions, attempts: s.attempts, mistakes: input.mistakes }, top.mission!.stage).minutes)));
+  });
+});
+
+describe("mission sessions do not leave a stale resume point", () => {
+  it("keeps the generic practice queue from saving a checkpoint while a mission runs", async () => {
+    const { readFileSync } = await import("fs");
+    const src = readFileSync("src/app/practice/page.tsx", "utf8");
+    expect(src).toContain('const missionActive = Boolean(params.get("mission"));');
+    expect(src).toMatch(/if \(missionActive\) return;\s+if \(closed \|\| !current\)/);
   });
 });
