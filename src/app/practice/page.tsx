@@ -241,7 +241,11 @@ function Practice() {
     return query ? `/practice?${query}` : "/practice?resume=1";
   }, [mode, retestId, sessionId, subjectId, topicId]);
 
+  // Mission, recovery, paper-repair, weak-topic and quick modes run their own question sets; the generic
+  // queue behind them must not save a resume point for questions the student never opened.
+  const missionActive = Boolean(params.get("mission")) || recover || Boolean(autopsyRun) || weakExam || quickMinutes !== null;
   useEffect(() => {
+    if (missionActive) return;
     if (closed || !current) {
       if (resumeRequested && !current) void clearRevisionCheckpoint();
       return;
@@ -259,7 +263,7 @@ function Practice() {
       queueIds: retestMistake ? [current.id] : order,
       retestMistakeId: retestMistake?.id,
     });
-  }, [checkpointHref, clearRevisionCheckpoint, closed, current, index, mode, order, queue.length, resumeRequested, retestMistake, saveRevisionCheckpoint]);
+  }, [checkpointHref, clearRevisionCheckpoint, closed, current, index, missionActive, mode, order, queue.length, resumeRequested, retestMistake, saveRevisionCheckpoint]);
 
   function resetSession() {
     setSessionAttempts([]);

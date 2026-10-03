@@ -121,7 +121,7 @@ describe("exam missions", () => {
     expect(action.title).toMatch(/^Start:/);
     expect(action.minutes).toBeGreaterThan(0);
     expect(action.why).toMatch(/6 marks/);
-    expect(action.after).toMatch(/^Next,/);
+    expect(action.after).toMatch(/^After this:/);
     expect(action.proof).toMatch(/different question/);
     expect(action.href).toMatch(/^\/practice\?mission=/);
     const later = buildExamMissions(input([...paperAttempts, attempt("a1", "q-a2", 3, 3, "2026-09-25T09:00:00.000Z")]))[0];
