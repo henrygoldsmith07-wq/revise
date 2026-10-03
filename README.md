@@ -1,11 +1,31 @@
 # Revise
 
-A revision-first study platform designed to help students choose and complete
-their next useful revision task. Today uses available study history and exam
-dates; when evidence is sparse, suggestions are provisional.
+A revision-first study platform. Revise decides the one most useful thing to do
+next, makes it easy to start, and only claims an improvement when it has been
+proven on questions the learner has not seen.
 
-Open Today → choose a recommended task → practise → receive feedback or a
-human-review status → use the result to guide the next step.
+## The product loop
+
+**Diagnose → Learn/Repair → Practise → Prove → Revisit.**
+
+Today selects the best next step through that loop and shows one Start button:
+
+| Stage | What happens | Where it lives |
+|---|---|---|
+| **Diagnose** | A new learner takes a short, skippable quick check of reviewed, unseen questions across several topics. Answers are normal attempts; lost marks appear immediately. | `quick-diagnostic.ts`, `cold-start.ts` |
+| **Learn / Repair** | A lost mark becomes a repair mission: understand the cause, then re-sit with help. Help never counts as proof. | `exam-mission.ts`, `mission-session.ts` |
+| **Practise** | Different questions on the same skill, then an unfamiliar context. | `mission-session.ts`, `learning-action.ts` |
+| **Prove** | A delayed, unaided answer to a new, reviewed question. Reskins of an earlier question never count. | `mark-recovery.ts`, `supply.ts` |
+| **Revisit** | FSRS keeps what is proven fresh; a later failure marks it Regressed and sends the learner back to repair. | `scheduling.ts`, `revision-engine.ts` |
+
+Every topic reads as one of six states: **Not checked, Needs work, Improving,
+Awaiting proof, Proven, Regressed**. Statistics, confidence intervals and trust
+counts stay behind a "Why?" or "Evidence" disclosure; Revise only mentions trust
+when it changes what it can claim ("You improved here, but Revise does not yet
+have enough reviewed new questions to prove it.").
+
+Manual modes (Review, Study, Lessons, Practice, Past papers, Session) stay in
+Tools. The main navigation is **Today, Subjects, Progress, Tools**.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
@@ -45,7 +65,7 @@ source immediately.
 
 ## What it does
 
-The app is one loop — **board → topic → card → exam question** — and nothing else. The first screen locks in the board, subject and exam date; every destination after that is a step in the loop.
+The app is one loop — **Diagnose → Learn/Repair → Practise → Prove → Revisit** — chosen for you on Today. The first screen locks in the board, subject and exam date; every other destination is a manual way into the same loop.
 
 | Area | Behaviour |
 |------|-----------|
@@ -63,6 +83,27 @@ The app is one loop — **board → topic → card → exam question** — and n
 | **Prediction reality check** | Weekly grade forecasts are frozen before the outcome, then dated mocks, timed papers and final results are joined only to forecasts that already existed. Readiness shows error, bias and interval coverage instead of letting later predictions rewrite history. |
 | **Keyboard** | Shortcuts throughout, with a `?` sheet generated from the live bindings. |
 | **Offline** | IndexedDB-first with a durable outbox; installable PWA; the complete written lesson, recall and practice loop works without a connection. |
+
+## Trusted content: the real bottleneck
+
+Revise can only prove an improvement on questions a qualified person has
+reviewed. The four WJEC A-level flagships (Mathematics, Biology, Chemistry,
+Physics) have large authored banks but **no human-reviewed questions yet**, so
+proof, the cold-start diagnostic and Exam Mission proof are blocked there until
+review happens. The repository therefore ships a review workflow rather than
+pretending the review has been done:
+
+```bash
+npm run wjec:review:priorities          # what to review next, ranked by capability unlocked
+npm run wjec:review:queue -- maths ./pack --limit=10   # reviewer pack: question, mark scheme, spec, provenance, reskin warnings
+npm run wjec:review:import -- ./pack/review-return.json   # validate + append to the audit log
+npm run wjec:review:promote             # ledger entries for questions with two independent approvals
+npm run wjec:review:gates               # release gate (part of npm run verify)
+npm run wjec:quality:report             # internal supply dashboard
+```
+
+See [`docs/review-workflow.md`](docs/review-workflow.md). Nothing in the tooling
+approves a question; approvals come only from named reviewers in return files.
 
 ## Depth first: flagship subject combinations
 
@@ -239,7 +280,10 @@ searchable. No other file changes. Add the subject to `src/domain/spec.ts:SPEC_M
 - [`docs/architecture.md`](docs/architecture.md) — data flow, sync, AI layer, quality gates
 - [`docs/revision-engine.md`](docs/revision-engine.md) — the algorithms and the evidence behind them
 - [`docs/benchmark.md`](docs/benchmark.md) — harnesses and outcome benchmarks
-- [`docs/roadmap.md`](docs/roadmap.md) — competitor-gap backlog and the path to "what should I revise next?" intelligence
+- [`docs/roadmap.md`](docs/roadmap.md) — priorities (trusted content first) and the longer backlog
+- [`docs/review-workflow.md`](docs/review-workflow.md) — unverified → checked → verified, review queues, prioritisation and audit log
+- [`docs/question-supply-audit.md`](docs/question-supply-audit.md) — what counts as trusted, distinct supply per topic
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to author, review and verify changes
 - [`docs/error-diagnosis.md`](docs/error-diagnosis.md) — post-marking error diagnosis (classifier.dev): versioned taxonomy, interventions, routing and evaluation
 
 ## Content accuracy — statement-level provenance

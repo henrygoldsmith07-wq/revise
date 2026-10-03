@@ -4,6 +4,7 @@
 // do, how long, why, what it is worth, what happens after, and one Start button.
 // Everything that explains the ranking sits behind a disclosure.
 
+import { useEffect } from "react";
 import { getSubject } from "@/domain/curriculum";
 import { describeFocus } from "@/domain/today-focus";
 import { useStoreFields } from "@/state/store";
@@ -21,7 +22,12 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
   const waiting = plan.deferred.filter((d) => /Waiting for the delay/.test(d.reason)).slice(0, 2);
   const e = action.explanation;
   const focus = describeFocus(action, subject);
-  const { settings, updateSettings } = useStoreFields("settings", "updateSettings");
+  const { settings, updateSettings, recordFunnel } = useStoreFields("settings", "updateSettings", "recordFunnel");
+  const blockedTopic = plan.authoringNeeds.find((n) => action.topicIds.includes(n.topicId))?.topicId;
+  useEffect(() => {
+    void recordFunnel("next_action_shown", action.type);
+    if (blockedTopic) void recordFunnel("proof_blocked_by_supply", blockedTopic);
+  }, [action.type, blockedTopic, recordFunnel]);
   return (
     <section aria-label="Best next step" className="grid gap-4">
       <div className="min-w-0">
@@ -34,7 +40,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
         <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">{focus.title}</h2>
         <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{focus.subject}</p>
         <p className="mt-1 text-sm text-ink2">{focus.examLine} · {focus.stake}</p>
-        <ButtonLink href={focus.cta.href} variant="primary" size="md" className="mt-4 min-h-[3rem] w-full text-base sm:w-auto">
+        <ButtonLink href={focus.cta.href} variant="primary" size="md" className="mt-4 min-h-[3rem] w-full text-base sm:w-auto" onClick={() => void recordFunnel("recommendation_accepted", action.id)}>
           {focus.cta.label} <ForwardIcon size={17} aria-hidden />
         </ButtonLink>
         {focus.skippable ? (
@@ -42,7 +48,10 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
             variant="ghost"
             size="sm"
             className="mt-2 w-full sm:ml-2 sm:w-auto"
-            onClick={() => void updateSettings({ quickCheckSkipped: [...new Set([...(settings.quickCheckSkipped ?? []), ...settings.subjectIds])] })}
+            onClick={() => {
+              void recordFunnel("diagnostic_skipped", action.subjectId);
+              void updateSettings({ quickCheckSkipped: [...new Set([...(settings.quickCheckSkipped ?? []), ...settings.subjectIds])] });
+            }}
           >
             Skip, just start revising
           </Button>

@@ -45,16 +45,19 @@ export function RecoverySummaryPanel() {
       <div>
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Marks recovered</p>
         <p className="text-sm font-semibold text-ink mt-0.5">{t.statement}</p>
-        <ul className="mt-1 text-xs text-ink2 space-y-0.5">
-          <li>{t.previouslyLost} marks previously lost</li>
-          <li>{t.targeted} targeted by revision</li>
-          <li>{t.provisional - t.awaitingProof} provisionally recovered</li>
-          <li>{t.awaitingProof} awaiting delayed proof</li>
-          <li>{t.proven} proven recovered</li>
-          <li>{t.regressed} lost again</li>
-          <li>{t.open} still open</li>
-        </ul>
-        <p className="mt-2 text-xs text-ink3"><span className="font-medium text-ink2">This week:</span> {weekLines(week).join(" · ")}</p>
+        <p className="mt-1 text-xs text-ink3"><span className="font-medium text-ink2">This week:</span> {weekLines(week).join(" · ")}</p>
+        <details className="mt-2">
+          <summary className="cursor-pointer select-none text-xs text-ink2">Evidence</summary>
+          <ul className="mt-1 text-xs text-ink2 space-y-0.5">
+            <li>{t.previouslyLost} marks previously lost</li>
+            <li>{t.targeted} targeted by revision</li>
+            <li>{t.provisional - t.awaitingProof} provisionally recovered</li>
+            <li>{t.awaitingProof} awaiting delayed proof</li>
+            <li>{t.proven} proven recovered</li>
+            <li>{t.regressed} lost again</li>
+            <li>{t.open} still open</li>
+          </ul>
+        </details>
       </div>
       <details>
         <summary className="cursor-pointer select-none text-sm text-ink2">Where these marks came from</summary>
@@ -96,8 +99,11 @@ export function RealWorldEvidencePanel() {
           <div className="space-y-1" aria-label="What your own results show">
             <p className="text-sm font-medium text-ink">What your own results show</p>
             <p className="text-sm text-ink2">{statement(outcome).text}</p>
-            <p className="text-xs text-ink3">{recurrenceStatement(outcome).text}</p>
-            <p className="text-xs text-ink3">{efficiencyStatement(outcome).text}</p>
+            <details>
+              <summary className="cursor-pointer select-none text-xs text-ink3">Why?</summary>
+              <p className="mt-1 text-xs text-ink3">{recurrenceStatement(outcome).text}</p>
+              <p className="mt-1 text-xs text-ink3">{efficiencyStatement(outcome).text}</p>
+            </details>
           </div>
         ) : null}
         <div className="space-y-1" aria-label="Where Revise can prove improvement">

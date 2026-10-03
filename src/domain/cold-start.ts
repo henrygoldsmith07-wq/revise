@@ -7,13 +7,16 @@
 // normal attempt pipeline, so once they exist the learner is no longer cold.
 // ---------------------------------------------------------------------------
 
-import { selectQuickDiagnostic } from "./quick-diagnostic";
+import { isFlagship } from "./flagship";
+import { quickDiagnosticPool, selectQuickDiagnostic } from "./quick-diagnostic";
 import { trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, ExamDate, Id, Mistake, Question, ReviewLog } from "./types";
 
 export const COLD_START_MIN_ATTEMPTS = 3;
 export const COLD_START_MIN_REVIEWS = 15;
 export const COLD_START_MIN_QUESTIONS = 3;
+/** A flagship check must sample several topics, or it is a topic quiz, not a first signal. */
+export const COLD_START_FLAGSHIP_MIN_TOPICS = 3;
 
 export interface ColdStartPlan {
   subjectId: Id;
@@ -59,16 +62,16 @@ function daysTo(exams: readonly ExamDate[], subjectId: Id, now: Date): number {
  */
 export function planColdStart(input: ColdStartInput): ColdStartPlan | null {
   const skipped = new Set(input.skipped ?? []);
-  const seen = new Set(input.attempts.map((a) => a.questionId));
   const candidates = [...new Set(input.subjectIds)]
     .filter((id) => !skipped.has(id) && subjectIsCold(id, input))
     .sort((a, b) => daysTo(input.examDates, a, input.now) - daysTo(input.examDates, b, input.now) || a.localeCompare(b));
   for (const subjectId of candidates) {
-    const pool = input.questions.filter((q) => q.subjectId === subjectId && !seen.has(q.id));
+    const pool = quickDiagnosticPool(input.questions, input.attempts, subjectId);
     const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
     const selection = selectQuickDiagnostic({ questions: pool, topicIds });
-    if (selection.items.length >= COLD_START_MIN_QUESTIONS) {
-      return { subjectId, questions: selection.items.length, minutes: selection.minutes, topics: new Set(selection.items.map((i) => i.topicId)).size };
+    const topics = new Set(selection.items.map((i) => i.topicId)).size;
+    if (selection.items.length >= COLD_START_MIN_QUESTIONS && (!isFlagship(subjectId) || topics >= COLD_START_FLAGSHIP_MIN_TOPICS)) {
+      return { subjectId, questions: selection.items.length, minutes: selection.minutes, topics };
     }
   }
   return null;

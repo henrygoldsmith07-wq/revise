@@ -8,9 +8,9 @@
 // ---------------------------------------------------------------------------
 
 import { trustedAssessmentContent } from "./content-trust";
-import { questionFamily } from "./learning-evidence";
+import { questionFamily, unseenQuestion } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
-import type { Id, Question } from "./types";
+import type { Attempt, Id, Question } from "./types";
 
 export type DiagnosticDimension =
   | "recall"
@@ -41,6 +41,10 @@ const COMMAND_WORDS = /^\s*(evaluate|assess|discuss|justify|compare|suggest)\b/i
 const PASS = 0.6;
 const STRONG = 0.75;
 
+/** Time a learner is expected to need for one diagnostic question. */
+export const quickItemSeconds = (question: Question): number =>
+  Math.max(45, question.totalMarks * 45, (question.learning?.expectedMinutes ?? 0) * 60);
+
 export interface QuickItem {
   questionId: Id;
   topicId: Id;
@@ -59,6 +63,14 @@ export function dimensionOf(question: Question, opts: { prerequisite?: boolean }
   if (demand === "explanation" || demand === "misconception" || question.kind === "extended") return "explanation";
   if (question.kind === "mcq" || question.kind === "short" || demand === "recall") return "recall";
   return "standard-application";
+}
+
+/**
+ * Questions a diagnostic may use: the subject's questions the learner has not
+ * seen (including same-family variants). Trust is enforced by the selector.
+ */
+export function quickDiagnosticPool(questions: readonly Question[], attempts: readonly Attempt[], subjectId: Id): Question[] {
+  return questions.filter((q) => q.subjectId === subjectId && unseenQuestion(q, attempts, questions));
 }
 
 export interface QuickSelection {
@@ -83,7 +95,7 @@ export function selectQuickDiagnostic(input: {
   for (const q of pool) {
     const topicId = input.topicIds.find((t) => q.topicIds.includes(t))!;
     const dimension = dimensionOf(q, { prerequisite: input.prerequisiteTopicIds?.has(topicId) });
-    const item: QuickItem = { questionId: q.id, topicId, dimension, marks: q.totalMarks, seconds: Math.max(45, q.totalMarks * 45, (q.learning?.expectedMinutes ?? 0) * 60) };
+    const item: QuickItem = { questionId: q.id, topicId, dimension, marks: q.totalMarks, seconds: quickItemSeconds(q) };
     byDimension.set(dimension, [...(byDimension.get(dimension) ?? []), item]);
   }
   for (const list of byDimension.values()) list.sort((a, b) => a.seconds - b.seconds || a.questionId.localeCompare(b.questionId));
@@ -198,7 +210,7 @@ export function quickDiagnosticReport(input: { probes: readonly QuickProbe[]; to
     : needsEvidence.length ? `Answer a few more questions on ${title(needsEvidence[0]!)} so Revise can judge it.` : "Nothing clearly weak yet. Revise will schedule delayed checks on what looks strong.";
   return {
     findings, weakDimensions, repeatedErrors, needsEvidence, firstMission,
-    caveat: "This is a quick sample, not a grade. Anything with one or two questions behind it is a first impression.",
+    caveat: "This is an initial signal, not a predicted grade. Anything with one or two questions behind it is a first impression.",
     lines: { found, next },
   };
 }

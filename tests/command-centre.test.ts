@@ -91,7 +91,7 @@ describe("quick diagnostic", () => {
     expect(r.findings.find((f) => f.topicId === "t1")?.verdict).toBe("unproven");
     expect(r.findings.find((f) => f.topicId === "t2")?.verdict).toBe("unmeasured");
     expect(r.firstMission).toBeNull();
-    expect(r.caveat).toMatch(/not a grade/);
+    expect(r.caveat).toMatch(/initial signal, not a predicted grade/);
   });
 
   it("finds weaknesses, repeated errors and a first mission", () => {

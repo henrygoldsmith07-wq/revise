@@ -300,11 +300,20 @@ describe("statements", () => {
     }
   });
 
+  it("uses plain, non-alarming wording while data is thin", () => {
+    const one = statement(overall(many(1)));
+    expect(one.text).toMatch(/Too early to tell/);
+    expect(one.text).toMatch(/1 later check completed; 4 more later checks needed before Revise can judge this reliably/);
+    expect(one.text).not.toMatch(/error|fail|chance|confidence|interval|p-value/i);
+    expect(statement(overall(many(1, () => ({ delayed: null })))).text).toMatch(/^Too early to tell/);
+  });
+
   it("flips at exactly five independent delayed checks, not four", () => {
     const four = statement(overall(many(4)));
     const five = statement(overall(many(5)));
     expect(four.level).toBe("early-signs");
-    expect(four.text).toMatch(/4 checks/);
+    expect(four.text).toMatch(/Too early to tell/);
+    expect(four.text).toMatch(/4 later checks completed; 1 more later check needed before Revise can judge this reliably/);
     expect(five.level).toBe("works-well");
     expect(five.text).toMatch(/not that it was the cause/);
     expect(five.text).toMatch(/90%/);

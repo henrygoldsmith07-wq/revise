@@ -10,7 +10,7 @@
     "lint:check": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm run curriculum:freshness -- --fail-on-stale && npm run content:check && npm run docs:integrity --silent && npm run wjec:authoring:check --silent && npm run wjec:trust:check --silent && npm run wjec:supply:check --silent && npm test -- --run && npm run build && npm run perf:budget",
+    "verify": "npm run lint:check --silent && npm run type-check && npm run type-check:strict && node scripts/validate-curriculum.mjs && npm run curriculum:freshness -- --fail-on-stale && npm run content:check && npm run docs:integrity --silent && npm run wjec:authoring:check --silent && npm run wjec:trust:check --silent && npm run wjec:supply:check --silent && npm run wjec:review:gates --silent && npm test -- --run && npm run build && npm run perf:budget",
     "perf:budget": "node scripts/check-client-performance.mjs --require-build",
     "docs:integrity": "node scripts/check-docs-integrity.mjs",
     "content:capacitors": "node scripts/generate-content.mjs capacitors",
@@ -45,7 +45,14 @@
     "type-check:strict": "tsc --noEmit -p tsconfig.strict.json",
     "content:physics": "node scripts/generate-structured-physics.mjs",
     "content:check": "node scripts/generate-content.mjs capacitors --check && node scripts/generate-structured-physics.mjs --check && node scripts/generate-physics-reasoning.mjs --check",
-    "content:reasoning": "node scripts/generate-physics-reasoning.mjs"
+    "content:reasoning": "node scripts/generate-physics-reasoning.mjs",
+    "wjec:review:priorities": "node scripts/wjec-review.mjs priorities",
+    "wjec:review:queue": "node scripts/wjec-review.mjs queue",
+    "wjec:review:import": "node scripts/wjec-review.mjs import",
+    "wjec:review:promote": "node scripts/wjec-review.mjs promote",
+    "wjec:review:status": "node scripts/wjec-review.mjs status",
+    "wjec:review:gates": "node scripts/wjec-review.mjs check",
+    "wjec:quality:report": "node scripts/report-wjec-quality.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

@@ -58,7 +58,7 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
         <>
           {session.intro.map((line) => <p key={line}>{line}</p>)}
           {session.steps.map((step) => (
-            <p key={step.id}><span className="font-semibold">{step.title}:</span> {step.why}{step.verified ? "" : " Some of these questions have not been human-verified, so they are practice only."}</p>
+            <p key={step.id}><span className="font-semibold">{step.title}:</span> {step.why}{step.verified ? "" : " Some of these questions have not been reviewed yet, so they are practice only."}</p>
           ))}
           {session.limit ? <p className="font-semibold">{session.limit}</p> : null}
         </>

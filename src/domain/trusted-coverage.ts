@@ -12,11 +12,12 @@ import { questionDepthBySpecPoint, type DepthCategory } from "./flagship";
 import { questionFamilies } from "./learning-evidence";
 import { contentTokens, textOverload } from "./text-similarity";
 import { humanVerifiedWjecQuestion } from "./physics-content-review";
+import { NEAR_DUPLICATE } from "./reskin";
 import type { Id, Question, Subject, Topic, Unit } from "./types";
 
 export const TRUSTED_DEPTH = { minTrusted: 4, minFamilies: 3 } as const;
 /** Prompts this similar (value-stripped) are treated as one question reskinned. */
-export const NEAR_DUPLICATE = 0.8;
+export { NEAR_DUPLICATE };
 /** Below this many content words, similarity is meaningless and only families can merge. */
 const MIN_TOKENS_FOR_SIMILARITY = 5;
 

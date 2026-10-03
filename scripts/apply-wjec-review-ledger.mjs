@@ -21,6 +21,7 @@ const bundle = await build({
         humanVerificationLedgerKey as entryKey,
         mergeHumanVerificationLedger as mergeLedger
       } from "./src/domain/human-verification-ledger";
+      export { appendReviewDecisions, promotableLedgerEntries } from "./src/domain/review-workflow";
     `,
     resolveDir: process.cwd(),
     loader: "ts",
@@ -57,7 +58,9 @@ async function firstExisting(paths) {
   return null;
 }
 
-const additions = [];
+// Returned packets feed the same audit log as the review queue: a ledger entry
+// only exists once two different reviewers approved the exact content.
+const decisions = [];
 const reports = [];
 const blockingErrors = [];
 
@@ -85,7 +88,12 @@ for (const candidate of packetCandidates) {
       blockingErrors.push(`${candidate.label}: approved question ${questionId} disappeared after import`);
       continue;
     }
-    additions.push(data.buildEntry(question));
+    const review = question.humanVerification;
+    decisions.push({
+      questionId, contentFingerprint: review.contentFingerprint, decision: "approve", reviewerId: review.reviewerId,
+      reviewerRole: review.reviewerRole, reviewerQualification: review.reviewerQualification, reviewedAt: review.reviewedAt,
+      checks: review.checks, comments: review.notes ?? "",
+    });
   }
 }
 
@@ -98,6 +106,14 @@ if (blockingErrors.length) {
   process.exit(1);
 }
 
+const auditPath = resolve(dirname(ledgerPath), "wjec-review-audit-log.json");
+const auditLog = JSON.parse(await readFile(auditPath, "utf8"));
+const appended = data.appendReviewDecisions(auditLog, decisions, data.questions);
+if (appended.problems.length) {
+  console.error(JSON.stringify({ applied: false, reports, errors: appended.problems }, null, 2));
+  process.exit(1);
+}
+const additions = data.promotableLedgerEntries(data.questions, appended.log);
 const currentLedger = JSON.parse(await readFile(ledgerPath, "utf8"));
 const merged = data.mergeLedger(currentLedger, additions);
 const applied = data.applyLedger(data.questions, merged);
@@ -107,14 +123,11 @@ if (ledgerErrors.length) {
   process.exit(1);
 }
 
-const expectedKeys = new Set(additions.map((entry) => data.entryKey(entry.questionId, entry.contentFingerprint)));
-const appliedKeys = new Set(applied.appliedKeys);
-const unapplied = [...expectedKeys].filter((key) => !appliedKeys.has(key));
-if (unapplied.length) {
-  console.error(JSON.stringify({ applied: false, reports, errors: unapplied.map((key) => `Validated approval did not apply: ${key}`) }, null, 2));
-  process.exit(1);
+if (!dryRun && appended.accepted) {
+  const tempAudit = resolve(dirname(ledgerPath), ".wjec-review-audit-log.json.tmp");
+  await writeFile(tempAudit, `${JSON.stringify(appended.log, null, 2)}\n`, "utf8");
+  await rename(tempAudit, auditPath);
 }
-
 if (additions.length && !dryRun) {
   const tempPath = resolve(dirname(ledgerPath), ".wjec-human-verification.json.tmp");
   await writeFile(tempPath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
@@ -125,7 +138,9 @@ console.log(JSON.stringify({
   applied: true,
   dryRun,
   ledgerPath,
-  approvalsAddedOrRefreshed: additions.length,
+  decisionsRecorded: appended.accepted,
+  verifiedQuestions: additions.length,
+  note: "An approval is recorded in the audit log; a question is trusted only after two different reviewers approve the same content.",
   ledgerEntries: merged.entries.length,
   historicalEntries: applied.historicalKeys.length,
   reports,

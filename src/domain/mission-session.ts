@@ -152,9 +152,9 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     add("delayed-proof", "Delayed check", "A separate question, later, answered independently. This is what proves the marks are back.", unseenPick({ max: 2, verifiedOnly: true }), 0);
   }
   if (proofStage && !steps.length) {
-    limit = mission.limitsSentence ?? "There are no unseen verified questions left for this stage, so Revise cannot prove improvement here yet.";
+    limit = mission.limitsSentence ?? "Revise does not have enough reviewed new questions to prove improvement here yet.";
   } else if (proofStage && stage === "apply" && !steps.some((s) => s.kind === "transfer")) {
-    limit = "No unseen verified unfamiliar-context question exists for this mission, so transfer cannot be tested yet.";
+    limit = "Revise does not have a reviewed unfamiliar-context question for this yet, so transfer cannot be tested.";
   }
   const questionIds = steps.flatMap((s) => s.questionIds);
   const hintBudgetFor: Record<Id, number | undefined> = {};

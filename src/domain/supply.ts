@@ -52,10 +52,10 @@ export function evidenceLimits(input: {
 }): EvidenceLimitNote[] {
   const out: EvidenceLimitNote[] = [];
   const { supply } = input;
-  if (supply.provable === 0 && supply.practiceOnly > 0) out.push({ kind: "only-unverified", text: "the remaining unseen questions are not human-verified, so they can be practised but not used as proof" });
-  else if (supply.provable === 0) out.push({ kind: "no-unseen-verified", text: "there are no unseen verified questions left" });
-  else if (supply.provable < MIN_PROVABLE_QUESTIONS) out.push({ kind: "one-unseen-verified", text: "only one unseen verified question remains" });
-  if (supply.transfer === 0) out.push({ kind: "no-transfer", text: "there is no unseen unfamiliar-context question to test transfer" });
+  if (supply.provable === 0 && supply.practiceOnly > 0) out.push({ kind: "only-unverified", text: "the remaining new questions have not been reviewed yet, so they can be practised but not used as proof" });
+  else if (supply.provable === 0) out.push({ kind: "no-unseen-verified", text: "there are no new reviewed questions left" });
+  else if (supply.provable < MIN_PROVABLE_QUESTIONS) out.push({ kind: "one-unseen-verified", text: "only one new reviewed question is left" });
+  if (supply.transfer === 0) out.push({ kind: "no-transfer", text: "there is no new unfamiliar-context question to test transfer" });
   if (input.daysToExam !== null && input.daysToExam <= input.minProofDays) out.push({ kind: "exam-too-close", text: "the exam is too close for a delayed check" });
   if (input.trustedAttempts < 3) out.push({ kind: "thin-evidence", text: "there are too few trusted answers to judge this yet" });
   if (!input.delayedChecked) out.push({ kind: "no-delayed-evidence", text: "there is no delayed evidence yet" });

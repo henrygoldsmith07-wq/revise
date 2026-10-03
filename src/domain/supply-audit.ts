@@ -12,13 +12,11 @@
 import { trustedAssessmentContent } from "./content-trust";
 import { FLAGSHIP_SUBJECTS, isFlagship } from "./flagship";
 import { isTransferQuestion, questionFamilies, unseenQuestion } from "./learning-evidence";
-import { isNearDuplicateReasoning, reasoningProfilesOf, reasoningSimilarity, type ReasoningProfile } from "./reasoning-signature";
+import { reskinFeatures, shallowRelationOf, type ReskinFeatures, type ShallowKind } from "./reskin";
 import { MIN_PROVABLE_QUESTIONS } from "./supply";
-import { promptSignature, textOverload } from "./text-similarity";
-import { NEAR_DUPLICATE } from "./trusted-coverage";
 import type { Attempt, Id, Question, Topic } from "./types";
 
-export type ShallowKind = "number-swap" | "noun-swap" | "same-signature";
+export type { ShallowKind } from "./reskin";
 /** Strongest evidence first: a group reports its most severe edge kind. */
 const KIND_ORDER: readonly ShallowKind[] = ["number-swap", "noun-swap", "same-signature"];
 
@@ -106,33 +104,12 @@ const flagshipTrusted = (trusted: SupplyAuditOptions["trusted"]) =>
 
 // --- per-question features ----------------------------------------------------
 
-const UNITS = new Set(["kg", "g", "mg", "m", "cm", "mm", "nm", "km", "s", "ms", "min", "h", "hz", "khz", "mhz", "n", "j", "kj",
-  "mol", "dm", "v", "mv", "a", "ma", "w", "kw", "pa", "kpa", "atm", "l", "ml", "k", "c", "°c", "°", "%", "ev", "µf", "μf", "ω", "ohm", "ohms",
-  "metres", "meters", "seconds", "minutes", "hours", "degrees", "grams", "newtons", "joules", "volts", "amps", "watts"]);
-const unitToken = (token: string): boolean => {
-  const bare = token.replace(/[^a-zµμω°%0-9^-]/g, "").replace(/\^?-?\d$/, "");
-  return UNITS.has(bare) || (bare.length > 1 && /^[kmcdµμnp]/.test(bare) && UNITS.has(bare.slice(1)));
-};
-
-/** Text with every number and following unit removed: equal keys are number swaps. */
-function numberKey(text: string): string {
-  const replaced = text.toLowerCase().replace(/[−–—]/g, "-")
-    .replace(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*[×x*]\s*10\s*\^?\s*[+-]?\d+)?(?:e[+-]?\d+)?/g, " # ")
-    .replace(/[^a-z0-9#µμω°%^ -]+/g, " ");
-  const out: string[] = [];
-  for (const token of replaced.split(/\s+/).filter(Boolean)) {
-    if (out.length && out[out.length - 1] === "#" && (unitToken(token) || token === "#")) continue;
-    out.push(token);
-  }
-  return out.join(" ");
-}
-
 const DATA_STRUCTURES = new Set(["table-dataset", "graph-dataset", "enzyme-assay", "titration-dataset", "stoichiometric-data",
   "gas-data", "numeric-data", "mass-spectrum", "controlled-experiment", "micrograph"]);
 const DATA_REPRESENTATION = /\b(?:table|graph|chart|dataset|data|spectrum|micrograph)\b/i;
 
 /** Authored setup metadata only; prompt wording is never guessed at. */
-function isDataAnalysis(question: Question): boolean {
+export function isDataAnalysis(question: Question): boolean {
   const prints = [question.learning?.setupFingerprint, ...question.parts.map((part) => part.learning?.setupFingerprint)];
   return prints.some((fp) => fp && (fp.structures.some((s) => DATA_STRUCTURES.has(s)) || fp.representations.some((r) => DATA_REPRESENTATION.test(r))));
 }
@@ -144,40 +121,15 @@ interface Features {
   question: Question;
   id: Id;
   trusted: boolean;
-  numberKey: string;
-  tokens: string[];
-  profiles: ReasoningProfile[];
+  reskin: ReskinFeatures;
   families: string[];
 }
 
-const promptText = (q: Question): string => `${q.stem} ${q.parts.map((part) => part.prompt).join(" ")}`;
-/** Below this many content words, similarity is meaningless. */
-const MIN_TOKENS = 5;
-
 function featuresOf(question: Question, trusted: boolean): Features {
-  const text = promptText(question);
-  return {
-    question, id: question.id, trusted, numberKey: numberKey(text),
-    tokens: promptSignature(text).split(" ").filter(Boolean),
-    profiles: reasoningProfilesOf(question), families: questionFamilies(question),
-  };
+  return { question, id: question.id, trusted, reskin: reskinFeatures(question), families: questionFamilies(question) };
 }
 
-/** Why two questions are one question in disguise, or null if they differ. */
-function shallowRelation(a: Features, b: Features): ShallowKind | null {
-  if (a.tokens.length < MIN_TOKENS || b.tokens.length < MIN_TOKENS) return null;
-  if (a.numberKey === b.numberKey) return "number-swap";
-  const swapped = a.tokens.length === b.tokens.length ? a.tokens.filter((token, i) => token !== b.tokens[i]).length : Infinity;
-  if (swapped <= Math.max(1, Math.floor(a.tokens.length * 0.2)) ||
-    textOverload(promptText(a.question), promptText(b.question)) >= NEAR_DUPLICATE) return "noun-swap";
-  if (a.profiles.length && a.profiles.length === b.profiles.length &&
-    a.profiles.every((pa, i) => {
-      const pb = b.profiles[i]!;
-      return (pa.reasoningMoves.length > 0 || pa.solutionPath.length > 0) && isNearDuplicateReasoning(pa, pb) &&
-        reasoningSimilarity(pa, pb).signals.promptStructure >= 0.5;
-    })) return "same-signature";
-  return null;
-}
+const shallowRelation = (a: Features, b: Features): ShallowKind | null => shallowRelationOf(a.reskin, b.reskin);
 
 class Components {
   private parent: number[];
@@ -355,4 +307,23 @@ export function supplyAuditIntegrityIssues(audits: readonly SubjectSupplyAudit[]
     if (row.verdict !== verdictFor(row.provableDistinct)) issues.push(`${where}: verdict ${row.verdict} disagrees with ${row.provableDistinct} distinct trusted questions`);
   }
   return issues;
+}
+
+// --- clusters for review planning -----------------------------------------------
+
+/**
+ * Every question of a topic grouped into "one question in disguise" clusters
+ * (number/noun/same-signature reskins and shared families merged). Reviewing
+ * one member covers its cluster, so planning works on clusters, not rows.
+ */
+export function topicQuestionClusters(topic: Pick<Topic, "id" | "subjectId">, questions: readonly Question[], options: SupplyAuditOptions = {}): Array<{ ids: Id[]; trustedIds: Id[] }> {
+  const trustedOf = flagshipTrusted(options.trusted);
+  const attempts = options.attempts ?? [];
+  const inTopic = [...questions].filter((q) => q.subjectId === topic.subjectId && q.topicIds.includes(topic.id)).sort((a, b) => a.id.localeCompare(b.id));
+  const all = inTopic.map((q) => featuresOf(q, trustedOf(q) && unseenQuestion(q, attempts, questions)));
+  const { distinct } = cluster(all);
+  const byRoot = new Map<number, Features[]>();
+  all.forEach((f, i) => { const root = distinct.find(i); byRoot.set(root, [...(byRoot.get(root) ?? []), f]); });
+  return [...byRoot.values()].map((members) => ({ ids: members.map((m) => m.id), trustedIds: members.filter((m) => m.trusted).map((m) => m.id) }))
+    .sort((a, b) => a.ids[0]!.localeCompare(b.ids[0]!));
 }
