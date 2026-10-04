@@ -1,5 +1,23 @@
 # Changelog
 
+## A reviewer pack a teacher can use without a terminal — 2026-10-04
+
+**Review stops requiring a terminal.** `npm run wjec:review:pack` renders the selection
+`wjec:review:queue` already chose into one self-contained HTML file: each question with its
+mark scheme, worked answer, specification statements, provenance, content-gate warnings, reskin
+cluster and exact content fingerprint. It works from `file://`, loads nothing and cannot open a
+network connection. The reviewer signs in once, works through the pack and exports a return file
+that `wjec:review:import` accepts unchanged; `wjec:review:pack:import` performs that translation
+and validates it exactly as the importer does, writing nothing.
+
+**The pack cannot approve anything.** It collects only what the importer requires — named
+reviewer, role, qualification, a timezone-bearing ISO instant, all six checks, approve / needs
+changes / reject and a comment whenever the decision is not an approval — and refuses to export
+an incomplete or partial attestation. An untouched question is omitted rather than guessed at,
+two reviewers work the same pack independently, and trust still requires two different reviewers
+approving the same fingerprint. Two route notes are now explicit: `wjec:review:queue` feeds
+`wjec:review:import`, while `wjec:review:batch` feeds `wjec:review:apply`.
+
 ## Trusted-content workflow, review priorities and reskin-proof evidence — 2026-10-03
 
 **Review is now a workflow, not a gap.** Questions move unverified → checked → verified through an append-only, hash-chained audit log (reviewer, role, qualification, date, six checks, comments). A question becomes trusted only after two different reviewers approve its exact content; any edit sends it back for re-review. `npm run wjec:review:priorities`, `:queue`, `:import`, `:promote` and `:gates` cover ranking, reviewer packs, external return files, promotion and the release gate. No flagship question is trusted yet: no review has been performed.

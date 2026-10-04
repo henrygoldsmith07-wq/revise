@@ -48,6 +48,8 @@
     "content:reasoning": "node scripts/generate-physics-reasoning.mjs",
     "wjec:review:priorities": "node scripts/wjec-review.mjs priorities",
     "wjec:review:queue": "node scripts/wjec-review.mjs queue",
+    "wjec:review:pack": "node scripts/generate-review-pack-html.mjs",
+    "wjec:review:pack:import": "node scripts/import-review-pack-html.mjs",
     "wjec:review:import": "node scripts/wjec-review.mjs import",
     "wjec:review:promote": "node scripts/wjec-review.mjs promote",
     "wjec:review:status": "node scripts/wjec-review.mjs status",

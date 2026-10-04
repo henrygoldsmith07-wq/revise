@@ -139,6 +139,8 @@ pretending the review has been done:
 ```bash
 npm run wjec:review:priorities          # what to review next, ranked by capability unlocked
 npm run wjec:review:queue -- maths ./pack --limit=10   # reviewer pack: question, mark scheme, spec, provenance, reskin warnings
+npm run wjec:review:pack -- ./pack      # same selection as one offline HTML file a teacher reviews without a terminal
+npm run wjec:review:pack:import -- ./pack/exported-review-pack.html --out=./pack/returns   # exported pack -> return file (validates, writes nothing)
 npm run wjec:review:import -- ./pack/review-return.json   # validate + append to the audit log
 npm run wjec:review:promote             # ledger entries for questions with two independent approvals
 npm run wjec:review:gates               # release gate (part of npm run verify)
