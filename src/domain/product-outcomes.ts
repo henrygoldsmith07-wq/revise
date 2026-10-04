@@ -60,7 +60,7 @@ export function measureLearnerOutcomes(input: { events: readonly FunnelEvent[]; 
     diagnostic: { started: count("diagnostic_started"), completed: count("diagnostic_completed"), skipped: count("diagnostic_skipped") },
     nextActionsShown: actions.length,
     personalisedActionsShown: actions.filter((e) => !GENERIC_ACTIONS.has(e.detail ?? "none")).length,
-    recommendationsShown: count("recommendation_displayed") + actions.length,
+    recommendationsShown: count("recommendation_displayed") || actions.length,
     recommendationsAccepted: count("recommendation_accepted"),
     sessions, secondSession: sessions >= 2,
     marksProvenRecovered: input.recovery.totals.recovered.low,
@@ -90,13 +90,15 @@ export interface CohortOutcomes {
 const share = (num: number, den: number, min: number): number | null => (den >= min ? Math.round((num / den) * 1000) / 1000 : null);
 
 export function aggregateOutcomes(learners: readonly LearnerOutcomes[], supplyReady: ReadonlyArray<boolean> = [], minLearners = 5): CohortOutcomes {
-  const started = learners.reduce((n, l) => n + l.diagnostic.started, 0);
-  const completed = learners.reduce((n, l) => n + l.diagnostic.completed, 0);
-  const skipped = learners.reduce((n, l) => n + l.diagnostic.skipped, 0);
-  const shown = learners.reduce((n, l) => n + l.nextActionsShown, 0);
-  const personalised = learners.reduce((n, l) => n + l.personalisedActionsShown, 0);
-  const displayed = learners.reduce((n, l) => n + l.recommendationsShown, 0);
-  const accepted = learners.reduce((n, l) => n + l.recommendationsAccepted, 0);
+  if (!Number.isInteger(minLearners) || minLearners < 5) throw new Error("Cohort shares require at least five distinct learners.");
+  const started = learners.filter(l => l.diagnostic.started > 0).length;
+  const completed = learners.filter(l => l.diagnostic.started > 0 && l.diagnostic.completed > 0).length;
+  const resolved = learners.filter(l => l.diagnostic.started > 0 || l.diagnostic.skipped > 0);
+  const skipped = resolved.filter(l => l.diagnostic.skipped > 0).length;
+  const shown = learners.filter(l => l.nextActionsShown > 0).length;
+  const personalised = learners.filter(l => l.nextActionsShown > 0 && l.personalisedActionsShown > 0).length;
+  const displayed = learners.filter(l => l.recommendationsShown > 0).length;
+  const accepted = learners.filter(l => l.recommendationsShown > 0 && l.recommendationsAccepted > 0).length;
   const days = learners.flatMap((l) => l.daysFromLossToProof).sort((a, b) => a - b);
   const mid = Math.floor(days.length / 2);
   const median = days.length ? (days.length % 2 ? days[mid]! : (days[mid - 1]! + days[mid]!) / 2) : null;
@@ -104,13 +106,13 @@ export function aggregateOutcomes(learners: readonly LearnerOutcomes[], supplyRe
     learners: learners.length,
     onboardingCompletion: share(learners.filter((l) => l.onboardingCompleted).length, learners.length, minLearners),
     diagnosticCompletion: share(completed, started, minLearners),
-    diagnosticSkipRate: share(skipped, started + skipped, minLearners),
+    diagnosticSkipRate: share(skipped, resolved.length, minLearners),
     personalisedNextActionShare: share(personalised, shown, minLearners),
     recommendationStartRate: share(accepted, displayed, minLearners),
     secondSessionRate: share(learners.filter((l) => l.secondSession).length, learners.filter((l) => l.sessions >= 1).length, minLearners),
     recoveredMarks: learners.reduce((n, l) => n + l.marksProvenRecovered, 0),
     learnersWithProof: learners.filter((l) => l.delayedProofsCompleted > 0).length,
-    medianDaysFromLossToProof: days.length >= minLearners ? median : null,
+    medianDaysFromLossToProof: learners.filter(l => l.daysFromLossToProof.length > 0).length >= minLearners ? median : null,
     learnersBlockedBySupply: learners.filter((l) => l.proofBlockedBySupply > 0).length,
     flagshipSupplyReadyShare: share(supplyReady.filter(Boolean).length, supplyReady.length, 1),
   };

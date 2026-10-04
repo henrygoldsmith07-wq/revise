@@ -356,7 +356,7 @@ export function useQuestionExecution({
           ? {
               label: "Retry unaided for full evidence",
               href: null,
-              why: "Full marks with support count at reduced weight — one clean unaided answer proves the capability.",
+              why: "You succeeded with support. Try a different question unaided; a later reviewed check can confirm the improvement.",
             }
           : question.difficulty < 4
             ? {

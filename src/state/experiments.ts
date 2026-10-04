@@ -7,7 +7,7 @@
 // recommendation shown) and recorders flow into grading paths; nothing here
 // touches the snapshot.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Id } from "@/domain/types";
 import {
   readReviseMeta,
@@ -39,6 +39,9 @@ export function useExperiments(userId: Id): Experiments {
   const [experimentArm, setExperimentArm] = useState<ExperimentAssignment | null>(null);
   const [funnelEvents, setFunnelEvents] = useState<FunnelEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const funnelWrites = useRef<Promise<void>>(Promise.resolve());
+  const activeUser = useRef(userId);
+  useEffect(() => { activeUser.current = userId; }, [userId]);
 
   // Self-loading on mount (in parallel with the snapshot load).
   useEffect(() => {
@@ -89,7 +92,7 @@ export function useExperiments(userId: Id): Experiments {
 
       if (cancelled) return;
       setExperimentArm(assignment?.optedOut ? null : assignment);
-      setFunnelEvents(funnel ?? []);
+      setFunnelEvents((funnel ?? []).filter(e => e.anonId === userId));
       setLoaded(true);
     })();
     return () => {
@@ -97,14 +100,15 @@ export function useExperiments(userId: Id): Experiments {
     };
   }, [userId]);
 
-  const recordFunnel = useCallback(async (type: FunnelEventType, detail?: string) => {
+  const recordFunnel = useCallback((type: FunnelEventType, detail?: string) => {
+    const write = async () => {
     const now = Date.now();
-    const windows: Record<FunnelEventType, number> = { app_opened: 3_600_000, recommendation_displayed: 6 * 3_600_000, recommendation_accepted: 0, feedback_read: 0, onboarding_completed: 0, diagnostic_started: 0, diagnostic_completed: 0, diagnostic_skipped: 0, next_action_shown: 6 * 3_600_000, proof_blocked_by_supply: 24 * 3_600_000 };
+    const windows: Record<FunnelEventType, number> = { app_opened: 3_600_000, recommendation_displayed: 6 * 3_600_000, recommendation_accepted: 0, revision_task_started: 30 * 60_000, recommendation_completed: 30 * 60_000, feedback_read: 0, onboarding_completed: 0, diagnostic_started: 0, diagnostic_completed: 0, diagnostic_skipped: 0, next_action_shown: 6 * 3_600_000, proof_blocked_by_supply: 24 * 3_600_000 };
     const existing = ((await readReviseMeta<Array<{ anonId: string; type: FunnelEventType; at: string; detail?: string }>>("funnelEvents")) ?? []);
     let last: number | null = null;
     for (let i = existing.length - 1; i >= 0; i--) {
       const e = existing[i];
-      if (e.type !== type || (detail != null && e.detail !== detail)) continue;
+      if (e.anonId !== userId || e.type !== type || (detail != null && e.detail !== detail)) continue;
       last = new Date(e.at).getTime();
       break;
     }
@@ -112,7 +116,11 @@ export function useExperiments(userId: Id): Experiments {
     const log = existing;
     const nextFunnel = [...log.slice(-2000), { anonId: userId, type, at: new Date(now).toISOString(), detail }];
     await writeReviseMeta("funnelEvents", nextFunnel);
-    setFunnelEvents(nextFunnel);
+    if (activeUser.current === userId) setFunnelEvents(nextFunnel.filter(e => e.anonId === userId));
+    };
+    const pending = funnelWrites.current.then(write);
+    funnelWrites.current = pending.catch(() => undefined);
+    return pending;
   }, [userId]);
 
   const joinExperiment = useCallback(async () => {

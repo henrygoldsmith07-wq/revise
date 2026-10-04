@@ -32,4 +32,9 @@ describe("core-value outcomes", () => {
     expect(aggregateOutcomes([one], [false])).toMatchObject({ learners: 1, onboardingCompletion: null, flagshipSupplyReadyShare: 0 });
     expect(aggregateOutcomes(Array(5).fill(one), [true, true, false, false, false]).onboardingCompletion).toBe(1);
   });
+
+  it("does not treat repeated events from one learner as a cohort denominator", () => {
+    const one = measureLearnerOutcomes({ events: Array.from({ length: 20 }, () => ev("diagnostic_started", 1)), attempts: [], recovery, mistakeCreatedAt: new Map() });
+    expect(aggregateOutcomes([one]).diagnosticCompletion).toBeNull();
+  });
 });

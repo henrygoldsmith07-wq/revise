@@ -1,6 +1,8 @@
 "use client";
 
 import { exportContinuityDeletions } from "@/data/learner-history";
+import { privatePilotExport } from "@/domain/pilot-export";
+import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 
 import { useAccount } from "@/state/account";
 
@@ -705,6 +707,7 @@ function DataControls() {
   const filename = portabilityFilename(store.userId);
   const [pendingRestore, setPendingRestore] = useState<PortabilitySnapshot | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [pilotConsent, setPilotConsent] = useState(false);
   const restorePreview = pendingRestore ? portabilityRestorePreview(pendingRestore) : null;
   const preview = deletionPreview(
     [
@@ -726,6 +729,21 @@ function DataControls() {
     <section>
       <SectionHeading title="Data" hint="Portable, private, and yours to delete." />
       <Panel className="space-y-3">
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-ink2">Pilot evidence export</summary>
+          <p className="mt-2 text-sm text-ink2">For an agreed learner pilot. This saves a private local file with activity dates, marks and progress under a random ID. Answers, feedback and account details are excluded. Choose whether to share the file with your pilot organiser.</p>
+          <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={pilotConsent} onChange={event => setPilotConsent(event.target.checked)} />I agree to export my pilot evidence</label>
+          <Button className="mt-2" disabled={!pilotConsent} onClick={() => {
+            void (async () => {
+              let anonId = await readReviseUserMeta<string>("pilotParticipantId", store.userId);
+              if (!anonId) { anonId = crypto.randomUUID(); await writeReviseUserMeta("pilotParticipantId", store.userId, anonId); }
+              const payload = privatePilotExport({ userId: store.userId, anonId, capturedAt: new Date().toISOString(), events: store.funnelEvents, attempts: store.attempts, mistakes: store.mistakes });
+              const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+              const link = document.createElement("a"); link.href = url; link.download = `revise-pilot-${anonId}.json`; link.click(); URL.revokeObjectURL(url);
+              setRestoreMessage("Pilot evidence saved locally. Sharing is your choice.");
+            })().catch(error => setRestoreMessage(error instanceof Error ? error.message : "Pilot export failed."));
+          }}>Export pilot evidence</Button>
+        </details>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => { void exportDataPortable(store, filename).catch(error => setRestoreMessage(error instanceof Error ? error.message : "Export failed.")); }}>Export portable snapshot</Button>
           <Button onClick={() => exportDataLegacy(store)}>Export legacy JSON</Button>
@@ -882,5 +900,5 @@ function exportDataLegacy(store: ReturnType<typeof usePageStore>) {
 }
 
 function usePageStore() {
-  return useStoreFields("attempts", "cards", "examDates", "experimentArm", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
+  return useStoreFields("attempts", "cards", "examDates", "experimentArm", "funnelEvents", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
 }

@@ -68,6 +68,8 @@ export interface ReviewPriorityInput {
   now?: Date;
   trusted?: SupplyAuditOptions["trusted"];
   subjectIds?: readonly Id[];
+  /** Campaigns rank marginal capability per estimated reviewer minute. */
+  optimiseReviewerTime?: boolean;
 }
 
 export interface ReviewQueueItem {
@@ -79,6 +81,7 @@ export interface ReviewQueueItem {
   unlocks: Capability[];
   stage: ReviewStage;
   reviewsNeeded: number;
+  reviewMinutes: number;
   /** Other questions in the same reskin cluster: covered by this review, not extra reviews. */
   clusterSize: number;
   warnings: string[];
@@ -134,6 +137,12 @@ interface Candidate {
   stage: ReviewStage;
   reviewsNeeded: number;
   warnings: string[];
+}
+
+/** Solve independently, inspect marking/specification and record all six checks.
+ * Planning estimate only; never evidence of review or a timing guarantee. */
+export function estimatedReviewMinutes(question: Question): number {
+  return Math.ceil(quickItemSeconds(question) / 60 + 3 + question.parts.length * 0.5);
 }
 
 interface BestPick { cluster: number; member: Candidate; score: number; unlocks: Capability[]; value: number }
@@ -218,7 +227,7 @@ export function buildReviewPriorities(input: ReviewPriorityInput): ReviewPriorit
         if (blockingGates(issues).length) { blockedByGates++; continue; }
         if (state.lastDecision === "reject" || state.lastDecision === "revise") { awaitingRevision++; continue; }
         usable.push({
-          question: q, stage: state.stage, reviewsNeeded: Math.max(1, state.approvalsNeeded),
+          question: q, stage: state.stage, reviewsNeeded: state.approvalsNeeded,
           transfer: isTransferDemand(q),
           data: isDataAnalysis(q) && hasDataRepresentation(q),
           diagnostic: quickItemSeconds(q) <= DIAGNOSTIC_MAX_SECONDS,
@@ -246,7 +255,8 @@ export function buildReviewPriorities(input: ReviewPriorityInput): ReviewPriorit
     state.candidates.forEach((members, cluster) => {
       for (const member of members) {
         const g = gain(state, member, covered.get(state.topic.subjectId) ?? 0, coldTarget);
-        const value = g.score / member.reviewsNeeded;
+        const cost = member.reviewsNeeded * (input.optimiseReviewerTime ? estimatedReviewMinutes(member.question) : 1);
+        const value = g.score / Math.max(0.25, cost);
         if (g.score <= 0) continue;
         const current = top as BestPick | null;
         if (!current || value > current.value || (value === current.value && member.question.id < current.member.question.id)) top = { cluster, member, score: g.score, unlocks: g.unlocks, value };
@@ -273,6 +283,7 @@ export function buildReviewPriorities(input: ReviewPriorityInput): ReviewPriorit
     const item: ReviewQueueItem = {
       rank: queue.length + 1, questionId: top.member.question.id, subjectId: state.topic.subjectId, topicId: state.topic.id,
       score: Math.round(top.value * 10) / 10, unlocks: top.unlocks, stage: top.member.stage, reviewsNeeded: top.member.reviewsNeeded,
+      reviewMinutes: top.member.reviewsNeeded * estimatedReviewMinutes(top.member.question),
       clusterSize: members.length, warnings: top.member.warnings,
       kind: top.member.transfer && top.unlocks.includes("first-transfer-question") ? "transfer" : top.member.data && top.unlocks.includes("first-data-question") ? "data" : top.unlocks.includes("cold-start-diagnostic") ? "diagnostic" : "standard",
     };

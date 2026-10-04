@@ -78,6 +78,8 @@ export interface MarkerMetadata {
    */
   independentlyMarked?: boolean;
   markedAt?: IsoInstant;
+  qualification?: string;
+  contentFingerprint?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +126,12 @@ export interface AnswerCorpusRecord {
   abilityLevel?: AbilityLevel;
   createdAt: IsoInstant;
   updatedAt?: IsoInstant;
+  /** Explicit collection attestations; authoring fixtures never set these. */
+  collection?: { genuineStudentAnswer: boolean; anonymised: boolean; consented: boolean; sourceRef: string; collectedAt: IsoInstant };
+  answerQualityBand?: "blank" | "weak" | "partial" | "strong";
+  rubricMark?: number | null;
+  aiMark?: number | null;
+  markingVersion?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,13 +218,25 @@ export function validateAnswerCorpusRecord(record: unknown, index: number): { re
   if (Array.isArray(r.questionTypeTags) && r.questionTypeTags.length === 0) warnings.push(`Record ${rowNum}: questionTypeTags is empty`);
 
   // human marks
-  for (const field of ["humanMark1", "humanMark2", "adjudicatedMark"] as const) {
+  for (const field of ["humanMark1", "humanMark2", "adjudicatedMark", "rubricMark", "aiMark"] as const) {
     const v = r[field];
     if (v !== null && v !== undefined) {
       if (typeof v !== "number" || !Number.isInteger(v)) issues.push(`Record ${rowNum}: ${field} must be integer or null`);
       else if (typeof maxMarks === "number" && (v < 0 || v > maxMarks)) issues.push(`Record ${rowNum}: ${field} ${v} outside 0..${maxMarks}`);
     }
   }
+
+  if (r.collection !== undefined) {
+    const c = r.collection as Record<string, unknown> | null;
+    if (!c || typeof c !== "object" || Array.isArray(c)) issues.push(`Record ${rowNum}: collection must be an object`);
+    else {
+      for (const f of ["genuineStudentAnswer", "anonymised", "consented"] as const) if (typeof c[f] !== "boolean") issues.push(`Record ${rowNum}: collection.${f} must be boolean`);
+      if (!isNonEmptyString(c.sourceRef)) issues.push(`Record ${rowNum}: collection.sourceRef is required`);
+      if (typeof c.collectedAt !== "string" || !Number.isFinite(Date.parse(c.collectedAt))) issues.push(`Record ${rowNum}: collection.collectedAt must be an ISO timestamp`);
+    }
+  }
+  if (r.answerQualityBand !== undefined && !["blank", "weak", "partial", "strong"].includes(String(r.answerQualityBand))) issues.push(`Record ${rowNum}: answerQualityBand invalid`);
+  if (r.markingVersion !== undefined && !isNonEmptyString(r.markingVersion)) issues.push(`Record ${rowNum}: markingVersion must be non-empty`);
 
   // misconceptions
   if (r.identifiedMisconceptions !== undefined && !Array.isArray(r.identifiedMisconceptions)) issues.push(`Record ${rowNum}: identifiedMisconceptions must be an array`);

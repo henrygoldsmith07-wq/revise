@@ -52,7 +52,14 @@
     "wjec:review:promote": "node scripts/wjec-review.mjs promote",
     "wjec:review:status": "node scripts/wjec-review.mjs status",
     "wjec:review:gates": "node scripts/wjec-review.mjs check",
-    "wjec:quality:report": "node scripts/report-wjec-quality.mjs"
+    "wjec:quality:report": "node scripts/report-wjec-quality.mjs",
+    "wjec:campaign": "node scripts/wjec-review.mjs campaign",
+    "wjec:readiness": "node scripts/wjec-review.mjs readiness",
+    "product:quality": "node scripts/report-product-quality.mjs",
+    "marking:evidence:init": "node scripts/marking-evidence.mjs init",
+    "marking:evidence:pack": "node scripts/marking-evidence.mjs pack",
+    "marking:evidence:import": "node scripts/marking-evidence.mjs import",
+    "marking:evidence:report": "node scripts/marking-evidence.mjs report"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

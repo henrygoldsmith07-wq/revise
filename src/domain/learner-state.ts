@@ -4,7 +4,7 @@
 // This is a projection of the proof lifecycle, not a second mastery system.
 // ---------------------------------------------------------------------------
 
-import { independentAttempt, isTransferQuestion, questionFamily } from "./learning-evidence";
+import { independentAttempt, isTransferQuestion, questionFamily, trustedAssessmentAttempt } from "./learning-evidence";
 import type { RecoveryState } from "./mark-recovery";
 import type { LifecycleStage, TopicLifecycle } from "./proof-lifecycle";
 import type { Attempt, Id, Question } from "./types";
@@ -43,7 +43,7 @@ export interface TopicEvidenceSummary {
 
 export function topicEvidenceSummary(topicId: Id, attempts: readonly Attempt[], questions: readonly Question[]): TopicEvidenceSummary {
   const byId = new Map(questions.map((q) => [q.id, q] as const));
-  const used = attempts.filter((a) => a.topicIds.includes(topicId) && independentAttempt(a) && a.awarded / a.max >= 0.5 && byId.has(a.questionId));
+  const used = attempts.filter((a) => a.topicIds.includes(topicId) && independentAttempt(a) && a.awarded / a.max >= 0.5 && trustedAssessmentAttempt(a, byId.get(a.questionId), attempts, questions));
   const families = new Set(used.map((a) => questionFamily(byId.get(a.questionId)!)));
   const times = used.map((a) => Date.parse(a.createdAt)).sort((a, b) => a - b);
   return {
