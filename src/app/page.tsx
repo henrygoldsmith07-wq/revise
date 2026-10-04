@@ -59,7 +59,7 @@ export default function TodayPage() {
   const greetingLabel = useGreeting();
   // The Next Best Action engine ranks missions, paper recovery, proof checks, reviews and the
   // adaptive session together; Today shows only its winner.
-  const { plan } = useRevisionPlan();
+  const { plan, supplyNote } = useRevisionPlan();
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -100,7 +100,7 @@ export default function TodayPage() {
     void recordExperimentEvent("shown", { taskId, activity: "adaptive", topicId: adaptiveSession.topicId });
   }, [adaptiveSession, experimentArm, recordExperimentEvent, recordFunnel]);
 
-  if (!adaptiveSession && !plan.top) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} />;
+  if (!adaptiveSession && !plan.top) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} supplyNote={supplyNote} />;
 
   // Hierarchy: the next session (or resume) dominates the first viewport.
   // Everything else — overview, roadmap, pace, outlook — sits one tap away
@@ -157,7 +157,7 @@ function TodayWelcome({ name, greeting, hasSession = true }: { name: string; gre
   );
 }
 
-function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; pace: ReturnType<typeof forecastUntouched> }) {
+function EmptyToday({ name, greeting, pace, supplyNote }: { name: string; greeting: string; pace: ReturnType<typeof forecastUntouched>; supplyNote?: string | null }) {
   return (
     <div className="mx-auto w-full space-y-5">
       <TodayWelcome name={name} greeting={greeting} hasSession={false} />
@@ -166,8 +166,16 @@ function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; 
       <div className="today-focus card p-5 sm:p-7">
         <h2 className="text-xl font-semibold text-ink">A lesson is a good place to begin</h2>
         <p className="mt-2 text-sm leading-6 text-ink2">Browse a topic that interests you, or add exam dates to make a plan.</p>
+        {/* Nothing here is ranked yet. Say which of the two reasons applies, rather
+            than letting "nothing to do" look like an unfinished setup. */}
+        {supplyNote ? (
+          <p className="mt-3 border-l-2 border-ink3 pl-3 text-sm leading-6 text-ink2">{supplyNote}</p>
+        ) : null}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <ButtonLink href="/lesson" variant="primary" size="md" className="w-full sm:w-auto min-h-[3rem] text-base">Browse lessons</ButtonLink>
+          <Link href="/practice" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink py-3 px-1 min-h-[3rem] inline-flex items-center">
+            Practise a question
+          </Link>
           <Link href="/settings" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink py-3 px-1 min-h-[3rem] inline-flex items-center">
             Set up exams
           </Link>

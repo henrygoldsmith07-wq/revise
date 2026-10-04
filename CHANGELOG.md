@@ -1,5 +1,51 @@
 # Changelog
 
+## Proving the loop works when there are no reviewed questions — 2026-10-04
+
+**Every flagship subject has 0 verified questions.** The learner-facing consequences of that were
+untested, so they are now properties rather than assumptions. `tests/supply-journey.property.test.ts`
+drives a simulated learner through at least three cycles of the loop with 0–3 trusted questions per
+topic, and holds the engine to four invariants: Today never headlines an action it cannot perform
+(blocked work is always deferred with a reason), proof supply only ever counts questions the learner
+has not seen and answering one can never increase it, exhaustion is stated in plain words, and a
+blocked proof attempt is recorded as review demand. Trust in the fixtures comes from the real
+two-reviewer audit-log path, never from a fixture flag.
+
+**Two real defects fell out.** `RevisionPlan.authoringNeeds` measured `marksAtStake` as
+`recovery.byTopic(topic).open` — which is zero for exactly the topics where a learner is blocked
+awaiting proof, so the review-demand signal reported no demand for the questions that review would
+most obviously unlock. It now counts every mark in the topic that is not yet proven, matching the
+definition `exam-mission` already used. And an empty Today said nothing about *why*: a learner whose
+subject is authored but unreviewed saw "Browse a topic that interests you", which reads as an
+unfinished setup rather than an evidence gap. `reviewedSupplyNote()` now names the actual reason —
+no reviewed questions, too few, or too few spread across too few topics — from counts in the bank,
+and stays silent when there is no shortfall to explain.
+
+**Blocked proof now shows up where reviewers look.** `npm run wjec:quality:report` ranks the topics
+where review effort would unlock the most proof, distinguishing work that is already queued, work
+that is authored but never reviewed, and topics with nothing in the bank. It is built from the bank
+alone: a learner's blocked proof is a local-only funnel event and never leaves the device.
+
+**The exhaustion policy is written down.** `docs/revision-engine.md` documents what counts as supply,
+the two-question proof floor, the three-day delayed check, why blocked work is deferred rather than
+shown, and what the design deliberately refuses to do — it does not relax what counts as verified or
+unseen, and it does not invent supply to fill a slot. New `e2e/narrow-360.spec.ts` runs the loop at
+360×800, narrower than any existing device profile.
+
+**One reachability gap is recorded, not hidden.** A learner who has started every topic with no
+mistakes to repair and no cards due reaches `plan.top === null` and gets the generic first-run
+screen. Supply is not the cause, so the new note correctly stays silent. Closing it needs a new
+action rather than new wording, so it is written up in `docs/revision-engine.md` and the property
+test pins the boundary — an empty Today is permitted only in that state or when the reviewed supply
+is genuinely too small, so the gap cannot quietly widen.
+
+**A pre-existing flake, made explicit.** `tests/repository.test.ts`, `a11y.test.ts`,
+`learner-continuity.test.ts` and `question-replication.test.ts` drive IndexedDB through
+fake-indexeddb and sit at 3–4s against a 5s default timeout, so the suite failed intermittently
+before this branch existed — confirmed by two consecutive baseline runs with no changes present, one
+passing and one timing out. `vitest.config.mts` now budgets 30s. This changes only how long a
+slow-but-correct test may run: no assertion, guard or gate is weakened, and a real hang still fails.
+
 ## A reviewer pack a teacher can use without a terminal — 2026-10-04
 
 **Review stops requiring a terminal.** `npm run wjec:review:pack` renders the selection
