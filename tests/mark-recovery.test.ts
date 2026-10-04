@@ -47,6 +47,15 @@ describe("marks recovered", () => {
     expect(r.state).toBe("awaiting-proof");
   });
 
+  it("does not turn an earlier failed exposure into a genuinely unseen delayed proof", () => {
+    const r = run([
+      attempt("success", "q-a2", 3, 3, "2026-09-22T09:00:00.000Z"),
+      attempt("seen", "q-a3", 0, 3, "2026-09-23T09:00:00.000Z"),
+      attempt("repeat", "q-a3", 3, 3, "2026-09-30T09:00:00.000Z"),
+    ]);
+    expect(r.state).toBe("awaiting-proof");
+  });
+
   it("marks a proven mark as regressed when a later independent attempt fails", () => {
     const r = run([
       attempt("a1", "q-a2", 3, 3, "2026-09-22T09:00:00.000Z"), attempt("a2", "q-a3", 3, 3, "2026-09-30T09:00:00.000Z"),

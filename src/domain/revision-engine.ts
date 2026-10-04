@@ -35,6 +35,7 @@ import { ROOT_CAUSE_LABEL } from "./mistake-patterns";
 import { timeBoxPlan, type TimeBox, type TimeBoxPlan } from "./pre-exam-plan";
 import type { TopicSupply } from "./supply";
 import type { Attempt, ExamDate, Id, Mistake, Question } from "./types";
+import { BLOCKED_PROOF_COPY } from "./proof-copy";
 
 export type ActionType =
   | "proof-check" | "regression-recovery" | "mission" | "paper-repair" | "recurring-error" | "exam-urgent"
@@ -214,7 +215,9 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     confidence, expectedLearningGain: share, expectedMarks: round(marks * share * weight, 2),
     proofStatus: missionLearnerState(mission.status, mission.recovery), requiredFirst: regressed, effectiveness: eff, mistakeIds: mission.mistakeIds,
     explanation: {
-      why: `${lost} mark${lost === 1 ? "" : "s"} were lost${where}${cause ? `, mainly through ${cause}` : ""}. ${stage.reason}`,
+      why: gap && r.provisional + r.awaitingProof > 0
+        ? BLOCKED_PROOF_COPY
+        : `${lost} mark${lost === 1 ? "" : "s"} were lost${where}${cause ? `, mainly through ${cause}` : ""}. ${stage.reason}`,
       whyNow: regressed ? "Marks you had recovered were lost again, so they are the most likely to cost you in the exam."
         : stage.kind === "delayed-proof" ? "Enough time has passed that a check on a different question now counts as proof."
         : mission.status === "not-started" ? "These marks are open and nothing has been done about them yet."

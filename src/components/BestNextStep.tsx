@@ -26,8 +26,9 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
   const blockedTopic = plan.authoringNeeds.find((n) => action.topicIds.includes(n.topicId))?.topicId;
   useEffect(() => {
     void recordFunnel("next_action_shown", action.type);
-    if (blockedTopic) void recordFunnel("proof_blocked_by_supply", blockedTopic);
-  }, [action.type, blockedTopic, recordFunnel]);
+    void recordFunnel("recommendation_displayed", action.id);
+    if (blockedTopic && action.type === "evidence-gap") void recordFunnel("proof_blocked_by_supply", blockedTopic);
+  }, [action.id, action.type, blockedTopic, recordFunnel]);
   return (
     <section aria-label="Best next step" className="grid gap-4">
       <div className="min-w-0">

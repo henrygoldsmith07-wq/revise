@@ -18,7 +18,7 @@
 // One successful repeat never proves a mark. Pure domain: no clock, no storage.
 // ---------------------------------------------------------------------------
 
-import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
+import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import { isShallowReskin } from "./reskin";
 import type { Attempt, Id, Mistake, Question } from "./types";
@@ -118,7 +118,9 @@ export function classifyMistake(
     return !!q && !questionFamilies(q).some((f) => sourceFamilies.has(f)) && !(sourceQuestion && isShallowReskin(q, sourceQuestion));
   };
   const independentDifferent = successes.filter((a) => independentAttempt(a) && different(a));
-  const provable = independentDifferent.filter(verified);
+  const provable = independentDifferent.filter(a => verified(a) &&
+    trustedAssessmentMistake(mistake, bank, attempts) &&
+    unseenQuestion(questionsById.get(a.questionId)!, attempts.filter(prior => prior.userId === a.userId && prior.id !== a.id && prior.createdAt <= a.createdAt), bank));
   if (!first) {
     return { ...base, ...(targetedAt ? { targetedAt } : {}), state: targeted ? "targeted" : "open", reason: targeted
       ? "Revised, but no successful answer on this yet." : "Not revisited since the mark was lost." };

@@ -13,8 +13,8 @@ import { SessionEvidenceBlock } from "./SessionEvidenceBlock";
 import { useRecoveryEvidence, useRevisionPlan } from "./recovery-evidence";
 
 export function MissionSessionMode({ missionId, stage, onExit }: { missionId: string; stage: string | null; onExit: () => void }) {
-  const store = useStoreFields("attempts", "clearRevisionCheckpoint", "examDates", "mistakes", "papers", "questions", "revisionCheckpoint", "saveRevisionCheckpoint");
-  const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
+  const store = useStoreFields("attempts", "clearRevisionCheckpoint", "examDates", "mistakes", "papers", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "recordFunnel");
+  const { saveRevisionCheckpoint, clearRevisionCheckpoint, recordFunnel } = store;
   const ev = useRecoveryEvidence();
   const { plan } = useRevisionPlan();
   const [{ session, resume, startedAt }] = useState(() => {
@@ -35,9 +35,13 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
   });
   const onProgress = useCallback((position: number) => {
     if (!session || position >= session.questionIds.length) return;
+    if (position === 0) void recordFunnel("revision_task_started", `action:${missionId}:${session.stage}`);
     void saveRevisionCheckpoint(missionCheckpoint(session, { stage }, startedAt, position));
-  }, [saveRevisionCheckpoint, session, stage, startedAt]);
-  const onFinished = useCallback(() => void clearRevisionCheckpoint(), [clearRevisionCheckpoint]);
+  }, [saveRevisionCheckpoint, session, stage, startedAt, missionId, recordFunnel]);
+  const onFinished = useCallback(() => {
+    void clearRevisionCheckpoint();
+    if (session) void recordFunnel("recommendation_completed", `action:${missionId}:${session.stage}`);
+  }, [clearRevisionCheckpoint, missionId, recordFunnel, session]);
   const exit = useCallback(() => { void clearRevisionCheckpoint(); onExit(); }, [clearRevisionCheckpoint, onExit]);
 
   return (

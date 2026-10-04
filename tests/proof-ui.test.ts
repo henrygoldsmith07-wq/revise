@@ -33,6 +33,6 @@ describe("evidence and proof surfaces", () => {
   it("computes the proof ledger once and feeds both the planner and the screens", () => {
     const sessions = read("src/state/sessions.ts");
     expect(sessions.match(/buildProofLedger\(/g)).toHaveLength(1);
-    expect(sessions).toContain("proofLedger,\n      topics,");
+    expect(sessions).toMatch(/proofLedger,\s+topics,/);
   });
 });

@@ -53,6 +53,6 @@ describe("a mission step survives a refresh", () => {
     const src = readFileSync("src/components/MissionSessionMode.tsx", "utf8");
     expect(src).toContain("saveRevisionCheckpoint(missionCheckpoint(");
     expect(src).toContain("restoreMissionSession(");
-    expect(src).toMatch(/onFinished = useCallback\(\(\) => void clearRevisionCheckpoint\(\)/);
+    expect(src).toMatch(/onFinished = useCallback\(\(\) => \{[\s\S]*?void clearRevisionCheckpoint\(\)/);
   });
 });

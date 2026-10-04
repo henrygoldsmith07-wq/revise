@@ -13,6 +13,7 @@ const d = await loadDomain(`
   export { auditFlagshipSupply as audit } from "./src/domain/supply-audit";
   export { buildReviewPriorities } from "./src/domain/review-priority";
   export { reviewStateOf } from "./src/domain/review-workflow";
+  export { flagshipReadiness } from "./src/domain/flagship-readiness";
 `);
 const log = JSON.parse(await readFile("src/content/reviews/wjec-review-audit-log.json", "utf8"));
 const topics = d.allTopics();
@@ -31,6 +32,7 @@ const subjects = audits.map((a) => {
   }
   return {
     subjectId: a.subjectId, label: a.label, summary, stages, rollup: a.rollup,
+    readiness: d.flagshipReadiness({ topics, questions: d.questions, auditEvents: log.events, gate, subjectId: a.subjectId }),
     topics: a.topics.map((t) => {
       const r = rowOf.get(t.topicId);
       return {
@@ -48,6 +50,7 @@ else {
   const md = Boolean(flags.markdown);
   const out = [];
   out.push(md ? "# Flagship trusted-supply dashboard (internal)" : "Flagship trusted-supply dashboard (internal; learners never see these counts)", "");
+  for (const s of subjects) out.push(`${s.label}: ${s.readiness.verdict}`);
   const head = ["subject", "trusted", "topics proving", "cold-start", "mission-proof topics", "delayed-proof topics", "blocked from proof", "verified/checked/unverified", "re-review"];
   const rows = subjects.map((s) => [s.label, s.summary.trustedQuestions, `${s.summary.topicsWithProof}/${s.summary.topics}`, s.summary.coldStartReady ? "ready" : `not ready (${s.summary.coldStartTopics}/${s.summary.coldStartTarget} topics)`, s.summary.missionProofTopics, s.summary.delayedProofTopics, s.topics.filter((t) => t.blockedFromProof).length, `${s.stages.verified}/${s.stages.checked}/${s.stages.unverified}`, s.stages.reReview]);
   if (md) out.push(`| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`, ...rows.map((r) => `| ${r.join(" | ")} |`));

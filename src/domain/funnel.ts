@@ -27,6 +27,8 @@ export type FunnelEventType =
   | "app_opened"
   | "recommendation_displayed"
   | "recommendation_accepted"
+  | "revision_task_started"
+  | "recommendation_completed"
   | "onboarding_completed"
   | "diagnostic_started"
   | "diagnostic_completed"

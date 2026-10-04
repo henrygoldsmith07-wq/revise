@@ -4,6 +4,49 @@ A revision-first study platform. Revise decides the one most useful thing to do
 next, makes it easy to start, and only claims an improvement when it has been
 proven on questions the learner has not seen.
 
+## Current evidence status
+
+### Shipped
+
+Local-first revision, adaptive ranking, FSRS, resumable Exam Missions, conservative
+evidence states and the two-independent-reviewer content pipeline are implemented.
+Internal operations now include cross-subject reviewer campaigns, deterministic
+flagship readiness, blind human marking intake and learner-level pilot reports.
+Implementation and synthetic tests demonstrate behaviour, not learner benefit.
+
+### Blocked by external evidence
+
+The flagship banks still require genuine qualified human reviews. Authored volume
+does not establish trusted supply. Marking validation requires at least 250 genuine
+anonymised independently double-marked student answers, then 1,000+. A consented
+real learner cohort and configured staging verification are also required. Revise
+does not yet have evidence for a product-wide claim that it improves learning.
+
+### Current priorities
+
+1. Obtain independent reviews from the highest-leverage campaign.
+2. Reach a usable reviewed diagnostic and complete delayed-proof loop per flagship.
+3. Collect and adjudicate the Phase 1 student-answer marking corpus.
+4. Run a consented learner pilot through repair, proof and mature return windows.
+5. Verify configured staging account isolation, continuity and failure recovery.
+
+### Future
+
+Broader subject coverage and non-critical enhancements remain secondary to these
+evidence gaps. Historical implementation detail is preserved below; its shipped
+mechanisms must not be read as external validation.
+
+```bash
+npm run wjec:campaign -- --limit=25
+npm run wjec:campaign -- private-review-pack --limit=25 --minutes=240
+npm run wjec:readiness
+npm run product:quality
+npm run product:quality -- --json --pilot=private-pilot.json --corpus=private-corpus.json
+```
+
+See [evidence operations](docs/evidence-operations.md) for the reviewer, pilot,
+marking and release contracts. All large reporting logic stays CLI-only.
+
 ## The product loop
 
 **Diagnose → Learn/Repair → Practise → Prove → Revisit.**
