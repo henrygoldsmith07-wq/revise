@@ -166,6 +166,7 @@ export const CONTENT_ID_MIGRATION_STORES = [
   "outbox",
   "aiCache",
   "aiDlq",
+  "markingFlags",
 ] as const;
 
 /** Which field keys each store above (aiCache keys on its composite string). */
@@ -181,6 +182,7 @@ const STORE_KEY_FIELD: Readonly<Record<ContentIdMigrationStore, string>> = {
   outbox: "id",
   aiCache: "key",
   aiDlq: "id",
+  markingFlags: "id",
 };
 
 export type ContentIdMigrationStore = (typeof CONTENT_ID_MIGRATION_STORES)[number];

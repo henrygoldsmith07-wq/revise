@@ -4,8 +4,15 @@ import type { Id } from "@/domain/types";
  * The IndexedDB shape is a public data contract even though the database is
  * local. A browser can be offline for weeks, so old rows must remain readable
  * after a new build ships. Keep this list in lockstep with `src/data/db.ts`.
+ *
+ * Rollout order for a new store: (1) add the store to PERSISTED_STORES and the
+ * migration entry below, (2) create it in `db.ts`'s upgrade guarded by
+ * `objectStoreNames.contains`, (3) ship. There is no server table for a
+ * device-local store, so migration always lands before client. Nothing is ever
+ * renamed or dropped here — a downgrade reads the old version's rows and
+ * ignores stores it does not know.
  */
-export const PERSISTED_SCHEMA_VERSION = 6 as const;
+export const PERSISTED_SCHEMA_VERSION = 7 as const;
 
 /**
  * Append-only migration inventory. Keeping the steps named and contiguous
@@ -19,6 +26,7 @@ export const PERSISTED_MIGRATIONS = [
   { version: 4, name: "history-indexes" },
   { version: 5, name: "ai-marking-stores" },
   { version: 6, name: "owned-outbox-indexes" },
+  { version: 7, name: "marking-flags" },
 ] as const;
 
 export const PERSISTED_STORES = [
@@ -37,6 +45,7 @@ export const PERSISTED_STORES = [
   "meta",
   "aiCache",
   "aiDlq",
+  "markingFlags",
 ] as const;
 
 export type PersistedStore = (typeof PERSISTED_STORES)[number];
@@ -169,6 +178,17 @@ export function validatePersistedRecord(store: PersistedStore, value: unknown, r
       return [
         ...requiredTextFields(store, value, row, ["id", "attemptId", "queuedAt", "nextAttemptAt"]),
         ...(numberValue(value.attempts) ? [] : [issue(store, row, "attempts", "expected a finite number")]),
+      ];
+    case "markingFlags":
+      // `reason` and `note` are optional by design; `learnerAnswer` and
+      // `rubricFeedback` must be strings but may be empty, because a learner may
+      // flag a mark before typing anything at all.
+      return [
+        ...requiredTextFields(store, value, row, ["id", "userId", "attemptId", "questionId", "partId", "subjectId", "createdAt"]),
+        ...(Array.isArray(value.topicIds) ? [] : [issue(store, row, "topicIds", "expected an array")]),
+        ...(typeof value.learnerAnswer === "string" ? [] : [issue(store, row, "learnerAnswer", "expected a string")]),
+        ...(typeof value.rubricFeedback === "string" ? [] : [issue(store, row, "rubricFeedback", "expected a string")]),
+        ...(numberValue(value.max) ? [] : [issue(store, row, "max", "expected a finite number")]),
       ];
   }
 }

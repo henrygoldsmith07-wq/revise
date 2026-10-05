@@ -12,6 +12,7 @@ import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/do
 
 import { confidenceWord } from "@/domain/plain-numbers";
 import { ImproveAnswer } from "./ImproveAnswer";
+import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { RichText } from "./RichText";
 import { Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
@@ -23,15 +24,20 @@ export function MarkedResult({
   awarded,
   improvableAnswers,
   answers,
+  attempt,
 }: {
   /** Submitted answers by part id, used for long-answer feedback. */
   answers?: Record<string, string>;
+  /** The persisted attempt. Set when one exists, which is what makes a mark disputable. */
+  attempt?: Attempt;
   question: Question;
   /** Original answers by part id. When set, parts that lost marks offer a guided rewrite. */
   improvableAnswers?: Record<string, string>;
   result: {
     marked: MarkedPart[];
     feedback: string;
+    /** Present when the attempt is persisted; gates the "flag this mark" control. */
+    attemptId?: string;
     source: "ai" | "fallback";
     note?: string;
     withheld?: string;
@@ -234,6 +240,7 @@ export function MarkedResult({
                 <ImproveAnswer question={question} part={part} marked={marked} original={improvableAnswers[part.id] ?? ""} />
               ) : null}
               {marked.comment ? <p className="text-xs text-ink3 mt-1.5">{marked.comment}</p> : null}
+              {attempt ? <FlagThisMark attempt={attempt} part={marked} /> : null}
               {marked.evidence?.length ? (
                 <details className="mt-2" open={marked.missedPoints.length > 0}>
                   <summary className="text-xs text-ink2 cursor-pointer select-none">Evidence for each mark</summary>

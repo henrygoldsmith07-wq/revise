@@ -318,6 +318,7 @@ export async function dumpSnapshotForRecovery(): Promise<Record<string, unknown[
     "meta",
     "aiCache",
     "aiDlq",
+    "markingFlags",
   ] as const;
   const rows: Record<string, unknown[]> = {};
   for (const name of names) rows[name] = (await db.getAll(name)) as unknown[];

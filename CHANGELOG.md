@@ -1,5 +1,50 @@
 # Changelog
 
+## Letting a student say "this mark is wrong" — 2026-10-04
+
+**A marked answer had no way to be contested.** A student who believes a mark is
+wrong had nowhere to say so inside the product, so the dispute left as a support
+email with no attempt, no mark-scheme point and no way to find the row afterwards.
+There is now a **Flag this mark** control on every marked part.
+
+**It is local-first and it says so.** Each flag is one IndexedDB row in a new
+`markingFlags` store, carrying the ids, the learner's own answer as submitted, the
+award and the rubric feedback as shown, an optional reason and an optional note.
+The control states plainly that it is stored on this device, that nothing has been
+sent to anyone, and that a flag never changes a mark — only a person can do that.
+No learner free text is required: reason and note are both optional, and a note
+is clamped rather than stored unbounded.
+
+**A flag is an assertion, not evidence.** Nothing in the flag path is read by the
+marking engine or by any trust gate, `resolution` is null until a human fills it
+in, and re-flagging a part replaces rather than duplicates. A property test drives
+arbitrary answers, reasons and awards through the export and asserts the round trip
+never manufactures a human judgement.
+
+**The export targets the reviewer tooling that already exists.** The brief asked for
+an export importable by `marking:evidence:*`, and that namespace is not a new one:
+`scripts/marking-evidence.mjs` (`npm run marking:evidence:init`) already reads an
+answer-corpus v2 file and `pack` turns it into blind double-marking sheets. A
+dispute is therefore exported **as an answer-corpus v2 file**. The one rule that
+governs it: a disputed mark is not a human mark, so `humanMark1`, `humanMark2`,
+`adjudicatedMark` and `humanFeedback` are all `null`, the record is `unreviewed` /
+`needs_review`, and the app's own award goes in the corpus's `aiMark` field — never
+in a field a human attestation flows through. Dispute specifics travel in a
+sidecar `disputes` array that the corpus reader ignores. The importer re-validates
+through the corpus parser itself, so a dispute file the reviewer tooling would
+reject cannot be accepted here either.
+
+**Sync stays off.** `markingFlags` is device-local. It has no server table, no RLS
+policy and no opt-in, and it carries the learner's answer text — routing it into the
+outbox would be a schema change needing its own migration and a per-learner opt-in.
+It is adopted into a new account so a learner keeps their disputes when they sign
+up, but is explicitly never queued, and it is covered by the device erase path.
+Adding it to sync is recorded as deliberate future work, not an oversight.
+
+Schema change is additive: `PERSISTED_SCHEMA_VERSION` 6 → 7, migration
+`marking-flags`, a new store created only when absent. No store renamed or dropped,
+and a downgrade reads old rows and ignores stores it does not know.
+
 ## What a visitor without JavaScript actually sees — 2026-10-04
 
 **The app could never be read without JavaScript, and nothing admitted it.** `AccountBoundary` resolves
