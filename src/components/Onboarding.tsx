@@ -42,6 +42,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [boardId, setBoardId] = useState<Id | null>(null);
   const [subjectIds, setSubjectIds] = useState<Id[]>([]);
   const [examDates, setExamDates] = useState<Record<string, string>>({});
+  const [showReference, setShowReference] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const boards = useMemo(() => availableBoards(), []);
@@ -82,6 +83,19 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         .filter((s) => subjectIds.includes(s.id)),
     [subjectRows, subjectIds],
   );
+
+  // 28 of the 32 registered subjects reuse a WJEC A-level outline without having
+  // been checked against their own board's specification. They are offered, but
+  // only behind an explicit "Unverified preview" choice — a student picking a
+  // subject should never have to notice a disclaimer to find out it is a guess.
+  const { flagshipRows, referenceRows, hiddenReferenceCount } = useMemo(() => {
+    const isReference = (subject: { detail: string }) => subject.detail.includes("Reference");
+    return {
+      flagshipRows: subjectRows.map((row) => ({ ...row, subjects: row.subjects.filter((s) => !isReference(s)) })).filter((row) => row.subjects.length > 0),
+      referenceRows: subjectRows.map((row) => ({ ...row, subjects: row.subjects.filter(isReference) })).filter((row) => row.subjects.length > 0),
+      hiddenReferenceCount: subjectRows.reduce((sum, row) => sum + row.subjects.filter(isReference).length, 0),
+    };
+  }, [subjectRows]);
 
   const missingDates = chosenSubjects.filter((s) => !examDates[s.id]);
   const invalidDates = chosenSubjects.filter((s) => {
@@ -197,7 +211,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   <h2 className="text-sm font-semibold">Which subjects do you take with {board.name}?</h2>
                   <p className="text-xs text-ink3 mt-0.5">
                     Choose every subject you&apos;re sitting. Flagship subjects are authored against the spec;
-                    reference-tier boards reuse that outline and are labelled as not spec-checked.
+                    other subjects reuse that outline and are offered behind an unverified-preview choice.
                   </p>
                 </div>
                 <div className="shrink-0 rounded-xl border border-line bg-surface2 px-3 py-2 text-center" aria-live="polite">
@@ -230,7 +244,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 </p>
               )}
             </div>
-            {subjectRows.map((row) => (
+            {flagshipRows.map((row) => (
               <section key={row.qualificationId} className="rounded-xl border border-line bg-surface2/40 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
@@ -249,6 +263,46 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 />
               </section>
             ))}
+            {hiddenReferenceCount > 0 ? (
+              showReference ? (
+                referenceRows.map((row) => (
+                  <section key={`ref-${row.qualificationId}`} className="rounded-xl border border-line bg-surface2/40 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
+                        Unverified preview &mdash; {board.name} {row.level}
+                      </p>
+                      <p className="text-[11px] text-ink3 tabular-nums">
+                        {row.subjects.filter((subject) => subjectIds.includes(subject.id)).length} of {row.subjects.length}
+                      </p>
+                    </div>
+                    <p className="mb-2 text-xs text-ink3">
+                      These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
+                      specification. Use them to navigate, not as a specification guarantee.
+                    </p>
+                    <SubjectPicker
+                      options={row.subjects}
+                      selectedIds={subjectIds}
+                      onChange={setSubjectIds}
+                      selectionMode="multiple"
+                      ariaLabel={`${row.level} unverified preview subjects`}
+                    />
+                  </section>
+                ))
+              ) : (
+                <button
+                  type="button"
+                  className="w-full rounded-xl border border-dashed border-line bg-surface2/40 px-3 py-3 text-left text-sm text-ink2 hover:text-ink"
+                  aria-expanded={false}
+                  onClick={() => setShowReference(true)}
+                >
+                  <span className="font-semibold">Show {hiddenReferenceCount} more subjects — unverified preview</span>
+                  <span className="mt-0.5 block text-xs text-ink3">
+                    These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
+                    specification.
+                  </span>
+                </button>
+              )
+            ) : null}
             {!subjectIds.length ? <p className="text-xs text-ink3">Pick at least one subject to continue.</p> : null}
           </Panel>
         ) : null}

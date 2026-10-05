@@ -54,7 +54,11 @@ export async function completeOnboarding(
   // Phase 1 — exam board.
   await page.getByRole("button", { name: new RegExp(board, "i") }).first().click();
   await page.getByRole("button", { name: /Continue/i }).click();
-  // Phase 2 — subjects of that board (multi-select). Default: first card.
+  // Phase 2 — subjects of that board (multi-select). Subjects whose outline was
+  // not checked against this board sit behind an unverified-preview disclosure;
+  // most specs onboard on boards where every subject is one, so opt in first.
+  const preview = page.getByRole("button", { name: /unverified preview/i }).first();
+  if (await preview.count()) await preview.click();
   if (opts.subjectNames?.length) {
     for (const name of opts.subjectNames) {
       await page.getByRole("button", { name: new RegExp(name, "i") }).first().click();

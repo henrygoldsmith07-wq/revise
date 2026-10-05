@@ -78,7 +78,16 @@ taken from the spec manifest rather than the A-level clone. Adding a board
 still means one curriculum module and nothing else changing.
 
 New students start on the four flagships. Settings and onboarding group subjects
-as Flagship vs Reference so cloned boards cannot look spec-checked.
+as Flagship vs Reference so cloned boards cannot look spec-checked, and
+reference-tier subjects sit behind an explicit **"Unverified preview"** choice in
+onboarding rather than appearing in the list next to a disclaimer. Only WJEC
+A-level Physics is fully authored (108 of 108 specification statements); Maths,
+Biology and Chemistry still have 78, 102 and 95 statements to write.
+
+**Nothing is trusted yet.** All four flagships have **0 human-reviewed
+questions**, so Revise can practise with a student but cannot yet prove an
+improvement. That is a content-supply state, not a product limitation, and the
+app says so on screen instead of implying a plan exists.
 
 ## Running it
 

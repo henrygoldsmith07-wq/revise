@@ -1,5 +1,41 @@
 # Changelog
 
+## What a visitor without JavaScript actually sees — 2026-10-04
+
+**The app could never be read without JavaScript, and nothing admitted it.** `AccountBoundary` resolves
+its profile in a client effect, so on the server every route — `/` included — rendered one line,
+"Opening your revision profile…". A `<noscript>` in `page.tsx` would never have been seen, because
+`page.tsx` never renders server-side either. The fallback now lives in the root layout, outside that
+boundary, and says what Revise is, why the app cannot start without scripting, and where to go next.
+
+**`/welcome` is a real static page.** It is a route handler, so it is served outside the app layout and
+none of the client providers apply: no scripts, no hydration, no per-user data. It states the flagship
+position plainly — four WJEC A-level subjects authored to their specifications, none of their questions
+signed off by two independent human reviewers, so Revise can practise but cannot yet prove an
+improvement. It is the only route declared indexable, because it is the only one that works without
+JavaScript. `/welcome` is added to the precached app shell, which `tests/perf.test.ts` requires of any
+new route; `start_url`, `scope`, `CACHE_VERSION` and the fetch logic are untouched.
+
+**Reference-tier subjects moved behind an explicit choice.** 28 of the 32 registered subjects reuse a
+WJEC A-level outline without being checked against their own board's specification. They were listed
+in the ordinary subject picker next to a disclaimer, which is how a guess ends up looking like a
+guarantee. They are now behind a "Show N more subjects — unverified preview" disclosure in onboarding,
+rendered in a separately-named group once chosen. Nothing was dropped; only the order changed. WJEC
+A-level Physics is the only subject authored to all 108 of its statements, and the README now says so
+alongside the fact that all four flagships have zero reviewed questions.
+
+**The marketing site stopped overclaiming.** It advertised "2,216 spec statements across WJEC, AQA,
+Edexcel and OCR". The four flagships hold 417 WJEC A-level specification statements, of which 275 are
+still to be authored in Maths, Biology and Chemistry. The stat row, the title, the meta and OG tags and
+the structured data now carry the flagship scope, the real figures and the zero-reviewed-questions
+position.
+
+**A second load-dependent flake, made explicit.** `tests/perf.test.ts` asserted that compiling the
+curriculum module takes under 5s while its own comment deferred the real budget to
+`npm run perf:budget` — a shipped-artifact gate that is unaffected by scheduling and passes at 17% of
+the raw and 18% of the gzip allowance. On a loaded box a cold transform cache took 8.4s. The wall-clock
+duplicate now has room not to flake; the artifact budget is unchanged.
+
 ## Proving the loop works when there are no reviewed questions — 2026-10-04
 
 **Every flagship subject has 0 verified questions.** The learner-facing consequences of that were
