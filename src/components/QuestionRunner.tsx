@@ -8,6 +8,7 @@ import { type DelayedFarTransferRetest } from "@/domain/delayed-far-transfer";
 import { shouldOfferMathInput } from "@/domain/math-input";
 
 import { EditorialBadge } from "./EditorialBadge";
+import { TrustDetails } from "./TrustDetails";
 
 import type { Attempt, Id, InterventionAttemptContext, Mistake, Question } from "@/domain/types";
 
@@ -75,17 +76,19 @@ export function QuestionRunner({
             verification={needsWjecHumanReview ? "unverified" : question.verification ?? null}
             origin={question.origin} reviewer={question.reviewer ?? null} contentTier={getSubject(question.subjectId)?.contentTier} />
           {needsWjecHumanReview ?
-            <span className="text-xs text-muted-foreground">Needs human review · practice evidence only</span> : null}
+            <span className="text-xs text-ink3">Needs human review · practice evidence only</span> : null}
           {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
-          {farTransfer ? <Pill tone="accent">Delayed far-transfer</Pill> : null}
+          {farTransfer ? <Pill tone="accent">Delayed check · new context</Pill> : null}
         </div>
+
+        <TrustDetails question={question} />
 
         {farTransfer ? (
           <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mb-4 text-sm text-ink2">
-            <p className="font-semibold text-ink">A different-context transfer check</p>
+            <p className="font-semibold text-ink">Does it hold in a new context?</p>
             <p className="text-xs mt-1">
-              This question tests the same mapped learning claim after a {farTransfer.delayDays}-day delay. It is
-              scored separately from the original answer.
+              This checks the same idea, {farTransfer.delayDays} days later, on a question set in a different context. It is
+              marked separately from your original answer.
             </p>
           </div>
         ) : null}
