@@ -25,8 +25,6 @@ import {
   buildPortabilitySnapshot,
   parsePortabilitySnapshot,
   portabilityFilename,
-  defaultRetention,
-  shouldRetain,
   privacyDisclosure,
   deletionPreview,
   deletionSummary,
@@ -370,22 +368,20 @@ describe("portability", () => {
     expect(name.includes("/")).toBe(false);
   });
 
-  it("shouldRetain obeys retentionDays and localOnly", () => {
-    const r365 = { ...defaultRetention(NOW), serverRetentionDays: 30, cloudEnabled: true, localOnly: false };
-    const recent = { updatedAt: "2025-06-09T10:00:00.000Z" as const };
-    const old = { updatedAt: "2025-05-01T10:00:00.000Z" as const };
-    expect(shouldRetain(recent, r365, NOW)).toBe(true);
-    expect(shouldRetain(old, r365, NOW)).toBe(false);
-    // localOnly never purges locally
-    const local = { ...r365, localOnly: true };
-    expect(shouldRetain(old, local, NOW)).toBe(true);
-    // null retention never purges
-    expect(shouldRetain(old, { ...r365, serverRetentionDays: null }, NOW)).toBe(true);
-  });
-
   it("privacyDisclosure branches on cloudEnabled", () => {
     expect(privacyDisclosure(false).join(" ")).toContain("Local-only");
     expect(privacyDisclosure(true).join(" ")).toContain("Supabase");
+  });
+
+  it("privacyDisclosure never claims local erasure deletes server data, and states AI is off by default", () => {
+    for (const cloud of [false, true]) {
+      const text = privacyDisclosure(cloud).join(" ");
+      expect(text).not.toContain("on next sync on the server");
+      expect(text).toContain("AI features are off unless you switch them on");
+    }
+    const cloudText = privacyDisclosure(true).join(" ");
+    expect(cloudText).toContain("Erase local data wipes this device only");
+    expect(cloudText).toContain("Delete account permanently deletes your account");
   });
 
   it("deletionPreview warns with and without authored content", () => {
