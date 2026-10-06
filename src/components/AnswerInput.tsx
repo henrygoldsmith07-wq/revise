@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { aiOcr } from "@/lib/optional-ai";
+import { imageForAi } from "@/lib/file-data";
 import { insertMathToken, MATH_TOKENS, type MathTokenId } from "@/domain/math-input";
 import { Button, cx } from "./ui";
 import { DictateIcon, DictateStopIcon, ICON_SIZE, PhotoIcon } from "./icons";
@@ -127,8 +128,9 @@ export function AnswerInput({
   const onPhoto = async (file: File) => {
     try {
       setStatus("Reading your handwriting…");
-      const base64 = await toBase64(file);
-      const result = await aiOcr(base64, file.type || "image/jpeg", "handwriting");
+      // Re-encoded first so camera metadata (location, device, time) never leaves.
+      const image = await imageForAi(file);
+      const result = await aiOcr(image.base64, image.mediaType, "handwriting");
       if (!result.data.text) {
         setStatus(result.note ?? "Could not transcribe that image — type your answer instead.");
         return;

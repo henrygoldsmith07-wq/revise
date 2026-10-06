@@ -139,10 +139,15 @@ export async function lookupCachedMark(
   markScheme: string[],
 ): Promise<CacheLookupResult> {
   const db = await getDb();
+  // The retention period is enforced on read as well as on write: an entry
+  // past its TTL is never served, and is deleted when found.
+  const cutoff = Date.now() - CACHE_TTL_MS;
+  const fresh = (entry: AiCacheEntry) => Date.parse(entry.createdAt) >= cutoff;
 
   // Tier 1: exact normalised hash.
   const exact = await db.get("aiCache", answerKey(questionId, partId, answer));
-  if (exact) return { hit: { marked: exact.marked, confidence: exact.confidence, via: "exact" }, embedding: null };
+  if (exact && !fresh(exact)) await db.delete("aiCache", exact.key);
+  else if (exact) return { hit: { marked: exact.marked, confidence: exact.confidence, via: "exact" }, embedding: null };
 
   // Tier 2: cosine similarity against this part's cached answers.
   let embedding: number[] | null = null;
@@ -154,7 +159,7 @@ export async function lookupCachedMark(
       const scope = await db.getAllFromIndex("aiCache", "byScope", scopeKey(questionId, partId));
       let best: { entry: AiCacheEntry; sim: number } | null = null;
       for (const entry of scope) {
-        if (!entry.embedding) continue;
+        if (!entry.embedding || !fresh(entry)) continue;
         const sim = cosineSimilarity(vector, entry.embedding);
         if (sim >= CACHE_THRESHOLD && (!best || sim > best.sim)) best = { entry, sim };
       }
