@@ -18,14 +18,17 @@ same flows onto the ICO Children's code.
 
 | # | Claim | Today | Why |
 |---|---|---|---|
-| a | No AI-provider request without explicit opt-in | ❌ **No** | There is no per-learner AI opt-in. The only gate on a provider call is deployment configuration. See gap 1. |
+| a | No AI-provider request without explicit opt-in | ✅ **Yes** | `UserSettings.aiEnabled` defaults to `false`; only an explicit opt-in at the current consent wording counts (`src/domain/ai-consent.ts`). The browser gate (`src/ai/transport.ts`) and the server (`src/app/api/ai/route.ts`, reading `public.ai_consent` on every request) both refuse without it. Executed at runtime in `tests/api-routes-behaviour.test.ts`. |
 | b | No Pulse request without explicit opt-in | ✅ **Yes** | `UserSettings.pulseEnabled` defaults to `false` and is enforced server-side on every request. Executed at runtime in `tests/api-routes-behaviour.test.ts`. |
 | c | No learner free text in server logs | ✅ **Yes** | The only server-side `console.*` carrying anything derived from a learner request logs the task name and a slice of the *provider's response*. `tests/api-ai-failure.test.ts` proves the 500 body carries none of it. |
-| d | Account deletion removes server-side rows | ❌ **No** | No account-deletion path exists. "Erase local data" wipes IndexedDB on that device only. See gap 2. |
+| d | Account deletion removes server-side rows | ✅ **Yes**, once the migration and `SUPABASE_SERVICE_ROLE_KEY` are deployed | `POST /api/account/delete` verifies the session, purges non-cascading rows, deletes the auth user (cascading every user table), then verifies nothing is left (`account_residual_rows`). "Erase local data" remains device-only and says so. Route behaviour in `tests/account-deletion.test.ts`; SQL cascade and residue checks executed in PGlite in `tests/privacy-sql.test.ts`. |
 
-Claims (a) and (d) are **false as written today**. Do not repeat them in
-marketing, sales material, school conversations, or the in-app privacy text
-until the corresponding gap is closed and covered by a test.
+Claims (a) and (d) became true with the privacy / AI trust change set, **on a
+deployment that has applied `supabase/migrations/20261007000100_privacy_ai_trust.sql`
+and set `SUPABASE_SERVICE_ROLE_KEY`**. Without the migration the AI route fails
+closed (503: consent cannot be read); without the key account deletion fails
+closed (503) and deletes nothing. Neither claim should be repeated externally
+until the staging suite has passed against a migrated database.
 
 ---
 
@@ -35,7 +38,7 @@ until the corresponding gap is closed and covered by a test.
 |---|---|---|---|---|---|---|
 | **IndexedDB** (15 stores, `src/data/db.ts`) | Nothing, by itself. It is the primary durable store; egress only happens through the writers below. | Any repository write in `src/data/repository.ts` | `bindDatabaseProfile` pins one profile per application boundary. `clearAll()` and `deleteLocalDatabase()` are the only wipe paths. | Signed-out local profile named `revise`, profile id `local`. No network dependency. | **Yes** — answers, card text, `Mistake.description`, settings, E2EE key material. Plaintext at rest. | `tests/repository.test.ts`, `tests/content-id-migration.test.ts`, `tests/ai-resilience.test.ts` |
 | **Supabase sync** (`src/data/sync.ts`, `src/data/sync-contract.ts`, `src/data/sync-deletions.ts`) | Whole domain rows for the 8 collection stores plus settings, streak, lesson progress, learner records and tombstones. Columns: `user_id`, `subject_id`, `topic_id`, `due`, `date`, `data` (JSONB), `updated_at`. | `sync()` — debounced auto-sync timer, manual sync, and the background drain pass | `enqueue()` returns immediately when Supabase is unconfigured. `authIdentity()` must return `"ok"` and is re-checked before and after every batch. `userId !== "local"`. Row-level security scopes every table to `auth.uid()`. | **Off** for a signed-out learner. On for a signed-in learner with a working network. E2EE is **off** by default. | **Yes**, unless E2EE is switched on, in which case `data` is an AES-GCM blob. `user_id` and `updated_at` stay plaintext by design; `due`/`date` are nulled when E2EE is on. | `tests/sync-resilience.test.ts`, `tests/sync-pagination.test.ts`, `tests/sync-schema-parity.test.ts`, `tests/supabase-staging.test.ts`, `tests/compliance.test.ts`, `tests/learner-continuity.test.ts`, `tests/continuity-pull.test.ts` |
-| **AI provider** (`src/app/api/ai/route.ts`, `src/ai/client.ts`, `src/ai/provider.ts`, `src/ai/marking-resilience.ts`, `src/ai/mark-dlq.ts`) | A task name plus a payload. For `mark`: the question object and PII-masked answers. For `ocr`: a base64 image. For `cards-from-notes` and `extract-questions`: raw learner text. For `diagnose`: the mistake objects. Downstream: Anthropic or any OpenAI-compatible endpoint, plus classifier.dev on `diagnose-error`. | A learner action — submit an answer, ask for an explanation, photograph work, paste notes. Also the DLQ drain pass, without a learner present. | Server: `getUser()` (401) when Supabase is configured; fail-closed 503 in production when provider credentials exist but auth is not configured; zod `payloadSchemas`; body-size caps; per-user quota via the `consume_ai_quota` RPC. **No learner consent check of any kind.** | Depends entirely on deployment. A deployment with `ANTHROPIC_API_KEY` or `AI_PROVIDER` set will call a model on the first AI action by any signed-in user. Local development with no provider configured returns the deterministic offline fallback. | **Yes, and only partly masked.** `aiMark` applies `maskPii` per answer part; `aiExplain`, `aiSocratic`, `aiDiagnoseError` and `aiRouteSpec` apply `maskStudentText`. `aiDiagnose`, `aiExtractQuestions`, `aiCardsFromNotes` and `aiOcr` apply **no masking at all**. | `tests/api-routes-behaviour.test.ts`, `tests/api-ai-failure.test.ts`, `tests/security.test.ts`, `tests/compliance.test.ts`, `tests/ai-resilience.test.ts` |
+| **AI provider** (`src/app/api/ai/route.ts`, `src/ai/transport.ts`, `src/ai/egress.ts`, `src/ai/client.ts`, `src/ai/provider.ts`, `src/ai/marking-resilience.ts`, `src/ai/mark-dlq.ts`) | A task name plus the output of the egress policy (`src/ai/egress.ts`): for `mark` a minimised question (no model answer, provenance or reviewer data) and PII-masked answers; for `diagnose` category plus masked description per mistake; for `cards-from-notes`, `extract-questions`, `explain`, `socratic`, `diagnose-error` and `route-spec` masked text; for `ocr` a JPEG/PNG with EXIF/GPS/text metadata stripped (the handwriting itself cannot be masked). Downstream: Anthropic or any OpenAI-compatible endpoint, plus classifier.dev on `diagnose-error`. | A learner action — submit an answer, ask for an explanation, photograph work, paste notes. Also the DLQ drain pass, through the **same transport** as the live request. | Browser: the learner's consent, read from IndexedDB on every call, then the egress policy, in `sendAiTask` — the only code that POSTs to `/api/ai`. Server: `getUser()` (401); fail-closed 503 in production when provider credentials exist but auth is not configured; **consent from `public.ai_consent` on every request (403 absent/disabled/revoked, 503 unreadable), before parsing**; zod `payloadSchemas` (bounded mark-question and mistake shapes); body-size caps; the egress policy re-applied; per-user quota via `consume_ai_quota`. | **Off.** `aiEnabled` defaults to `false`; legacy stored `true` without a recorded consent wording reads as off. | **Masked everywhere text can be masked**, by the same idempotent policy in the browser and on the server. OCR images are metadata-stripped and sent only with consent. | `tests/api-routes-behaviour.test.ts`, `tests/ai-consent.test.ts`, `tests/ai-egress.test.ts`, `tests/ai-task-policy.test.ts`, `tests/api-ai-failure.test.ts`, `tests/security.test.ts`, `tests/compliance.test.ts`, `tests/ai-resilience.test.ts` |
 | **Pulse** (`src/app/api/pulse/history/route.ts`, `src/data/pulse-consent.ts`) | A paginated view of the caller's own review logs and attempts: record id, card/topic/subject id, grade, confidence, elapsed time, awarded/max, mode, markedBy, timestamps. | An authenticated `GET` to the history endpoint. | `pulseHistoryAllowed()` reads the synced `user_settings.data` on **every** request, including every page of a pagination run. Missing row, missing flag, or anything other than boolean `true` withholds. | `UserSettings.pulseEnabled` defaults to `false` (`src/data/repository.ts`). There is a toggle in Settings. | **No.** The response shape has no free-text field; answers and feedback are not part of it. | `tests/api-routes-behaviour.test.ts` — executes the route and proves 403 when consent is absent, disabled, or revoked mid-pagination. Also `tests/pulse-history-pagination.test.ts`, `tests/api-boundary.test.ts`. `tests/pulse-consent.test.ts` covers the predicate only. |
 | **Telemetry** (`src/lib/observability.ts`) | `{ event, at, app: "revise", fields }` where `fields` is built key-by-key from a closed allowlist. | Sync completed/failed, migration failure, AI degraded, storage quota. | `safeTelemetryFields()` rebuilds the object from the 5 allowed event names and 15 allowed field names, clamping numbers and sanitising labels. Out-of-contract keys are dropped, not passed through. | **Nothing leaves the device** unless `NEXT_PUBLIC_OBSERVABILITY_ENDPOINT` is set. With it unset, `captureTelemetry` returns before any network call; events are still dispatched as an in-page `revise:telemetry` DOM event. | **No.** The allowlist cannot express it. | `tests/storage-quota.test.ts` — passes an out-of-contract `answer` and `userId` through a cast and proves both are dropped at runtime. |
 | **Funnel / product outcomes** (`src/domain/funnel.ts`, `src/domain/product-outcomes.ts`) | Nothing. Written to the `meta` store under the key `revise.funnelEvents.v1` only. | `recordFunnel()` on app open, recommendation display/accept, feedback read, diagnostic events. | None needed — there is no egress. The log is capped at the most recent 2000 entries with per-type dedupe windows. | Always local. | **No** — event type, a task id or attempt id, and a timestamp. | `tests/funnel.test.ts`, `tests/product-outcomes.test.ts`, `tests/recommendation-audit.test.ts` |
@@ -214,16 +217,16 @@ Server-side `console.*` calls, exhaustively:
 
 | Location | Carries |
 |---|---|
-| `src/app/api/ai/route.ts:186` | `` `console.error(`[ai] ${task} failed`, error)` `` — the task name and the thrown error object. |
+| `src/app/api/ai/route.ts` | `` console.error(`[ai] ${task} failed`, { errorClass }) `` — the task name and the error's class name only. |
+| `src/app/api/account/delete/route.ts` | The names of tables with residual rows after a deletion, or an error class. No row data, no user id. |
+| `src/app/api/maintenance/retention/route.ts` | An error class when the purge throws. |
 | `src/ai/provider.ts:167` | A configuration warning naming the configured model when it is absent from the allowlist. Deployment config, not learner data. |
 | `src/lib/rate-limit-supabase.ts:148` | A fixed warning string about the rate-limit backend. No data. |
 | `src/lib/observability.ts:129` | `[revise.telemetry]` plus a JSON payload built through the same allowlist as above. |
 
-The AI-route error object is built in `src/ai/provider.ts` as
-`` `anthropic ${res.status}: ${(await res.text()).slice(0, 200)}` `` and the
-equivalent for the OpenAI-compatible path. That is a slice of the **provider's
-response body** — the upstream service's reply to our request. It is never the
-request body. The request body is not reachable from that expression.
+The provider error object built in `src/ai/provider.ts` quotes a slice of the
+provider's response body, which some providers echo back from the request. It
+is therefore no longer logged: the route logs only `errorClass(error)`.
 
 `tests/api-ai-failure.test.ts` proves the 500 response body is the fixed string
 `"The AI service failed unexpectedly."` and does not contain the thrown
@@ -237,75 +240,56 @@ message. The browser-side `console.warn` in `src/state/sync-engine.ts` and
 
 ## What is NOT proven
 
-These are real gaps in the current code. None of them is mitigated, and none
-should be described as solved.
+Gaps 1–8 from the previous revision of this document were closed by the
+privacy / AI trust change set. What closed each, and what is still open:
 
-1. **There is no per-learner AI opt-in.** `UserSettings.aiEnabled` is declared
-   in `src/domain/types-planning.ts` and defaults to `true` in
-   `src/data/repository.ts`, but a repository-wide search finds exactly two
-   occurrences of the identifier — the type and the default. It is never read
-   by any code path and has no toggle in Settings; the AI panel shows a status
-   pill and an explanation, not a control. The only gate on a provider call is
-   deployment environment: if `ANTHROPIC_API_KEY` is set, or `AI_PROVIDER` is
-   set to something other than `none`, or a compatible base URL and model are
-   set, the next AI action by any signed-in user goes to that provider. The
-   product claim "no AI request without explicit opt-in" is **false today**.
+1. **Per-learner AI opt-in — closed.** `aiEnabled` is off by default, has a
+   real Settings control, and is enforced server-side from `public.ai_consent`
+   on every `/api/ai` request (`src/domain/ai-consent.ts`,
+   `src/app/api/ai/route.ts`). Revoking stops the next request on this device
+   immediately and, once the change reaches the server, on every device; a
+   revocation made offline is pushed on the next sync and always wins over an
+   older opt-in (`ai_consent_order` trigger). **Residual:** while a device is
+   offline its revocation cannot reach the server, so *other* devices of the
+   same account can still use AI until it reconnects. Local mode (no Supabase
+   identity, non-production only) relies on a versioned header the browser
+   sends from the learner's local choice; it is not identity-backed.
+2. **Account deletion — closed** on deployments with the migration and the
+   service-role key. `POST /api/account/delete`; local erasure is labelled as
+   device-only everywhere. **Residual:** no re-authentication step is required
+   beyond a valid session plus a typed confirmation; a learner's exported
+   files and the Pulse controller's copies are outside Revise's reach.
+3. **`ai_rate_quota` foreign key — closed.** `user_id uuid not null
+   references auth.users on delete cascade`, derived from the key by trigger;
+   existing orphans are deleted by the migration; idle rows are purged after
+   2 days by `/api/maintenance/retention` (Vercel cron + `CRON_SECRET`).
+4. **DLQ egress — closed.** `drainDeadMarks` goes through `sendAiTask`
+   (consent → egress policy → request), enqueues nothing without consent, and
+   clears the queue when consent is withdrawn.
+5. **Unmasked tasks — closed** for text (`diagnose`, `extract-questions`,
+   `cards-from-notes` now masked and minimised). **Residual:** an OCR
+   photograph of handwriting cannot be masked; it is sent only with consent,
+   with metadata stripped, and the Settings copy says so.
+6. **RLS test — closed.** `tests/security.test.ts` derives RLS and policies per
+   table from the SQL and requires an explicit decision for every table,
+   including `lesson_progress`, `learner_records`, `sync_tombstones`,
+   `ai_rate_quota` and `ai_consent`. `scripts/staging-contract.mjs` adds a
+   deployed-catalog check for the consent and quota tables, and
+   `tests/privacy-sql.test.ts` executes the policies in PGlite. **Residual:** the
+   live staging suite has not been run against a migrated staging project.
+7. **Server log assertion — closed** for the AI route: it now logs a task name
+   and an error *class* only, and `tests/security.test.ts` asserts no logging
+   call in the route references the body, payload or raw error.
+8. **Device-local AI caches — closed.** `tests/ai-task-policy.test.ts` asserts
+   `aiCache`/`aiDlq` are neither collection stores nor sync tables and are
+   never enqueued.
 
-2. **There is no account-deletion path.** No `deleteAccount` function, route or
-   control exists anywhere in `src/`. The Settings button reads "Erase local
-   data" and calls `clearAll()` in `src/data/db.ts`, which clears the fifteen
-   IndexedDB stores on that browser profile only. It enqueues nothing and tells
-   the server nothing; the replica rows remain in Supabase. A cascade does exist
-   in `supabase/schema.sql` — every user-owned table declares
-   `references auth.users (id) on delete cascade` — but it only fires when the
-   auth user is deleted, and nothing in the app deletes the auth user. A learner
-   who believes they have "deleted their account" has not.
-
-3. **`public.ai_rate_quota` has no foreign key to `auth.users`.** The table at
-   `supabase/schema.sql:226` is keyed by `key text primary key`, and the key is
-   the string `user:<uuid>` built from the caller's auth id. Nothing constrains
-   it to a real user and nothing cascades on account deletion, so a
-   user-identifying uuid string survives indefinitely. RLS is enabled with no
-   policies and the only writer is the `consume_ai_quota` security-definer
-   function, which does check `p_key` against `auth.uid()` — but "who may read
-   it" and "when does it go away" are separate questions, and the second one has
-   no answer.
-
-4. **`drainDeadMarks` is a second, unmasked egress path.** `src/ai/mark-dlq.ts`
-   re-POSTs queued marks to the AI route as
-   `JSON.stringify({ task: "mark", payload: { question: item.question, answers: item.answers } })`
-   with the raw answers straight out of the `aiDlq` store. `maskPii` is not
-   applied. Every other cloud mark path masks first; this one does not, and it
-   fires on a background timer with no learner present and no disclosure shown.
-
-5. **Four AI tasks send learner content with no masking.**
-   `aiDiagnose` posts the `mistakes` array, including `Mistake.description`, to
-   the `diagnose` task. `aiExtractQuestions` and `aiCardsFromNotes` post learner
-   prose as `text`. `aiOcr` posts a base64 photograph of the learner's written
-   work. None of the four passes through `maskPii`, `maskStudentText` or
-   `maskChatHistory`.
-
-6. **`tests/security.test.ts` does not actually check RLS per table.** The test
-   loops over ten table names and, inside the loop, asserts only that the whole
-   schema text contains the string `enable row level security` — a property of
-   the file, not of the table named by the loop variable. Dropping RLS from any
-   single table would not fail this test. The list is also incomplete: it omits
-   `lesson_progress`, `learner_records`, `sync_tombstones` and `ai_rate_quota`.
-
-7. **Nothing asserts that the server never logs a request body.** There is no
-   test over the logging statements themselves. `tests/api-ai-failure.test.ts`
-   covers the HTTP response body only. The claim in this document rests on a
-   human having read every `console.*` call in `src/`.
-
-8. **Nothing asserts that `aiCache` and `aiDlq` are device-local and never
-   synced.** `tests/ai-resilience.test.ts` checks the two store names exist in
-   the schema. It does not check that they are absent from `SYNC_TABLES`, absent
-   from the outbox, or absent from `clearAll()`'s inverse. Today they are
-   correctly device-local — they are not in `COLLECTION_STORES` and not in
-   `SYNC_TABLES` — but that is an observation, not an enforced invariant, and a
-   future change could break it silently.
-
----
+Still open and outside this change set: the controller identity, privacy
+notice, sub-processor register and transfer mechanism (DPIA section 7, items
+4–5, 7); Pulse consent is read from the synced `user_settings.data`, which is
+unreadable server-side when sync encryption is on (Pulse then withholds —
+fail-safe, but the toggle silently stops working for E2EE users); card image
+attachments are synced with whatever metadata the original file carried.
 
 ## Test evidence index
 
@@ -319,4 +303,9 @@ should be described as solved.
 | The pilot export is redacted and account-scoped | `tests/pilot-claim-quality.test.ts` |
 | AI route auth, payload validation, body caps, rate limiting | `tests/api-routes-behaviour.test.ts`, `tests/security.test.ts` |
 | Marking tiers and DLQ behaviour | `tests/ai-resilience.test.ts` |
-| Retention settings and the in-app privacy disclosure text | `tests/phase6-platform.test.ts` |
+| The in-app privacy disclosure text | `tests/phase6-platform.test.ts` |
+| AI consent is off by default, strict, enforced per request, revocable | `tests/ai-consent.test.ts`, `tests/api-routes-behaviour.test.ts` |
+| Every AI task's payload goes through one masking/minimisation policy, browser and server; retries use the same transport | `tests/ai-egress.test.ts`, `tests/ai-task-policy.test.ts` |
+| Account deletion: session-scoped, service role server-only, cascade, residue check | `tests/account-deletion.test.ts`, `tests/privacy-sql.test.ts` |
+| Retention policy names only enforcing code; quota purge runs daily and is secret-gated | `tests/retention-policy.test.ts`, `tests/privacy-sql.test.ts` |
+| Per-table RLS decision for every table | `tests/security.test.ts`, `tests/privacy-sql.test.ts` |
