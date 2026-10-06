@@ -29,12 +29,12 @@ export interface TodayBrief {
 }
 
 const EVIDENCE: Partial<Record<AdaptiveStepKind, string>> = {
-  "overdue-retrieval": "fresh recall evidence",
-  "misconception-repair": "a repair check on a mistake you made",
-  "independent-application": "unaided application evidence",
-  transfer: "unfamiliar-context evidence",
-  "prerequisite-repair": "evidence on the prerequisite topic",
-  "delayed-retrieval": "a delayed proof check, scheduled for later",
+  "overdue-retrieval": "a check of what you still remember",
+  "misconception-repair": "a fix for a mistake you made",
+  "independent-application": "an exam-style question done without help",
+  transfer: "a question set in an unfamiliar context",
+  "prerequisite-repair": "a check on an earlier topic this builds on",
+  "delayed-retrieval": "a follow-up check booked for a later day",
 };
 
 export function countdownLabel(days: number | null): string | null {
@@ -95,7 +95,7 @@ export function buildTodayBrief(input: {
     doesNotProve: guidedOnly
       ? "Guided questions build skill but do not count as independent proof."
       : kinds.has("independent-application") && !kinds.has("transfer")
-        ? "Unfamiliar-context proof comes in a later session."
+        ? "A question in an unfamiliar context comes in a later session — that is what proves it."
         : null,
   };
 }

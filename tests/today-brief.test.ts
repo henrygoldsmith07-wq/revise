@@ -35,7 +35,7 @@ describe("today brief", () => {
   it("is honest that guided practice is not proof", () => {
     const b = buildTodayBrief({ plan: plan("overdue-retrieval", "supported-practice"), now: NOW });
     expect(b.doesNotProve).toMatch(/do not count as independent proof/);
-    expect(b.produces).toEqual(["fresh recall evidence"]);
+    expect(b.produces).toEqual(["a check of what you still remember"]);
   });
   it("lists the evidence a full ladder produces", () => {
     const b = buildTodayBrief({ plan: plan("overdue-retrieval", "independent-application", "transfer", "delayed-retrieval"), now: NOW });

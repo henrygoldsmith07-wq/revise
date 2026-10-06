@@ -69,7 +69,7 @@ export function AdaptiveSessionHero({
         ) : null}
         {brief.produces.length ? (
           <p className="mt-1 text-sm text-ink2">
-            This will produce: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
+            In this session: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
           </p>
         ) : null}
 
