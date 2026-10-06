@@ -2,6 +2,8 @@
 
 import { exportContinuityDeletions } from "@/data/learner-history";
 import { privatePilotExport } from "@/domain/pilot-export";
+import { exportMarkingFlags, type MarkingFlag } from "@/domain/marking-flag";
+import { listMarkingFlags } from "@/data/db";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 
 import { useAccount } from "@/state/account";
@@ -16,6 +18,7 @@ const ARM_LABELS: Record<string, string> = {
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/lib/optional-ai";
 import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
+import { seedQuestions } from "@/content";
 import {
   buildPortabilitySnapshot,
   deletionPreview,
@@ -708,6 +711,16 @@ function DataControls() {
   const [pendingRestore, setPendingRestore] = useState<PortabilitySnapshot | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [pilotConsent, setPilotConsent] = useState(false);
+  // Read straight from IndexedDB rather than through the store snapshot: a
+  // disputed mark is device-local by design and has no place in the sync graph.
+  const [markingFlags, setMarkingFlags] = useState<readonly MarkingFlag[]>([]);
+  useEffect(() => {
+    let live = true;
+    void listMarkingFlags(store.userId)
+      .then((rows) => { if (live) setMarkingFlags(rows); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [store.userId]);
   const restorePreview = pendingRestore ? portabilityRestorePreview(pendingRestore) : null;
   const preview = deletionPreview(
     [
@@ -743,6 +756,52 @@ function DataControls() {
               setRestoreMessage("Pilot evidence saved locally. Sharing is your choice.");
             })().catch(error => setRestoreMessage(error instanceof Error ? error.message : "Pilot export failed."));
           }}>Export pilot evidence</Button>
+        </details>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-ink2">Disputed marks ({markingFlags.length})</summary>
+          <p className="mt-2 text-sm text-ink2">
+            Marks you flagged as wrong, one per mark. These stay on this device until you export them.
+            Unlike the pilot export above, this file <strong>does</strong> contain your answer text and
+            anything you typed — a marker cannot check a disputed mark without them. Send it only to a
+            teacher you trust, and only after they ask for it.
+          </p>
+          {markingFlags.length === 0 ? (
+            <p className="mt-2 text-sm text-ink3">You have not flagged any marks yet.</p>
+          ) : (
+            <ul className="mt-2 space-y-1 text-xs text-ink3">
+              {markingFlags.slice(0, 10).map((flag) => (
+                <li key={flag.id}>
+                  {flag.awarded ?? 0}/{flag.max} — {flag.reason ? flag.reason.replace(/-/g, " ") : "no reason given"}
+                </li>
+              ))}
+              {markingFlags.length > 10 ? <li>…and {markingFlags.length - 10} more.</li> : null}
+            </ul>
+          )}
+          <Button className="mt-2" disabled={!markingFlags.length} onClick={() => {
+            void (async () => {
+              const anonId = crypto.randomUUID();
+              const payload = exportMarkingFlags({
+                userId: store.userId,
+                anonId,
+                flags: markingFlags,
+                capturedAt: new Date().toISOString(),
+                questionOf: (questionId) => {
+                  const question = seedQuestions.find((q: { id: string }) => q.id === questionId);
+                  if (!question) return null;
+                  return {
+                    questionText: question.stem,
+                    markScheme: question.parts.flatMap((part) => part.markScheme),
+                    maximumMarks: question.totalMarks,
+                    topicId: question.topicIds[0] ?? question.subjectId,
+                    specification: question.specVersion ?? "unmapped",
+                  };
+                },
+              });
+              const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+              const link = document.createElement("a"); link.href = url; link.download = `revise-marking-evidence-${anonId}.json`; link.click(); URL.revokeObjectURL(url);
+              setRestoreMessage("Disputed marks saved locally. Nothing has been sent anywhere.");
+            })().catch(error => setRestoreMessage(error instanceof Error ? error.message : "Marking evidence export failed."));
+          }}>Export disputed marks</Button>
         </details>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => { void exportDataPortable(store, filename).catch(error => setRestoreMessage(error instanceof Error ? error.message : "Export failed.")); }}>Export portable snapshot</Button>

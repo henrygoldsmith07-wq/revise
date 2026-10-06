@@ -72,3 +72,50 @@ export function limitsSentence(notes: readonly EvidenceLimitNote[]): string | nu
   if (!blocking.length) return null;
   return `You can still revise this, but Revise cannot currently prove the improvement because ${blocking.map((n) => n.text).join(" and ")}.`;
 }
+
+/**
+ * Why a subject cannot start the Diagnose → Prove loop yet, in the words the
+ * learner reads on an otherwise empty Today screen.
+ *
+ * A new learner whose subject has authored questions but too few human-reviewed
+ * ones sees "nothing to do", which reads as an unconfigured plan rather than as
+ * an evidence gap. This says which of the two it is, using counts that are
+ * actually in the bank — it never invents supply and never claims a shortfall
+ * that has not been measured. Null when there is nothing to explain: there are
+ * enough reviewed questions to plan with, or the subject has no questions at all
+ * (which is reported separately, by the paths that know a subject is missing).
+ */
+export function reviewedSupplyNote(input: {
+  supplyByTopic: Readonly<Record<Id, TopicSupply>>;
+  /** Subject labels in the wording shown to the learner. */
+  subjectLabels: readonly string[];
+  /** Reviewed questions needed before a diagnostic can start. */
+  minReviewed?: number;
+  /** …and they must span this many topics, so a diagnostic can be a spread. */
+  minReviewedTopics?: number;
+}): string | null {
+  const rows = Object.values(input.supplyByTopic);
+  if (!rows.length) return null;
+  const min = input.minReviewed ?? 3;
+  const minTopics = input.minReviewedTopics ?? min;
+  const reviewable = rows.reduce((sum, row) => sum + row.provable, 0);
+  const spread = rows.filter((row) => row.provable > 0).length;
+  if (reviewable >= min && spread >= minTopics) return null;
+  const practisable = rows.reduce((sum, row) => sum + row.practiceOnly, 0);
+  const one = input.subjectLabels.length === 1;
+  const who = one ? input.subjectLabels[0]! : "These subjects";
+  const verb = one ? "has" : "have";
+  const questions = (n: number) => `${n.toLocaleString("en-GB")} question${n === 1 ? "" : "s"}`;
+  if (reviewable === 0 && practisable === 0) return `Revise does not have any questions for ${who} yet.`;
+  if (reviewable === 0) {
+    return `${who} ${verb} ${questions(practisable)} you can practise, but none of them have been through human review yet. `
+      + "You can practise and Revise will track what you lose, but it cannot yet prove an improvement or build a plan from them.";
+  }
+  if (spread < minTopics) {
+    return `Revise ${verb} ${questions(reviewable)} for ${who} that ${one ? "has" : "have"} been through human review, `
+      + `spread across only ${spread} topic${spread === 1 ? "" : "s"}. A diagnostic needs ${minTopics} different topics, so there is nothing to rank yet — `
+      + "keep practising, and the plan appears as more topics are reviewed.";
+  }
+  return `Revise only ${verb} ${questions(reviewable)} for ${who} that ${one ? "has" : "have"} been through human review, `
+    + `and needs ${min} before it can offer a diagnostic. There is nothing to rank yet, so keep practising — the plan appears as questions are reviewed.`;
+}

@@ -470,7 +470,14 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       const s = supply[topicId];
       if (!s) continue;
       const need = s.provable < 2 ? "unseen-verified" : s.transfer === 0 ? "transfer" : null;
-      if (need) needs.set(`${topicId}:${need}`, { topicId, subjectId: mission.subjectId, need, marksAtStake: input.recovery.byTopic(topicId).open });
+      // Marks at stake is every mark in this topic that is not yet *proven*, not
+      // just the ones still classified as open. A topic where the learner is
+      // blocked awaiting proof has no open mistakes left, and counting only those
+      // would report zero demand for exactly the topics review would unblock.
+      if (need) needs.set(`${topicId}:${need}`, {
+        topicId, subjectId: mission.subjectId, need,
+        marksAtStake: input.recovery.items.filter((i) => i.topicId === topicId && i.state !== "proven").reduce((sum, i) => sum + i.marks, 0),
+      });
     }
   }
   deferred.sort((a, b) => b.action.score - a.action.score || a.action.id.localeCompare(b.action.id));

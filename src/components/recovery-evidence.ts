@@ -15,7 +15,7 @@ import { buildMarkRecovery, type MarkRecovery } from "@/domain/mark-recovery";
 import { buildMistakePatterns, type MistakePattern } from "@/domain/mistake-patterns";
 import { daysToNearestExam, rankRevisionActions, type RevisionPlan } from "@/domain/revision-engine";
 import { isDue } from "@/domain/scheduling";
-import { unseenSupplyByTopic, type TopicSupply } from "@/domain/supply";
+import { reviewedSupplyNote, unseenSupplyByTopic, type TopicSupply } from "@/domain/supply";
 import { topicShares } from "@/domain/topic-weight";
 import { useStoreFields } from "@/state/store";
 import type { Mistake } from "@/domain/types";
@@ -57,7 +57,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
 }
 
 /** The single ranked plan Today, the command centre, the diagnostic and mission routes all read. */
-export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvidence } {
+export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvidence; supplyNote: string | null } {
   const evidence = useRecoveryEvidence();
   const store = useStoreFields("adaptiveSession", "attempts", "cards", "examDates", "mastery", "mistakes", "papers", "questions", "reviewLogs", "settings");
   const plan = useMemo(() => {
@@ -103,5 +103,16 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
       paperTitles: Object.fromEntries(store.papers.map((p) => [p.id, p.title])),
     });
   }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.reviewLogs, store.settings.quickCheckSkipped, store.settings.subjectIds, store.settings.targetGrades]);
-  return { plan, evidence };
+  // Only computed when Today has nothing to rank: measuring unseen supply is an
+  // O(questions x topic) reskin check, and Today re-renders often.
+  const supplyNote = useMemo(
+    () => (plan.top === null
+      ? reviewedSupplyNote({
+        supplyByTopic: unseenSupplyByTopic(allTopics(store.settings.subjectIds).map((t) => t.id), store.questions, store.attempts),
+        subjectLabels: store.settings.subjectIds.map((id) => getSubject(id)?.name ?? id),
+      })
+      : null),
+    [plan.top, store.attempts, store.questions, store.settings.subjectIds],
+  );
+  return { plan, evidence, supplyNote };
 }

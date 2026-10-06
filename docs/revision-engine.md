@@ -328,6 +328,70 @@ next action. The split is labelled preliminary until there are at least eight
 mistakes and ten lost marks; it is a prioritisation signal, not a claim that a
 single mistake has one perfectly observable cause.
 
+## When the questions run out — the exhaustion policy
+
+`src/domain/supply.ts`, `src/domain/mark-recovery.ts`, `src/domain/cold-start.ts`
+
+Every flagship subject is currently authored but **not yet human-reviewed**: the
+trust audit reports 0 verified questions in all four. The loop is therefore
+designed to run at the edge of its supply, and the policy for that edge is stated
+here rather than left to each screen.
+
+**What counts as supply.** `unseenSupplyByTopic` splits a topic's unseen
+questions three ways:
+
+| | meaning |
+|---|---|
+| `provable` | unseen **and** human-verified — the only questions that can prove improvement |
+| `practiceOnly` | unseen but unreviewed — practisable, never evidence |
+| `transfer` | unseen, verified, unfamiliar context |
+
+A question stops being supply the moment it is answered, shares a `familyId`
+with something already seen, or is judged a shallow reskin of it. Counting a
+seen question as proof is the one failure this design exists to prevent.
+
+**Proof has a floor.** `MIN_PROVABLE_QUESTIONS = 2`, and improvement is only ever
+proven by a *delayed, unaided* attempt on a different question at least
+`MIN_PROOF_DELAY_DAYS` later (`MIN_PROOF_DELAY_DAYS = 3`). Below the floor the
+state is `provisional` — an honest "this looks better, but not yet proven" — and
+`evidenceLimits()` reports which specific limit bit (`no-unseen-verified`,
+`one-unseen-verified`, `only-unverified`, `no-transfer`, `exam-too-close`,
+`thin-evidence`, `no-delayed-evidence`).
+
+**Blocked work is deferred, never shown.** `rankRevisionActions` moves any action
+it cannot make runnable into `plan.deferred` with a reason and leaves it out of
+the ranked list, so Today can never headline a step the learner cannot finish.
+`plan.authoringNeeds` is the same fact read the other way round: for each topic
+where proof is blocked, whether more verified questions are needed
+(`unseen-verified`) or a transfer question (`transfer`), and the marks in that
+topic that are **not yet proven** as `marksAtStake`. That is the review-demand
+signal `npm run wjec:quality:report` ranks by, and it is built from the bank
+alone — a learner's blocked proof is recorded as a local-only funnel event and
+never leaves the device.
+
+**Saying it plainly.** When a subject has too few reviewed questions to rank
+anything, `reviewedSupplyNote()` states which of the two reasons applies — no
+reviewed questions at all, too few, or too few spread across too few topics —
+with counts taken from the bank. It never estimates, and it returns `null` when
+there is no shortfall to explain. An empty Today must never read as "you have
+not finished setting up".
+
+**What this deliberately does not do.** It does not relax what counts as verified
+or unseen, does not let unreviewed questions stand in for proof, does not invent
+supply to fill a slot, and does not manufacture review to unblock a learner. A
+learner whose subject is unreviewed gets an honest explanation and practice that
+counts, not a plan that overstates what the bank can support.
+
+**Known gap — an empty Today with nothing behind it.** A learner who has started
+every topic, has no mistakes to repair and no cards due reaches a state where
+`plan.top` is `null` and Today shows only its generic first-run screen. The
+supply-shortfall note correctly stays silent, because supply is not the problem.
+Closing this needs a new action — something to do with material already seen —
+rather than a better message, so it is recorded here instead of papered over.
+`tests/supply-journey.property.test.ts` asserts that an empty Today is allowed
+only in that state or when the reviewed supply is genuinely too small to plan
+from, so the gap cannot quietly widen.
+
 ## Gamification
 
 `src/domain/gamification.ts`

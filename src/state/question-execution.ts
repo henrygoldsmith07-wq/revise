@@ -138,6 +138,8 @@ export function useQuestionExecution({
   const [marking, setMarking] = useState(false);
   const [result, setResult] = useState<{
     attemptId: Id;
+    /** The persisted attempt, so a learner can dispute a specific mark after it. */
+    lastAttempt?: Attempt;
     marked: MarkedPart[];
     feedback: string;
     source: "ai" | "fallback";
@@ -393,6 +395,7 @@ export function useQuestionExecution({
     }
     setResult({
       attemptId: persistedAttempt.id,
+      lastAttempt: persistedAttempt,
       marked,
       feedback,
       source,

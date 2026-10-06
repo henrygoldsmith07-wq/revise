@@ -61,6 +61,54 @@ approvals stay in the log as history and never apply to the new content.
 The older packet route (`npm run wjec:review:apply`) feeds the same audit log,
 so there is only one path to trust.
 
+Note which command consumes which file, because the two routes are not
+interchangeable: `wjec:review:queue` writes `review-return.json` for
+`wjec:review:import`, while `wjec:review:batch` writes `content-review.json`
+for `wjec:review:apply`. Both end up in the same audit log, and both still need
+two different reviewers before a question is trusted.
+
+## Offline reviewer pack (no terminal)
+
+The markdown pack assumes the reviewer can open a terminal and edit JSON. Most
+cannot. `npm run wjec:review:pack` renders the queue's own selection into a
+single self-contained HTML file that works from `file://` with no network, no
+build step and no tooling:
+
+```bash
+npm run wjec:review:queue -- physics ./pack --limit=10
+npm run wjec:review:pack -- ./pack          # writes pack/review-pack.html
+```
+
+Give the reviewer that one file. It shows, for every question, the stem, each
+part, the full mark scheme and worked answer, the specification statements with
+their board refs, the provenance record, any content-gate warnings, the reskin
+cluster (approval never extends to these siblings) and the exact content
+fingerprint. It collects exactly what the importer requires and nothing else:
+reviewer id, reviewer role, reviewer qualification, a timezone-bearing ISO
+review instant, all six checks, the decision (approve / needs changes / reject)
+and a comment whenever the decision is not an approval.
+
+Two reviewers work independently on the same pack file, so reviewer two never
+sees reviewer one's decisions. A question left untouched is omitted from the
+return file rather than guessed at.
+
+Then convert and validate, and only then record:
+
+```bash
+npm run wjec:review:pack:import -- ./pack/exported-review-pack.html --out=./pack/returns
+npm run wjec:review:import -- ./pack/returns/review-return.json --dry-run
+npm run wjec:review:import -- ./pack/returns/review-return.json
+```
+
+The conversion step validates exactly as the importer does and writes nothing:
+it is a translation, not an approval. The page refuses to export an incomplete
+attestation (missing reviewer, role or qualification; a date-only, future-dated
+or timezone-less instant; an approval with a check left unticked; a rejection
+without a comment; or a reviewer approving content they already approved), and
+`wjec:review:pack:import` re-checks every one of those against the current bank.
+The page's content security policy cannot open a network connection, so opening
+the pack cannot leak anything.
+
 ## Prioritisation
 
 `src/domain/review-priority.ts` runs a greedy marginal simulation over the

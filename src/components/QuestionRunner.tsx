@@ -219,6 +219,7 @@ export function QuestionRunner({
           result={result}
           awarded={awarded}
           answers={answers}
+          attempt={result.lastAttempt}
           improvableAnswers={mode === "practice" && !farTransfer && !retestMistake ? answers : undefined}
         />
       ) : null}

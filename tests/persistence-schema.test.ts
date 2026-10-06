@@ -116,6 +116,27 @@ const validFixture: Partial<Record<(typeof PERSISTED_STORES)[number], unknown[]>
     { id: "fixture-outbox", entity: "cards", op: "upsert", queuedAt: "2026-09-04T00:00:00.000Z", attempts: 0, ownerId: USER },
   ],
   meta: [{ key: "schemaMigration" }],
+  markingFlags: [
+    {
+      id: "markflag:fixture-attempt:part-1",
+      userId: USER,
+      attemptId: "fixture-attempt",
+      questionId: "fixture-question",
+      partId: "part-1",
+      subjectId: "biology",
+      topicIds: ["biology.cells"],
+      schemeIndex: null,
+      // Empty strings are valid: a learner may flag a mark before typing anything.
+      learnerAnswer: "",
+      awarded: 0,
+      max: 2,
+      rubricFeedback: "",
+      reason: null,
+      note: "",
+      resolution: null,
+      createdAt: "2026-09-04T00:00:00.000Z",
+    },
+  ],
 };
 
 beforeEach(async () => {
@@ -124,8 +145,8 @@ beforeEach(async () => {
 
 describe("persisted schema compatibility", () => {
   it("keeps every persisted store represented by a valid fixture", () => {
-    expect(PERSISTED_STORES).toHaveLength(15);
-    expect(PERSISTED_MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(PERSISTED_STORES).toHaveLength(16);
+    expect(PERSISTED_MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(PERSISTED_SCHEMA_VERSION).toBe(DB_VERSION);
     expect(validatePersistedStores(validFixture)).toEqual([]);
   });
