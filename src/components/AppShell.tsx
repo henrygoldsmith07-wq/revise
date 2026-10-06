@@ -21,6 +21,7 @@ import {
   SettingsIcon,
   SyncIcon,
   TodayIcon,
+  TutorIcon,
   WarningIcon,
 } from "./icons";
 import type { LucideIcon } from "./icons";
@@ -52,6 +53,7 @@ const STUDY_NAV: NavItem[] = [
   { href: "/review", label: "Review", Icon: ReviewIcon },
   { href: "/study", label: "Study", Icon: ModesIcon },
   { href: "/lesson", label: "Lessons", Icon: LessonsIcon },
+  { href: "/tutor", label: "Tutor", Icon: TutorIcon },
   { href: "/practice", label: "Practice", Icon: PracticeIcon },
   { href: "/papers", label: "Past papers", Icon: PapersIcon },
 ];

@@ -4,6 +4,7 @@ import { markQuestion } from "@/domain/marking";
 import { mistakePatterns } from "@/domain/mistakes";
 import { makeCloze } from "@/content/seed-cards";
 import type { Mistake, Question, Topic } from "@/domain/types";
+import type { TutorLearnerContext } from "@/domain/tutor-grounding";
 import type {
   DiagnoseResponse,
   ExplainResponse,
@@ -12,6 +13,7 @@ import type {
   MarkResponse,
   SocraticResponse,
   SummariseResponse,
+  TutorResponse,
 } from "./types";
 
 function firstClause(point: string): string {
@@ -54,6 +56,64 @@ export function explainFallback(topicId: string, question?: string): ExplainResp
     checkQuestion: topic.keyPoints[0]
       ? `Without looking: ${topic.keyPoints[0].split(":")[0].trim()} — why?`
       : undefined,
+  };
+}
+
+/**
+ * The conversational tutor without a model. Still a tutor, not a stub: it
+ * walks the student through the exact mark-scheme points they have lost (when
+ * the caller passes them) or through the topic's key points in order, and it
+ * always ends by making the student retrieve. What it cannot do offline is
+ * improvise — every line comes from the authored curriculum.
+ */
+export function tutorFallback(
+  topicId: string,
+  turnCount: number,
+  learner: Pick<TutorLearnerContext, "openMistakes">,
+): TutorResponse {
+  const topic = getTopic(topicId);
+  if (!topic) {
+    return {
+      reply: "Pick a topic and I can teach you from the specification content stored on this device.",
+      suggestPractice: false,
+    };
+  }
+  const mistake = learner.openMistakes.length
+    ? learner.openMistakes[turnCount % learner.openMistakes.length]
+    : null;
+  if (mistake) {
+    return {
+      reply: [
+        "Working offline, so I will coach you from the spec content on this device rather than explain freely.",
+        "",
+        `The mark you keep losing in **${topic.title}**: a ${mistake.category} slip worth ${mistake.marksLost} mark${mistake.marksLost === 1 ? "" : "s"}.`,
+        "",
+        "The point as the mark scheme words it:",
+        `> ${mistake.point}`,
+      ].join("\n"),
+      checkQuestion:
+        "Say that point back in your own words, then apply it to one example from your notes — I will tell you whether it holds.",
+      suggestPractice: true,
+    };
+  }
+  const point = topic.keyPoints.length
+    ? topic.keyPoints[turnCount % topic.keyPoints.length]
+    : topic.summary;
+  return {
+    reply: [
+      "Working offline, so I will teach you straight from the spec content on this device.",
+      "",
+      `**${topic.title}** — the next thing examiners reward here: *${firstClause(point)}*.`,
+      "",
+      `Full wording: ${point}`,
+      topic.commonErrors.length
+        ? `\nThe classic way this loses marks: ${topic.commonErrors[turnCount % topic.commonErrors.length]}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    checkQuestion: "Can you state that in your own words and say why it earns marks?",
+    suggestPractice: turnCount >= 2,
   };
 }
 

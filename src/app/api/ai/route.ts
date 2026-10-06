@@ -198,6 +198,14 @@ async function dispatch(task: AiTask, payload: unknown) {
       const p = payload as { topicId: string; history: { role: "user" | "assistant"; content: string }[] };
       return tasks.socratic(p.topicId, p.history);
     }
+    case "tutor": {
+      const p = payload as {
+        topicId: string;
+        history: { role: "user" | "assistant"; content: string }[];
+        learner: { position?: string; masteryLine?: string; openMistakes: { point: string; category: string; marksLost: number }[] };
+      };
+      return tasks.tutor(p.topicId, p.history, p.learner);
+    }
     case "mark": {
       const p = payload as { question: Question; answers: Record<string, string> };
       return tasks.mark(p.question, p.answers);

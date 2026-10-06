@@ -55,6 +55,11 @@ export async function aiSocratic(...args: Parameters<(typeof import("@/ai/client
   return run(...args);
 }
 
+export async function aiTutor(...args: Parameters<(typeof import("@/ai/client"))["aiTutor"]>) {
+  const { aiTutor: run } = await import("@/ai/client");
+  return run(...args);
+}
+
 export async function aiStatus(...args: Parameters<(typeof import("@/ai/client"))["aiStatus"]>) {
   const { aiStatus: run } = await import("@/ai/client");
   return run(...args);

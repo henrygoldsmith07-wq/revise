@@ -20,6 +20,7 @@ import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner"
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { parseQuickSessionMinutes, type QuickSessionMinutes } from "@/domain/quick-session";
 import { buildWeakTopicExam } from "@/domain/weak-topic-exam";
+import { wrongAnswerQueue } from "@/domain/wrong-answers";
 import { reviewedWjecTopicEdges } from "@/content/capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
@@ -86,6 +87,9 @@ function Practice() {
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
   const [weakExam, setWeakExam] = useState(() => params.get("weak") === "1");
+  // Wrong-answer-only mode (?wrong=1): do only the questions behind lost marks.
+  const wrongParam = params.get("wrong") === "1";
+  const [wrongOnly, setWrongOnly] = useState(wrongParam);
   const recoverParam = params.get("recover") === "1";
   const autopsyParam = params.get("autopsy");
   const autopsyStep = params.get("step");
@@ -101,6 +105,22 @@ function Practice() {
   const weakExamPlan = useMemo(
     () => buildWeakTopicExam({ mistakes: store.mistakes, questions: store.questions }),
     [store.mistakes, store.questions],
+  );
+  const wrongPlan = useMemo(
+    () =>
+      wrongAnswerQueue({
+        mistakes: store.mistakes,
+        questions: store.questions,
+        subjectIds: store.settings.subjectIds,
+      }),
+    [store.mistakes, store.questions, store.settings.subjectIds],
+  );
+  const wrongQueueIds = useMemo(
+    () =>
+      subjectId
+        ? wrongPlan.items.filter((item) => item.subjectId === subjectId).map((item) => item.questionId)
+        : wrongPlan.questionIds,
+    [wrongPlan, subjectId],
   );
   const [sessionAttempts, setSessionAttempts] = useState<Attempt[]>([]);
   const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>({});
@@ -187,6 +207,9 @@ function Practice() {
       const direct = questionsById.get(requestedQuestionParam);
       if (direct) return [direct.id];
     }
+    // Wrong-answer-only mode: the queue is exactly the questions behind lost
+    // marks — no exposure ranking, no unseen questions mixed in.
+    if (wrongOnly) return wrongQueueIds;
     let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
     if (subject) pool = pool.filter((q) => q.subjectId === subject);
     if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
@@ -402,10 +425,18 @@ function Practice() {
       <header className="space-y-3 sm:flex sm:flex-wrap sm:items-end sm:justify-between sm:gap-3 sm:space-y-0">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight">
-            {retestMistake ? "Retest a mistake" : mode === "recall" ? "Active recall" : "Exam questions"}
+            {wrongOnly
+              ? "Wrong answers only"
+              : retestMistake
+              ? "Retest a mistake"
+              : mode === "recall"
+              ? "Active recall"
+              : "Exam questions"}
           </h1>
           <p className="text-sm text-ink3 mt-0.5">
-            {retestMistake
+            {wrongOnly
+              ? "Every question here carries marks you dropped. Re-answer them until they stick."
+              : retestMistake
               ? "Apply the remediation, answer the original question again, and close the loop only when the missed point is secure."
               : mode === "recall"
               ? "Answer from memory with nothing in front of you, then get it marked."
@@ -454,6 +485,74 @@ function Practice() {
         </Panel>
       ) : null}
 
+      {wrongOnly ? (
+        wrongQueueIds.length ? (
+          <Panel className="border-accent bg-accentsoft">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">Wrong answers only</p>
+                <p className="text-xs text-ink2 mt-1">
+                  {wrongQueueIds.length} question{wrongQueueIds.length === 1 ? "" : "s"} · {wrongPlan.totalMarksLost} marks
+                  dropped{wrongPlan.openCount ? `, ${wrongPlan.openCount} question${wrongPlan.openCount === 1 ? "" : "s"} still unrecovered` : ""}.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setWrongOnly(false);
+                  setIndex(0);
+                  setOrder(orderFor(subjectId, topicId));
+                  resetSession();
+                }}
+              >
+                Back to all questions
+              </Button>
+            </div>
+          </Panel>
+        ) : (
+          <Panel>
+            <p className="text-sm text-ink">Nothing unrecovered here right now — no question is waiting on lost marks.</p>
+            <Button
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                setWrongOnly(false);
+                setOrder(orderFor(subjectId, topicId));
+              }}
+            >
+              Back to all questions
+            </Button>
+          </Panel>
+        )
+      ) : wrongPlan.questionIds.length ? (
+        <section>
+          <SectionHeading title="Wrong answers only" hint="Every question you have dropped marks on, weakest first." />
+          <button
+            type="button"
+            onClick={() => {
+              setWrongOnly(true);
+              setIndex(0);
+              setOrder(orderFor(subjectId, ""));
+              resetSession();
+            }}
+            className="card p-4 text-left hover:border-ink3 transition-colors w-full"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">Do only questions I got wrong</p>
+                <p className="text-xs text-ink3 mt-1">
+                  {wrongPlan.questionIds.length} question{wrongPlan.questionIds.length === 1 ? "" : "s"} ·{" "}
+                  {wrongPlan.openCount} still unrecovered
+                </p>
+              </div>
+              <Pill tone="danger" className="shrink-0">
+                {wrongPlan.totalMarksLost} marks lost
+              </Pill>
+            </div>
+          </button>
+        </section>
+      ) : null}
+
       {weakExamPlan.questionIds.length ? (
         <section>
           <SectionHeading title="This week's misses" hint="Questions behind marks dropped in the last 7 days — re-sat now that the mark scheme is known." />
@@ -488,7 +587,7 @@ function Practice() {
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
         <select
           value={topicId}
-          disabled={Boolean(retestMistake || farTransferRetest)}
+          disabled={Boolean(retestMistake || farTransferRetest || wrongOnly)}
           onChange={(e) => {
             setTopicId(e.target.value);
             // The queue is rebuilt for the new filter, so a stale cursor would
@@ -511,7 +610,7 @@ function Practice() {
             );
           })}
         </select>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => void generate()} disabled={generating || Boolean(retestMistake || farTransferRetest)}>
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => void generate()} disabled={generating || Boolean(retestMistake || farTransferRetest || wrongOnly)}>
           {generating ? "Generating…" : "Generate similar questions"}
         </Button>
         {queue.length ? (

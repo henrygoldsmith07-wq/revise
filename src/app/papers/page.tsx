@@ -22,6 +22,8 @@ import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { ExamConditionMode } from "@/components/ExamConditionMode";
+import { GenerateMockPanel } from "@/components/GenerateMockPanel";
+import { TopicForecastPanel } from "@/components/TopicForecastPanel";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { ICON_SIZE, PhotoIcon, TimerIcon } from "@/components/icons";
 
@@ -51,6 +53,7 @@ function Papers() {
     resumeCheckpoint?.paperId ? store.papers.find((paper) => paper.id === resumeCheckpoint.paperId) ?? null : null,
   );
   const [examPaper, setExamPaper] = useState<Paper | null>(null);
+  const [generatedPaperId, setGeneratedPaperId] = useState<string | null>(null);
   const [plannedPaperId, setPlannedPaperId] = useState<string | null>(null);
 
   const papers = useMemo(
@@ -126,6 +129,13 @@ function Papers() {
     return <ExamConditionMode paper={examPaper} onExit={() => setExamPaper(null)} />;
   }
 
+  // A freshly generated mock is already in the store, so resolve it from there
+  // (the same store slice every paper sits from).
+  const generatedPaper = generatedPaperId ? store.papers.find((paper) => paper.id === generatedPaperId) ?? null : null;
+  if (generatedPaper) {
+    return <ExamConditionMode paper={generatedPaper} onExit={() => setGeneratedPaperId(null)} />;
+  }
+
   return (
     <div className="space-y-6">
       <header className="space-y-3 sm:flex sm:flex-wrap sm:items-end sm:justify-between sm:gap-3 sm:space-y-0">
@@ -148,6 +158,13 @@ function Papers() {
       </header>
 
       <UploadPaper subjectId={subjectId} />
+
+      <GenerateMockPanel
+        subjectId={subjectId}
+        onStart={(paperId) => setGeneratedPaperId(paperId)}
+      />
+
+      <TopicForecastPanel subjectId={subjectId} />
 
       <Panel className="space-y-2">
         <SectionHeading title="Full exam conditions" hint="A fixed clock, no in-paper help, and feedback only after submission." />

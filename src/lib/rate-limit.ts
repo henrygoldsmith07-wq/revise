@@ -180,6 +180,7 @@ export function resolveRateLimitKey(request: Request, userId?: string | null): s
 export const AI_TASK_COSTS: Record<AiTask, number> = {
   explain: 1,
   socratic: 1,
+  tutor: 1,
   summarise: 1,
   diagnose: 1,
   mark: 2,
