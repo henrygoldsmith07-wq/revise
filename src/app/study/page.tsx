@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { browse } from "@/domain/browser";
 import { isDiagramCard } from "@/domain/diagrams";
+import { isTextCard } from "@/domain/card-display";
 import { allTopics, getSubject, topicsFor } from "@/domain/curriculum";
 import type { StudyMode } from "@/domain/study-modes";
 import { useStoreFields, useSubjects } from "@/state/store";
@@ -141,6 +142,11 @@ function Study() {
     return restored.length ? restored : pool;
   }, [pool, resumeQueueIds, cards]);
 
+  // Learn, test, match and audio are text modes: a diagram card's back is an
+  // image + hotspot payload, which would surface as raw JSON in a multiple-
+  // choice option or a match tile. Diagram cards belong to "Label a diagram".
+  const textPool = useMemo(() => activePool.filter(isTextCard), [activePool]);
+
   const checkpointHref = useMemo(() => {
     const next = new URLSearchParams();
     if (mode) next.set("mode", mode);
@@ -173,11 +179,11 @@ function Study() {
     };
     return (
       <div className="pb-4">
-        {mode === "learn" ? <LearnMode cards={activePool} onExit={exit} /> : null}
-        {mode === "test" ? <TestMode cards={activePool} onExit={exit} /> : null}
-        {mode === "match" ? <MatchGame cards={activePool} onExit={exit} /> : null}
+        {mode === "learn" ? <LearnMode cards={textPool} onExit={exit} /> : null}
+        {mode === "test" ? <TestMode cards={textPool} onExit={exit} /> : null}
+        {mode === "match" ? <MatchGame cards={textPool} onExit={exit} /> : null}
         {mode === "diagram" ? <DiagramMode cards={activePool} onExit={exit} /> : null}
-        {mode === "audio" ? <AudioMode cards={activePool} onExit={exit} /> : null}
+        {mode === "audio" ? <AudioMode cards={textPool} onExit={exit} /> : null}
         {mode === "explanation" ? (
           <ExplanationMode topics={topicPool} initialTopicId={topicId || undefined} onExit={exit} />
         ) : null}
