@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { allTopics, getSubject, getTopic } from "@/domain/curriculum";
@@ -25,6 +26,9 @@ import type { Attempt, Card, Id, Mistake, Question, Topic } from "@/domain/types
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { proofLine } from "@/domain/proof-of-improvement";
 import { buildTopicLifecycles } from "@/domain/proof-lifecycle";
+import { buildWhatChanged } from "@/domain/what-changed";
+import { describePathway } from "@/domain/study-pathway";
+import { WhatChangedCard } from "@/components/WhatChangedCard";
 import { useStoreFields } from "@/state/store";
 import { AdaptiveRetrievalBlock, type RetrievalOutcome } from "@/components/AdaptiveRetrievalBlock";
 import { AdaptiveQuestionBlock } from "@/components/AdaptiveQuestionBlock";
@@ -255,9 +259,11 @@ function AdaptiveSession() {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <EmptyState
-          title="No adaptive session yet"
-          body="Choose a subject in onboarding or settings and Today will build the next best sequence for you."
+          title="No session to run yet"
+          body="Revise builds each session from the subjects you are studying."
+          why="Without a subject it cannot tell which topic is worth your time right now."
           action={<ButtonLink href="/settings" variant="primary">Choose subjects</ButtonLink>}
+          after="Today will then show one session, chosen for you, ready to start."
         />
       </div>
     );
@@ -733,38 +739,43 @@ function ExplanationGate({
 // ---------------------------------------------------------------------------
 
 function Intro({ plan, subjectName, onStart }: { plan: AdaptiveSessionPlan; subjectName: string; onStart: () => void }) {
+  // The planner already chose and ordered the steps from evidence; the intro
+  // names that choice instead of offering a menu of modes.
+  const pathway = describePathway(plan);
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <ButtonLink href="/" variant="ghost" size="sm">← Today</ButtonLink>
       <header>
-        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Adaptive session</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink mt-1">
-          Best use of the next {plan.totalMinutes} minutes
-        </h1>
-        <p className="text-lg text-ink mt-2">{subjectName} — {plan.topicTitle}</p>
-        <p className="text-sm text-ink3 mt-1">{plan.reason}</p>
+        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Adaptive session · about {plan.totalMinutes} min</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink mt-1">{subjectName} — {plan.topicTitle}</h1>
+        <p className="text-sm text-ink2 mt-2">{plan.reason}</p>
       </header>
 
-      <Panel>
-        <p className="text-sm text-ink2">
-          One clear action at a time: answer, get feedback, and Revise chooses what comes next from how you did — no
-          menus, no leaving the session. Answer from memory first; support appears only when you need it.
+      <Panel className="space-y-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">How Revise will run it</p>
+          <p className="text-base font-medium text-ink mt-1">{pathway.headline}</p>
+          <p className="text-sm text-ink2 mt-1">{pathway.why}</p>
+        </div>
+        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink2" aria-label="Session steps">
+          {pathway.steps.map((step, index) => (
+            <li key={`${index}-${step}`} className="flex items-center gap-2">
+              {index ? <span aria-hidden="true" className="text-ink3">→</span> : null}
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="text-xs text-ink3">
+          One step at a time: answer from memory first, and help appears only when you need it. Revise adjusts the next step after every answer.
         </p>
-        <details className="mt-3">
-          <summary className="text-xs text-ink2 cursor-pointer select-none">Preview the planned ladder</summary>
-          <ol className="mt-2 space-y-1.5 list-disc list-inside text-xs text-ink3">
-            {plan.steps.map((step) => (
-              <li key={step.id}>
-                <span className="font-medium text-ink2">{step.label}</span> — {step.minutes}m
-              </li>
-            ))}
-          </ol>
-        </details>
       </Panel>
 
       <Button variant="primary" className="w-full min-h-[3rem] text-base" onClick={onStart}>
         Start session
       </Button>
+      <p className="text-xs text-ink3 text-center">
+        Prefer to choose? <Link href="/study" className="underline underline-offset-2 hover:text-ink">Choose how to study</Link>
+      </p>
     </div>
   );
 }
@@ -793,6 +804,11 @@ function AdaptiveComplete({
     [plan.topicId, plan.topicTitle, store.proofLedger, store.attempts, store.questions],
   );
 
+  const change = useMemo(
+    () => buildWhatChanged({ plan, completed: run.completed, proof: store.proofLedger.topics.find((row) => row.topicId === plan.topicId) ?? null, lifecycle: lifecycle ?? null }),
+    [plan, run.completed, store.proofLedger, lifecycle],
+  );
+
   return (
     <div className="max-w-lg mx-auto space-y-5">
       <div role="status" aria-live="polite">
@@ -801,36 +817,37 @@ function AdaptiveComplete({
         <p className="text-sm text-ink3 mt-1">{subject?.name ?? plan.subjectId} — {plan.topicTitle}</p>
       </div>
 
-      <Panel className="space-y-4">
-        {summary.marks.max > 0 ? (
-          <ProgressBar
-            value={summary.marks.awarded / summary.marks.max}
-            label={`${summary.marks.awarded}/${summary.marks.max} marks on this session's questions`}
-            tone="accent"
-          />
-        ) : null}
-        <SummarySection title="Evidence strength" lines={[summary.evidenceStrength.line]} />
-        {lifecycle ? <SummarySection title="Where this topic stands" lines={[`${lifecycle.label}. ${lifecycle.line}`, ...(lifecycle.claim ? [lifecycle.claim] : [])]} /> : null}
-        <SummarySection title="Improved" lines={summary.improved} />
-        <SummarySection title="Still fragile" lines={summary.fragile} />
-        <SummarySection title="Repaired" lines={summary.repaired} />
-        <SummarySection title="Later" lines={summary.later} />
-        {summary.learned.length ? (
-          <div className="rounded-[10px] bg-accentsoft border border-accent/15 px-3.5 py-3">
-            <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Revise learned</p>
-            {summary.learned.map((line) => <p key={line} className="text-xs text-ink2 mt-1">{line}</p>)}
-          </div>
-        ) : null}
-        <div className="rounded-[10px] bg-accentsoft border border-accent/15 px-3.5 py-3">
-          <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">Best next action</p>
-          <p className="text-sm text-ink2 mt-1">{summary.bestNext}</p>
-        </div>
-      </Panel>
+      {/* The learner-facing result leads; the full debrief stays one tap away so
+          there is one session summary, not two competing ones. */}
+      <WhatChangedCard change={change} subjectName={subject?.name ?? plan.subjectId} topicTitle={plan.topicTitle} />
 
-      <div className="flex gap-2">
-        <ButtonLink href="/" variant="primary" className="flex-1">Back to Today</ButtonLink>
-        <Button variant="secondary" className="flex-1" onClick={onRestart}>Start again</Button>
+      {summary.marks.max > 0 ? (
+        <ProgressBar
+          value={summary.marks.awarded / summary.marks.max}
+          label={`${summary.marks.awarded}/${summary.marks.max} marks on this session's questions`}
+          tone="accent"
+        />
+      ) : null}
+
+      <details className="card p-4 sm:p-5">
+        <summary className="cursor-pointer select-none text-sm font-medium text-ink2 min-h-11 inline-flex items-center">Full session notes</summary>
+        <div className="mt-3 space-y-4">
+          <SummarySection title="How strong this evidence is" lines={[summary.evidenceStrength.line]} />
+          {lifecycle ? <SummarySection title="Where this topic stands" lines={[`${lifecycle.label}. ${lifecycle.line}`, ...(lifecycle.claim ? [lifecycle.claim] : [])]} /> : null}
+          <SummarySection title="Improved" lines={summary.improved} />
+          <SummarySection title="Still fragile" lines={summary.fragile} />
+          <SummarySection title="Repaired" lines={summary.repaired} />
+          <SummarySection title="Later" lines={summary.later} />
+          {summary.learned.length ? <SummarySection title="What Revise learned" lines={summary.learned} /> : null}
+          <SummarySection title="Suggested next" lines={[summary.bestNext]} />
+        </div>
+      </details>
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row">
+        <Button variant="secondary" className="flex-1 min-h-11" onClick={onRestart}>Start again</Button>
+        <ButtonLink href="/" variant="primary" className="flex-1 min-h-[3rem] text-base">Continue</ButtonLink>
       </div>
+      <p className="text-xs text-ink3 text-center">Today has already been updated from this session.</p>
     </div>
   );
 }

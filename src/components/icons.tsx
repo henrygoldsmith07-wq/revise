@@ -26,6 +26,7 @@ import {
   CircleHelp,
   Database,
   Clock,
+  Ellipsis,
   FileText,
   Flame,
   GraduationCap,
@@ -82,6 +83,8 @@ export const CardsIcon = LayoutGrid;
 /** The Socratic tutor. */
 export const TutorIcon = Sparkles;
 export const SettingsIcon = Settings;
+/** Secondary destinations that are not part of the main loop. */
+export const MoreIcon = Ellipsis;
 /** Teacher cohort, assignment and moderation workspace. */
 export const TeacherIcon = UsersRound;
 /** Study modes other than plain review. */
