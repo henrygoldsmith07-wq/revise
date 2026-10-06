@@ -52,6 +52,13 @@ export interface Paper {
   /** Extracted plain text, kept so questions can be re-extracted later. */
   sourceText?: string;
   markSchemeText?: string;
+  /** Present when the paper was assembled from the question bank (bespoke mock) rather than uploaded. */
+  generated?: {
+    /** 0 = even coverage, 1 = pure weakness targeting. */
+    focus: number;
+    targetMarks: number;
+    topicIds: Id[];
+  };
   totalMarks: number;
   questionIds: Id[];
   status: "uploaded" | "extracted" | "practised";

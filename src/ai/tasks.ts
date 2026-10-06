@@ -10,6 +10,7 @@ import {
   markFallback,
   socraticFallback,
   summariseFallback,
+  tutorFallback,
 } from "./fallback";
 import { extractJson, getProvider } from "./provider";
 import type { AiEnvelope, AiTask } from "./types";
@@ -33,6 +34,18 @@ const SOCRATIC_VOICE = `You are a Socratic A-level tutor. You do not give answer
 You ask one focused question at a time that moves the student toward the answer,
 acknowledge what they got right, and name the misconception when they have one.
 Keep every reply under 120 words and end with exactly one question.`;
+
+const TUTOR_VOICE = `You are Revise's A-level tutor. You teach one student interactively,
+grounded only in the specification content you are given — you never invent
+specification content. You know the mark-scheme points this student has already
+lost: use them to decide what to teach, which misconception to confront, and
+what to check next.
+Method: name the plan in one line, teach the missing idea in plain language,
+work one short example with the student, then ask them one question to answer
+themselves. One question per reply. Never hand over a full model answer for an
+exam question — build it with them, step by step.
+Warm but direct. Short paragraphs. Use LaTeX between $ delimiters for any
+mathematics. Keep every reply under 160 words.`;
 
 function topicContext(topic: Topic | undefined): string {
   if (!topic) return "";
@@ -115,6 +128,26 @@ export const payloadSchemas = {
     topicId: z.string(),
     history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) })).max(20),
   }),
+  tutor: z.object({
+    topicId: z.string(),
+    history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) })).max(30),
+    learner: z
+      .object({
+        position: z.string().max(200).optional(),
+        masteryLine: z.string().max(200).optional(),
+        openMistakes: z
+          .array(
+            z.object({
+              point: z.string().max(600),
+              category: z.string().max(30),
+              marksLost: z.number().min(0).max(60),
+            }),
+          )
+          .max(8)
+          .default([]),
+      })
+      .default({ openMistakes: [] }),
+  }),
   mark: z.object({
     question: z.custom<Question>((v) => typeof v === "object" && v !== null),
     answers: z.record(z.string(), z.string().max(8000)),
@@ -191,6 +224,61 @@ export async function socratic(topicId: string, history: { role: "user" | "assis
     `{ "reply": string, "nextQuestion": string }`,
     () => socraticFallback(topicId, history.length),
     800,
+  );
+}
+
+/**
+ * The conversational tutor: teaches from the learner's exact position rather
+ * than from the topic alone. The payload carries the curriculum position, the
+ * topic's measured mastery and the mark-scheme points the student has actually
+ * lost, so the model's first move is the student's weakest ground — not a
+ * generic walkthrough. Grounding stays in the spec content on this device.
+ */
+export async function tutor(
+  topicId: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  learner: {
+    position?: string;
+    masteryLine?: string;
+    openMistakes: { point: string; category: string; marksLost: number }[];
+  },
+) {
+  const topic = getTopic(topicId);
+  const provider = getProvider();
+  if (!provider) {
+    return {
+      data: tutorFallback(topicId, history.length, learner),
+      source: "fallback" as const,
+      provider: null,
+    };
+  }
+  const learnerLines = [
+    learner.position ? `Curriculum position: ${learner.position}` : null,
+    learner.masteryLine ? `Evidence so far: ${learner.masteryLine}` : null,
+    learner.openMistakes.length
+      ? `Marks this student has lost on this topic and not yet recovered:\n${learner.openMistakes
+          .map((m) => `- ${m.category} slip (${m.marksLost} mark${m.marksLost === 1 ? "" : "s"}): ${m.point}`)
+          .join("\n")}`
+      : null,
+  ].filter((line): line is string => line !== null);
+  const transcript = history.map((m) => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`).join("\n");
+  return run(
+    RESPONSE_SCHEMAS.tutor,
+    TUTOR_VOICE,
+    [
+      topicContext(topic),
+      "",
+      learnerLines.length ? [...learnerLines, ""].join("\n") : "",
+      history.length
+        ? "Conversation so far:"
+        : "The student has just opened the tutor. Open with a one-line greeting and the plan for this topic — starting from the lost marks above when there are any — then ask your first question.",
+      transcript || "(the student has not typed anything yet)",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    `{ "reply": string, "checkQuestion": string (optional), "suggestPractice": boolean }`,
+    () => tutorFallback(topicId, history.length, learner),
+    1000,
   );
 }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { countdownGuidance } from "@/domain/exam-countdown";
+import { buildIcsCalendar } from "@/domain/calendar-export";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { formatTime } from "@/domain/planner";
 import type { ActivityKind, ExamDate, PlannedSession } from "@/domain/types";
@@ -103,6 +104,22 @@ export default function SchedulePage() {
     }
   }
 
+  /** Download the plan + exams as an .ics any calendar app can import. */
+  function downloadIcs() {
+    const ics = buildIcsCalendar({
+      sessions,
+      exams,
+      subjectName: (id) => getSubject(id)?.name ?? id,
+    });
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "revise-schedule.ics";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (!subjects.length) return null;
 
   return (
@@ -114,9 +131,14 @@ export default function SchedulePage() {
             The whole run-up to each exam, rebuilt automatically as dates, availability and evidence change.
           </p>
         </div>
-        <Button variant="secondary" size="sm" disabled={rebuilding} onClick={() => void rebuild()}>
-          {rebuilding ? "Rebuilding…" : "Rebuild schedule"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={downloadIcs}>
+            Add to calendar
+          </Button>
+          <Button variant="secondary" size="sm" disabled={rebuilding} onClick={() => void rebuild()}>
+            {rebuilding ? "Rebuilding…" : "Rebuild schedule"}
+          </Button>
+        </div>
       </header>
 
       {store.planChangelog.length ? (

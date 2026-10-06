@@ -15,6 +15,7 @@ import { topicLifecycle } from "@/domain/proof-lifecycle";
 import type { Card, Topic } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
 import { RichText } from "@/components/RichText";
+import { RevisionSheetPanel } from "@/components/RevisionSheetPanel";
 import { KnowledgeMap } from "@/components/KnowledgeMap";
 import { TechniqueSignal } from "@/components/TechniqueSignal";
 import { LearnerStateTag } from "@/components/LearnerStateTag";
@@ -385,6 +386,8 @@ function TopicDetail({
           </div>
         ) : null}
       </header>
+
+      <RevisionSheetPanel topicId={topic.id} />
 
       <Panel>
         <p className="text-sm text-ink2">{topic.summary}</p>

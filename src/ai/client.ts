@@ -6,6 +6,7 @@ import {
   markFallback,
   socraticFallback,
   summariseFallback,
+  tutorFallback,
 } from "./fallback";
 import { resilientMark } from "./marking-resilience";
 import { maskChatHistory, maskPii, maskStudentText, maskSummaryMany } from "./pii";
@@ -15,6 +16,7 @@ import { ERROR_TAXONOMY_VERSION } from "@/domain/error-taxonomy";
 import { withMarkEvidence } from "@/domain/marking";
 import type { Mistake, Question, Topic } from "@/domain/types";
 import { RESPONSE_SCHEMAS } from "./types";
+import type { TutorLearnerContext } from "@/domain/tutor-grounding";
 import type {
   AiEnvelope,
   AiTask,
@@ -26,6 +28,8 @@ import type {
   OcrResponse,
   SocraticResponse,
   SummariseResponse,
+  TutorChatMessage,
+  TutorResponse,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -76,6 +80,34 @@ export function aiExplain(topicId: string, question?: string) {
 export function aiSocratic(topicId: string, history: { role: "user" | "assistant"; content: string }[]) {
   return call<SocraticResponse>("socratic", { topicId, history: maskChatHistory(history) }, () =>
     socraticFallback(topicId, history.length),
+  );
+}
+
+/**
+ * One tutor turn. The conversation history and the lost mark-scheme points are
+ * PII-masked before anything leaves the device; the offline fallback (and the
+ * visible reply when the network fails) always sees the original text.
+ */
+export function aiTutor(input: {
+  topicId: string;
+  history: TutorChatMessage[];
+  learner: TutorLearnerContext;
+}) {
+  return call<TutorResponse>(
+    "tutor",
+    {
+      topicId: input.topicId,
+      history: maskChatHistory(input.history),
+      learner: {
+        position: input.learner.position,
+        masteryLine: input.learner.masteryLine,
+        openMistakes: input.learner.openMistakes.map((mistake) => ({
+          ...mistake,
+          point: maskStudentText(mistake.point),
+        })),
+      },
+    },
+    () => tutorFallback(input.topicId, input.history.length, input.learner),
   );
 }
 

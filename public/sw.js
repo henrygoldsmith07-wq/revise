@@ -23,6 +23,7 @@ const APP_SHELL = [
   "/shared",
   "/study",
   "/twin",
+  "/tutor",
   "/welcome",
   "/manifest.webmanifest",
   "/icon.svg",

@@ -7,6 +7,7 @@ import { z } from "zod";
 export const AI_TASKS = [
   "explain",
   "socratic",
+  "tutor",
   "mark",
   "generate-cards",
   "generate-questions",
@@ -71,6 +72,20 @@ export const socraticResponseSchema = z.object({
   nextQuestion: z.string().max(600).optional(),
 });
 
+/** One student turn in the tutor conversation. */
+export interface TutorChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export const tutorResponseSchema = z.object({
+  reply: z.string().min(1).max(4000),
+  /** The one check the student should answer before moving on. */
+  checkQuestion: z.string().max(600).optional(),
+  /** True when the tutor thinks the topic is ready for exam questions. */
+  suggestPractice: z.boolean().default(false),
+});
+
 export const diagnoseResponseSchema = z.object({
   headline: z.string().min(1).max(300),
   findings: z.array(z.string().min(1).max(500)).min(1).max(6),
@@ -107,6 +122,7 @@ export const errorDiagnosisSchema = z.object({
 export const RESPONSE_SCHEMAS = {
   explain: explainResponseSchema,
   socratic: socraticResponseSchema,
+  tutor: tutorResponseSchema,
   mark: markResponseSchema,
   "generate-cards": z.object({ cards: z.array(generatedCardSchema).min(1).max(20) }),
   "generate-questions": z.object({ questions: z.array(generatedQuestionSchema).min(1).max(5) }),
@@ -127,6 +143,7 @@ export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 export type MarkResponse = z.infer<typeof markResponseSchema>;
 export type ExplainResponse = z.infer<typeof explainResponseSchema>;
 export type SocraticResponse = z.infer<typeof socraticResponseSchema>;
+export type TutorResponse = z.infer<typeof tutorResponseSchema>;
 export type DiagnoseResponse = z.infer<typeof diagnoseResponseSchema>;
 export type OcrResponse = z.infer<typeof ocrResponseSchema>;
 export type SummariseResponse = z.infer<typeof summariseResponseSchema>;
