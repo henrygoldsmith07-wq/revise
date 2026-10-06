@@ -181,7 +181,7 @@ export function buildSteps(input: StepInput): AdaptiveSessionStep[] {
       kind: "overdue-retrieval",
       minutes: 2,
       label: `${count} ${selected.evidence.overdueCount ? "overdue" : "due"} retrieval${count === 1 ? "" : "s"}`,
-      description: "Recall the answer before you reveal it; FSRS grades decide what returns next.",
+      description: "Recall the answer before you reveal it; how well you remembered decides when each card comes back.",
       href: reviewHref(topic.id, `limit=${dueCardIds.length}`),
       cardIds: dueCardIds,
       why: `${count} card${count === 1 ? " is" : "s are"} due — recall first so today's work builds on what is actually there.`,

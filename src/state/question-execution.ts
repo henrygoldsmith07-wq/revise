@@ -362,9 +362,9 @@ export function useQuestionExecution({
             }
           : question.difficulty < 4
             ? {
-                label: "Prove it in a new context",
+                label: "Try it in an unfamiliar context",
                 href: null,
-                why: "Independent success on familiar ground — transfer to unfamiliar clothing is the exam test.",
+                why: "You got it on a familiar question. Exams test the same idea in a setting you have not seen, so try one of those next.",
               }
             : retestOpen
               ? {

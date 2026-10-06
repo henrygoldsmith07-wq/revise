@@ -28,6 +28,21 @@ export interface LearningAction {
   policy?: { score: number; evidenceLevel: "limited" | "developing" | "strong" };
 }
 
+/**
+ * Capability labels are verb phrases ("Find the resultant force with signs",
+ * or a spec statement such as "interpret local slopes…"). Learner-facing
+ * sentences wrap them as "check whether you can …", so only the first letter
+ * is lowered (keeping acronyms and units intact) and a trailing full stop is
+ * dropped. Previously "Check interpret local slopes…" read as broken English.
+ */
+export function skillPhrase(label: string): string {
+  const trimmed = label.trim().replace(/\.$/, "");
+  if (!trimmed) return "this skill";
+  const second = trimmed.charAt(1);
+  const keepCase = second && second === second.toUpperCase() && second !== second.toLowerCase();
+  return keepCase ? trimmed : trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
 export function selectLearningAction(input: {
   topicId: string; nodes: readonly CapabilityNode[]; questions: readonly Question[];
   attempts: readonly Attempt[]; mistakes: readonly Mistake[]; now: Date; remainingMinutes?: number;
@@ -100,17 +115,17 @@ export function selectLearningAction(input: {
       const probes = questions.filter((q) => q.subjectId === root.subjectId && hasLearningMetadata(q) &&
         !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? "") &&
         questionCapabilities(q).includes(root.id) && unseenQuestion(q, attempts, questions));
-      add("diagnose", root.id, probes, `Check ${root.label.toLowerCase()} first; the upstream cause is still a hypothesis.`, mistake);
+      add("diagnose", root.id, probes, `First check whether you can ${skillPhrase(root.label)}; that earlier skill may be the real cause.`, mistake);
       if (probes.length) continue;
     }
     const relevant = eligible.filter((q) => repairTargetParts(mistake, q).length > 0);
     const fresh = relevant.filter((q) => unseenQuestion(q, attempts, questions));
     if (["detected", "diagnosed", "taught"].includes(stage)) {
       const source = relevant.filter((q) => q.id === mistake.questionId);
-      add("guided", capabilityId, source, `Repair ${target.label.toLowerCase()}, then complete one guided attempt.`, mistake);
+      add("guided", capabilityId, source, `Fix how you ${skillPhrase(target.label)}, then try one question with guidance.`, mistake);
     } else if (stage === "guided-success") {
       add("independent", capabilityId, fresh.filter((q) => questionDemands(q).some((demand) => ["application", "calculation"].includes(demand))),
-        `The guided answer held. Test ${target.label.toLowerCase()} on a fresh question without help.`, mistake);
+        `The guided answer held. Now ${skillPhrase(target.label)} on a fresh question without help.`, mistake);
     } else if (stage === "independent-success") {
       const source = questions.find((q) => q.id === mistake.questionId);
       add("transfer", capabilityId, fresh.filter((q) => source && isTransferQuestion(q, source)),
@@ -131,7 +146,7 @@ export function selectLearningAction(input: {
     for (const target of orderedTargets) {
       const pool = eligible.filter((q) => questionCapabilities(q).includes(target.id) && unseenQuestion(q, attempts, questions) && !isTransferQuestion(q));
       if (!pool.length) continue;
-      add("diagnose", target.id, pool, `One short question will check ${target.label.toLowerCase()} before choosing an explanation.`);
+      add("diagnose", target.id, pool, `One short question will check whether you can ${skillPhrase(target.label)} before choosing an explanation.`);
       break;
     }
   }

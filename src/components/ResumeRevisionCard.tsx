@@ -14,7 +14,11 @@ export function ResumeRevisionCard() {
   const progress = checkpoint.total ? checkpoint.position / checkpoint.total : 0;
   const progressLabel = checkpoint.activity === "review"
     ? `${checkpoint.position} of ${checkpoint.total} reviewed`
-    : `Position ${next} of ${checkpoint.total}`;
+    : checkpoint.activity === "adaptive"
+      // Adaptive positions count whole steps (a step can hold several cards),
+      // so say "step" — "Position 1 of 3" read as if finished cards were lost.
+      ? `${checkpoint.position} of ${checkpoint.total} steps done`
+      : `Position ${next} of ${checkpoint.total}`;
 
   return (
     <Panel className="border-accent/40 bg-accentsoft/30">
@@ -27,7 +31,9 @@ export function ResumeRevisionCard() {
           <h2 className="text-sm font-semibold text-ink mt-2">Resume interrupted revision</h2>
           <p className="text-sm text-ink2 mt-0.5 truncate">{checkpoint.title}</p>
           <p className="text-[11px] text-ink3 mt-1">
-            {checkpoint.total ? `Continue at ${next} of ${checkpoint.total}` : "Continue where you stopped"} · last active {lastActive(checkpoint.updatedAt)}
+            {checkpoint.total
+              ? `Continue at ${checkpoint.activity === "adaptive" ? "step " : ""}${next} of ${checkpoint.total}`
+              : "Continue where you stopped"} · last active {lastActive(checkpoint.updatedAt)}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
