@@ -483,7 +483,7 @@ function Practice() {
                 <Pill tone={farTransferRetest.status === "due" ? "review" : "accent"}>
                   {farTransferRetest.status === "due" ? "Due now" : `Due ${farTransferRetest.scheduledFor}`}
                 </Pill>
-                <p className="text-sm font-semibold text-ink">Delayed far-transfer retest</p>
+                <p className="text-sm font-semibold text-ink">Delayed check in a new context</p>
               </div>
               <p className="text-xs text-ink2 mt-2">
                 A new-context question checks whether your original success on {getTopic(farTransferRetest.topicIds[0] ?? "")?.title ?? "this topic"} transfers after a delay.

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { confidenceWord, EVIDENCE_CONFIDENCE } from "@/domain/plain-numbers";
 import { getSubject } from "@/domain/curriculum";
 import type { ExamReadiness, ExamReadinessStatus, ReadinessAction, ReadinessSignalStatus } from "@/domain/exam-readiness";
@@ -66,7 +65,7 @@ function actionHref(subjectId: string, action: ReadinessAction): string {
 
 function readinessSummaryText(summary: { subjectCount: number; readyCount: number; atRiskCount: number; confidence: number }): string {
   if (!summary.subjectCount) return "Choose a subject to start collecting evidence.";
-  if (summary.confidence < 0.35) return "Early estimate — marked work will make this passport trustworthy.";
+  if (summary.confidence < 0.35) return "Early estimate. More marked answers will make this more reliable.";
   if (summary.atRiskCount) return `${summary.atRiskCount} subject${summary.atRiskCount === 1 ? " is" : "s are"} carrying a clear exam-day risk.`;
   if (summary.readyCount === summary.subjectCount) return "Every selected subject has enough evidence to face a proof set.";
   return `${summary.readyCount}/${summary.subjectCount} subject${summary.subjectCount === 1 ? " has" : "s have"} enough evidence to face a proof set.`;
@@ -151,13 +150,11 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <Pill tone="accent">USP · evidence</Pill>
               <Pill tone={statusTone(summary.status)}>{STATUS_LABEL[summary.status]}</Pill>
             </div>
-            <h2 className="text-lg font-semibold tracking-tight text-ink">Exam Readiness Passport</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-ink">Exam readiness</h2>
             <p className="text-sm text-ink3 mt-0.5 max-w-2xl">Know whether your marks will hold when the paper is timed and unfamiliar.</p>
           </div>
-          <Link href="/readiness" className="text-xs font-semibold text-ink2 hover:text-ink hover:underline shrink-0">Open passport →</Link>
         </div>
         <div className="mt-4 grid sm:grid-cols-[minmax(0,1fr)_auto] gap-4 items-center">
           <div>
@@ -170,7 +167,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
           </div>
           {weakest ? (
             <div className="rounded-[9px] bg-surface2 px-3 py-2.5 sm:min-w-52">
-              <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Weakest passport</p>
+              <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Needs most attention</p>
               <p className="text-sm font-semibold text-ink truncate mt-0.5">{weakestSubject?.name ?? weakest.subjectId}</p>
               <p className="text-[11px] text-ink3 mt-0.5">{weakest.nextAction.label}</p>
             </div>
@@ -190,7 +187,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
               <Pill tone={statusTone(summary.status)}>{STATUS_LABEL[summary.status]}</Pill>
             </div>
             <h2 className="text-xl font-semibold tracking-tight text-ink">Your exam readiness is {scoreLabel(summary.score, summary.confidence)}</h2>
-            <p className="text-sm text-ink3 mt-1 max-w-2xl">{readinessSummaryText(summary)} The passport separates outcome, knowledge, recall, pace and transfer so you can see exactly what still needs proof.</p>
+            <p className="text-sm text-ink3 mt-1 max-w-2xl">{readinessSummaryText(summary)} It separates your target, coverage, remembering, pace and new kinds of question, so you can see what still needs work.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 shrink-0">
             <StatTile label="Subjects" value={summary.subjectCount} sub={`${summary.readyCount} ready`} />
@@ -211,7 +208,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
         </section>
       ) : (
         <Panel>
-          <p className="text-sm font-semibold text-ink">Choose a subject to start your passport.</p>
+          <p className="text-sm font-semibold text-ink">Choose a subject to see how ready you are.</p>
           <p className="text-sm text-ink3 mt-1">Once Revise has a syllabus and a few marked answers, this page will show whether your grade survives timing and unfamiliar questions.</p>
           <ButtonLink href="/settings" size="sm" variant="primary" className="mt-3">Choose subjects</ButtonLink>
         </Panel>

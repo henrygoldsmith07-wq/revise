@@ -376,7 +376,7 @@ function AdaptiveSession() {
                 : justCompleted?.result === "missed" || justCompleted?.result === "gave-up"
                   ? "Recorded — this attempt missed"
                   : justCompleted?.result === "scheduled"
-                    ? "Delayed retrieval scheduled"
+                    ? "Check booked for later"
                     : "Step recorded"}
           </p>
           {replanReason ? <p className="text-xs text-ink2 mt-1">{replanReason}</p> : null}
@@ -568,7 +568,7 @@ function StepPanel({
             />
           ) : (
             <p className="text-xs text-ink3" role="status">
-              No source question is stored for this mistake — the next application rung re-tests the idea.
+              The original question is not stored for this mistake, so the next exam-style question checks the idea instead.
             </p>
           )}
         </div>
@@ -589,7 +589,7 @@ function StepPanel({
           />
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-ink2">No question is available for this rung in the current bank.</p>
+            <p className="text-sm text-ink2">There is no suitable question for this step yet.</p>
             <Button
               variant="primary"
               onClick={async () => {
@@ -618,7 +618,7 @@ function StepPanel({
                 });
               }}
             >
-              Mark this rung as not attemptable
+              Skip this step: no suitable question
             </Button>
           </div>
         )
@@ -627,8 +627,8 @@ function StepPanel({
       {step.kind === "delayed-retrieval" ? (
         <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-3">
           <p className="text-sm text-ink2">
-            Tomorrow&apos;s short retrieval is part of today&apos;s learning, not an optional extra — the gain is only
-            proven once it survives a delay.
+            Tomorrow&apos;s short check is part of today&apos;s learning, not an optional extra: an improvement only
+            counts once it lasts.
           </p>
           <Button
             variant={scheduled ? "secondary" : "primary"}
@@ -666,7 +666,7 @@ function StepPanel({
               });
             }}
           >
-            {scheduled ? "Delayed retrieval scheduled" : "Schedule for tomorrow"}
+            {scheduled ? "Check booked for later" : "Schedule for tomorrow"}
           </Button>
         </div>
       ) : null}
