@@ -63,18 +63,19 @@ test.describe("mobile core loop — Pixel 7", () => {
 
     // Bottom bar is visible on mobile; desktop rail is hidden.
     await expect(mobileNav(page)).toBeVisible();
-    const tabs = ["Today", "Subjects", "Progress", "Session", "Review", "Study", "Lessons", "Practice", "Past papers", "Schedule", "Settings"];
+    const primary = ["Today", "Learn", "Practice", "Progress", "Library"];
+    const tabs = [...primary, "Review", "Past papers", "Choose how to study", "Tutor", "Schedule", "Settings"];
     for (const tab of tabs) {
-      if (!["Today", "Subjects", "Progress"].includes(tab)) await mobileNav(page).locator("summary").tap();
+      if (!primary.includes(tab)) await mobileNav(page).locator("summary").tap();
       await mobileNav(page).getByRole("link", { name: tab, exact: true }).tap();
       await expect(page.locator("main#main")).toBeVisible({ timeout: 10_000 });
     }
 
-    // The three destinations stay on one row; all manual alternatives remain reachable under Tools.
+    // The five destinations stay on one row; specialist routes remain reachable under More.
     const rows = await mobileNav(page).locator(":scope > div > a").evaluateAll((links) =>
       links.map((link) => Math.round(link.getBoundingClientRect().top)),
     );
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(5);
     expect(new Set(rows).size).toBe(1);
   });
 

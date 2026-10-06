@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
@@ -46,7 +47,8 @@ export default function PracticePage() {
 function Practice() {
   const params = useSearchParams();
   const router = useRouter();
-  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "dueCards", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const dueCount = store.dueCards.length;
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
   const topicParam = params.get("topic");
@@ -442,6 +444,13 @@ function Practice() {
               ? "Answer from memory with nothing in front of you, then get it marked."
               : "Answer as you would in the exam. Every dropped mark becomes a card."}
           </p>
+          {!wrongOnly && !retestMistake && !farTransferRetest ? (
+            <nav aria-label="Other ways to practise" className="mt-1 flex flex-wrap gap-x-4 text-sm text-ink2">
+              <Link href="/review" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Review cards{dueCount ? ` (${dueCount} due)` : ""}</Link>
+              <Link href="/papers" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Past papers</Link>
+              <Link href="/diagnostic" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Quick check</Link>
+            </nav>
+          ) : null}
         </div>
         {subjects.length > 1 && !farTransferRetest ? (
           <div className="w-full sm:w-auto max-w-full overflow-x-auto nice-scroll pb-1">
