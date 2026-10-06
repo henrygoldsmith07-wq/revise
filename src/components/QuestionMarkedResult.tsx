@@ -11,6 +11,7 @@ import type { RemediationPlan } from "@/domain/remediation";
 import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/domain/types";
 
 import { confidenceWord } from "@/domain/plain-numbers";
+import { markAssessmentLabel, type MarkConfidenceAssessment } from "@/domain/marking-confidence";
 import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
@@ -47,12 +48,18 @@ export function MarkedResult({
     copiedAnswer?: boolean;
     workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
+    /** Confidence-aware marking result; provisional marks are labelled and disputable. */
+    assessment?: MarkConfidenceAssessment;
     farTransfer?: Attempt["farTransfer"];
     nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
 }) {
   const pct = question.totalMarks ? awarded / question.totalMarks : 0;
+  // A reloaded or re-graded attempt carries only the stored record.
+  const stored = attempt?.markAssessment;
+  const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
+  const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
   const plan = result.remediation;
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
@@ -110,7 +117,9 @@ export function MarkedResult({
                 : `Transfer check due ${result.farTransfer.scheduledFor}`}
             </Pill>
           ) : null}
-          {result.source === "ai" ? (
+          {markLabel ? (
+            <Pill tone={provisional ? "review" : "success"}>{markLabel}</Pill>
+          ) : result.source === "ai" ? (
             <Pill tone={result.escalation ? "review" : "success"}>
               {result.confidence === null ? "AI confidence unavailable" : `AI confidence: ${confidenceWord(result.confidence)}`}
             </Pill>
@@ -118,6 +127,15 @@ export function MarkedResult({
           {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}
         </div>
       </div>
+      {provisional ? (
+        <div className="mb-3 rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
+          <p className="font-semibold text-review">Provisional mark</p>
+          <p className="text-xs mt-1">
+            {result.assessment?.explanation ??
+              "This mark is provisional, not an examiner's decision. If you think it is wrong, use “Flag this mark”."}
+          </p>
+        </div>
+      ) : null}
       {result.escalation ? (
         <div className="rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Human review requested</p>

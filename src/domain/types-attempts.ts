@@ -3,7 +3,7 @@
 // Part of the domain model (see ./types.ts barrel). Split by bounded
 // context for ownership; every name is re-exported from "@/domain/types".
 import type { Id, IsoInstant } from "./types-base";
-import type { MarkedPart, MarkEscalation, FarTransferAttemptLink, PaperMarkingReview } from "./types-marking";
+import type { MarkedPart, MarkAssessmentRecord, MarkEscalation, FarTransferAttemptLink, PaperMarkingReview } from "./types-marking";
 
 /** Which Exam Mission, stage and weakness an attempt was made for, so its effect can be measured later. */
 export interface MissionAttemptContext {
@@ -34,6 +34,8 @@ export interface Attempt {
   markConfidence?: number;
   /** Durable request for a second marker when an AI mark is not reliable enough. */
   markEscalation?: MarkEscalation;
+  /** Confidence and provisional status of the mark (AI interpretation → deterministic checks → confidence). */
+  markAssessment?: MarkAssessmentRecord;
   /** A high-scoring source answer or its completed delayed transfer check. */
   farTransfer?: FarTransferAttemptLink;
   confidence?: 1 | 2 | 3 | 4 | 5;
