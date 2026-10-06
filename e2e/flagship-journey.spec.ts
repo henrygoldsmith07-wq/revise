@@ -14,7 +14,7 @@ test("onboarding → quick check → Today → repair → independent success �
   const main = page.locator("main#main");
 
   // Cold start: one clear action, visible without scrolling, and skippable.
-  await expect(main).toContainText("Your best next step", { timeout: 30_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
   await expect(main).toContainText("Find where to start");
   const start = main.getByRole("link", { name: "Start quick check" });
   const box = await start.boundingBox();
@@ -37,7 +37,7 @@ test("onboarding → quick check → Today → repair → independent success �
 
   // The check changed the recommendation: lost marks now lead, and the quick check is gone.
   await page.goto("/");
-  await expect(main).toContainText("Your best next step", { timeout: 30_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
   await expect(main).not.toContainText("Find where to start");
   await expect(main).toContainText(/Recover \d+(\.\d)? marks?|marks/);
   await expect(main).toContainText(/Needs work|Improving/);
@@ -60,7 +60,7 @@ test("onboarding → quick check → Today → repair → independent success �
 
   // Today never calls this proven: nothing has been checked after a delay.
   await page.goto("/");
-  await expect(main).toContainText("Your best next step", { timeout: 30_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
   await expect(main).not.toContainText("Proven");
   await page.goto("/readiness");
   const panel = page.locator("section[aria-label='Marks recovered']");
