@@ -62,6 +62,14 @@ export const AI_TASK_POLICY = {
     sourceLabel: "AI tutor",
     authoritative: false,
   },
+  tutor: {
+    learnerContent: "masked-text",
+    requiresConsent: true,
+    fallback: "deterministic",
+    contextBoundary: "Specification context is trusted; learner turns and lost mark-scheme points are wrapped as untrusted data and never treated as instructions.",
+    sourceLabel: "AI tutor",
+    authoritative: false,
+  },
   mark: {
     learnerContent: "masked-text",
     requiresConsent: true,

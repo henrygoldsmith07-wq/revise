@@ -246,6 +246,44 @@ export function prepareAiEgress(task: AiTask, payload: unknown): EgressResult {
         withheld: maskSummaryMany(history.filter((e) => e.role === "user").map((e) => maskPii(e.content))),
       };
     }
+    case "tutor": {
+      const history = Array.isArray(p.history)
+        ? p.history
+            .slice(-30)
+            .map((entry) => record(entry))
+            .filter((entry) => entry.role === "user" || entry.role === "assistant")
+            .map((entry) => ({ role: entry.role as "user" | "assistant", content: text(entry.content, 4000) }))
+        : [];
+      const learner = record(p.learner);
+      const position = optionalText(learner.position);
+      const masteryLine = optionalText(learner.masteryLine);
+      const rawMistakes = Array.isArray(learner.openMistakes) ? learner.openMistakes.slice(0, 8) : [];
+      const points = rawMistakes.map((m) => maskPii(text(record(m).point, 600)));
+      const openMistakes = rawMistakes.map((m, i) => {
+        const mistake = record(m);
+        return {
+          point: points[i]!.masked,
+          category: text(mistake.category, 30),
+          marksLost: typeof mistake.marksLost === "number" ? Math.max(0, Math.min(60, mistake.marksLost)) : 0,
+        };
+      });
+      return {
+        ok: true,
+        payload: {
+          topicId: text(p.topicId),
+          history: maskChatHistory(history),
+          learner: {
+            ...(position ? { position: position.slice(0, 200) } : {}),
+            ...(masteryLine ? { masteryLine: masteryLine.slice(0, 200) } : {}),
+            openMistakes,
+          },
+        },
+        withheld: maskSummaryMany([
+          ...history.filter((e) => e.role === "user").map((e) => maskPii(e.content)),
+          ...points,
+        ]),
+      };
+    }
     case "mark": {
       const { masked, results } = maskAnswers(p.answers);
       return {

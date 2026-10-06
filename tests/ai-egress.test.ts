@@ -36,6 +36,11 @@ const question = {
 const SAMPLES: Record<AiTask, unknown> = {
   explain: { topicId: "t", question: PII },
   socratic: { topicId: "t", history: [{ role: "user", content: PII }, { role: "assistant", content: "Tell me more." }] },
+  tutor: {
+    topicId: "t",
+    history: [{ role: "user", content: PII }, { role: "assistant", content: "Tell me more." }],
+    learner: { position: "Topic 2 of 5", masteryLine: "Improving", openMistakes: [{ point: PII, category: "recall", marksLost: 2 }] },
+  },
   mark: { question, answers: { p1: PII } },
   "generate-cards": { topicId: "t", count: 3 },
   "generate-questions": { topicId: "t", count: 2, difficulty: 3 },
