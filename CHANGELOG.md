@@ -1,5 +1,51 @@
 # Changelog
 
+## One product loop: what to do, why, what changed, what Revise now knows — 2026-10-07
+
+**Today leads with the highest-value session.** Both Today heroes open with "Your
+highest-value session", the greeting carries the nearest exam in days (never an
+invented number), and the adaptive hero names how Revise will run the session and
+what happens after it. Manual study is one tap away as "Choose how to study".
+
+**The engine chooses the method.** `src/domain/study-pathway.ts` names the sequence
+the adaptive planner already chose (for example "Fix the mistake → Exam-style question
+on your own → Check again in a few days"). The session intro shows it instead of a
+"ladder" preview; the `/study` route is now "Choose how to study" and leads with the
+recommended session. No mode was removed.
+
+**Every session ends with "What changed".** `src/domain/what-changed.ts` builds
+Before / This session / Next proof and the problem → intervention → straight after →
+new context → after a delay → outcome chain from the run's own step records and the
+proof ledger. Same-session success is never called proof; only the ledger can say
+"proven". The old debrief list stays one tap away, so there is one summary, not two.
+
+**One learner model, one owner per metric.** `src/domain/learner-model.ts` projects
+recall, application, technique, mistakes, retention, transfer, confidence,
+intervention history and outcomes from their existing owners;
+`docs/learner-model.md` and `LEARNER_MODEL_OWNERS` record who owns what.
+
+**Progress is an Exam Command Centre.** One card per subject: exam date, risk (from
+readiness), the outlook band or an honest "no number yet", where the evidence points,
+what is driving it and the subject's best next step. Proven improvement and
+"what Revise has learned about how you learn" (intervention memory) follow. Every
+specialist panel is kept, in the same order, under "Detailed readiness and evidence".
+
+**Personal intervention memory now reaches the ranking of the adaptive session**, not
+only mission stages, through the existing `estimateEffectiveness` (neutral until a
+kind of session has enough durable chains).
+
+**Navigation is Today, Learn, Practice, Progress, Library**, with Review, Past papers,
+Choose how to study, Tutor and Schedule under More, and Settings separate. No route was
+removed or renamed.
+
+**Trust at the moment it matters.** Every practice question has an "About this
+question" disclosure (specification match, check status, source, last review) built
+from the existing trust predicates; unverified and reference content cannot read as
+checked.
+
+**Plain English.** Passport, Digital Twin, FSRS, rung and retrieval vocabulary removed
+from learner-facing copy; it remains in specialist and reviewer surfaces.
+
 ## Letting a student say "this mark is wrong" — 2026-10-04
 
 **A marked answer had no way to be contested.** A student who believes a mark is
