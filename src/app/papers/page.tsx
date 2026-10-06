@@ -4,7 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { aiExtractQuestions, aiOcr } from "@/lib/optional-ai";
-import { toBase64 } from "@/components/AnswerInput";
+import { imageForAi } from "@/lib/file-data";
+import { gateGeneratedQuestions } from "@/domain/generated-question-quality";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { tokenise } from "@/domain/marking";
@@ -348,7 +349,7 @@ function Papers() {
 }
 
 function UploadPaper({ subjectId }: { subjectId: string }) {
-  const store = useStoreFields("addPaper", "addQuestions", "userId");
+  const store = useStoreFields("addPaper", "addQuestions", "questions", "userId");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [markScheme, setMarkScheme] = useState("");
@@ -360,8 +361,8 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
     try {
       const pages: string[] = [];
       for (const file of Array.from(files).slice(0, 12)) {
-        const base64 = await toBase64(file);
-        const result = await aiOcr(base64, file.type || "image/jpeg", "printed");
+        const image = await imageForAi(file);
+        const result = await aiOcr(image.base64, image.mediaType, "printed");
         if (result.data.text) pages.push(result.data.text);
         else setStatus(result.note ?? "Could not read that page.");
       }
@@ -391,7 +392,7 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
     }
 
     const paperId = crypto.randomUUID();
-    const questions: Question[] = result.data.questions.map((generated, index) => ({
+    const extracted: Question[] = result.data.questions.map((generated, index) => ({
       id: crypto.randomUUID(),
       subjectId,
       topicIds: mapToTopics(subjectId, `${generated.stem} ${generated.parts.map((p) => p.prompt).join(" ")}`),
@@ -415,6 +416,25 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
       paperQuestionNumber: String(index + 1),
       createdAt: new Date().toISOString(),
     }));
+    // Extraction is an AI interpretation of the upload (and may have written
+    // a mark scheme where none was supplied). Deterministic quality gates
+    // decide what is saved, and saved questions stay unverified imports —
+    // never verified past-paper provenance.
+    const gated = result.source === "ai"
+      ? gateGeneratedQuestions({
+          questions: extracted,
+          origin: "extracted",
+          topicFor: (question) => getTopic(question.topicIds[0] ?? "") ?? null,
+          bank: store.questions.filter((existing) => existing.subjectId === subjectId),
+          checkedAt: new Date().toISOString(),
+        })
+      : { accepted: [] as Question[], rejected: [] };
+    const questions = gated.accepted;
+    if (!questions.length && gated.rejected.length) {
+      setStatus(
+        `None of the ${gated.rejected.length} extracted questions passed the quality checks, so none were added. The paper is saved as text.`,
+      );
+    }
 
     if (questions.length) await store.addQuestions(questions);
 
@@ -433,7 +453,11 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
     await store.addPaper(paper);
 
     if (questions.length) {
-      setStatus(`Extracted ${questions.length} questions worth ${paper.totalMarks} marks, mapped to topics.`);
+      setStatus(
+        `Extracted ${questions.length} questions worth ${paper.totalMarks} marks, mapped to topics${
+          gated.rejected.length ? ` (${gated.rejected.length} failed the quality checks and ${gated.rejected.length === 1 ? "was" : "were"} left out)` : ""
+        }. Extracted questions are not checked by a person — compare them with the original paper.`,
+      );
       setText("");
       setMarkScheme("");
       setTitle("");
