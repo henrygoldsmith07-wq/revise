@@ -2,6 +2,7 @@ import { syncWireIdValue } from "./sync-contract";
 import { seedCards, seedQuestions } from "@/content";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
+import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
 import type {
   Attempt,
   Card,
@@ -123,7 +124,10 @@ export function defaultSettings(userId: Id): UserSettings {
     targetGrades: {},
     theme: "system",
     accessibility: { largeText: false, dyslexiaFont: false, highContrast: false, reduceMotion: false },
-    aiEnabled: true,
+    // AI is off until the learner explicitly opts in (domain/ai-consent.ts).
+    // The audience includes under-18s, so no work leaves for a model provider
+    // by default.
+    aiEnabled: false,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
     labMode: false,
@@ -216,6 +220,10 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
         accessibility: { ...fallback.accessibility, ...stored.accessibility },
         labMode: stored.labMode === true,
         pulseEnabled: stored.pulseEnabled === true,
+        // The historic default stored `aiEnabled: true` for every profile even
+        // though no learner chose it. Only an explicit opt-in at the current
+        // consent wording counts.
+        aiEnabled: aiConsentGrantedInSettings(stored),
       }
     : fallback;
   const streak = ((await db.get("streak", userId)) as StreakState | undefined) ?? defaultStreak(userId);

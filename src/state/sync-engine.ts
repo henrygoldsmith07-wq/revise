@@ -18,6 +18,7 @@ import type { Snapshot } from "@/data/repository";
 import * as repo from "@/data/repository";
 import { SYNC_QUEUE_EVENT, failedOutboxItems, outboxSize, sync } from "@/data/sync";
 import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
+import { reconcileAiConsentWithServer } from "@/ai/consent-client";
 import { isSupabaseConfigured } from "@/data/supabase";
 import { initialSyncStatus, type SyncStatus } from "./sync-status";
 
@@ -114,6 +115,13 @@ export function useSyncEngine(input: {
         // History changed server-side; restart hydration from the fresh
         // baseline, superseding any stream still running.
         startHydration();
+      }
+      // AI consent is enforced from the server's own record. After every sync
+      // pass, push a choice made offline on this device or adopt one made on
+      // another device (a revocation anywhere stops AI here too).
+      if (!result.skipped) {
+        const adopted = await reconcileAiConsentWithServer(userId).catch(() => null);
+        if (adopted) setSnapshot((prev) => (prev ? { ...prev, settings: adopted } : prev));
       }
     } catch (caught) {
       // Keep a diagnostic trail instead of swallowing the failure: without it,

@@ -12,20 +12,36 @@ import {
   resolveRateLimitKey,
 } from "@/lib/rate-limit";
 import { enforceAiRateLimit, RateLimiterUnavailableError, type QuotaRpcCaller } from "@/lib/rate-limit-supabase";
-import { captureServerTelemetry } from "@/lib/observability";
+import { captureServerTelemetry, errorClass } from "@/lib/observability";
+import { AI_CONSENT_HEADER, decideAiConsent, type AiConsentDecision } from "@/domain/ai-consent";
+import { prepareAiEgress } from "@/ai/egress";
 
 // The single AI entry point. Keys never leave this process; the browser only
 // ever sees a task name and a validated payload going out, and an envelope
 // coming back that states whether a model or the offline fallback answered.
 // Provider credentials are read only inside src/ai/provider.ts (server-only);
 // this route never references a key and never serialises one.
+//
+// Privacy order for every POST, before any quota row is touched or any
+// provider is called:
+//   1. authentication (401), or fail-closed configuration (503);
+//   2. the learner's AI consent (403 when absent, disabled or revoked; 503
+//      when it cannot be read) — re-read from public.ai_consent on every
+//      request, so revoking takes effect on the very next call;
+//   3. payload validation (400/413);
+//   4. the egress policy (src/ai/egress.ts) re-applied server-side, so an
+//      older client or a hand-written request still cannot put unmasked
+//      learner text in front of a model;
+//   5. the shared quota.
 
 export const runtime = "nodejs";
 
 export const MAX_BODY_CHARS = 1_500_000;
 export const MAX_OCR_CHARS = 1_200_000;
 
-type AiAuth = { error: NextResponse } | { userId: string | null; rpc: QuotaRpcCaller | null };
+type AiAuth =
+  | { error: NextResponse }
+  | { userId: string | null; rpc: QuotaRpcCaller | null; consent: AiConsentDecision };
 
 function providerCredentialsPresent(): boolean {
   // Mirrors src/ai/provider.ts selection without importing keys: any provider
@@ -41,7 +57,7 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-async function requireAiUser(): Promise<AiAuth> {
+async function requireAiUser(request: Request): Promise<AiAuth> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseKey) {
@@ -56,7 +72,11 @@ async function requireAiUser(): Promise<AiAuth> {
         ),
       };
     }
-    return { userId: null, rpc: null };
+    // Local mode (non-production, or no provider configured): there is no
+    // account to hold consent, so the browser's versioned consent header is
+    // the learner's recorded choice. Production with a provider never gets
+    // here — it failed closed above.
+    return { userId: null, rpc: null, consent: decideAiConsent({ mode: "local", header: request.headers.get(AI_CONSENT_HEADER) }) };
   }
 
   const cookieStore = await cookies();
@@ -90,7 +110,15 @@ async function requireAiUser(): Promise<AiAuth> {
       return res;
     },
   };
-  return { userId: auth.user.id, rpc };
+  // Consent is the server's own record, read with the learner's JWT (RLS
+  // scopes the row to auth.uid()). Never the synced settings blob: that can be
+  // end-to-end encrypted and lags behind a revocation by a sync cycle.
+  const { data: consentRow, error: consentError } = await supabase
+    .from("ai_consent")
+    .select("enabled, consent_version")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  return { userId: auth.user.id, rpc, consent: decideAiConsent({ mode: "account", row: consentRow, error: consentError }) };
 }
 
 export async function GET() {
@@ -98,8 +126,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAiUser();
+  const auth = await requireAiUser(request);
   if ("error" in auth) return auth.error;
+  if (!auth.consent.allowed) {
+    return NextResponse.json({ error: auth.consent.error, code: auth.consent.code }, { status: auth.consent.status });
+  }
   const rateKey = resolveRateLimitKey(request, auth.userId);
 
   let raw: string;
@@ -139,6 +170,13 @@ export async function POST(request: Request) {
     }
   }
 
+  // Same egress policy the browser applied: masking, minimisation and image
+  // metadata stripping. Idempotent, so a well-behaved client loses nothing.
+  const egress = prepareAiEgress(task, parsed.data);
+  if (!egress.ok) {
+    return NextResponse.json({ error: egress.reason }, { status: 400 });
+  }
+
   // Enforce quota by authenticated user where possible (else IP), with
   // per-minute + burst + daily allowance and per-task cost accounting. The
   // shared Supabase backend holds the quota across instances; the in-memory
@@ -170,7 +208,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await dispatch(task, parsed.data);
+    const result = await dispatch(task, egress.payload);
     const envelope = result as { source?: unknown; provider?: unknown };
     if (envelope.source === "fallback") {
       captureServerTelemetry("ai.degraded", {
@@ -183,7 +221,10 @@ export async function POST(request: Request) {
   } catch (error) {
     // Genuine 500s only — task-level model failures are handled inside the
     // task layer and come back as `source: "fallback"`.
-    console.error(`[ai] ${task} failed`, error);
+    // Log a label only: a thrown provider error can quote the provider's
+    // response, which may echo the request. Never log the error object, its
+    // message, or anything derived from the payload.
+    console.error(`[ai] ${task} failed`, { errorClass: errorClass(error) });
     return NextResponse.json({ error: "The AI service failed unexpectedly." }, { status: 500 });
   }
 }

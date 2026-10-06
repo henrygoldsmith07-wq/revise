@@ -20,7 +20,7 @@ vi.mock("next/server", () => ({
 
 type DbRow = { id: string; updated_at: string; user_id?: string; data: unknown };
 
-const db: Record<string, DbRow[]> = { user_settings: [], review_logs: [], attempts: [] };
+const db: Record<string, DbRow[]> = { user_settings: [], review_logs: [], attempts: [], ai_consent: [] };
 let authUser: { id: string } | null = null;
 let failingTable: string | null = null;
 
@@ -107,6 +107,7 @@ vi.mock("@supabase/ssr", () => ({
 import { GET as pulseGet } from "@/app/api/pulse/history/route";
 import { GET as aiGet, POST as aiPost } from "@/app/api/ai/route";
 import { resetRateLimiterForTests } from "@/lib/rate-limit";
+import { AI_CONSENT_HEADER, AI_CONSENT_HEADER_VALUE, AI_CONSENT_VERSION } from "@/domain/ai-consent";
 
 const USER = "user-1";
 const SAVED_ENV: Record<string, string | undefined> = {};
@@ -267,6 +268,8 @@ describe("AI route behaviour", () => {
     delete process.env.RATE_LIMIT_BACKEND;
     delete process.env.AI_DAILY_LIMIT;
     authUser = null;
+    db.ai_consent = [];
+    failingTable = null;
     resetRateLimiterForTests();
   });
   afterEach(() => {
@@ -274,12 +277,23 @@ describe("AI route behaviour", () => {
     restoreEnv(...ALL_KEYS);
   });
 
-  const aiRequest = (body: unknown) =>
+  // Local mode (no Supabase identity): the browser asserts the learner's
+  // recorded choice with the versioned consent header.
+  const aiRequest = (body: unknown, consent = true) =>
     new Request("https://x/api/ai", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(consent ? { [AI_CONSENT_HEADER]: AI_CONSENT_HEADER_VALUE } : {}) },
       body: typeof body === "string" ? body : JSON.stringify(body),
     });
+
+  const consentRow = (enabled: unknown, version: unknown = AI_CONSENT_VERSION) =>
+    ({ id: USER, user_id: USER, updated_at: "2026-10-07T00:00:00.000Z", enabled, consent_version: version, data: null }) as unknown as DbRow;
+
+  const configureAuth = () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
+    authUser = { id: USER };
+  };
 
   it("reports provider status without leaking keys", async () => {
     process.env.OPENAI_COMPATIBLE_API_KEY = "sk-test-secret";
@@ -324,11 +338,67 @@ describe("AI route behaviour", () => {
     expect(res.status).toBe(503);
   });
 
+  it("refuses every task with 403 when the signed-in learner has no consent row", async () => {
+    configureAuth();
+    const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }));
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("ai-consent-required");
+  });
+
+  it("refuses when consent is disabled, not a strict boolean, or recorded against an older wording", async () => {
+    configureAuth();
+    for (const row of [consentRow(false), consentRow("true"), consentRow(1), consentRow(true, "older-version")]) {
+      db.ai_consent = [row];
+      const res = await aiPost(aiRequest({ task: "summarise", payload: { topicId: "t" } }));
+      expect(res.status).toBe(403);
+    }
+  });
+
+  it("ignores the local-mode header once an account exists: only the server record counts", async () => {
+    configureAuth();
+    const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }, true));
+    expect(res.status).toBe(403);
+  });
+
+  it("stops the very next request after consent is revoked", async () => {
+    configureAuth();
+    db.ai_consent = [consentRow(true)];
+    expect((await aiPost(aiRequest({ task: "explain", payload: { topicId: "unknown-topic" } }))).status).toBe(200);
+    db.ai_consent = [consentRow(false)];
+    expect((await aiPost(aiRequest({ task: "explain", payload: { topicId: "unknown-topic" } }))).status).toBe(403);
+  });
+
+  it("fails closed with 503 when the consent record cannot be read", async () => {
+    configureAuth();
+    db.ai_consent = [consentRow(true)];
+    failingTable = "ai_consent";
+    const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }));
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { code: string }).code).toBe("ai-consent-unavailable");
+  });
+
+  it("checks consent before validating the payload, so nothing is parsed for a non-consenting learner", async () => {
+    configureAuth();
+    const res = await aiPost(aiRequest("{not json"));
+    expect(res.status).toBe(403);
+  });
+
+  it("requires the consent header in local mode", async () => {
+    const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }, false));
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects an OCR image that cannot be stripped of metadata", async () => {
+    const res = await aiPost(aiRequest({ task: "ocr", payload: { image: "bm90IGFuIGltYWdl", mediaType: "image/heic" } }));
+    expect(res.status).toBe(400);
+  });
+
   it("serves an offline fallback to authenticated users without calling a model", async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
     process.env.OPENAI_COMPATIBLE_API_KEY = "sk-test-secret-DO-NOT-LEAK";
     authUser = { id: USER };
+    db.ai_consent = [consentRow(true)];
     const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "unknown-topic" } }));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { source: string };
