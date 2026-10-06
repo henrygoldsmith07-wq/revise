@@ -6,14 +6,13 @@ import { allTopics } from "@/domain/curriculum";
 import { STAGE_LABEL, STAGE_MEANING, type MasteryStage } from "@/domain/mastery-stage";
 import { buildProgressSummary } from "@/domain/progress-summary";
 import { useStoreFields } from "@/state/store";
-import { ExamOutlook } from "./ExamOutlook";
 import { ButtonLink, Panel, Pill } from "./ui";
 
 const TONE: Record<MasteryStage, "neutral" | "review" | "success" | "accent" | "danger"> = {
   untouched: "neutral", learning: "review", practised: "accent", secure: "success", proven: "success", fading: "danger",
 };
 
-/** Four plain questions first; the detailed analytics stay below, one tap away. */
+/** Four plain questions. "Where am I?" is answered by the Exam Command Centre above it, so it is not repeated here. */
 export function ProgressSummaryPanel() {
   const store = useStoreFields("attempts", "mistakes", "questions", "settings", "proofLedger", "adaptiveSession", "mastery");
   const summary = useMemo(() => {
@@ -35,10 +34,6 @@ export function ProgressSummaryPanel() {
     <section aria-labelledby="progress-summary-heading" className="space-y-3">
       <h2 id="progress-summary-heading" className="sr-only">Your progress at a glance</h2>
       <div className="grid gap-4 md:grid-cols-2">
-        <Panel className="space-y-2 md:col-span-2">
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Where am I?</p>
-          <ExamOutlook />
-        </Panel>
         <Panel className="space-y-2">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What am I strong at?</p>
           {summary.strong.length ? (
@@ -61,7 +56,7 @@ export function ProgressSummaryPanel() {
               {summary.losing.patterns.map((row) => <p key={row.cause} className="text-xs text-ink2">{row.headline}</p>)}
             </>
           ) : (
-            <p className="text-sm text-ink2">No open lost marks recorded.</p>
+            <p className="text-sm text-ink2">No lost marks recorded yet. Every mark you drop in practice shows up here, with a plan to win it back.</p>
           )}
         </Panel>
 
@@ -82,7 +77,7 @@ export function ProgressSummaryPanel() {
 
         <Panel className="space-y-2 border-accent">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What should I work on next?</p>
-          <p className="text-sm text-ink">{summary.next ?? "Nothing is suggested yet."}</p>
+          <p className="text-sm text-ink">{summary.next ?? "Nothing to suggest yet. Answer a few questions and Today will pick your next session."}</p>
           <ButtonLink href="/" size="sm" variant="primary">Go to Today</ButtonLink>
         </Panel>
       </div>
