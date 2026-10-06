@@ -6,6 +6,7 @@
 // step from problem to outcome, with repeats marked as not counted.
 
 import type { ChainStepStatus, InterventionChainView } from "@/domain/intervention-memory";
+import { useStoreFields } from "@/state/store";
 import { useInterventionMemory } from "./learner-model";
 import { CreditedIcon, MissedIcon } from "./icons";
 import { Panel, Pill } from "./ui";
@@ -20,6 +21,8 @@ const STATUS_TEXT: Record<ChainStepStatus, string> = {
 
 export function InterventionMemoryPanel() {
   const memory = useInterventionMemory();
+  const { ready } = useStoreFields("ready");
+  if (!ready) return null;
   return (
     <Panel className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">

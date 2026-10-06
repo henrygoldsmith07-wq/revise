@@ -9,6 +9,7 @@ import Link from "next/link";
 import type { CommandCentreSubject } from "@/domain/exam-command-centre";
 import type { RiskLevel } from "@/domain/exam-trajectory";
 import { formatExamDate } from "@/domain/pace-forecast";
+import { useStoreFields } from "@/state/store";
 import { useCommandCentre, useLearnerModels } from "./learner-model";
 import { ForwardIcon } from "./icons";
 import { ButtonLink, EmptyState, Panel, Pill } from "./ui";
@@ -22,6 +23,9 @@ const RISK_TONE: Record<RiskLevel, "danger" | "review" | "success" | "neutral"> 
 
 export function ExamCommandCentre() {
   const centre = useCommandCentre();
+  const { ready } = useStoreFields("ready");
+  // Before the local database has loaded, an empty list means "not loaded", not "no subjects".
+  if (!ready) return <CommandCentreLoading />;
   if (!centre.subjects.length) {
     return (
       <EmptyState
@@ -43,6 +47,18 @@ export function ExamCommandCentre() {
       <ul className="grid gap-3 lg:grid-cols-2">
         {centre.subjects.map((subject) => <SubjectCard key={subject.subjectId} subject={subject} />)}
       </ul>
+    </section>
+  );
+}
+
+function CommandCentreLoading() {
+  return (
+    <section aria-label="Your exams" aria-busy="true" className="space-y-3">
+      <p className="text-[11px] uppercase tracking-[0.13em] text-ink3 font-bold">Your exams</p>
+      <p className="text-sm text-ink3" role="status">Loading your exams…</p>
+      <div className="grid gap-3 lg:grid-cols-2" aria-hidden="true">
+        {[0, 1].map((i) => <div key={i} className="card h-40 animate-pulse bg-surface2" />)}
+      </div>
     </section>
   );
 }
@@ -113,11 +129,13 @@ function SubjectCard({ subject }: { subject: CommandCentreSubject }) {
 /** Improvement as the reward: what has been proven, recovered and is ready to check. */
 export function ImprovementStory() {
   const models = useLearnerModels();
+  const { ready } = useStoreFields("ready");
   const proven = models.flatMap((m) => m.outcomes.proven);
   const recovered = Math.round(models.reduce((s, m) => s + m.mistakes.proven, 0) * 10) / 10;
   const due = models.flatMap((m) => m.transfer.proofDue);
   const provisional = Math.round(models.reduce((s, m) => s + m.mistakes.provisional, 0) * 10) / 10;
   const anything = proven.length > 0 || recovered > 0;
+  if (!ready) return null;
   return (
     <Panel className="space-y-2">
       <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Proven improvement</p>

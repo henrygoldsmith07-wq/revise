@@ -67,7 +67,11 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
             <div><dt className="font-semibold text-ink">What it is based on</dt><dd><ul className="list-disc pl-5">{e.evidence.map((line) => <li key={line}>{line}</li>)}</ul></dd></div>
             <div><dt className="font-semibold text-ink">What will prove it worked</dt><dd>{e.proves}</dd></div>
             {action.effectiveness && action.effectiveness.level !== "neutral" ? (
-              <div><dt className="font-semibold text-ink">What has worked for you</dt><dd>{action.effectiveness.uncertainty === "high" ? "Early signs only, from a small number of completed checks." : "Based on your own completed, delayed checks."}</dd></div>
+              <div><dt className="font-semibold text-ink">What has worked for you</dt><dd>{action.effectiveness.uncertainty === "high"
+                ? "Early signs only, from a small number of completed checks."
+                : action.effectiveness.weight >= 1
+                  ? `This kind of session has tended to hold up for you after a delay (${action.effectiveness.samples} checked).`
+                  : `This kind of session has held up less well for you (${action.effectiveness.samples} checked), so it is suggested only because the gap is worth it.`}</dd></div>
             ) : null}
           </dl>
         </details>
