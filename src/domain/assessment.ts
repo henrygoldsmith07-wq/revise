@@ -57,9 +57,20 @@ const MISCONCEPTION_PATTERNS: Array<{ tag: MisconceptionTag; re: RegExp }> = [
   { tag: "conceptual", re: /concept|misconception|principle/i },
 ];
 
+/**
+ * The command word that governs a prompt: the one that appears first.
+ * "Calculate the critical angle and state the conditions…" is a calculation;
+ * checking words in list order used to call it "State" because "state" sits
+ * first in COMMAND_WORDS.
+ */
 export function commandOf(text: string): CommandWord {
-  for (const c of COMMAND_WORDS) if (c !== "other" && COMMAND_RE[c].test(text)) return c;
-  return "other";
+  let best: { command: CommandWord; at: number } | null = null;
+  for (const c of COMMAND_WORDS) {
+    if (c === "other") continue;
+    const at = text.search(COMMAND_RE[c]);
+    if (at >= 0 && (!best || at < best.at)) best = { command: c, at };
+  }
+  return best?.command ?? "other";
 }
 
 export function misconceptionOf(missedPoints: string[]): MisconceptionTag {
