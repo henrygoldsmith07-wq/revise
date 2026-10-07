@@ -137,6 +137,30 @@ describe("AI egress policy", () => {
     expectNoLeak(mistakes);
   });
 
+  it("masks the answer in Socratic-examiner mode and keeps only the fields the prompt reads", () => {
+    const result = prepareAiEgress("socratic", {
+      topicId: "t",
+      history: [],
+      examiner: {
+        partPrompt: "Explain osmosis.",
+        markScheme: ["water moves", "partially permeable"],
+        studentAnswer: PII,
+        misconception: { statement: "s", explanation: "e", correction: "c", id: "cnt:misconception:x", reviewer: "Dr R" },
+        matchStrength: "weak",
+        userId: "user-1",
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expectNoLeak(result.payload);
+    const examiner = (result.payload as { examiner: Record<string, unknown> }).examiner;
+    expect(Object.keys(examiner).sort()).toEqual(["markScheme", "matchStrength", "misconception", "partPrompt", "studentAnswer"]);
+    expect(examiner.misconception).toEqual({ statement: "s", explanation: "e", correction: "c" });
+    expect(result.withheld).toMatch(/email/);
+    const twice = prepareAiEgress("socratic", result.payload);
+    expect(twice.ok && twice.payload).toEqual(result.payload);
+  });
+
   it("drops fields a task does not read", () => {
     const result = prepareAiEgress("summarise", { topicId: "t", answers: { p1: PII }, userId: "user-1" });
     expect(result.ok && result.payload).toEqual({ topicId: "t" });
