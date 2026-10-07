@@ -51,7 +51,7 @@ describe("mobile exam UI contracts", () => {
     }
   });
 
-  it("keeps the five destinations and More on one row", () => {
+  it("keeps the five destinations and Tools on one row", () => {
     const shell = read("src/components/AppShell.tsx");
     const primaryCount = (shell.match(/primary: true/g) ?? []).length;
     expect(primaryCount).toBe(5);

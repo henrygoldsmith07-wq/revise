@@ -36,8 +36,9 @@ import { Onboarding } from "./Onboarding";
 //   Practice  answer questions and prove it  (practice, review, past papers, quick check)
 //   Progress  trajectory, readiness, improvement (schedule, revision twin)
 //   Library   find content directly
-// Specialist surfaces keep their routes (no deep link breaks) and sit under
-// "More" or are linked from the screen they belong to. `match` lists the
+// Manual study modes and specialist surfaces keep their routes (no deep link
+// breaks) but sit in a collapsed "Tools" menu, so the adaptive Today loop is
+// the primary journey and nothing in the rail competes with it. `match` lists the
 // routes a destination owns, so the right tab stays highlighted inside them.
 
 type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolean; match?: readonly string[] };
@@ -50,8 +51,8 @@ const PRIMARY_NAV: NavItem[] = [
   { href: "/library", label: "Library", Icon: LibraryIcon, primary: true, match: ["/shared"] },
 ];
 
-// Secondary destinations: still one tap away, never competing with the loop.
-const MORE_NAV: NavItem[] = [
+// Tools: manual modes, one tap away, collapsed by default, never competing with the loop.
+const TOOLS_NAV: NavItem[] = [
   { href: "/review", label: "Review", Icon: ReviewIcon },
   { href: "/papers", label: "Past papers", Icon: PapersIcon },
   { href: "/study", label: "Choose how to study", Icon: ModesIcon },
@@ -61,11 +62,6 @@ const MORE_NAV: NavItem[] = [
 
 const SETTINGS_NAV: NavItem[] = [{ href: "/settings", label: "Settings", Icon: SettingsIcon }];
 
-const DESKTOP_NAV_GROUPS = [
-  { label: null, items: PRIMARY_NAV },
-  { label: "More", items: MORE_NAV },
-  { label: null, items: SETTINGS_NAV },
-] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -157,6 +153,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   // A destination is highlighted inside the routes it owns; aria-current stays on the exact page only.
   const inSection = (item: NavItem) => isActive(item.href) || (item.match ?? []).some((route) => pathname.startsWith(route));
+  const toolsActive = TOOLS_NAV.some((item) => isActive(item.href));
 
   if (needsOnboarding) {
     return <Onboarding onDone={() => void completeOnboarding()} />;
@@ -179,34 +176,30 @@ export function AppShell({ children }: { children: ReactNode }) {
           <p className="text-[11px] text-ink3 mt-0.5">{settings.displayName}</p>
         </div>
         <nav className="flex-1 px-2" aria-label="Main">
-          {DESKTOP_NAV_GROUPS.map((group, groupIndex) => (
-            <div key={group.label ?? `group-${groupIndex}`} className={groupIndex ? "mt-4" : ""}>
-              {group.label ? (
-                <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3">
-                  {group.label}
-                </p>
-              ) : null}
-              <div className="space-y-0.5">
-                {group.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                    className={cx(
-                      "flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-sm transition-colors",
-                      (item.primary ? inSection(item) : isActive(item.href)) ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
-                    )}
-                  >
-                    <item.Icon size={ICON_SIZE.md} aria-hidden className="shrink-0" />
-                    <span className="flex-1">{item.label}</span>
-                    {(item.href === "/review" || item.href === "/practice") && dueCards.length > 0 ? (
-                      <span className="text-[11px] font-semibold tabular-nums text-review">{dueCards.length}</span>
-                    ) : null}
-                  </Link>
-                ))}
-              </div>
+          <div className="space-y-0.5">
+            {PRIMARY_NAV.map((item) => (
+              <RailLink key={item.href} item={item} active={inSection(item)} current={isActive(item.href)} due={dueCards.length} />
+            ))}
+          </div>
+          {/* Collapsed unless the current page is one of the tools, so it never competes with Today. */}
+          <details className="mt-4 group/tools" open={toolsActive || undefined}>
+            <summary className="list-none cursor-pointer select-none flex items-center gap-2 px-2.5 py-1.5 min-h-9 rounded-[10px] text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3 hover:bg-surface2">
+              <span className="flex-1">Tools</span>
+              <svg viewBox="0 0 12 12" aria-hidden="true" className="w-3 h-3 transition-transform group-open/tools:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 4.5l3 3 3-3" />
+              </svg>
+            </summary>
+            <div className="space-y-0.5 mt-0.5">
+              {TOOLS_NAV.map((item) => (
+                <RailLink key={item.href} item={item} active={isActive(item.href)} current={isActive(item.href)} due={dueCards.length} />
+              ))}
             </div>
-          ))}
+          </details>
+          <div className="mt-4 space-y-0.5">
+            {SETTINGS_NAV.map((item) => (
+              <RailLink key={item.href} item={item} active={isActive(item.href)} current={isActive(item.href)} due={dueCards.length} />
+            ))}
+          </div>
         </nav>
         <div className="p-3 space-y-2">
           <button
@@ -295,10 +288,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <details className="relative group">
             <summary className="list-none cursor-pointer flex flex-col items-center justify-center gap-0.5 py-2 min-h-12 text-[10px] font-medium text-ink3">
               <MoreIcon size={ICON_SIZE.lg} aria-hidden />
-              More
+              Tools
             </summary>
             <div className="absolute bottom-full right-2 mb-2 w-60 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
-              {[...MORE_NAV, ...SETTINGS_NAV].map((item) => (
+              <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3">Tools</p>
+              {[...TOOLS_NAV, ...SETTINGS_NAV].map((item) => (
                 <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
                   aria-current={isActive(item.href) ? "page" : undefined}
                   className="flex items-center gap-2 px-3 py-3 min-h-11 rounded-lg text-sm hover:bg-surface2">
@@ -313,6 +307,25 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {searchOpen ? <SearchOverlay onClose={() => setSearchOpen(false)} /> : null}
     </div>
+  );
+}
+
+function RailLink({ item, active, current, due }: { item: NavItem; active: boolean; current: boolean; due: number }) {
+  return (
+    <Link
+      href={item.href}
+      aria-current={current ? "page" : undefined}
+      className={cx(
+        "flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-sm transition-colors",
+        active ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
+      )}
+    >
+      <item.Icon size={ICON_SIZE.md} aria-hidden className="shrink-0" />
+      <span className="flex-1">{item.label}</span>
+      {(item.href === "/review" || item.href === "/practice") && due > 0 ? (
+        <span className="text-[11px] font-semibold tabular-nums text-review">{due}</span>
+      ) : null}
+    </Link>
   );
 }
 

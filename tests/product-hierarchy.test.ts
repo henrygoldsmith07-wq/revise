@@ -6,9 +6,9 @@ import { traceTransition } from "@/domain/adaptive-trace";
 const ROOT = join(__dirname, "..");
 
 describe("product hierarchy", () => {
-  it("keeps five destinations: Today, Learn, Practice, Progress and Library, with specialist tools under More", () => {
+  it("keeps five destinations: Today, Learn, Practice, Progress and Library, with manual modes in a collapsed Tools menu", () => {
     const shell = readFileSync(join(ROOT, "src/components/AppShell.tsx"), "utf8");
-    // Five direct destinations and one More menu on the phone bar.
+    // Five direct destinations and one Tools menu on the phone bar.
     expect(shell).toContain("grid grid-cols-6");
     expect(shell).toContain('href: "/", label: "Today"');
     expect(shell).toContain('href: "/lesson", label: "Learn"');
@@ -18,7 +18,10 @@ describe("product hierarchy", () => {
     expect((shell.match(/primary: true/g) ?? [])).toHaveLength(5);
     const order = ["Today", "Learn", "Practice", "Progress", "Library"].map((label) => shell.indexOf(`label: "${label}"`));
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(shell).toContain("More");
+    expect(shell).toContain("Tools");
+    expect(shell).toContain("const TOOLS_NAV");
+    // On desktop the Tools group is a disclosure, closed unless a tool is the current page.
+    expect(shell).toContain("open={toolsActive || undefined}");
     // Specialist and manual routes stay reachable (deep links unchanged) but are not primary.
     for (const label of ["Review", "Past papers", "Choose how to study", "Tutor", "Schedule", "Settings"]) {
       expect(shell).toContain(`label: "${label}"`);
