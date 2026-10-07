@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LessonMode } from "@/components/LessonMode";
@@ -56,10 +57,15 @@ function LessonBrowser() {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">Learning roadmap</h1>
+        <p className="text-[11px] uppercase tracking-[0.13em] text-ink3 font-bold">Learn</p>
+        <h1 className="text-xl font-semibold tracking-tight mt-1">Learning roadmap</h1>
         <p className="text-sm text-ink3 mt-0.5">
           Follow your subject from foundations to exam-ready ideas with detailed, step-by-step lessons.
         </p>
+        <nav aria-label="Other ways to learn" className="mt-2 flex flex-wrap gap-x-4 text-sm text-ink2">
+          <Link href="/tutor" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Ask the tutor</Link>
+          <Link href="/study" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Choose how to study</Link>
+        </nav>
       </header>
 
       <section aria-label="Choose a lesson subject" className="card bg-surface2/40 p-3 sm:p-4">
@@ -95,7 +101,7 @@ function LessonBrowser() {
         <>
           {returnHref ? (
             <p className="text-[11px] text-ink3">
-              Opened from your adaptive session — <a className="underline hover:text-ink" href={returnHref}>back to the tutor step</a> when the gap is filled.
+              Opened from your session — <a className="underline hover:text-ink" href={returnHref}>go back to it</a> when you are ready.
             </p>
           ) : null}
           <LessonMode

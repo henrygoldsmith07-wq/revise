@@ -616,7 +616,7 @@ function SessionSummary({
   return (
     <PostSessionClosure
       closure={closure}
-      hint="Every card has been rescheduled by FSRS from how you graded it."
+      hint="Every card has been rescheduled from how you graded it: what you found hard comes back sooner."
       secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise questions" }}
     />
   );

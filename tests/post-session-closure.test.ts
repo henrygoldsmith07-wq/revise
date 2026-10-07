@@ -94,7 +94,8 @@ describe("post-session closure", () => {
 
     expect(component).toContain('role="status"');
     expect(component).toContain('aria-live="polite"');
-    expect(component).toContain("What this session shows");
+    // The same heading as the adaptive session's debrief, so every session ends with "What changed".
+    expect(component).toContain("What changed");
     expect(review).toContain("PostSessionClosure");
     expect(practice).toContain("finishSession");
     expect(practice).toContain("PostSessionClosure");

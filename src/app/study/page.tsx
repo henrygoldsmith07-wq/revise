@@ -16,7 +16,7 @@ import { TestMode } from "@/components/modes/TestMode";
 import { AudioMode } from "@/components/modes/AudioMode";
 import { ExplanationMode } from "@/components/modes/ExplanationMode";
 import { SubjectPicker } from "@/components/SubjectPicker";
-import { Button, EmptyState, Panel, Pill, SectionHeading, cx } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, cx } from "@/components/ui";
 import { ICON_SIZE, ModesIcon } from "@/components/icons";
 import { DailySessionCard } from "@/components/DailySessionCard";
 import type { LucideIcon } from "@/components/icons";
@@ -90,7 +90,7 @@ export default function StudyPage() {
 
 function Study() {
   const params = useSearchParams();
-  const store = useStoreFields("cards", "clearRevisionCheckpoint", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "cards", "clearRevisionCheckpoint", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
   const subjectOptions = useMemo(
@@ -194,11 +194,21 @@ function Study() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">Study</h1>
+        <p className="text-[11px] uppercase tracking-[0.13em] text-ink3 font-bold">Learn</p>
+        <h1 className="text-xl font-semibold tracking-tight mt-1">Choose how to study</h1>
         <p className="text-sm text-ink3 mt-0.5">
-          One default session first. The other modes are behind “More” for when you want a different angle.
+          Revise normally picks the method for you from your answers. Use this page when you want to pick it yourself.
         </p>
       </header>
+
+      {store.adaptiveSession ? (
+        <Panel className="space-y-2 border-accent">
+          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Recommended</p>
+          <p className="text-base font-medium text-ink">Let Revise choose: {store.adaptiveSession.topicTitle}</p>
+          <p className="text-sm text-ink2">It mixes recall, exam-style questions and fixes for your mistakes in the order your evidence needs, then checks again in a few days.</p>
+          <ButtonLink href={store.adaptiveSession.startHref} variant="primary" className="w-full sm:w-auto min-h-11">Start the recommended session</ButtonLink>
+        </Panel>
+      ) : null}
 
       <DailySessionCard subjectIds={store.settings.subjectIds} />
 
@@ -280,7 +290,9 @@ function Study() {
       ) : (
         <EmptyState
           title="Nothing in this selection"
-          body="Widen the filter, or add cards from your notes."
+          body="No cards match this filter, so there is nothing to study in this way yet."
+          why="Every method here works from your cards."
+          after="Widen the filter, or add cards from your notes, and the methods unlock."
           action={<Button onClick={() => { setQuery(""); setSubjectId(""); setTopicId(""); }}>Clear filter</Button>}
         />
       )}

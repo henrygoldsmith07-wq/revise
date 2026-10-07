@@ -34,7 +34,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="today-focus-icon" aria-hidden="true"><TodayIcon size={18} /></span>
-          <p className="text-sm font-semibold text-speak">Your best next step</p>
+          <p className="text-sm font-semibold text-speak">Your highest-value session</p>
           {action.proofStatus && action.proofStatus !== "not-checked" ? <Pill tone={TONE[action.proofStatus]}>{LEARNER_STATE_LABEL[action.proofStatus]}</Pill> : null}
           <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">{focus.duration}</span>
         </div>
@@ -60,14 +60,18 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
         <p className="mt-3 max-w-2xl text-sm text-ink2">{focus.why}</p>
         <p className="mt-1 max-w-2xl text-sm text-ink2"><span className="font-medium text-ink">Then:</span> {focus.after}</p>
         <details className="mt-4 max-w-2xl">
-          <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Why this, and why now?</summary>
+          <summary className="cursor-pointer select-none text-sm font-medium text-ink2 min-h-11 inline-flex items-center">Why this, and why now?</summary>
           <dl className="mt-2 space-y-2 text-sm leading-6 text-ink2" aria-label="Why this recommendation">
             <div><dt className="font-semibold text-ink">Why now</dt><dd>{e.whyNow}</dd></div>
             <div><dt className="font-semibold text-ink">Why before the others</dt><dd>{e.whyBefore}</dd></div>
             <div><dt className="font-semibold text-ink">What it is based on</dt><dd><ul className="list-disc pl-5">{e.evidence.map((line) => <li key={line}>{line}</li>)}</ul></dd></div>
             <div><dt className="font-semibold text-ink">What will prove it worked</dt><dd>{e.proves}</dd></div>
             {action.effectiveness && action.effectiveness.level !== "neutral" ? (
-              <div><dt className="font-semibold text-ink">What has worked for you</dt><dd>{action.effectiveness.uncertainty === "high" ? "Early signs only, from a small number of completed checks." : "Based on your own completed, delayed checks."}</dd></div>
+              <div><dt className="font-semibold text-ink">What has worked for you</dt><dd>{action.effectiveness.uncertainty === "high"
+                ? "Early signs only, from a small number of completed checks."
+                : action.effectiveness.weight >= 1
+                  ? `This kind of session has tended to hold up for you after a delay (${action.effectiveness.samples} checked).`
+                  : `This kind of session has held up less well for you (${action.effectiveness.samples} checked), so it is suggested only because the gap is worth it.`}</dd></div>
             ) : null}
           </dl>
         </details>

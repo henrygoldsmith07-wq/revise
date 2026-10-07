@@ -11,6 +11,7 @@ import {
   LessonsIcon,
   LibraryIcon,
   ModesIcon,
+  MoreIcon,
   OfflineIcon,
   PapersIcon,
   PlanIcon,
@@ -29,45 +30,41 @@ import { SearchOverlay } from "./SearchOverlay";
 import { useShortcuts } from "./shortcuts";
 import { Onboarding } from "./Onboarding";
 
-// Today, Subjects and Progress are the three destinations; manual tools keep direct routes.
-// Navigation is verb-first: every destination is something the student does,
-// not a noun they browse. "Today" is always first because the product's whole
-// claim is that it knows what you should do next.
-// The app is the loop board → topic → card → exam question: Today feeds due
-// cards, Study drills them, Lessons teaches a topic, Practice and Past papers
-// are the exam questions, Library is the topic index. Schedule is the layer
-// above the loop — it places those same actions across the run-up to each
-// exam, derived from the same planner the store already maintains.
+// Five destinations, one per thing a student does, plus Settings:
+//   Today     what should I do?              (and the session it starts)
+//   Learn     learn content                  (lessons, tutor, manual study modes)
+//   Practice  answer questions and prove it  (practice, review, past papers, quick check)
+//   Progress  trajectory, readiness, improvement (schedule, revision twin)
+//   Library   find content directly
+// Specialist surfaces keep their routes (no deep link breaks) and sit under
+// "More" or are linked from the screen they belong to. `match` lists the
+// routes a destination owns, so the right tab stays highlighted inside them.
 
-type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolean };
+type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolean; match?: readonly string[] };
 
-const TODAY_NAV: NavItem[] = [
-  { href: "/", label: "Today", Icon: TodayIcon, primary: true },
-  { href: "/library", label: "Subjects", Icon: LibraryIcon, primary: true },
-  { href: "/readiness", label: "Progress", Icon: ProgressIcon, primary: true },
+const PRIMARY_NAV: NavItem[] = [
+  { href: "/", label: "Today", Icon: TodayIcon, primary: true, match: ["/adaptive-session"] },
+  { href: "/lesson", label: "Learn", Icon: LessonsIcon, primary: true, match: ["/study", "/tutor"] },
+  { href: "/practice", label: "Practice", Icon: PracticeIcon, primary: true, match: ["/review", "/papers", "/diagnostic"] },
+  { href: "/readiness", label: "Progress", Icon: ProgressIcon, primary: true, match: ["/schedule", "/twin"] },
+  { href: "/library", label: "Library", Icon: LibraryIcon, primary: true, match: ["/shared"] },
 ];
 
-// Manual tools stay one tap away but no longer compete with the three destinations.
-const STUDY_NAV: NavItem[] = [
-  { href: "/adaptive-session", label: "Session", Icon: PracticeIcon },
+// Secondary destinations: still one tap away, never competing with the loop.
+const MORE_NAV: NavItem[] = [
   { href: "/review", label: "Review", Icon: ReviewIcon },
-  { href: "/study", label: "Study", Icon: ModesIcon },
-  { href: "/lesson", label: "Lessons", Icon: LessonsIcon },
-  { href: "/tutor", label: "Tutor", Icon: TutorIcon },
-  { href: "/practice", label: "Practice", Icon: PracticeIcon },
   { href: "/papers", label: "Past papers", Icon: PapersIcon },
-];
-
-const MANAGEMENT_NAV: NavItem[] = [
+  { href: "/study", label: "Choose how to study", Icon: ModesIcon },
+  { href: "/tutor", label: "Tutor", Icon: TutorIcon },
   { href: "/schedule", label: "Schedule", Icon: PlanIcon },
-  { href: "/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
-const NAV = [...TODAY_NAV, ...STUDY_NAV, ...MANAGEMENT_NAV];
+const SETTINGS_NAV: NavItem[] = [{ href: "/settings", label: "Settings", Icon: SettingsIcon }];
+
 const DESKTOP_NAV_GROUPS = [
-  { label: null, items: TODAY_NAV },
-  { label: "Choose your own", items: STUDY_NAV },
-  { label: null, items: MANAGEMENT_NAV },
+  { label: null, items: PRIMARY_NAV },
+  { label: "More", items: MORE_NAV },
+  { label: null, items: SETTINGS_NAV },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -147,15 +144,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       { key: "g", group: "Go to", label: "Today", run: () => router.push("/") },
       { key: "r", group: "Go to", label: "Review", run: () => router.push("/review") },
       { key: "p", group: "Go to", label: "Practice", run: () => router.push("/practice") },
-      { key: "m", group: "Go to", label: "Study modes", run: () => router.push("/study") },
+      { key: "m", group: "Go to", label: "Choose how to study", run: () => router.push("/study") },
       { key: "h", group: "Go to", label: "Lessons", run: () => router.push("/lesson") },
       { key: "a", group: "Go to", label: "Past papers", run: () => router.push("/papers") },
+      { key: "o", group: "Go to", label: "Progress", run: () => router.push("/readiness") },
+      { key: "l", group: "Go to", label: "Library", run: () => router.push("/library") },
       { key: "d", group: "Global", label: "Toggle dark mode", run: toggleTheme },
     ],
     [router, settings.theme],
   );
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  // A destination is highlighted inside the routes it owns; aria-current stays on the exact page only.
+  const inSection = (item: NavItem) => isActive(item.href) || (item.match ?? []).some((route) => pathname.startsWith(route));
 
   if (needsOnboarding) {
     return <Onboarding onDone={() => void completeOnboarding()} />;
@@ -193,12 +194,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                     aria-current={isActive(item.href) ? "page" : undefined}
                     className={cx(
                       "flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-sm transition-colors",
-                      isActive(item.href) ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
+                      (item.primary ? inSection(item) : isActive(item.href)) ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
                     )}
                   >
                     <item.Icon size={ICON_SIZE.md} aria-hidden className="shrink-0" />
                     <span className="flex-1">{item.label}</span>
-                    {item.href === "/review" && dueCards.length > 0 ? (
+                    {(item.href === "/review" || item.href === "/practice") && dueCards.length > 0 ? (
                       <span className="text-[11px] font-semibold tabular-nums text-review">{dueCards.length}</span>
                     ) : null}
                   </Link>
@@ -273,36 +274,36 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line elev-nav pb-safe"
         aria-label="Primary sections (mobile)"
       >
-        <div className="grid grid-cols-4">
-          {NAV.filter((item) => item.primary).map((item) => (
+        <div className="grid grid-cols-6">
+          {PRIMARY_NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={isActive(item.href) ? "page" : undefined}
               className={cx(
-                "flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors relative",
-                isActive(item.href) ? "text-ink" : "text-ink3",
+                "flex flex-col items-center justify-center gap-0.5 py-2 min-h-12 text-[10px] font-medium transition-colors relative",
+                inSection(item) ? "text-ink" : "text-ink3",
               )}
             >
               <item.Icon size={ICON_SIZE.lg} aria-hidden />
               {item.label}
-              {item.href === "/review" && dueCards.length > 0 ? (
-                <span className="absolute top-1 right-[22%] w-1.5 h-1.5 rounded-full bg-review" />
+              {item.href === "/practice" && dueCards.length > 0 ? (
+                <span className="absolute top-1 right-[22%] w-1.5 h-1.5 rounded-full bg-review" aria-hidden="true" />
               ) : null}
             </Link>
           ))}
           <details className="relative group">
-            <summary className="list-none cursor-pointer flex flex-col items-center gap-0.5 py-2 min-h-12 text-[10px] font-medium text-ink3">
-              <ModesIcon size={ICON_SIZE.lg} aria-hidden />
-              Tools
+            <summary className="list-none cursor-pointer flex flex-col items-center justify-center gap-0.5 py-2 min-h-12 text-[10px] font-medium text-ink3">
+              <MoreIcon size={ICON_SIZE.lg} aria-hidden />
+              More
             </summary>
-            <div className="absolute bottom-full right-2 mb-2 w-56 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
-              <p className="px-3 py-2 text-xs text-ink3">Choose your own</p>
-              {[...STUDY_NAV, ...MANAGEMENT_NAV].map((item) => (
+            <div className="absolute bottom-full right-2 mb-2 w-60 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
+              {[...MORE_NAV, ...SETTINGS_NAV].map((item) => (
                 <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
                   aria-current={isActive(item.href) ? "page" : undefined}
-                  className="flex items-center gap-2 px-3 py-3 rounded-lg text-sm hover:bg-surface2">
+                  className="flex items-center gap-2 px-3 py-3 min-h-11 rounded-lg text-sm hover:bg-surface2">
                   <item.Icon size={ICON_SIZE.md} aria-hidden />{item.label}
+                  {item.href === "/review" && dueCards.length > 0 ? <span className="ml-auto text-[11px] font-semibold tabular-nums text-review">{dueCards.length}</span> : null}
                 </Link>
               ))}
             </div>
