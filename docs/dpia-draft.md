@@ -20,6 +20,30 @@ to raise.
 
 ---
 
+## Update — privacy / AI trust change set (October 2026)
+
+Engineering status of the findings below, after the change set that added
+per-learner AI consent, a single AI egress policy, account deletion, enforced
+retention and per-table RLS verification. This is an engineering summary for
+the reviewer, not a re-assessment; the sections below keep their original
+analysis, and anything they say is unimplemented that appears in this table
+as implemented should be read with this table.
+
+| Finding | Status | Where |
+|---|---|---|
+| R1 / blocker 1 — no AI opt-in | **Implemented.** Off by default; explicit, versioned, revocable; enforced server-side on every `/api/ai` request from `public.ai_consent`. | `src/domain/ai-consent.ts`, `src/app/api/ai/route.ts`, Settings → AI |
+| R3 / blocker 2 — unmasked DLQ retries | **Implemented.** Retries use the same transport (consent → egress policy → request); nothing is queued or retried without consent; revoking clears the queue. | `src/ai/transport.ts`, `src/ai/mark-dlq.ts` |
+| R4 / blocker 2 — unmasked tasks | **Implemented for text.** All text tasks masked and minimised, in the browser and again on the server. OCR images are metadata-stripped; handwriting itself cannot be masked and is sent only with consent. | `src/ai/egress.ts`, `src/ai/task-policy.ts` |
+| R2 / blocker 3 — no account deletion | **Implemented** (needs the migration and `SUPABASE_SERVICE_ROLE_KEY`). Session-verified route; auth user deleted; cascades; residue verified. | `src/app/api/account/delete/route.ts` |
+| R6 — quota identifiers without FK | **Implemented.** FK with cascade; orphans removed; idle rows purged after 2 days by a secret-gated daily cron. | `supabase/migrations/20261007000100_privacy_ai_trust.sql`, `src/app/api/maintenance/retention/route.ts` |
+| R7 / item 6 — RLS test | **Implemented** locally (per-table test, PGlite execution, deployed-catalog preflight). Live staging run still required. | `tests/security.test.ts`, `tests/privacy-sql.test.ts`, `scripts/staging-contract.mjs` |
+| R9 — inaccurate deletion copy | **Fixed.** The disclosure distinguishes local erasure from account deletion and states AI is off by default. | `src/domain/portability.ts` |
+| Item 8 — unused retention helpers | **Removed** and replaced by a retention table that names the enforcing code for each row. | `src/domain/retention-policy.ts` |
+| Item 13 — log and device-local invariants | **Asserted by tests.** | `tests/security.test.ts`, `tests/ai-task-policy.test.ts` |
+| Blocker 4, items 5, 7, 9–12, 14–15 | **Not addressed** — controller identity, transfers, privacy notice, parental position, consultation, telemetry decision, E2EE default, output review, sign-off. | — |
+
+---
+
 ## 1. Scope
 
 **Service.** Revise, a Next.js web application for UK students aged 15–18. It
@@ -155,11 +179,13 @@ receives structured study records and no free text.
 | Telemetry | Whatever the receiving endpoint does | **Not established from the code.** No endpoint, retention policy or processor agreement is defined in the repository. |
 | E2EE key material | Until erased with local data | Yes |
 
-There is a `shouldRetain()` helper and a `defaultRetention()` returning 365
-days in `src/domain/portability.ts`, with unit tests in
-`tests/phase6-platform.test.ts`. **Nothing in the application calls either
-function.** They are a model of a retention policy, not a retention policy. The
-honest position is that no automatic retention period is enforced anywhere.
+The `shouldRetain()` / `defaultRetention()` helpers this section originally
+described (an unenforced 365-day model) have been removed. The retention that
+is actually enforced — learner-controlled deletion of revision data, account
+deletion, a 2-day purge of idle AI quota rows, a 30-day device-local AI mark
+cache, and a consent-bound AI re-grade queue — is stated row by row, with the
+enforcing code, in `src/domain/retention-policy.ts`. Revision history itself is
+not auto-expired.
 
 ### 3.6 Security measures actually present
 

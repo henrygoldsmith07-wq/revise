@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
+import { gateGeneratedQuestions } from "@/domain/generated-question-quality";
 import { remapContentIdString } from "@/data/content-ids";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { diagnosePrerequisiteWeakness, type PrerequisiteDiagnosis } from "@/domain/prerequisite-diagnosis";
@@ -376,7 +377,22 @@ function Practice() {
 
     // The fallback returns bank questions that are already stored — adding
     // them again would duplicate the whole topic's bank.
-    const fresh = created.filter((q) => !store.questions.some((existing) => existing.stem === q.stem));
+    let fresh = created.filter((q) => !store.questions.some((existing) => existing.stem === q.stem));
+    let rejectedCount = 0;
+    if (result.source === "ai") {
+      // A schema-valid model reply is only well-formed. Deterministic quality
+      // gates decide whether it is saved, and anything saved stays unverified
+      // machine output — it never acquires reviewed status here.
+      const gated = gateGeneratedQuestions({
+        questions: fresh,
+        origin: "generated",
+        topicFor: () => topic ?? null,
+        bank: store.questions.filter((existing) => existing.topicIds.includes(topicId)),
+        checkedAt: new Date().toISOString(),
+      });
+      fresh = gated.accepted;
+      rejectedCount = gated.rejected.length;
+    }
     if (fresh.length) {
       await store.addQuestions(fresh);
       // New questions go to the front: the student asked for them just now.
@@ -385,8 +401,12 @@ function Practice() {
     }
     setNote(
       result.source === "ai"
-        ? `Generated ${fresh.length} new question${fresh.length === 1 ? "" : "s"} on this topic.`
-        : "No AI provider available, so this is showing questions from the authored bank instead.",
+        ? `Generated ${fresh.length} new question${fresh.length === 1 ? "" : "s"} on this topic${
+            rejectedCount ? ` (${rejectedCount} failed the quality checks and ${rejectedCount === 1 ? "was" : "were"} discarded)` : ""
+          }. AI-generated questions are not checked by a person, so treat their marking as a guide.`
+        : result.note?.startsWith("AI features are off")
+          ? "AI features are off, so this is showing questions from the authored bank instead. You can switch AI on in Settings."
+          : "No AI provider available, so this is showing questions from the authored bank instead.",
     );
     setGenerating(false);
   }

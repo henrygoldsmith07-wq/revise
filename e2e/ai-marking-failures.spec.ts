@@ -32,6 +32,19 @@ async function failMarksWith(page: Page, status: number, error: string): Promise
   });
 }
 
+/**
+ * AI is off until the learner opts in (Settings → AI), so no mark request
+ * would reach the route at all without this. Local mode records the choice
+ * on the device and sends the versioned consent header.
+ */
+async function enableAiConsent(page: Page): Promise<void> {
+  await page.goto("/settings");
+  const section = page.locator("section", { hasText: "Use AI for marking, explanations" });
+  const toggle = section.getByRole("button", { name: "Off" });
+  if (await toggle.count()) await toggle.click();
+  await expect(section.getByRole("button", { name: "On" })).toBeVisible({ timeout: 10_000 });
+}
+
 /** Reach the practice runner on a non-MCQ question with the shell hydrated. */
 async function openWrittenQuestion(page: Page): Promise<void> {
   await page.goto("/");
@@ -40,6 +53,7 @@ async function openWrittenQuestion(page: Page): Promise<void> {
     await completeOnboarding(page);
     await expect(main).toBeVisible({ timeout: 15_000 });
   }
+  await enableAiConsent(page);
   // Default practice mode queues written questions first; the runner renders
   // the stem and the answer textarea once a question is current.
   await page.goto("/practice");

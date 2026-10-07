@@ -29,6 +29,7 @@ vi.mock("@/ai/tasks", () => ({
 
 import { POST as aiPost } from "@/app/api/ai/route";
 import { resetRateLimiterForTests } from "@/lib/rate-limit";
+import { AI_CONSENT_HEADER, AI_CONSENT_HEADER_VALUE } from "@/domain/ai-consent";
 
 describe("AI route unexpected task failure", () => {
   beforeEach(() => resetRateLimiterForTests());
@@ -37,7 +38,7 @@ describe("AI route unexpected task failure", () => {
     const res = await aiPost(
       new Request("https://x/api/ai", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", [AI_CONSENT_HEADER]: AI_CONSENT_HEADER_VALUE },
         body: JSON.stringify({ task: "explain", payload: { topicId: "t" } }),
       }),
     );

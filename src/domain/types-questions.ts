@@ -430,6 +430,22 @@ export interface QuestionValidationRecord {
   updatedAt: IsoInstant;
 }
 
+/**
+ * Result of the deterministic quality gates applied when an AI-generated or
+ * AI-extracted question was saved (domain/generated-question-quality.ts).
+ * Records machine checks only — it is never a human review and confers no
+ * trust; verification stays "unverified" until the human review workflow
+ * attaches a HumanVerificationRecord.
+ */
+export interface GeneratedQuestionQualityRecord {
+  version: string;
+  origin: "generated" | "extracted";
+  decision: "accept" | "accept-with-warnings";
+  /** Ids of the non-blocking gates that did not pass. */
+  failedGates: string[];
+  checkedAt: IsoInstant;
+}
+
 export interface Question {
   id: Id;
   subjectId: Id;
@@ -470,4 +486,6 @@ export interface Question {
   paperProvenance?: PaperQuestionProvenance;
   createdAt: IsoInstant;
   learning?: LearningQuestionMetadata;
+  /** Machine quality-gate result for AI-generated/extracted content; never a review. */
+  generationQuality?: GeneratedQuestionQualityRecord;
 }

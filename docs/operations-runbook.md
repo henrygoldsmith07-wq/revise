@@ -161,3 +161,26 @@ the client does not guess provenance or rewrite those observations.
 A failed continuity page can have committed valid rows before the failure. The
 client now refreshes those changes and retains the cursor and pending work for
 replay. A visible retry error does not imply that every row was rolled back.
+
+## Privacy / AI trust rollout
+
+Order matters, because the new client and route fail closed without the SQL:
+
+1. Apply `supabase/migrations/20261007000100_privacy_ai_trust.sql` to staging
+   (it is also appended to `supabase/schema.sql`; re-running either is safe).
+   It creates `public.ai_consent`, adds the `ai_rate_quota.user_id` foreign key
+   (deleting quota rows whose account no longer exists), and adds the
+   service-role-only functions `purge_account_server_data`,
+   `account_residual_rows` and `purge_expired_server_data`.
+2. Set server-only environment variables: `SUPABASE_SERVICE_ROLE_KEY` (never
+   `NEXT_PUBLIC_`) and `CRON_SECRET` (16+ characters). The daily purge is
+   scheduled in `vercel.json`.
+3. Run `npm run test:staging`; the preflight now also checks the consent and
+   quota tables and the privacy functions.
+4. Apply the migration to production, then deploy the client.
+
+Behaviour to expect: every learner starts with AI **off** (including existing
+learners, whose old implicit `aiEnabled: true` is not treated as consent) and
+must switch it on in Settings → AI. Before the migration is applied, `/api/ai`
+answers 503 (consent cannot be read) for signed-in users. Without the
+service-role key, account deletion answers 503 and deletes nothing.

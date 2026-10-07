@@ -13,6 +13,7 @@ import {
   type DelayedFarTransferRetest,
 } from "@/domain/delayed-far-transfer";
 import { markMcq, rubricConfidence } from "@/domain/marking";
+import { assessDeterministicMark, markAssessmentRecord, type MarkConfidenceAssessment } from "@/domain/marking-confidence";
 
 import { answerLooksCopied } from "@/domain/learning-evidence";
 import { analyseAttemptWorking } from "@/domain/working-analysis";
@@ -151,6 +152,8 @@ export function useQuestionExecution({
     copiedAnswer?: boolean;
     workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
+    /** How far to trust this mark; provisional marks are labelled and disputable. */
+    assessment?: MarkConfidenceAssessment;
     farTransfer?: Attempt["farTransfer"];
     /** Post-marking error diagnosis; never changes the marks above. */
     errorDiagnosis?: AttemptErrorDiagnosis;
@@ -207,7 +210,13 @@ export function useQuestionExecution({
               source: "ai",
               confidence: upgraded.markConfidence ?? null,
               remediation: planRemediation(question, answers, upgraded.marked, topic, misconceptionsForTopic(question.topicIds[0] ?? "")),
-              escalation: undefined,
+              // The re-grade went through the same confidence checks as a live
+              // AI mark; keep its escalation and provisional status visible.
+              escalation: upgraded.markEscalation
+                ? assessLowConfidenceMark({ markedBy: "ai", confidence: upgraded.markConfidence ?? null })
+                : undefined,
+              assessment: undefined,
+              lastAttempt: upgraded,
             }
           : prev,
       );
@@ -244,6 +253,8 @@ export function useQuestionExecution({
     let markTier: string | undefined;
     let markConfidence: number | null = null;
     let withheld: string | undefined;
+    let assessment: MarkConfidenceAssessment;
+    let retryable = false;
 
     if (isMcq) {
       const single = markMcq(question, choice ?? -1);
@@ -252,6 +263,8 @@ export function useQuestionExecution({
         single.awarded > 0
           ? `Correct. ${question.parts[0]?.modelAnswer ?? ""}`
           : `${single.comment} ${question.parts[0]?.modelAnswer ?? ""}`;
+      // An answer key is exact: the deterministic mark is authoritative.
+      assessment = assessDeterministicMark({ marked, rubricConfidence: null });
     } else {
       const envelope = await aiMark(question, answers, { useLocalModel: Boolean(store.settings?.localAiMarking) });
       marked = envelope.data.marked;
@@ -259,8 +272,14 @@ export function useQuestionExecution({
       source = envelope.source;
       note = envelope.note;
       markTier = envelope.tier;
-      markConfidence = source === "ai" && typeof envelope.data.confidence === "number" ? envelope.data.confidence : null;
+      assessment = envelope.assessment;
+      // For an AI mark the stored confidence is the system's confidence after
+      // the deterministic checks, not the model's self-report alone, so a
+      // mark that fails a check reaches the review queue and cannot count as
+      // trusted learning evidence.
+      markConfidence = source === "ai" ? assessment.score : null;
       withheld = envelope.withheld ?? undefined;
+      retryable = envelope.retryable;
     }
 
     const submittedAnswers = isMcq ? { [question.parts[0]?.id ?? question.id]: String(choice) } : answers;
@@ -298,6 +317,7 @@ export function useQuestionExecution({
       markedBy,
       markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
       markEscalation,
+      markAssessment: markAssessmentRecord(assessment),
       ...(copiedAnswer ? { copiedAnswer: true } : {}),
       ...(workingAnalysis.length ? { workingAnalysis } : {}),
       ...(intervention ? { intervention } : {}),
@@ -390,7 +410,10 @@ export function useQuestionExecution({
     // pass retries with exponential backoff + jitter and upgrades this attempt
     // in place when the provider recovers. Cache/local tiers already carry a
     // genuine model grade, so they are not re-queued.
-    if (markTier === "fallback") {
+    // Only a cloud request that was actually attempted with the learner's
+    // consent and then failed is queued; a mark that fell back because AI is
+    // switched off is never queued for sending later.
+    if (markTier === "fallback" && retryable) {
       void enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" });
     }
     setResult({
@@ -407,6 +430,7 @@ export function useQuestionExecution({
       copiedAnswer,
       workingAnalysis,
       escalation: escalationDecision.escalate ? escalationDecision : undefined,
+      assessment,
       farTransfer: persistedAttempt.farTransfer,
       withheld,
       nextAction,
