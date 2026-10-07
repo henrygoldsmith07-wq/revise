@@ -97,7 +97,7 @@ export default function TrustedCoveragePage() {
           ) : (
             <p className="text-sm text-ink3">Nothing is waiting for review that would add coverage.</p>
           )}
-          <p className="text-xs text-ink3 mt-3">Approve through the review ledger (<code>npm run wjec:review:batch</code> then <code>wjec:review:apply</code>); this page never approves anything.</p>
+          <p className="text-xs text-ink3 mt-3">Teachers approve questions in the reviewer portal; two different reviewers must approve the same content. This page never approves anything.</p>
         </Panel>
       </section>
 

@@ -35,7 +35,8 @@ function existingRoutes() {
       const full = join(dir, e);
       const st = statSync(full);
       if (st.isDirectory()) {
-        walk(full, `${prefix}/${e}`);
+        // Route groups such as `(reviewer)` do not appear in the URL.
+        walk(full, /^\(.+\)$/.test(e) ? prefix : `${prefix}/${e}`);
       } else if (e === "page.tsx") {
         routes.add(prefix === "" ? "/" : prefix);
       } else if (e === "route.ts") {
