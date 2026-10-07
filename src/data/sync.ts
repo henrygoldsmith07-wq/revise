@@ -40,8 +40,11 @@ import { captureTelemetry, errorClass } from "@/lib/observability";
 // keyed puts, so re-fetched pages are idempotent and never duplicate writes.
 //
 // Delivery: stable row keys and replay-safe merges make retries idempotent.
-// Delivered mutation UUIDs are recorded in `sync_writes` best-effort; that
-// ledger is not transactional with the entity write and does not gate delivery.
+// Upserts drain through the `sync_push_batch` RPC: one request and one server
+// transaction per chunk across all entities, with the delivered mutation UUIDs
+// written to `sync_writes` in the same transaction. Against a server without
+// that RPC the drain falls back to per-table upserts, where the `sync_writes`
+// ledger is best-effort and not transactional with the entity write.
 // ---------------------------------------------------------------------------
 
 /** Domain entity → Postgres table. Keeps snake_case confined to this module. */
@@ -255,7 +258,20 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
     bucket.set(item.entity, list);
   }
 
-  for (const [entity, list] of upserts) {
+  // Preferred path: one `sync_push_batch` RPC per chunk carries rows for
+  // every entity at once, in one server transaction (a finished mock paper's
+  // attempts, mistakes, cards and paper row land together or not at all).
+  // Falls back to the per-table upserts below when the RPC is not installed.
+  let remainingUpserts = upserts;
+  if (typeof (supabase as Partial<SupabaseClient>).rpc === "function" && !batchRpcUnavailable) {
+    const batched = await drainUpsertsBatched(userId, supabase, items, upserts, e2ee);
+    pushed += batched.pushed;
+    failed += batched.failed;
+    if (batched.skipped) return { pushed, failed, skipped: batched.skipped };
+    remainingUpserts = batched.remaining;
+  }
+
+  for (const [entity, list] of remainingUpserts) {
     // Later queue entries for the same row supersede earlier ones. Keep the
     // request bounded so a very large offline session cannot monopolise the
     // connection, and so a mid-drain failure leaves a durable remainder.
@@ -320,6 +336,82 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
   }
 
   return { pushed, failed, ...(hasUnknownOwner ? { skipped: "owner-unknown" as const } : {}) };
+}
+
+/** Most rows one `sync_push_batch` call may carry (the server caps at 500). */
+export const SYNC_BATCH_MAX_ROWS = 200;
+/** Set once per page life when the server has no `sync_push_batch` yet. */
+let batchRpcUnavailable = false;
+/** Test-only: forget a cached "RPC not installed" verdict. */
+export function resetSyncBatchSupportForTests(): void {
+  batchRpcUnavailable = false;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** PostgREST / Postgres "function does not exist" — safe to fall back. */
+function missingRpc(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "PGRST202" || error.code === "42883" ||
+    /sync_push_batch/.test(error.message ?? "") && /(could not find|does not exist)/i.test(error.message ?? "");
+}
+
+/**
+ * Drain upserts through `sync_push_batch`: rows for several entities in one
+ * request and one transaction. Outbox semantics are unchanged: entries are
+ * deleted only after the server accepted the whole chunk, a failed chunk
+ * increments every covered entry's attempt counter, and ownership is checked
+ * before and after each request. Row shape and ids come from `toRow`, so wire
+ * ids stay deterministic and conflict resolution stays server-side
+ * (`on conflict (pk) do update` plus the updated_at guard triggers).
+ */
+async function drainUpsertsBatched(
+  userId: Id,
+  supabase: SupabaseClient,
+  items: OutboxItem[],
+  upserts: Map<SyncEntity, OutboxItem[]>,
+  e2ee: boolean,
+): Promise<{ pushed: number; failed: number; skipped?: SyncSkip; remaining: Map<SyncEntity, OutboxItem[]> }> {
+  const db = await getDb();
+  let pushed = 0;
+  let failed = 0;
+  const queue = [...upserts.values()].flatMap((list) => collapseOutboxItems(list)).sort(queueOrder);
+  const done = new Set<string>();
+  const remainingAfter = (): Map<SyncEntity, OutboxItem[]> => {
+    const rest = new Map<SyncEntity, OutboxItem[]>();
+    for (const [entity, list] of upserts) {
+      const left = list.filter((item) => !done.has(item.id));
+      if (left.length) rest.set(entity, left);
+    }
+    return rest;
+  };
+  for (const batch of chunks(queue, SYNC_BATCH_MAX_ROWS)) {
+    const identity = await authIdentity(supabase, userId);
+    if (identity !== "ok") return { pushed, failed, skipped: identity, remaining: new Map() };
+    const rows = await Promise.all(batch.map(async (item) => ({
+      table: TABLES[item.entity],
+      row: await toRow(item.entity, item.payload, userId, { e2ee }),
+    })));
+    const keys = batch.flatMap((item) => item.idempotencyKey && UUID_RE.test(item.idempotencyKey) ? [item.idempotencyKey] : []);
+    const { error } = await supabase.rpc("sync_push_batch", { p_rows: rows, p_idempotency_keys: keys });
+    if (missingRpc(error)) {
+      batchRpcUnavailable = true;
+      return { pushed, failed, remaining: remainingAfter() };
+    }
+    const covered = items.filter((item) => item.op === "upsert" && batch.some((latest) =>
+      latest.entity === item.entity && (latest.id === item.id || rowId(latest.payload) === rowId(item.payload))));
+    for (const item of batch) done.add(item.id);
+    if (error) {
+      failed += covered.length;
+      for (const item of covered) await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
+      continue;
+    }
+    const stillOwned = await authIdentity(supabase, userId);
+    if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned, remaining: new Map() };
+    pushed += rows.length;
+    for (const item of covered) await db.delete("outbox", item.id);
+  }
+  return { pushed, failed, remaining: remainingAfter() };
 }
 
 async function pull(userId: Id, supabase: SupabaseClient): Promise<{ pulled: number; failed: number; skipped?: SyncSkip }> {
