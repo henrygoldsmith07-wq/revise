@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MAX_PROVEN_MOMENTS, newlyProvenTopics, nextSeenProofStates, parseSeenProofStates } from "@/domain/proof-moment";
 
@@ -32,5 +34,28 @@ describe("proof moment", () => {
     expect(parseSeenProofStates("not json")).toEqual({});
     expect(parseSeenProofStates("[1,2]")).toEqual({});
     expect(parseSeenProofStates(JSON.stringify({ a: "proven", b: "made-up", c: 3 }))).toEqual({ a: "proven" });
+  });
+});
+
+describe("proof moment UI", () => {
+  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("animates Awaiting proof → Proven in CSS only, with no motion library", () => {
+    const panel = read("src/components/ProofPanel.tsx");
+    expect(panel).toContain("newlyProvenTopics(");
+    expect(panel).toContain("proof-moment__from");
+    expect(panel).toContain("proof-moment__to");
+    expect(panel).toContain('aria-live="polite"');
+    const pkg = JSON.parse(read("package.json")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect({ ...pkg.dependencies, ...pkg.devDependencies }).not.toHaveProperty("framer-motion");
+    expect(panel).not.toMatch(/framer-motion|motion\/react/);
+  });
+
+  it("respects reduced motion from the OS and from the in-app setting", () => {
+    const css = read("src/app/globals.css");
+    expect(css).toContain("@keyframes proof-to");
+    const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce) {\n  .proof-moment__from"));
+    expect(reduced).toContain(".proof-moment__from { display: none; }");
+    expect(css).toContain(":root.reduce-motion .proof-moment__from { display: none; }");
   });
 });
