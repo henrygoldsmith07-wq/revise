@@ -13,7 +13,11 @@ describe("security — RLS + schema invariants", () => {
   type RlsExpectation =
     | { kind: "owner"; policy: string }
     | { kind: "tombstones" }
-    | { kind: "definer-only" };
+    | { kind: "definer-only" }
+    // Granted by the service role only; the holder may read their own row.
+    | { kind: "self-read"; policy: string }
+    // Append-only audit history: reviewer insert + read, no update/delete.
+    | { kind: "append-only"; insert: string; read: string };
 
   const EXPECTED: Record<string, RlsExpectation> = {
     cards: { kind: "owner", policy: "cards_owner" },
@@ -34,6 +38,9 @@ describe("security — RLS + schema invariants", () => {
     // Quota and consent structures.
     ai_rate_quota: { kind: "definer-only" },
     ai_consent: { kind: "owner", policy: "ai_consent_owner" },
+    // Reviewer portal.
+    reviewer_roles: { kind: "self-read", policy: "reviewer_roles_self_read" },
+    review_audit_events: { kind: "append-only", insert: "review_audit_events_reviewer_insert", read: "review_audit_events_reviewer_read" },
   };
 
   const OWNER_CLAUSE = "using (user_id = auth.uid()) with check (user_id = auth.uid())";
@@ -82,6 +89,18 @@ describe("security — RLS + schema invariants", () => {
       expect(explicit.find((p) => p.name === "sync_tombstones_read")!.text).toContain("for select to authenticated using (user_id = auth.uid())");
       expect(explicit.find((p) => p.name === "sync_tombstones_insert")!.text).toContain("for insert to authenticated with check (user_id = auth.uid())");
       expect(sql).toContain("revoke update, delete on public.sync_tombstones from authenticated");
+    } else if (expectation.kind === "self-read") {
+      expect(looped).not.toContain(table);
+      expect(explicit.map((p) => p.name)).toEqual([expectation.policy]);
+      expect(explicit[0]!.text).toContain("for select to authenticated using (user_id = auth.uid())");
+      expect(sql).toContain(`revoke insert, update, delete, truncate on public.${table} from anon, authenticated`);
+    } else if (expectation.kind === "append-only") {
+      expect(looped).not.toContain(table);
+      expect(explicit.map((p) => p.name).sort()).toEqual([expectation.insert, expectation.read].sort());
+      expect(explicit.find((p) => p.name === expectation.read)!.text).toContain("for select to authenticated using (public.is_active_reviewer())");
+      expect(explicit.find((p) => p.name === expectation.insert)!.text).toContain("for insert to authenticated with check (reviewer_user_id = auth.uid() and public.is_active_reviewer())");
+      expect(sql).toContain(`revoke update, delete, truncate on public.${table} from anon, authenticated`);
+      expect(sql).toContain(`create trigger ${table}_immutable before update or delete on public.${table}`);
     } else {
       // No policy at all: only SECURITY DEFINER functions may touch it.
       expect(looped).not.toContain(table);
@@ -93,6 +112,9 @@ describe("security — RLS + schema invariants", () => {
     const sql = schema();
     for (const table of Object.keys(EXPECTED)) {
       if (table === "ai_rate_quota") continue;
+      // Attestations are audit history and deliberately outlive the reviewer's
+      // account (reviewer_user_id, no foreign key; never exposed publicly).
+      if (table === "review_audit_events") continue;
       const start = sql.indexOf(`create table if not exists public.${table} (`);
       const block = sql.slice(start, sql.indexOf(");", start));
       expect(block, `${table}: user_id must reference auth.users with cascade`).toMatch(/user_id uuid[^,]*references auth\.users ?\(id\) on delete cascade/);
@@ -104,11 +126,30 @@ describe("security — RLS + schema invariants", () => {
 
   it("privileged account and retention functions are callable by the service role only", () => {
     const sql = schema();
-    for (const fn of ["purge_account_server_data(uuid)", "account_residual_rows(uuid)", "purge_expired_server_data()"]) {
+    for (const fn of [
+      "purge_account_server_data(uuid)", "account_residual_rows(uuid)", "purge_expired_server_data()",
+      "grant_reviewer_role(uuid, text, text, text, text)", "revoke_reviewer_role(uuid)",
+    ]) {
       expect(sql).toContain(`revoke all on function public.${fn} from public, anon, authenticated;`);
       expect(sql).toContain(`grant execute on function public.${fn} to service_role`);
       expect(sql).not.toContain(`grant execute on function public.${fn} to authenticated`);
     }
+  });
+
+  it("review audit events stay append-only and reviewer status is checked by a definer function", () => {
+    const sql = schema();
+    expect(sql).toContain("raise exception 'review_audit_events is append-only'");
+    expect(sql).toMatch(/create or replace function public\.is_active_reviewer\(\)[\s\S]*?security definer[\s\S]*?where user_id = auth\.uid\(\) and revoked_at is null/);
+    expect(sql).not.toContain("grant execute on function public.grant_reviewer_role(uuid, text, text, text, text) to authenticated");
+  });
+
+  it("batched sync RPC runs as the caller so table RLS still applies", () => {
+    const sql = schema();
+    const fn = sql.slice(sql.indexOf("create or replace function public.sync_push_batch"));
+    expect(fn).toContain("security invoker");
+    expect(fn).not.toMatch(/^\s*security definer/m);
+    expect(fn).toContain("is distinct from uid::text");
+    expect(sql).toContain("revoke all on function public.sync_push_batch(jsonb, uuid[]) from public, anon;");
   });
 
   it("updated_at trigger rejects stale duplicate-device writes", () => {
