@@ -73,6 +73,9 @@ export function useShortcuts(shortcuts: Shortcut[], deps: unknown[] = []) {
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
+  // Nothing can be typed into a checkbox, radio or button, so shortcuts stay
+  // live after ticking one (the reviewer portal's 1–6 then A flow).
+  if (target instanceof HTMLInputElement && ["checkbox", "radio", "button", "submit", "reset"].includes(target.type)) return false;
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 

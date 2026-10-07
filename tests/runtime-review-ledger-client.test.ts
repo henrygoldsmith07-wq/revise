@@ -15,7 +15,7 @@ import { PROMPTS, verifyThroughWorkflow, wq } from "./helpers-review";
 const q1 = wq("q1", "algebra", PROMPTS[0]!);
 const q2 = wq("q2", "algebra", PROMPTS[1]!);
 const verified = verifyThroughWorkflow([q1, q2], [q1.id]);
-const ledger = { formatVersion: 1, entries: promotableLedgerEntries([q1, q2], verified.log) };
+const ledger = { formatVersion: 1 as const, entries: promotableLedgerEntries([q1, q2], verified.log) };
 
 const okFetch = (body: unknown) => (async () => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
 

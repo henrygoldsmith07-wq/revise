@@ -239,6 +239,55 @@ describe("security — API route guards", () => {
   });
 });
 
+describe("security — reviewer portal routes", () => {
+  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("/api/reviewer/decisions checks origin, size, zod, session, grant and rate limit before any write", () => {
+    const route = read("src/app/api/reviewer/decisions/route.ts");
+    const post = route.slice(route.indexOf("export async function POST"));
+    const order = ["sameOriginRequest(", "MAX_BODY_CHARS", "reviewDecisionRequestSchema.safeParse", "getReviewerContext()", "rateLimit(", "prepareDecision(", "appendRuntimeEvent("];
+    const positions = order.map((needle) => post.indexOf(needle));
+    expect(positions.every((p) => p > -1), JSON.stringify(positions)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(route).toContain("status: 401");
+    expect(route).toContain("status: 403");
+    expect(route).toContain("status: 429");
+    // Identity is never taken from the request; the service role is never used.
+    expect(route).not.toMatch(/body\??\.(reviewerId|reviewerRole|reviewerQualification|reviewedAt|userId)/);
+    expect(route).not.toContain("getSupabaseAdmin");
+    const schema = read("src/lib/reviewer/runtime-ledger.ts");
+    expect(schema).toContain(".strict()");
+  });
+
+  it("reviewer server helpers authenticate with getUser and read the grant under RLS", () => {
+    const lib = read("src/lib/reviewer/server.ts");
+    expect(lib).toContain('import "server-only";');
+    expect(lib).toContain("supabase.auth.getUser()");
+    expect(lib).toContain('.from("reviewer_roles")');
+    expect(lib).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    for (const page of ["src/app/(reviewer)/reviewer/page.tsx", "src/app/(reviewer)/reviewer/review/[questionId]/page.tsx"]) {
+      const source = read(page);
+      expect(source).toContain("getReviewerContext()");
+      expect(source).toContain('context.status !== "ok"');
+      expect(source).not.toContain('"use client"');
+    }
+  });
+
+  it("export is reviewer-only and the public ledger uses the service role read-only", () => {
+    const exp = read("src/app/api/reviewer/export/route.ts");
+    expect(exp).toContain("getReviewerContext()");
+    expect(exp).not.toContain("getSupabaseAdmin");
+    const pub = read("src/app/api/review-ledger/route.ts");
+    expect(pub).toContain("rateLimit(");
+    expect(pub).not.toMatch(/\.(insert|update|delete|upsert|rpc)\(/);
+    expect(read("src/lib/reviewer/server.ts")).not.toMatch(/admin[^\n]*\.(insert|update|delete|upsert)\(/);
+  });
+
+  it("the service worker never caches the reviewer portal", () => {
+    expect(read("public/sw.js")).toContain('url.pathname.startsWith("/reviewer/")');
+  });
+});
+
 describe("security — browser response headers", () => {
   it("ships baseline CSP, framing, MIME, referrer and permissions protections", () => {
     const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
