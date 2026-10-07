@@ -46,3 +46,20 @@ describe("Socratic examiner panel", () => {
     expect(panel).not.toMatch(/text-danger|bg-danger|text-success|bg-success/);
   });
 });
+
+describe("Tutor chat accessibility", () => {
+  const tutor = read("src/app/tutor/page.tsx");
+
+  it("announces replies through a polite live log and a status typing indicator", () => {
+    expect(tutor).toContain('role="log"');
+    expect(tutor).toContain('aria-live="polite"');
+    expect(tutor).toContain("aria-busy={pending}");
+    expect(tutor).toContain("typing-dot");
+  });
+
+  it("keeps keyboard focus in the composer across turns", () => {
+    expect(tutor).toContain("composerRef.current?.focus()");
+    expect(tutor).not.toMatch(/id="tutor-composer"[\s\S]{0,600}disabled=\{pending\}/);
+    expect(tutor).toContain("ref={endRef}");
+  });
+});
