@@ -13,6 +13,7 @@ import { GradePredictionRealityPanel } from "@/components/GradePredictionReality
 import { ExamCommandCentre, ImprovementStory } from "@/components/ExamCommandCentre";
 import { InterventionMemoryPanel } from "@/components/InterventionMemoryPanel";
 import { AdvancedEvidence } from "@/components/AdvancedEvidence";
+import { StudentOnly, TeacherModeToggle, TeacherOnly } from "@/components/TeacherMode";
 import {
   ApplicationMasteryCard,
   MarksLostByCause,
@@ -48,6 +49,8 @@ export default function ReadinessPage() {
       <ProgressSummaryPanel />
 
       <AdvancedEvidence summary="Detailed readiness and evidence">
+        <TeacherModeToggle />
+
         <ExamReadinessCard />
 
         <PaperReadinessPanel />
@@ -82,7 +85,12 @@ export default function ReadinessPage() {
 
         <div className="space-y-2 text-sm text-ink3 max-w-3xl">
           <h2 className="text-base font-semibold text-ink">How readiness is worked out</h2>
-          <p>Readiness weighs progress towards your target grade (30%), how much of the course you have covered (20%), marked accuracy (15%), how well you remember (15%), exam pace (10%) and success on new kinds of question after a delay (10%).</p>
+          <StudentOnly>
+            <p>Readiness combines progress towards your target grade, how much of the course you have covered, your marks, how well you remember, your exam pace and how you do on new questions after a break.</p>
+          </StudentOnly>
+          <TeacherOnly>
+            <p>Readiness weighs progress towards your target grade (30%), how much of the course you have covered (20%), marked accuracy (15%), how well you remember (15%), exam pace (10%) and success on new kinds of question after a delay (10%).</p>
+          </TeacherOnly>
           <p>Missing evidence is shown as missing, never quietly counted as a pass. How sure Revise is about the result is shown separately from the result itself.</p>
           <p>“Ready to prove” means the result is high, the evidence is broad and nothing serious is in the way. It is a signal to try a proof set, not a promise about the exam.</p>
         </div>
