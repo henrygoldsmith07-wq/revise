@@ -66,20 +66,24 @@ background and do other work while it runs. On Windows, invoke npm through
 
 ## Review workflow
 
-Two routes, both appending to the same hash-chained audit log:
+The **reviewer portal** (`src/app/(reviewer)`, `/reviewer`) is the canonical
+path for humans. It appends to the same hash-chained audit log: runtime events
+live in Supabase `public.review_audit_events` as the continuation of
+`src/content/reviews/wjec-review-audit-log.json`, and every rule runs through
+`src/domain/review-workflow.ts`. Never add a parallel review store, and never
+record via the CLI against a live portal without `npm run wjec:review:pull`
+first (it would fork the chain).
+
+Developer/seeding CLI routes (not for reviewers; keep them out of user-facing
+docs and onboarding):
 
 ```bash
+npm run wjec:review:pull      # runtime portal events -> committed audit log (service role)
 npm run wjec:review:queue     # -> review-return.json
 npm run wjec:review:import    # applies it
 npm run wjec:review:batch     # -> content-review.json
 npm run wjec:review:apply     # applies it
-```
-
-There is also an offline HTML pack for reviewers without the toolchain:
-
-```bash
-npm run wjec:review:pack -- --subject <id> > pack.html
-npm run wjec:review:pack:import pack.html
+npm run wjec:review:pack      # offline HTML pack (developer fallback)
 ```
 
 `docs/review-workflow.md` covers all of it.

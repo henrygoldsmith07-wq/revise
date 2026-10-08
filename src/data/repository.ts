@@ -1,5 +1,6 @@
 import { syncWireIdValue } from "./sync-contract";
 import { seedCards, seedQuestions } from "@/content";
+import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
@@ -260,6 +261,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
     );
   }
 
+  const runtimeLedger = await readRuntimeReviewLedger();
   const scoped = <T>(store: CollectionStore): T[] =>
     rows[store].filter((value) => {
       if (store === "questions") {
@@ -274,7 +276,12 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
     reviewLogs: reviewLogs.filter((row) => row.userId === userId),
     // Retired template rows stay on disk for export/history recovery, but can
     // no longer be selected or contribute to live learning evidence.
-    questions: scoped<Question>("questions").filter((question) => !question.id.startsWith("cnt:question:wjec-physics-depth-")),
+    // Reviewer-portal approvals (cached effective ledger) are applied on read,
+    // never written back, so the trust state is always re-derived.
+    questions: applyRuntimeReviewLedger(
+      scoped<Question>("questions").filter((question) => !question.id.startsWith("cnt:question:wjec-physics-depth-")),
+      runtimeLedger,
+    ),
     attempts: attempts.filter((row) => row.userId === userId),
     mistakes: scoped<Mistake>("mistakes"),
     papers: scoped<Paper>("papers"),

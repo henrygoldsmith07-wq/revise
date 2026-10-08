@@ -76,7 +76,11 @@ than by trusting a deployment.
 
 `src/data/sync-contract.ts` is the entity-to-table map. `src/data/sync.ts`
 drains the `outbox` store and then pulls, using `(updated_at, id)` keyset
-cursors per entity. `src/data/sync-deletions.ts` handles per-row deletion:
+cursors per entity. Upserts drain through the `sync_push_batch` RPC
+(`supabase/migrations/20261007000300_sync_push_batch.sql`): up to 200 rows across
+all entities per request, one transaction, SECURITY INVOKER so each table's owner
+RLS and clock/stale-write triggers still apply; servers without the RPC get the
+older per-table upserts. `src/data/sync-deletions.ts` handles per-row deletion:
 delete the local row, write a tombstone into `meta`, drop any pending stale
 upsert, queue a delete intent, and call the `delete_replica_row` RPC.
 
@@ -94,6 +98,19 @@ is true. It is **off by default** and there is a Settings toggle for it. The key
 is generated on the device and stored in the local `meta` store under
 `revise.e2ee.key.v1`; it is never transmitted, except through the explicit
 "reveal key" backup flow the learner initiates.
+
+### Reviewer portal (teachers only)
+
+Teachers, not learners. `public.reviewer_roles` holds the reviewer's auth user
+id, a pseudonymous reviewer label, role and stated qualification; it cascades
+with the account. Each decision in `public.review_audit_events` carries the
+label, role, qualification, date, six checks and comment, plus the reviewer's
+auth user id (`reviewer_user_id`, no foreign key) so RLS can bind a decision to
+its author. Audit rows are append-only and are kept after the reviewer's account
+is deleted, because they are the attestation trail behind trusted content; the
+user id is never served to students. `/api/review-ledger` publishes only the
+fields the committed ledger already publishes (label, role, qualification,
+date, checks), never comments, account ids or rejected decisions.
 
 ### The AI provider
 

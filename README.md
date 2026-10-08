@@ -143,21 +143,19 @@ reviewed. The four WJEC A-level flagships (Mathematics, Biology, Chemistry,
 Physics) have large authored banks but **no human-reviewed questions yet**, so
 proof, the cold-start diagnostic and Exam Mission proof are blocked there until
 review happens. The repository therefore ships a review workflow rather than
-pretending the review has been done:
+pretending the review has been done.
 
-```bash
-npm run wjec:review:priorities          # what to review next, ranked by capability unlocked
-npm run wjec:review:queue -- maths ./pack --limit=10   # reviewer pack: question, mark scheme, spec, provenance, reskin warnings
-npm run wjec:review:pack -- ./pack      # same selection as one offline HTML file a teacher reviews without a terminal
-npm run wjec:review:pack:import -- ./pack/exported-review-pack.html --out=./pack/returns   # exported pack -> return file (validates, writes nothing)
-npm run wjec:review:import -- ./pack/review-return.json   # validate + append to the audit log
-npm run wjec:review:promote             # ledger entries for questions with two independent approvals
-npm run wjec:review:gates               # release gate (part of npm run verify)
-npm run wjec:quality:report             # internal supply dashboard
-```
-
-See [`docs/review-workflow.md`](docs/review-workflow.md). Nothing in the tooling
-approves a question; approvals come only from named reviewers in return files.
+**Teachers review in the browser** at `/reviewer` (the `(reviewer)` route
+group): a server-rendered queue, one dense screen per question (stem, mark
+scheme, specification points, provenance) and keyboard decisions (`A` approve,
+`R` request changes). Decisions extend the same hash-chained audit log, and a
+question becomes trusted for students once two different reviewers approve the
+same content. Access is granted by the maintainer; see
+[`docs/review-workflow.md`](docs/review-workflow.md) for the design, how to
+grant a teacher, and the developer-only CLI (`npm run wjec:review:priorities`,
+`npm run wjec:review:pull`, `npm run wjec:review:promote`,
+`npm run wjec:review:gates`). Nothing in the tooling approves a question;
+approvals come only from named reviewers.
 
 ## Depth first: flagship subject combinations
 

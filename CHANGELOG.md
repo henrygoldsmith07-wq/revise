@@ -1,5 +1,35 @@
 # Changelog
 
+## Teachers review in the browser — 2026-10-07
+
+**Reviewer portal.** A `(reviewer)` route group at `/reviewer` replaces the CLI and
+HTML pack as the way teachers review flagship questions: a server-rendered queue per
+subject, one dense screen per question (stem, each part beside its mark scheme and
+worked answer, specification points, provenance, gate and reskin warnings, history,
+fingerprint) and keyboard decisions (`1`–`6` checks, `A` approve, `R` request
+changes, `J` skip). Access comes only from `public.reviewer_roles`, granted by the
+service role; RLS and a definer `is_active_reviewer()` enforce it in the database as
+well as on every page and route.
+
+**Same audit log, at runtime.** Decisions are built by `appendReviewDecisions` and
+stored in `public.review_audit_events` as the continuation of the committed hash
+chain, verified end to end with `auditLogIssues` on every read. The table is
+insert-only (update/delete rejected for every role) and the insert trigger refuses
+forks and decisions recorded under someone else's grant. `/api/review-ledger`
+serves the effective ledger; student devices cache it and apply it with
+`applyHumanVerificationLedger`, so a question two teachers verify joins the
+provable pool without a rebuild. `npm run wjec:review:pull` brings runtime events
+back into the committed log for `wjec:review:promote` and `wjec:review:gates`.
+
+**One request per mock paper.** The outbox drains upserts through
+`sync_push_batch`, one transaction for up to 200 rows across all entities, with the
+same owner checks, deterministic wire ids, causal order and outbox durability, and
+`sync_writes` keys committed in the same transaction. Older servers fall back to
+per-table upserts.
+
+**CLI review tools are developer-only.** The npm scripts stay for seeding and CI;
+user-facing docs and the trusted-coverage page now point to the portal.
+
 ## One product loop: what to do, why, what changed, what Revise now knows — 2026-10-07
 
 **Today leads with the highest-value session.** Both Today heroes open with "Your

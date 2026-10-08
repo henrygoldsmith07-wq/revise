@@ -103,7 +103,9 @@ instead, linked to topics and tagged for analytics.
 
 IndexedDB is the primary store. A write lands there and is durable before the UI
 updates; the same change is then queued in an outbox. `sync()` drains the outbox
-in batches per entity, then pulls anything newer.
+through one `sync_push_batch` RPC per chunk (all entities, one transaction; a
+finished mock paper is one request), falling back to per-entity upserts on a
+server without the RPC, then pulls anything newer.
 
 **Conflict rules:** plain entities use last-write-wins on `updated_at`; FSRS
 cards union/replay causally stamped review operations, and lesson progress and

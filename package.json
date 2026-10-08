@@ -53,6 +53,7 @@
     "wjec:review:import": "node scripts/wjec-review.mjs import",
     "wjec:review:promote": "node scripts/wjec-review.mjs promote",
     "wjec:review:status": "node scripts/wjec-review.mjs status",
+    "wjec:review:pull": "node scripts/pull-runtime-review-log.mjs",
     "wjec:review:gates": "node scripts/wjec-review.mjs check",
     "wjec:quality:report": "node scripts/report-wjec-quality.mjs",
     "wjec:campaign": "node scripts/wjec-review.mjs campaign",
