@@ -10,6 +10,8 @@ import { collectMissions } from "@/domain/revision-engine";
 import { useStoreFields } from "@/state/store";
 import { QuestionSetSession } from "./QuestionSetSession";
 import { SessionEvidenceBlock } from "./SessionEvidenceBlock";
+import { ProofCheckBanner } from "./ProofCheckBanner";
+import { captureProductEvent } from "@/lib/product-telemetry";
 import { useRecoveryEvidence, useRevisionPlan } from "./recovery-evidence";
 
 export function MissionSessionMode({ missionId, stage, onExit }: { missionId: string; stage: string | null; onExit: () => void }) {
@@ -35,14 +37,26 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
   });
   const onProgress = useCallback((position: number) => {
     if (!session || position >= session.questionIds.length) return;
-    if (position === 0) void recordFunnel("revision_task_started", `action:${missionId}:${session.stage}`);
+    if (position === 0) {
+      void recordFunnel("revision_task_started", `action:${missionId}:${session.stage}`);
+      captureProductEvent("intervention.started", { kind: session.stage });
+      if (session.stage === "delayed-proof") captureProductEvent("proof.attempted", { kind: session.stage });
+    }
     void saveRevisionCheckpoint(missionCheckpoint(session, { stage }, startedAt, position));
   }, [saveRevisionCheckpoint, session, stage, startedAt, missionId, recordFunnel]);
   const onFinished = useCallback(() => {
     void clearRevisionCheckpoint();
-    if (session) void recordFunnel("recommendation_completed", `action:${missionId}:${session.stage}`);
+    if (session) {
+      void recordFunnel("recommendation_completed", `action:${missionId}:${session.stage}`);
+      captureProductEvent("recommendation.completed", { kind: session.stage });
+      captureProductEvent("intervention.completed", { kind: session.stage });
+    }
   }, [clearRevisionCheckpoint, missionId, recordFunnel, session]);
-  const exit = useCallback(() => { void clearRevisionCheckpoint(); onExit(); }, [clearRevisionCheckpoint, onExit]);
+  const exit = useCallback(() => {
+    void clearRevisionCheckpoint();
+    captureProductEvent("session.abandoned", { kind: session?.stage ?? "mission" });
+    onExit();
+  }, [clearRevisionCheckpoint, onExit, session?.stage]);
 
   return (
     <QuestionSetSession
@@ -60,6 +74,12 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
       contextFor={session?.contextFor}
       intro={session ? (
         <>
+          {session.stage === "delayed-proof" ? (
+            <ProofCheckBanner
+              href={`/adaptive-session?topic=${encodeURIComponent(session.questionIds[0] ?? "")}&start=1&proof=1`}
+              state="due"
+            />
+          ) : null}
           {session.intro.map((line) => <p key={line}>{line}</p>)}
           {session.steps.map((step) => (
             <p key={step.id}><span className="font-semibold">{step.title}:</span> {step.why}{step.verified ? "" : " Some of these questions have not been reviewed yet, so they are practice only."}</p>

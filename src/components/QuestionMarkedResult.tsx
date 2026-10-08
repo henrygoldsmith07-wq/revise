@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import type { RetestEvaluation } from "@/domain/mistakes";
 
@@ -13,8 +13,10 @@ import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/do
 import { confidenceWord } from "@/domain/plain-numbers";
 import { ImproveAnswer } from "./ImproveAnswer";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
+import { ProofCheckBanner } from "./ProofCheckBanner";
 import { RichText } from "./RichText";
-import { Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
+import { ButtonLink, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
+import { captureProductEvent } from "@/lib/product-telemetry";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 
 export function MarkedResult({
@@ -48,6 +50,13 @@ export function MarkedResult({
 }) {
   const pct = question.totalMarks ? awarded / question.totalMarks : 0;
   const plan = result.remediation;
+  useEffect(() => {
+    if (result.retest?.status === "resolved") {
+      captureProductEvent("mistake.repaired", { count: 1 });
+    }
+    // Once per marked result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result.retest?.status]);
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
     for (const part of plan.parts) {
@@ -310,6 +319,49 @@ export function MarkedResult({
           <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
           <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
         </div>
+        {awarded < question.totalMarks ? (
+          <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="Repair path">
+            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Repair path — one flow</p>
+            <ol className="text-xs text-ink2 space-y-1 list-decimal pl-4">
+              <li>Your answer above is preserved. Read the cause below, then repair with help.</li>
+              <li>Try a new related question on the same skill.</li>
+              <li>Prove it on an unseen transfer question with no hints.</li>
+            </ol>
+            <div className="flex flex-wrap gap-2">
+              <ButtonLink
+                href={`/tutor?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`}
+                size="sm"
+                variant="secondary"
+                onClick={() => captureProductEvent("intervention.started", { kind: "misconception-repair" })}
+              >
+                Repair with tutor
+              </ButtonLink>
+              <ButtonLink
+                href={`/practice?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`}
+                size="sm"
+                variant="secondary"
+                onClick={() => captureProductEvent("intervention.started", { kind: "exam-style-question" })}
+              >
+                New related question
+              </ButtonLink>
+              <ButtonLink
+                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                size="sm"
+                variant="primary"
+                onClick={() => captureProductEvent("proof.attempted", { kind: "delayed-proof" })}
+              >
+                Unseen proof check
+              </ButtonLink>
+            </div>
+            <p className="text-[11px] text-ink3">Help never counts as proof. Only an unaided answer on a new question does.</p>
+          </div>
+        ) : (
+          <ProofCheckBanner
+            topicTitle={question.topicIds[0]}
+            href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+            state="passed"
+          />
+        )}
         {/* Ask: what did this one attempt teach us? */}
         {result.marked.some((m) => m.missedPoints.length) ? (
           <div className="flex flex-wrap gap-1.5">

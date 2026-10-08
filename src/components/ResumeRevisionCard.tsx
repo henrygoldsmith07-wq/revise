@@ -3,6 +3,7 @@
 import { revisionActivityLabel } from "@/domain/revision-checkpoint";
 import { useStoreFields } from "@/state/store";
 import { Button, ButtonLink, Panel, Pill, ProgressBar } from "@/components/ui";
+import { captureProductEvent } from "@/lib/product-telemetry";
 
 export function ResumeRevisionCard() {
   const store = useStoreFields("clearRevisionCheckpoint", "revisionCheckpoint");
@@ -31,8 +32,21 @@ export function ResumeRevisionCard() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <ButtonLink href={checkpoint.href} size="sm">Resume</ButtonLink>
-          <Button size="sm" variant="ghost" onClick={() => void store.clearRevisionCheckpoint()}>
+          <ButtonLink
+            href={checkpoint.href}
+            size="sm"
+            onClick={() => captureProductEvent("session.returned", { kind: checkpoint.activity })}
+          >
+            Resume
+          </ButtonLink>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              captureProductEvent("session.abandoned", { kind: checkpoint.activity });
+              void store.clearRevisionCheckpoint();
+            }}
+          >
             Dismiss
           </Button>
         </div>

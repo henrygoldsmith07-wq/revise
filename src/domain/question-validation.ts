@@ -310,3 +310,123 @@ export function retireQuestionValidation(
 export function isQuestionValidated(question: Question): boolean {
   return question.validation?.stage === "validated" && question.validation.report.ok;
 }
+
+// ---------------------------------------------------------------------------
+// Generated-content depth checks. Deterministic warnings only — they never
+// approve content and never replace qualified human review. Generated
+// questions must still pass validateQuestion + two independent human
+// approvals before they can become trusted.
+// ---------------------------------------------------------------------------
+
+function addWarning(
+  issues: QuestionValidationIssue[],
+  code: QuestionValidationIssue["code"],
+  message: string,
+): void {
+  issues.push({ code, message, severity: "warning" });
+}
+
+function normalise(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function wordOverlap(a: string, b: string): number {
+  const aw = new Set(normalise(a).split(" ").filter(Boolean));
+  const bw = new Set(normalise(b).split(" ").filter(Boolean));
+  if (!aw.size || !bw.size) return 0;
+  let shared = 0;
+  for (const w of aw) if (bw.has(w)) shared += 1;
+  return shared / Math.max(aw.size, bw.size);
+}
+
+/**
+ * Extra deterministic gates for generated questions: spec alignment, mark
+ * allocation, answerability, duplicate similarity, difficulty, AO mapping,
+ * ambiguity and factual consistency. All findings are warnings; `ok` still
+ * depends only on the error-level structural checks above.
+ */
+export function validateGeneratedContent(
+  question: Question,
+  topics: readonly Topic[] = [],
+  bank: readonly Question[] = [],
+): QuestionValidationIssue[] {
+  const warnings: QuestionValidationIssue[] = [];
+  if (question.origin !== "ai" && question.source !== "generated") return warnings;
+
+  // Spec alignment: generated questions must map to at least one spec point
+  // with learning claims, otherwise they cannot be trusted for assessment.
+  const mapped = mappedSpecPointIds(question);
+  if (mapped.size === 0) {
+    addWarning(warnings, "weak-spec-alignment", `${question.id}: generated question has no spec point mapping`);
+  } else if (topics.length) {
+    const known = new Set(topics.flatMap((t) => (t.specPoints ?? []).map((s) => s.id)));
+    if ([...mapped].every((id) => !known.has(id))) {
+      addWarning(warnings, "weak-spec-alignment", `${question.id}: spec mapping matches no known statement`);
+    }
+  }
+  for (const part of question.parts) {
+    if ((part.learningClaims ?? []).filter((c) => c.trim()).length === 0) {
+      addWarning(warnings, "weak-spec-alignment", `${question.id}/${part.id}: no learning claim for the mark scheme`);
+    }
+  }
+
+  // Mark allocation: one claim may earn several marks, but every mark should
+  // trace to an explicit scheme point.
+  for (const part of question.parts) {
+    if (part.markScheme.length > 0 && part.markScheme.length < part.marks) {
+      addWarning(warnings, "mark-allocation-mismatch", `${question.id}/${part.id}: ${part.marks} marks but only ${part.markScheme.length} scheme points`);
+    }
+  }
+
+  // Answerability: a model answer must exist and reference the scheme.
+  for (const part of question.parts) {
+    const answer = (part.modelAnswer ?? "").trim();
+    if (answer.length < 12) {
+      addWarning(warnings, "unanswerable", `${question.id}/${part.id}: model answer too short to be answerable`);
+    }
+  }
+
+  // Duplicate similarity: near-identical stems to existing bank items.
+  for (const other of bank) {
+    if (other.id === question.id) continue;
+    if (other.subjectId !== question.subjectId) continue;
+    if (wordOverlap(question.stem, other.stem) >= 0.82) {
+      addWarning(warnings, "duplicate-similar", `${question.id}: very similar to ${other.id}; reskins never count as proof`);
+      break;
+    }
+  }
+
+  // Difficulty: 1-mark recall should not claim level 5 and vice versa.
+  if (question.totalMarks <= 2 && question.difficulty >= 4) {
+    addWarning(warnings, "difficulty-mismatch", `${question.id}: low marks with high difficulty claim`);
+  }
+  if (question.totalMarks >= 6 && question.difficulty <= 1) {
+    addWarning(warnings, "difficulty-mismatch", `${question.id}: high marks with low difficulty claim`);
+  }
+
+  // AO mapping: every part needs an explicit AO; generated content often omits AO3.
+  for (const part of question.parts) {
+    if (!part.aos?.length) {
+      addWarning(warnings, "ao-mapping-gap", `${question.id}/${part.id}: no AO mapping`);
+    }
+  }
+
+  // Ambiguity: hedged prompts ("maybe", "etc.", "something like") need review.
+  if (/\b(maybe|etc\.|something like|and so on|various)\b/i.test(question.stem)) {
+    addWarning(warnings, "ambiguous-prompt", `${question.id}: prompt contains ambiguous phrasing`);
+  }
+
+  // Factual consistency: numbers in the model answer should appear in the
+  // scheme or stem, otherwise the answer may contradict its own marks.
+  for (const part of question.parts) {
+    const numbers = (part.modelAnswer ?? "").match(/-?\d+(\.\d+)?/g) ?? [];
+    const context = `${part.markScheme.join(" ")} ${question.stem}`;
+    const stray = numbers.filter((n) => !context.includes(n));
+    if (numbers.length >= 2 && stray.length >= 2) {
+      addWarning(warnings, "factual-consistency-risk", `${question.id}/${part.id}: model answer numbers not traceable to the scheme`);
+      break;
+    }
+  }
+
+  return warnings;
+}

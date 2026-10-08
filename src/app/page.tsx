@@ -164,14 +164,17 @@ function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; 
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
       <div className="today-focus card p-5 sm:p-7">
-        <h2 className="text-xl font-semibold text-ink">A lesson is a good place to begin</h2>
-        <p className="mt-2 text-sm leading-6 text-ink2">Browse a topic that interests you, or add exam dates to make a plan.</p>
+        <p className="text-sm font-semibold text-speak">Do this now</p>
+        <h2 className="mt-2 text-xl font-semibold text-ink">Find where to start</h2>
+        <p className="mt-2 text-sm leading-6 text-ink2">A 5–10 minute quick check across several topics — no hints, so answers count as evidence. Revise then chooses your personalised next step.</p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <ButtonLink href="/lesson" variant="primary" size="md" className="w-full sm:w-auto min-h-[3rem] text-base">Browse lessons</ButtonLink>
+          <ButtonLink href="/diagnostic" variant="primary" size="md" className="w-full sm:w-auto min-h-[3rem] text-base">Start quick check</ButtonLink>
+          <ButtonLink href="/lesson" variant="secondary" size="md" className="w-full sm:w-auto min-h-[3rem]">Browse lessons</ButtonLink>
           <Link href="/settings" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink py-3 px-1 min-h-[3rem] inline-flex items-center">
             Set up exams
           </Link>
         </div>
+        <p className="mt-3 text-xs text-ink3">Not a grade. Unreviewed questions are practice only — Revise says so rather than guessing.</p>
       </div>
       <TodayOverview />
       <SafeTodayRoadmap />

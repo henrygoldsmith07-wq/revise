@@ -2,6 +2,11 @@
 // Plain-language content-trust label. A thin mapping over the repo's existing
 // trust predicates (trustedAssessmentContent, isFlagship) and the supply
 // audit's counts; it defines no trust rule of its own.
+//
+// Provenance tiers (reference → authored → reviewed → independently reviewed
+// → trusted → proof-capable) describe how far a question has travelled.
+// TrustTier (trusted / reference / unverified / insufficient) remains the
+// backwards-compatible learner summary.
 // ---------------------------------------------------------------------------
 
 import { trustedAssessmentContent } from "./content-trust";
@@ -17,6 +22,50 @@ export const TRUST_LABEL: Record<TrustTier, string> = {
   unverified: "Not yet checked",
   insufficient: "Not enough questions to prove this yet",
 };
+
+/** Editorial journey of one question. Generated content never skips steps. */
+export type ProvenanceTier =
+  | "reference"
+  | "authored"
+  | "reviewed"
+  | "independently-reviewed"
+  | "trusted"
+  | "proof-capable";
+
+export const PROVENANCE_LABEL: Record<ProvenanceTier, string> = {
+  reference: "Reference · not spec-checked",
+  authored: "Authored · awaiting review",
+  reviewed: "Reviewed · one check",
+  "independently-reviewed": "Independently reviewed",
+  trusted: "Trusted, reviewed material",
+  "proof-capable": "Proof-capable · trusted and unseen",
+};
+
+export function provenanceTier(question: Question): ProvenanceTier {
+  if (!isFlagship(question.subjectId)) return "reference";
+  if (question.origin === "ai" || question.source === "generated") {
+    // Generated questions must pass human review before they leave "authored".
+    return question.verification === "verified" && trustedAssessmentContent(question)
+      ? "trusted"
+      : "authored";
+  }
+  if (trustedAssessmentContent(question)) {
+    const checks = question.humanVerification?.checks;
+    const count = checks ? Object.values(checks).filter(Boolean).length : 0;
+    if (count >= 6) return "trusted";
+    return "independently-reviewed";
+  }
+  if (question.verification === "checked") return "reviewed";
+  return "authored";
+}
+
+export const provenanceLabel = (question: Question): string =>
+  PROVENANCE_LABEL[provenanceTier(question)];
+
+/** Trusted + unseen questions can carry proof; everything else is practice only. */
+export function isProofCapable(question: Question, seenQuestionIds: ReadonlySet<Id>): boolean {
+  return trustedAssessmentContent(question) && !seenQuestionIds.has(question.id);
+}
 
 /** Topic-level supply, as produced by unseenSupplyByTopic or the supply audit. */
 export interface TopicTrustInput {

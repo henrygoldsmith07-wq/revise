@@ -29,7 +29,7 @@ import { SearchOverlay } from "./SearchOverlay";
 import { useShortcuts } from "./shortcuts";
 import { Onboarding } from "./Onboarding";
 
-// Today, Subjects and Progress are the three destinations; manual tools keep direct routes.
+// Today, Subjects and Readiness are the three destinations; manual tools keep direct routes.
 // Navigation is verb-first: every destination is something the student does,
 // not a noun they browse. "Today" is always first because the product's whole
 // claim is that it knows what you should do next.
@@ -44,7 +44,7 @@ type NavItem = { href: string; label: string; Icon: LucideIcon; primary?: boolea
 const TODAY_NAV: NavItem[] = [
   { href: "/", label: "Today", Icon: TodayIcon, primary: true },
   { href: "/library", label: "Subjects", Icon: LibraryIcon, primary: true },
-  { href: "/readiness", label: "Progress", Icon: ProgressIcon, primary: true },
+  { href: "/readiness", label: "Readiness", Icon: ProgressIcon, primary: true },
 ];
 
 // Manual tools stay one tap away but no longer compete with the three destinations.
@@ -66,7 +66,7 @@ const MANAGEMENT_NAV: NavItem[] = [
 const NAV = [...TODAY_NAV, ...STUDY_NAV, ...MANAGEMENT_NAV];
 const DESKTOP_NAV_GROUPS = [
   { label: null, items: TODAY_NAV },
-  { label: "Choose your own", items: STUDY_NAV },
+  { label: "Tools", items: STUDY_NAV },
   { label: null, items: MANAGEMENT_NAV },
 ] as const;
 
@@ -297,7 +297,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Tools
             </summary>
             <div className="absolute bottom-full right-2 mb-2 w-56 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
-              <p className="px-3 py-2 text-xs text-ink3">Choose your own</p>
+              <p className="px-3 py-2 text-xs text-ink3">Tools · choose your own</p>
               {[...STUDY_NAV, ...MANAGEMENT_NAV].map((item) => (
                 <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
                   aria-current={isActive(item.href) ? "page" : undefined}

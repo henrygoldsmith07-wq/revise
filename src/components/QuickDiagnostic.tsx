@@ -11,6 +11,7 @@ import { QuestionRunner } from "./QuestionRunner";
 import { ButtonLink, Button, Panel } from "./ui";
 import { useStoreFields } from "@/state/store";
 import { useRevisionPlan } from "./recovery-evidence";
+import { captureProductEvent } from "@/lib/product-telemetry";
 import type { Attempt } from "@/domain/types";
 
 export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: string; autoStart?: boolean }) {
@@ -45,7 +46,10 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
 
   const finished = Boolean(report);
   useEffect(() => {
-    if (finished) void store.recordFunnel("diagnostic_completed", subjectId);
+    if (finished) {
+      void store.recordFunnel("diagnostic_completed", subjectId);
+      captureProductEvent("diagnostic.completed", { subject: subjectId, count: selection.items.length });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 

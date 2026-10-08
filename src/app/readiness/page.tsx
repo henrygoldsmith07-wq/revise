@@ -20,6 +20,7 @@ import {
   RecurringMisconceptions,
 } from "@/components/AssessmentPanels";
 import { ButtonLink, Panel } from "@/components/ui";
+import { ReadinessAutopilot } from "@/components/ReadinessAutopilot";
 
 export default function ReadinessPage() {
   const store = useStoreFields("examReadinessSummary");
@@ -30,11 +31,13 @@ export default function ReadinessPage() {
     <div className="space-y-6">
       <header>
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">How you are doing</p>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Progress</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Readiness</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          Where you stand, what is costing marks, and whether revision is actually working. Numbers appear only when there is evidence behind them.
+          If the exam were today, where would you stand? What is strong, weak, unproven, at risk — and what should happen next. Numbers appear only when there is evidence behind them.
         </p>
       </header>
+
+      <ReadinessAutopilot />
 
       <ProgressSummaryPanel />
 

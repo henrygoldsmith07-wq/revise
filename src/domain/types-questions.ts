@@ -393,7 +393,15 @@ export type QuestionValidationIssueCode =
   | "missing-last-checked"
   | "stale-provenance"
   | "missing-licence"
-  | "missing-paper-provenance";
+  | "missing-paper-provenance"
+  | "weak-spec-alignment"
+  | "mark-allocation-mismatch"
+  | "unanswerable"
+  | "duplicate-similar"
+  | "difficulty-mismatch"
+  | "ao-mapping-gap"
+  | "ambiguous-prompt"
+  | "factual-consistency-risk";
 
 export interface QuestionValidationIssue {
   code: QuestionValidationIssueCode;

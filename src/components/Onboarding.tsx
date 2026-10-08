@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { allQualifications, allSubjects, availableBoards, getBoard, gradesFor } from "@/domain/curriculum";
+import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
+import { isFlagship } from "@/domain/flagship";
 import { todayIso } from "@/domain/scheduling";
 import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
@@ -14,17 +15,14 @@ import { CreditedIcon } from "./icons";
 // First screen. Not a dialog over the app — the app itself waits (AppShell
 // renders nothing else until onboarding completes), so this is a full page.
 //
-// Exactly three questions, each of which materially changes what the app does
-// next: which exam board (scopes every subject offered), which subjects on
-// that board (scopes all content), and when each exam is (drives planner
-// urgency). Everything that can be defaulted is not asked: the time budget
-// starts on the "Steady" preset and the target grade on the qualification's
-// top grade, both fine-tunable in Settings afterwards. Exam dates are optional:
-// valid dates improve prioritisation, but students can reach their first study
-// plan immediately and add or change dates later in Settings.
+// Five steps that end in value, not configuration:
+//   1. board → 2. subjects → 3. exam dates → 4. quick check → 5. first step.
+// The diagnostic preferentially uses trusted/reviewed content; unreviewed
+// questions never provide trusted evidence. After onboarding Today shows the
+// personalised next action immediately.
 // ---------------------------------------------------------------------------
 
-const PHASES = ["Board", "Subjects", "Exam dates"] as const;
+const PHASES = ["Board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;
 
 /** Default time budget while the student has not yet tuned Settings. */
 const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
@@ -37,11 +35,12 @@ interface SubjectRow {
 }
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
-  const store = useStoreFields("regeneratePlan", "updateSettings", "upsertExamDate", "userId");
+  const store = useStoreFields("regeneratePlan", "updateSettings", "upsertExamDate", "userId", "recordFunnel");
   const [phase, setPhase] = useState(0);
   const [boardId, setBoardId] = useState<Id | null>(null);
   const [subjectIds, setSubjectIds] = useState<Id[]>([]);
   const [examDates, setExamDates] = useState<Record<string, string>>({});
+  const [diagnosticChoice, setDiagnosticChoice] = useState<"quick" | "skip">("quick");
   const [saving, setSaving] = useState(false);
 
   const boards = useMemo(() => availableBoards(), []);
@@ -89,8 +88,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     return !isOptionalExamDateValid(date, today);
   });
   const enteredDatesValid = invalidDates.length === 0;
-  const onDatesPhase = phase === PHASES.length - 1;
-  const canContinue = phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : enteredDatesValid;
+  const onFinalPhase = phase === PHASES.length - 1;
+  const onDatesPhase = phase === 2;
+  const flagshipChosen = subjectIds.filter((id) => isFlagship(id));
+  const referenceChosen = subjectIds.filter((id) => !isFlagship(id));
+  const firstSubjectName = chosenSubjects[0] ? getSubject(chosenSubjects[0].id)?.name ?? chosenSubjects[0].name : "";
+  const canContinue =
+    phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : phase === 2 ? enteredDatesValid : true;
 
   function chooseBoard(id: Id) {
     // Changing board resets subject + date choices: they belonged to the
@@ -110,6 +114,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       subjectIds,
       availability,
       targetGrades: Object.fromEntries(subjectIds.map((id) => [id, gradesFor(id)[0] ?? "A*"])),
+      // A skipped quick check stays skipped on Today; otherwise Today leads with it.
+      quickCheckSkipped: diagnosticChoice === "skip" ? [...subjectIds] : [],
     });
 
     for (const subject of chosenSubjects) {
@@ -127,6 +133,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
     // Build the plan now, so Today has real work on it the moment they land.
     await store.regeneratePlan();
+    if (diagnosticChoice === "quick" && subjectIds.length) {
+      void store.recordFunnel("diagnostic_started", subjectIds[0]!);
+    } else {
+      void store.recordFunnel("diagnostic_skipped", subjectIds[0] ?? "none");
+    }
     onDone();
   }
 
@@ -253,7 +264,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </Panel>
         ) : null}
 
-        {phase === 2 && onDatesPhase ? (
+        {phase === 2 ? (
           <Panel className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold">When are the exams? <span className="text-ink3 font-normal">(optional)</span></h2>
@@ -289,13 +300,103 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </Panel>
         ) : null}
 
-        <div className={cx("flex gap-2", onDatesPhase && "flex-col sm:flex-row")}>
+        {phase === 3 ? (
+          <Panel className="space-y-3">
+            <h2 className="text-sm font-semibold">Start with a short diagnostic?</h2>
+            <p className="text-xs text-ink3">
+              A 5–10 minute quick check across several topics shows Revise where to start. It uses
+              trusted, reviewed questions where they exist — no hints, so answers count as unaided
+              evidence. It is not a grade and never tests everything.
+            </p>
+            <ul className="space-y-2" role="radiogroup" aria-label="Diagnostic choice">
+              <li>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={diagnosticChoice === "quick"}
+                  onClick={() => setDiagnosticChoice("quick")}
+                  className={cx(
+                    "w-full text-left card px-4 py-3 min-h-[3.5rem] flex items-start gap-3",
+                    diagnosticChoice === "quick" ? "border-ink3 bg-surface2" : "hover:border-ink3",
+                  )}
+                >
+                  <span className={cx("mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0", diagnosticChoice === "quick" ? "bg-accent border-transparent text-onaccent" : "border-line")}>
+                    {diagnosticChoice === "quick" ? <CreditedIcon size={12} aria-hidden /> : null}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium text-ink">Yes — find where I should start</span>
+                    <span className="block text-xs text-ink3 mt-0.5">Recommended. About 5–10 minutes, then a personalised first step.</span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={diagnosticChoice === "skip"}
+                  onClick={() => setDiagnosticChoice("skip")}
+                  className={cx(
+                    "w-full text-left card px-4 py-3 min-h-[3.5rem] flex items-start gap-3",
+                    diagnosticChoice === "skip" ? "border-ink3 bg-surface2" : "hover:border-ink3",
+                  )}
+                >
+                  <span className={cx("mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0", diagnosticChoice === "skip" ? "bg-accent border-transparent text-onaccent" : "border-line")}>
+                    {diagnosticChoice === "skip" ? <CreditedIcon size={12} aria-hidden /> : null}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium text-ink">Skip for now</span>
+                    <span className="block text-xs text-ink3 mt-0.5">Start revising directly. You can run the check later from Today.</span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+            {flagshipChosen.length ? (
+              <p className="text-xs text-ink2" role="status">
+                {flagshipChosen.length === subjectIds.length
+                  ? "Your subjects have authored flagship content; the check uses reviewed questions where they exist."
+                  : `Flagship: ${flagshipChosen.map((id) => getSubject(id)?.name ?? id).join(", ")} use reviewed questions where available.`}
+              </p>
+            ) : null}
+            {referenceChosen.length ? (
+              <p className="text-xs text-ink3" role="note">
+                Reference subjects ({referenceChosen.map((id) => getSubject(id)?.name ?? id).join(", ")}) are good for
+                practice, but unreviewed questions cannot provide trusted evidence — Revise will say so rather than guess.
+              </p>
+            ) : null}
+          </Panel>
+        ) : null}
+
+        {phase === 4 ? (
+          <Panel className="space-y-3">
+            <h2 className="text-sm font-semibold">Your first step is ready</h2>
+            <p className="text-sm text-ink2">
+              {diagnosticChoice === "quick"
+                ? firstSubjectName
+                  ? `Revise will start with a quick check in ${firstSubjectName}, then choose your personalised next action from what you get wrong. Anything you lose becomes a repair plan.`
+                  : "Revise will start with a quick check, then choose your personalised next action."
+                : "Revise already has a first step waiting on Today — and you can run the quick check any time to sharpen it."}
+            </p>
+            <div className="rounded-xl border border-line bg-surface2/60 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What happens next</p>
+              <ol className="mt-1.5 space-y-1 text-xs text-ink2 list-decimal pl-4">
+                <li>{diagnosticChoice === "quick" ? "Answer a few short questions with no hints." : "Open Today and start the recommended step."}</li>
+                <li>See what Revise found and why it chose the next action.</li>
+                <li>Mistakes turn into targeted repair, then an unseen proof check.</li>
+              </ol>
+            </div>
+            <p className="text-xs text-ink3">
+              Revise already understands where to look first — you will leave thinking that, not that you configured a dashboard.
+            </p>
+          </Panel>
+        ) : null}
+
+        <div className={cx("flex gap-2", onFinalPhase && "flex-col sm:flex-row")}>
           {phase > 0 ? (
             <Button className="min-h-[3rem]" onClick={() => setPhase(phase - 1)}>
               Back
             </Button>
           ) : null}
-          {!onDatesPhase ? (
+          {!onFinalPhase ? (
             <Button
               variant="primary"
               className="flex-1 min-h-[3rem]"
@@ -305,14 +406,20 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               Continue
             </Button>
           ) : null}
-          {onDatesPhase ? (
+          {onFinalPhase ? (
             <Button
               variant="primary"
               className="flex-1 min-h-[3rem]"
               disabled={saving || !canContinue}
               onClick={() => void finish()}
             >
-              {saving ? "Building your plan…" : missingDates.length ? "Build my plan without all dates" : "Build my plan"}
+              {saving
+                ? "Building your plan…"
+                : diagnosticChoice === "quick"
+                  ? "Start my quick check"
+                  : missingDates.length
+                    ? "Build my plan without all dates"
+                    : "Build my plan"}
             </Button>
           ) : null}
         </div>

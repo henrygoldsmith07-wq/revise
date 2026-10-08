@@ -36,6 +36,12 @@ export interface TutorLearnerContext {
   position?: string;
   masteryLine?: string;
   openMistakes: TutorMistakeContext[];
+  /** Recall vs application split, when both have been measured. */
+  applicationGapLine?: string;
+  examLine?: string;
+  interventionLine?: string;
+  /** Proactive coach opener, grounded in the same evidence. */
+  coachOpener?: string;
 }
 
 const CATEGORY_LABELS: Record<Mistake["category"], string> = {
@@ -160,6 +166,10 @@ export function buildTutorLearnerContext(input: {
   topic: Topic;
   mistakes: readonly Mistake[];
   mastery?: TopicMastery | null;
+  recall?: number | null;
+  application?: number | null;
+  examDays?: number | null;
+  intervention?: string | null;
 }): TutorLearnerContext {
   const { topic } = input;
   const open = input.mistakes
@@ -172,13 +182,59 @@ export function buildTutorLearnerContext(input: {
     marksLost: mistake.marksLost,
   }));
 
+  const recall = input.recall ?? null;
+  const application = input.application ?? null;
+  const applicationGapLine =
+    recall !== null && application !== null && recall - application > 0.08
+      ? `Recall ${Math.round(recall * 100)}% but application ${Math.round(application * 100)}% on checked answers — knows the fact, struggles when context changes.`
+      : undefined;
+  const examLine =
+    input.examDays === null || input.examDays === undefined
+      ? undefined
+      : input.examDays <= 0
+        ? "Exam is today."
+        : `Exam in ${input.examDays} days.`;
+  const interventionLine = input.intervention ?? undefined;
+  const coachOpener = buildCoachOpener({
+    title: topic.title,
+    openCount: open.length,
+    marksLost: open.reduce((s, m) => s + m.marksLost, 0),
+    applicationGapLine,
+    examLine,
+  });
+
   return {
     position: [curriculumPosition(topic), topic.specRef ? `spec ${topic.specRef}` : null]
       .filter((part): part is string => part !== null)
       .join(" · "),
     masteryLine: masteryLine(input.mastery),
     openMistakes,
+    ...(applicationGapLine ? { applicationGapLine } : {}),
+    ...(examLine ? { examLine } : {}),
+    ...(interventionLine ? { interventionLine } : {}),
+    ...(coachOpener ? { coachOpener } : {}),
   };
+}
+
+/** Proactive, grounded opener — never generic encouragement. Null when nothing to say. */
+function buildCoachOpener(input: {
+  title: string;
+  openCount: number;
+  marksLost: number;
+  applicationGapLine?: string;
+  examLine?: string;
+}): string | undefined {
+  if (input.openCount === 0 && !input.applicationGapLine) return undefined;
+  if (input.applicationGapLine) {
+    return `You have repeatedly lost application marks on ${input.title}. Let's work through one example together, then try an unseen question with no hints.`;
+  }
+  if (input.openCount >= 2) {
+    return `You lost ${input.marksLost} marks on ${input.title} across separate questions. Let's fix the underlying cause, then prove it on something new.`;
+  }
+  if (input.openCount === 1) {
+    return `One mark is still open on ${input.title}. Let's repair it, then check it holds on a new question.`;
+  }
+  return undefined;
 }
 
 function masteryLine(mastery: TopicMastery | null | undefined): string | undefined {

@@ -19,6 +19,7 @@ import { RevisionSheetPanel } from "@/components/RevisionSheetPanel";
 import { KnowledgeMap } from "@/components/KnowledgeMap";
 import { TechniqueSignal } from "@/components/TechniqueSignal";
 import { LearnerStateTag } from "@/components/LearnerStateTag";
+import { InterventionCard } from "@/components/InterventionCard";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, ProgressBar, SectionHeading, Segmented, SourceBadge } from "@/components/ui";
 import { BackIcon, CreditedIcon, DeleteIcon, ICON_SIZE, MissedIcon } from "@/components/icons";
 
@@ -389,6 +390,26 @@ function TopicDetail({
 
       <RevisionSheetPanel topicId={topic.id} />
 
+      <InterventionCard topicId={topic.id} />
+
+      <details className="card p-4 sm:p-5">
+        <summary className="cursor-pointer select-none text-sm font-medium text-ink2">More ways to study this topic</summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => void explain()} disabled={busy !== null}>
+            {busy === "explain" ? "Thinking…" : "Explain"}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void summary()} disabled={busy !== null}>
+            {busy === "summary" ? "Writing…" : "Summary"}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void generate()} disabled={busy !== null}>
+            {busy === "cards" ? "Generating…" : "Flashcards"}
+          </Button>
+          <ButtonLink size="sm" href={`/practice?mode=recall&topic=${encodeURIComponent(topic.id)}`}>Active recall</ButtonLink>
+          <ButtonLink size="sm" href={`/practice?topic=${encodeURIComponent(topic.id)}`}>Practise</ButtonLink>
+          <ButtonLink size="sm" href={`/review?topic=${encodeURIComponent(topic.id)}`}>Review</ButtonLink>
+        </div>
+      </details>
+
       <Panel>
         <p className="text-sm text-ink2">{topic.summary}</p>
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-4 mb-1.5">What earns marks</p>
@@ -448,19 +469,8 @@ function TopicDetail({
         </section>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="primary" onClick={() => void explain()} disabled={busy !== null}>
-          {busy === "explain" ? "Thinking…" : "Explain this topic"}
-        </Button>
-        <Button onClick={() => void summary()} disabled={busy !== null}>
-          {busy === "summary" ? "Writing…" : "Revision summary"}
-        </Button>
-        <Button onClick={() => void generate()} disabled={busy !== null}>
-          {busy === "cards" ? "Generating…" : "Generate flashcards"}
-        </Button>
-        <ButtonLink href={`/practice?mode=recall&topic=${encodeURIComponent(topic.id)}`}>Active recall</ButtonLink>
-        <ButtonLink href={`/practice?topic=${encodeURIComponent(topic.id)}`}>Practise questions</ButtonLink>
-        <ButtonLink href={`/review?topic=${encodeURIComponent(topic.id)}`}>Review cards</ButtonLink>
+      <div className="flex flex-wrap gap-2" aria-label="Secondary study actions">
+        <span className="text-xs text-ink3">All study modes remain above under “More ways”. Manual card tools follow.</span>
       </div>
 
       {status ? <p className="text-xs text-ink3">{status}</p> : null}

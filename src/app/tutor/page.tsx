@@ -173,11 +173,34 @@ function Tutor() {
 }
 
 function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
-  const { mastery } = useStoreFields("mastery");
+  const { mastery, recallMastery, applicationMastery, examDates } = useStoreFields(
+    "mastery",
+    "recallMastery",
+    "applicationMastery",
+    "examDates",
+  );
   const masteryRow = mastery.find((row) => row.topicId === topic.id) ?? null;
+  const recall = recallMastery.find((row) => row.topicId === topic.id) ?? null;
+  const application = applicationMastery.find((row) => row.topicId === topic.id) ?? null;
+  const examDays = useMemo(() => {
+    const dates = examDates
+      .filter((e) => e.subjectId === topic.subjectId)
+      .map((e) => Date.parse(`${e.date}T00:00:00Z`))
+      .filter((t) => Number.isFinite(t) && t >= Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+    if (!dates.length) return null;
+    return Math.round((Math.min(...dates) - Date.now()) / 86_400_000);
+  }, [examDates, topic.subjectId]);
   const learner: TutorLearnerContext = useMemo(
-    () => buildTutorLearnerContext({ topic, mistakes, mastery: masteryRow }),
-    [topic, mistakes, masteryRow],
+    () =>
+      buildTutorLearnerContext({
+        topic,
+        mistakes,
+        mastery: masteryRow,
+        recall: recall && recall.evidence !== "unmeasured" ? recall.mastery : null,
+        application: application && application.evidence !== "unmeasured" ? application.mastery : null,
+        examDays,
+      }),
+    [topic, mistakes, masteryRow, recall, application, examDays],
   );
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -243,9 +266,25 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink truncate">{topic.title}</p>
           <p className="text-xs text-ink3 truncate">{learner.position ?? "Specification content on this device"}</p>
+          {learner.examLine ? <p className="text-xs text-ink3">{learner.examLine}</p> : null}
         </div>
         <TutorIcon size={ICON_SIZE.md} className="text-accent shrink-0" aria-hidden />
       </div>
+
+      {learner.coachOpener ? (
+        <div className="rounded-[8px] border border-accent/30 bg-accentsoft/50 px-3 py-2" role="status">
+          <p className="text-xs font-semibold text-accent">Study coach</p>
+          <p className="mt-0.5 text-sm text-ink">{learner.coachOpener}</p>
+          <ButtonLink href={`/practice?topic=${encodeURIComponent(topic.id)}`} variant="ghost" size="sm" className="mt-1">
+            Tutor → practice → marking → repair → proof →
+          </ButtonLink>
+        </div>
+      ) : null}
+      {learner.applicationGapLine ? (
+        <p className="rounded-[8px] border border-line bg-surface2/60 px-3 py-2 text-xs text-ink2" role="note">
+          {learner.applicationGapLine}
+        </p>
+      ) : null}
 
       <div className="space-y-3" aria-live="polite" aria-label="Tutor conversation">
         {messages.map((message, index) =>

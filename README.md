@@ -68,7 +68,7 @@ when it changes what it can claim ("You improved here, but Revise does not yet
 have enough reviewed new questions to prove it.").
 
 Manual modes (Review, Study, Lessons, Practice, Past papers, Session) stay in
-Tools. The main navigation is **Today, Subjects, Progress, Tools**.
+Tools. The main navigation is **Today, Subjects, Readiness, Tools**.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
@@ -108,11 +108,11 @@ source immediately.
 
 ## What it does
 
-The app is one loop — **Diagnose → Learn/Repair → Practise → Prove → Revisit** — chosen for you on Today. The first screen locks in the board, subject and exam date; every other destination is a manual way into the same loop.
+The app is one loop — **Diagnose → Learn/Repair → Practise → Prove → Revisit** — chosen for you on Today. The first screen locks in the board, subjects and exam dates, then offers a short diagnostic and shows your personalised first step; every other destination is a manual way into the same loop.
 
 | Area | Behaviour |
 |------|-----------|
-| **Onboarding** | First screen only: board → subjects → required exam dates. Nothing renders until it is complete. |
+| **Onboarding** | First screen only: board → subjects → exam dates (optional) → quick check → first step. Nothing renders until it is complete. |
 | **Topic status** | Every topic reads in plain language — covered, shaky, untouched — with a what-to-do-next sentence, never a raw score pretending to be a grade. |
 | **Lessons** | Every authored topic follows a written, step-by-step lesson: clear objectives, process explanations, active recall, worked application, exam technique and check questions; a lesson streak rewards finishing. |
 | **Spaced repetition** | FSRS scheduling with per-grade interval previews, confidence captured *before* reveal, failed cards reinserted within the same session, and real cloze cards built from a complete sentence + hidden answer. Today sizes one bounded review session (15–25 minutes) and stops — the loop, not a dashboard. |

@@ -14,6 +14,7 @@ import type { Attempt, Id, InterventionAttemptContext, Mistake, Question } from 
 import { AnswerInput } from "./AnswerInput";
 import { RichText } from "./RichText";
 import { Button, Panel, Pill, cx } from "./ui";
+import { ProofCheckBanner } from "./ProofCheckBanner";
 
 import { useQuestionExecution, type QuestionDraft } from "@/state/question-execution";
 export type { QuestionDraft } from "@/state/question-execution";
@@ -63,8 +64,12 @@ export function QuestionRunner({
   mission?: Attempt["mission"];
 }) {
   const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
+  const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || Boolean(farTransfer));
   return (
     <div className="space-y-4">
+      {isProofContext && !result ? (
+        <ProofCheckBanner topicTitle={topic?.title} href={`/practice?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`} state="due" />
+      ) : null}
       <Panel>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <Pill>{question.totalMarks} marks</Pill>
