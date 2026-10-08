@@ -1,5 +1,6 @@
 "use client";
 
+import { cardSpeechText, isTextCard } from "@/domain/card-display";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { allTopics, topicsFor } from "@/domain/curriculum";
@@ -153,7 +154,7 @@ export default function SharedDeckPage() {
         {deck.cards.slice(0, 60).map((card, i) => (
           <li key={i} className="px-4 py-2.5">
             <RichText className="text-sm text-ink line-clamp-2">{card.front}</RichText>
-            <RichText className="text-xs text-ink3 line-clamp-2 mt-0.5">{card.back}</RichText>
+            <RichText className="text-xs text-ink3 line-clamp-2 mt-0.5">{isTextCard(card) ? card.back : cardSpeechText(card, true)}</RichText>
           </li>
         ))}
       </ul>

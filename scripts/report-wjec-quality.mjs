@@ -45,7 +45,27 @@ const subjects = audits.map((a) => {
   };
 });
 
-if (flags.json) process.stdout.write(`${JSON.stringify({ generatedAt: new Date().toISOString(), subjects }, null, 2)}\n`);
+// Where reviewer effort would unlock the most proof. A topic blocked from proof
+// is only worth a reviewer's time if there is something to review: "review
+// queued" means questions are already in the review queue, "queue for review"
+// means questions are authored but have never been through review, and "author
+// new" means the bank is empty for that topic. Learners hitting this wall
+// record it themselves as a local-only funnel event (proof_blocked_by_supply);
+// that never leaves the device, so this ranking is built from the bank alone and
+// never from learner behaviour.
+const demand = subjects
+  .flatMap((s) => s.topics.filter((t) => t.blockedFromProof).map((t) => ({
+    subject: s.label,
+    topic: t.topicId.split(".").slice(1).join("."),
+    authored: t.authored,
+    awaitingReview: t.awaitingReview,
+    lever: t.awaitingReview > 0 ? "review queued"
+      : t.authored > t.trusted ? "queue for review"
+      : "author new",
+  })))
+  .sort((a, b) => b.awaitingReview - a.awaitingReview || b.authored - a.authored);
+
+if (flags.json) process.stdout.write(`${JSON.stringify({ generatedAt: new Date().toISOString(), demand, subjects }, null, 2)}\n`);
 else {
   const md = Boolean(flags.markdown);
   const out = [];
@@ -55,6 +75,13 @@ else {
   const rows = subjects.map((s) => [s.label, s.summary.trustedQuestions, `${s.summary.topicsWithProof}/${s.summary.topics}`, s.summary.coldStartReady ? "ready" : `not ready (${s.summary.coldStartTopics}/${s.summary.coldStartTarget} topics)`, s.summary.missionProofTopics, s.summary.delayedProofTopics, s.topics.filter((t) => t.blockedFromProof).length, `${s.stages.verified}/${s.stages.checked}/${s.stages.unverified}`, s.stages.reReview]);
   if (md) out.push(`| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`, ...rows.map((r) => `| ${r.join(" | ")} |`));
   else out.push(head.join(" · "), ...rows.map((r) => r.join(" · ")));
+  if (demand.length) {
+    out.push("", md ? "## Where review effort unlocks the most proof" : "Where review effort unlocks the most proof (topics blocked from proof, most reviewable first)");
+    const dh = ["subject", "topic", "authored", "awaiting review", "lever"];
+    const top = demand.slice(0, 12).map((r) => [r.subject, r.topic, r.authored, r.awaitingReview, r.lever]);
+    if (md) out.push(`| ${dh.join(" | ")} |`, `|${dh.map(() => "---").join("|")}|`, ...top.map((r) => `| ${r.join(" | ")} |`));
+    else out.push(dh.join(" · "), ...top.map((r) => r.join(" · ")));
+  }
   for (const s of subjects) {
     out.push("", md ? `## ${s.label}` : s.label);
     const th = ["topic", "authored", "trusted", "distinct", "families", "transfer", "data", "delayed", "shallow groups", "awaiting review", "next review"];

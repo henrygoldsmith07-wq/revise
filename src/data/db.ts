@@ -16,6 +16,7 @@ import type {
   StreakState,
   UserSettings,
 } from "@/domain/types";
+import type { MarkingFlag } from "@/domain/marking-flag";
 import { PERSISTED_SCHEMA_VERSION } from "./persistence-schema";
 import { captureTelemetry, errorClass } from "@/lib/observability";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
@@ -31,6 +32,14 @@ import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 // `aiDlq` (dead-letter queue of marks awaiting an AI re-grade). They are
 // device-local by design: a cached grade is only valid for the same student,
 // and the DLQ replays against the *local* attempt records.
+//
+// A third local-only store, `markingFlags`, holds marks a learner disputes. It
+// is device-local because the only sanctioned egress is the `marking:evidence`
+// export the learner triggers themselves; routing those flags into the sync
+// outbox would send a learner's answer text and free-text note to the server
+// without an opt-in that does not exist. Adding it to the outbox is a schema
+// change that needs its own migration, its own RLS policy, and an opt-in —
+// deliberately out of scope here.
 // ---------------------------------------------------------------------------
 
 export const DB_NAME = "revise";
@@ -83,6 +92,8 @@ interface ReviseSchema extends DBSchema {
   meta: { key: string; value: { key: string; value: unknown } };
   aiCache: { key: string; value: AiCacheEntry; indexes: { byScope: string } };
   aiDlq: { key: string; value: AiDlqItem; indexes: { byNextAttempt: string } };
+  /** Learner-disputed marks. Device-local: see the note below before changing that. */
+  markingFlags: { key: Id; value: MarkingFlag; indexes: { byUser: Id; byCreated: string } };
 }
 
 export type ReviseDB = IDBPDatabase<ReviseSchema>;
@@ -179,6 +190,13 @@ function openProfileDb(userId: string): Promise<ReviseDB> {
       if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
       if (!db.objectStoreNames.contains("aiCache")) db.createObjectStore("aiCache", { keyPath: "key" });
       if (!db.objectStoreNames.contains("aiDlq")) db.createObjectStore("aiDlq", { keyPath: "id" });
+      // Additive store, created only when absent so an existing profile upgrades
+      // without touching its other 15 stores.
+      if (!db.objectStoreNames.contains("markingFlags")) {
+        const flags = db.createObjectStore("markingFlags", { keyPath: "id" });
+        flags.createIndex("byUser", "userId");
+        flags.createIndex("byCreated", "createdAt");
+      }
 
       const cards = tx.objectStore("cards");
       if (!cards.indexNames.contains("byUser")) cards.createIndex("byUser", "userId");
@@ -360,8 +378,37 @@ export async function clearAll(): Promise<void> {
     "meta",
     "aiCache",
     "aiDlq",
+    "markingFlags",
   ] as const;
   const tx = db.transaction(stores, "readwrite");
   await Promise.all(stores.map((s) => tx.objectStore(s).clear()));
   await tx.done;
+}
+
+// ---------------------------------------------------------------------------
+// Marking flags. Device-local (see the store note above): these hold the
+// learner's own answer text, so they are written only here and only leave via
+// the explicit `marking:evidence` export.
+// ---------------------------------------------------------------------------
+
+export async function listMarkingFlags(userId: string): Promise<MarkingFlag[]> {
+  const db = await getDb();
+  const flags = (await db.getAllFromIndex("markingFlags", "byUser", userId)) as MarkingFlag[];
+  return flags.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+export async function getMarkingFlag(id: string): Promise<MarkingFlag | undefined> {
+  const db = await getDb();
+  return (await db.get("markingFlags", id)) as MarkingFlag | undefined;
+}
+
+/** Idempotent: the key is attemptId:partId, so re-flagging replaces rather than duplicates. */
+export async function putMarkingFlag(flag: MarkingFlag): Promise<void> {
+  const db = await getDb();
+  await db.put("markingFlags", flag);
+}
+
+export async function deleteMarkingFlag(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete("markingFlags", id);
 }

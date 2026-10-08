@@ -232,8 +232,15 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
   };
 }
 
-function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput): Draft {
+function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput, estimate: Estimate): Draft {
   const ev = plan.evidence;
+  // Personal intervention memory: the planner's chosen intervention is weighted by
+  // this learner's own delayed outcomes for that kind of session, exactly as
+  // mission stages are. Neutral (weight 1) until estimateEffectiveness has
+  // enough durable chains, so a thin history never moves the ranking.
+  const measured = plan.intervention ? estimate(plan.intervention.kind, null) : null;
+  const eff = measured && measured.level !== "neutral" ? measured : null;
+  const weight = eff?.weight ?? 1;
   const tw = input.topicWeight?.(plan.topicId) ?? { share: ev.value?.share ?? 0, relative: ev.value?.relativeWeight ?? 1 };
   const atStake = ev.value?.atStake.mid ?? round((1 - clamp(ev.mastery, 0, 1)) * 5, 1);
   const untouched = ev.attempts === 0 && ev.dueCount === 0;
@@ -246,8 +253,8 @@ function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput): Draft {
     title: untouched ? `Learn ${topic}` : type === "weak-topic" ? `Strengthen ${topic}` : `Next session: ${topic}`,
     subjectId: plan.subjectId, topicIds: [plan.topicId], specPoints: [], minutes: Math.max(5, plan.totalMinutes),
     marksRecoverable: ev.marksLost > 0 ? ev.marksLost : null, examWeight: tw.share, daysToExam: ev.daysToExam,
-    evidenceStrength: confidence, confidence, expectedLearningGain: share, expectedMarks: round(atStake * share, 2),
-    proofStatus: ev.attempts === 0 ? "not-checked" : ev.mastery < 0.6 ? "needs-work" : "improving", requiredFirst: false, effectiveness: null,
+    evidenceStrength: confidence, confidence, expectedLearningGain: share, expectedMarks: round(atStake * share * weight, 2),
+    proofStatus: ev.attempts === 0 ? "not-checked" : ev.mastery < 0.6 ? "needs-work" : "improving", requiredFirst: false, effectiveness: eff,
     mistakeIds: ev.openMistakeIds,
     explanation: {
       why: plan.reason,
@@ -372,7 +379,7 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
     } else drafts.push(d);
   }
   if (input.adaptive && enrolled.has(input.adaptive.subjectId)) {
-    const d = adaptiveDraft(input.adaptive, scoped);
+    const d = adaptiveDraft(input.adaptive, scoped, estimate);
     if (d.type === "learn-untouched" && d.daysToExam !== null && d.daysToExam <= FINAL_DAYS && (d.examWeight ?? 0) < 0.15) {
       const reason = "Too close to the exam to start a large new area unless it is worth a lot.";
       deferred.push({ action: { ...finalise(d, scoped), blockedBy: reason }, reason });
@@ -470,7 +477,14 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       const s = supply[topicId];
       if (!s) continue;
       const need = s.provable < 2 ? "unseen-verified" : s.transfer === 0 ? "transfer" : null;
-      if (need) needs.set(`${topicId}:${need}`, { topicId, subjectId: mission.subjectId, need, marksAtStake: input.recovery.byTopic(topicId).open });
+      // Marks at stake is every mark in this topic that is not yet *proven*, not
+      // just the ones still classified as open. A topic where the learner is
+      // blocked awaiting proof has no open mistakes left, and counting only those
+      // would report zero demand for exactly the topics review would unblock.
+      if (need) needs.set(`${topicId}:${need}`, {
+        topicId, subjectId: mission.subjectId, need,
+        marksAtStake: input.recovery.items.filter((i) => i.topicId === topicId && i.state !== "proven").reduce((sum, i) => sum + i.marks, 0),
+      });
     }
   }
   deferred.sort((a, b) => b.action.score - a.action.score || a.action.id.localeCompare(b.action.id));

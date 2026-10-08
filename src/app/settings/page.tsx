@@ -2,6 +2,8 @@
 
 import { exportContinuityDeletions } from "@/data/learner-history";
 import { privatePilotExport } from "@/domain/pilot-export";
+import { exportMarkingFlags, type MarkingFlag } from "@/domain/marking-flag";
+import { listMarkingFlags } from "@/data/db";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 
 import { useAccount } from "@/state/account";
@@ -16,6 +18,7 @@ const ARM_LABELS: Record<string, string> = {
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/lib/optional-ai";
 import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
+import { seedQuestions } from "@/content";
 import {
   buildPortabilitySnapshot,
   deletionPreview,
@@ -37,6 +40,9 @@ import {
   type FailedOutboxItemSummary,
 } from "@/data/sync";
 import { useStoreFields } from "@/state/store";
+import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
+import { ACCOUNT_DELETION_CONFIRMATION, ACCOUNT_DELETION_EXPLANATION, LOCAL_ERASE_EXPLANATION } from "@/domain/account-deletion";
+import { recordAiConsentChoice } from "@/ai/consent-client";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
 
@@ -318,23 +324,7 @@ export default function SettingsPage() {
         </Panel>
       </section>
 
-      <section>
-        <SectionHeading title="AI" hint="The app is fully usable without it." />
-        <Panel>
-          <div className="flex items-center gap-2">
-            {ai?.available ? (
-              <Pill tone="success">Connected · {ai.name}</Pill>
-            ) : (
-              <Pill tone="review">No provider configured</Pill>
-            )}
-          </div>
-          <p className="text-sm text-ink3 mt-2">
-            {ai?.available
-              ? "Explanations, marking, generation and OCR use the configured provider. Keys stay on the server and are never sent to the browser."
-              : "Marking falls back to the mark scheme on this device, explanations come from the stored spec content, and question generation serves the authored bank. Set AI_PROVIDER and a key on the server to enable the model-backed versions."}
-          </p>
-        </Panel>
-      </section>
+      <AiConsentSection ai={ai} />
 
       <Account />
 
@@ -486,6 +476,84 @@ export default function SettingsPage() {
   );
 }
 
+/**
+ * Per-learner AI consent. Off by default; turning it on is an explicit choice
+ * recorded on this device and on the server, and the server refuses every AI
+ * request without it. Turning it off stops the next request immediately and
+ * discards anything queued for an AI re-grade.
+ */
+function AiConsentSection({ ai }: { ai: { available: boolean; name: string | null } | null }) {
+  const store = usePageStore();
+  const enabled = aiConsentGrantedInSettings(store.settings);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function choose(next: boolean) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { serverConfirmed } = await recordAiConsentChoice({ userId: store.userId, enabled: next, updateSettings: store.updateSettings });
+      setMessage(
+        next
+          ? serverConfirmed
+            ? "AI features are on for this account."
+            : "AI features are on for this device. Your account will be updated when you are back online; until then the server keeps refusing AI requests."
+          : serverConfirmed
+            ? "AI features are off. Nothing more is sent to the AI service, and queued re-grades were discarded."
+            : "AI features are off on this device. Your account will be updated when you are back online.",
+      );
+    } catch {
+      setMessage("That change could not be saved. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section>
+      <SectionHeading title="AI" hint="Off unless you switch it on. The app is fully usable without it." />
+      <Panel className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-ink">Use AI for marking, explanations, generated questions and photo reading</p>
+            <p className="text-[11px] text-ink3 mt-0.5">
+              When on, the question, the mark scheme and your answer (or notes, or a photo of your work) are sent to the
+              AI service this app is set up with{ai?.available && ai.name ? ` (${ai.name})` : ""}. Names, emails, phone
+              numbers, postcodes, school names and addresses are replaced with placeholders before anything is sent, and
+              photo location data is removed — but a photo of your handwriting cannot be masked. Turning this off takes
+              effect straight away: the server refuses AI requests for your account until you switch it back on.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant={enabled ? "primary" : "secondary"}
+            aria-pressed={enabled}
+            disabled={busy}
+            onClick={() => void choose(!enabled)}
+          >
+            {enabled ? "On" : "Off"}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          {ai?.available ? (
+            <Pill tone="success">Provider configured · {ai.name}</Pill>
+          ) : (
+            <Pill tone="review">No provider configured</Pill>
+          )}
+        </div>
+        <p className="text-[11px] text-ink3">
+          {enabled
+            ? ai?.available
+              ? "AI marks are checked against the mark scheme on this device and labelled provisional when the checks disagree."
+              : "No AI provider is configured on the server, so everything below still runs on this device."
+            : "With AI off, marking uses the mark scheme on this device, explanations come from the stored specification content, and question generation serves the authored bank."}
+        </p>
+        {message ? <p className="text-[11px] text-ink2" role="status">{message}</p> : null}
+      </Panel>
+    </section>
+  );
+}
+
 function Account() {
   const profile = useAccount();
   const store = usePageStore();
@@ -556,6 +624,7 @@ function Account() {
               <Button onClick={() => void store.syncNow()}>Sync now</Button>
               <Button onClick={() => void signOut()}>Sign out</Button>
             </div>
+            <DeleteAccount />
           </>
         ) : (
           <>
@@ -576,6 +645,70 @@ function Account() {
         {message ? <p className="text-xs text-ink3">{message}</p> : null}
       </Panel>
     </section>
+  );
+}
+
+/**
+ * Server-side account deletion. Distinct from "Erase local data": this asks
+ * the server to delete the account itself and everything synced to it, then
+ * clears this device's copy of the account and signs out.
+ */
+function DeleteAccount() {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const confirmed = typed === ACCOUNT_DELETION_CONFIRMATION;
+
+  async function remove() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirm: typed }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; deleted?: boolean };
+      if (!res.ok || !body.deleted) {
+        setMessage(body.error ?? "Your account could not be deleted. Nothing on this device was changed.");
+        return;
+      }
+      // The account is gone server-side. Remove this device's copy of it too,
+      // then drop the browser session.
+      await clearAll().catch(() => undefined);
+      await getSupabase()?.auth.signOut().catch(() => undefined);
+      setMessage("Your account and its synced data have been deleted.");
+      window.setTimeout(() => location.replace("/"), 800);
+    } catch {
+      setMessage("Your account could not be deleted because the server could not be reached. Nothing was changed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <details className="pt-2 border-t border-line" open={open} onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
+      <summary className="cursor-pointer text-sm font-medium text-danger">Delete account</summary>
+      <p className="mt-2 text-xs text-ink2">{ACCOUNT_DELETION_EXPLANATION}</p>
+      <p className="mt-1 text-[11px] text-ink3">{LOCAL_ERASE_EXPLANATION}</p>
+      <Field label={`Type ${ACCOUNT_DELETION_CONFIRMATION} to confirm`}>
+        <input
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          className="field text-sm"
+          autoComplete="off"
+          spellCheck={false}
+          aria-describedby="delete-account-status"
+        />
+      </Field>
+      <Button className="mt-2" variant="secondary" disabled={!confirmed || busy} onClick={() => void remove()}>
+        {busy ? "Deleting…" : "Permanently delete my account"}
+      </Button>
+      <p id="delete-account-status" className="mt-1 text-[11px] text-ink2" role="status">
+        {message ?? ""}
+      </p>
+    </details>
   );
 }
 
@@ -708,6 +841,16 @@ function DataControls() {
   const [pendingRestore, setPendingRestore] = useState<PortabilitySnapshot | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const [pilotConsent, setPilotConsent] = useState(false);
+  // Read straight from IndexedDB rather than through the store snapshot: a
+  // disputed mark is device-local by design and has no place in the sync graph.
+  const [markingFlags, setMarkingFlags] = useState<readonly MarkingFlag[]>([]);
+  useEffect(() => {
+    let live = true;
+    void listMarkingFlags(store.userId)
+      .then((rows) => { if (live) setMarkingFlags(rows); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [store.userId]);
   const restorePreview = pendingRestore ? portabilityRestorePreview(pendingRestore) : null;
   const preview = deletionPreview(
     [
@@ -743,6 +886,52 @@ function DataControls() {
               setRestoreMessage("Pilot evidence saved locally. Sharing is your choice.");
             })().catch(error => setRestoreMessage(error instanceof Error ? error.message : "Pilot export failed."));
           }}>Export pilot evidence</Button>
+        </details>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-ink2">Disputed marks ({markingFlags.length})</summary>
+          <p className="mt-2 text-sm text-ink2">
+            Marks you flagged as wrong, one per mark. These stay on this device until you export them.
+            Unlike the pilot export above, this file <strong>does</strong> contain your answer text and
+            anything you typed — a marker cannot check a disputed mark without them. Send it only to a
+            teacher you trust, and only after they ask for it.
+          </p>
+          {markingFlags.length === 0 ? (
+            <p className="mt-2 text-sm text-ink3">You have not flagged any marks yet.</p>
+          ) : (
+            <ul className="mt-2 space-y-1 text-xs text-ink3">
+              {markingFlags.slice(0, 10).map((flag) => (
+                <li key={flag.id}>
+                  {flag.awarded ?? 0}/{flag.max} — {flag.reason ? flag.reason.replace(/-/g, " ") : "no reason given"}
+                </li>
+              ))}
+              {markingFlags.length > 10 ? <li>…and {markingFlags.length - 10} more.</li> : null}
+            </ul>
+          )}
+          <Button className="mt-2" disabled={!markingFlags.length} onClick={() => {
+            void (async () => {
+              const anonId = crypto.randomUUID();
+              const payload = exportMarkingFlags({
+                userId: store.userId,
+                anonId,
+                flags: markingFlags,
+                capturedAt: new Date().toISOString(),
+                questionOf: (questionId) => {
+                  const question = seedQuestions.find((q: { id: string }) => q.id === questionId);
+                  if (!question) return null;
+                  return {
+                    questionText: question.stem,
+                    markScheme: question.parts.flatMap((part) => part.markScheme),
+                    maximumMarks: question.totalMarks,
+                    topicId: question.topicIds[0] ?? question.subjectId,
+                    specification: question.specVersion ?? "unmapped",
+                  };
+                },
+              });
+              const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+              const link = document.createElement("a"); link.href = url; link.download = `revise-marking-evidence-${anonId}.json`; link.click(); URL.revokeObjectURL(url);
+              setRestoreMessage("Disputed marks saved locally. Nothing has been sent anywhere.");
+            })().catch(error => setRestoreMessage(error instanceof Error ? error.message : "Marking evidence export failed."));
+          }}>Export disputed marks</Button>
         </details>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => { void exportDataPortable(store, filename).catch(error => setRestoreMessage(error instanceof Error ? error.message : "Export failed.")); }}>Export portable snapshot</Button>
@@ -829,7 +1018,7 @@ function DataControls() {
         <p className="text-[11px] text-ink3">{preview.warning}</p>
         <p className="text-[11px] text-ink3">
           {isSupabaseConfigured
-            ? "Erasing local data does not delete rows already synced to your account — use your account provider to delete server data."
+            ? `${LOCAL_ERASE_EXPLANATION} To delete the account and its server data, use Delete account under Account.`
             : "Sync is not configured, so this device holds the only copy — export before erasing."}
         </p>
       </Panel>

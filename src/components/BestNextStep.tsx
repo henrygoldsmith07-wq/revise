@@ -89,7 +89,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
         {strength ? <p className="mt-1 max-w-2xl text-xs text-ink3">{strength}</p> : null}
         <p className="mt-1 max-w-2xl text-sm text-ink2"><span className="font-medium text-ink">Then:</span> {focus.after}</p>
         <details className="mt-4 max-w-2xl">
-          <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Why this?</summary>
+          <summary className="cursor-pointer select-none text-sm font-medium text-ink2 min-h-11 inline-flex items-center">Why this?</summary>
           <dl className="mt-2 space-y-2 text-sm leading-6 text-ink2" aria-label="Why this recommendation">
             <div><dt className="font-semibold text-ink">Why now</dt><dd>{e.whyNow}</dd></div>
             <div><dt className="font-semibold text-ink">Why before the others</dt><dd>{e.whyBefore}</dd></div>
@@ -99,7 +99,11 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
               <div><dt className="font-semibold text-ink">Evidence limit</dt><dd>You improved here, but Revise does not yet have enough reviewed new questions to prove it.</dd></div>
             ) : null}
             {action.effectiveness && action.effectiveness.level !== "neutral" ? (
-              <div><dt className="font-semibold text-ink">What has worked for you</dt><dd>{action.effectiveness.uncertainty === "high" ? "Early signs only, from a small number of completed checks." : "Based on your own completed, delayed checks."}</dd></div>
+              <div><dt className="font-semibold text-ink">What has worked for you</dt><dd>{action.effectiveness.uncertainty === "high"
+                ? "Early signs only, from a small number of completed checks."
+                : action.effectiveness.weight >= 1
+                  ? `This kind of session has tended to hold up for you after a delay (${action.effectiveness.samples} checked).`
+                  : `This kind of session has held up less well for you (${action.effectiveness.samples} checked), so it is suggested only because the gap is worth it.`}</dd></div>
             ) : null}
           </dl>
         </details>

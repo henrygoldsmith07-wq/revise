@@ -29,6 +29,10 @@ export const REVISE_META_KEYS = {
   lamport: "revise.lamport.v1",
   /** Per-entity pull cursors for keyset pagination — resume points per table. */
   pullCursors: "revise.pullCursors.v1",
+  /** An AI consent change made on this device that the server has not confirmed yet. */
+  aiConsentPending: "revise.aiConsentPending.v1",
+  /** Last verified human-verification ledger fetched from /api/review-ledger (reviewer portal approvals). */
+  runtimeReviewLedger: "revise.runtimeReviewLedger.v1",
 } as const;
 
 // New keys have no legacy spelling; lookups fall back gracefully.

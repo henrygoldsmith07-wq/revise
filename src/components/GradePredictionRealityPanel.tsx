@@ -11,6 +11,7 @@ import {
 } from "@/domain/grade-loop";
 import { useStoreFields } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading, StatTile } from "./ui";
+import { useTeacherMode } from "./TeacherMode";
 
 const RESULT_KIND_LABEL: Record<ActualResultRecord["kind"], string> = {
   mock: "Mock",
@@ -52,6 +53,7 @@ function outcomeByActualId(outcomes: PredictionOutcome[]): Map<string, Predictio
 
 export function GradePredictionRealityPanel() {
   const store = useStoreFields("gradeActuals", "gradePredictionLog", "recordGradeActual", "removeGradeActual", "settings", "userId");
+  const [teacher] = useTeacherMode();
   const ownPredictions = useMemo(
     () => store.gradePredictionLog.filter((row) => row.anonId === store.userId),
     [store.gradePredictionLog, store.userId],
@@ -212,13 +214,13 @@ export function GradePredictionRealityPanel() {
             <StatTile
               label="Mean error"
               value={report.mae == null ? "—" : String(Math.round(report.mae * 10) / 10) + " pts"}
-              sub="absolute error"
+              sub={teacher ? "absolute error" : "how far off predictions were, on average"}
             />
             <StatTile label="Bias" value={biasLabel(report.bias)} sub={biasExplanation(report.bias)} />
             <StatTile
               label="Inside range"
               value={report.intervalCoverage == null ? "—" : String(Math.round(report.intervalCoverage * 100)) + "%"}
-              sub="prediction interval coverage"
+              sub={teacher ? "prediction interval coverage" : "results that landed inside the predicted range"}
             />
           </div>
 

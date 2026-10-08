@@ -13,6 +13,12 @@
 // parts, feedback, confidence and escalation state are recomputed from the AI
 // grade, and the app is told via a DOM event so any open view re-renders. The
 // student sees the rubric mark immediately; the AI mark replaces it later.
+//
+// Privacy: the retry is not a second egress path. It goes through the same
+// transport as the live request (src/ai/transport.ts) — consent gate, then
+// the egress policy (masking, question minimisation), then the request — and
+// nothing is queued or retried while the learner's AI consent is off.
+// Revoking consent empties the queue (clearDeadMarks).
 // ---------------------------------------------------------------------------
 
 import type { Attempt, Question } from "@/domain/types";
@@ -21,8 +27,11 @@ import type { AiDlqItem } from "@/data/db";
 import { saveAttempt } from "@/data/repository";
 import { markResponseSchema } from "./types";
 import type { MarkResponse } from "./types";
-import { withMarkEvidence } from "@/domain/marking";
+import { markQuestion, withMarkEvidence } from "@/domain/marking";
 import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
+import { assessMarkConfidence, markAssessmentRecord } from "@/domain/marking-confidence";
+import { localAiConsentGranted } from "./consent-client";
+import { sendAiTask } from "./transport";
 
 /** First retry after ~30s; each failure multiplies the delay, capped at 24h. */
 export const DLQ_BASE_DELAY_MS = 30_000;
@@ -62,6 +71,9 @@ export async function enqueueDeadMark(input: {
   reason: string;
 }): Promise<void> {
   try {
+    // A queued answer exists only to be sent to the AI service later; without
+    // consent it must not be kept for that purpose at all.
+    if (!(await localAiConsentGranted())) return;
     const db = await getDb();
     const item: AiDlqItem = {
       id: crypto.randomUUID(),
@@ -92,6 +104,17 @@ export async function dueDeadMarks(now: Date = new Date()): Promise<AiDlqItem[]>
     .slice(0, DLQ_BATCH);
 }
 
+/** Remove every queued re-grade. Used when AI consent is revoked. */
+export async function clearDeadMarks(): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.clear("aiDlq");
+  } catch {
+    // An unreadable queue cannot be drained either: drainDeadMarks re-checks
+    // consent before every pass.
+  }
+}
+
 export async function dlqSize(): Promise<number> {
   const db = await getDb();
   return db.count("aiDlq");
@@ -118,21 +141,35 @@ async function reschedule(item: AiDlqItem, error: string): Promise<void> {
  * Returns how many were successfully re-graded.
  */
 export async function drainDeadMarks(fetchFn: typeof fetch = fetch): Promise<number> {
+  // Same consent rule as the live path, checked before every pass: a learner
+  // who has turned AI off has nothing re-sent on a background timer.
+  if (!(await localAiConsentGranted())) {
+    await clearDeadMarks();
+    return 0;
+  }
   const due = await dueDeadMarks();
   let resolved = 0;
   for (const item of due) {
     try {
-      const res = await fetchFn("/api/ai", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: "mark", payload: { question: item.question, answers: item.answers } }),
-      });
+      const sent = await sendAiTask("mark", { question: item.question, answers: item.answers }, fetchFn);
+      if (!sent.ok) {
+        if (sent.blocked === "consent") {
+          await clearDeadMarks();
+          return resolved;
+        }
+        // The egress policy refused this payload; it will refuse it again.
+        await dbRemove(item.id);
+        continue;
+      }
+      const res = sent.response;
       if (res.status === 429 || res.status >= 500) {
         await reschedule(item, `HTTP ${res.status}`);
         continue;
       }
       if (!res.ok) {
         // 4xx other than 429: the payload is the problem — retrying is futile.
+        // A 403 means the server holds no consent for this account (revoked on
+        // another device): the item is dropped, never retried.
         await dbRemove(item.id);
         continue;
       }
@@ -173,7 +210,18 @@ async function dbRemove(id: string): Promise<void> {
 async function applyResolvedMark(item: AiDlqItem, data: unknown): Promise<boolean> {
   const parsed = markResponseSchema.safeParse(data);
   if (!parsed.success) return false;
-  const mark: MarkResponse = withMarkEvidence(item.question, item.answers, parsed.data);
+  const evidenced: MarkResponse = withMarkEvidence(item.question, item.answers, parsed.data);
+  // Identical treatment to the live path: the AI interpretation is checked
+  // deterministically, impossible marks are corrected, and the result is
+  // provisional unless every check agrees.
+  const assessment = assessMarkConfidence({
+    question: item.question,
+    answers: item.answers,
+    mark: evidenced,
+    tier: "ai",
+    rubric: markQuestion(item.question, item.answers).marked,
+  });
+  const mark: MarkResponse = { ...evidenced, marked: assessment.marked };
 
   const db = await getDb();
   const attempt = (await db.get("attempts", item.attemptId)) as Attempt | undefined;
@@ -187,7 +235,7 @@ async function applyResolvedMark(item: AiDlqItem, data: unknown): Promise<boolea
   // Recompute confidence/escalation exactly as the live marking path would:
   // an AI grade that clears the confidence threshold closes the pending
   // escalation; an still-shaky one re-requests review with fresh evidence.
-  const confidence = typeof mark.confidence === "number" ? mark.confidence : null;
+  const confidence = assessment.score;
   const decision = assessLowConfidenceMark({ markedBy: "ai", confidence });
   const escalation = createMarkEscalationRecord(decision, new Date().toISOString());
 
@@ -198,8 +246,9 @@ async function applyResolvedMark(item: AiDlqItem, data: unknown): Promise<boolea
     awarded: mark.marked.reduce((a, m) => a + m.awarded, 0),
     max: mark.marked.reduce((a, m) => a + m.max, 0),
     markedBy: "ai",
-    markConfidence: confidence ?? undefined,
+    markConfidence: confidence,
     markEscalation: escalation,
+    markAssessment: markAssessmentRecord(assessment),
   };
   // Save through the repository (not raw IDB) so the upgrade enters the sync
   // outbox and the AI mark reaches the student's other devices too.

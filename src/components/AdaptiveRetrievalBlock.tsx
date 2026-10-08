@@ -7,6 +7,9 @@ import type { Card, Id, RecallGrade } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { Button, Panel, Pill, ProgressBar } from "./ui";
 import { RichText } from "./RichText";
+import { CardAnswerBody, CardPromptMedia, cardAnswerHeading } from "./CardFaces";
+import { cardRevealNote, cardSpeechText } from "@/domain/card-display";
+import { examinerNoteForCard } from "@/domain/examiner-note";
 import { SpeakButton } from "./SpeakButton";
 
 // Inline card retrieval for the adaptive runner — one card, one decision, and
@@ -51,6 +54,7 @@ export function AdaptiveRetrievalBlock({
   const remaining = cards.slice(index + 1);
   const progressTotal = Math.max(1, cards.length);
   const topic = current ? getTopic(current.topicId) : undefined;
+  const examinerNote = current ? examinerNoteForCard(current, topic) : null;
 
   // useCallback rather than a plain function: this reads the clock and the
   // card-shown ref, which only makes sense once an interaction has happened,
@@ -95,17 +99,18 @@ export function AdaptiveRetrievalBlock({
               <span className="text-xs text-ink3">Last card</span>
             )}
             <span className="ml-auto">
-              <SpeakButton text={revealed ? current.back : current.front} audioUrl={current.audioUrl} />
+              <SpeakButton text={cardSpeechText(current, revealed)} audioUrl={current.audioUrl} />
             </span>
           </div>
 
           <div className="flex-1">
             <RichText className="text-base text-ink">{current.front}</RichText>
+            <CardPromptMedia card={current} />
             {revealed ? (
               <div className="mt-5 pt-4 border-t border-line fade-in">
-                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">Answer</p>
-                <RichText className="text-base">{current.back}</RichText>
-                {current.note ? <p className="text-xs text-ink3 mt-2 italic">{current.note}</p> : null}
+                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">{cardAnswerHeading(current)}</p>
+                <CardAnswerBody card={current} />
+                {cardRevealNote(current) ? <p className="text-xs text-ink3 mt-2 italic">{cardRevealNote(current)}</p> : null}
               </div>
             ) : null}
           </div>
@@ -162,10 +167,10 @@ export function AdaptiveRetrievalBlock({
           All {cards.length} cards handled.
         </p>
       )}
-      {topic?.commonErrors.length && revealed ? (
+      {revealed && examinerNote ? (
         <p className="text-xs text-ink3">
-          <span className="font-semibold text-ink2">Examiner note: </span>
-          {topic.commonErrors[0]}
+          <span className="font-semibold text-ink2">Common mistake on this: </span>
+          {examinerNote}
         </p>
       ) : null}
       <span className="sr-only" aria-live="polite">

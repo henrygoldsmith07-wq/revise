@@ -6,28 +6,30 @@ import { traceTransition } from "@/domain/adaptive-trace";
 const ROOT = join(__dirname, "..");
 
 describe("product hierarchy", () => {
-  it("keeps three destinations: Today first, then Subjects and Progress, with manual tools subordinate", () => {
+  it("keeps five destinations: Today, Learn, Practice, Progress and Library, with manual modes in a collapsed Tools menu", () => {
     const shell = readFileSync(join(ROOT, "src/components/AppShell.tsx"), "utf8");
-    // Three direct destinations and one Tools menu.
-    expect(shell).toContain("grid-cols-4");
-    expect(shell).toContain('label: "Today"');
-    expect(shell).toContain('href: "/library", label: "Subjects"');
+    // Five direct destinations and one Tools menu on the phone bar.
+    expect(shell).toContain("grid grid-cols-6");
+    expect(shell).toContain('href: "/", label: "Today"');
+    expect(shell).toContain('href: "/lesson", label: "Learn"');
+    expect(shell).toContain('href: "/practice", label: "Practice"');
     expect(shell).toContain('href: "/readiness", label: "Progress"');
-    expect((shell.match(/primary: true/g) ?? [])).toHaveLength(3);
-    // Session stays reachable but is no longer a top-level destination.
-    expect(shell).not.toMatch(/label: "Session", Icon: [A-Za-z]+, primary: true/);
+    expect(shell).toContain('href: "/library", label: "Library"');
+    expect((shell.match(/primary: true/g) ?? [])).toHaveLength(5);
+    const order = ["Today", "Learn", "Practice", "Progress", "Library"].map((label) => shell.indexOf(`label: "${label}"`));
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(shell).toContain("Tools");
-    const todayIndex = shell.indexOf('label: "Today"');
-    const reviewIndex = shell.indexOf('label: "Review"');
-    expect(todayIndex).toBeGreaterThanOrEqual(0);
-    expect(todayIndex).toBeLessThan(reviewIndex);
-    // Secondary systems exist but are not primary thumb-reach actions.
-    for (const label of ["Session", "Review", "Study", "Lessons", "Practice", "Past papers", "Schedule", "Settings"]) {
+    expect(shell).toContain("const TOOLS_NAV");
+    // On desktop the Tools group is a disclosure, closed unless a tool is the current page.
+    expect(shell).toContain("open={toolsActive || undefined}");
+    // Specialist and manual routes stay reachable (deep links unchanged) but are not primary.
+    for (const label of ["Review", "Past papers", "Choose how to study", "Tutor", "Schedule", "Settings"]) {
       expect(shell).toContain(`label: "${label}"`);
-    }
-    for (const label of ["Review", "Practice", "Schedule", "Settings"]) {
       expect(shell).not.toMatch(new RegExp(`label: "${label}", Icon: [A-Za-z]+, primary: true`));
     }
+    // A destination stays highlighted inside the routes it owns.
+    expect(shell).toContain('match: ["/review", "/papers", "/diagnostic"]');
+    expect(shell).toContain('match: ["/adaptive-session"]');
   });
 
   it("renders the highest-value task before analytics on Today", () => {

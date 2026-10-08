@@ -40,7 +40,7 @@ export function serialiseDiagram(spec: DiagramSpec): string {
  * diagram, and for one whose payload is damaged — a half-parsed diagram would
  * render as an unanswerable question.
  */
-export function parseDiagram(card: Card): DiagramSpec | null {
+export function parseDiagram(card: Pick<Card, "back">): DiagramSpec | null {
   if (!card.back.startsWith(MARKER)) return null;
   try {
     const raw = JSON.parse(card.back.slice(MARKER.length)) as DiagramSpec;
@@ -60,7 +60,7 @@ export function parseDiagram(card: Card): DiagramSpec | null {
   }
 }
 
-export function isDiagramCard(card: Card): boolean {
+export function isDiagramCard(card: Pick<Card, "back">): boolean {
   return parseDiagram(card) !== null;
 }
 

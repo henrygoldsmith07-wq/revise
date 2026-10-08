@@ -75,7 +75,7 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
     await new Promise((r) => { tx.oncomplete = r; });
   }, trusted);
   await page.goto("/");
-  await expect(main).toContainText("Your best next step", { timeout: 30_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
 
   // Cold start with reviewed supply: one clear, skippable action above the fold.
   await expect(main).toContainText("Find where to start");
@@ -100,7 +100,7 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
 
   // The same attempts feed recovery: Today changes immediately.
   await page.goto("/");
-  await expect(main).toContainText("Your best next step", { timeout: 30_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
   await expect(main).not.toContainText("Find where to start");
   await expect(main).toContainText(/Recover \d+(\.\d)? marks?|marks/);
   const repair = main.getByRole("link", { name: "Start session", exact: true });
@@ -114,6 +114,6 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
 
   // Repair alone is never proof.
   await page.goto("/");
-  await expect(main).toContainText("Your best next step", { timeout: 30_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
   await expect(main).not.toContainText("Proven");
 });

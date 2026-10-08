@@ -32,6 +32,33 @@ export interface MarkedPart {
   evidence?: MarkEvidence[];
 }
 
+/** Who the final mark ultimately rests on. */
+export type MarkAuthority =
+  /** The deterministic marker (MCQ key, rubric) produced the mark. */
+  | "deterministic"
+  /** A model suggested the mark and every deterministic check agreed. */
+  | "ai-checked"
+  /** A model suggested the mark and at least one check disagreed: provisional. */
+  | "ai-provisional";
+
+export type MarkConfidenceLevel = "high" | "medium" | "low";
+
+/**
+ * How far to trust a mark, recorded with the attempt so a reloaded result
+ * keeps its provisional label. Produced by domain/marking-confidence.ts.
+ */
+export interface MarkAssessmentRecord {
+  version: string;
+  level: MarkConfidenceLevel;
+  /** True whenever the mark must not be presented as an examiner's decision. */
+  provisional: boolean;
+  authority: MarkAuthority;
+  /** Ids of the deterministic checks that did not pass. */
+  failedChecks: string[];
+  /** The model's self-reported confidence, kept separate from the system's. */
+  modelConfidence: number | null;
+}
+
 export type MarkEscalationReason = "low-confidence" | "missing-confidence";
 export type MarkEscalationPriority = "standard" | "urgent";
 

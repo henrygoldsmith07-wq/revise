@@ -18,7 +18,9 @@ import type { Snapshot } from "@/data/repository";
 import * as repo from "@/data/repository";
 import { SYNC_QUEUE_EVENT, failedOutboxItems, outboxSize, sync } from "@/data/sync";
 import { AI_DLQ_RESOLVED_EVENT, drainDeadMarks, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
+import { reconcileAiConsentWithServer } from "@/ai/consent-client";
 import { isSupabaseConfigured } from "@/data/supabase";
+import { applyRuntimeReviewLedger, readRuntimeReviewLedger, refreshRuntimeReviewLedger } from "@/data/runtime-review-ledger";
 import { initialSyncStatus, type SyncStatus } from "./sync-status";
 
 let syncInFlight = false;
@@ -115,6 +117,13 @@ export function useSyncEngine(input: {
         // baseline, superseding any stream still running.
         startHydration();
       }
+      // AI consent is enforced from the server's own record. After every sync
+      // pass, push a choice made offline on this device or adopt one made on
+      // another device (a revocation anywhere stops AI here too).
+      if (!result.skipped) {
+        const adopted = await reconcileAiConsentWithServer(userId).catch(() => null);
+        if (adopted) setSnapshot((prev) => (prev ? { ...prev, settings: adopted } : prev));
+      }
     } catch (caught) {
       // Keep a diagnostic trail instead of swallowing the failure: without it,
       // a permanently broken sync looks identical to a slow one.
@@ -131,6 +140,27 @@ export function useSyncEngine(input: {
       syncInFlight = false;
     }
   }, [userId, startHydration, setSnapshot]);
+
+  // Reviewer-portal approvals: fetch the effective human-verification ledger
+  // when online (signed in or not) and re-apply it to the in-memory bank, so a
+  // question two teachers just verified joins the provable pool without a
+  // reload. Offline or failing fetches keep the cached copy; nothing blocks.
+  const hasSnapshot = Boolean(snapshot);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !hasSnapshot || !syncStatus.online) return;
+    let cancelled = false;
+    const refresh = async () => {
+      if (!(await refreshRuntimeReviewLedger())) return;
+      const ledger = await readRuntimeReviewLedger();
+      if (!cancelled) setSnapshot((prev) => (prev ? { ...prev, questions: applyRuntimeReviewLedger(prev.questions, ledger) } : prev));
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 10 * 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [hasSnapshot, setSnapshot, syncStatus.online]);
 
   // Network status drives the offline banner and gates sync attempts.
   useEffect(() => {

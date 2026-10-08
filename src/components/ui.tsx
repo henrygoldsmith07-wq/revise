@@ -169,20 +169,32 @@ export function ProgressBar({
   );
 }
 
+/**
+ * An empty state answers four questions: what is missing (title), why it
+ * matters (body or why), what to do (action) and what happens after (after).
+ */
 export function EmptyState({
   title,
   body,
+  why,
   action,
+  after,
 }: {
   title: string;
   body: string;
+  /** Why the missing thing matters, when body does not already say it. */
+  why?: string;
   action?: ReactNode;
+  /** What happens once the learner has done it. */
+  after?: string;
 }) {
   return (
-    <div className="card p-8 text-center">
+    <div className="card p-6 sm:p-8 text-center">
       <p className="text-sm font-semibold text-ink">{title}</p>
       <p className="text-sm text-ink3 mt-1 max-w-md mx-auto">{body}</p>
+      {why ? <p className="text-sm text-ink3 mt-1 max-w-md mx-auto">{why}</p> : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+      {after ? <p className="text-xs text-ink3 mt-3 max-w-md mx-auto">{after}</p> : null}
     </div>
   );
 }

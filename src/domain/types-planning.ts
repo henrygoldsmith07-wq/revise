@@ -113,7 +113,17 @@ export interface UserSettings {
     highContrast: boolean;
     reduceMotion: boolean;
   };
+  /**
+   * Explicit, revocable opt-in to sending this learner's work to a third-party
+   * AI provider. Off by default. Only counts together with `aiConsentVersion`
+   * at the current wording (see domain/ai-consent.ts); the server enforces its
+   * own copy of the decision in public.ai_consent on every AI request.
+   */
   aiEnabled: boolean;
+  /** Consent wording version the learner agreed to (or declined) most recently. */
+  aiConsentVersion?: string;
+  /** When the learner last changed the AI choice on any device. */
+  aiConsentUpdatedAt?: string;
   /** Whether Pulse may read this account's study history. Off by default. */
   pulseEnabled: boolean;
   /**

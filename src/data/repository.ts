@@ -1,7 +1,9 @@
 import { syncWireIdValue } from "./sync-contract";
 import { seedCards, seedQuestions } from "@/content";
+import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
+import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
 import type {
   Attempt,
   Card,
@@ -123,7 +125,10 @@ export function defaultSettings(userId: Id): UserSettings {
     targetGrades: {},
     theme: "system",
     accessibility: { largeText: false, dyslexiaFont: false, highContrast: false, reduceMotion: false },
-    aiEnabled: true,
+    // AI is off until the learner explicitly opts in (domain/ai-consent.ts).
+    // The audience includes under-18s, so no work leaves for a model provider
+    // by default.
+    aiEnabled: false,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
     labMode: false,
@@ -216,6 +221,10 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
         accessibility: { ...fallback.accessibility, ...stored.accessibility },
         labMode: stored.labMode === true,
         pulseEnabled: stored.pulseEnabled === true,
+        // The historic default stored `aiEnabled: true` for every profile even
+        // though no learner chose it. Only an explicit opt-in at the current
+        // consent wording counts.
+        aiEnabled: aiConsentGrantedInSettings(stored),
       }
     : fallback;
   const streak = ((await db.get("streak", userId)) as StreakState | undefined) ?? defaultStreak(userId);
@@ -252,6 +261,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
     );
   }
 
+  const runtimeLedger = await readRuntimeReviewLedger();
   const scoped = <T>(store: CollectionStore): T[] =>
     rows[store].filter((value) => {
       if (store === "questions") {
@@ -266,7 +276,12 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
     reviewLogs: reviewLogs.filter((row) => row.userId === userId),
     // Retired template rows stay on disk for export/history recovery, but can
     // no longer be selected or contribute to live learning evidence.
-    questions: scoped<Question>("questions").filter((question) => !question.id.startsWith("cnt:question:wjec-physics-depth-")),
+    // Reviewer-portal approvals (cached effective ledger) are applied on read,
+    // never written back, so the trust state is always re-derived.
+    questions: applyRuntimeReviewLedger(
+      scoped<Question>("questions").filter((question) => !question.id.startsWith("cnt:question:wjec-physics-depth-")),
+      runtimeLedger,
+    ),
     attempts: attempts.filter((row) => row.userId === userId),
     mistakes: scoped<Mistake>("mistakes"),
     papers: scoped<Paper>("papers"),
@@ -318,6 +333,7 @@ export async function dumpSnapshotForRecovery(): Promise<Record<string, unknown[
     "meta",
     "aiCache",
     "aiDlq",
+    "markingFlags",
   ] as const;
   const rows: Record<string, unknown[]> = {};
   for (const name of names) rows[name] = (await db.getAll(name)) as unknown[];

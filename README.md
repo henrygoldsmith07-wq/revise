@@ -78,7 +78,16 @@ taken from the spec manifest rather than the A-level clone. Adding a board
 still means one curriculum module and nothing else changing.
 
 New students start on the four flagships. Settings and onboarding group subjects
-as Flagship vs Reference so cloned boards cannot look spec-checked.
+as Flagship vs Reference so cloned boards cannot look spec-checked, and
+reference-tier subjects sit behind an explicit **"Unverified preview"** choice in
+onboarding rather than appearing in the list next to a disclaimer. Only WJEC
+A-level Physics is fully authored (108 of 108 specification statements); Maths,
+Biology and Chemistry still have 78, 102 and 95 statements to write.
+
+**Nothing is trusted yet.** All four flagships have **0 human-reviewed
+questions**, so Revise can practise with a student but cannot yet prove an
+improvement. That is a content-supply state, not a product limitation, and the
+app says so on screen instead of implying a plan exists.
 
 ## Running it
 
@@ -134,19 +143,19 @@ reviewed. The four WJEC A-level flagships (Mathematics, Biology, Chemistry,
 Physics) have large authored banks but **no human-reviewed questions yet**, so
 proof, the cold-start diagnostic and Exam Mission proof are blocked there until
 review happens. The repository therefore ships a review workflow rather than
-pretending the review has been done:
+pretending the review has been done.
 
-```bash
-npm run wjec:review:priorities          # what to review next, ranked by capability unlocked
-npm run wjec:review:queue -- maths ./pack --limit=10   # reviewer pack: question, mark scheme, spec, provenance, reskin warnings
-npm run wjec:review:import -- ./pack/review-return.json   # validate + append to the audit log
-npm run wjec:review:promote             # ledger entries for questions with two independent approvals
-npm run wjec:review:gates               # release gate (part of npm run verify)
-npm run wjec:quality:report             # internal supply dashboard
-```
-
-See [`docs/review-workflow.md`](docs/review-workflow.md). Nothing in the tooling
-approves a question; approvals come only from named reviewers in return files.
+**Teachers review in the browser** at `/reviewer` (the `(reviewer)` route
+group): a server-rendered queue, one dense screen per question (stem, mark
+scheme, specification points, provenance) and keyboard decisions (`A` approve,
+`R` request changes). Decisions extend the same hash-chained audit log, and a
+question becomes trusted for students once two different reviewers approve the
+same content. Access is granted by the maintainer; see
+[`docs/review-workflow.md`](docs/review-workflow.md) for the design, how to
+grant a teacher, and the developer-only CLI (`npm run wjec:review:priorities`,
+`npm run wjec:review:pull`, `npm run wjec:review:promote`,
+`npm run wjec:review:gates`). Nothing in the tooling approves a question;
+approvals come only from named reviewers.
 
 ## Depth first: flagship subject combinations
 

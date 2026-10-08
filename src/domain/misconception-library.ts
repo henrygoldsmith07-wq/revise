@@ -74,12 +74,12 @@ function scorePair(pattern: string, evidence: string): number | null {
 }
 
 /**
- * Match a missed mark-scheme point plus the student's answer against the
- * library. The `example` field carries the concrete wrong-answer symptom and
- * the `statement` carries the wrong belief, so the strongest of those four
- * comparisons is the score. Returns the best entry at or above 0.5, else null.
+ * The best-scoring library entry for a missed point and answer, with no
+ * threshold applied. Callers that need to say "this match is weak" (the
+ * Socratic examiner) read the raw score; `matchMisconception` applies the
+ * library's 0.5 cut-off on top of this.
  */
-export function matchMisconception(
+export function bestMisconceptionMatch(
   entries: readonly Misconception[],
   missedPoint: string,
   studentAnswer: string,
@@ -94,5 +94,23 @@ export function matchMisconception(
     );
     if (!best || score > best.score) best = { entry, score };
   }
-  return best && best.score >= 0.5 ? best : null;
+  return best;
+}
+
+/** Below this score a library match is not reported at all. */
+export const MISCONCEPTION_MATCH_THRESHOLD = 0.5;
+
+/**
+ * Match a missed mark-scheme point plus the student's answer against the
+ * library. The `example` field carries the concrete wrong-answer symptom and
+ * the `statement` carries the wrong belief, so the strongest of those four
+ * comparisons is the score. Returns the best entry at or above 0.5, else null.
+ */
+export function matchMisconception(
+  entries: readonly Misconception[],
+  missedPoint: string,
+  studentAnswer: string,
+): MisconceptionMatch | null {
+  const best = bestMisconceptionMatch(entries, missedPoint, studentAnswer);
+  return best && best.score >= MISCONCEPTION_MATCH_THRESHOLD ? best : null;
 }

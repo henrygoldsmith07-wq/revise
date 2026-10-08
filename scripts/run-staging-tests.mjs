@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { stagingConfiguration, STAGING_CATALOG_SQL, validateStagingCatalog, validateStagingFunctions, STAGING_TABLES } from "./staging-contract.mjs";
+import { stagingConfiguration, STAGING_CATALOG_SQL, validateStagingCatalog, validateStagingFunctions, STAGING_TABLES, PRIVACY_TABLES, PRIVACY_FUNCTIONS, validatePrivacyCatalog, validatePrivacyFunctions } from "./staging-contract.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 mkdirSync(path.join(root, "artifacts"), { recursive: true });
@@ -21,9 +21,14 @@ try {
     const errors = validateStagingCatalog(rows);
     const functions = await db.query("select proname as name, prosecdef as \"securityDefiner\", pg_get_functiondef(p.oid) as definition from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname=any($1::text[])", [["order_continuity_change","guard_replica_resurrection","record_replica_deletion","delete_replica_row"]]);
     errors.push(...validateStagingFunctions(functions.rows));
+    // Consent and quota structures: RLS, owner policy / no client policy, owner key.
+    const privacy = await db.query(STAGING_CATALOG_SQL, [PRIVACY_TABLES]);
+    errors.push(...validatePrivacyCatalog(privacy.rows));
+    const privacyFunctions = await db.query("select proname as name, prosecdef as \"securityDefiner\" from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname=any($1::text[])", [PRIVACY_FUNCTIONS]);
+    errors.push(...validatePrivacyFunctions(privacyFunctions.rows));
     if (errors.length) throw new Error(errors.join("\n"));
   } finally { await db.end(); }
-  writeFileSync(path.join(root, "artifacts/staging-schema.json"), JSON.stringify({ status: "passed", tables: STAGING_TABLES }, null, 2));
+  writeFileSync(path.join(root, "artifacts/staging-schema.json"), JSON.stringify({ status: "passed", tables: [...STAGING_TABLES, ...PRIVACY_TABLES] }, null, 2));
 } catch (error) {
   // Connection strings, passwords and server error details must never be logged.
   const message = stage === "infrastructure" ? "Missing/misconfigured staging infrastructure. Check all seven secrets, the TLS database connection and runner network access." : error.message;

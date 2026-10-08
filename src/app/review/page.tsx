@@ -18,7 +18,9 @@ import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
 import { RichText } from "@/components/RichText";
-import { clozeReveal } from "@/domain/cloze";
+import { cardRevealNote, cardSpeechText } from "@/domain/card-display";
+import { examinerNoteForCard } from "@/domain/examiner-note";
+import { CardAnswerBody, CardPromptMedia, cardAnswerHeading } from "@/components/CardFaces";
 
 // The review session. One card, one decision, no chrome competing for
 // attention. Confidence is captured *before* the answer is revealed, because
@@ -347,6 +349,7 @@ function ReviewSession() {
   }
 
   const topic = getTopic(current.topicId);
+  const examinerNote = examinerNoteForCard(current, topic);
   const intervals = previewIntervals(current);
 
   return (
@@ -376,7 +379,7 @@ function ReviewSession() {
           <Pill>{cardKindLabel(current)}</Pill>
           {current.lapses > 2 ? <Pill tone="danger">Leech · {current.lapses} lapses</Pill> : null}
           <span className="ml-auto">
-            <SpeakButton text={revealed && current.kind === "cloze" ? clozeReveal(current) : revealed ? current.back : current.front} audioUrl={current.audioUrl} />
+            <SpeakButton text={cardSpeechText(current, revealed)} audioUrl={current.audioUrl} />
           </span>
         </div>
 
@@ -418,25 +421,15 @@ function ReviewSession() {
 
         <div className="flex-1">
           <RichText className="text-base text-ink">{current.front}</RichText>
-          {current.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={current.imageUrl} alt="" className="mt-3 max-h-60 rounded-[8px] border border-line mx-auto" />
-          ) : null}
+          <CardPromptMedia card={current} />
 
           {revealed ? (
             <div className="mt-5 pt-4 border-t border-line fade-in">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">
-                {current.kind === "cloze" ? "Completed sentence" : "Answer"}
+                {cardAnswerHeading(current)}
               </p>
-              <RichText className="text-base">
-                {current.kind === "cloze" ? clozeReveal(current) : current.back}
-              </RichText>
-              {current.kind === "cloze" ? (
-                <p className="text-xs text-ink3 mt-2">
-                  Hidden answer: <span className="font-semibold text-ink2">{current.back}</span>
-                </p>
-              ) : null}
-              {current.note ? <p className="text-xs text-ink3 mt-2 italic">{current.note}</p> : null}
+              <CardAnswerBody card={current} />
+              {cardRevealNote(current) ? <p className="text-xs text-ink3 mt-2 italic">{cardRevealNote(current)}</p> : null}
             </div>
           ) : null}
         </div>
@@ -490,10 +483,10 @@ function ReviewSession() {
         )}
       </Panel>
 
-      {topic?.commonErrors.length && revealed ? (
+      {revealed && examinerNote ? (
         <p className="text-xs text-ink3">
-          <span className="font-semibold text-ink2">Examiner note: </span>
-          {topic.commonErrors[0]}
+          <span className="font-semibold text-ink2">Common mistake on this: </span>
+          {examinerNote}
         </p>
       ) : null}
     </div>
@@ -623,7 +616,7 @@ function SessionSummary({
   return (
     <PostSessionClosure
       closure={closure}
-      hint="Every card has been rescheduled by FSRS from how you graded it."
+      hint="Every card has been rescheduled from how you graded it: what you found hard comes back sooner."
       secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise questions" }}
     />
   );

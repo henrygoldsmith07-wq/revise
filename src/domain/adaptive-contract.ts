@@ -26,16 +26,16 @@ export interface AdaptiveStepParams {
   hintBudget: number;
 }
 
-/** Plain-language labels the runner/UI reads off a step. */
+/** Plain-language labels the runner/UI reads off a step. No rung or retrieval vocabulary. */
 export const STEP_LABELS: Record<AdaptiveStepKind, string> = {
-  "overdue-retrieval": "Retrieval",
-  "misconception-repair": "Repair the misconception",
-  explanation: "Explain the gap",
-  "supported-practice": "Supported question",
-  "independent-application": "Independent application",
-  transfer: "Unfamiliar transfer",
+  "overdue-retrieval": "Quick recall",
+  "misconception-repair": "Fix the mistake",
+  explanation: "Short explanation",
+  "supported-practice": "Guided question",
+  "independent-application": "Exam-style question on your own",
+  transfer: "Question in a new context",
   "prerequisite-repair": "Fix the foundation first",
-  "delayed-retrieval": "Schedule delayed retrieval",
+  "delayed-retrieval": "Check again in a few days",
 };
 
 /** The individual blocks the adaptive runner exposes to the student. */

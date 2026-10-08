@@ -9,7 +9,7 @@ export const LOCAL_PROFILE = "local";
 export const PROFILE_INITIALIZED = "revise.profile.initialized.v1";
 const ADOPTED_BY = "revise.profile.adoptedBy.v1";
 const SINGLETONS = ["settings", "streak", "lessonProgress"] as const;
-const PROFILE_STORES = [...COLLECTION_STORES, ...SINGLETONS, "outbox", "meta", "aiCache", "aiDlq"] as const;
+const PROFILE_STORES = [...COLLECTION_STORES, ...SINGLETONS, "outbox", "meta", "aiCache", "aiDlq", "markingFlags"] as const;
 
 export function canonicalProfile(accountId: string | null): string {
   if (accountId === null) return LOCAL_PROFILE;
@@ -131,7 +131,10 @@ export async function initializeAccountProfile(userId: string, adoptLocal: boole
       await tx.objectStore(store).put(row as never);
       // Queue the complete adopted state, including data created without a backend.
       // Seed questions are public curriculum content and have no userId.
-      if (store !== "outbox" && store !== "meta" && (row.userId === userId || (store === "questions" && isPrivateQuestion(row)))) {
+      // `markingFlags` is adopted so a learner keeps their disputes when they
+      // sign up, but is deliberately never queued: it carries their own answer
+      // text and free-text note, and has no sync entity or RLS policy behind it.
+      if (store !== "outbox" && store !== "meta" && store !== "markingFlags" && (row.userId === userId || (store === "questions" && isPrivateQuestion(row)))) {
         const entity = entities[store] ?? store as SyncEntity;
         const item: OutboxItem = {
           id: crypto.randomUUID(), entity, op: "upsert", payload: row, ownerId: userId,

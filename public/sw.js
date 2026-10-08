@@ -24,6 +24,7 @@ const APP_SHELL = [
   "/study",
   "/twin",
   "/tutor",
+  "/welcome",
   "/manifest.webmanifest",
   "/icon.svg",
   "/icon-maskable.svg",
@@ -64,6 +65,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   // AI responses are never cached: a stale explanation is worse than none.
   if (url.pathname.startsWith("/api/")) return;
+  // The reviewer portal is signed-in, teacher-only and server-rendered: never
+  // cache it, so a shared device cannot replay a reviewer's queue offline.
+  if (url.pathname === "/reviewer" || url.pathname.startsWith("/reviewer/")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

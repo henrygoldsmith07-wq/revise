@@ -12,6 +12,8 @@ import {
   questionHasAnswer,
 } from "@/domain/exam-conditions";
 import { markMcq } from "@/domain/marking";
+import { assessDeterministicMark, markAssessmentRecord, type MarkConfidenceAssessment } from "@/domain/marking-confidence";
+import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
 import type { Attempt, MarkedPart, Paper, PaperSpec, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { RichText } from "./RichText";
@@ -116,6 +118,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
           let marked: MarkedPart[];
           let feedback: string;
           let source: "ai" | "fallback" = "fallback";
+          let assessment: MarkConfidenceAssessment;
           const answerForQuestion: Record<string, string> = {};
 
           if (isMcq) {
@@ -127,14 +130,25 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
                 ? `Correct. ${question.parts[0]?.modelAnswer ?? ""}`
                 : `${single.comment} ${question.parts[0]?.modelAnswer ?? ""}`;
             answerForQuestion[question.parts[0]?.id ?? question.id] = Number.isInteger(chosen) ? String(chosen) : "";
+            assessment = assessDeterministicMark({ marked, rubricConfidence: null });
           } else {
             for (const part of question.parts) answerForQuestion[part.id] = answers[part.id] ?? "";
             const envelope = await aiMark(question, answerForQuestion);
             marked = envelope.data.marked;
             feedback = envelope.data.feedback;
             source = envelope.source;
+            assessment = envelope.assessment;
           }
 
+          const createdAt = new Date().toISOString();
+          // Paper marks go through the same confidence checks as practice
+          // marks: an AI mark that fails a check is stored as provisional with
+          // a pending review request rather than as a definitive result.
+          const markedBy: Attempt["markedBy"] = source === "ai" ? "ai" : "rubric";
+          const escalation = createMarkEscalationRecord(
+            assessLowConfidenceMark({ markedBy, confidence: source === "ai" ? assessment.score : null }),
+            createdAt,
+          );
           const attempt: Attempt = {
             id: crypto.randomUUID(),
             userId: store.userId,
@@ -146,14 +160,17 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
             awarded: marked.reduce((total, part) => total + part.awarded, 0),
             max: marked.reduce((total, part) => total + part.max, 0),
             feedback,
-            markedBy: source === "ai" ? "ai" : "rubric",
+            markedBy,
+            ...(source === "ai" ? { markConfidence: assessment.score } : {}),
+            ...(escalation ? { markEscalation: escalation } : {}),
+            markAssessment: markAssessmentRecord(assessment),
             elapsedMs: elapsedByQuestion[question.id] ?? 0,
             mode: "paper",
             paperId: question.paperId ?? paper.id,
             paperSpecId,
             paperRunId,
             paperMarking: { status: "unreviewed" as const },
-            createdAt: new Date().toISOString(),
+            createdAt,
           };
 
           await store.recordAttempt(attempt, question);
@@ -498,6 +515,7 @@ function ExamResultView({ paper, result, onExit }: { paper: Paper; result: ExamR
   const awarded = result.attempts.reduce((total, attempt) => total + attempt.awarded, 0);
   const maximum = result.attempts.reduce((total, attempt) => total + attempt.max, 0);
   const percentage = maximum ? awarded / maximum : 0;
+  const provisionalCount = result.attempts.filter((attempt) => attempt.markAssessment?.provisional).length;
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -521,6 +539,12 @@ function ExamResultView({ paper, result, onExit }: { paper: Paper; result: ExamR
           {result.timedOut ? "The timer submitted the paper automatically. " : "The paper was submitted under timed conditions. "}
           {result.unanswered ? `${result.unanswered} question${result.unanswered === 1 ? " was" : "s were"} blank.` : "All questions were answered."}
         </p>
+        {provisionalCount ? (
+          <p className="text-xs text-review" role="status">
+            {provisionalCount} mark{provisionalCount === 1 ? " is" : "s are"} provisional: the AI marker and the checks on this
+            device did not fully agree. Open the question in your review history to see why or to flag the mark.
+          </p>
+        ) : null}
       </Panel>
 
       <Panel>
@@ -528,7 +552,10 @@ function ExamResultView({ paper, result, onExit }: { paper: Paper; result: ExamR
         <ul className="divide-y divide-line">
           {result.attempts.map((attempt, index) => (
             <li key={attempt.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
-              <span className="text-ink2">Question {index + 1}</span>
+              <span className="text-ink2">
+                Question {index + 1}
+                {attempt.markAssessment?.provisional ? <Pill tone="review" className="ml-2">Provisional</Pill> : null}
+              </span>
               <span className={cx("font-semibold tabular-nums", attempt.awarded === attempt.max ? "text-success" : "text-ink")}>{attempt.awarded}/{attempt.max}</span>
             </li>
           ))}

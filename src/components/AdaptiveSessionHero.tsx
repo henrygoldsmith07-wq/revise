@@ -10,6 +10,7 @@ import { useStoreFields } from "@/state/store";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { explainSession } from "@/domain/session-explanation";
+import { describePathway } from "@/domain/study-pathway";
 import { ButtonLink, Pill } from "./ui";
 import { ForwardIcon, TodayIcon } from "./icons";
 
@@ -39,6 +40,8 @@ export function AdaptiveSessionHero({
     return buildTodayBrief({ plan: session, papers, examDates: store.examDates, mistakes: store.mistakes, lifecycle });
   }, [subject, session, proof, store.questions, store.attempts, store.mistakes, store.examDates]);
   const explanation = useMemo(() => explainSession(session, proof?.conversion), [session, proof?.conversion]);
+  // The planner already chose the sequence; name it so the learner sees one session, not a menu of modes.
+  const pathway = useMemo(() => describePathway(session), [session]);
   // Today stays calm: mention proof only when something is shown or a test is due, not while it is merely waiting.
   const proofHeadline = proof && (proof.proven || proof.declined || proof.illusory || proof.due) ? proof.headline : null;
 
@@ -49,7 +52,7 @@ export function AdaptiveSessionHero({
 
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="today-focus-icon" aria-hidden="true"><TodayIcon size={18} /></span>
-          <p className="text-sm font-semibold text-speak">A good next step</p>
+          <p className="text-sm font-semibold text-speak">Your highest-value session</p>
           <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">About {Math.ceil(session.totalMinutes)} min</span>
         </div>
         <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
@@ -69,7 +72,7 @@ export function AdaptiveSessionHero({
         ) : null}
         {brief.produces.length ? (
           <p className="mt-1 text-sm text-ink2">
-            This will produce: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
+            In this session: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
           </p>
         ) : null}
 
@@ -77,9 +80,18 @@ export function AdaptiveSessionHero({
           <p className="mt-2 text-sm text-ink2" role="note">{session.stoppedEarly.reason}</p>
         ) : null}
 
+        <p className="mt-3 text-sm text-ink2">
+          <span className="font-medium text-ink">How:</span> {pathway.steps.join(" → ")}
+        </p>
+
         <ButtonLink href={session.startHref} variant="primary" size="md" className="mt-5 min-h-[3rem] w-full text-base sm:w-auto">
           Start session <ForwardIcon size={17} aria-hidden />
         </ButtonLink>
+        {pathway.endsWithDelayedCheck ? (
+          <p className="mt-3 max-w-2xl text-sm text-ink2">
+            <span className="font-medium text-ink">After this:</span> a check in a few days, on a question you have not seen, shows whether it stuck.
+          </p>
+        ) : null}
 
         <details className="today-sequence mt-4 lg:hidden">
           <summary className="cursor-pointer select-none text-sm font-medium text-ink2">What you&apos;ll do</summary>

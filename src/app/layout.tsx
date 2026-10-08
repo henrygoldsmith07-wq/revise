@@ -9,13 +9,41 @@ import { AccountBoundary } from "@/state/account";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
+/**
+ * Canonical origin. Deliberately the same origin the app is served from; set
+ * SITE_URL at deploy time rather than trusting a Host header, so OG tags and
+ * canonicals can never be pointed at a spoofed origin.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Revise — exam revision that knows what to do next",
   description:
-    "Evidence-based A-level revision: FSRS spaced repetition, exam-style practice with examiner marking, weak-topic detection and a plan that rebuilds itself.",
+    "WJEC A-level revision that tells you the one thing to do next: spaced repetition, exam-style practice with examiner marking, and a plan that rebuilds itself. Four subjects are authored to their specification; everything else is labelled reference material.",
+  applicationName: "Revise",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Revise", statusBarStyle: "default" },
   icons: { icon: "/logo.svg", apple: "/logo.svg" },
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Revise",
+    title: "Revise — exam revision that knows what to do next",
+    description:
+      "WJEC A-level revision that tells you the one thing to do next. Four subjects are authored to their specification; everything else is labelled reference material.",
+    url: "/",
+    locale: "en_GB",
+  },
+  twitter: {
+    card: "summary",
+    title: "Revise — exam revision that knows what to do next",
+    description:
+      "WJEC A-level revision that tells you the one thing to do next. Four subjects are authored to their specification; everything else is labelled reference material.",
+  },
+  // This is an app, not a marketing site: only /welcome is meant to be indexed,
+  // and only because it is the page that works without JavaScript.
+  robots: { index: false, follow: true },
 };
 
 export const viewport: Viewport = {
@@ -43,6 +71,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body className={`${inter.variable} antialiased`}>
+        {/* AccountBoundary resolves its profile in a client effect, so without
+            JavaScript the app below never renders — only its "opening your
+            profile" placeholder. This has to live outside that boundary to be
+            visible at all. It points at /welcome, a static page that needs no JS. */}
+        <noscript>
+          <div style={{ maxWidth: "42rem", margin: "3rem auto", padding: "0 1.25rem", lineHeight: 1.6 }}>
+            <h1 style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>Revise</h1>
+            <p style={{ marginBottom: "0.75rem" }}>
+              Revise stores your work on your own device and needs JavaScript to read it, so the
+              revision app cannot start without it.
+            </p>
+            <p>
+              <a href="/welcome">Read what Revise does, and what it cannot yet do, without JavaScript</a>.
+            </p>
+          </div>
+        </noscript>
         <PwaInstallProvider>
           <AccountBoundary>
             <ShortcutProvider>

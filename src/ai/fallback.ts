@@ -11,6 +11,7 @@ import type {
   GeneratedCard,
   GeneratedQuestion,
   MarkResponse,
+  SocraticExaminerPayload,
   SocraticResponse,
   SummariseResponse,
   TutorResponse,
@@ -138,6 +139,24 @@ export function socraticFallback(topicId: string, turnCount: number): SocraticRe
       `A trap to avoid: ${error}`,
     ].join("\n"),
     nextQuestion: `Can you state ${firstClause(point).toLowerCase()} in your own words, and say why it is true?`,
+  };
+}
+
+/**
+ * The examiner's offline answer is the authored misconception itself — the
+ * same static text the panel shows before any model replies — so a provider
+ * failure changes nothing the student sees.
+ */
+export function socraticExaminerFallback(examiner: SocraticExaminerPayload): SocraticResponse {
+  if (examiner.misconception) {
+    const caveat =
+      examiner.matchStrength === "weak" ? " (closest known misconception — the match is weak, so it may not apply)" : "";
+    return {
+      reply: [`**${examiner.misconception.statement}**${caveat}`, "", examiner.misconception.explanation, "", examiner.misconception.correction].join("\n"),
+    };
+  }
+  return {
+    reply: "No known misconception matches this answer closely. Compare your answer with the points you missed.",
   };
 }
 

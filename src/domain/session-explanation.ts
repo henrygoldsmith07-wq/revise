@@ -93,8 +93,8 @@ export function explainSession(plan: AdaptiveSessionPlan, conversion?: ProofLedg
   }
 
   const drivers: string[] = [];
-  if (evidence.overdueCount) drivers.push(`${plural(evidence.overdueCount, "overdue retrieval")} on this topic`);
-  else if (evidence.dueCount) drivers.push(`${plural(evidence.dueCount, "retrieval")} due on this topic`);
+  if (evidence.overdueCount) drivers.push(`${plural(evidence.overdueCount, "overdue recall check")} on this topic`);
+  else if (evidence.dueCount) drivers.push(`${plural(evidence.dueCount, "recall check")} due on this topic`);
   if (evidence.openMistakes) drivers.push(`${plural(evidence.openMistakes, "open mistake")} (${evidence.marksLost} ${evidence.marksLost === 1 ? "mark" : "marks"} lost)`);
   if (evidence.retention > 0 && evidence.retention < 0.8 && evidence.dueCount + evidence.overdueCount > 0) {
     drivers.push(`memory down to about ${percent(evidence.retention)}%`);

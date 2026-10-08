@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
+import { gateGeneratedQuestions } from "@/domain/generated-question-quality";
 import { remapContentIdString } from "@/data/content-ids";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { diagnosePrerequisiteWeakness, type PrerequisiteDiagnosis } from "@/domain/prerequisite-diagnosis";
@@ -46,7 +48,8 @@ export default function PracticePage() {
 function Practice() {
   const params = useSearchParams();
   const router = useRouter();
-  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "dueCards", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const dueCount = store.dueCards.length;
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
   const topicParam = params.get("topic");
@@ -374,7 +377,22 @@ function Practice() {
 
     // The fallback returns bank questions that are already stored — adding
     // them again would duplicate the whole topic's bank.
-    const fresh = created.filter((q) => !store.questions.some((existing) => existing.stem === q.stem));
+    let fresh = created.filter((q) => !store.questions.some((existing) => existing.stem === q.stem));
+    let rejectedCount = 0;
+    if (result.source === "ai") {
+      // A schema-valid model reply is only well-formed. Deterministic quality
+      // gates decide whether it is saved, and anything saved stays unverified
+      // machine output — it never acquires reviewed status here.
+      const gated = gateGeneratedQuestions({
+        questions: fresh,
+        origin: "generated",
+        topicFor: () => topic ?? null,
+        bank: store.questions.filter((existing) => existing.topicIds.includes(topicId)),
+        checkedAt: new Date().toISOString(),
+      });
+      fresh = gated.accepted;
+      rejectedCount = gated.rejected.length;
+    }
     if (fresh.length) {
       await store.addQuestions(fresh);
       // New questions go to the front: the student asked for them just now.
@@ -383,8 +401,12 @@ function Practice() {
     }
     setNote(
       result.source === "ai"
-        ? `Generated ${fresh.length} new question${fresh.length === 1 ? "" : "s"} on this topic.`
-        : "No AI provider available, so this is showing questions from the authored bank instead.",
+        ? `Generated ${fresh.length} new question${fresh.length === 1 ? "" : "s"} on this topic${
+            rejectedCount ? ` (${rejectedCount} failed the quality checks and ${rejectedCount === 1 ? "was" : "were"} discarded)` : ""
+          }. AI-generated questions are not checked by a person, so treat their marking as a guide.`
+        : result.note?.startsWith("AI features are off")
+          ? "AI features are off, so this is showing questions from the authored bank instead. You can switch AI on in Settings."
+          : "No AI provider available, so this is showing questions from the authored bank instead.",
     );
     setGenerating(false);
   }
@@ -442,6 +464,13 @@ function Practice() {
               ? "Answer from memory with nothing in front of you, then get it marked."
               : "Answer as you would in the exam. Every dropped mark becomes a card."}
           </p>
+          {!wrongOnly && !retestMistake && !farTransferRetest ? (
+            <nav aria-label="Other ways to practise" className="mt-1 flex flex-wrap gap-x-4 text-sm text-ink2">
+              <Link href="/review" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Review cards{dueCount ? ` (${dueCount} due)` : ""}</Link>
+              <Link href="/papers" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Past papers</Link>
+              <Link href="/diagnostic" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Quick check</Link>
+            </nav>
+          ) : null}
         </div>
         {subjects.length > 1 && !farTransferRetest ? (
           <div className="w-full sm:w-auto max-w-full overflow-x-auto nice-scroll pb-1">
@@ -474,7 +503,7 @@ function Practice() {
                 <Pill tone={farTransferRetest.status === "due" ? "review" : "accent"}>
                   {farTransferRetest.status === "due" ? "Due now" : `Due ${farTransferRetest.scheduledFor}`}
                 </Pill>
-                <p className="text-sm font-semibold text-ink">Delayed far-transfer retest</p>
+                <p className="text-sm font-semibold text-ink">Delayed check in a new context</p>
               </div>
               <p className="text-xs text-ink2 mt-2">
                 A new-context question checks whether your original success on {getTopic(farTransferRetest.topicIds[0] ?? "")?.title ?? "this topic"} transfers after a delay.

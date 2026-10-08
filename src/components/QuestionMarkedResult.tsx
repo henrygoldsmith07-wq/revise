@@ -11,11 +11,14 @@ import type { RemediationPlan } from "@/domain/remediation";
 import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/domain/types";
 
 import { confidenceWord } from "@/domain/plain-numbers";
+import { markAssessmentLabel, type MarkConfidenceAssessment } from "@/domain/marking-confidence";
 import { ImproveAnswer } from "./ImproveAnswer";
+import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { ProofCheckBanner } from "./ProofCheckBanner";
 import { RichText } from "./RichText";
 import { ButtonLink, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
+import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 
@@ -25,15 +28,20 @@ export function MarkedResult({
   awarded,
   improvableAnswers,
   answers,
+  attempt,
 }: {
   /** Submitted answers by part id, used for long-answer feedback. */
   answers?: Record<string, string>;
+  /** The persisted attempt. Set when one exists, which is what makes a mark disputable. */
+  attempt?: Attempt;
   question: Question;
   /** Original answers by part id. When set, parts that lost marks offer a guided rewrite. */
   improvableAnswers?: Record<string, string>;
   result: {
     marked: MarkedPart[];
     feedback: string;
+    /** Present when the attempt is persisted; gates the "flag this mark" control. */
+    attemptId?: string;
     source: "ai" | "fallback";
     note?: string;
     withheld?: string;
@@ -43,12 +51,18 @@ export function MarkedResult({
     copiedAnswer?: boolean;
     workingAnalysis?: AttemptWorkingEvidence[];
     escalation?: LowConfidenceMarkDecision;
+    /** Confidence-aware marking result; provisional marks are labelled and disputable. */
+    assessment?: MarkConfidenceAssessment;
     farTransfer?: Attempt["farTransfer"];
     nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
 }) {
   const pct = question.totalMarks ? awarded / question.totalMarks : 0;
+  // A reloaded or re-graded attempt carries only the stored record.
+  const stored = attempt?.markAssessment;
+  const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
+  const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
   const plan = result.remediation;
   useEffect(() => {
     if (result.retest?.status === "resolved") {
@@ -57,6 +71,7 @@ export function MarkedResult({
     // Once per marked result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result.retest?.status]);
+  const showSocratic = question.kind !== "mcq" && awarded < question.totalMarks && Boolean(answers);
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
     for (const part of plan.parts) {
@@ -113,7 +128,9 @@ export function MarkedResult({
                 : `Transfer check due ${result.farTransfer.scheduledFor}`}
             </Pill>
           ) : null}
-          {result.source === "ai" ? (
+          {markLabel ? (
+            <Pill tone={provisional ? "review" : "success"}>{markLabel}</Pill>
+          ) : result.source === "ai" ? (
             <Pill tone={result.escalation ? "review" : "success"}>
               {result.confidence === null ? "AI confidence unavailable" : `AI confidence: ${confidenceWord(result.confidence)}`}
             </Pill>
@@ -121,6 +138,15 @@ export function MarkedResult({
           {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}
         </div>
       </div>
+      {provisional ? (
+        <div className="mb-3 rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
+          <p className="font-semibold text-review">Provisional mark</p>
+          <p className="text-xs mt-1">
+            {result.assessment?.explanation ??
+              "This mark is provisional, not an examiner's decision. If you think it is wrong, use “Flag this mark”."}
+          </p>
+        </div>
+      ) : null}
       {result.escalation ? (
         <div className="rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Human review requested</p>
@@ -135,6 +161,10 @@ export function MarkedResult({
         </p>
       ) : null}
       <ProgressBar value={pct} tone={pct >= 0.8 ? "success" : pct >= 0.5 ? "review" : "danger"} />
+
+      {/* Below full marks on a written answer: one guiding question before the
+          mark scheme. MCQs are excluded — marking already reveals the key. */}
+      {showSocratic ? <SocraticExaminerPanel question={question} marked={result.marked} answers={answers ?? {}} /> : null}
 
       {result.retest ? (
         <div
@@ -243,6 +273,7 @@ export function MarkedResult({
                 <ImproveAnswer question={question} part={part} marked={marked} original={improvableAnswers[part.id] ?? ""} />
               ) : null}
               {marked.comment ? <p className="text-xs text-ink3 mt-1.5">{marked.comment}</p> : null}
+              {attempt ? <FlagThisMark attempt={attempt} part={marked} /> : null}
               {marked.evidence?.length ? (
                 <details className="mt-2" open={marked.missedPoints.length > 0}>
                   <summary className="text-xs text-ink2 cursor-pointer select-none">Evidence for each mark</summary>
@@ -282,8 +313,8 @@ export function MarkedResult({
       </div>
 
       {question.kind !== "mcq" && actions.length ? (
-        <div className="mt-4 pt-4 border-t border-line">
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2">How to fix it</p>
+        <details className="mt-4 pt-4 border-t border-line" open={!showSocratic}>
+          <summary className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2 cursor-pointer select-none">How to fix it</summary>
           <ul className="space-y-2.5">
             {actions.map((action) => (
               <li key={action.misconception} className="card card-2 p-3">
@@ -309,7 +340,7 @@ export function MarkedResult({
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       ) : null}
 
       <div className="mt-4 pt-4 border-t border-line space-y-3">

@@ -73,7 +73,7 @@ test("lost marks become one mission that runs, closes honestly and leaves no sta
   const { lost } = await seed(page, { withEarlierSuccess: false });
   const main = page.locator("main#main");
 
-  await expect(main).toContainText("Your best next step");
+  await expect(main).toContainText("Your highest-value session");
   await expect(main).toContainText(`Recover ${lost} marks`);
   const start = main.getByRole("link", { name: "Start session", exact: true });
   const box = await start.boundingBox();
@@ -92,7 +92,7 @@ test("lost marks become one mission that runs, closes honestly and leaves no sta
   await expect(main).toContainText("no delayed proof yet");
 
   await page.goto("/");
-  await expect(main).toContainText("Your best next step", { timeout: 20_000 });
+  await expect(main).toContainText("Your highest-value session", { timeout: 20_000 });
   await expect(main).not.toContainText("Resume interrupted revision");
   await expect(main).toContainText(/Needs work|Improving/);
 });

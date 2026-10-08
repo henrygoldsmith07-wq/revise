@@ -40,4 +40,19 @@ describe("subject picker UI", () => {
     expect(onboarding).toContain("Clear all");
     expect(onboarding).toContain("setSubjectIds([])");
   });
+
+  it("offers an unverified preview instead of quietly listing unverified subjects", () => {
+    const onboarding = read("src/components/Onboarding.tsx");
+    // Reference-tier subjects reuse another board's outline without having been
+    // checked against this board's spec, so they sit behind an explicit choice
+    // rather than in the main list next to a disclaimer.
+    expect(onboarding).toMatch(/unverified preview/i);
+    expect(onboarding).toContain("setShowReference(true)");
+    // Both tiers still exist: nothing was dropped, only ordered behind a choice.
+    expect(onboarding).toContain("referenceRows");
+    expect(onboarding).toContain("flagshipRows");
+    // The flagship list keeps its own accessible name, and the preview is distinct.
+    expect(onboarding).toContain("ariaLabel={`${row.level} subjects`}");
+    expect(onboarding).toContain("ariaLabel={`${row.level} unverified preview subjects`}");
+  });
 });

@@ -59,7 +59,8 @@ export default function TodayPage() {
   const greetingLabel = useGreeting();
   // The Next Best Action engine ranks missions, paper recovery, proof checks, reviews and the
   // adaptive session together; Today shows only its winner.
-  const { plan } = useRevisionPlan();
+  const { plan, supplyNote, evidence } = useRevisionPlan();
+  const context = todayContext(evidence.daysToExam);
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -100,14 +101,14 @@ export default function TodayPage() {
     void recordExperimentEvent("shown", { taskId, activity: "adaptive", topicId: adaptiveSession.topicId });
   }, [adaptiveSession, experimentArm, recordExperimentEvent, recordFunnel]);
 
-  if (!adaptiveSession && !plan.top) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} />;
+  if (!adaptiveSession && !plan.top) return <EmptyToday name={settings.displayName} greeting={greetingLabel} pace={pace} supplyNote={supplyNote} />;
 
   // Hierarchy: the next session (or resume) dominates the first viewport.
   // Everything else — overview, roadmap, pace, outlook — sits one tap away
   // inside a collapsed section so secondary data never competes with starting.
   return (
     <div className="mx-auto w-full space-y-5">
-      <TodayWelcome name={settings.displayName} greeting={greetingLabel} />
+      <TodayWelcome name={settings.displayName} greeting={greetingLabel} context={context} />
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
       {revisionCheckpoint ? (
@@ -121,6 +122,12 @@ export default function TodayPage() {
           )}
         </div>
       )}
+      {revisionCheckpoint ? null : (
+        <p className="text-sm text-ink3">
+          Prefer to pick for yourself?{" "}
+          <Link href="/study" className="font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
+        </p>
+      )}
       {revisionCheckpoint ? null : <WeekLine />}
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
@@ -132,6 +139,9 @@ export default function TodayPage() {
           <SafeTodayRoadmap preferredSubjectId={adaptiveSession?.subjectId ?? plan.top?.subjectId} />
           {pace ? <PaceForecastLine forecast={pace} /> : null}
           <ExamOutlook />
+          <Link href="/readiness" className="inline-flex min-h-11 items-center text-sm font-medium text-ink2 underline underline-offset-4 hover:text-ink">
+            See how every exam is tracking
+          </Link>
         </div>
       </details>
     </div>
@@ -142,7 +152,14 @@ export default function TodayPage() {
 // Empty state — nothing due, no next task (fresh profile pre-plan).
 // ---------------------------------------------------------------------------
 
-function TodayWelcome({ name, greeting, hasSession = true }: { name: string; greeting: string; hasSession?: boolean }) {
+/** One line of context under the greeting: the nearest exam when there is one, never a made-up number. */
+function todayContext(daysToExam: number | null): string {
+  if (daysToExam === null) return "One session, chosen from your answers so far. Start it, and Revise adjusts as you go.";
+  if (daysToExam === 0) return "Exam day. Keep it short and calm: one focused session.";
+  return `Your next exam is in ${daysToExam} day${daysToExam === 1 ? "" : "s"}. This is the best use of your time right now.`;
+}
+
+function TodayWelcome({ name, greeting, hasSession = true, context }: { name: string; greeting: string; hasSession?: boolean; context?: string }) {
   const salutation = greeting ? "Good " + greeting.toLowerCase() : "Welcome back";
   return (
     <header className="today-welcome">
@@ -150,14 +167,14 @@ function TodayWelcome({ name, greeting, hasSession = true }: { name: string; gre
       <h1 className="relative z-10 mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
         {salutation}{name ? ", " + name : ""}
       </h1>
-      <p className="relative z-10 mt-2 hidden max-w-xl text-sm leading-6 text-ink2 sm:block sm:text-base">
-        {hasSession ? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
+      <p className="relative z-10 mt-2 max-w-xl text-sm leading-6 text-ink2 sm:text-base">
+        {hasSession ? context ?? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
       </p>
     </header>
   );
 }
 
-function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; pace: ReturnType<typeof forecastUntouched> }) {
+function EmptyToday({ name, greeting, pace, supplyNote }: { name: string; greeting: string; pace: ReturnType<typeof forecastUntouched>; supplyNote?: string | null }) {
   return (
     <div className="mx-auto w-full space-y-5">
       <TodayWelcome name={name} greeting={greeting} hasSession={false} />
@@ -167,9 +184,18 @@ function EmptyToday({ name, greeting, pace }: { name: string; greeting: string; 
         <p className="text-sm font-semibold text-speak">Do this now</p>
         <h2 className="mt-2 text-xl font-semibold text-ink">Find where to start</h2>
         <p className="mt-2 text-sm leading-6 text-ink2">A 5–10 minute quick check across several topics — no hints, so answers count as evidence. Revise then chooses your personalised next step.</p>
+        <p className="mt-1 text-sm leading-6 text-ink2">After that, this space shows one session chosen for you, with the reason why.</p>
+        {/* Nothing here is ranked yet. Say which of the two reasons applies, rather
+            than letting "nothing to do" look like an unfinished setup. */}
+        {supplyNote ? (
+          <p className="mt-3 border-l-2 border-ink3 pl-3 text-sm leading-6 text-ink2">{supplyNote}</p>
+        ) : null}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <ButtonLink href="/diagnostic" variant="primary" size="md" className="w-full sm:w-auto min-h-[3rem] text-base">Start quick check</ButtonLink>
           <ButtonLink href="/lesson" variant="secondary" size="md" className="w-full sm:w-auto min-h-[3rem]">Browse lessons</ButtonLink>
+          <Link href="/practice" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink py-3 px-1 min-h-[3rem] inline-flex items-center">
+            Practise a question
+          </Link>
           <Link href="/settings" className="text-sm text-ink2 underline underline-offset-4 hover:text-ink py-3 px-1 min-h-[3rem] inline-flex items-center">
             Set up exams
           </Link>

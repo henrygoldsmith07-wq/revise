@@ -14,12 +14,14 @@ import type { ActualResultRecord, GradePredictionRecord } from "./grade-loop";
 //     machine-readable JSON archive. Card decks have a first-class importer;
 //     full snapshot restore is intentionally not claimed until every linked
 //     history row can be restored without breaking ids or evidence provenance.
-//  2. **Deletion (Art. 17) + retention** — purging is an explicit, reversible
+//  2. **Local erasure (Art. 17, device)** — purging this device is an explicit
 //     step in the UI; the helpers here are pure so the UI can show exactly
-//     what will disappear before it does.
+//     what will disappear before it does. Deleting the *account* and its
+//     server data is a separate, authenticated server request
+//     (src/app/api/account/delete/route.ts, domain/account-deletion.ts).
 //  3. **Local-only / private mode** — Revise already runs without an account.
-//     `privacyDisclosure` makes that claim auditable, and `shouldRetain`
-//     enforces a configurable retention window without a background job.
+//     `privacyDisclosure` states what actually leaves the device; retention is
+//     stated, with its enforcing code, in domain/retention-policy.ts.
 // ---------------------------------------------------------------------------
 
 export interface PortabilitySnapshot {
@@ -227,65 +229,31 @@ export function portabilityFilename(userId: Id, at: IsoInstant = new Date().toIS
 }
 
 // ---------------------------------------------------------------------------
-// Privacy disclosure + retention
+// Privacy disclosure
 // ---------------------------------------------------------------------------
-
-export interface RetentionSettings {
-  /** Keep server-synced rows this long after last update (days). null = keep forever locally. */
-  serverRetentionDays: number | null;
-  /** Whether cloud sync is enabled at all. */
-  cloudEnabled: boolean;
-  /** When true, no card text, question text or raw review logs are queued for upload even if cloudEnabled. */
-  localOnly: boolean;
-  updatedAt: IsoInstant;
-}
-
-export function defaultRetention(now?: Date): RetentionSettings {
-  return {
-    serverRetentionDays: 365,
-    cloudEnabled: false,
-    localOnly: true,
-    updatedAt: (now ?? new Date()).toISOString(),
-  };
-}
-
-/**
- * Whether a row should still be retained given retention settings.
- * Compares the row's updatedAt/createdAt against the window; locally-stored
- * rows are never auto-purged unless the user explicitly deletes the account.
- */
-export function shouldRetain(
-  row: { updatedAt?: IsoInstant; createdAt?: IsoInstant },
-  retention: RetentionSettings,
-  now: Date = new Date(),
-): boolean {
-  if (retention.serverRetentionDays == null) return true;
-  const stamp = row.updatedAt ?? row.createdAt;
-  if (!stamp) return true;
-  const ageDays = Math.round((now.getTime() - new Date(stamp).getTime()) / 86_400_000);
-  // Local-only mode never expires local rows; expiry only applies to the
-  // server replica. The helper still returns true locally so the UI does not
-  // hide rows prematurely.
-  if (retention.localOnly) return true;
-  return ageDays <= retention.serverRetentionDays;
-}
 
 /**
  * Plain-English privacy disclosure the Settings page can render verbatim.
- * The text is kept here so tests can assert its claims.
+ * The text is kept here so tests can assert its claims; every sentence must
+ * describe what the code does today (docs/data-flows.md is the reference).
  */
 export function privacyDisclosure(cloudEnabled: boolean): string[] {
+  const ai =
+    "AI features are off unless you switch them on in Settings → AI. When on, your answer, notes or photo is sent to the AI service with names, contact details, postcodes, school names and addresses replaced first; turning AI off stops this immediately.";
   if (!cloudEnabled) {
     return [
-      "Local-only mode: everything is stored in your browser (IndexedDB) and never sent to a server.",
-      "No analytics, no cookies, no account required. Your cards, attempts, review logs and recorded assessment outcomes leave this device only if you export or share data.",
-      "Clear site data or use Settings → Data → Delete to remove everything. Nothing can be recovered after that.",
+      "Local-only mode: your revision data is stored in this browser (IndexedDB). With AI off, nothing you write is sent to a server.",
+      "No analytics, no cookies, no account required. Your cards, attempts, review logs and recorded assessment outcomes leave this device only if you export them, share them, or switch AI on.",
+      ai,
+      "Use Settings → Data → Erase local data, or clear site data, to remove everything on this device. Nothing can be recovered after that.",
     ];
   }
   return [
-    "Cloud sync relays supported study rows to Supabase so they can appear on other devices. Local metadata such as forecast calibration history stays on this device unless you export it.",
-    "Data is scoped by your user id with row-level security. Use Settings → Data → Export to get a machine-readable copy, or Delete to remove your account's rows locally and on next sync on the server.",
-    "You can switch back to local-only at any time — queued changes stay local and nothing new is uploaded.",
+    "When you are signed in, cloud sync copies supported study rows to Supabase so they appear on your other devices. Local metadata such as forecast calibration history stays on this device unless you export it.",
+    "Data is scoped to your account with row-level security. Settings → Data → Export gives you a machine-readable copy of this device's data.",
+    ai,
+    "Erase local data wipes this device only — your synced account data stays on the server and comes back when you sign in. Settings → Account → Delete account permanently deletes your account and everything synced to it.",
+    "You can sign out and use the local profile at any time — nothing new from it is uploaded.",
   ];
 }
 

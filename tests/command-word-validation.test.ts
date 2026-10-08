@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { commandOf } from "@/domain/assessment";
 import { commandWordForPart, validateCommandWord } from "@/domain/command-word-validation";
 import type { Question, QuestionPart } from "@/domain/types";
 
@@ -34,5 +35,14 @@ describe("command-word validation", () => {
     const result = validateCommandWord(question(), part("Compare the two results."), "");
     expect(result.status).toBe("empty");
     expect(result.message).toContain("both things");
+  });
+});
+
+describe("commandOf picks the command word that governs the prompt", () => {
+  it("uses the first command word in the text, not the first in the list", () => {
+    expect(commandOf("Calculate the critical angle and state the conditions for total internal reflection.")).toBe("calculate");
+    expect(commandOf("Explain why the current falls, and state one assumption.")).toBe("explain");
+    expect(commandOf("State the law of conservation of momentum.")).toBe("state");
+    expect(commandOf("Write down your name.")).toBe("other");
   });
 });
