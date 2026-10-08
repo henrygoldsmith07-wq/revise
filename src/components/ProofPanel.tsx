@@ -1,16 +1,65 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { allTopics, getSubject, getTopic } from "@/domain/curriculum";
 import { evidenceGapReport, type SubjectGapSummary } from "@/domain/marks-value";
 import { learnerState, topicEvidenceSummary, type LearnerState } from "@/domain/learner-state";
 import { topicLifecycle } from "@/domain/proof-lifecycle";
 import { shortDate, type ProofStatus, type TopicProof } from "@/domain/proof-of-improvement";
 import { topicShares } from "@/domain/topic-weight";
+import { newlyProvenTopics, nextSeenProofStates, parseSeenProofStates } from "@/domain/proof-moment";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, SectionHeading, StatTile } from "./ui";
 
 const VISIBLE_ROWS = 6;
+/** Device-local memory of which topics the learner has already seen as Proven (display only). */
+export const PROOF_SEEN_KEY = "revise.proof.seen";
+
+function readSeen(): Record<string, LearnerState> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return parseSeenProofStates(window.localStorage.getItem(PROOF_SEEN_KEY));
+  } catch {
+    return null; // storage unavailable: no moment, nothing breaks
+  }
+}
+
+/**
+ * Which topics reached Proven since this panel was last seen. The last-seen
+ * map is read once per mount, so the moment plays once; the new map is written
+ * back as soon as the ledger has rows.
+ */
+function useProvenMoments(states: ReadonlyArray<{ topicId: string; state: LearnerState }>): ReadonlySet<string> {
+  const [seenAtMount] = useState(readSeen);
+  const moments = useMemo(
+    () => (seenAtMount ? new Set(newlyProvenTopics(seenAtMount, states)) : new Set<string>()),
+    [seenAtMount, states],
+  );
+  useEffect(() => {
+    if (!seenAtMount || !states.length) return;
+    try {
+      window.localStorage.setItem(PROOF_SEEN_KEY, JSON.stringify(nextSeenProofStates(seenAtMount, states)));
+    } catch {
+      /* best effort */
+    }
+  }, [seenAtMount, states]);
+  return moments;
+}
+
+/** "Awaiting proof" → "Proven", animated in CSS (globals.css .proof-moment); static under reduced motion. */
+function ProvenMoment() {
+  return (
+    <span className="proof-moment" aria-hidden="true">
+      <span className="proof-moment__from pill bg-reviewsoft text-review border-transparent">Awaiting proof</span>
+      <span className="proof-moment__to pill bg-accentsoft text-accent border-transparent inline-flex items-center gap-1">
+        <svg viewBox="0 0 12 12" className="proof-moment__check w-3 h-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2.5 6.4l2.3 2.2 4.7-5" />
+        </svg>
+        Proven
+      </span>
+    </span>
+  );
+}
 
 const STATUS: Record<ProofStatus, { label: string; tone: "success" | "review" | "danger" | "neutral" }> = {
   "proven-gain": { label: "Proven", tone: "success" },
@@ -62,21 +111,35 @@ export function ProofPanel() {
     return evidenceGapReport({ topics, shares: topicShares(topics), questions: store.questions, attempts: store.attempts });
   }, [store.attempts, store.questions, store.settings.subjectIds]);
 
-  const rows = ledger.topics.filter((row) => row.status !== "untested" || row.illusory);
+  const rows = useMemo(() => ledger.topics.filter((row) => row.status !== "untested" || row.illusory), [ledger.topics]);
   const visible = rows.slice(0, VISIBLE_ROWS);
   const hidden = rows.slice(VISIBLE_ROWS);
   const due = ledger.topics.filter((row) => row.proofDue).length;
+  const views = useMemo(
+    () =>
+      new Map(
+        rows.map((row) => [
+          row.topicId,
+          learnerState(
+            topicLifecycle({ topic: { id: row.topicId, title: getTopic(row.topicId)?.title ?? row.topicId }, proof: row, attempts: store.attempts, questions: store.questions }),
+            topicEvidenceSummary(row.topicId, store.attempts, store.questions),
+          ),
+        ]),
+      ),
+    [rows, store.attempts, store.questions],
+  );
+  const viewStates = useMemo(() => [...views].map(([topicId, view]) => ({ topicId, state: view.state })), [views]);
+  const moments = useProvenMoments(viewStates);
+  const momentTitles = [...moments].map((id) => getTopic(id)?.title ?? id);
 
   const renderRow = (row: TopicProof) => {
     const status = STATUS[row.status];
     const topic = getTopic(row.topicId);
     const act = row.proofDue || row.illusory;
-    const view = learnerState(
-      topicLifecycle({ topic: { id: row.topicId, title: topic?.title ?? row.topicId }, proof: row, attempts: store.attempts, questions: store.questions }),
-      topicEvidenceSummary(row.topicId, store.attempts, store.questions),
-    );
+    const view = views.get(row.topicId)!;
+    const moment = moments.has(row.topicId);
     return (
-      <li key={row.topicId} className="py-3 flex flex-wrap items-start justify-between gap-3">
+      <li key={row.topicId} className={`py-3 flex flex-wrap items-start justify-between gap-3${moment ? " rounded-[8px]" : ""}`}>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-ink">
             {topic?.title ?? row.topicId}
@@ -89,7 +152,14 @@ export function ProofPanel() {
           </details>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Pill tone={STATE_TONE[view.state]}>{view.label}</Pill>
+          {moment ? (
+            <>
+              <ProvenMoment />
+              <span className="sr-only">{view.label}</span>
+            </>
+          ) : (
+            <Pill tone={STATE_TONE[view.state]}>{view.label}</Pill>
+          )}
           {act ? <ButtonLink href={startHref(row.topicId)} size="sm" variant="primary">Prove it</ButtonLink> : null}
         </div>
       </li>
@@ -105,6 +175,16 @@ export function ProofPanel() {
       <Panel className="space-y-5">
         <h2 id="proof-heading" className="sr-only">Proof of improvement</h2>
         <p className="text-sm text-ink2" role="status">{ledger.headline}</p>
+        {momentTitles.length ? (
+          <div className="proof-moment-banner rounded-[8px] border border-line bg-accentsoft px-3 py-2.5" role="status" aria-live="polite">
+            <p className="text-sm font-semibold text-ink">
+              Proven: {momentTitles.join(", ")}
+            </p>
+            <p className="text-xs text-ink2 mt-0.5">
+              You answered a new question unaided, days after studying{momentTitles.length === 1 ? " it" : " them"}. That is the evidence that it stuck.
+            </p>
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatTile label="Proven" value={ledger.proven} sub={ledger.proven ? `about +${ledger.provenMarks} marks` : "topics"} tone={ledger.proven ? "success" : undefined} />
           <StatTile label="Awaiting proof" value={ledger.awaiting} sub={due ? `${due} due now` : "topics"} tone={due ? "review" : undefined} />

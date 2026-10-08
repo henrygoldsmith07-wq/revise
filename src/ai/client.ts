@@ -4,6 +4,7 @@ import {
   generateCardsFallback,
   generateQuestionsFallback,
   markFallback,
+  socraticExaminerFallback,
   socraticFallback,
   summariseFallback,
   tutorFallback,
@@ -30,6 +31,7 @@ import type {
   GeneratedQuestion,
   MarkResponse,
   OcrResponse,
+  SocraticExaminerPayload,
   SocraticResponse,
   SummariseResponse,
   TutorChatMessage,
@@ -84,6 +86,41 @@ export function aiSocratic(topicId: string, history: { role: "user" | "assistant
   return call<SocraticResponse>("socratic", { topicId, history: maskChatHistory(history) }, () =>
     socraticFallback(topicId, history.length),
   );
+}
+
+/**
+ * The Socratic examiner: one guiding question about a just-marked answer.
+ * The answer is masked here and again by the transport's egress policy; the
+ * fallback is the authored misconception text, which the panel is already
+ * showing, so a failure is invisible. `timeoutMs` bounds the wait: the panel
+ * never waits on a slow provider.
+ */
+export async function aiSocraticExaminer(input: {
+  topicId: string;
+  examiner: SocraticExaminerPayload;
+  history?: { role: "user" | "assistant"; content: string }[];
+  timeoutMs?: number;
+}): Promise<AiEnvelope<SocraticResponse>> {
+  const fallback = () => socraticExaminerFallback(input.examiner);
+  const request = call<SocraticResponse>(
+    "socratic",
+    {
+      topicId: input.topicId,
+      history: maskChatHistory(input.history ?? []),
+      examiner: { ...input.examiner, studentAnswer: maskStudentText(input.examiner.studentAnswer) },
+    },
+    fallback,
+  );
+  const timeoutMs = input.timeoutMs ?? 8000;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<AiEnvelope<SocraticResponse>>((resolve) => {
+    timer = setTimeout(() => resolve({ data: fallback(), source: "fallback", note: "timeout" }), timeoutMs);
+  });
+  try {
+    return await Promise.race([request, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**

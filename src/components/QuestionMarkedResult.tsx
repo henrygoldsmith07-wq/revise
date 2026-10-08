@@ -16,6 +16,7 @@ import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { RichText } from "./RichText";
+import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
 import { Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 
@@ -61,6 +62,7 @@ export function MarkedResult({
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
   const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
   const plan = result.remediation;
+  const showSocratic = question.kind !== "mcq" && awarded < question.totalMarks && Boolean(answers);
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
     for (const part of plan.parts) {
@@ -150,6 +152,10 @@ export function MarkedResult({
         </p>
       ) : null}
       <ProgressBar value={pct} tone={pct >= 0.8 ? "success" : pct >= 0.5 ? "review" : "danger"} />
+
+      {/* Below full marks on a written answer: one guiding question before the
+          mark scheme. MCQs are excluded — marking already reveals the key. */}
+      {showSocratic ? <SocraticExaminerPanel question={question} marked={result.marked} answers={answers ?? {}} /> : null}
 
       {result.retest ? (
         <div
@@ -298,8 +304,8 @@ export function MarkedResult({
       </div>
 
       {question.kind !== "mcq" && actions.length ? (
-        <div className="mt-4 pt-4 border-t border-line">
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2">How to fix it</p>
+        <details className="mt-4 pt-4 border-t border-line" open={!showSocratic}>
+          <summary className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2 cursor-pointer select-none">How to fix it</summary>
           <ul className="space-y-2.5">
             {actions.map((action) => (
               <li key={action.misconception} className="card card-2 p-3">
@@ -325,7 +331,7 @@ export function MarkedResult({
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       ) : null}
 
       <div className="mt-4 pt-4 border-t border-line space-y-3">

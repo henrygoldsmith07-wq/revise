@@ -240,10 +240,42 @@ export function prepareAiEgress(task: AiTask, payload: unknown): EgressResult {
             .filter((entry) => entry.role === "user" || entry.role === "assistant")
             .map((entry) => ({ role: entry.role as "user" | "assistant", content: text(entry.content) }))
         : [];
+      // Socratic-examiner mode: the learner's answer is masked; the dropped
+      // mark-scheme points and the authored misconception are content, not
+      // learner text, but are bounded and keep only the fields the prompt reads.
+      const examiner = p.examiner === undefined ? null : record(p.examiner);
+      const answer = examiner ? maskPii(text(examiner.studentAnswer, 8000)) : null;
+      const misconception = examiner && examiner.misconception !== undefined ? record(examiner.misconception) : null;
+      const strength = examiner?.matchStrength;
       return {
         ok: true,
-        payload: { topicId: text(p.topicId), history: maskChatHistory(history) },
-        withheld: maskSummaryMany(history.filter((e) => e.role === "user").map((e) => maskPii(e.content))),
+        payload: {
+          topicId: text(p.topicId),
+          history: maskChatHistory(history),
+          ...(examiner && answer
+            ? {
+                examiner: {
+                  partPrompt: text(examiner.partPrompt, 4000),
+                  markScheme: strings(examiner.markScheme).slice(0, 10).map((point) => point.slice(0, 1000)),
+                  studentAnswer: answer.masked,
+                  ...(misconception
+                    ? {
+                        misconception: {
+                          statement: text(misconception.statement, 1000),
+                          explanation: text(misconception.explanation, 2000),
+                          correction: text(misconception.correction, 1000),
+                        },
+                      }
+                    : {}),
+                  matchStrength: strength === "strong" || strength === "weak" ? strength : "none",
+                },
+              }
+            : {}),
+        },
+        withheld: maskSummaryMany([
+          ...history.filter((e) => e.role === "user").map((e) => maskPii(e.content)),
+          ...(answer ? [answer] : []),
+        ]),
       };
     }
     case "tutor": {

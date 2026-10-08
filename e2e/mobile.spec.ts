@@ -71,7 +71,7 @@ test.describe("mobile core loop — Pixel 7", () => {
       await expect(page.locator("main#main")).toBeVisible({ timeout: 10_000 });
     }
 
-    // The five destinations stay on one row; specialist routes remain reachable under More.
+    // The five destinations stay on one row; manual modes remain reachable under Tools.
     const rows = await mobileNav(page).locator(":scope > div > a").evaluateAll((links) =>
       links.map((link) => Math.round(link.getBoundingClientRect().top)),
     );

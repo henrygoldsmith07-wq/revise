@@ -6,6 +6,7 @@ import type { QuestionDiscriminationBand } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, SectionHeading } from "../ui";
 import { EmptyHint } from "./shared";
+import { StudentOnly, TeacherOnly } from "../TeacherMode";
 
 export function DifficultyAndSubtopics() {
   const store = useStoreFields("assessment", "difficultyCalibration", "questionTraces", "questions");
@@ -47,7 +48,7 @@ export function DifficultyAndSubtopics() {
                   <span className="tabular-nums w-20 text-right text-ink2">
                     {row.empiricalDifficulty.toFixed(1)}/5
                   </span>
-                  <span className="tabular-nums w-16 text-right text-ink3">n={row.attempts}</span>
+                  <span className="tabular-nums w-16 text-right text-ink3"><TeacherOnly>n=</TeacherOnly>{row.attempts}<StudentOnly> tries</StudentOnly></span>
                   <span className={row.gap > 0 ? "tabular-nums w-12 text-right text-danger" : row.gap < 0 ? "tabular-nums w-12 text-right text-success" : "tabular-nums w-12 text-right text-ink3"}>
                     {row.gap > 0 ? "+" : ""}{row.gap.toFixed(1)}
                   </span>
@@ -150,11 +151,13 @@ export function QuestionDiscriminationCard() {
               return (
                 <li key={measurement.questionId} className="flex items-center gap-2 text-xs">
                   <span className="min-w-0 flex-1 truncate text-ink" title={question?.stem}>{label}</span>
-                  <span className="tabular-nums text-ink2 shrink-0">
-                    r={measurement.discrimination == null ? "—" : measurement.discrimination.toFixed(2)}
-                  </span>
+                  <TeacherOnly>
+                    <span className="tabular-nums text-ink2 shrink-0">
+                      r={measurement.discrimination == null ? "—" : measurement.discrimination.toFixed(2)}
+                    </span>
+                  </TeacherOnly>
                   <Pill tone={discriminationTone(measurement.band)}>{discriminationLabel(measurement.band)}</Pill>
-                  <span className="tabular-nums text-ink3 shrink-0">n={measurement.usableSampleSize}</span>
+                  <span className="tabular-nums text-ink3 shrink-0"><TeacherOnly>n=</TeacherOnly>{measurement.usableSampleSize}<StudentOnly> answers</StudentOnly></span>
                 </li>
               );
             })}

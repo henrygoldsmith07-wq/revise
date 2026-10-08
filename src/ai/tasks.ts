@@ -5,6 +5,7 @@ import type { Question, Topic } from "@/domain/types";
 import {
   diagnoseFallback,
   explainFallback,
+  socraticExaminerFallback,
   generateCardsFallback,
   generateQuestionsFallback,
   markFallback,
@@ -13,8 +14,9 @@ import {
   tutorFallback,
 } from "./fallback";
 import { extractJson, getProvider } from "./provider";
-import type { AiEnvelope, AiTask } from "./types";
-import { RESPONSE_SCHEMAS } from "./types";
+import type { AiEnvelope, AiTask, SocraticExaminerPayload, SocraticResponse } from "./types";
+import { RESPONSE_SCHEMAS, socraticExaminerPayloadSchema } from "./types";
+import { checkSocraticReply } from "@/domain/socratic-examiner";
 
 // ---------------------------------------------------------------------------
 // One place where prompts live, one place where responses are validated, one
@@ -144,6 +146,12 @@ export const payloadSchemas = {
   socratic: z.object({
     topicId: z.string(),
     history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) })).max(20),
+    /**
+     * Socratic-examiner mode (post-marking, < 100%): the dropped mark-scheme
+     * points, the masked answer and the matched authored misconception. When
+     * present the tutor asks exactly one guiding question about this answer.
+     */
+    examiner: socraticExaminerPayloadSchema.optional(),
   }),
   tutor: z.object({
     topicId: z.string(),
@@ -280,7 +288,82 @@ export async function explain(topicId: string, question?: string) {
   );
 }
 
-export async function socratic(topicId: string, history: { role: "user" | "assistant"; content: string }[]) {
+const SOCRATIC_EXAMINER_VOICE = `You are a patient A-level examiner helping one student understand the
+marks they just dropped. You never give the answer, never quote or paraphrase
+the mark-scheme points back, and never write a model answer. You ask exactly ONE
+short guiding question that would lead the student to notice the gap themselves,
+built on the misconception you are given when there is one. If you are told the
+misconception match is weak or absent, do not claim the student holds it; ask
+about the gap in their answer instead. Optionally open with one calm sentence
+acknowledging something they did right. No other question marks anywhere.
+Plain, warm, specific. Under 70 words in total.
+${UNTRUSTED_RULE}`;
+
+/**
+ * Output validation beyond shape for the examiner: exactly one question and no
+ * restating of a dropped point. A reply that breaks it gets the one corrective
+ * retry and then falls back to the authored misconception text.
+ */
+export function socraticExaminerSchemaFor(examiner: Pick<SocraticExaminerPayload, "markScheme">) {
+  return RESPONSE_SCHEMAS.socratic.superRefine((value, ctx) => {
+    const check = checkSocraticReply(value, examiner.markScheme);
+    if (!check.ok) ctx.addIssue({ code: "custom", message: `examiner reply ${check.reason}` });
+  });
+}
+
+/** The Socratic examiner: one guiding question about a just-marked answer. */
+export async function socraticExaminer(
+  topicId: string,
+  examiner: SocraticExaminerPayload,
+  history: { role: "user" | "assistant"; content: string }[] = [],
+): Promise<AiEnvelope<SocraticResponse>> {
+  const topic = getTopic(topicId);
+  const misconceptionLines = examiner.misconception
+    ? [
+        `Matched misconception (match strength: ${examiner.matchStrength}${examiner.matchStrength === "weak" ? " — may not apply" : ""}):`,
+        `- Belief: ${examiner.misconception.statement}`,
+        `- Why it is wrong: ${examiner.misconception.explanation}`,
+        `- What fixes it (do NOT tell the student this directly): ${examiner.misconception.correction}`,
+      ]
+    : ["No authored misconception matched this answer closely. Do not name one."];
+  const transcript = history
+    .map((m) => (m.role === "user" ? `Student:\n${untrusted("student turn", m.content)}` : `Examiner: ${m.content}`))
+    .join("\n");
+  return run(
+    socraticExaminerSchemaFor(examiner),
+    SOCRATIC_EXAMINER_VOICE,
+    [
+      topicContext(topic),
+      "",
+      `Question part: ${examiner.partPrompt}`,
+      "Mark-scheme points the student dropped (for you only — never restate them):",
+      untrusted("dropped mark-scheme points", examiner.markScheme.map((p) => `- ${p}`).join("\n")),
+      "The student's answer:",
+      untrusted("student answer", examiner.studentAnswer.trim() || "(no answer given)"),
+      "",
+      ...misconceptionLines,
+      "",
+      history.length ? "Conversation so far:" : "Ask your one guiding question now.",
+      transcript,
+    ]
+      .filter((line) => line !== "")
+      .join("\n"),
+    `{ "reply": string (one optional sentence, no question mark), "nextQuestion": string (exactly one question, ending in ?) }`,
+    () => socraticExaminerFallback(examiner),
+    600,
+  );
+}
+
+export async function socratic(
+  topicId: string,
+  history: { role: "user" | "assistant"; content: string }[],
+  examiner?: SocraticExaminerPayload,
+) {
+  if (examiner) {
+    const provider = getProvider();
+    if (!provider) return { data: socraticExaminerFallback(examiner), source: "fallback" as const, provider: null };
+    return socraticExaminer(topicId, examiner, history);
+  }
   const topic = getTopic(topicId);
   const provider = getProvider();
   if (!provider) {

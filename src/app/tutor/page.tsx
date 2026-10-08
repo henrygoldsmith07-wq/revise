@@ -185,9 +185,11 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || document.documentElement.classList.contains("reduce-motion");
+    endRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "end" });
   }, [messages.length, pending]);
 
   const send = useCallback(
@@ -214,6 +216,8 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         setError("The tutor could not answer just now. Your conversation is unchanged — try again.");
       } finally {
         setPending(false);
+        // Keep the keyboard where the student types; the live log announces the reply.
+        if (text) requestAnimationFrame(() => composerRef.current?.focus());
       }
     },
     [learner, messages, pending, topic.id],
@@ -232,7 +236,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
 
   const submit = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || pending) return;
     setDraft("");
     void send(text);
   };
@@ -247,7 +251,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         <TutorIcon size={ICON_SIZE.md} className="text-accent shrink-0" aria-hidden />
       </div>
 
-      <div className="space-y-3" aria-live="polite" aria-label="Tutor conversation">
+      <div className="space-y-3" role="log" aria-live="polite" aria-relevant="additions" aria-busy={pending} aria-label="Tutor conversation">
         {messages.map((message, index) =>
           message.role === "user" ? (
             <div key={index} className="flex justify-end">
@@ -279,16 +283,21 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
             </div>
           ),
         )}
-        {pending ? (
-          <div className="flex items-center gap-2 text-xs text-ink3" role="status">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-            The tutor is thinking…
-          </div>
-        ) : null}
       </div>
+      {pending ? (
+        <div className="inline-flex items-center gap-2 self-start rounded-[12px] border border-line bg-surface2/60 px-3 py-2" role="status">
+          <span className="flex items-center gap-1" aria-hidden="true">
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+          </span>
+          <span id="tutor-pending" className="text-xs text-ink3">The tutor is thinking…</span>
+        </div>
+      ) : null}
+      <div ref={endRef} aria-hidden="true" />
 
       {error ? (
-        <p className="rounded-[8px] border border-danger/30 bg-dangersoft px-3 py-2 text-xs text-danger">{error}</p>
+        <p className="rounded-[8px] border border-review/30 bg-reviewsoft px-3 py-2 text-xs text-ink2" role="status">{error}</p>
       ) : null}
 
       <div className="flex flex-wrap gap-1.5" aria-label="Quick prompts">
@@ -317,6 +326,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         </label>
         <textarea
           id="tutor-composer"
+          ref={composerRef}
           rows={2}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -328,7 +338,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
           }}
           placeholder="Ask anything on this topic — or answer the tutor's question here"
           className="flex-1 rounded-[8px] border border-line bg-surface px-3 py-2 text-sm resize-none"
-          disabled={pending}
+          aria-describedby={pending ? "tutor-pending" : undefined}
         />
         <Button type="submit" variant="primary" disabled={pending || !draft.trim()}>
           Send

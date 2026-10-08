@@ -5,7 +5,7 @@ import { providerStatus } from "@/ai/provider";
 import * as tasks from "@/ai/tasks";
 import { payloadSchemas } from "@/ai/tasks";
 import { AI_TASKS } from "@/ai/types";
-import type { AiTask } from "@/ai/types";
+import type { AiTask, SocraticExaminerPayload } from "@/ai/types";
 import type { Question } from "@/domain/types";
 import {
   aiTaskCost,
@@ -236,8 +236,12 @@ async function dispatch(task: AiTask, payload: unknown) {
       return tasks.explain(p.topicId, p.question);
     }
     case "socratic": {
-      const p = payload as { topicId: string; history: { role: "user" | "assistant"; content: string }[] };
-      return tasks.socratic(p.topicId, p.history);
+      const p = payload as {
+        topicId: string;
+        history: { role: "user" | "assistant"; content: string }[];
+        examiner?: SocraticExaminerPayload;
+      };
+      return tasks.socratic(p.topicId, p.history, p.examiner);
     }
     case "tutor": {
       const p = payload as {

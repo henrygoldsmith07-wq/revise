@@ -74,3 +74,8 @@ export async function aiRouteSpec(...args: Parameters<(typeof import("@/ai/clien
   const { aiRouteSpec: run } = await import("@/ai/client");
   return run(...args);
 }
+
+export async function aiSocraticExaminer(...args: Parameters<(typeof import("@/ai/client"))["aiSocraticExaminer"]>) {
+  const { aiSocraticExaminer: run } = await import("@/ai/client");
+  return run(...args);
+}

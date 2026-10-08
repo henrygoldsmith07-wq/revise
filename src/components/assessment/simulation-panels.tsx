@@ -6,6 +6,7 @@ import { getSubject, getTopic } from "@/domain/curriculum";
 import { useStoreFields } from "@/state/store";
 import { Panel, Pill, ProgressBar, SectionHeading, StatTile } from "../ui";
 import { EmptyHint } from "./shared";
+import { StudentOnly, TeacherOnly } from "../TeacherMode";
 
 export function PaperSimulationCard() {
   const store = useStoreFields("previewPaper", "questions", "settings");
@@ -79,7 +80,7 @@ export function CalibrationCard() {
     <Panel>
       <SectionHeading title="Actual vs predicted — calibration" hint="How honest the predictions are. Needs three sat papers per subject." />
       {!rows.length ? (
-        <EmptyHint>Sit three papers in the same subject and the calibration appears here — bias, slope and mean error are then shown per subject.</EmptyHint>
+        <EmptyHint>Sit three papers in the same subject and this shows whether your predictions run high or low.</EmptyHint>
       ) : (
         <ul className="divide-y divide-line card overflow-hidden">
           {rows.map((c) => {
@@ -87,10 +88,18 @@ export function CalibrationCard() {
             return (
               <li key={c.subjectId} className="px-4 py-3 flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-semibold text-ink min-w-[7rem]">{subject?.name ?? c.subjectId}</span>
-                <Pill>n={c.sampleSize}</Pill>
-                <span className="text-ink2">bias {c.bias >= 0 ? "+" : ""}{c.bias.toFixed(1)}</span>
-                <span className="text-ink2">slope {c.slope.toFixed(2)}</span>
-                <span className="text-ink3">MAE {c.mae.toFixed(1)}</span>
+                <TeacherOnly>
+                  <Pill>n={c.sampleSize}</Pill>
+                  <span className="text-ink2">bias {c.bias >= 0 ? "+" : ""}{c.bias.toFixed(1)}</span>
+                  <span className="text-ink2">slope {c.slope.toFixed(2)}</span>
+                  <span className="text-ink3">MAE {c.mae.toFixed(1)}</span>
+                </TeacherOnly>
+                <StudentOnly>
+                  <span className="text-ink2">
+                    {c.sampleSize} paper{c.sampleSize === 1 ? "" : "s"} · predictions are usually{" "}
+                    {Math.abs(c.bias) < 1 ? "about right" : c.bias > 0 ? "a little high" : "a little low"}
+                  </span>
+                </StudentOnly>
                 {Math.abs(c.bias) < 1 && Math.abs(c.slope - 1) < 0.15 ? <Pill tone="success">Well calibrated</Pill> : <Pill tone="review">Drifting</Pill>}
               </li>
             );

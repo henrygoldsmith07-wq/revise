@@ -72,6 +72,28 @@ export const socraticResponseSchema = z.object({
   nextQuestion: z.string().max(600).optional(),
 });
 
+/**
+ * Socratic-examiner context (the `examiner` field of a `socratic` payload).
+ * Built by src/domain/socratic-examiner.ts; the answer is PII-masked by the
+ * egress policy before it leaves the device. Bounded so a request cannot
+ * smuggle an arbitrary object into a prompt.
+ */
+export const socraticExaminerPayloadSchema = z.object({
+  partPrompt: z.string().max(4000),
+  markScheme: z.array(z.string().max(1000)).min(1).max(10),
+  studentAnswer: z.string().max(8000),
+  misconception: z
+    .object({
+      statement: z.string().max(1000),
+      explanation: z.string().max(2000),
+      correction: z.string().max(1000),
+    })
+    .optional(),
+  matchStrength: z.enum(["strong", "weak", "none"]),
+});
+
+export type SocraticExaminerPayload = z.infer<typeof socraticExaminerPayloadSchema>;
+
 /** One student turn in the tutor conversation. */
 export interface TutorChatMessage {
   role: "user" | "assistant";

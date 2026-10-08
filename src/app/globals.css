@@ -178,3 +178,60 @@
   .today-subject-card { transition: none; }
   .today-subject-card:hover { transform: none; }
 }
+
+/* ---- the "Proven" moment (ProofPanel) ----
+   "Awaiting proof" lifts away, "Proven" settles in with a drawn tick and one
+   soft ring. Calm accent tokens, not a green flash. Pure CSS, no library. */
+.proof-moment {
+  position: relative;
+  display: inline-grid;
+  align-items: center;
+  justify-items: end;
+}
+.proof-moment > * { grid-area: 1 / 1; }
+.proof-moment__from { animation: proof-from 0.55s ease-in 0.35s forwards; }
+.proof-moment__to {
+  opacity: 0;
+  animation: proof-to 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.75s forwards;
+}
+.proof-moment__to::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: proof-ring 0.9s ease-out 1.05s 1 both;
+}
+.proof-moment__check path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  animation: proof-check 0.35s ease-out 1.1s forwards;
+}
+.proof-moment-banner { animation: fade-in 0.4s ease-out 1.2s both; }
+@keyframes proof-from {
+  to { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes proof-to {
+  0% { opacity: 0; transform: scale(0.85); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes proof-check {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes proof-ring {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+  to { box-shadow: 0 0 0 10px transparent; }
+}
+/* Reduced motion (OS setting or the in-app switch): show the end state at once. */
+@media (prefers-reduced-motion: reduce) {
+  .proof-moment__from { display: none; }
+  .proof-moment__to, .proof-moment-banner { opacity: 1; animation: none; }
+  .proof-moment__to::after { animation: none; }
+  .proof-moment__check path { stroke-dashoffset: 0; animation: none; }
+}
+:root.reduce-motion .proof-moment__from { display: none; }
+:root.reduce-motion .proof-moment__to,
+:root.reduce-motion .proof-moment-banner { opacity: 1; animation: none; }
+:root.reduce-motion .proof-moment__to::after { animation: none; }
+:root.reduce-motion .proof-moment__check path { stroke-dashoffset: 0; animation: none; }
