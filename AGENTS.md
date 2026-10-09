@@ -96,11 +96,17 @@ Biology and Chemistry still have 78, 102 and 95 statements to write. Practising
 works. Proving an improvement does not yet, and the app says so rather than
 implying otherwise. Do not let a change quietly close that gap.
 
-There is **no account-deletion path**: "Erase local data" calls `clearAll()` and is
-device-local only, and `public.ai_rate_quota` has no foreign key, so it survives
-auth-user deletion. There is **no per-learner AI opt-in**: `UserSettings.aiEnabled`
-defaults to `true`, is never read, and has no toggle. `docs/data-flows.md` and
-`docs/dpia-draft.md` record these, and more, as open.
+There is an account-deletion path in code (`src/app/api/account/delete/route.ts`
+with rules in `src/domain/account-deletion.ts`, cascade coverage in
+`supabase/schema.sql`): "Erase local data" stays device-local while "Delete
+account" requests server-side deletion with residual verification. There is a
+per-learner AI opt-in: `UserSettings.aiEnabled` defaults to `false`
+(`src/data/repository.ts`), enforced server-side (`src/domain/ai-consent.ts`,
+`src/ai/transport.ts`) with a Settings toggle (`AiConsentSection` in
+`src/app/settings/page.tsx`). Deployment assurance (RLS, cascade behaviour,
+consent revocation timing) still requires a configured staging run; code
+existing is not proof it works in production. `docs/data-flows.md` and
+`docs/dpia-draft.md` record what remains open.
 
 ## Tests that auto-skip
 

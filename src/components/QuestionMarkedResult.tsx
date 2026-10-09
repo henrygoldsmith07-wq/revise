@@ -196,7 +196,7 @@ export function MarkedResult({
             <span className="text-xs text-ink2">{result.retest.feedback}</span>
           </div>
           {result.retest.status === "resolved" ? (
-            <p className="text-[11px] text-success mt-2">The mistake has been removed from your open repair queue.</p>
+            <p className="text-[11px] text-success mt-2">You passed this retest. The mark stays provisional until a different question is answered independently after a delay.</p>
           ) : result.retest.status === "still-open" ? (
             <p className="text-[11px] text-ink2 mt-2">Continue your adaptive session for the next evidence check.</p>
           ) : null}
@@ -356,7 +356,7 @@ export function MarkedResult({
             <ol className="text-xs text-ink2 space-y-1 list-decimal pl-4">
               <li>Your answer above is preserved. Read the cause below, then repair with help.</li>
               <li>Try a new related question on the same skill.</li>
-              <li>Prove it on an unseen transfer question with no hints.</li>
+              <li>Prove it on a new question with no hints, at least 3 days on.</li>
             </ol>
             <div className="flex flex-wrap gap-2">
               <ButtonLink
@@ -384,7 +384,7 @@ export function MarkedResult({
                 Unseen proof check
               </ButtonLink>
             </div>
-            <p className="text-[11px] text-ink3">Help never counts as proof. Only an unaided answer on a new question does.</p>
+            <p className="text-[11px] text-ink3">Help never counts as proof. Only an unaided answer on a new question — at least 3 days on, where reviewed questions exist — counts.</p>
           </div>
         ) : (
           <ProofCheckBanner

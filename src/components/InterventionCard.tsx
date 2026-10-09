@@ -21,6 +21,8 @@ export function InterventionCard({ topicId }: { topicId: string }) {
     "applicationMastery",
     "examDates",
     "proofLedger",
+    "reviewLogs",
+    "plannedSessions",
   );
   const topic = getTopic(topicId);
 
@@ -36,6 +38,8 @@ export function InterventionCard({ topicId }: { topicId: string }) {
       mistakes: store.mistakes,
       proof: store.proofLedger.topics,
       examDates: store.examDates,
+      reviewLogs: store.reviewLogs,
+      plannedSessions: store.plannedSessions,
       now: new Date(),
     });
     const row = intel.subjects.flatMap((s) => s.topics).find((t) => t.topicId === topicId);
@@ -51,6 +55,8 @@ export function InterventionCard({ topicId }: { topicId: string }) {
     store.mistakes,
     store.proofLedger,
     store.examDates,
+    store.reviewLogs,
+    store.plannedSessions,
   ]);
 
   if (!topic || !prescription) return null;
@@ -67,7 +73,7 @@ export function InterventionCard({ topicId }: { topicId: string }) {
         <p className="mt-1 text-sm text-ink2">{prescription.reason}</p>
       </div>
       <ol className="space-y-1.5" aria-label="Repair steps">
-        {[first, ...rest.slice(0, 3)].map((step, i) => (
+        {prescription.steps.map((step, i) => (
           <li key={step.kind} className="flex items-start gap-2 text-xs text-ink2">
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface2 text-[11px] font-semibold text-ink">
               {i + 1}

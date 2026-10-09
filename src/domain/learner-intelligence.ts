@@ -119,7 +119,7 @@ export interface LearnerIntelligenceInput {
   proof?: readonly TopicProof[];
   examDates: readonly ExamDate[];
   reviewLogs?: ReadonlyArray<{ topicId: Id; reviewedAt: string }>;
-  plannedSessions?: ReadonlyArray<{ status: string; date: string }>;
+  plannedSessions?: ReadonlyArray<{ status: string; date: string; minutes?: number }>;
   now?: Date;
 }
 
@@ -156,6 +156,7 @@ export function buildLearnerIntelligence(
     (input.applicationMastery ?? []).map((r) => [r.topicId, r]),
   );
   const proofByTopic = new Map((input.proof ?? []).map((p) => [p.topicId, p]));
+  const attemptById = new Map(input.attempts.map((a) => [a.id, a] as const));
 
   const openByTopic = new Map<Id, Mistake[]>();
   for (const m of input.mistakes) {
@@ -253,7 +254,9 @@ export function buildLearnerIntelligence(
       daysToExam: daysToExamFor(input.examDates, subjectId, now),
       proofStatus: proof?.status ?? null,
       commandWeakness,
-      timingWeakness: open.some((x) => x.category === "method" && /time/i.test(x.description ?? "")),
+      // A timing weakness is observed, not inferred: open marks whose source
+      // attempt was made under timed paper conditions.
+      timingWeakness: open.some((x) => x.attemptId != null && attemptById.get(x.attemptId)?.mode === "paper"),
     };
     const list = bySubject.get(subjectId) ?? [];
     list.push(row);
@@ -305,16 +308,30 @@ export function buildLearnerIntelligence(
       .filter(Boolean),
   );
   const sessions = input.plannedSessions ?? [];
+  const weekAgo = now.getTime() - 7 * DAY_MS;
+  const sessionsInWeek = sessions.filter((s) => {
+    const t = Date.parse(`${s.date}T00:00:00Z`);
+    return Number.isFinite(t) && t >= weekAgo;
+  });
+  // Preferred session length is the median of completed planned minutes.
+  // Null when nothing completed: unknown, never zero.
+  const completedMinutes = sessions
+    .filter((s) => s.status === "done" && typeof s.minutes === "number" && Number.isFinite(s.minutes))
+    .map((s) => s.minutes as number)
+    .sort((a, b) => a - b);
+  const preferredMinutes = completedMinutes.length
+    ? completedMinutes[Math.floor(completedMinutes.length / 2)]!
+    : null;
 
   return {
     subjects,
     behaviour: {
       recentRevisionDays: recentDays.size,
-      sessionsCompleted7d: sessions.filter((s) => s.status === "done").length,
-      missedSessions7d: sessions.filter((s) => s.status === "missed").length,
-      preferredMinutes: null,
+      sessionsCompleted7d: sessionsInWeek.filter((s) => s.status === "done").length,
+      missedSessions7d: sessionsInWeek.filter((s) => s.status === "missed").length,
+      preferredMinutes,
       repeatedFailureTopics: all.filter((t) => t.openMistakes >= 2).map((t) => t.topicId),
-      studyModesUsed: [],
+      studyModesUsed: [...new Set(input.attempts.map((a) => a.mode))].sort(),
     },
     applicationGaps,
     opportunities,
