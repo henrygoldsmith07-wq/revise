@@ -50,15 +50,27 @@ describe("performance budgets", () => {
     expect(sw).toContain('APP_SHELL');
     expect(sw).toContain('skipWaiting');
     expect(sw).toContain('/api/');
-    // Route-aware: every src/app/*/page.tsx must appear in APP_SHELL so the
+    // Route-aware: every src/app/**/page.tsx must appear in APP_SHELL so the
     // whole app loads offline. This is the fence that makes a missing route fail.
-    const routes = readdirSync(j2(process.cwd(), "src/app"), { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name)
-      .filter((n) => n !== "api" && !n.startsWith("("));
-    const expectedPaths = new Set(["/", ...routes.map((r) => `/${r}`)]);
+    // Walk the whole tree, not just top-level directories: the nested spec and
+    // trusted-coverage routes were silently missing for exactly that reason.
+    // The reviewer portal is deliberately excluded — it is signed-in,
+    // teacher-only and server-rendered, so the worker must never cache it.
+    const pages: string[] = [];
+    const walk = (dir: string, prefix: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        // Route groups such as `(reviewer)` do not appear in the URL.
+        const next = /^\(.+\)$/.test(entry.name) ? prefix : `${prefix}/${entry.name}`;
+        if (entry.isDirectory()) walk(join(dir, entry.name), next);
+        // `prefix` is the route; appending the filename would test "/x/page.tsx".
+        else if (entry.name === "page.tsx") pages.push(prefix === "" ? "/" : prefix);
+      }
+    };
+    walk(j2(process.cwd(), "src/app"), "");
+    const expectedPaths = new Set(pages.filter((p) => p !== "/reviewer" && !p.startsWith("/reviewer/")));
+    expect(expectedPaths.size, "no pages found under src/app").toBeGreaterThan(10);
     for (const p of expectedPaths) {
-      expect(sw, `sw.js APP_SHELL missing route ${p} (keep sw.js in sync with src/app/*)`).toContain(`"${p}"`);
+      expect(sw, `sw.js APP_SHELL missing route ${p} (keep sw.js in sync with src/app/**)`).toContain(`"${p}"`);
     }
   });
   it("build artifact budget: .next (when present) is not absurd", async () => {

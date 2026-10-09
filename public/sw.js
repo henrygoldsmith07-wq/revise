@@ -4,10 +4,10 @@
 // only job is making sure the app itself loads with no network. Bump
 // CACHE_VERSION to invalidate previously cached shells.
 
-const CACHE_VERSION = "revise-v5";
+const CACHE_VERSION = "revise-v6";
 // Precaches every App Router shell so the whole app loads offline.
-// Keep this in sync with src/app/*/page.tsx — tests/perf.test.ts fails when a
-// route is missing, and scripts/validate-curriculum.mjs also reports drift.
+// Keep this in sync with src/app/**/page.tsx — tests/perf.test.ts walks the
+// tree (not just top-level directories) and fails when a route is missing.
 const APP_SHELL = [
   "/",
   "/adaptive-session",
@@ -16,6 +16,8 @@ const APP_SHELL = [
   "/papers",
   "/practice",
   "/readiness",
+  "/readiness/spec",
+  "/readiness/trusted-coverage",
   "/diagnostic",
   "/review",
   "/schedule",

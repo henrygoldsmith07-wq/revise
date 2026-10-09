@@ -61,8 +61,11 @@ describe("no-JS entry point", () => {
     // tests/perf.test.ts derives the expected route list from src/app, so a new
     // route that is not precached would fail the build gate instead.
     expect(sw).toContain('"/welcome"');
-    // The offline shell must not change shape underneath existing users.
-    expect(sw).toContain('const CACHE_VERSION = "revise-v5"');
+    // The offline shell must not change shape underneath existing users, so
+    // the cache version is pinned. Bump it deliberately (and here) whenever
+    // the shell list changes, so a stale cache is invalidated rather than
+    // silently leaving new routes unavailable offline.
+    expect(sw).toContain('const CACHE_VERSION = "revise-v6"');
     expect(read("public/manifest.webmanifest")).toContain('"start_url": "/"');
     expect(read("public/manifest.webmanifest")).toContain('"scope": "/"');
   });
