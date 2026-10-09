@@ -58,6 +58,28 @@ material" honesty clause (restored, keeping the Physics-first framing), a
 setState-in-effect lint error in the practice draft store, impure `Date.now()`
 calls inside `useMemo`, and missing memo dependencies.
 
+### Verification actually run in this pass
+
+| Check | Result |
+|---|---|
+| `lint:check` | passes (0 errors, 0 warnings) |
+| `type-check` / `type-check:strict` | pass |
+| `docs:integrity` | OK — 44 files, 29 routes, 61 scripts |
+| `validate-curriculum`, `curriculum:freshness`, `content:check` | pass |
+| `wjec:authoring:check`, `wjec:trust:check`, `wjec:supply:check` | pass |
+| `wjec:review:gates` | OK — 0 verified, 0 checked, 0 needing re-review |
+| `vitest run` (full suite) | **315/331 files, 2899/2900 tests**. The remaining failure is a wall-clock performance assertion (`marks adversarial cases at interactive speed`, 507ms against a 400ms budget) on a loaded machine — one of the two flake classes AGENTS.md already records as pre-existing, and unrelated to any change here. It is deliberately not loosened. |
+| `build` | passes; 29 routes (10 dynamic, 19 static) |
+| `perf:budget` | passes — 552,708 B raw / 169,817 B gzip initial route; pdfjs, Transformers.js, WebLLM, onnxruntime and katex are all optional chunks outside the initial route |
+
+The suite count went from **186 failed / 144 passed** files to **1 failed / 315
+passed**, largely because two of those 186 were real defects and the rest were
+worker-RPC timeouts that disappeared once the build was not broken and the
+longest-running file stopped importing the entire app graph into node.
+
+Not verified here: `e2e` (Playwright), staging/Postgres suites, and any
+real-learner outcome. Those remain external evidence needs.
+
 ## Honest diagnosis, versioned marks, fitter plans, visible supply gaps — 2026-10-09
 
 **Uncertain diagnoses read as uncertain.** The post-marking error diagnosis now
