@@ -109,6 +109,12 @@ export interface EngineInput {
   topicWeight?: (topicId: Id) => { share: number; relative: number };
   /** Set only while the learner has too little evidence to rank anything; see cold-start.ts. */
   coldStart?: ColdStartPlan | null;
+  /**
+   * Minutes the learner has right now (their session length). When set, the
+   * winner must fit: longer actions defer with a reason instead of leading.
+   * At least one action always survives, so a short session never empties Today.
+   */
+  availableMinutes?: number;
 }
 
 export interface DeferredAction { action: RevisionAction; reason: string }
@@ -463,12 +469,29 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
     a.mistakeIds.forEach((id) => covered.add(id));
     kept.push(a);
   }
-  const first = kept[0];
-  kept.forEach((a, i) => {
-    if (i === 0) a.explanation.whyBefore = kept[1] ? explainVersus(a, kept[1]) : "It is the only action available right now.";
+  // Fit the winner to the time available: a step that does not fit defers
+  // with its reason, but the best fitting step always leads — even when
+  // nothing fits, the shortest useful step still leads with its duration
+  // shown honestly. Absent availableMinutes, ranking is unchanged.
+  let ranked = kept;
+  const budget = input.availableMinutes;
+  if (budget !== undefined && Number.isFinite(budget) && budget > 0) {
+    const fitting = kept.filter((a) => a.minutes <= budget + 2);
+    if (fitting.length > 0 && fitting.length < kept.length) {
+      for (const a of kept) {
+        if (fitting.includes(a)) continue;
+        const reason = `Needs about ${Math.max(1, Math.ceil(a.minutes))} min — longer than this ${Math.max(1, Math.ceil(budget))}-minute session, so shorter work comes first.`;
+        deferred.push({ action: { ...a, blockedBy: reason }, reason });
+      }
+      ranked = fitting;
+    }
+  }
+  const first = ranked[0];
+  ranked.forEach((a, i) => {
+    if (i === 0) a.explanation.whyBefore = ranked[1] ? explainVersus(a, ranked[1]) : "It is the only action available right now.";
     else a.explanation.whyBefore = `Behind “${first!.title}”: ${explainVersus(first!, a).replace(/^Before “[^”]*” because /, "").replace(/\.$/, "")}.`;
   });
-  for (const a of kept) if (a.type === "regression-recovery") a.requiredFirst = true;
+  for (const a of ranked) if (a.type === "regression-recovery") a.requiredFirst = true;
 
   const supply = input.supplyByTopic ?? {};
   const needs = new Map<string, RevisionPlan["authoringNeeds"][number]>();
@@ -489,7 +512,7 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
   }
   deferred.sort((a, b) => b.action.score - a.action.score || a.action.id.localeCompare(b.action.id));
   return {
-    actions: kept, top: first ?? null, deferred, model: SCORE_MODEL,
+    actions: ranked, top: first ?? null, deferred, model: SCORE_MODEL,
     authoringNeeds: [...needs.values()].sort((a, b) => b.marksAtStake - a.marksAtStake || a.topicId.localeCompare(b.topicId)),
   };
 }

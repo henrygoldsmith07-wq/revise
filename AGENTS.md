@@ -44,9 +44,9 @@ background and do other work while it runs. On Windows, invoke npm through
 ## Things that will bite you
 
 - **The engine under-produces if you under-supply it.** `rankRevisionActions`
-  takes exactly seven required fields plus optional `untouched`, `topicWeight`,
-  `supplyByTopic`. Omitting `untouched`/`topicWeight` makes it look like a dead
-  end when it is not. `src/components/recovery-evidence.ts` is the reference call.
+  takes seven required fields plus optional `untouched`, `topicWeight`,
+  `supplyByTopic` and `availableMinutes`. Omitting `untouched`/`topicWeight`
+  makes it look like a dead end when it is not. `src/components/recovery-evidence.ts` is the reference call.
 - **`unseenQuestion` is O(questions × topics).** Never call it over the whole
   bank in a React hook; it caused real render timeouts.
 - **Watch for TDZ and memo ordering** when adding a `useMemo` that reads another

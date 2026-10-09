@@ -1,5 +1,41 @@
 # Changelog
 
+## Honest diagnosis, versioned marks, fitter plans, visible supply gaps — 2026-10-09
+
+**Uncertain diagnoses read as uncertain.** The post-marking error diagnosis now
+drives the next action only when `isActionable()` holds (gated, confident,
+known category). A low-confidence read keeps the generic repair action and is
+shown as "Possible cause, not certain" in both the action reason and the
+"What this taught us" panel — a local 0.5–0.66 heuristic can no longer present
+a guess as a finding.
+
+**Every mark carries its provenance.** Persisted attempts record
+`markProvenance` (grading tier, provider/model, `MARK_POLICY_VERSION`, and a
+hash of the exact mark scheme graded against), re-stamped when the DLQ
+upgrades a fallback grade to an AI grade. The semantic cache reuses a grade
+only under an identical scheme hash and policy version — an edited scheme or
+policy regrades, and pre-versioning entries never hit. This is what lets a
+future human-marked comparison join on exact versions instead of assuming them.
+
+**Today fits the session length.** `rankRevisionActions` accepts the
+learner's `availableMinutes`: steps that do not fit defer with their reason
+and the best fitting step leads, while at least one action always survives.
+Ranking is otherwise unchanged.
+
+**Supply gaps name the missing capability.** The supply audit reports
+data-analysis and delayed-proof needs alongside distinct/transfer gaps, and
+the Proof panel lists per-topic needs ("What each topic still needs") with a
+practice alternative — reskins still never read as supply, and editorial
+metrics stay out of the learner view.
+
+**Practice keeps drafts and repair context.** Unsubmitted practice answers
+persist per account on the device across refreshes (never synced, dropped on
+submit), and re-attempted questions feed the session closure's repair rule.
+
+**Practice keeps drafts and repair context.** Unsubmitted practice answers
+persist per account on the device across refreshes (never synced, dropped on
+submit), and re-attempted questions feed the session closure's repair rule.
+
 ## Teachers review in the browser — 2026-10-07
 
 **Reviewer portal.** A `(reviewer)` route group at `/reviewer` replaces the CLI and

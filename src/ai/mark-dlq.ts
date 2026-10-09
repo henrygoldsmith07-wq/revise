@@ -28,6 +28,8 @@ import { saveAttempt } from "@/data/repository";
 import { markResponseSchema } from "./types";
 import type { MarkResponse } from "./types";
 import { markQuestion, withMarkEvidence } from "@/domain/marking";
+import { MARK_POLICY_VERSION } from "./task-policy";
+import { canonicalJson, sha256Hex } from "@/domain/content-fingerprint";
 import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
 import { assessMarkConfidence, markAssessmentRecord } from "@/domain/marking-confidence";
 import { localAiConsentGranted } from "./consent-client";
@@ -249,6 +251,13 @@ async function applyResolvedMark(item: AiDlqItem, data: unknown): Promise<boolea
     markConfidence: confidence,
     markEscalation: escalation,
     markAssessment: markAssessmentRecord(assessment),
+    // The grade is AI now, not the fallback recorded at submit time: re-stamp
+    // provenance so evaluation never joins this mark to the wrong tier.
+    markProvenance: {
+      tier: "ai",
+      policyVersion: MARK_POLICY_VERSION,
+      schemeHash: `scheme-v1:${sha256Hex(canonicalJson(item.question.parts.map((part) => ({ id: part.id, marks: part.marks, markScheme: part.markScheme }))))}`,
+    },
   };
   // Save through the repository (not raw IDB) so the upgrade enters the sync
   // outbox and the AI mark reaches the student's other devices too.

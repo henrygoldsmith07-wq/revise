@@ -49,7 +49,7 @@ export default function PracticePage() {
 function Practice() {
   const params = useSearchParams();
   const router = useRouter();
-  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "dueCards", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "addQuestions", "attempts", "cards", "clearRevisionCheckpoint", "completeSession", "dueCards", "mastery", "mistakes", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "userId");
   const dueCount = store.dueCards.length;
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
@@ -127,7 +127,17 @@ function Practice() {
     [wrongPlan, subjectId],
   );
   const [sessionAttempts, setSessionAttempts] = useState<Attempt[]>([]);
-  const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>({});
+  // Unsubmitted answers survive a refresh: drafts persist per account and
+  // question on this device only (never synced), and are dropped the moment
+  // the question is submitted. Keyed by user so accounts sharing a browser
+  // profile never see each other's half-written answers.
+  const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>(() => readPracticeDrafts(store.userId));
+  useEffect(() => {
+    setQuestionDrafts(readPracticeDrafts(store.userId));
+  }, [store.userId]);
+  useEffect(() => {
+    writePracticeDrafts(store.userId, questionDrafts);
+  }, [store.userId, questionDrafts]);
   const [closed, setClosed] = useState(false);
   const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
   const [sessionStartedAt, setSessionStartedAt] = useState(() => Date.now());
@@ -313,12 +323,16 @@ function Practice() {
 
   const sessionAwarded = sessionAttempts.reduce((sum, attempt) => sum + attempt.awarded, 0);
   const sessionAvailable = sessionAttempts.reduce((sum, attempt) => sum + attempt.max, 0);
+  // Re-attempts of the same question signal fragility even when the score
+  // looks fine, so the closure's repair rule sees them.
+  const sessionRetries = sessionAttempts.length - new Set(sessionAttempts.map((attempt) => attempt.questionId)).size;
   const closure = buildPostSessionClosure({
     session: "practice",
     attempted: sessionAttempts.length,
     total: queue.length,
     awarded: sessionAwarded,
     available: sessionAvailable,
+    retryCount: sessionRetries,
     elapsedMs: sessionElapsedMs,
     recommended: returnHref
       ? { href: returnHref, label: "Continue session", reason: "Your answer has updated the next tutor step." }
@@ -789,4 +803,51 @@ function Practice() {
       ) : null}
     </div>
   );
+}
+
+const DRAFT_STORAGE_PREFIX = "revise:practice-drafts:";
+const MAX_STORED_DRAFTS = 20;
+
+/**
+ * Unsubmitted practice answers, kept on this device so a refresh does not
+ * erase half-written work. Keyed by account so profiles sharing a browser
+ * never see each other's drafts; dropped the moment the question is
+ * submitted. Strictly validated on read — anything malformed is ignored.
+ */
+function readPracticeDrafts(userId: string): Record<string, QuestionDraft> {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_STORAGE_PREFIX + userId);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    const out: Record<string, QuestionDraft> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value !== "object" || value === null) continue;
+      const record = value as { answers?: unknown; choice?: unknown };
+      if (typeof record.answers !== "object" || record.answers === null) continue;
+      const answers: Record<string, string> = {};
+      for (const [partId, text] of Object.entries(record.answers as Record<string, unknown>)) {
+        if (typeof text === "string" && text.trim()) answers[partId] = text.slice(0, 8000);
+      }
+      const choice = typeof record.choice === "number" ? record.choice : null;
+      if (Object.keys(answers).length || choice !== null) out[key] = { answers, choice };
+      if (Object.keys(out).length >= MAX_STORED_DRAFTS) break;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writePracticeDrafts(userId: string, drafts: Record<string, QuestionDraft>): void {
+  try {
+    const entries = Object.entries(drafts).slice(-MAX_STORED_DRAFTS);
+    const raw = JSON.stringify(Object.fromEntries(entries));
+    // Drafts are unbounded learner text: refuse a large blob rather than
+    // evicting silently or growing storage without bound.
+    if (raw.length > 100_000) return;
+    window.localStorage.setItem(DRAFT_STORAGE_PREFIX + userId, raw);
+  } catch {
+    // Storage pressure or privacy mode: the session simply does not resume drafts.
+  }
 }

@@ -11,7 +11,7 @@
 
 import { trustedAssessmentContent } from "./content-trust";
 import { FLAGSHIP_SUBJECTS, isFlagship } from "./flagship";
-import { isTransferQuestion, questionFamilies, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, questionDemands, questionFamilies, unseenQuestion } from "./learning-evidence";
 import { reskinFeatures, shallowRelationOf, type ReskinFeatures, type ShallowKind } from "./reskin";
 import { MIN_PROVABLE_QUESTIONS } from "./supply";
 import type { Attempt, Id, Question, Topic } from "./types";
@@ -41,6 +41,10 @@ export interface TopicSupplyAudit {
   trusted: number;
   transfer: number;
   dataAnalysis: number;
+  /** Authored transfer questions (trusted or not). */
+  transferAuthored: number;
+  /** Authored data-analysis questions (trusted or not). */
+  dataAuthored: number;
   /** Distinct authored family ids among trusted questions. */
   trustedFamilies: number;
   /** Trusted questions after merging shared families and shallow variants. */
@@ -64,6 +68,15 @@ export interface AuthoringNeed {
   verdict: SupplyVerdict;
   missingDistinct: number;
   missingTransfer: number;
+  /**
+   * 1 when no trusted data-analysis/practical question exists. Only set when
+   * the bank holds authored data questions for the topic (dataAuthored > 0):
+   * a topic with no data content at all is a reviewer-pipeline decision, not
+   * a learner-visible gap.
+   */
+  missingData: number;
+  /** 1 when no delayed-proof-eligible trusted question exists. */
+  missingDelayedProof: number;
   reviewableDistinct: number;
   /** "review-existing" when reviewing authored items could close the gap. */
   action: "author-new" | "review-existing";
@@ -203,6 +216,65 @@ export function verdictFor(provableDistinct: number): SupplyVerdict {
   return provableDistinct > 0 ? "thin" : "insufficient";
 }
 
+// --- learner-facing capability gaps ------------------------------------------
+
+export type TopicCapability = "distinct" | "transfer" | "data" | "delayed-proof";
+
+export interface TopicCapabilityGap {
+  capability: TopicCapability;
+  /** Plain learner language: what is missing, without editorial metrics. */
+  text: string;
+  /** What to do instead while the supply gap stands. */
+  alternative: string;
+}
+
+/**
+ * Which trusted-question capabilities one topic still lacks, in the order
+ * that unlocks proof. Derived from the same collapsed counts as the audit,
+ * so a reskin never reads as supply. Empty when the topic can be proven.
+ * Data appears only when authored data questions exist but none are
+ * reviewed; topics with no data content at all are a reviewer decision, not
+ * a learner-visible gap. Delayed-proof appears only once two distinct
+ * trusted questions exist but no pair suits a delayed check.
+ */
+export function capabilityGapsForTopic(row: TopicSupplyAudit): TopicCapabilityGap[] {
+  const gaps: TopicCapabilityGap[] = [];
+  const missingDistinct = Math.max(0, MIN_PROVABLE_QUESTIONS - row.provableDistinct);
+  if (missingDistinct > 0) {
+    gaps.push({
+      capability: "distinct",
+      text: row.provableDistinct === 0
+        ? "No reviewed question yet — improvement here cannot be proven."
+        : "Only one reviewed question so far — a second, different one is needed before improvement here can be proven.",
+      alternative: "Practise the authored questions: answers still surface mistakes and build repair evidence.",
+    });
+  }
+  if (row.transfer === 0) {
+    gaps.push({
+      capability: "transfer",
+      text: row.transferAuthored > 0
+        ? "Unfamiliar-context questions exist but none are reviewed yet."
+        : "No unfamiliar-context question checked yet.",
+      alternative: "Practise standard questions first; transfer gets its own check once a reviewed unfamiliar question exists.",
+    });
+  }
+  if (row.dataAuthored > 0 && row.dataAnalysis === 0) {
+    gaps.push({
+      capability: "data",
+      text: "Practical and data questions exist but none are reviewed yet.",
+      alternative: "Practise the underlying method on standard questions meanwhile.",
+    });
+  }
+  if (row.provableDistinct >= MIN_PROVABLE_QUESTIONS && row.delayedProofEligible === 0) {
+    gaps.push({
+      capability: "delayed-proof",
+      text: "The reviewed questions are too similar for a delayed check — it needs a genuinely different one.",
+      alternative: "Keep the gain fresh with spaced review until then.",
+    });
+  }
+  return gaps;
+}
+
 // --- topic and subject audits -------------------------------------------------
 
 export function auditTopicSupply(topic: Pick<Topic, "id" | "subjectId" | "title">, questions: readonly Question[], options: SupplyAuditOptions = {}): TopicSupplyAudit {
@@ -221,6 +293,11 @@ export function auditTopicSupply(topic: Pick<Topic, "id" | "subjectId" | "title"
   const gap = Math.max(0, MIN_PROVABLE_QUESTIONS - provableDistinct);
   const authoredDistinct = distinctReps(all, everything).length;
   const transfer = trusted.filter((f) => transferOf(f.question)).length;
+  // Authored transfer demand, regardless of trust: isTransferQuestion itself
+  // requires a trusted question, so reusing it here would make this count
+  // identical to `transfer` and hide the reviewable pool.
+  const hasTransferDemand = (q: Question) =>
+    questionDemands(q).some((demand) => demand === "transfer" || demand === "synoptic");
 
   return {
     subjectId: topic.subjectId, topicId: topic.id, title: topic.title,
@@ -229,6 +306,9 @@ export function auditTopicSupply(topic: Pick<Topic, "id" | "subjectId" | "title"
     trusted: trusted.length,
     transfer,
     dataAnalysis: trusted.filter((f) => isDataAnalysis(f.question)).length,
+    /** Authored transfer/data questions (trusted or not): review can close these gaps without new writing. */
+    transferAuthored: all.filter((f) => hasTransferDemand(f.question)).length,
+    dataAuthored: all.filter((f) => isDataAnalysis(f.question)).length,
     trustedFamilies: new Set(trusted.flatMap((f) => f.families)).size,
     provableDistinct,
     provenIds,
@@ -250,17 +330,20 @@ export function auditSubjectSupply(input: { subjectId: Id; label?: string; topic
   const byVerdict: Record<SupplyVerdict, number> = { "enough-for-proof": 0, thin: 0, insufficient: 0 };
   for (const row of rows) byVerdict[row.verdict]++;
   const authoringNeeds: AuthoringNeed[] = rows
-    .filter((row) => row.verdict !== "enough-for-proof" || row.transfer === 0)
+    .filter((row) => row.verdict !== "enough-for-proof" || row.transfer === 0 || (row.dataAuthored > 0 && row.dataAnalysis === 0) || row.delayedProofEligible === 0)
     .map((row) => {
       const missingDistinct = Math.max(0, MIN_PROVABLE_QUESTIONS - row.provableDistinct);
       return {
         subjectId, topicId: row.topicId, title: row.title, verdict: row.verdict, missingDistinct,
         missingTransfer: row.transfer === 0 ? 1 : 0,
+        missingData: row.dataAuthored > 0 && row.dataAnalysis === 0 ? 1 : 0,
+        missingDelayedProof: row.delayedProofEligible === 0 ? 1 : 0,
         reviewableDistinct: row.reviewableDistinct,
         action: missingDistinct > 0 && row.reviewableDistinct >= missingDistinct ? "review-existing" as const : "author-new" as const,
       };
     })
     .sort((a, b) => b.missingDistinct - a.missingDistinct || b.missingTransfer - a.missingTransfer ||
+      b.missingData - a.missingData || b.missingDelayedProof - a.missingDelayedProof ||
       Number(a.action === "review-existing") - Number(b.action === "review-existing") || a.topicId.localeCompare(b.topicId));
   return {
     subjectId, label, topics: rows,

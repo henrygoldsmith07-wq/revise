@@ -505,3 +505,30 @@ describe("mission sessions do not leave a stale resume point", () => {
     expect(src).toMatch(/if \(missionActive\) return;\s+if \(closed \|\| !current\)/);
   });
 });
+
+describe("available session length", () => {
+  const ids = (plan: ReturnType<typeof rankRevisionActions>) => plan.actions.map((x) => x.id);
+
+  it("leaves ranking identical when the budget fits everything", () => {
+    const s = scenario();
+    const subjects = ["physics", "biology", "maths", "chemistry"] as const;
+    const base = rankRevisionActions(engine({ ...s, subjectIds: [...subjects] }));
+    const ample = rankRevisionActions(engine({ ...s, subjectIds: [...subjects], availableMinutes: 1_000_000 }));
+    expect(ids(ample)).toEqual(ids(base));
+    expect(ample.top?.id).toBe(base.top?.id);
+    expect(ample.deferred.map((d) => d.action.id)).toEqual(base.deferred.map((d) => d.action.id));
+  });
+
+  it("never empties Today for a very short session", () => {
+    const s = scenario();
+    const subjects = ["physics", "biology", "maths", "chemistry"] as const;
+    const full = rankRevisionActions(engine({ ...s, subjectIds: [...subjects] }));
+    const tiny = rankRevisionActions(engine({ ...s, subjectIds: [...subjects], availableMinutes: 1 }));
+    expect(tiny.top).not.toBeNull();
+    expect(tiny.actions.length).toBeGreaterThan(0);
+    // Either every kept action fits the minute, or nothing fit and the
+    // ranking stands unchanged with durations shown honestly.
+    const over = tiny.actions.filter((a) => a.minutes > 3);
+    expect(over.length === 0 || ids(tiny).join() === ids(full).join()).toBe(true);
+  });
+});

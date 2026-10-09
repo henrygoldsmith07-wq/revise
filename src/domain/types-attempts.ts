@@ -36,6 +36,21 @@ export interface Attempt {
   markEscalation?: MarkEscalation;
   /** Confidence and provisional status of the mark (AI interpretation → deterministic checks → confidence). */
   markAssessment?: MarkAssessmentRecord;
+  /**
+   * Which marking pipeline link produced this mark, with the versions needed
+   * to compare it against human marks later. Optional for older attempts.
+   * The tier names the link (answer key, cache, on-device model, cloud
+   * model, deterministic fallback); provider names the model or cache tier
+   * that graded; policyVersion pins the marking policy; schemeHash pins the
+   * exact mark scheme it was graded against, so an edited scheme or policy
+   * can never silently reuse this mark as evidence.
+   */
+  markProvenance?: {
+    tier: "key" | "cache" | "local" | "ai" | "fallback";
+    provider?: string;
+    policyVersion: string;
+    schemeHash: string;
+  };
   /** A high-scoring source answer or its completed delayed transfer check. */
   farTransfer?: FarTransferAttemptLink;
   confidence?: 1 | 2 | 3 | 4 | 5;

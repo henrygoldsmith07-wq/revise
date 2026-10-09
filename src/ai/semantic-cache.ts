@@ -8,7 +8,9 @@
 // does. Two tiers:
 //
 // 1. **Exact tier (always available).** Key = questionId:partId + FNV-1a hash
-//    of the normalised answer. No model, no downloads, deterministic.
+//    of the normalised answer. No model, no downloads, deterministic. A hit
+//    additionally requires the entry's mark-scheme hash and policy version to
+//    equal the current ones — an edited scheme or policy regrades.
 // 2. **Embedding tier (progressive enhancement).** A MiniLM sentence
 //    transformer (Transformers.js, ~23MB quantised, lazy-loaded on first use)
 //    embeds the answer + mark-scheme points; a cosine similarity above
@@ -22,6 +24,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Attempt, Question } from "@/domain/types";
+import { canonicalJson, sha256Hex } from "@/domain/content-fingerprint";
 import { getDb } from "@/data/db";
 import type { AiCacheEntry } from "@/data/db";
 
@@ -115,6 +118,22 @@ function embedText(answer: string, markScheme: string[]): string {
 
 // --- public API -------------------------------------------------------------
 
+/**
+ * What a cached grade is valid under. A cached mark may be reused only for
+ * the exact mark scheme and marking policy that produced it: an edited
+ * scheme or a policy change must regrade, never reuse. Entries written
+ * before versioning carry neither field and never hit.
+ */
+export interface CachePolicy {
+  schemeHash: string;
+  policyVersion: string;
+}
+
+/** Stable fingerprint of one part's tariff: id, marks and mark-scheme text. */
+export function schemeHashForPart(part: Pick<Question["parts"][number], "id" | "marks" | "markScheme">): string {
+  return `scheme-v1:${sha256Hex(canonicalJson({ id: part.id, marks: part.marks, markScheme: part.markScheme }))}`;
+}
+
 export interface CachedMark {
   marked: Attempt["marked"][number];
   confidence: number;
@@ -131,22 +150,30 @@ export interface CacheLookupResult {
 /**
  * Look up a previously AI-graded mark for this part's answer. Falls through
  * every tier quietly; a miss is the normal path, never an error.
+ *
+ * Versioning is conservative on purpose: a hit requires the entry's scheme
+ * hash and policy version to equal the current ones. An entry from an edited
+ * mark scheme, a changed policy, or the pre-versioning era is deleted (exact
+ * tier) or skipped (semantic tier), never served.
  */
 export async function lookupCachedMark(
   questionId: string,
   partId: string,
   answer: string,
   markScheme: string[],
+  policy: CachePolicy,
 ): Promise<CacheLookupResult> {
   const db = await getDb();
   // The retention period is enforced on read as well as on write: an entry
   // past its TTL is never served, and is deleted when found.
   const cutoff = Date.now() - CACHE_TTL_MS;
   const fresh = (entry: AiCacheEntry) => Date.parse(entry.createdAt) >= cutoff;
+  const current = (entry: AiCacheEntry) =>
+    entry.schemeHash === policy.schemeHash && entry.policyVersion === policy.policyVersion;
 
   // Tier 1: exact normalised hash.
   const exact = await db.get("aiCache", answerKey(questionId, partId, answer));
-  if (exact && !fresh(exact)) await db.delete("aiCache", exact.key);
+  if (exact && (!fresh(exact) || !current(exact))) await db.delete("aiCache", exact.key);
   else if (exact) return { hit: { marked: exact.marked, confidence: exact.confidence, via: "exact" }, embedding: null };
 
   // Tier 2: cosine similarity against this part's cached answers.
@@ -159,7 +186,7 @@ export async function lookupCachedMark(
       const scope = await db.getAllFromIndex("aiCache", "byScope", scopeKey(questionId, partId));
       let best: { entry: AiCacheEntry; sim: number } | null = null;
       for (const entry of scope) {
-        if (!entry.embedding || !fresh(entry)) continue;
+        if (!entry.embedding || !fresh(entry) || !current(entry)) continue;
         const sim = cosineSimilarity(vector, entry.embedding);
         if (sim >= CACHE_THRESHOLD && (!best || sim > best.sim)) best = { entry, sim };
       }
@@ -176,11 +203,12 @@ export async function lookupCachedMark(
 /** Persist an AI grade so identical future answers skip the network. */
 export async function storeCachedMark(
   questionId: string,
-  part: Question["parts"][number],
+  part: Pick<Question["parts"][number], "id">,
   answer: string,
   marked: Attempt["marked"][number],
   confidence: number,
   embedding: number[] | null,
+  policy: CachePolicy,
 ): Promise<void> {
   const db = await getDb();
   const entry: AiCacheEntry = {
@@ -190,6 +218,8 @@ export async function storeCachedMark(
     marked,
     confidence,
     markedBy: "ai",
+    schemeHash: policy.schemeHash,
+    policyVersion: policy.policyVersion,
     createdAt: new Date().toISOString(),
   };
   await db.put("aiCache", entry);

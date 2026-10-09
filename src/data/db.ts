@@ -58,6 +58,14 @@ export interface AiCacheEntry {
   /** Overall provider confidence for the mark that produced this entry. */
   confidence: number;
   markedBy: "ai";
+  /**
+   * Fingerprint of the mark scheme the grade was produced under. Optional for
+   * pre-versioning rows, which never hit: lookup requires equality, so an
+   * edited scheme regrades instead of reusing a stale mark.
+   */
+  schemeHash?: string;
+  /** Marking policy version at grade time; same miss-on-mismatch rule. */
+  policyVersion?: string;
   /** When the entry was written — used for LRU eviction and staleness. */
   createdAt: string;
 }

@@ -12,6 +12,9 @@ import type { Attempt, AttemptWorkingEvidence, MarkedPart, Question } from "@/do
 
 import { confidenceWord } from "@/domain/plain-numbers";
 import { markAssessmentLabel, type MarkConfidenceAssessment } from "@/domain/marking-confidence";
+import { ERROR_CATEGORY_MEANING } from "@/domain/error-taxonomy";
+import { isActionable as isErrorDiagnosisActionable } from "@/domain/error-diagnosis-plan";
+import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
 import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
@@ -54,11 +57,24 @@ export function MarkedResult({
     /** Confidence-aware marking result; provisional marks are labelled and disputable. */
     assessment?: MarkConfidenceAssessment;
     farTransfer?: Attempt["farTransfer"];
+    /** Post-marking error diagnosis; never changes the marks above. May be uncertain. */
+    errorDiagnosis?: AttemptErrorDiagnosis;
     nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
 }) {
   const pct = question.totalMarks ? awarded / question.totalMarks : 0;
+  // A low-confidence diagnosis is shown as a possibility, never a finding.
+  // The headline that drove the next action may already say this; the line
+  // below makes the uncertainty visible even when it does not.
+  const headline = result.errorDiagnosis?.headline ?? null;
+  const uncertainCause =
+    headline && !isErrorDiagnosisActionable(headline) && headline.category !== "other"
+      ? (() => {
+          const meaning = ERROR_CATEGORY_MEANING[headline.category];
+          return `${meaning.charAt(0).toLowerCase()}${meaning.replace(/\.$/, "").slice(1)}. One more answered question will sharpen this.`;
+        })()
+      : null;
   // A reloaded or re-graded attempt carries only the stored record.
   const stored = attempt?.markAssessment;
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
@@ -349,6 +365,12 @@ export function MarkedResult({
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
           <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
           <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
+          {uncertainCause ? (
+            <p className="text-xs text-ink2 mt-1.5">
+              <span className="font-medium text-ink">Possible cause, not certain: </span>
+              {uncertainCause}
+            </p>
+          ) : null}
         </div>
         {awarded < question.totalMarks ? (
           <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="Repair path">

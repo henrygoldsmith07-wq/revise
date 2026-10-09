@@ -20,7 +20,8 @@
 
 import type { Question } from "@/domain/types";
 import type { AiEnvelope, MarkResponse } from "./types";
-import { lookupCachedMark, storeCachedMark } from "./semantic-cache";
+import { lookupCachedMark, schemeHashForPart, storeCachedMark } from "./semantic-cache";
+import { MARK_POLICY_VERSION } from "./task-policy";
 import { localMarkPart } from "./local-model";
 
 export type MarkTier = "cache" | "local" | "ai" | "fallback";
@@ -61,7 +62,8 @@ export async function resilientMark(
   // --- tier 1: per-part semantic cache --------------------------------------
   for (const part of question.parts) {
     const answer = answers[part.id] ?? "";
-    const lookup = await lookupCachedMark(question.id, part.id, answer, part.markScheme);
+    const policy = { schemeHash: schemeHashForPart(part), policyVersion: MARK_POLICY_VERSION };
+    const lookup = await lookupCachedMark(question.id, part.id, answer, part.markScheme, policy);
     if (lookup.hit) {
       outcomes.push({
         partId: part.id,
@@ -116,6 +118,7 @@ export async function resilientMark(
         markedPart,
         typeof serverEnvelope.data.confidence === "number" ? serverEnvelope.data.confidence : 0.5,
         null, // embedding attached lazily by storeCachedMark's caller when cheap
+        { schemeHash: schemeHashForPart(part), policyVersion: MARK_POLICY_VERSION },
       );
     }
     return { envelope: serverEnvelope, tier: "ai" };

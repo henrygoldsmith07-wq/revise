@@ -45,6 +45,15 @@ export interface AiTaskPolicy {
   authoritative: false;
 }
 
+/**
+ * Version of the marking contract: prompt shape, output schema tariffs and
+ * deterministic checks a mark was produced under. Stored on every attempt
+ * (`markProvenance`) and every cache entry so a policy or scheme change
+ * invalidates old grades instead of silently reusing them. Bump when the
+ * mark prompt, schema, tariffs or confidence checks change.
+ */
+export const MARK_POLICY_VERSION = "mark-policy-v1" as const;
+
 export const AI_TASK_POLICY = {
   explain: {
     learnerContent: "masked-text",

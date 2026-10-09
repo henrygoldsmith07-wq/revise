@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyHumanVerification, physicsContentFingerprint } from "@/domain/content-trust";
-import { auditFlagshipSupply, auditSubjectSupply, auditTopicSupply, supplyAuditIntegrityIssues, verdictFor } from "@/domain/supply-audit";
+import { auditFlagshipSupply, auditSubjectSupply, auditTopicSupply, capabilityGapsForTopic, supplyAuditIntegrityIssues, verdictFor } from "@/domain/supply-audit";
 import { MIN_PROVABLE_QUESTIONS } from "@/domain/supply";
 import type { Question, Topic } from "@/domain/types";
 
@@ -206,5 +206,66 @@ describe("determinism", () => {
     const forward = auditFlagshipSupply({ topics, questions: bank, ...trustAll });
     const shuffled = auditFlagshipSupply({ topics: [...topics].reverse(), questions: [bank[3]!, bank[5]!, bank[0]!, bank[4]!, bank[2]!, bank[1]!], ...trustAll });
     expect(JSON.stringify(shuffled)).toBe(JSON.stringify(forward));
+  });
+});
+
+describe("capability-aware authoring needs", () => {
+  const topics = [topic("t1", 1), topic("t2", 2), topic("t3", 3)];
+  const bank = [
+    q("a1", FACTOR, {}, ["t1"]), q("a2", CARDS, {}, ["t1"]),
+    q("b1", COPPER, {}, ["t2"]), q("b2", NITRATE, {}, ["t2"]),
+  ];
+  const result = auditSubjectSupply({ subjectId: SUBJECT, topics, questions: bank, ...trustAll });
+
+  it("reports data and delayed-proof needs without disturbing the ranking", () => {
+    // Order is still driven by the distinct gap first: t3 (2), t2 (1), t1 (0).
+    expect(result.authoringNeeds.map((n) => [n.topicId, n.missingDistinct])).toEqual([["t3", 2], ["t2", 1], ["t1", 0]]);
+    const [t3, t2, t1] = result.authoringNeeds;
+    // t2's pair is a noun swap: one distinct question, no delayed-proof pair.
+    expect(t2).toMatchObject({ missingTransfer: 1, missingDelayedProof: 1 });
+    // t1 has two distinct questions but no transfer supply.
+    expect(t1).toMatchObject({ missingDistinct: 0, missingTransfer: 1, missingData: 0, missingDelayedProof: 0 });
+    // Nothing authored here is data content, so no data need is raised.
+    expect(t3).toMatchObject({ missingData: 0, missingDelayedProof: 1 });
+  });
+
+  it("raises a data need only when authored data questions exist unreviewed", () => {
+    const data = q("d", FACTOR, { learning: { familyId: "f", contextId: "c", demand: "application", expectedMinutes: 3, setupFingerprint: { structures: ["table-dataset"], representations: ["table"], operations: [], relationships: [], outputTypes: [] } } });
+    const row = audit([data], {});
+    expect(row.dataAuthored).toBe(1);
+    expect(row.dataAnalysis).toBe(0);
+    const gaps = capabilityGapsForTopic(row);
+    expect(gaps.map((g) => g.capability)).toContain("data");
+  });
+});
+
+describe("learner-facing capability gaps", () => {
+  it("is empty when a topic can be proven", () => {
+    const row = audit([approve(q("a", FACTOR)), approve(q("b", CARDS)), approve(q("c", STATIONARY))], {});
+    expect(row.verdict).toBe("enough-for-proof");
+    // Plain short questions carry no transfer demand, so only transfer is listed.
+    expect(capabilityGapsForTopic(row).map((g) => g.capability)).toEqual(["transfer"]);
+  });
+
+  it("names the distinct gap first on an empty topic", () => {
+    const gaps = capabilityGapsForTopic(audit([], {}));
+    expect(gaps.map((g) => g.capability)).toEqual(["distinct", "transfer"]);
+    expect(gaps[0]!.text).toMatch(/cannot be proven/);
+    expect(gaps[0]!.alternative).toMatch(/Practise the authored questions/);
+  });
+
+  it("names the delayed-proof gap only once distinct supply exists", () => {
+    const pair = (id: string, stem: string) => approve(q(id, stem));
+    const row = audit([
+      pair("a", "Show that x = 2 is a root of f(x) = x³ - 5x² + 4x - 3 and state the remainder when divided by x - 2."),
+      pair("b", "Show that x = 3 is a root of f(x) = x³ - 6x² + 5x - 4 and state the remainder when divided by x - 3."),
+      pair("c", COPPER),
+      pair("d", NITRATE),
+    ], {});
+    expect(row.provableDistinct).toBe(2);
+    expect(row.delayedProofEligible).toBe(0);
+    const gaps = capabilityGapsForTopic(row);
+    expect(gaps.map((g) => g.capability)).toEqual(["transfer", "delayed-proof"]);
+    expect(gaps[1]!.alternative).toMatch(/spaced review/);
   });
 });

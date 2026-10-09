@@ -111,8 +111,9 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
       adaptive: store.adaptiveSession, supplyByTopic: evidence.supplyByTopic, effectiveness: evidence.effectiveness, topicWeight, papers, untouched,
       dueReviews: [...due].map(([subjectId, v]) => ({ subjectId, ...v })),
       paperTitles: Object.fromEntries(store.papers.map((p) => [p.id, p.title])),
+      availableMinutes: store.settings.sessionLengthMinutes,
     });
-  }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.reviewLogs, store.settings.quickCheckSkipped, store.settings.subjectIds, store.settings.targetGrades]);
+  }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.reviewLogs, store.settings.quickCheckSkipped, store.settings.sessionLengthMinutes, store.settings.subjectIds, store.settings.targetGrades]);
   // Only computed when Today has nothing to rank: measuring unseen supply is an
   // O(questions x topic) reskin check, and Today re-renders often.
   const supplyNote = useMemo(

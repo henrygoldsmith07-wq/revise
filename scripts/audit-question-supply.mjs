@@ -50,7 +50,7 @@ if (process.argv.includes("--json")) {
   for (const a of audits) {
     console.log(`\nLargest authoring gaps — ${a.label}`);
     for (const n of a.authoringNeeds.slice(0, needsLimit)) {
-      console.log(`  ${pad(n.topicId, 44)} need ${n.missingDistinct} more distinct trusted${n.missingTransfer ? " + 1 transfer" : ""} (${n.verdict}; ${n.action})`);
+      console.log(`  ${pad(n.topicId, 44)} need ${n.missingDistinct} more distinct trusted${n.missingTransfer ? " + 1 transfer" : ""}${n.missingData ? " + 1 data" : ""}${n.missingDelayedProof ? " + delayed-proof" : ""} (${n.verdict}; ${n.action})`);
     }
   }
   console.log(issues.length ? `\nIntegrity: ${issues.length} problem(s)` : "\nIntegrity: OK");

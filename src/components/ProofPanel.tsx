@@ -7,6 +7,7 @@ import { learnerState, topicEvidenceSummary, type LearnerState } from "@/domain/
 import { topicLifecycle } from "@/domain/proof-lifecycle";
 import { shortDate, type ProofStatus, type TopicProof } from "@/domain/proof-of-improvement";
 import { topicShares } from "@/domain/topic-weight";
+import { auditTopicSupply, capabilityGapsForTopic, type TopicCapabilityGap } from "@/domain/supply-audit";
 import { newlyProvenTopics, nextSeenProofStates, parseSeenProofStates } from "@/domain/proof-moment";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, SectionHeading, StatTile } from "./ui";
@@ -132,6 +133,23 @@ export function ProofPanel() {
   const moments = useProvenMoments(viewStates);
   const momentTitles = [...moments].map((id) => getTopic(id)?.title ?? id);
 
+  // Per-topic trusted-question capabilities, for topics the learner has
+  // touched. Bounded (first rows only, first gaps only): each audit scans one
+  // topic's questions, and supply-side counts need no attempt history.
+  const capabilityGaps = useMemo(() => {
+    const out: Array<{ topicId: string; title: string; gaps: TopicCapabilityGap[] }> = [];
+    for (const row of rows.slice(0, 8)) {
+      const topic = getTopic(row.topicId);
+      if (!topic) continue;
+      const gaps = capabilityGapsForTopic(
+        auditTopicSupply({ id: topic.id, subjectId: topic.subjectId, title: topic.title }, store.questions),
+      );
+      if (gaps.length) out.push({ topicId: topic.id, title: topic.title, gaps: gaps.slice(0, 2) });
+      if (out.length >= 6) break;
+    }
+    return out;
+  }, [rows, store.questions]);
+
   const renderRow = (row: TopicProof) => {
     const status = STATUS[row.status];
     const topic = getTopic(row.topicId);
@@ -213,6 +231,25 @@ export function ProofPanel() {
               ))}
             </ul>
             <p className="text-[11px] text-ink3">These topics can still be revised. Their answers just cannot be counted as proof, so nothing here is presented as confidence.</p>
+          </div>
+        ) : null}
+
+        {capabilityGaps.length ? (
+          <div className="rounded-[8px] border border-line px-3 py-3 space-y-2">
+            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What each topic still needs</p>
+            <ul className="space-y-2.5">
+              {capabilityGaps.map((entry) => (
+                <li key={entry.topicId} className="text-xs">
+                  <p className="font-medium text-ink">{entry.title}</p>
+                  {entry.gaps.map((gap) => (
+                    <p key={gap.capability} className="text-ink2 mt-0.5">{gap.text} {gap.alternative}</p>
+                  ))}
+                  <ButtonLink href={`/practice?topic=${encodeURIComponent(entry.topicId)}`} size="sm" variant="ghost" className="mt-1">
+                    Practise {entry.title} →
+                  </ButtonLink>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </Panel>

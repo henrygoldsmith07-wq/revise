@@ -27,7 +27,9 @@ import { planRemediation } from "@/domain/remediation";
 import type { RemediationPlan } from "@/domain/remediation";
 import { diagnoseAttemptErrors, isActionable } from "@/domain/error-diagnosis-plan";
 import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
-import { isErrorCategory } from "@/domain/error-taxonomy";
+import { MARK_POLICY_VERSION } from "@/ai/task-policy";
+import { canonicalJson, sha256Hex } from "@/domain/content-fingerprint";
+import { ERROR_CATEGORY_MEANING, isErrorCategory } from "@/domain/error-taxonomy";
 import type { ErrorCategory } from "@/domain/error-taxonomy";
 import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
@@ -251,6 +253,7 @@ export function useQuestionExecution({
     let source: "ai" | "fallback" = "fallback";
     let note: string | undefined;
     let markTier: string | undefined;
+    let markProvider: string | undefined;
     let markConfidence: number | null = null;
     let withheld: string | undefined;
     let assessment: MarkConfidenceAssessment;
@@ -272,6 +275,7 @@ export function useQuestionExecution({
       source = envelope.source;
       note = envelope.note;
       markTier = envelope.tier;
+      markProvider = envelope.provider ?? undefined;
       assessment = envelope.assessment;
       // For an AI mark the stored confidence is the system's confidence after
       // the deterministic checks, not the model's self-report alone, so a
@@ -303,6 +307,15 @@ export function useQuestionExecution({
     const markEscalation = createMarkEscalationRecord(escalationDecision, createdAt);
     const awarded = marked.reduce((a, m) => a + m.awarded, 0);
     const max = marked.reduce((a, m) => a + m.max, 0);
+    // Provenance for later evaluation: which link graded, under which policy
+    // and scheme. Persisted with the attempt so a human-marked comparison can
+    // join on exact versions instead of assuming them.
+    const markProvenance: Attempt["markProvenance"] = {
+      tier: isMcq ? "key" : markTier === "cache" || markTier === "local" || markTier === "ai" ? markTier : "fallback",
+      ...(markProvider ? { provider: markProvider } : {}),
+      policyVersion: MARK_POLICY_VERSION,
+      schemeHash: `scheme-v1:${sha256Hex(canonicalJson(question.parts.map((part) => ({ id: part.id, marks: part.marks, markScheme: part.markScheme }))))}`,
+    };
     const attempt: Attempt = {
       id: attemptId,
       userId: store.userId,
@@ -318,6 +331,7 @@ export function useQuestionExecution({
       markConfidence: source === "ai" ? markConfidence ?? undefined : rubricConf ?? undefined,
       markEscalation,
       markAssessment: markAssessmentRecord(assessment),
+      markProvenance,
       ...(copiedAnswer ? { copiedAnswer: true } : {}),
       ...(workingAnalysis.length ? { workingAnalysis } : {}),
       ...(intervention ? { intervention } : {}),
@@ -398,12 +412,18 @@ export function useQuestionExecution({
                   why: "Strong unaided evidence. The tutor loop moves on to the next weakest capability.",
                 };
     // When the diagnosis names one error, the next action says so in those
-    // words. The error type is what makes "micro-practice the missed point"
-    // concrete: a misconception gets an explanation, a slip gets a check.
+    // words — but only when the diagnosis is actionable. A low-confidence
+    // local read must never present a guess as a finding: the generic action
+    // stands, with the possible cause marked as uncertain.
     const diagnosisHeadline = errorDiagnosis.headline;
     if (diagnosisHeadline && awarded < max) {
-      nextAction.label = diagnosisHeadline.intervention.action;
-      nextAction.why = `${diagnosisHeadline.intervention.action} (${diagnosisHeadline.label}, ${diagnosisHeadline.awarded}/${diagnosisHeadline.max} — diagnosed as ${diagnosisHeadline.category}${diagnosisHeadline.provenance === "classifier-dev" ? "" : " on-device"}).`;
+      if (isActionable(diagnosisHeadline)) {
+        nextAction.label = diagnosisHeadline.intervention.action;
+        nextAction.why = `${diagnosisHeadline.intervention.action} (${diagnosisHeadline.label}, ${diagnosisHeadline.awarded}/${diagnosisHeadline.max} — diagnosed as ${diagnosisHeadline.category}${diagnosisHeadline.provenance === "classifier-dev" ? "" : " on-device"}).`;
+      } else if (diagnosisHeadline.category !== "other") {
+        const meaning = ERROR_CATEGORY_MEANING[diagnosisHeadline.category];
+        nextAction.why = `${nextAction.why} One possibility is ${meaning.charAt(0).toLowerCase()}${meaning.replace(/\.$/, "").slice(1)} — but there is not enough evidence yet to say for sure.`;
+      }
     }
     // A rubric fallback grade (the AI never ran, or the provider failed) gets a
     // second chance: queue the persisted attempt for an AI re-grade. The drain

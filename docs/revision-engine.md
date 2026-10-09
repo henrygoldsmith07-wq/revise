@@ -432,6 +432,12 @@ Regression recovery gates new work on the same topic; one lost mark is planned o
 (overlapping actions are parked with the reason). Every action carries why, why now,
 why before the others, the evidence, what happens after and what proves it worked.
 
+**Fit to the time available.** `rankRevisionActions` accepts the learner's
+`availableMinutes` (their session length). A step that does not fit defers with
+its reason and the best fitting step leads instead — but at least one action
+always survives, so a short session never empties Today. Ranking is otherwise
+unchanged, and every existing caller that omits the field gets identical results.
+
 Missions run as real sessions (`mission-session.ts`): questions are chosen for the
 mission's target weakness across all its topics, support is set by stage, and every
 attempt carries `mission` (mission, stage, method, target cause, source mistakes).
