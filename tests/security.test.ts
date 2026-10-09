@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const schema = () => readFileSync(join(process.cwd(), "supabase/schema.sql"), "utf8");
+const schema = () => readFileSync(join(process.cwd(), "supabase/schema.sql"), "utf8").replace(/\r\n/g, "\n");
 
 describe("security — RLS + schema invariants", () => {
   // Per-table RLS coverage. The previous version of this test asserted only
@@ -17,7 +17,10 @@ describe("security — RLS + schema invariants", () => {
     // Granted by the service role only; the holder may read their own row.
     | { kind: "self-read"; policy: string }
     // Append-only audit history: reviewer insert + read, no update/delete.
-    | { kind: "append-only"; insert: string; read: string };
+    | { kind: "append-only"; insert: string; read: string }
+    // Write-only: the learner may insert their own rows and read nothing back
+    // (opt-in telemetry, shared disputes). Aggregation is service-role only.
+    | { kind: "insert-only"; policy: string };
 
   const EXPECTED: Record<string, RlsExpectation> = {
     cards: { kind: "owner", policy: "cards_owner" },
@@ -41,6 +44,9 @@ describe("security — RLS + schema invariants", () => {
     // Reviewer portal.
     reviewer_roles: { kind: "self-read", policy: "reviewer_roles_self_read" },
     review_audit_events: { kind: "append-only", insert: "review_audit_events_reviewer_insert", read: "review_audit_events_reviewer_read" },
+    // Opt-in pilot telemetry and shared disputes: write-only for the learner.
+    product_events: { kind: "insert-only", policy: "product_events_insert" },
+    marking_disputes: { kind: "insert-only", policy: "marking_disputes_insert" },
   };
 
   const OWNER_CLAUSE = "using (user_id = auth.uid()) with check (user_id = auth.uid())";
@@ -101,6 +107,13 @@ describe("security — RLS + schema invariants", () => {
       expect(explicit.find((p) => p.name === expectation.insert)!.text).toContain("for insert to authenticated with check (reviewer_user_id = auth.uid() and public.is_active_reviewer())");
       expect(sql).toContain(`revoke update, delete, truncate on public.${table} from anon, authenticated`);
       expect(sql).toContain(`create trigger ${table}_immutable before update or delete on public.${table}`);
+    } else if (expectation.kind === "insert-only") {
+      expect(looped).not.toContain(table);
+      expect(explicit.map((p) => p.name)).toEqual([expectation.policy]);
+      expect(explicit[0]!.text).toContain("for insert to authenticated");
+      expect(explicit[0]!.text).toContain("with check (user_id = auth.uid())");
+      // Write-only: no client read, update or delete on a learner's own rows.
+      expect(sql).toContain(`revoke select, update, delete, truncate on public.${table} from anon, authenticated`);
     } else {
       // No policy at all: only SECURITY DEFINER functions may touch it.
       expect(looped).not.toContain(table);

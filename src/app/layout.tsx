@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "Revise — exam revision that knows what to do next",
   description:
-    "WJEC A-level revision, Physics first: Revise tells you the one thing to do next — spaced repetition, exam-style practice with examiner marking, and a plan that rebuilds itself.",
+    "WJEC A-level revision, Physics first: tells you the one thing to do next — spaced repetition, exam-style practice with examiner marking, and a plan that rebuilds itself. Four subjects are authored to their specification; everything else is labelled reference material.",
   applicationName: "Revise",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Revise", statusBarStyle: "default" },
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     siteName: "Revise",
     title: "Revise — exam revision that knows what to do next",
     description:
-      "WJEC A-level revision, Physics first: the one thing to do next, proven on trusted questions.",
+      "WJEC A-level revision, Physics first: tells you the one thing to do next. Four subjects are authored to their specification; everything else is labelled reference material.",
     url: "/",
     locale: "en_GB",
   },
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Revise — exam revision that knows what to do next",
     description:
-      "WJEC A-level revision, Physics first: the one thing to do next, proven on trusted questions.",
+      "WJEC A-level revision, Physics first: tells you the one thing to do next. Four subjects are authored to their specification; everything else is labelled reference material.",
   },
   // This is an app, not a marketing site: only /welcome is meant to be indexed,
   // and only because it is the page that works without JavaScript.

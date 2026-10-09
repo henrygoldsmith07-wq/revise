@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { buildMarksIntelligence } from "@/domain/readiness-intelligence";
+import { todayLocal } from "@/domain/local-date";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill } from "./ui";
 
@@ -59,7 +60,7 @@ export function ReadinessAutopilot() {
     ? Math.max(
         0,
         Math.round(
-          (Date.parse(`${nearestExam.date}T00:00:00Z`) - Date.now()) / 86_400_000,
+          (Date.parse(`${nearestExam.date}T00:00:00Z`) - Date.parse(`${todayLocal()}T00:00:00Z`)) / 86_400_000,
         ),
       )
     : null;

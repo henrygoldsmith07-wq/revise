@@ -310,6 +310,32 @@ A mistake resolves only when its card has `reps ≥ 2`, `stability ≥ 7 days` a
 zero lapses. Resolving on a single correct answer would close mistakes that the
 student got right by luck.
 
+### Repair follows the failure mode
+
+`src/domain/learner-intelligence.ts`, `src/domain/intervention-engine.ts`,
+`src/components/InterventionPrescriptionPanel.tsx`
+
+The learner model (`buildLearnerIntelligence`) projects one coherent state per
+topic from the existing owners — recall mastery, application mastery, open
+mistakes, retention, uncertainty and proof — rather than adding a second
+model. From that state `prescribeIntervention` picks an ordered repair path
+that depends on *why* the mark was lost:
+
+| Failure mode | Path |
+|---|---|
+| no evidence yet | first recall check (creates the evidence) |
+| recall not secure | quick recall → targeted explanation |
+| recurring misconception | confront it before new questions |
+| application gap (recall secure, application weak) | quick recall → understand → worked example → guided try → unaided exam question |
+| command-word weakness | timed command-word check |
+| proof due | delayed proof check |
+
+The rendered panel names the finding in the learner's words ("You remember the
+facts here but lose marks when the question changes context") and marks every
+step "practice, not proof" or "counts as evidence", so help is never
+mistaken for proof. The same modules drive the Library topic sheet; the mark
+result is now the primary place a learner meets them.
+
 ## Exam technique vs knowledge separation
 
 `src/domain/retention-analytics.ts`, `src/domain/assessment.ts` and

@@ -876,10 +876,9 @@ function PilotTelemetryToggle() {
   const enabled = store.settings.pilotTelemetry === true;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [pending, setPending] = useState(0);
-  useEffect(() => {
-    setPending(pendingPilotEvents(store.userId));
-  }, [store.userId, enabled]);
+  // Read once on mount (account switches remount this section), then refreshed
+  // after this panel's own actions — never from an effect.
+  const [pending, setPending] = useState(() => pendingPilotEvents(store.userId));
 
   async function choose(next: boolean) {
     setBusy(true);

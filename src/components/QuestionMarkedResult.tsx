@@ -19,8 +19,10 @@ import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { ProofCheckBanner } from "./ProofCheckBanner";
+import { InterventionPrescriptionPanel } from "./InterventionPrescriptionPanel";
 import { RichText } from "./RichText";
 import { ButtonLink, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
+import { trustedAssessmentContent } from "@/domain/physics-content-review";
 import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
@@ -85,7 +87,6 @@ export function MarkedResult({
       captureProductEvent("mistake.repaired", { count: 1 });
     }
     // Once per marked result.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result.retest?.status]);
   const showSocratic = question.kind !== "mcq" && awarded < question.totalMarks && Boolean(answers);
   const actions = useMemo(() => {
@@ -373,47 +374,37 @@ export function MarkedResult({
           ) : null}
         </div>
         {awarded < question.totalMarks ? (
-          <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="Repair path">
-            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Repair path — one flow</p>
-            <ol className="text-xs text-ink2 space-y-1 list-decimal pl-4">
-              <li>Your answer above is preserved. Read the cause below, then repair with help.</li>
-              <li>Try a new related question on the same skill.</li>
-              <li>Prove it on a new question with no hints, at least 3 days on.</li>
-            </ol>
-            <div className="flex flex-wrap gap-2">
-              <ButtonLink
-                href={`/tutor?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`}
-                size="sm"
-                variant="secondary"
-                onClick={() => captureProductEvent("intervention.started", { kind: "misconception-repair" })}
-              >
-                Repair with tutor
-              </ButtonLink>
-              <ButtonLink
-                href={`/practice?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`}
-                size="sm"
-                variant="secondary"
-                onClick={() => captureProductEvent("intervention.started", { kind: "exam-style-question" })}
-              >
-                New related question
-              </ButtonLink>
-              <ButtonLink
-                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
-                size="sm"
-                variant="primary"
-                onClick={() => captureProductEvent("proof.attempted", { kind: "delayed-proof" })}
-              >
-                Unseen proof check
-              </ButtonLink>
-            </div>
-            <p className="text-[11px] text-ink3">Help never counts as proof. Only an unaided answer on a new question — at least 3 days on, where reviewed questions exist — counts.</p>
-          </div>
+          <InterventionPrescriptionPanel topicId={question.topicIds[0] ?? question.subjectId} marksLost={question.totalMarks - awarded} />
         ) : (
-          <ProofCheckBanner
-            topicTitle={question.topicIds[0]}
-            href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
-            state="passed"
-          />
+          // Full marks is only "proven" when the answer can actually count as
+          // evidence: trusted content, answered unaided, outside recall mode.
+          // On an unreviewed or hinted question the same score is practice.
+          attempt && trustedAssessmentContent(question) &&
+          !attempt.hintTier && !attempt.repairTeachingSeen &&
+          !attempt.copiedAnswer && attempt.mode !== "recall"
+            ? (
+              <ProofCheckBanner
+                topicTitle={question.topicIds[0]}
+                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                state="passed"
+              />
+            ) : (
+              <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="What this answer establishes">
+                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Full marks — practice, not proof</p>
+                <p className="text-sm text-ink2">
+                  Revise records this as a correct answer. It only becomes proof once the
+                  same skill is answered unaided on a different question, after a delay.
+                </p>
+                <ButtonLink
+                  href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => captureProductEvent("proof.attempted", { kind: "delayed-proof" })}
+                >
+                  Try an unseen question
+                </ButtonLink>
+              </div>
+            )
         )}
         {/* Ask: what did this one attempt teach us? */}
         {result.marked.some((m) => m.missedPoints.length) ? (

@@ -103,7 +103,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   });
   const enteredDatesValid = invalidDates.length === 0;
   const onFinalPhase = phase === PHASES.length - 1;
-  const onDatesPhase = phase === 2;
   const flagshipChosen = subjectIds.filter((id) => isFlagship(id));
   const referenceChosen = subjectIds.filter((id) => !isFlagship(id));
   const firstSubjectName = chosenSubjects[0] ? getSubject(chosenSubjects[0].id)?.name ?? chosenSubjects[0].name : "";

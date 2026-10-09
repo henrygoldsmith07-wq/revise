@@ -49,7 +49,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
         void flushPilotEvents(userId);
       }
     }
-  }, [action.id, action.type, action.subjectId, blockedTopic, pilotOn, recordFunnel, userId]);
+  }, [action.id, action.type, action.subjectId, action.minutes, blockedTopic, pilotOn, recordFunnel, userId]);
   return (
     <section aria-label="What to do now" className="grid gap-4">
       <div className="min-w-0">

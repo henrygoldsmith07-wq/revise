@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { seedQuestions } from "@/content";
 import { markQuestion } from "@/domain/marking";
-import { markSchemaFor } from "@/ai/tasks";
+import { assessMarkConfidence } from "@/domain/marking-confidence";
 import { untrusted } from "@/ai/untrusted";
 import type { Question } from "@/domain/types";
 
@@ -63,36 +63,50 @@ describe("prompt injection cannot increase deterministic marks", () => {
   });
 });
 
-describe("AI mark output schema rejects inflated awards", () => {
+describe("inflated award attempts are corrected down to the tariff", () => {
   const question = writtenQuestion();
 
-  it("rejects awarded above the part tariff", () => {
-    const schema = markSchemaFor(question);
-    const inflated = {
-      marked: question.parts.map((p) => ({
-        partId: p.id,
-        awarded: p.marks + 1,
-        max: p.marks,
-        creditedPoints: [] as string[],
-        missedPoints: [] as string[],
-        comment: "injected",
-      })),
-      feedback: "injected",
-    };
-    expect(schema.safeParse(inflated).success).toBe(false);
+  it("never credits more than a part's own tariff", () => {
+    // The deterministic confidence assessment clamps any award above the part
+    // tariff and records the violation, so an inflated mark cannot survive.
+    const inflated = question.parts.map((p) => ({
+      partId: p.id,
+      awarded: p.marks + 5,
+      max: p.marks,
+      creditedPoints: [],
+      missedPoints: [],
+      comment: "injected award above tariff",
+    }));
+    const result = assessMarkConfidence({
+      question,
+      answers: {},
+      mark: { marked: inflated },
+      tier: "ai",
+      rubric: question.parts.map((p) => ({ partId: p.id, awarded: 0, max: p.marks, creditedPoints: [], missedPoints: p.markScheme, comment: "" })),
+      rubricConfidence: null,
+    });
+    for (const marked of result.marked) {
+      const part = question.parts.find((p) => p.id === marked.partId)!;
+      expect(marked.awarded).toBeLessThanOrEqual(part.marks);
+      expect(marked.max).toBe(part.marks);
+    }
+    expect(result.failedChecks).toContain("tariff");
   });
 
-  it("rejects a wrong max tariff per part", () => {
-    const schema = markSchemaFor(question);
+  it("keeps an inflated mark provisional rather than trusting it", () => {
     const part = question.parts[0]!;
-    const wrongMax = {
-      marked: [
-        { partId: part.id, awarded: 99, max: 99, creditedPoints: [], missedPoints: [], comment: "x" },
-        ...question.parts.slice(1).map((p) => ({ partId: p.id, awarded: 0, max: p.marks, creditedPoints: [], missedPoints: [], comment: "" })),
-      ],
-      feedback: "injected",
-    };
-    expect(schema.safeParse(wrongMax).success).toBe(false);
+    const result = assessMarkConfidence({
+      question,
+      answers: { [part.id]: "irrelevant" },
+      mark: {
+        marked: [{ partId: part.id, awarded: part.marks, max: part.marks, creditedPoints: [...part.markScheme], missedPoints: [], comment: "full marks" }],
+      },
+      tier: "ai",
+      rubric: question.parts.map((p) => ({ partId: p.id, awarded: 0, max: p.marks, creditedPoints: [], missedPoints: p.markScheme, comment: "" })),
+      rubricConfidence: null,
+    });
+    // Unsupported by the rubric and by any matching answer text: provisional.
+    expect(result.provisional).toBe(true);
   });
 });
 

@@ -1,5 +1,63 @@
 # Changelog
 
+## The repair path follows the failure mode — 2026-10-10
+
+**Today's mark result prescribes, not just links.** Losing marks now renders
+`InterventionPrescriptionPanel`: the unified learner model decides which
+capability is actually missing on that topic and prescribes the ordered repair
+path that follows. A learner who remembers the definition but loses the
+application marks reads "You remember it — now make it score", then quick
+recall → understand → worked example → guided try → unaided exam question,
+each step labelled "practice, not proof" or "counts as evidence". A recall gap
+gets retrieval and explanation instead; a repeated misconception is confronted
+before new questions. The engine, the copy and the ordering all come from the
+existing `learner-intelligence` + `intervention-engine` domain modules, which
+were previously only reachable from the Library topic sheet.
+
+**Two defects found and fixed by running verification.** This pass ran the
+static checks and the suite, which had not been executed since the merge:
+
+1. `src/components/AppShell.tsx` carried a stray `];` left over from the
+   merge-conflict resolution — a syntax error that broke every build. Fixed.
+2. `src/components/PdfPageImage.tsx` used a pdfjs API this version does not
+   expose (`PDFDocumentProxy.destroy`, a `render` call missing `canvas`).
+   Fixed against the installed types.
+
+**Tests repaired rather than deleted.** Five failures were environmental or
+stale, and each is now honest:
+
+- Source-string tests compared multi-line text with `\n` while git checks
+  files out with CRLF on Windows (`core.autocrlf=true`). `schema()` and the
+  CSS reader now normalise line endings; the assertions are unchanged.
+- `tests/ai-structured-output.test.ts` predated the AI consent gate: the
+  request never left the browser, so the malformed-response branch could not
+  run. It now seeds an explicit opt-in first.
+- `tests/onboarding-first-screen.test.ts` pinned the old three-phase
+  onboarding to the five-phase funnel that shipped (adding that the
+  diagnostic is labelled practice-not-proof).
+- `tests/a11y.test.ts` imported `AppShell` into a node test to assert it was
+  a function, which pulled the whole app graph in and timed out; it now
+  asserts the export in source, which is what actually pins the contract.
+- `tests/marking-prompt-injection.test.ts` imported the server-only
+  `@/ai/tasks`. It now asserts tariff clamping through the client-safe
+  `assessMarkConfidence` instead.
+- `tests/security.test.ts` gained an `insert-only` RLS expectation, so
+  `product_events` and `marking_disputes` are covered by the schema contract
+  (write-only for the learner, readable by nobody but the service role).
+
+**An honesty defect in the previous pass, fixed.** A full-marks answer on an
+unreviewed practice question was rendering the "Proven" proof banner. It now
+renders "Full marks — practice, not proof" unless the answer can actually count
+as evidence: trusted content, answered unaided, outside recall mode. The same
+gate protects the ledger: with zero human-reviewed flagship questions, nothing
+in the flagships can claim proof.
+
+Also fixed in this pass: the root layout metadata had lost the "four subjects
+are authored to their specification; everything else is labelled reference
+material" honesty clause (restored, keeping the Physics-first framing), a
+setState-in-effect lint error in the practice draft store, impure `Date.now()`
+calls inside `useMemo`, and missing memo dependencies.
+
 ## Honest diagnosis, versioned marks, fitter plans, visible supply gaps — 2026-10-09
 
 **Uncertain diagnoses read as uncertain.** The post-marking error diagnosis now

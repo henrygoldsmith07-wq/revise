@@ -74,14 +74,20 @@ describe("first screen collects board → subjects → optional exam dates", () 
     expect(srcText).toContain("if (!date) continue");
   });
 
-  it("defaults time budget and target grade instead of asking; board → subjects → dates → quick check", () => {
+  it("defaults time budget and target grade instead of asking; board → subjects → dates → quick check → first step", () => {
     expect(srcText).toContain("STEADY_MINUTES");
     expect(srcText).toContain("gradesFor(id)[0]");
     // The old wizard's extra asks are gone.
     expect(srcText).not.toContain("What should we call you?");
     expect(srcText).not.toContain("How much time do you have?");
     expect(srcText).not.toContain("TIME_PRESETS");
-    expect(srcText).toContain('PHASES = ["Board", "Subjects", "Exam dates"]');
+    // The shipped funnel: three configuration steps, then a diagnostic offer,
+    // then the promise of a personalised first step.
+    expect(srcText).toContain('const PHASES = ["Board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;');
+    expect(srcText).toContain("quickCheckSkipped");
+    // The diagnostic step never implies unreviewed questions are evidence.
+    expect(srcText).toContain("cannot provide trusted evidence");
+    expect(srcText).toContain("Start my quick check");
   });
 
   it("does not offer a global Skip that leaves a hollow profile", () => {

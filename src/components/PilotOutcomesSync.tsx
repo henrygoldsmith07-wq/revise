@@ -14,7 +14,6 @@ import { recordPilotEvent } from "@/lib/pilot-telemetry";
 import { useRecoveryEvidence } from "./recovery-evidence";
 
 const WATERMARK_KEY = (userId: string) => `revise.pilot.watermark.${userId}`;
-const DAY_MS = 86_400_000;
 
 function readWatermark(userId: string): { provenTotal: number; seenProven: string[] } {
   try {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { aiGenerateQuestions } from "@/lib/optional-ai";
 import { gateGeneratedQuestions } from "@/domain/generated-question-quality";
 import { remapContentIdString } from "@/data/content-ids";
@@ -130,14 +130,26 @@ function Practice() {
   // Unsubmitted answers survive a refresh: drafts persist per account and
   // question on this device only (never synced), and are dropped the moment
   // the question is submitted. Keyed by user so accounts sharing a browser
-  // profile never see each other's half-written answers.
-  const [questionDrafts, setQuestionDrafts] = useState<Record<string, QuestionDraft>>(() => readPracticeDrafts(store.userId));
+  // profile never see each other's half-written answers. The active user's
+  // map is derived from the bucket, so switching account needs no re-read
+  // effect, and persisting stays the effect's only job.
+  const [draftsByUser, setDraftsByUser] = useState<Record<string, Record<string, QuestionDraft>>>(() =>
+    store.userId ? { [store.userId]: readPracticeDrafts(store.userId) } : {},
+  );
   useEffect(() => {
-    setQuestionDrafts(readPracticeDrafts(store.userId));
-  }, [store.userId]);
-  useEffect(() => {
-    writePracticeDrafts(store.userId, questionDrafts);
-  }, [store.userId, questionDrafts]);
+    writePracticeDrafts(store.userId, draftsByUser[store.userId] ?? {});
+  }, [store.userId, draftsByUser]);
+  const questionDrafts = draftsByUser[store.userId] ?? {};
+  const setQuestionDrafts = useCallback(
+    (next: Record<string, QuestionDraft> | ((previous: Record<string, QuestionDraft>) => Record<string, QuestionDraft>)) => {
+      setDraftsByUser((prev) => {
+        const current = prev[store.userId] ?? {};
+        const updated = typeof next === "function" ? next(current) : next;
+        return { ...prev, [store.userId]: updated };
+      });
+    },
+    [store.userId],
+  );
   const [closed, setClosed] = useState(false);
   const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
   const [sessionStartedAt, setSessionStartedAt] = useState(() => Date.now());
@@ -744,13 +756,13 @@ function Practice() {
             farTransfer={farTransferRetest}
             hintBudget={adaptiveHintBudget}
             draft={questionDrafts[current.id]}
-            onDraftChange={(draft) => setQuestionDrafts((previous) => ({ ...previous, [current.id]: draft }))}
+            onDraftChange={(draft) => setQuestionDrafts((previous: Record<string, QuestionDraft>) => ({ ...previous, [current.id]: draft }))}
             onFinished={(attempt) => {
               setSessionAttempts((previous) => [
                 ...previous.filter((existing) => existing.questionId !== attempt.questionId),
                 attempt,
               ]);
-              setQuestionDrafts((previous) => {
+              setQuestionDrafts((previous: Record<string, QuestionDraft>) => {
                 const next = { ...previous };
                 delete next[attempt.questionId];
                 return next;

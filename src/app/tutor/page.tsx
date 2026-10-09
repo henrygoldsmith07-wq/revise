@@ -13,6 +13,7 @@ import {
   suggestTutorStarters,
   type TutorLearnerContext,
 } from "@/domain/tutor-grounding";
+import { todayLocal } from "@/domain/local-date";
 import type { Mistake, Topic } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import type { TutorChatMessage } from "@/ai/types";
@@ -183,12 +184,13 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
   const recall = recallMastery.find((row) => row.topicId === topic.id) ?? null;
   const application = applicationMastery.find((row) => row.topicId === topic.id) ?? null;
   const examDays = useMemo(() => {
+    const today = Date.parse(`${todayLocal()}T00:00:00Z`);
     const dates = examDates
       .filter((e) => e.subjectId === topic.subjectId)
       .map((e) => Date.parse(`${e.date}T00:00:00Z`))
-      .filter((t) => Number.isFinite(t) && t >= Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+      .filter((t) => Number.isFinite(t) && t >= today);
     if (!dates.length) return null;
-    return Math.round((Math.min(...dates) - Date.now()) / 86_400_000);
+    return Math.round((Math.min(...dates) - today) / 86_400_000);
   }, [examDates, topic.subjectId]);
   const learner: TutorLearnerContext = useMemo(
     () =>

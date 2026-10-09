@@ -53,8 +53,6 @@ const PRIMARY_NAV: NavItem[] = [
   { href: "/readiness", label: "Progress", Icon: ProgressIcon, primary: true, match: ["/schedule", "/twin"] },
   { href: "/library", label: "Library", Icon: LibraryIcon, primary: true, match: ["/shared"] },
 ];
-];
-
 // Tools: manual modes, one tap away, collapsed by default, never competing with the loop.
 const TOOLS_NAV: NavItem[] = [
   { href: "/review", label: "Review", Icon: ReviewIcon },

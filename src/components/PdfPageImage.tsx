@@ -12,26 +12,32 @@ export function PdfPageImage({ bytes, page, className }: { bytes: ArrayBuffer; p
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
     void (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
+        // Cleared inside the async path (once a render actually succeeds), not
+        // synchronously in the effect body, so a page change re-renders rather
+        // than cascading.
+        if (!cancelled) setError(null);
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const doc = await pdfjs.getDocument({ data: bytes.slice(0) }).promise;
-        if (cancelled) { await doc.destroy().catch(() => undefined); return; }
+        const loadingTask = pdfjs.getDocument({ data: bytes.slice(0) });
+        const doc = await loadingTask.promise;
+        if (cancelled) { await loadingTask.destroy().catch(() => undefined); return; }
         const safePage = Math.min(Math.max(1, page), doc.numPages);
         const pdfPage = await doc.getPage(safePage);
-        if (cancelled) { await doc.destroy().catch(() => undefined); return; }
+        if (cancelled) { await loadingTask.destroy().catch(() => undefined); return; }
         const viewport = pdfPage.getViewport({ scale: 1.0 });
         const canvas = canvasRef.current;
         if (canvas) {
           canvas.width = Math.ceil(viewport.width);
           canvas.height = Math.ceil(viewport.height);
           const ctx = canvas.getContext("2d");
-          if (ctx) await pdfPage.render({ canvasContext: ctx, viewport }).promise;
+          // The canvas element itself is part of the render contract in this
+          // pdfjs version: it sizes the backing store.
+          if (ctx) await pdfPage.render({ canvas, canvasContext: ctx, viewport }).promise;
         }
         pdfPage.cleanup();
-        await doc.destroy().catch(() => undefined);
+        await loadingTask.destroy().catch(() => undefined);
       } catch {
         if (!cancelled) setError("That page could not be rendered.");
       }

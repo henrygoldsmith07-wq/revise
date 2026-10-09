@@ -11,7 +11,7 @@
 
 import { trustedAssessmentContent } from "./content-trust";
 import { isFlagship } from "./flagship";
-import { OFFICIAL_PAPER_TRUST_TIER, officialPaperQuestionEligible, type OfficialPaperManifest } from "./official-papers";
+import { officialPaperQuestionEligible, type OfficialPaperManifest } from "./official-papers";
 import { MIN_PROVABLE_QUESTIONS } from "./supply";
 import type { Id, Question } from "./types";
 

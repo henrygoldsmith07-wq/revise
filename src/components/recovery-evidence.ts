@@ -63,7 +63,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
       mistakes, recovery, patterns, unseenByTopic, supplyByTopic, daysToExam: days, topicTitle: (id: string) => getTopic(id)?.title ?? id, effectiveness,
       repairWeight: (kind: InterventionKind) => estimateEffectiveness(effectiveness, { kind }).weight,
     };
-  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.questions, store.settings.subjectIds]);
+  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.questions, store.settings.subjectIds, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
 }
 
 /** The single ranked plan Today, the command centre, the diagnostic and mission routes all read. */

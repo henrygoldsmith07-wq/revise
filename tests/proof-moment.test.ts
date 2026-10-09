@@ -52,9 +52,12 @@ describe("proof moment UI", () => {
   });
 
   it("respects reduced motion from the OS and from the in-app setting", () => {
-    const css = read("src/app/globals.css");
+    // Normalise line endings: git checks the file out with CRLF on Windows,
+    // and these assertions describe the CSS text rather than its line endings.
+    const css = read("src/app/globals.css").replace(/\r\n/g, "\n");
     expect(css).toContain("@keyframes proof-to");
     const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce) {\n  .proof-moment__from"));
+    expect(css.indexOf("@media (prefers-reduced-motion: reduce) {\n  .proof-moment__from")).toBeGreaterThan(-1);
     expect(reduced).toContain(".proof-moment__from { display: none; }");
     expect(css).toContain(":root.reduce-motion .proof-moment__from { display: none; }");
   });
