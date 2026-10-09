@@ -13,6 +13,7 @@ import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { ExamReadiness } from "@/domain/exam-readiness";
 import { buildProofLedger, type ProofLedger } from "@/domain/proof-of-improvement";
+import type { OfficialPaperContext } from "@/domain/official-papers";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type {
   Attempt,
@@ -76,11 +77,13 @@ export function useRevisionSessions(input: {
   applicationMastery: ApplicationMasteryRow[];
   readiness: ExamReadiness[];
   interventionOutcomes: InterventionOutcomeRecord[];
+  /** Official-paper tier context; absent means the tier is off (default). */
+  officialPaper?: OfficialPaperContext;
 }): RevisionSessions {
   const {
     userId, recommendations, topics, cards, reviewLogs, questions, attempts,
     mistakes, mastery, exams, subjectIds, recallMastery, applicationMastery,
-    readiness, interventionOutcomes,
+    readiness, interventionOutcomes, officialPaper,
   } = input;
   const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
   const [revisionTwin, setRevisionTwin] = useState<RevisionTwinState | null>(null);
@@ -165,8 +168,8 @@ export function useRevisionSessions(input: {
   // exact value so the hero cannot drift from the route it opens. Readiness
   // gates adaptive stopping, so the optimiser reads the computed rows.
   const proofLedger = useMemo(
-    () => buildProofLedger({ topics, attempts, questions, reviewLogs }),
-    [topics, attempts, questions, reviewLogs],
+    () => buildProofLedger({ topics, attempts, questions, reviewLogs, officialPaper }),
+    [topics, attempts, questions, reviewLogs, officialPaper],
   );
 
   const adaptiveSession = useMemo(() => {

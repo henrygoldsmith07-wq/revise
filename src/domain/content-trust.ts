@@ -3,6 +3,17 @@ import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import { localDayOfInstant } from "./local-date";
 import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { HumanVerificationRecord, Id, Question } from "./types";
+import { OFFICIAL_PAPER_TRUST_TIER, type OfficialPaperTrustTier } from "./official-papers";
+
+/**
+ * Official-paper trust tier marker. Re-exported here so the tier is explicit
+ * in the trust module, but it is deliberately NOT part of any trust
+ * predicate below: trustedAssessmentContent, humanVerifiedWjecQuestion and
+ * the review gates never consult it. It counts toward proof only through the
+ * dedicated officialPaperProofEligible gate, per learner, with the feature
+ * flag on, for a paper not previously attempted.
+ */
+export const OfficialPaperTier: OfficialPaperTrustTier = OFFICIAL_PAPER_TRUST_TIER;
 
 export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
 export const REVIEWED_WJEC_SUBJECT_IDS = [PHYSICS_SUBJECT_ID, "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry"] as const;

@@ -45,6 +45,8 @@ export interface Paper {
   sittingId?: Id;
   sourceUrl?: string;
   sourceDigest?: string;
+  /** Official-paper manifest id when the uploaded file bytes matched; null/undefined otherwise. */
+  officialPaperId?: string | null;
   provenanceStatus?: "pending" | "verified" | "rejected";
   provenanceVerifiedBy?: Id;
   provenanceVerifiedAt?: IsoInstant;
@@ -126,6 +128,21 @@ export interface UserSettings {
   aiConsentUpdatedAt?: string;
   /** Whether Pulse may read this account's study history. Off by default. */
   pulseEnabled: boolean;
+  /**
+   * Whether anonymised outcome events may be sent for an agreed learner pilot.
+   * Off by default; switched on in Settings → Data with plain-language consent.
+   * Counts and coarse days only — never answers, marks detail or free text.
+   * Revoking stops the next send immediately.
+   */
+  pilotTelemetry?: boolean;
+  /**
+   * Official-paper trust tier (feature flag, default off). Requires the
+   * separate WJEC-terms confirmation below: the owner must confirm the WJEC
+   * terms permit this use before enabling.
+   */
+  officialPaperTrust?: boolean;
+  /** Owner confirmation that the WJEC terms permit official-paper matching. */
+  officialPaperTermsConfirmed?: boolean;
   /**
    * Lab routes (benchmarks, teacher, corpora, case study) stay off the student
    * nav until this is switched on in Settings.

@@ -56,6 +56,7 @@
     "wjec:review:pull": "node scripts/pull-runtime-review-log.mjs",
     "wjec:review:gates": "node scripts/wjec-review.mjs check",
     "wjec:quality:report": "node scripts/report-wjec-quality.mjs",
+    "wjec:papers:fingerprint": "node scripts/wjec-papers-fingerprint.mjs",
     "wjec:campaign": "node scripts/wjec-review.mjs campaign",
     "wjec:readiness": "node scripts/wjec-review.mjs readiness",
     "product:quality": "node scripts/report-product-quality.mjs",

@@ -19,6 +19,7 @@ import {
   type CapabilityState,
 } from "./capability-mastery";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
+import type { OfficialPaperContext } from "./official-papers";
 import { localDayOfInstant } from "./local-date";
 import { exposureWeights } from "./evidence-weights";
 import { buildTopicValue, type TopicValue } from "./marks-value";
@@ -99,19 +100,21 @@ export function trustedAdaptiveAttempt(
   questionById: ReadonlyMap<Id, Question>,
   allAttempts: readonly Attempt[],
   questions: readonly Question[],
+  officialPaper?: OfficialPaperContext,
 ): boolean {
   const question = questionById.get(attempt.questionId);
   if (!question) return !requiresWjecContentReview(attempt.subjectId) && trustworthyAttempt(attempt);
-  return trustedAssessmentAttempt(attempt, question, allAttempts, questions);
+  return trustedAssessmentAttempt(attempt, question, allAttempts, questions, officialPaper);
 }
 
 export function trustedAdaptiveEvidence(input: {
   attempts: readonly Attempt[];
   mistakes: readonly Mistake[];
   questions: readonly Question[];
+  officialPaper?: OfficialPaperContext;
 }): { attempts: Attempt[]; mistakes: Mistake[] } {
   const questionById = new Map(input.questions.map((question) => [question.id, question] as const));
-  const attempts = input.attempts.filter((attempt) => trustedAdaptiveAttempt(attempt, questionById, input.attempts, input.questions));
+  const attempts = input.attempts.filter((attempt) => trustedAdaptiveAttempt(attempt, questionById, input.attempts, input.questions, input.officialPaper));
   const mistakes = input.mistakes.filter((mistake) => trustedAssessmentMistake(mistake, input.questions, input.attempts));
   return { attempts, mistakes };
 }

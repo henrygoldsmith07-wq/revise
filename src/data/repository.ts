@@ -131,6 +131,11 @@ export function defaultSettings(userId: Id): UserSettings {
     aiEnabled: false,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
+    // Pilot telemetry never leaves the device until it is switched on.
+    pilotTelemetry: false,
+    // Official-paper matching stays off until the owner confirms the terms.
+    officialPaperTrust: false,
+    officialPaperTermsConfirmed: false,
     labMode: false,
     lastLessonSubject: "",
     updatedAt: new Date().toISOString(),
@@ -221,6 +226,9 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
         accessibility: { ...fallback.accessibility, ...stored.accessibility },
         labMode: stored.labMode === true,
         pulseEnabled: stored.pulseEnabled === true,
+        pilotTelemetry: stored.pilotTelemetry === true,
+        officialPaperTrust: stored.officialPaperTrust === true,
+        officialPaperTermsConfirmed: stored.officialPaperTermsConfirmed === true,
         // The historic default stored `aiEnabled: true` for every profile even
         // though no learner chose it. Only an explicit opt-in at the current
         // consent wording counts.

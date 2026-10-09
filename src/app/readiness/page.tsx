@@ -25,6 +25,7 @@ import {
 } from "@/components/AssessmentPanels";
 import { ButtonLink, Panel } from "@/components/ui";
 import { ReadinessAutopilot } from "@/components/ReadinessAutopilot";
+import { MarksLedger } from "@/components/MarksLedger";
 
 // Progress answers, in this order: how are my exams going and what do I do
 // about it (Exam Command Centre), what has been proven to work (improvement
@@ -74,6 +75,8 @@ export default function ReadinessPage() {
         <RecommendationAuditPanel />
 
         <MarksAtRiskPanel />
+
+        <MarksLedger />
 
         <MistakePatternsPanel />
 

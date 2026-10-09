@@ -19,7 +19,9 @@
 // ---------------------------------------------------------------------------
 
 import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
+import { trustedAssessmentContent } from "./content-trust";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
+import { officialPaperQuestionEligible, type OfficialPaperContext } from "./official-papers";
 import { isShallowReskin } from "./reskin";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
@@ -81,6 +83,14 @@ export interface MarkRecoveryInput {
   attempts: readonly Attempt[];
   questions: readonly Question[];
   now?: Date;
+  /**
+   * Official-paper tier context. Absent or disabled by default: byte-identical
+   * behaviour to before. When enabled, attempts on learner-confirmed official
+   * paper matches can satisfy the trust half of proof for that learner only;
+   * independent/unseen/delayed rules still apply, and shared coverage metrics
+   * never see this tier.
+   */
+  officialPaper?: OfficialPaperContext;
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -96,6 +106,7 @@ export function classifyMistake(
   attempts: readonly Attempt[],
   questionsById: ReadonlyMap<Id, Question>,
   now: Date = new Date(),
+  officialPaper?: OfficialPaperContext,
 ): MistakeRecovery {
   const base = { mistakeId: mistake.id, topicId: mistake.topicId, subjectId: mistake.subjectId, marks: mistake.marksLost };
   const sourceQuestion = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
@@ -104,7 +115,13 @@ export function classifyMistake(
     .filter((a) => a.createdAt > mistake.createdAt && a.topicIds.includes(mistake.topicId) && trustworthyAttempt(a))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const bank = [...questionsById.values()];
-  const verified = (a: Attempt) => trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank);
+  const verified = (a: Attempt) => trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank, officialPaper);
+  // trustedAssessmentMistake defaults to reviewer trust; the official-paper
+  // tier ORs in only at the question level, per learner, with the flag on.
+  // With no context the second disjunct is false, so behaviour is unchanged.
+  const trustedQuestion = (q: Question): boolean =>
+    trustedAssessmentContent(q) ||
+    (officialPaper?.enabled === true && officialPaperQuestionEligible(q, officialPaper.manifest, true));
   // Revision "targets" a loss only when it is a retest of it or a mission attempt aimed at it. A later
   // attempt that merely happens to be on the same topic, including the one that lost other marks, is not.
   const aimed = after.filter((a) => a.retestMistakeId === mistake.id || a.mission?.sourceMistakeIds.includes(mistake.id));
@@ -119,7 +136,7 @@ export function classifyMistake(
   };
   const independentDifferent = successes.filter((a) => independentAttempt(a) && different(a));
   const provable = independentDifferent.filter(a => verified(a) &&
-    trustedAssessmentMistake(mistake, bank, attempts) &&
+    trustedAssessmentMistake(mistake, bank, attempts, trustedQuestion) &&
     unseenQuestion(questionsById.get(a.questionId)!, attempts.filter(prior => prior.userId === a.userId && prior.id !== a.id && prior.createdAt <= a.createdAt), bank));
   if (!first) {
     return { ...base, ...(targetedAt ? { targetedAt } : {}), state: targeted ? "targeted" : "open", reason: targeted
@@ -192,7 +209,7 @@ export function buildMarkRecovery(input: MarkRecoveryInput): MarkRecovery {
     .filter((m) => m.marksLost > 0)
     .map((m): MistakeRecovery => {
       const paperId = (m.attemptId ? attemptById.get(m.attemptId)?.paperId ?? attemptById.get(m.attemptId)?.paperSpecId : undefined);
-      const recovery = classifyMistake(m, input.attempts, questionsById, now);
+      const recovery = classifyMistake(m, input.attempts, questionsById, now, input.officialPaper);
       return paperId ? { ...recovery, paperId } : recovery;
     });
   const trusted = (subset: readonly MistakeRecovery[]) => {

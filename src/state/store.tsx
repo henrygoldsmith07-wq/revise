@@ -9,6 +9,7 @@ import { allTopics } from "@/domain/curriculum";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content";
 
 import type { GradePrediction } from "@/domain/grades";
+import { officialPaperContextFromSettings } from "@/domain/official-papers";
 
 import {
   evaluateMistakeRetest,
@@ -667,6 +668,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     applicationMastery,
     readiness: examReadiness,
     interventionOutcomes,
+    officialPaper: officialPaperContextFromSettings({
+      officialPaperTrust: snapshot?.settings.officialPaperTrust,
+      officialPaperTermsConfirmed: snapshot?.settings.officialPaperTermsConfirmed,
+    }),
   });
   const previewPaper = useCallback(
     (subjectId: Id, paperSpecId: Id, questionIds: Id[]): PaperSimulation | null =>

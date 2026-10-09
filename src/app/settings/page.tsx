@@ -45,6 +45,7 @@ import { ACCOUNT_DELETION_CONFIRMATION, ACCOUNT_DELETION_EXPLANATION, LOCAL_ERAS
 import { recordAiConsentChoice } from "@/ai/consent-client";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
+import { clearPilotQueue, flushPilotEvents, pendingPilotEvents } from "@/lib/pilot-telemetry";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -460,6 +461,41 @@ export default function SettingsPage() {
         </Panel>
       </section>
 
+      <section>
+        <SectionHeading title="Official papers" hint="Off by default. Your uploads stay practice-only until you switch this on." />
+        <Panel className="space-y-3">
+          <p className="text-xs text-ink2">
+            When on, an uploaded paper whose file matches an official WJEC paper can have its
+            questions confirmed against the paper, and those confirmations can count toward proof
+            for you only. This never affects shared trust, coverage or any other learner. Only
+            switch this on if the WJEC terms permit your use of the paper.
+          </p>
+          <label className="flex items-start gap-2 text-xs text-ink2">
+            <input
+              type="checkbox"
+              checked={settings.officialPaperTermsConfirmed === true}
+              onChange={(e) => void store.updateSettings({
+                officialPaperTermsConfirmed: e.target.checked,
+                ...(e.target.checked ? {} : { officialPaperTrust: false }),
+              })}
+              className="mt-0.5"
+            />
+            <span>I confirm the WJEC terms permit my use of official papers in this way.</span>
+          </label>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-ink">Count confirmed official-paper matches toward proof</p>
+            <Button
+              size="sm"
+              variant={settings.officialPaperTrust ? "primary" : "secondary"}
+              aria-pressed={!!settings.officialPaperTrust}
+              disabled={settings.officialPaperTermsConfirmed !== true}
+              onClick={() => void store.updateSettings({ officialPaperTrust: !settings.officialPaperTrust })}
+            >
+              {settings.officialPaperTrust ? "On" : "Off"}
+            </Button>
+          </div>
+        </Panel>
+      </section>
 
       <section>
         <SectionHeading title="Privacy" hint="What leaves this device, and what never does." />
@@ -835,6 +871,62 @@ function FailedSyncRecovery() {
   );
 }
 
+function PilotTelemetryToggle() {
+  const store = usePageStore();
+  const enabled = store.settings.pilotTelemetry === true;
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  useEffect(() => {
+    setPending(pendingPilotEvents(store.userId));
+  }, [store.userId, enabled]);
+
+  async function choose(next: boolean) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await store.updateSettings({ pilotTelemetry: next });
+      if (!next) {
+        // Opt-out takes effect immediately: nothing queued is sent afterwards.
+        clearPilotQueue(store.userId);
+        setPending(0);
+        setMessage("Pilot telemetry is off. Queued events were discarded unsent.");
+      } else {
+        const result = await flushPilotEvents(store.userId);
+        setPending(result.kept);
+        setMessage(
+          result.sent > 0
+            ? `Pilot telemetry is on. ${result.sent} queued event${result.sent === 1 ? "" : "s"} sent.`
+            : "Pilot telemetry is on. Events will be sent when you are online and signed in.",
+        );
+      }
+    } catch {
+      setMessage("That change could not be saved. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      <p className="text-sm text-ink2">
+        For an agreed learner pilot. When on, Revise sends anonymous outcome counts — diagnostic
+        completions, started recommendations, recovered marks, completed proofs, time from first
+        loss to proof, and proof blocked by supply. Each event carries a rotating random ID (fresh
+        daily), a subject name and numbers only: no answers, no marks detail, no free text. Signed-in
+        learners only; nothing is readable back by any device.
+        {pending > 0 ? ` ${pending} event${pending === 1 ? "" : "s"} waiting on this device.` : ""}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant={enabled ? "primary" : "secondary"} aria-pressed={enabled} disabled={busy} onClick={() => void choose(!enabled)}>
+          {enabled ? "On" : "Off"}
+        </Button>
+      </div>
+      {message ? <p className="text-xs text-ink2" role="status">{message}</p> : null}
+    </div>
+  );
+}
+
 function DataControls() {
   const store = usePageStore();
   const filename = portabilityFilename(store.userId);
@@ -886,6 +978,10 @@ function DataControls() {
               setRestoreMessage("Pilot evidence saved locally. Sharing is your choice.");
             })().catch(error => setRestoreMessage(error instanceof Error ? error.message : "Pilot export failed."));
           }}>Export pilot evidence</Button>
+        </details>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-ink2">Pilot telemetry (anonymous outcome events)</summary>
+          <PilotTelemetryToggle />
         </details>
         <details>
           <summary className="cursor-pointer text-sm font-medium text-ink2">Disputed marks ({markingFlags.length})</summary>

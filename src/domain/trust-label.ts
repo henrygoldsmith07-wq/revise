@@ -11,6 +11,7 @@
 
 import { trustedAssessmentContent } from "./content-trust";
 import { isFlagship } from "./flagship";
+import { OFFICIAL_PAPER_TRUST_TIER, officialPaperQuestionEligible, type OfficialPaperManifest } from "./official-papers";
 import { MIN_PROVABLE_QUESTIONS } from "./supply";
 import type { Id, Question } from "./types";
 
@@ -65,6 +66,21 @@ export const provenanceLabel = (question: Question): string =>
 /** Trusted + unseen questions can carry proof; everything else is practice only. */
 export function isProofCapable(question: Question, seenQuestionIds: ReadonlySet<Id>): boolean {
   return trustedAssessmentContent(question) && !seenQuestionIds.has(question.id);
+}
+
+/**
+ * Official-paper tier label for one question. Distinct from every TrustTier:
+ * an official-paper question still reads as unverified/insufficient in the
+ * normal summary, and this sentence appears only where the learner confirmed
+ * the match. Never merged with the two-reviewer tier in any metric.
+ */
+export function officialPaperLabel(
+  question: Question,
+  manifest: OfficialPaperManifest,
+  enabled: boolean,
+): string | null {
+  if (!officialPaperQuestionEligible(question, manifest, enabled)) return null;
+  return "Official paper · confirmed match, this learner only — counts toward proof here, never in shared coverage";
 }
 
 /** Topic-level supply, as produced by unseenSupplyByTopic or the supply audit. */

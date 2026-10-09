@@ -273,3 +273,16 @@ evidence.
 
 No automated check is a human review. Authoring new questions where the
 priorities report says "needs new or revised" is still manual work.
+
+## Official-paper tier (separate from review)
+
+A learner-confirmed official WJEC paper match (`src/domain/official-papers.ts`)
+is a distinct, per-learner tier — not a review state. It never appears in the
+audit log or ledger, never counts in supply/coverage metrics, and never makes
+`trustedAssessmentContent` true. It substitutes only for reviewer trust inside
+the two proof gates, and only with the settings flag plus WJEC-terms
+confirmation both on, for a paper the learner had not previously attempted.
+The manifest (`src/content/official-papers/manifest.json`) holds official URLs
+plus SHA-256 digests only — never paper PDFs or question text — and ships
+empty until digests are verified from WJEC's site. Fingerprint a file with
+`npm run wjec:papers:fingerprint`.

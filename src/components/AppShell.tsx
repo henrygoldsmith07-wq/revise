@@ -27,6 +27,7 @@ import {
 } from "./icons";
 import type { LucideIcon } from "./icons";
 import { SearchOverlay } from "./SearchOverlay";
+import { PilotOutcomesSync } from "./PilotOutcomesSync";
 import { useShortcuts } from "./shortcuts";
 import { Onboarding } from "./Onboarding";
 
@@ -308,6 +309,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
 
       {searchOpen ? <SearchOverlay onClose={() => setSearchOpen(false)} /> : null}
+      <PilotOutcomesSync />
     </div>
   );
 }

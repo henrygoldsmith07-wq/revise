@@ -15,6 +15,7 @@ import type { RevisionAction, RevisionPlan } from "@/domain/revision-engine";
 import { ButtonLink, Pill } from "./ui";
 import { ForwardIcon, TodayIcon } from "./icons";
 import { captureProductEvent } from "@/lib/product-telemetry";
+import { flushPilotEvents, recordPilotEvent } from "@/lib/pilot-telemetry";
 
 const TONE = { "not-checked": "neutral", "needs-work": "danger", improving: "accent", "awaiting-proof": "review", proven: "success", regressed: "danger" } as const;
 
@@ -32,16 +33,23 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
   const waiting = plan.deferred.filter((d) => /Waiting for the delay/.test(d.reason)).slice(0, 2);
   const e = action.explanation;
   const focus = describeFocus(action, subject);
-  const { settings, updateSettings, recordFunnel } = useStoreFields("settings", "updateSettings", "recordFunnel");
+  const { settings, updateSettings, recordFunnel, userId } = useStoreFields("settings", "updateSettings", "recordFunnel", "userId");
   const blockedTopic = plan.authoringNeeds.find((n) => action.topicIds.includes(n.topicId))?.topicId;
   const strength = evidenceStrengthLine(action);
   const isProof = action.type === "proof-check";
+  const pilotOn = settings.pilotTelemetry === true;
   useEffect(() => {
     void recordFunnel("next_action_shown", action.type);
     void recordFunnel("recommendation_displayed", action.id);
     captureProductEvent("recommendation.shown", { kind: action.type, minutes: Math.ceil(action.minutes) });
-    if (blockedTopic && action.type === "evidence-gap") void recordFunnel("proof_blocked_by_supply", blockedTopic);
-  }, [action.id, action.type, blockedTopic, recordFunnel]);
+    if (blockedTopic && action.type === "evidence-gap") {
+      void recordFunnel("proof_blocked_by_supply", blockedTopic);
+      if (pilotOn && userId) {
+        recordPilotEvent(userId, { event: "proof.blocked", subjectId: action.subjectId });
+        void flushPilotEvents(userId);
+      }
+    }
+  }, [action.id, action.type, action.subjectId, blockedTopic, pilotOn, recordFunnel, userId]);
   return (
     <section aria-label="What to do now" className="grid gap-4">
       <div className="min-w-0">
@@ -68,6 +76,10 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
           onClick={() => {
             void recordFunnel("recommendation_accepted", action.id);
             captureProductEvent("recommendation.accepted", { kind: action.type, minutes: Math.ceil(action.minutes) });
+            if (pilotOn && userId) {
+              recordPilotEvent(userId, { event: "recommendation.started", subjectId: action.subjectId, minutes: Math.ceil(action.minutes) });
+              void flushPilotEvents(userId);
+            }
           }}
         >
           {isProof ? "Start proof check" : focus.cta.label} <ForwardIcon size={17} aria-hidden />

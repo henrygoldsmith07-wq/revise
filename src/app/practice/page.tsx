@@ -29,6 +29,7 @@ import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
 import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
 import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionMode";
 import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
+import { MarksLedger } from "@/components/MarksLedger";
 import { PaperAutopsyView, PaperRepairMode, RecoverMarksMode } from "@/components/RecoveryModes";
 import { RichText } from "@/components/RichText";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
@@ -610,6 +611,8 @@ function Practice() {
       ) : null}
 
       <RecoverMarksCard />
+
+      <MarksLedger />
 
       <QuickSessionPicker onSelect={setQuickMinutes} />
 

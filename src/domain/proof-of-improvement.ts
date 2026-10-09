@@ -25,6 +25,7 @@
 // ---------------------------------------------------------------------------
 
 import { trustedAdaptiveEvidence } from "./adaptive-scoring";
+import type { OfficialPaperContext } from "./official-papers";
 import { exposureWeights } from "./evidence-weights";
 import { betaInterval } from "./marks-value";
 import { topicShares } from "./topic-weight";
@@ -113,6 +114,8 @@ export interface ProofInput {
   questions: readonly Question[];
   reviewLogs?: readonly ReviewLog[];
   now?: Date;
+  /** Official-paper tier context; absent/disabled by default (see mark-recovery.ts). */
+  officialPaper?: OfficialPaperContext;
 }
 
 interface Observation {
@@ -147,7 +150,7 @@ export function buildProofLedger(input: ProofInput): ProofLedger {
   const nowMs = (input.now ?? new Date()).getTime();
   const shares = topicShares(input.topics);
   const exposure = exposureWeights(input.attempts);
-  const trusted = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: [], questions: [...input.questions] }).attempts;
+  const trusted = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: [], questions: [...input.questions], officialPaper: input.officialPaper }).attempts;
 
   const byTopic = new Map<Id, Attempt[]>();
   for (const attempt of trusted) {

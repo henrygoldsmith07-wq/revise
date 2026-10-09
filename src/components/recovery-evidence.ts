@@ -12,6 +12,7 @@ import type { InterventionKind } from "@/domain/intervention-ranking";
 import { todayLocal } from "@/domain/local-date";
 import { planColdStart } from "@/domain/cold-start";
 import { buildMarkRecovery, type MarkRecovery } from "@/domain/mark-recovery";
+import { officialPaperContextFromSettings } from "@/domain/official-papers";
 import { buildMistakePatterns, type MistakePattern } from "@/domain/mistake-patterns";
 import { daysToNearestExam, rankRevisionActions, type RevisionPlan } from "@/domain/revision-engine";
 import { isDue } from "@/domain/scheduling";
@@ -40,7 +41,16 @@ export function useRecoveryEvidence(): RecoveryEvidence {
     const subjects = new Set(store.settings.subjectIds);
     const mistakes = store.mistakes.filter((m) => subjects.has(m.subjectId));
     const now = new Date();
-    const recovery = buildMarkRecovery({ mistakes, attempts: store.attempts, questions: store.questions, now });
+    const recovery = buildMarkRecovery({
+      mistakes,
+      attempts: store.attempts,
+      questions: store.questions,
+      now,
+      officialPaper: officialPaperContextFromSettings({
+        officialPaperTrust: store.settings.officialPaperTrust,
+        officialPaperTermsConfirmed: store.settings.officialPaperTermsConfirmed,
+      }),
+    });
     const patterns = buildMistakePatterns({ mistakes, attempts: store.attempts, questions: store.questions });
     const supplyByTopic = unseenSupplyByTopic(new Set(mistakes.map((m) => m.topicId)), store.questions, store.attempts);
     const unseenByTopic = Object.fromEntries(Object.entries(supplyByTopic).map(([t, s]) => [t, s.provable]));

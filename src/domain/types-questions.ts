@@ -4,6 +4,7 @@
 // context for ownership; every name is re-exported from "@/domain/types".
 import type { Id, IsoDate, IsoInstant } from "./types-base";
 import type { AoCode, VerificationStatus, ContentSource, HumanVerificationRecord, LicensedSource, PaperQuestionProvenance } from "./types-curriculum";
+import type { OfficialPaperConfirmation } from "./official-papers";
 
 // --- questions & marking ---------------------------------------------------
 
@@ -492,6 +493,15 @@ export interface Question {
   paperQuestionNumber?: string;
   /** Authenticated provenance required for trusted WJEC past-paper evidence. */
   paperProvenance?: PaperQuestionProvenance;
+  /**
+   * Official-paper tier confirmation, set only by the learner after matching
+   * an uploaded paper against the official manifest and confirming this
+   * question against it. Distinct from human review: never feeds
+   * trustedAssessmentContent, coverage or supply metrics. Counts toward proof
+   * only for the confirming learner, only with the feature flag on, and only
+   * for a paper not previously attempted (see official-papers.ts).
+   */
+  officialPaper?: OfficialPaperConfirmation;
   createdAt: IsoInstant;
   learning?: LearningQuestionMetadata;
   /** Machine quality-gate result for AI-generated/extracted content; never a review. */

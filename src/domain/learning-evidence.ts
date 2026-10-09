@@ -4,6 +4,7 @@ import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import { validAttestationInstant, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import { isReasoningTransfer, reasoningNovelty } from "./reasoning-signature";
 import { isShallowReskin } from "./reskin";
+import { officialPaperProofEligible, type OfficialPaperContext } from "./official-papers";
 
 function normaliseAnswer(text: string): string {
   return (text ?? "").toLowerCase().replace(/[−–]/g, "-").replace(/[^a-z0-9.+\-*/= ]/g, " ").replace(/\s+/g, " ").trim();
@@ -80,14 +81,27 @@ export function humanReviewedPaperAttempt(attempt: Attempt): boolean {
  * the attempt, the content must be trusted, and review-gated WJEC paper attempts must
  * additionally pass the authenticated provenance + human-marking check. This
  * keeps planners and analytics from inventing their own weaker trust rules.
+ *
+ * The optional officialPaper override substitutes ONLY for reviewer trust,
+ * and only when the learner confirmed an official-paper match with the
+ * feature flag on, for a paper not previously attempted. Existing predicates
+ * are never weakened: with no override the result is byte-identical to
+ * before, and coverage/supply metrics never consult this path.
  */
 export function trustedAssessmentAttempt(
   attempt: Attempt,
   question: Question | undefined,
   history: readonly Attempt[],
   questions: readonly Question[],
+  officialPaper?: OfficialPaperContext,
 ): boolean {
-  if (!question || !trustworthyAttempt(attempt) || question.subjectId !== attempt.subjectId || !trustedAssessmentContent(question)) return false;
+  if (!question || !trustworthyAttempt(attempt) || question.subjectId !== attempt.subjectId) return false;
+  if (officialPaper?.enabled && officialPaperProofEligible({ question, attempt, history, manifest: officialPaper.manifest, enabled: true })) {
+    return requiresWjecContentReview(question.subjectId) && attempt.mode === "paper"
+      ? authenticPaperEvidence(attempt, question, history, questions)
+      : true;
+  }
+  if (!trustedAssessmentContent(question)) return false;
   return !requiresWjecContentReview(question.subjectId) || attempt.mode !== "paper" ||
     authenticPaperEvidence(attempt, question, history, questions);
 }

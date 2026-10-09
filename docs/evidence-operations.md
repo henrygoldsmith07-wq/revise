@@ -55,6 +55,21 @@ across exports. Answers, feedback, profile and account identity are removed.
 Pilot outcome reporting is separate from collecting answers for human marking.
 Pulse privacy is unchanged.
 
+Server-side pilot telemetry is a separate, equally opt-in channel: Settings →
+Data → "Pilot telemetry" (default off) sends anonymous outcome counts to
+`POST /api/pilot/events` (see `src/app/api/pilot/events/route.ts`), stored in
+the insert-only `product_events` table (migration
+`supabase/migrations/20261009000100_pilot_telemetry.sql`; no client read
+policy). Each event carries a device-minted pseudonym rotated daily, a closed
+event name (`diagnostic.completed`, `recommendation.started`,
+`marks.recovered`, `proof.completed`, `first-loss-to-proof`, `proof.blocked`),
+a subject id and integer counts only — no free text, no raw answers, coarse
+UTC day stamped by the server. Opting out stops the next send and discards the
+device queue unsent. The client bridge is `src/components/PilotOutcomesSync.tsx`
+(watermarked, so each proven mark reports once) plus precise moments in
+`QuickDiagnostic` (diagnostic completed) and `BestNextStep` (recommendation
+started, proof blocked by supply).
+
 Combine the `learners` arrays from consented exports into one private JSON file.
 Use only the latest export per alias; duplicate participants are rejected rather
 than inflating the denominator. Preserve dates and linkage. For multi-device
@@ -133,6 +148,18 @@ or independently adjudicated truth. Unresolved disagreements remain visible.
 the later target. Neither number alone licenses a marking-quality claim. Review
 coverage by subject, tariff, type and quality band; descriptive sample agreement
 does not demonstrate statistical equivalence with examiners.
+
+## Shared marking disputes
+
+"Dispute this mark" (`src/components/FlagThisMark.tsx`) always writes a local
+`markingFlags` row first: it never changes the mark, question trust or proof.
+Each dispute carries an explicit "Share with the Revise team" action
+(per-dispute opt-in, never a blanket toggle) that POSTs the single flag to
+`/api/marking-disputes` (see `src/app/api/marking-disputes/route.ts`),
+validated by zod and stored in the insert-only `marking_disputes` table (same
+migration as above; no client read policy). Shared rows keep the learner's
+reason, capped note, awarded/max and marker source so a human can review the
+marker; resolution happens outside the app, by a person.
 
 ## Claims and external verification
 

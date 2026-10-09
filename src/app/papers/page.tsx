@@ -27,6 +27,14 @@ import { GenerateMockPanel } from "@/components/GenerateMockPanel";
 import { TopicForecastPanel } from "@/components/TopicForecastPanel";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { ICON_SIZE, PhotoIcon, TimerIcon } from "@/components/icons";
+import { PdfPageImage } from "@/components/PdfPageImage";
+import { extractPdfText } from "@/lib/pdf";
+import {
+  BUNDLED_OFFICIAL_PAPER_MANIFEST,
+  findOfficialPaperMatch,
+  officialPaperContextEnabled,
+  type OfficialPaperManifestEntry,
+} from "@/domain/official-papers";
 
 // Past papers: upload, extract, map to topics, practise by topic, or sit a
 // paper under full exam conditions. Extraction needs a model; everything after
@@ -349,12 +357,60 @@ function Papers() {
 }
 
 function UploadPaper({ subjectId }: { subjectId: string }) {
-  const store = useStoreFields("addPaper", "addQuestions", "questions", "userId");
+  const store = useStoreFields("addPaper", "addQuestions", "questions", "userId", "settings");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [markScheme, setMarkScheme] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // Official-paper matching: file bytes → manifest digest. Kept only while
+  // this panel is open; nothing is uploaded anywhere to check it.
+  const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
+  const [pdfPages, setPdfPages] = useState(1);
+  const [pdfMatch, setPdfMatch] = useState<{ entry: OfficialPaperManifestEntry; digest: string } | { entry: null; digest: string } | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<Array<{ question: Question; ref: string; confirmed: boolean }> | null>(null);
+  const [pendingMatch, setPendingMatch] = useState<{ entry: OfficialPaperManifestEntry; digest: string } | null>(null);
+  const [pendingRejected, setPendingRejected] = useState(0);
+  const [pendingPaperId, setPendingPaperId] = useState<string | null>(null);
+  const [confirmPage, setConfirmPage] = useState(1);
+  const officialTierOn = officialPaperContextEnabled({
+    officialPaperTrust: store.settings.officialPaperTrust,
+    officialPaperTermsConfirmed: store.settings.officialPaperTermsConfirmed,
+  });
+
+  async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function uploadPdf(files: FileList) {
+    const file = files[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      setStatus("That PDF is over 15 MB — extract the pages you need instead.");
+      return;
+    }
+    setBusy("pdf");
+    setStatus(null);
+    try {
+      const bytes = await file.arrayBuffer();
+      const digest = await sha256Hex(bytes);
+      const entry = findOfficialPaperMatch(BUNDLED_OFFICIAL_PAPER_MANIFEST, digest);
+      const extracted = await extractPdfText(bytes);
+      setPdfBytes(bytes);
+      setPdfPages(Math.max(1, extracted.pages));
+      setPdfMatch(entry ? { entry, digest } : { entry: null, digest });
+      if (extracted.text) setText((t) => `${t}\n${extracted.text}`.trim());
+      else setStatus("That PDF has no readable text (likely a scan) — photograph the pages or paste the text instead.");
+      if (entry && entry.subjectId !== subjectId) {
+        setStatus(`That file matches ${entry.title}, which belongs to a different subject — switch subjects to use the official-paper tier.`);
+      }
+    } catch {
+      setStatus("That PDF could not be read. Paste the text instead.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function photograph(files: FileList, into: (value: string) => void) {
     setBusy("ocr");
@@ -436,36 +492,88 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
       );
     }
 
-    if (questions.length) await store.addQuestions(questions);
+    // Official-paper tier: when the uploaded file matched the manifest and the
+    // tier is on, hold the questions for per-question confirmation instead of
+    // saving immediately. Nothing here confers trust by itself.
+    const match = pdfMatch && pdfMatch.entry && officialTierOn && pdfMatch.entry.subjectId === subjectId ? pdfMatch : null;
+    if (match && match.entry && questions.length) {
+      setPendingConfirm(questions.map((question) => ({ question, ref: question.paperQuestionNumber ?? "", confirmed: false })));
+      setPendingMatch(match);
+      setPendingRejected(gated.rejected.length);
+      setPendingPaperId(paperId);
+      setConfirmPage(1);
+      setStatus(
+        `That file matches ${match.entry.title}. Confirm each question against the paper before saving — only confirmed questions can count toward proof for you.`,
+      );
+      return;
+    }
+
+    await saveExtracted({ paperId, questions, rejected: gated.rejected.length, match: null });
+
+    } catch {
+      setStatus("Extraction failed — the paper is still saved as text, so try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveExtracted(input: {
+    paperId: string;
+    questions: Question[];
+    rejected: number;
+    match: { entry: OfficialPaperManifestEntry; digest: string } | null;
+  }) {
+    const { questions } = input;
+    const confirmedAt = new Date().toISOString();
+    const withConfirmations = input.match
+      ? questions.map((question, index) => {
+          const row = pendingConfirm?.[index];
+          if (!row?.confirmed || !row.ref.trim()) return question;
+          return {
+            ...question,
+            officialPaper: {
+              manifestId: input.match!.entry.id,
+              digest: input.match!.digest,
+              confirmedAt,
+              questionRef: row.ref.trim().slice(0, 40),
+            },
+          };
+        })
+      : questions;
+    if (withConfirmations.length) await store.addQuestions(withConfirmations);
 
     const paper: Paper = {
-      id: paperId,
+      id: input.paperId,
       userId: store.userId,
       subjectId,
       title: title.trim() || `Paper uploaded ${new Date().toLocaleDateString("en-GB")}`,
       sourceText: text.slice(0, 60_000),
       markSchemeText: markScheme.slice(0, 60_000) || undefined,
-      totalMarks: questions.reduce((a, q) => a + q.totalMarks, 0),
-      questionIds: questions.map((q) => q.id),
-      status: questions.length ? "extracted" : "uploaded",
+      ...(input.match ? { sourceDigest: input.match.digest, officialPaperId: input.match.entry.id } : {}),
+      totalMarks: withConfirmations.reduce((a, q) => a + q.totalMarks, 0),
+      questionIds: withConfirmations.map((q) => q.id),
+      status: withConfirmations.length ? "extracted" : "uploaded",
       createdAt: new Date().toISOString(),
     };
     await store.addPaper(paper);
 
-    if (questions.length) {
+    if (withConfirmations.length) {
+      const confirmed = withConfirmations.filter((q) => q.officialPaper).length;
       setStatus(
-        `Extracted ${questions.length} questions worth ${paper.totalMarks} marks, mapped to topics${
-          gated.rejected.length ? ` (${gated.rejected.length} failed the quality checks and ${gated.rejected.length === 1 ? "was" : "were"} left out)` : ""
-        }. Extracted questions are not checked by a person — compare them with the original paper.`,
+        `Extracted ${withConfirmations.length} questions worth ${paper.totalMarks} marks, mapped to topics${
+          input.rejected ? ` (${input.rejected} failed the quality checks and ${input.rejected === 1 ? "was" : "were"} left out)` : ""
+        }. Extracted questions are not checked by a person — compare them with the original paper.${
+          input.match ? (confirmed ? ` ${confirmed} confirmed against ${input.match.entry.title}; only those can count toward proof for you.` : " None confirmed, so all stay practice-only.") : ""
+        }`,
       );
       setText("");
       setMarkScheme("");
       setTitle("");
-    }
-    } catch {
-      setStatus("Extraction failed — the paper is still saved as text, so try again.");
-    } finally {
-      setBusy(null);
+      setPdfBytes(null);
+      setPdfMatch(null);
+      setPendingConfirm(null);
+      setPendingMatch(null);
+      setPendingPaperId(null);
     }
   }
 
@@ -512,6 +620,19 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
             }}
           />
         </label>
+        <label className="btn btn-secondary text-sm cursor-pointer" title="Upload the official PDF to check it against the WJEC manifest">
+          <PhotoIcon size={ICON_SIZE.md} aria-hidden />
+          Upload official PDF
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            className="sr-only"
+            onChange={(e) => {
+              if (e.target.files?.length) void uploadPdf(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </label>
         <label className="btn btn-secondary text-sm cursor-pointer">
           <PhotoIcon size={ICON_SIZE.md} aria-hidden />
           Photograph mark scheme
@@ -528,9 +649,99 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
           />
         </label>
         <Button variant="primary" onClick={() => void extract()} disabled={busy !== null || !text.trim()}>
-          {busy === "extract" ? "Extracting…" : busy === "ocr" ? "Reading pages…" : "Extract questions"}
+          {busy === "extract" ? "Extracting…" : busy === "ocr" ? "Reading pages…" : busy === "pdf" ? "Reading PDF…" : "Extract questions"}
         </Button>
       </div>
+      {pdfMatch ? (
+        <p className="text-xs text-ink2" role="status">
+          {pdfMatch.entry
+            ? `Official paper recognised: ${pdfMatch.entry.title}. Extracted questions can be confirmed against it below.`
+            : "That file is not in the official-paper manifest, so everything from it stays practice-only."}
+        </p>
+      ) : null}
+      {pendingConfirm && pendingMatch && pendingPaperId ? (
+        <div className="rounded-xl border border-line bg-surface2/40 p-3 space-y-3" aria-label="Confirm extracted questions against the official paper">
+          <p className="text-sm font-semibold text-ink">Confirm against {pendingMatch.entry.title}</p>
+          <p className="text-xs text-ink2">
+            Tick each question you have checked against the paper, with its question number. Only
+            ticked questions with a reference can count toward proof for you — everything else
+            stays practice-only. This never affects shared trust or any other learner.
+          </p>
+          {pdfBytes ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" disabled={confirmPage <= 1} onClick={() => setConfirmPage((p) => p - 1)}>Previous page</Button>
+                <span className="text-xs text-ink3 tabular-nums">Page {confirmPage} of {pdfPages}</span>
+                <Button size="sm" variant="ghost" disabled={confirmPage >= pdfPages} onClick={() => setConfirmPage((p) => p + 1)}>Next page</Button>
+              </div>
+              <PdfPageImage bytes={pdfBytes} page={confirmPage} />
+            </div>
+          ) : null}
+          <ul className="space-y-2">
+            {pendingConfirm.map((row, index) => (
+              <li key={row.question.id} className="rounded-lg border border-line bg-surface p-3">
+                <p className="text-sm text-ink line-clamp-3">{row.question.stem}</p>
+                <details className="mt-1">
+                  <summary className="cursor-pointer select-none text-xs text-ink2">Mark scheme ({row.question.totalMarks} marks)</summary>
+                  <ul className="mt-1 space-y-0.5 text-xs text-ink2">
+                    {row.question.parts.flatMap((part) => part.markScheme).map((point, i) => (
+                      <li key={i}>• {point}</li>
+                    ))}
+                  </ul>
+                </details>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs text-ink2">
+                    <input
+                      type="checkbox"
+                      checked={row.confirmed}
+                      onChange={(e) => setPendingConfirm((prev) => prev ? prev.map((r, i) => i === index ? { ...r, confirmed: e.target.checked } : r) : prev)}
+                    />
+                    This matches the paper
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-ink2">
+                    Question ref
+                    <input
+                      value={row.ref}
+                      onChange={(e) => setPendingConfirm((prev) => prev ? prev.map((r, i) => i === index ? { ...r, ref: e.target.value } : r) : prev)}
+                      placeholder="Q3(a)"
+                      maxLength={40}
+                      className="field field-inline text-xs w-24"
+                      aria-label={`Paper reference for extracted question ${index + 1}`}
+                    />
+                  </label>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              onClick={() => {
+                if (!pendingPaperId) return;
+                const rows = pendingConfirm.filter((r) => r.confirmed && r.ref.trim());
+                void saveExtracted({ paperId: pendingPaperId, questions: pendingConfirm.map((r) => r.question), rejected: pendingRejected, match: rows.length ? pendingMatch : null });
+              }}
+            >
+              Save {pendingConfirm.filter((r) => r.confirmed && r.ref.trim()).length} confirmed of {pendingConfirm.length}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPendingConfirm(null);
+                setPendingMatch(null);
+                setPendingPaperId(null);
+                // Clearing the match too: the next Extract saves an ordinary
+                // practice-only paper instead of holding for confirmation again.
+                setPdfBytes(null);
+                setPdfMatch(null);
+                setStatus("Confirmation discarded. Extract again to save this as an ordinary practice-only paper.");
+              }}
+            >
+              Discard
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {status ? <p className="text-xs text-ink3">{status}</p> : null}
     </Panel>
   );

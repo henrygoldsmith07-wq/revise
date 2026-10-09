@@ -245,6 +245,7 @@ export function privacyDisclosure(cloudEnabled: boolean): string[] {
       "Local-only mode: your revision data is stored in this browser (IndexedDB). With AI off, nothing you write is sent to a server.",
       "No analytics, no cookies, no account required. Your cards, attempts, review logs and recorded assessment outcomes leave this device only if you export them, share them, or switch AI on.",
       ai,
+      "Pilot telemetry is off unless you switch it on in Settings → Data. It sends anonymous outcome counts only, and only when you are signed in.",
       "Use Settings → Data → Erase local data, or clear site data, to remove everything on this device. Nothing can be recovered after that.",
     ];
   }
@@ -252,6 +253,7 @@ export function privacyDisclosure(cloudEnabled: boolean): string[] {
     "When you are signed in, cloud sync copies supported study rows to Supabase so they appear on your other devices. Local metadata such as forecast calibration history stays on this device unless you export it.",
     "Data is scoped to your account with row-level security. Settings → Data → Export gives you a machine-readable copy of this device's data.",
     ai,
+    "Pilot telemetry and shared marking disputes are off unless you switch them on. Pilot telemetry sends anonymous outcome counts only; a shared dispute sends that one flagged mark for human review. Switching either off stops the next send immediately.",
     "Erase local data wipes this device only — your synced account data stays on the server and comes back when you sign in. Settings → Account → Delete account permanently deletes your account and everything synced to it.",
     "You can sign out and use the local profile at any time — nothing new from it is uploaded.",
   ];

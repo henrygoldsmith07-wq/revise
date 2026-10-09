@@ -19,18 +19,18 @@ const PAGE = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revise — what it does, and what it cannot yet do</title>
-<meta name="description" content="Revise is evidence-based A-level revision. Four WJEC A-level subjects are authored to their specification; no questions have been through human review yet, so Revise cannot yet prove an improvement.">
+<meta name="description" content="Revise is evidence-based WJEC A-level revision, Physics first. Four WJEC A-level subjects are authored to their specification; no questions have been through human review yet, so Revise cannot yet prove an improvement.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="${SUBJECT}/welcome">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Revise">
 <meta property="og:title" content="Revise — what it does, and what it cannot yet do">
-<meta property="og:description" content="Evidence-based A-level revision. Four WJEC A-level subjects are authored to their specification; no questions have been through human review yet.">
+<meta property="og:description" content="Evidence-based WJEC A-level revision, Physics first. Four subjects authored to specification; no questions human-reviewed yet.">
 <meta property="og:url" content="${SUBJECT}/welcome">
 <meta property="og:locale" content="en_GB">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Revise — what it does, and what it cannot yet do">
-<meta name="twitter:description" content="Evidence-based A-level revision. Four WJEC A-level subjects are authored to their specification; no questions have been through human review yet.">
+<meta name="twitter:description" content="Evidence-based WJEC A-level revision, Physics first. Four subjects authored to specification; no questions human-reviewed yet.">
 <style>
   :root { color-scheme: light dark; }
   body { margin: 0; font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f4f6; color: #16161a; }
@@ -50,7 +50,7 @@ const PAGE = `<!doctype html>
 <body>
 <main>
   <h1>Revise</h1>
-  <p class="lead">Exam revision that tells you the one thing to do next, and admits when it cannot prove it.</p>
+  <p class="lead">WJEC A-level revision, Physics first: the one thing to do next, and honesty about what cannot be proven yet.</p>
 
   <h2>What it does</h2>
   <ul>
@@ -91,7 +91,7 @@ const PAGE = `<!doctype html>
   </p>
 
   <footer>
-    Revise &mdash; WJEC A-level revision, currently in build. No accounts are created until you ask for one.
+    Revise &mdash; WJEC A-level revision, Physics first, currently in build. No accounts are created until you ask for one.
   </footer>
 </main>
 </body>

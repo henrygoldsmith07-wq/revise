@@ -87,10 +87,24 @@ export function selectQuickDiagnostic(input: {
   topicIds: readonly Id[];
   prerequisiteTopicIds?: ReadonlySet<Id>;
   budgetMinutes?: number;
+  /**
+   * Practice tier: when no trusted supply exists, sample authored but
+   * unreviewed questions so a new learner still gets a first task. Generated
+   * questions are never eligible. Practice-tier answers flow through the
+   * normal pipeline but can never become proof: proof requires trusted
+   * questions (see trustedAssessmentAttempt), so the ledger stays honest.
+   * Callers must label the run "practice, not proof".
+   */
+  practiceTier?: boolean;
 }): QuickSelection {
   const budget = Math.min(QUICK_MAX_MINUTES, Math.max(QUICK_MIN_MINUTES, input.budgetMinutes ?? 8)) * 60;
   const topics = new Set(input.topicIds);
-  const pool = input.questions.filter((q) => trustedAssessmentContent(q) && q.topicIds.some((t) => topics.has(t)));
+  const eligible = (q: Question): boolean => {
+    if (!q.topicIds.some((t) => topics.has(t))) return false;
+    if (trustedAssessmentContent(q)) return true;
+    return Boolean(input.practiceTier) && q.origin !== "ai" && q.source !== "generated";
+  };
+  const pool = input.questions.filter(eligible);
   const byDimension = new Map<DiagnosticDimension, QuickItem[]>();
   for (const q of pool) {
     const topicId = input.topicIds.find((t) => q.topicIds.includes(t))!;

@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { extractJson } from "./json";
+import { UNTRUSTED_RULE, untrusted } from "./untrusted";
 import type { Question } from "@/domain/types";
 
 export const LOCAL_MODEL_ID = "Phi-3-mini-4k-instruct-q4f16_1-MLC";
@@ -103,12 +104,13 @@ function markingPrompt(question: Question, partId: string, answer: string): { sy
     "You are an exam marker. Grade the student's answer against the mark scheme. " +
     "Credit a mark-scheme point only if the answer contains it; reward correct alternative wording, never reward what is merely implied. " +
     'Reply with JSON only: {"awarded": number, "comment": string, "confidence": number}. ' +
-    "confidence is 0-1 in the mark.";
+    "confidence is 0-1 in the mark. " +
+    UNTRUSTED_RULE;
   const user = [
     `Question: ${question.stem}`,
     `Part (${part.marks} marks): ${part.prompt}`,
     `Mark scheme: ${part.markScheme.map((s) => `• ${s}`).join(" ")}`,
-    `Student answer: ${answer.trim() || "(no answer given)"}`,
+    untrusted("student answer", answer.trim() || "(no answer given)"),
   ].join("\n");
   return { system, user };
 }

@@ -13,6 +13,7 @@ import type { Attempt, MarkedPart } from "@/domain/types";
 
 import { deleteMarkingFlag, getMarkingFlag, putMarkingFlag } from "@/data/db";
 import { useStoreFields } from "@/state/store";
+import { pilotAnonId } from "@/lib/pilot-telemetry";
 import { Button, cx } from "./ui";
 
 /**
@@ -42,6 +43,8 @@ export function FlagThisMark({
   const [flagged, setFlagged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [shared, setShared] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "sending" | "failed">("idle");
 
   const flagId = `markflag:${attempt.id}:${part.partId}`;
 
@@ -91,6 +94,39 @@ export function FlagThisMark({
     }
   }, [flagId]);
 
+  // Per-dispute explicit opt-in: shares this one flag (reason + note + mark
+  // context, never the full answer history) with the Revise team for human
+  // review of the marker. Sharing never changes the mark.
+  const share = useCallback(async () => {
+    setShareState("sending");
+    try {
+      const res = await fetch("/api/marking-disputes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          anonId: pilotAnonId(userId),
+          attemptId: attempt.id,
+          questionId: attempt.questionId,
+          partId: part.partId,
+          subjectId: attempt.subjectId,
+          reason: reason ?? "other",
+          note: note.slice(0, MAX_FLAG_REASON_CHARS),
+          awarded: typeof part.awarded === "number" ? part.awarded : null,
+          maxMarks: part.max,
+          markedBy: attempt.markedBy,
+        }),
+      });
+      if (!res.ok) {
+        setShareState("failed");
+        return;
+      }
+      setShared(true);
+      setShareState("idle");
+    } catch {
+      setShareState("failed");
+    }
+  }, [userId, attempt, part, reason, note]);
+
   if (!attempt.id || !part.partId) return null;
 
   return (
@@ -98,7 +134,7 @@ export function FlagThisMark({
       {flagged && !open ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-[11px] text-ink2">
-            Flagged on this device. Nothing has been sent to anyone yet.
+            {shared ? "Flagged and shared with the Revise team for human review." : "Flagged on this device. Nothing has been sent to anyone yet."}
           </p>
           <Button size="sm" variant="ghost" className="px-2 py-1 text-[11px]" onClick={() => setOpen(true)}>
             Edit flag
@@ -106,6 +142,20 @@ export function FlagThisMark({
           <Button size="sm" variant="ghost" className="px-2 py-1 text-[11px]" disabled={busy} onClick={() => void clear()}>
             Remove
           </Button>
+          {!shared ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="px-2 py-1 text-[11px]"
+              disabled={shareState === "sending"}
+              onClick={() => void share()}
+            >
+              {shareState === "sending" ? "Sharing…" : "Share with the Revise team"}
+            </Button>
+          ) : null}
+          {shareState === "failed" ? (
+            <p className="text-[11px] text-danger">Could not share (sign-in and connection needed). It stays on this device.</p>
+          ) : null}
         </div>
       ) : (
         <Button

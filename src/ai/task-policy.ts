@@ -33,7 +33,7 @@ export interface AiTaskPolicy {
   /** Every task — even ones with no learner content — needs the learner's AI consent. */
   requiresConsent: true;
   fallback: FallbackKind;
-  /** How the prompt separates instructions from untrusted text (see tasks.ts `untrusted`). */
+  /** How the prompt separates instructions from untrusted text (see ai/untrusted.ts `untrusted`). */
   contextBoundary: string;
   /** What the UI must say produced the output. */
   sourceLabel: string;

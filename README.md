@@ -80,9 +80,10 @@ still means one curriculum module and nothing else changing.
 New students start on the four flagships. Settings and onboarding group subjects
 as Flagship vs Reference so cloned boards cannot look spec-checked, and
 reference-tier subjects sit behind an explicit **"Unverified preview"** choice in
-onboarding rather than appearing in the list next to a disclaimer. Only WJEC
-A-level Physics is fully authored (108 of 108 specification statements); Maths,
-Biology and Chemistry still have 78, 102 and 95 statements to write.
+onboarding rather than appearing in the list next to a disclaimer. Physics has the
+deepest authored bank; run `npm run wjec:authoring:gaps` for current per-statement
+authoring coverage (the manifest totals in `src/domain/spec.ts` are the source of
+truth — prose counts here are not maintained).
 
 **Nothing is trusted yet.** All four flagships have **0 human-reviewed
 questions**, so Revise can practise with a student but cannot yet prove an
@@ -117,7 +118,7 @@ source immediately.
 
 ## What it does
 
-The app is one loop — **Diagnose → Learn/Repair → Practise → Prove → Revisit** — chosen for you on Today. The first screen locks in the board, subjects and exam dates, then offers a short diagnostic and shows your personalised first step; every other destination is a manual way into the same loop.
+The app is one loop — **Diagnose → Learn/Repair → Practise → Prove → Revisit** — chosen for you on Today. The first screen locks in the board and subjects (exam dates stay optional throughout), then offers a short diagnostic and shows your personalised first step; every other destination is a manual way into the same loop.
 
 | Area | Behaviour |
 |------|-----------|
@@ -195,7 +196,7 @@ src/domain/      Pure revision engine — no React, no I/O, fully unit-tested
   working-analysis.ts  Student working diagnosis + authored worked-solution validation
   moderation.ts / sync-conflicts.ts / portability.ts  Platform: review, sync, GDPR portability
   retention-mastery.ts  Evidence-gated retention status, trend and next action
-  moderation.ts / question-validation.ts / sync-conflicts.ts / portability.ts  Platform: review, question quality, sync, GDPR portability
+  question-validation.ts / sync-conflicts.ts / portability.ts  Platform: question quality, sync, GDPR portability
   i18n.ts / onboarding.ts  Localisation scaffolding + funnel measurement
   gamification.ts  Streaks, XP, achievements
   search.ts        Local search across topics, cards and questions
@@ -257,10 +258,13 @@ hard part and this repo enforces it.
 | **Coverage** | `src/domain/coverage.ts` | topics · spec points · retrieval items · exam questions, auto-measured |
 
 ```ts
-// Progress → Specification coverage (live, statement-level):
-//  WJEC A-level Physics: 76 statements · 76 with cards · 9 parts mapped · Last checked: 2026-08-01
-//  Chemistry: 76 statements  ·  Biology: 70  ·  Maths: 55 — each specPoint = one stable id + ref + AO + provenance.
-```
+// Progress → Specification coverage (live, statement-level, example format):
+//  WJEC A-level Physics: N statements · N with cards · M parts mapped · Last checked: <date>
+// ```
+//
+// Per-subject statement counts live in SPEC_MANIFEST (`src/domain/spec.ts`) and
+// the live authoring report (`npm run wjec:authoring:gaps`); the numbers that
+// used to sit in this comment drifted and are deliberately not repeated here.
 
 `specPoints[]` is the competitive moat: each entry has a **stable id** (e.g.
 `wjec-alevel-physics.quantum.sp-01`), an **exact spec ref** (`Unit 1.1(a)`),
@@ -272,9 +276,8 @@ and measurable links from **cards** (`Card.specPointIds`) and **question parts**
 `specPointsVerified` / `specPointsLearnable` / `specPointsAssessable` /
 `statementCoverage` — statement by statement. `buildUnits()` auto-assigns stable
 ids when omitted and threads per-statement provenance from the topic. Cards
-auto-link to the nearest statement(s); all four subjects now have specPoints on
-every topic (Physics 76, Chemistry 76, Biology 70, Maths 55) with `paperBreakdown`
-for unit·duration·marks·weighting on every paper. Every seed question maps to
+auto-link to the nearest statement(s); every flagship topic carries specPoints
+with `paperBreakdown` for unit·duration·marks·weighting on every paper. Every seed question maps to
 statements with `learningClaims` (one claim may earn several marks; per-mark
 allocation is explicit via `claimMap`), including the new OCR
 A-Level and extended-response question sets — the `no-spec-points`

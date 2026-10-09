@@ -1,0 +1,5 @@
+{
+  "$comment": "Official WJEC paper manifest. URLs + SHA-256 digests ONLY — never commit paper PDFs or WJEC question text. Empty until digests are verified from WJEC's site; with no entries the official-paper trust tier is inert. Add entries with: npm run wjec:papers:fingerprint -- <file>",
+  "formatVersion": 1,
+  "papers": []
+}

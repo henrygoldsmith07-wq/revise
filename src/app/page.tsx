@@ -17,6 +17,7 @@ import { BestNextStep } from "@/components/BestNextStep";
 import { CommandCentreCard } from "@/components/CommandCentreCard";
 import { useRevisionPlan } from "@/components/recovery-evidence";
 import { WeekLine } from "@/components/RecoverySummary";
+import { ExamDateNudge } from "@/components/ExamDateNudge";
 import { TodayOverview } from "@/components/TodayOverview";
 import { todayLocal } from "@/domain/local-date";
 
@@ -129,6 +130,7 @@ export default function TodayPage() {
         </p>
       )}
       {revisionCheckpoint ? null : <WeekLine />}
+      {revisionCheckpoint ? null : <ExamDateNudge />}
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
           Plan, pace and outlook
