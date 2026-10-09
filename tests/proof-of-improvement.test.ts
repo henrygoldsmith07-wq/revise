@@ -1,25 +1,55 @@
 import { describe, expect, it } from "vitest";
 import { buildProofLedger, CONVERSION_PRIOR, MIN_PROOF_DELAY_DAYS, proofLine, shortDate } from "@/domain/proof-of-improvement";
-import type { Attempt, Question, ReviewLog, SpecPoint, Topic } from "@/domain/types";
+import { physicsContentFingerprint } from "@/domain/content-trust";
+import type { Attempt, HumanVerificationRecord, Question, ReviewLog, SpecPoint, Topic } from "@/domain/types";
 
 const NOW = new Date("2026-09-30T12:00:00.000Z");
 const day = (n: number) => new Date(Date.UTC(2026, 8, n, 9)).toISOString();
 
+// Proof is a claim about *reviewed* material, so the fixtures model a
+// flagship subject whose questions have passed the human review
+// contract. Non-flagship subjects deliberately cannot produce proof —
+// that distinction is what buildProofLedger now enforces.
+const FLAGSHIP = "wjec-alevel-physics";
+
 const spec = (id: string): SpecPoint => ({ id, ref: id, text: id, aos: ["AO1"] });
-const topic = (id: string, statements = 3, subjectId = "s"): Topic => ({
+const topic = (id: string, statements = 3, subjectId = FLAGSHIP): Topic => ({
   id, subjectId, unitId: "u", title: id, order: 1, intrinsicDifficulty: 3, summary: "", keyPoints: [], commonErrors: [],
   specPoints: Array.from({ length: statements }, (_, i) => spec(`${id}.${i}`)),
 });
-const question = (id: string, topicId: string, subjectId = "s"): Question => ({
-  id, subjectId, topicIds: [topicId], kind: "short", stem: id,
-  parts: [{ id: `${id}.a`, label: "", prompt: "p", marks: 4, markScheme: ["x"], modelAnswer: "x" }],
-  totalMarks: 4, calculatorAllowed: true, difficulty: 3, origin: "seed", createdAt: day(1),
+
+const reviewRecord = (question: Question): HumanVerificationRecord => ({
+  status: "approved",
+  reviewerId: "test-reviewer",
+  reviewerRole: "teacher",
+  reviewerQualification: "Test fixture only",
+  reviewedAt: "2026-09-26T18:00:00.000Z",
+  contentFingerprint: physicsContentFingerprint(question),
+  checks: {
+    question: true,
+    marking: true,
+    workedSolution: true,
+    capabilityMapping: true,
+    specificationMapping: true,
+    examRealism: true,
+  },
 });
+
+const question = (id: string, topicId: string, subjectId = FLAGSHIP): Question => {
+  const base: Question = {
+    id, subjectId, topicIds: [topicId], kind: "short", stem: id,
+    parts: [{ id: `${id}.a`, label: "", prompt: "p", marks: 4, markScheme: ["x"], modelAnswer: "x" }],
+    totalMarks: 4, calculatorAllowed: true, difficulty: 3, origin: "seed", createdAt: day(1),
+  };
+  // A reviewed flagship question: verified plus a full attestation
+  // whose fingerprint matches the content exactly.
+  return { ...base, verification: "verified", humanVerification: reviewRecord(base) };
+};
 
 let n = 0;
 function attempt(questionId: string, topicId: string, awarded: number, at: string, overrides: Partial<Attempt> = {}): Attempt {
   return {
-    id: `a${n++}`, userId: "u", questionId, subjectId: "s", topicIds: [topicId], answers: {}, marked: [], awarded, max: 4,
+    id: `a${n++}`, userId: "u", questionId, subjectId: FLAGSHIP, topicIds: [topicId], answers: {}, marked: [], awarded, max: 4,
     feedback: "", markedBy: "rubric", elapsedMs: 1, mode: "practice", createdAt: at, ...overrides,
   };
 }
@@ -131,22 +161,23 @@ describe("proof of improvement", () => {
   });
 
   it("weights proven marks by how much of the exam each topic carries, across subjects", () => {
-    const big = topic("big", 6, "s");
-    const small = topic("small", 2, "s");
-    const other = topic("other", 5, "s2");
-    const q = (topicId: string, subjectId = "s") => Array.from({ length: 6 }, (_, i) => question(`${topicId}${i}`, topicId, subjectId));
+    const maths = "wjec-alevel-maths";
+    const big = topic("big", 6, FLAGSHIP);
+    const small = topic("small", 2, FLAGSHIP);
+    const other = topic("other", 5, maths);
+    const q = (topicId: string, subjectId = FLAGSHIP) => Array.from({ length: 6 }, (_, i) => question(`${topicId}${i}`, topicId, subjectId));
     const run = (topicId: string, subjectId: string) => [
       attempt(`${topicId}0`, topicId, 1, day(1), { subjectId }), attempt(`${topicId}1`, topicId, 0, day(1), { subjectId }), attempt(`${topicId}2`, topicId, 1, day(2), { subjectId }),
       attempt(`${topicId}3`, topicId, 4, day(20), { subjectId }), attempt(`${topicId}4`, topicId, 4, day(21), { subjectId }), attempt(`${topicId}5`, topicId, 4, day(22), { subjectId }),
     ];
     const result = buildProofLedger({
-      topics: [big, small, other], questions: [...q("big"), ...q("small"), ...q("other", "s2")], now: NOW,
-      attempts: [...run("big", "s"), ...run("small", "s"), ...run("other", "s2")],
+      topics: [big, small, other], questions: [...q("big"), ...q("small"), ...q("other", maths)], now: NOW,
+      attempts: [...run("big", FLAGSHIP), ...run("small", FLAGSHIP), ...run("other", maths)],
     });
     const points = (id: string) => result.topics.find((row) => row.topicId === id)!.markPoints;
     expect(points("big")).toBeGreaterThan(points("small") * 2);
-    expect(result.bySubject["s"]!.proven).toBe(2);
-    expect(result.bySubject["s2"]!.proven).toBe(1);
+    expect(result.bySubject[FLAGSHIP]!.proven).toBe(2);
+    expect(result.bySubject[maths]!.proven).toBe(1);
     expect(result.proven).toBe(3);
     expect(result.provenMarks).toBeGreaterThan(0);
     expect(result.headline).toMatch(/Proven on new questions/);
@@ -169,6 +200,30 @@ describe("proof of improvement", () => {
       attempt("q3", "t1", 4, day(20), { markedBy: "self" }), attempt("q4", "t1", 4, day(21), { markedBy: "self" }),
     ]);
     expect(row.status).toBe("awaiting-proof");
+  });
+
+  it("never proves a gain on reference-tier material, however well it is answered", () => {
+    // Reference-tier subjects are labelled "not spec-checked" everywhere
+    // else in the app. An unreviewed answer there must not become a
+    // learner-visible "Proven", no matter how strong the pattern is.
+    const refTopic = topic("rt", 3, "aqa-alevel-biology");
+    const refBank = Array.from({ length: 6 }, (_, i) => question(`rq${i}`, "rt", "aqa-alevel-biology"));
+    const refAttempts = [
+      attempt("rq0", "rt", 1, day(1), { subjectId: "aqa-alevel-biology" }),
+      attempt("rq1", "rt", 0, day(1), { subjectId: "aqa-alevel-biology" }),
+      attempt("rq2", "rt", 1, day(2), { subjectId: "aqa-alevel-biology" }),
+      attempt("rq3", "rt", 4, day(20), { subjectId: "aqa-alevel-biology" }),
+      attempt("rq4", "rt", 4, day(21), { subjectId: "aqa-alevel-biology" }),
+      attempt("rq5", "rt", 3, day(22), { subjectId: "aqa-alevel-biology" }),
+    ];
+    const result = buildProofLedger({
+      topics: [refTopic], attempts: refAttempts, questions: refBank, now: NOW,
+    });
+    expect(result.topics[0]!.status).toBe("untested");
+    expect(result.topics[0]!.gain).toBeNull();
+    expect(result.topics[0]!.markPoints).toBe(0);
+    expect(result.proven).toBe(0);
+    expect(result.headline).toMatch(/nothing proven yet/i);
   });
 
   it("writes dates the way a student reads them", () => {

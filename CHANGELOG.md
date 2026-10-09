@@ -1,5 +1,44 @@
 # Changelog
 
+## Proof no longer overclaims on reference material — 2026-10-10
+
+**A trust inversion, found by audit and fixed.** `trustedAssessmentContent`
+is deliberately permissive for subjects with no review gate: authoring,
+supply and curriculum paths rely on that. But it was also the gate for
+*learner evidence*, and every reference-tier subject (a cloned outline the
+UI labels "Reference · not spec-checked" and says "cannot prove
+improvement") passes it unchecked. So a correct, unaided, delayed answer
+on an **unreviewed reference question** produced a learner-visible
+**"Proven"** — the one claim this product must never make without a human
+in the loop. Worse, it was an inversion: the four WJEC flagships, which
+*do* have a review gate, could never prove (0 reviewed questions), while
+unreviewed reference content could.
+
+**The fix tightens, and loosens nothing.** Proof now requires flagship
+**and** the human review contract, via a new `learnerEvidenceTrusted`
+predicate in `src/domain/content-trust.ts`. `buildProofLedger` filters
+its evidence through it, so a topic reaches `proven-gain` only on
+reviewed flagship questions. `trustedAssessmentContent` itself is
+unchanged — the authoring, supply and curriculum paths keep their
+existing, tested behaviour. A reference subject still practises exactly
+as before; it simply can no longer claim proof. `tests/proof-of-improvement.test.ts`
+now models genuinely reviewed flagship content (full six-check
+attestation whose fingerprint matches), and gains a regression test
+asserting reference-tier material never proves, however well it is
+answered.
+
+**Known remaining inconsistency, recorded rather than hidden.** The
+*supply* layer (`unseenSupplyByTopic` in `src/domain/supply.ts`,
+`topicSupply` in `src/domain/marks-value.ts`) still counts reference
+questions as "provable", because the adaptive-planner test suite
+(`revision-engine`, `cold-start`, `product-journey`, `today-focus`) is
+built on non-flagship synthetic subject ids and would need its fixtures
+rebased onto reviewed flagship content — a separate, larger change. In
+the shipped product this is benign for the four flagships (gated but
+unverified → `provable=0` → proof missions correctly blocked), but a
+reference-tier preview subject can still see an unblocked "Delayed
+check". Closing it is the next priority.
+
 ## The repair path follows the failure mode — 2026-10-10
 
 **Today's mark result prescribes, not just links.** Losing marks now renders

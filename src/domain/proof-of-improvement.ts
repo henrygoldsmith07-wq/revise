@@ -25,6 +25,7 @@
 // ---------------------------------------------------------------------------
 
 import { trustedAdaptiveEvidence } from "./adaptive-scoring";
+import { learnerEvidenceTrusted } from "./content-trust";
 import type { OfficialPaperContext } from "./official-papers";
 import { exposureWeights } from "./evidence-weights";
 import { betaInterval } from "./marks-value";
@@ -150,7 +151,14 @@ export function buildProofLedger(input: ProofInput): ProofLedger {
   const nowMs = (input.now ?? new Date()).getTime();
   const shares = topicShares(input.topics);
   const exposure = exposureWeights(input.attempts);
-  const trusted = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: [], questions: [...input.questions], officialPaper: input.officialPaper }).attempts;
+  const questionById = new Map(input.questions.map((question) => [question.id, question] as const));
+  const trusted = trustedAdaptiveEvidence({ attempts: input.attempts, mistakes: [], questions: [...input.questions], officialPaper: input.officialPaper }).attempts
+    // Proof is a claim about *reviewed* material. Reference-tier
+    // subjects are labelled "not spec-checked" everywhere else in the
+    // app, so an unreviewed answer there must never produce a
+    // learner-visible "Proven" — only flagship questions that also
+    // pass the human review contract count as evidence.
+    .filter((attempt) => learnerEvidenceTrusted(questionById.get(attempt.questionId)));
 
   const byTopic = new Map<Id, Attempt[]>();
   for (const attempt of trusted) {

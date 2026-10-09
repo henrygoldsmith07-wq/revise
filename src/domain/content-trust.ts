@@ -3,6 +3,7 @@ import { canonicalJson, sha256Hex } from "./content-fingerprint";
 import { localDayOfInstant } from "./local-date";
 import { validAttestationInstant, validOfficialWjecUrl, validSha256Digest, WJEC_ATTESTATION_ROLES } from "./trust-attestation";
 import type { HumanVerificationRecord, Id, Question } from "./types";
+import { isFlagship } from "./flagship";
 import { OFFICIAL_PAPER_TRUST_TIER, type OfficialPaperTrustTier } from "./official-papers";
 
 /**
@@ -109,6 +110,28 @@ export function humanVerifiedWjecQuestion(question: Question): boolean {
 
 export function trustedAssessmentContent(question: Question): boolean {
   return !requiresWjecContentReview(question.subjectId) || humanVerifiedWjecQuestion(question);
+}
+
+/**
+ * Learner-evidence trust. Deliberately stricter than
+ * `trustedAssessmentContent`, and the two are not interchangeable.
+ *
+ * `trustedAssessmentContent` is deliberately permissive for subjects with no
+ * review gate: authoring, supply and curriculum paths rely on that, and it is
+ * kept exactly as it is. But an exam candidate is entitled to know that
+ * "Proven" means *a qualified human checked this*. Reference-tier subjects are
+ * cloned outlines the UI labels "not checked against the specification"
+ * (`trustNoteFor`, `trust-indicator`, `docs/learner-model.md`), yet they pass
+ * the permissive predicate unchecked — so unreviewed reference answers were
+ * producing a learner-visible "Proven" claim.
+ *
+ * Proof therefore requires flagship **and** the human review contract. This
+ * loosens nothing: it only closes the gap between what the app claims and
+ * what it can show.
+ */
+export function learnerEvidenceTrusted(question: Question | undefined): boolean {
+  if (!question) return false;
+  return isFlagship(question.subjectId) && trustedAssessmentContent(question);
 }
 
 /**
