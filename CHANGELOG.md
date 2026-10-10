@@ -1,5 +1,45 @@
 # Changelog
 
+## Practice estimates say so; first linked Physics transfer items; honest AI re-mark notice — 2026-10-10 (third pass)
+
+**Reference-tier subjects no longer read as exam-ready or as an exam
+prediction.** Their questions pass the permissive `trustedAssessmentContent`
+(no review gate), which is right for practice but was flowing into claims:
+
+- `buildExamReadiness` could mark a reference subject **Ready** (and
+  `readinessStopFor` would then cut its practice short). It now caps them at
+  `nearly-ready` and sets `referenceTier`; the readiness card says why.
+- `outlookRows` could give a reference subject a non-provisional band, so
+  Today said "Estimate: you're most likely to score 60–80% in …" with no
+  qualifier. Reference rows are now always provisional and flagged
+  `referenceTier`; Today, the Progress trajectory heading and the knowledge
+  map's exam node call it a **practice estimate, not an exam prediction**.
+- `predictGrade` names the weakness in `uncertaintySources` for reference
+  subjects (shown under "What makes this estimate uncertain?").
+- `isProofCapable` used the permissive predicate; it now uses
+  `learnerEvidenceTrusted`, matching `provenanceTier`.
+- Left as practice-tier on purpose (labelled already, no proof/readiness
+  claim): supply, mock generation, diagnostics, knowledge-graph
+  covered/shaky statuses, calculation/response-time calibration.
+- Flagship behaviour is unchanged. `tests/reference-tier-claims.test.ts`
+  (6 of 7 cases fail on the previous code).
+
+**First Physics transfer items with a real baseline.** Two new transfer
+questions for the top-ranked authoring briefs (alternating currents sp-01,
+rms from a logged peak voltage and metered energy; sp-03, minimum
+transmission voltage and turns ratio from a loss limit), each linked to an
+existing application/calculation part of the same capability with recomputed
+setup fingerprints. `source: "generated"`, `verification: "unverified"`, no
+reviewer. Physics authored ceiling 0/108 → 2/108. A drafted sp-02 item was
+withheld because the structural-novelty comparison (not yet applied to
+Physics) rated it too close to its baseline. No gate was relaxed and the
+234 unlinked items were not touched.
+
+**AI marking failure is explained.** When the AI marker fails and the attempt
+is genuinely queued for a re-mark (consent given, cloud tried), the marked
+result now says so and that the mark may update; `enqueueDeadMark` resolves
+`true` only when the item was written.
+
 ## "Proven" means the same thing everywhere — 2026-10-10 (second pass)
 
 **Four places could tell a student something was proven, or provable, when
