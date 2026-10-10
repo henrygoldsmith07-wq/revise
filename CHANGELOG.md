@@ -1,5 +1,44 @@
 # Changelog
 
+## Reference-tier mastery says "practice"; nine more linked Physics transfer items — 2026-10-10 (fourth pass)
+
+**A reference-tier topic could still show "Proven".** `masteryStage`
+(Progress → "What am I strong at?" and the topic counts under it) judged
+evidence with `trustedAssessmentAttempt`, which is permissive for subjects
+with no review gate. A correct, unaided, delayed answer on an unreviewed
+reference question therefore produced a green **Proven** pill, the claim
+#40 removed from the proof ledger but which survived in this layer.
+
+- Reference topics now top out at Secure, labelled **"Secure in practice"**
+  (`stageLabel`), with a next step that says why the topic cannot be proven
+  there; the topic-count line notes how many "secure" topics rest on
+  reference practice only (`practiceOnlySecure`).
+- The specification map (`/readiness/spec`) carries `referenceTier`: the
+  eyebrow reads "Practice layer", the reference disclaimer is shown, and
+  "Secure" / "Secure but stale" become "Secure in practice" (`specStatusLabel`).
+- Paper readiness flags `referenceTier`: "secure in practice", "done well on
+  unfamiliar practice questions (practice, not proof)", "Next step" instead of
+  "Next proof", and "Practise it on an unfamiliar-context question" instead
+  of "Prove it…".
+- Flagship behaviour and every proof predicate are unchanged.
+  `tests/reference-tier-mastery-wording.test.ts` (7 cases, all fail on the
+  previous code). `mastery-stage` and `progress-summary` fixtures use a
+  non-flagship id, so their "proven"/"Secure" expectations moved to a reviewed
+  flagship fixture or to the practice label.
+
+**Nine more Physics transfer items with a real baseline.** Capacitance
+sp-01..03 and circular motion/SHM sp-01..06, the statements
+`wjec:authoring:plan -- physics` ranked next, in
+`src/content/questions/physics-transfer-linked.ts`. Each links to an existing
+application/calculation part of the same capability and passes the
+structural-novelty comparison on independently derived graphs (the stricter
+check that withheld the sp-02 draft last pass); tests recompute every worked
+number. `source: "generated"`, `verification: "unverified"`, no reviewer.
+Physics authored ceiling 2/108 → 11/108. The deeper `validateBaselineIntegrity`
+check still rejects 9 of the 11 baselines (the verified-graph derivation finds
+no evidence/conclusion nodes in most Physics model answers); it is not applied
+to Physics and was not changed.
+
 ## Practice estimates say so; first linked Physics transfer items; honest AI re-mark notice — 2026-10-10 (third pass)
 
 **Reference-tier subjects no longer read as exam-ready or as an exam
