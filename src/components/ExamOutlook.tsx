@@ -57,6 +57,16 @@ export function ExamOutlook() {
           const name = subject?.name ?? row.subjectId;
           const when = exam ? ` in ${name} (exam ${formatExamDate(exam.date)})` : ` in ${name}`;
           const provisional = row.provisional ? "Provisional estimate" : "Estimate";
+          // Reference-tier questions are not checked against the specification,
+          // so the band is a practice estimate, never an exam prediction.
+          if (row.referenceTier) {
+            return (
+              <p key={row.subjectId}>
+                Practice estimate: about {row.low}–{row.high}% on {name} reference questions (n={row.independentAttempts} independent).
+                These are not checked against the exam board&apos;s specification, so this is not an exam prediction.
+              </p>
+            );
+          }
           return (
             <p key={row.subjectId}>
               {provisional}: you&apos;re most likely to score {row.low}–{row.high}%{when} (n={row.independentAttempts} independent, {confidenceWord(row.confidence, EVIDENCE_CONFIDENCE)} confidence).

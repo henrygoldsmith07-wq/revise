@@ -66,16 +66,20 @@ export function dlqNextAttemptAt(attempts: number, now: Date = new Date(), rando
   return new Date(now.getTime() + dlqBackoffMs(attempts, random)).toISOString();
 }
 
-/** Enqueue an attempt for AI re-grading. Best-effort: never throws. */
+/**
+ * Enqueue an attempt for AI re-grading. Best-effort: never throws. Resolves
+ * true only when the item was actually written, so the UI can tell the
+ * learner a re-mark is coming without promising one that was never queued.
+ */
 export async function enqueueDeadMark(input: {
   attempt: Attempt;
   question: Question;
   reason: string;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     // A queued answer exists only to be sent to the AI service later; without
     // consent it must not be kept for that purpose at all.
-    if (!(await localAiConsentGranted())) return;
+    if (!(await localAiConsentGranted())) return false;
     const db = await getDb();
     const item: AiDlqItem = {
       id: crypto.randomUUID(),
@@ -89,9 +93,11 @@ export async function enqueueDeadMark(input: {
       lastError: input.reason,
     };
     await db.put("aiDlq", item);
+    return true;
   } catch {
     // The queue is a resilience enhancement; losing one enqueue must never
     // break the marking flow that already served the student a grade.
+    return false;
   }
 }
 

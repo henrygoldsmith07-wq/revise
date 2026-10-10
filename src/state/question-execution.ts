@@ -159,6 +159,8 @@ export function useQuestionExecution({
     farTransfer?: Attempt["farTransfer"];
     /** Post-marking error diagnosis; never changes the marks above. */
     errorDiagnosis?: AttemptErrorDiagnosis;
+    /** The AI marker failed and this attempt is genuinely queued for an AI re-mark. */
+    aiRemarkQueued?: boolean;
     nextAction: { label: string; href: null; why: string };
   } | null>(null);
   // Stamped after mount: reading the clock during render makes the render
@@ -218,6 +220,7 @@ export function useQuestionExecution({
                 ? assessLowConfidenceMark({ markedBy: "ai", confidence: upgraded.markConfidence ?? null })
                 : undefined,
               assessment: undefined,
+              aiRemarkQueued: false,
               lastAttempt: upgraded,
             }
           : prev,
@@ -433,9 +436,11 @@ export function useQuestionExecution({
     // Only a cloud request that was actually attempted with the learner's
     // consent and then failed is queued; a mark that fell back because AI is
     // switched off is never queued for sending later.
-    if (markTier === "fallback" && retryable) {
-      void enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" });
-    }
+    // Awaited (a local IndexedDB write, never the network) so the result can
+    // say a re-mark is queued only when it really is.
+    const aiRemarkQueued = markTier === "fallback" && retryable
+      ? await enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" })
+      : false;
     setResult({
       attemptId: persistedAttempt.id,
       lastAttempt: persistedAttempt,
@@ -453,6 +458,7 @@ export function useQuestionExecution({
       assessment,
       farTransfer: persistedAttempt.farTransfer,
       withheld,
+      aiRemarkQueued,
       nextAction,
     });
     // Refinement pass: classifier.dev may sharpen the error type on the parts

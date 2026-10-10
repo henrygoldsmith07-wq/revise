@@ -139,7 +139,7 @@ describe("AI consent — wiring", () => {
     expect(consent).toMatch(/if \(!input\.enabled\) \{[\s\S]*clearDeadMarks\(\)/);
     const dlq = read("src/ai/mark-dlq.ts");
     expect(dlq).toMatch(/drainDeadMarks[\s\S]*if \(!\(await localAiConsentGranted\(\)\)\) \{\s*await clearDeadMarks\(\);/);
-    expect(dlq).toMatch(/enqueueDeadMark[\s\S]*if \(!\(await localAiConsentGranted\(\)\)\) return;/);
+    expect(dlq).toMatch(/enqueueDeadMark[\s\S]*if \(!\(await localAiConsentGranted\(\)\)\) return false;/);
   });
 
   it("Settings offers a real, labelled toggle that records the choice server-side", () => {
