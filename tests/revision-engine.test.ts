@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { estimateEffectiveness, effectivenessClaims, missionChains, type MissionChain } from "@/domain/effectiveness";
+import { physicsContentFingerprint } from "@/domain/content-trust";
 import { buildExamMissions } from "@/domain/exam-mission";
 import { buildMarkRecovery } from "@/domain/mark-recovery";
 import { recoveryBreakdown, recoveryWindow, weekLines } from "@/domain/marks-progress";
@@ -17,14 +18,29 @@ function exam(subjectId: string, daysAhead: number): ExamDate {
   const date = new Date(NOW.getTime() + daysAhead * 86_400_000).toISOString().slice(0, 10);
   return { id: `e-${subjectId}`, userId: "u1", subjectId, date, label: subjectId };
 }
+// Proof is a claim about reviewed flagship material: reference-tier subjects
+// can never prove improvement (learnerEvidenceTrusted). These fixtures
+// therefore model the four WJEC flagships, and `bank()` is a reviewed bank.
+const PHY = "wjec-alevel-physics", BIO = "wjec-alevel-biology", MATHS = "wjec-alevel-maths", CHEM = "wjec-alevel-chemistry";
+/** Short fixture prefix so question ids stay readable ("maths-calculus-0"). */
+const short = (subjectId: string) => subjectId.replace(/^wjec-alevel-/, "");
 const q = (id: string, subjectId: string, topicId: string, over: Partial<Question> = {}) => mkQuestion(id, topicId, { subjectId, ...over });
+/** A question that has passed the full human review contract (test fixture only). */
+const reviewed = (question: Question): Question => ({
+  ...question, verification: "verified",
+  humanVerification: {
+    status: "approved", reviewerId: "test-reviewer", reviewerRole: "teacher", reviewerQualification: "Test fixture only",
+    reviewedAt: "2026-09-01T09:00:00.000Z", contentFingerprint: physicsContentFingerprint(question),
+    checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
+  },
+});
 const m = (id: string, subjectId: string, topicId: string, questionId: string, over: Partial<Mistake> = {}) =>
   mkMistake(id, { subjectId, topicId, questionId, attemptId: `att-${id}`, workingErrorKind: "unit-error", ...over });
 const a = (id: string, subjectId: string, topicId: string, questionId: string, awarded: number, at: string, over: Partial<Attempt> = {}) =>
   mkAttempt(id, questionId, awarded, 3, at, { subjectId, topicIds: [topicId], ...over });
 
 function bank(subjectId: string, topicId: string, n = 8): Question[] {
-  return Array.from({ length: n }, (_, i) => q(`${subjectId}-${topicId}-${i}`, subjectId, topicId, { kind: i % 2 ? "calculation" : "structured" }));
+  return Array.from({ length: n }, (_, i) => reviewed(q(`${short(subjectId)}-${topicId}-${i}`, subjectId, topicId, { kind: i % 2 ? "calculation" : "structured" })));
 }
 
 function engine(over: Partial<EngineInput> & Pick<EngineInput, "mistakes" | "attempts" | "questions" | "subjectIds" | "examDates">): EngineInput {
@@ -35,25 +51,25 @@ function engine(over: Partial<EngineInput> & Pick<EngineInput, "mistakes" | "att
 
 // Physics: 8 marks, exam in 8 days. Biology: 12 marks, exam in 40 days. Maths: delayed proof due.
 function scenario() {
-  const questions = [...bank("physics", "circuits"), ...bank("biology", "cells"), ...bank("maths", "calculus"), ...bank("chemistry", "bonding")];
+  const questions = [...bank(PHY, "circuits"), ...bank(BIO, "cells"), ...bank(MATHS, "calculus"), ...bank(CHEM, "bonding")];
   const mistakes = [
-    m("p1", "physics", "circuits", "physics-circuits-0", { marksLost: 4, createdAt: iso("2026-09-20") }),
-    m("p2", "physics", "circuits", "physics-circuits-1", { marksLost: 4, createdAt: iso("2026-09-21") }),
-    m("b1", "biology", "cells", "biology-cells-0", { marksLost: 6, category: "communication", workingErrorKind: undefined, createdAt: iso("2026-09-20") }),
-    m("b2", "biology", "cells", "biology-cells-1", { marksLost: 6, category: "communication", workingErrorKind: undefined, createdAt: iso("2026-09-21") }),
-    m("m1", "maths", "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10") }),
+    m("p1", PHY, "circuits", "physics-circuits-0", { marksLost: 4, createdAt: iso("2026-09-20") }),
+    m("p2", PHY, "circuits", "physics-circuits-1", { marksLost: 4, createdAt: iso("2026-09-21") }),
+    m("b1", BIO, "cells", "biology-cells-0", { marksLost: 6, category: "communication", workingErrorKind: undefined, createdAt: iso("2026-09-20") }),
+    m("b2", BIO, "cells", "biology-cells-1", { marksLost: 6, category: "communication", workingErrorKind: undefined, createdAt: iso("2026-09-21") }),
+    m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10") }),
   ];
   const attempts = [
-    a("att-m1", "maths", "calculus", "maths-calculus-0", 0, iso("2026-09-10")),
-    a("ms1", "maths", "calculus", "maths-calculus-2", 3, iso("2026-09-15")),
+    a("att-m1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10")),
+    a("ms1", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-15")),
   ];
-  return { questions, mistakes, attempts, examDates: [exam("physics", 8), exam("biology", 40), exam("maths", 30), exam("chemistry", 90)] };
+  return { questions, mistakes, attempts, examDates: [exam(PHY, 8), exam(BIO, 40), exam(MATHS, 30), exam(CHEM, 90)] };
 }
 
 describe("next best action engine", () => {
   it("compares candidates across subjects globally and explains the winner", () => {
     const s = scenario();
-    const plan = rankRevisionActions(engine({ ...s, subjectIds: ["physics", "biology", "maths", "chemistry"] }));
+    const plan = rankRevisionActions(engine({ ...s, subjectIds: [PHY, BIO, MATHS, CHEM] }));
     expect(plan.top).not.toBeNull();
     const subjects = new Set(plan.actions.map((x) => x.subjectId));
     expect(subjects.size).toBeGreaterThanOrEqual(3);
@@ -69,7 +85,7 @@ describe("next best action engine", () => {
   it("chooses the same action whatever order the subjects are listed in", () => {
     const s = scenario();
     const orders = [
-      ["physics", "biology", "maths", "chemistry"], ["chemistry", "maths", "biology", "physics"], ["biology", "physics", "chemistry", "maths"], ["maths", "chemistry", "physics", "biology"],
+      [PHY, BIO, MATHS, CHEM], [CHEM, MATHS, BIO, PHY], [BIO, PHY, CHEM, MATHS], [MATHS, CHEM, PHY, BIO],
     ];
     const ids = orders.map((subjectIds) => rankRevisionActions(engine({ ...s, subjectIds, examDates: [...s.examDates].reverse(), mistakes: [...s.mistakes].reverse() })).actions.map((x) => x.id));
     for (const list of ids) expect(list).toEqual(ids[0]);
@@ -77,56 +93,73 @@ describe("next best action engine", () => {
 
   it("lets a near exam outweigh a larger loss further away", () => {
     const s = scenario();
-    const plan = rankRevisionActions(engine({ ...s, subjectIds: ["physics", "biology"] }));
-    expect(plan.top!.subjectId).toBe("physics");
-    const bio = plan.actions.find((x) => x.subjectId === "biology")!;
+    const plan = rankRevisionActions(engine({ ...s, subjectIds: [PHY, BIO] }));
+    expect(plan.top!.subjectId).toBe(PHY);
+    const bio = plan.actions.find((x) => x.subjectId === BIO)!;
     expect(bio.marksRecoverable!).toBeGreaterThan(plan.top!.marksRecoverable!);
     expect(plan.top!.explanation.whyBefore).toMatch(/closer|per minute|stage|evidence|exam/);
   });
 
   it("only plans enrolled subjects", () => {
     const s = scenario();
-    const plan = rankRevisionActions(engine({ ...s, subjectIds: ["biology"] }));
-    expect(new Set(plan.actions.map((x) => x.subjectId))).toEqual(new Set(["biology"]));
+    const plan = rankRevisionActions(engine({ ...s, subjectIds: [BIO] }));
+    expect(new Set(plan.actions.map((x) => x.subjectId))).toEqual(new Set([BIO]));
   });
 
   it("parks a proof check until the delay has passed, then ranks it", () => {
     const s = scenario();
-    const early = rankRevisionActions(engine({ ...s, subjectIds: ["maths"], now: new Date("2026-09-16T09:00:00Z") }));
+    const early = rankRevisionActions(engine({ ...s, subjectIds: [MATHS], now: new Date("2026-09-16T09:00:00Z") }));
     const waiting = early.deferred.find((d) => d.action.type === "proof-check" || d.reason.includes("Waiting"));
     expect(waiting?.reason).toMatch(/Waiting for the delay/);
     expect(early.actions.find((x) => x.type === "proof-check")).toBeUndefined();
-    const later = rankRevisionActions(engine({ ...s, subjectIds: ["maths"], now: new Date("2026-10-03T12:00:00Z") }));
+    const later = rankRevisionActions(engine({ ...s, subjectIds: [MATHS], now: new Date("2026-10-03T12:00:00Z") }));
     expect(later.actions.some((x) => x.type === "proof-check" && x.proofStatus === "awaiting-proof")).toBe(true);
   });
 
+  it("keeps a learner practising when nothing else ranks, without spending supply a delayed check needs", () => {
+    const s = scenario();
+    // Maths only, before the delay has passed: the calculus proof check is
+    // parked. "limits" has been started and won, nothing is due.
+    const limits = bank(MATHS, "limits", 4);
+    const questions = [...s.questions, ...limits];
+    const attempts = [...s.attempts, a("l0", MATHS, "limits", "maths-limits-0", 3, iso("2026-09-14"))];
+    const plan = rankRevisionActions(engine({ ...s, questions, attempts, subjectIds: [MATHS], now: new Date("2026-09-16T09:00:00.000Z") }));
+    expect(plan.deferred.some((d) => /Waiting for the delay/.test(d.reason))).toBe(true);
+    expect(plan.top?.title).toBe("Keep practising limits");
+    expect(plan.top!.topicIds).toEqual(["limits"]);
+    expect(plan.top!.explanation.why).toMatch(/3 questions you have not answered/);
+    // With only the reserved topic left, Today stays honest rather than spending it.
+    const reservedOnly = rankRevisionActions(engine({ ...s, subjectIds: [MATHS], now: new Date("2026-09-16T09:00:00.000Z") }));
+    expect(reservedOnly.top?.topicIds ?? []).not.toContain("calculus");
+  });
+
   it("plans a regressed topic before new work on it and never claims proof it lacks", () => {
-    const questions = bank("maths", "calculus", 8);
-    const mistakes = [m("m1", "maths", "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10") })];
+    const questions = bank(MATHS, "calculus", 8);
+    const mistakes = [m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10") })];
     const attempts = [
-      a("att-m1", "maths", "calculus", "maths-calculus-0", 0, iso("2026-09-10")),
-      a("s1", "maths", "calculus", "maths-calculus-2", 3, iso("2026-09-15")), a("s2", "maths", "calculus", "maths-calculus-3", 3, iso("2026-09-25")),
-      a("s3", "maths", "calculus", "maths-calculus-4", 0, iso("2026-10-02")),
+      a("att-m1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10")),
+      a("s1", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-15")), a("s2", MATHS, "calculus", "maths-calculus-3", 3, iso("2026-09-25")),
+      a("s3", MATHS, "calculus", "maths-calculus-4", 0, iso("2026-10-02")),
     ];
-    const plan = rankRevisionActions(engine({ questions, mistakes, attempts, subjectIds: ["maths"], examDates: [exam("maths", 30)] }));
+    const plan = rankRevisionActions(engine({ questions, mistakes, attempts, subjectIds: [MATHS], examDates: [exam(MATHS, 30)] }));
     expect(plan.top!.type).toBe("regression-recovery");
     expect(plan.top!.requiredFirst).toBe(true);
     expect(plan.top!.proofStatus).toBe("regressed");
   });
 
   it("treats missing exam dates as unknown, not urgent", () => {
-    expect(daysToNearestExam([], "maths", NOW)).toBeNull();
-    expect(daysToNearestExam([exam("maths", 5), exam("maths", 20)], "maths", NOW)).toBe(5);
+    expect(daysToNearestExam([], MATHS, NOW)).toBeNull();
+    expect(daysToNearestExam([exam(MATHS, 5), exam(MATHS, 20)], MATHS, NOW)).toBe(5);
   });
 });
 
 describe("exam countdown strategy", () => {
   const base = () => {
     const s = scenario();
-    const papers = [{ subjectId: "physics", paperId: "paper-9", title: "2024 Physics Unit 1" }];
-    return { ...s, subjectIds: ["physics"], papers, dueReviews: [{ subjectId: "physics", count: 20, overdue: 4 }], untouched: [{ subjectId: "physics", topicId: "waves", label: "Waves", share: 0.08 }] };
+    const papers = [{ subjectId: PHY, paperId: "paper-9", title: "2024 Physics Unit 1" }];
+    return { ...s, subjectIds: [PHY], papers, dueReviews: [{ subjectId: PHY, count: 20, overdue: 4 }], untouched: [{ subjectId: PHY, topicId: "waves", label: "Waves", share: 0.08 }] };
   };
-  const at = (days: number) => rankRevisionActions(engine({ ...base(), examDates: [exam("physics", days)] }));
+  const at = (days: number) => rankRevisionActions(engine({ ...base(), examDates: [exam(PHY, days)] }));
 
   it("changes what is offered as the exam approaches", () => {
     const far = at(60);
@@ -152,7 +185,7 @@ describe("exam countdown strategy", () => {
     const final = at(2);
     const urgent = final.actions.find((x) => x.type === "exam-urgent")!;
     expect(urgent.explanation.proves).toMatch(/no time left/i);
-    const physics = collectMissions({ ...engine({ ...base(), examDates: [exam("physics", 2)] }), includeProven: true }).filter((x) => x.subjectId === "physics");
+    const physics = collectMissions({ ...engine({ ...base(), examDates: [exam(PHY, 2)] }), includeProven: true }).filter((x) => x.subjectId === PHY);
     expect(physics.length).toBeGreaterThan(0);
     for (const mission of physics) expect(mission.stages.some((s) => s.kind === "delayed-proof")).toBe(false);
   });
@@ -160,22 +193,22 @@ describe("exam countdown strategy", () => {
 
 describe("thin evidence and evidence gaps", () => {
   it("states uncertainty and low confidence when there is almost no evidence", () => {
-    const questions = bank("physics", "circuits", 4);
-    const mistakes = [m("p1", "physics", "circuits", "physics-circuits-0", { marksLost: 3 })];
-    const plan = rankRevisionActions(engine({ questions, mistakes, attempts: [], subjectIds: ["physics"], examDates: [exam("physics", 30)] }));
+    const questions = bank(PHY, "circuits", 4);
+    const mistakes = [m("p1", PHY, "circuits", "physics-circuits-0", { marksLost: 3 })];
+    const plan = rankRevisionActions(engine({ questions, mistakes, attempts: [], subjectIds: [PHY], examDates: [exam(PHY, 30)] }));
     const top = plan.top!;
     expect(top.confidence).toBeLessThan(0.6);
     expect(top.explanation.evidence.join(" ")).toMatch(/thin|no proof yet/i);
   });
 
   it("turns an unprovable mission into an explicit evidence-gap action that can still be practised", () => {
-    const questions = bank("physics", "circuits", 3);
-    const mistakes = [m("p1", "physics", "circuits", "physics-circuits-0", { marksLost: 3 }), m("p2", "physics", "circuits", "physics-circuits-1", { marksLost: 3, createdAt: iso("2026-09-22") })];
+    const questions = bank(PHY, "circuits", 3);
+    const mistakes = [m("p1", PHY, "circuits", "physics-circuits-0", { marksLost: 3 }), m("p2", PHY, "circuits", "physics-circuits-1", { marksLost: 3, createdAt: iso("2026-09-22") })];
     const attempts = [
-      a("att-p1", "physics", "circuits", "physics-circuits-0", 0, iso("2026-09-20")), a("att-p2", "physics", "circuits", "physics-circuits-1", 0, iso("2026-09-22")),
-      a("s1", "physics", "circuits", "physics-circuits-2", 3, iso("2026-09-25")),
+      a("att-p1", PHY, "circuits", "physics-circuits-0", 0, iso("2026-09-20")), a("att-p2", PHY, "circuits", "physics-circuits-1", 0, iso("2026-09-22")),
+      a("s1", PHY, "circuits", "physics-circuits-2", 3, iso("2026-09-25")),
     ];
-    const plan = rankRevisionActions(engine({ questions, mistakes, attempts, subjectIds: ["physics"], examDates: [exam("physics", 30)] }));
+    const plan = rankRevisionActions(engine({ questions, mistakes, attempts, subjectIds: [PHY], examDates: [exam(PHY, 30)] }));
     const gap = plan.actions.find((x) => x.type === "evidence-gap");
     expect(gap).toBeDefined();
     expect(gap!.explanation.evidence.join(" ")).toMatch(/cannot currently prove the improvement/);
@@ -202,25 +235,25 @@ describe("thin evidence and evidence gaps", () => {
   });
 
   it("supply counts only unseen verified questions as able to prove", () => {
-    const questions = bank("maths", "calculus", 4);
-    const seen = [a("s", "maths", "calculus", "maths-calculus-0", 3, iso("2026-09-01"))];
+    const questions = bank(MATHS, "calculus", 4);
+    const seen = [a("s", MATHS, "calculus", "maths-calculus-0", 3, iso("2026-09-01"))];
     expect(unseenSupplyByTopic(["calculus"], questions, seen).calculus!.provable).toBe(3);
   });
 });
 
 describe("mission sessions", () => {
   const s = scenario();
-  const base = engine({ ...s, subjectIds: ["physics"], mistakes: s.mistakes.filter((x) => x.subjectId === "physics") });
+  const base = engine({ ...s, subjectIds: [PHY], mistakes: s.mistakes.filter((x) => x.subjectId === PHY) });
   const mission = () => buildExamMissions({ mistakes: base.mistakes, recovery: base.recovery, daysToExam: 30, unseenByTopic: {}, supplyByTopic: base.supplyByTopic })[0]!;
 
   it("selects questions for the mission's weakness, spread across its topics, and attributes every attempt", () => {
     const ms = [
-      m("u1", "physics", "circuits", "p-c-0", { marksLost: 3 }), m("u2", "physics", "fields", "p-f-0", { marksLost: 3, createdAt: iso("2026-09-22") }),
+      m("u1", PHY, "circuits", "p-c-0", { marksLost: 3 }), m("u2", PHY, "fields", "p-f-0", { marksLost: 3, createdAt: iso("2026-09-22") }),
     ];
     const questions = [
-      q("p-c-0", "physics", "circuits", { kind: "calculation" }), q("p-f-0", "physics", "fields", { kind: "calculation" }),
-      ...["c1", "c2", "c3"].map((id) => q(id, "physics", "circuits", { kind: "calculation" })), ...["f1", "f2", "f3"].map((id) => q(id, "physics", "fields", { kind: "structured" })),
-    ];
+      q("p-c-0", PHY, "circuits", { kind: "calculation" }), q("p-f-0", PHY, "fields", { kind: "calculation" }),
+      ...["c1", "c2", "c3"].map((id) => q(id, PHY, "circuits", { kind: "calculation" })), ...["f1", "f2", "f3"].map((id) => q(id, PHY, "fields", { kind: "structured" })),
+    ].map(reviewed);
     const recovery = buildMarkRecovery({ mistakes: ms, attempts: [], questions, now: NOW });
     const mis = buildExamMissions({ mistakes: ms, recovery, daysToExam: 30, unseenByTopic: {}, supplyByTopic: unseenSupplyByTopic(["circuits", "fields"], questions, []) })[0]!;
     expect(mis.topicIds).toEqual(["circuits", "fields"]);
@@ -231,19 +264,41 @@ describe("mission sessions", () => {
     expect(practise.steps[0]!.hintBudget).toBeUndefined();
     for (const id of practise.questionIds) expect(practise.contextFor[id]).toMatchObject({ missionId: mis.id, stage: "practise", targetCause: "unit-error", sourceMistakeIds: ["u1", "u2"] });
     const apply = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "apply");
+    expect(apply.steps.length).toBeGreaterThan(0);
     expect(apply.steps.every((st) => st.hintBudget === 0 && st.verified)).toBe(true);
     const repair = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "repair");
     expect(repair.questionIds.sort()).toEqual(["p-c-0", "p-f-0"]);
   });
 
   it("reports the limit instead of inventing a proof stage when no verified unseen question exists", () => {
-    const ms = [m("u1", "physics", "circuits", "p-c-0", { marksLost: 3 })];
-    const questions = [q("p-c-0", "physics", "circuits")];
+    const ms = [m("u1", PHY, "circuits", "p-c-0", { marksLost: 3 })];
+    const questions = [q("p-c-0", PHY, "circuits")];
     const recovery = buildMarkRecovery({ mistakes: ms, attempts: [], questions, now: NOW });
     const mis = buildExamMissions({ mistakes: ms, recovery, daysToExam: 30, unseenByTopic: {} })[0]!;
     const apply = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "apply");
     expect(apply.questionIds).toEqual([]);
     expect(apply.limit).toMatch(/cannot (currently )?prove|enough reviewed new questions/i);
+  });
+
+  it("never offers a reference-tier question as proof, even when plenty are unseen", () => {
+    // Reference-tier subjects pass the permissive authoring predicate, but are
+    // labelled "not checked against the specification", so they must never
+    // feed a step that says it "proves the marks are back".
+    const REF = "gcse-geography";
+    const ms = [m("r1", REF, "rivers", "g-0", { marksLost: 3 })];
+    const questions = Array.from({ length: 6 }, (_, i) => q(`g-${i}`, REF, "rivers", { kind: "structured" }));
+    const supply = unseenSupplyByTopic(["rivers"], questions, []);
+    expect(supply.rivers).toEqual({ provable: 0, practiceOnly: 6, transfer: 0 });
+    const recovery = buildMarkRecovery({ mistakes: ms, attempts: [], questions, now: NOW });
+    const mis = buildExamMissions({ mistakes: ms, recovery, daysToExam: 30, unseenByTopic: {}, supplyByTopic: supply })[0]!;
+    for (const stage of ["apply", "delayed-proof"] as const) {
+      const session = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, stage);
+      expect(session.questionIds).toEqual([]);
+      expect(session.steps.some((st) => /proves the marks are back/.test(st.why))).toBe(false);
+      expect(session.limit).toBeTruthy();
+    }
+    // Practice is still served: reference content is practice-only, not hidden.
+    expect(buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "practise").questionIds.length).toBeGreaterThan(0);
   });
 
   it("builds a delayed check from questions unlike anything answered so far", () => {
@@ -257,7 +312,7 @@ describe("mission sessions", () => {
 
 describe("learner-specific effectiveness", () => {
   const chain = (i: number, intervention: string, cause: string | null, gain: number, durable = true): MissionChain => ({
-    missionId: `m${i}${intervention}${cause}`, intervention, cause, subjectId: "physics", baseline: 0.3, immediate: 0.6, differentQuestion: 0.6, transfer: null,
+    missionId: `m${i}${intervention}${cause}`, intervention, cause, subjectId: PHY, baseline: 0.3, immediate: 0.6, differentQuestion: 0.6, transfer: null,
     delayed: 0.3 + gain, delayedMarks: 3, minutes: 10, durable, gain: durable ? gain : null,
   });
   const many = (n: number, intervention: string, cause: string | null, gain: number) => Array.from({ length: n }, (_, i) => chain(i, intervention, cause, gain));
@@ -288,14 +343,14 @@ describe("learner-specific effectiveness", () => {
   });
 
   it("rebuilds a mission chain from attributed attempts, counting only independent verified different-question answers", () => {
-    const questions = bank("physics", "circuits", 8);
-    const ms = [m("u1", "physics", "circuits", "physics-circuits-0", { marksLost: 3, attemptId: "src" })];
+    const questions = bank(PHY, "circuits", 8);
+    const ms = [m("u1", PHY, "circuits", "physics-circuits-0", { marksLost: 3, attemptId: "src" })];
     const ctx = (stage: "repair" | "apply" | "delayed-proof") => ({ missionId: "mission:x", stage, intervention: stage === "repair" ? "technique-intervention" : "independent-set", targetCause: "unit-error", sourceMistakeIds: ["u1"] });
     const attempts = [
-      a("src", "physics", "circuits", "physics-circuits-0", 0, iso("2026-09-10")),
-      a("r", "physics", "circuits", "physics-circuits-1", 2, iso("2026-09-11"), { mission: ctx("repair"), hintTier: "cue" }),
-      a("p", "physics", "circuits", "physics-circuits-2", 3, iso("2026-09-12"), { mission: ctx("apply") }),
-      a("d", "physics", "circuits", "physics-circuits-3", 3, iso("2026-09-20"), { mission: ctx("delayed-proof") }),
+      a("src", PHY, "circuits", "physics-circuits-0", 0, iso("2026-09-10")),
+      a("r", PHY, "circuits", "physics-circuits-1", 2, iso("2026-09-11"), { mission: ctx("repair"), hintTier: "cue" }),
+      a("p", PHY, "circuits", "physics-circuits-2", 3, iso("2026-09-12"), { mission: ctx("apply") }),
+      a("d", PHY, "circuits", "physics-circuits-3", 3, iso("2026-09-20"), { mission: ctx("delayed-proof") }),
     ];
     const [c] = missionChains({ attempts, mistakes: ms, questions });
     expect(c).toMatchObject({ intervention: "technique-intervention", cause: "unit-error", durable: true });
@@ -306,12 +361,12 @@ describe("learner-specific effectiveness", () => {
 });
 
 describe("marks recovered narrative", () => {
-  const questions = bank("maths", "calculus", 6);
-  const ms = [m("m1", "maths", "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10"), attemptId: "att-m1", ao: "AO2" }), m("m2", "maths", "calculus", "maths-calculus-1", { marksLost: 2, createdAt: iso("2026-09-10"), attemptId: "att-m2" })];
+  const questions = bank(MATHS, "calculus", 6);
+  const ms = [m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10"), attemptId: "att-m1", ao: "AO2" }), m("m2", MATHS, "calculus", "maths-calculus-1", { marksLost: 2, createdAt: iso("2026-09-10"), attemptId: "att-m2" })];
   const ctx = { missionId: "mission:x", stage: "apply" as const, intervention: "independent-set", targetCause: "unit-error", sourceMistakeIds: ["m1"] };
   const attempts = [
-    a("att-m1", "maths", "calculus", "maths-calculus-0", 0, iso("2026-09-10")), a("att-m2", "maths", "calculus", "maths-calculus-1", 0, iso("2026-09-10")),
-    a("s1", "maths", "calculus", "maths-calculus-2", 3, iso("2026-09-30"), { mission: ctx }),
+    a("att-m1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10")), a("att-m2", MATHS, "calculus", "maths-calculus-1", 0, iso("2026-09-10")),
+    a("s1", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-30"), { mission: ctx }),
   ];
   const r = buildMarkRecovery({ mistakes: ms, attempts, questions, now: NOW });
 
@@ -326,7 +381,7 @@ describe("marks recovered narrative", () => {
 
   it("lets the student see where marks came from", () => {
     const bySubject = recoveryBreakdown({ items: r.items, mistakes: ms, attempts, by: "subject" });
-    expect(bySubject[0]).toMatchObject({ key: "maths", lost: 6 });
+    expect(bySubject[0]).toMatchObject({ key: MATHS, lost: 6 });
     const byIntervention = recoveryBreakdown({ items: r.items, mistakes: ms, attempts, by: "intervention" });
     expect(byIntervention.find((x) => x.key === "independent-set")?.awaitingProof).toBe(6);
     expect(recoveryBreakdown({ items: r.items, mistakes: ms, attempts, by: "ao" }).map((x) => x.key)).toEqual(expect.arrayContaining(["AO2", "none"]));
@@ -336,15 +391,15 @@ describe("marks recovered narrative", () => {
 
 describe("paper recovery diagnosis", () => {
   it("separates knowledge from technique, flags repeats across papers and weakly evidenced areas", () => {
-    const questions = [...bank("physics", "circuits", 4), ...bank("physics", "fields", 4)];
+    const questions = [...bank(PHY, "circuits", 4), ...bank(PHY, "fields", 4)];
     const ms = [
-      m("a", "physics", "circuits", "physics-circuits-0", { marksLost: 3, attemptId: "pa", createdAt: iso("2026-09-10") }),
-      m("b", "physics", "fields", "physics-fields-0", { marksLost: 2, attemptId: "pb", category: "recall", workingErrorKind: undefined, createdAt: iso("2026-09-10") }),
-      m("c", "physics", "circuits", "physics-circuits-1", { marksLost: 3, attemptId: "pc", createdAt: iso("2026-08-10") }),
+      m("a", PHY, "circuits", "physics-circuits-0", { marksLost: 3, attemptId: "pa", createdAt: iso("2026-09-10") }),
+      m("b", PHY, "fields", "physics-fields-0", { marksLost: 2, attemptId: "pb", category: "recall", workingErrorKind: undefined, createdAt: iso("2026-09-10") }),
+      m("c", PHY, "circuits", "physics-circuits-1", { marksLost: 3, attemptId: "pc", createdAt: iso("2026-08-10") }),
     ];
     const attempts = [
-      a("pa", "physics", "circuits", "physics-circuits-0", 0, iso("2026-09-10"), { paperId: "p1" }), a("pb", "physics", "fields", "physics-fields-0", 0, iso("2026-09-10"), { paperId: "p1" }),
-      a("pf", "physics", "fields", "physics-fields-2", 3, iso("2026-09-10"), { paperId: "p1" }), a("pc", "physics", "circuits", "physics-circuits-1", 0, iso("2026-08-10"), { paperId: "p0" }),
+      a("pa", PHY, "circuits", "physics-circuits-0", 0, iso("2026-09-10"), { paperId: "p1" }), a("pb", PHY, "fields", "physics-fields-0", 0, iso("2026-09-10"), { paperId: "p1" }),
+      a("pf", PHY, "fields", "physics-fields-2", 3, iso("2026-09-10"), { paperId: "p1" }), a("pc", PHY, "circuits", "physics-circuits-1", 0, iso("2026-08-10"), { paperId: "p0" }),
     ];
     const recovery = buildMarkRecovery({ mistakes: ms, attempts, questions, now: NOW });
     const r = buildPaperRecovery({ paperId: "p1", title: "Paper 1", mistakes: ms, recovery, attempts, questions })!;
@@ -358,16 +413,16 @@ describe("paper recovery diagnosis", () => {
 });
 
 describe("end-to-end journeys", () => {
-  const subjectIds = ["maths"];
-  const questions = bank("maths", "calculus", 10);
+  const subjectIds = [MATHS];
+  const questions = bank(MATHS, "calculus", 10);
   const ctx = (stage: "repair" | "practise" | "apply" | "delayed-proof", missionId: string) => ({ missionId, stage, intervention: "technique-intervention", targetCause: "unit-error", sourceMistakeIds: ["m1", "m2"] });
   const mistakes = [
-    m("m1", "maths", "calculus", "maths-calculus-0", { marksLost: 3, createdAt: iso("2026-09-10"), attemptId: "src1" }),
-    m("m2", "maths", "calculus", "maths-calculus-1", { marksLost: 3, createdAt: iso("2026-09-11"), attemptId: "src2" }),
+    m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 3, createdAt: iso("2026-09-10"), attemptId: "src1" }),
+    m("m2", MATHS, "calculus", "maths-calculus-1", { marksLost: 3, createdAt: iso("2026-09-11"), attemptId: "src2" }),
   ];
-  const source = [a("src1", "maths", "calculus", "maths-calculus-0", 0, iso("2026-09-10")), a("src2", "maths", "calculus", "maths-calculus-1", 0, iso("2026-09-11"))];
+  const source = [a("src1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10")), a("src2", MATHS, "calculus", "maths-calculus-1", 0, iso("2026-09-11"))];
   const view = (attempts: Attempt[], now: Date) => {
-    const input = engine({ questions, mistakes, attempts, subjectIds, examDates: [exam("maths", 40)], now });
+    const input = engine({ questions, mistakes, attempts, subjectIds, examDates: [exam(MATHS, 40)], now });
     const recovery = buildMarkRecovery({ mistakes, attempts, questions, now });
     return { plan: rankRevisionActions({ ...input, recovery, now }), recovery };
   };
@@ -381,12 +436,12 @@ describe("end-to-end journeys", () => {
     expect(recovery.totals.open).toBe(6);
     expect(plan.top!.proofStatus).toBe("needs-work");
     // 5–6: targeted repair, supported answer improves (hinted, so provisional at best).
-    let attempts = [...source, a("r1", "maths", "calculus", "maths-calculus-2", 3, iso("2026-09-12"), { mission: ctx("repair", missionId), hintTier: "cue" })];
+    let attempts = [...source, a("r1", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-12"), { mission: ctx("repair", missionId), hintTier: "cue" })];
     ({ plan, recovery } = view(attempts, new Date("2026-09-13T09:00:00Z")));
     expect(recovery.totals.proven).toBe(0);
     expect(plan.top!.mission!.stage).not.toBe("repair");
     // 7–8: a different independent question succeeds → awaiting proof, not proven.
-    attempts = [...attempts, a("i1", "maths", "calculus", "maths-calculus-3", 3, iso("2026-09-13"), { mission: ctx("apply", missionId) })];
+    attempts = [...attempts, a("i1", MATHS, "calculus", "maths-calculus-3", 3, iso("2026-09-13"), { mission: ctx("apply", missionId) })];
     ({ plan, recovery } = view(attempts, new Date("2026-09-14T09:00:00Z")));
     expect(recovery.totals.awaitingProof).toBe(6);
     expect(recovery.totals.proven).toBe(0);
@@ -395,39 +450,39 @@ describe("end-to-end journeys", () => {
     // 9–10: after the delay a proof check is offered; passing it proves the marks.
     ({ plan } = view(attempts, new Date("2026-09-20T09:00:00Z")));
     expect(plan.top!.type).toBe("proof-check");
-    attempts = [...attempts, a("d1", "maths", "calculus", "maths-calculus-4", 3, iso("2026-09-21"), { mission: ctx("delayed-proof", missionId) })];
+    attempts = [...attempts, a("d1", MATHS, "calculus", "maths-calculus-4", 3, iso("2026-09-21"), { mission: ctx("delayed-proof", missionId) })];
     ({ plan, recovery } = view(attempts, new Date("2026-09-22T09:00:00Z")));
     expect(recovery.totals.proven).toBe(6);
     expect(plan.actions.some((x) => x.mission?.id === missionId)).toBe(false);
     // 11–12: a later failure reopens recovery.
-    attempts = [...attempts, a("f1", "maths", "calculus", "maths-calculus-5", 0, iso("2026-10-01"))];
+    attempts = [...attempts, a("f1", MATHS, "calculus", "maths-calculus-5", 0, iso("2026-10-01"))];
     ({ plan, recovery } = view(attempts, new Date("2026-10-02T09:00:00Z")));
     expect(recovery.totals.regressed).toBeGreaterThan(0);
     expect(plan.top!.type).toBe("regression-recovery");
   });
 
   it("paper recovery: paper → autopsy → mission → repair → equivalent retest → delayed proof → closed", () => {
-    const pq = [...bank("maths", "calculus", 8), ...bank("maths", "algebra", 8)];
+    const pq = [...bank(MATHS, "calculus", 8), ...bank(MATHS, "algebra", 8)];
     const ms = [
-      m("a1", "maths", "calculus", "maths-calculus-0", { marksLost: 3, attemptId: "pa1", createdAt: iso("2026-09-10") }),
-      m("a2", "maths", "algebra", "maths-algebra-0", { marksLost: 3, attemptId: "pa2", createdAt: iso("2026-09-10") }),
+      m("a1", MATHS, "calculus", "maths-calculus-0", { marksLost: 3, attemptId: "pa1", createdAt: iso("2026-09-10") }),
+      m("a2", MATHS, "algebra", "maths-algebra-0", { marksLost: 3, attemptId: "pa2", createdAt: iso("2026-09-10") }),
     ];
-    const paper = [a("pa1", "maths", "calculus", "maths-calculus-0", 0, iso("2026-09-10"), { paperId: "P" }), a("pa2", "maths", "algebra", "maths-algebra-0", 0, iso("2026-09-10"), { paperId: "P" })];
+    const paper = [a("pa1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10"), { paperId: "P" }), a("pa2", MATHS, "algebra", "maths-algebra-0", 0, iso("2026-09-10"), { paperId: "P" })];
     const stageOf = (attempts: Attempt[], now: Date) => {
       const recovery = buildMarkRecovery({ mistakes: ms, attempts, questions: pq, now });
       return buildPaperRecovery({ paperId: "P", title: "2025 Unit 1", mistakes: ms, recovery, attempts, questions: pq })!;
     };
     expect(stageOf(paper, NOW).stage).toBe("autopsy");
-    const missions = collectMissions({ ...engine({ questions: pq, mistakes: ms, attempts: paper, subjectIds, examDates: [exam("maths", 40)] }) });
+    const missions = collectMissions({ ...engine({ questions: pq, mistakes: ms, attempts: paper, subjectIds, examDates: [exam(MATHS, 40)] }) });
     expect(missions.some((x) => x.origin === "paper" && x.paperId === "P")).toBe(true);
-    const first = [...paper, a("e1", "maths", "calculus", "maths-calculus-1", 3, iso("2026-09-12")), a("e2", "maths", "algebra", "maths-algebra-1", 3, iso("2026-09-12"))];
+    const first = [...paper, a("e1", MATHS, "calculus", "maths-calculus-1", 3, iso("2026-09-12")), a("e2", MATHS, "algebra", "maths-algebra-1", 3, iso("2026-09-12"))];
     expect(stageOf(first, new Date("2026-09-13T09:00:00Z")).stage).toBe("delayed-verification");
-    const later = [...first, a("e3", "maths", "calculus", "maths-calculus-2", 3, iso("2026-09-20")), a("e4", "maths", "algebra", "maths-algebra-2", 3, iso("2026-09-20"))];
+    const later = [...first, a("e3", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-20")), a("e4", MATHS, "algebra", "maths-algebra-2", 3, iso("2026-09-20"))];
     const done = stageOf(later, new Date("2026-09-21T09:00:00Z"));
     expect(done.stage).toBe("closed");
     expect(done.totals.proven).toBe(6);
     // Revision activity alone never closes it.
-    const sameQuestionOnly = [...paper, a("x1", "maths", "calculus", "maths-calculus-0", 3, iso("2026-09-12")), a("x2", "maths", "algebra", "maths-algebra-0", 3, iso("2026-09-20"))];
+    const sameQuestionOnly = [...paper, a("x1", MATHS, "calculus", "maths-calculus-0", 3, iso("2026-09-12")), a("x2", MATHS, "algebra", "maths-algebra-0", 3, iso("2026-09-20"))];
     expect(stageOf(sameQuestionOnly, new Date("2026-09-21T09:00:00Z")).stage).not.toBe("closed");
   });
 });
@@ -470,13 +525,13 @@ describe("evidence classes and vocabulary", () => {
 describe("due reviews are not a second decision", () => {
   it("does not offer a separate review for cards the adaptive session already retrieves", () => {
     const s = scenario();
-    const adaptive = { subjectId: "biology", topicId: "cells", topicTitle: "cells", totalMinutes: 20, startHref: "/adaptive-session?topic=cells&start=1", reason: "r", score: 1, evidence: { dueCount: 16, dueCardIds: Array.from({ length: 16 }, (_, i) => `c${i}`), openMistakeIds: [], overdueCount: 0, openMistakes: 0, marksLost: 0, mastery: 0.5, retention: 0.5, daysSinceStudy: null, daysToExam: null, examUrgency: 0, questionCount: 0, attempts: 0, focus: "recall", focusState: "unknown", factors: {} } } as never;
-    const base = engine({ ...s, subjectIds: ["biology"], mistakes: [], attempts: [], adaptive, dueReviews: [{ subjectId: "biology", count: 16, overdue: 0 }] });
+    const adaptive = { subjectId: BIO, topicId: "cells", topicTitle: "cells", totalMinutes: 20, startHref: "/adaptive-session?topic=cells&start=1", reason: "r", score: 1, evidence: { dueCount: 16, dueCardIds: Array.from({ length: 16 }, (_, i) => `c${i}`), openMistakeIds: [], overdueCount: 0, openMistakes: 0, marksLost: 0, mastery: 0.5, retention: 0.5, daysSinceStudy: null, daysToExam: null, examUrgency: 0, questionCount: 0, attempts: 0, focus: "recall", focusState: "unknown", factors: {} } } as never;
+    const base = engine({ ...s, subjectIds: [BIO], mistakes: [], attempts: [], adaptive, dueReviews: [{ subjectId: BIO, count: 16, overdue: 0 }] });
     expect(rankRevisionActions(base).actions.some((x) => x.type === "due-reviews")).toBe(false);
-    const backlog = rankRevisionActions({ ...base, dueReviews: [{ subjectId: "biology", count: 90, overdue: 80 }] });
+    const backlog = rankRevisionActions({ ...base, dueReviews: [{ subjectId: BIO, count: 90, overdue: 80 }] });
     expect(backlog.actions.some((x) => x.type === "due-reviews")).toBe(true);
     // A normal day's reviews never outrank the session that already includes retrieval.
-    expect(rankRevisionActions({ ...base, dueReviews: [{ subjectId: "biology", count: 22, overdue: 0 }] }).top!.type).not.toBe("due-reviews");
+    expect(rankRevisionActions({ ...base, dueReviews: [{ subjectId: BIO, count: 22, overdue: 0 }] }).top!.type).not.toBe("due-reviews");
     expect(backlog.top!.type).toBe("due-reviews");
     expect(rankRevisionActions(base).top!.route.href).toBe("/adaptive-session?topic=cells&start=1");
   });
@@ -490,7 +545,7 @@ describe("honest copy and consistent minutes", () => {
 
   it("shows the minutes the mission session will actually take", () => {
     const s = scenario();
-    const input = engine({ ...s, subjectIds: ["physics"] });
+    const input = engine({ ...s, subjectIds: [PHY] });
     const top = rankRevisionActions(input).top!;
     const mission = collectMissions(input).find((x) => x.id === top.mission!.id)!;
     expect(top.minutes).toBe(Math.max(3, Math.ceil(buildMissionSession(mission, { questions: s.questions, attempts: s.attempts, mistakes: input.mistakes }, top.mission!.stage).minutes)));
@@ -511,7 +566,7 @@ describe("available session length", () => {
 
   it("leaves ranking identical when the budget fits everything", () => {
     const s = scenario();
-    const subjects = ["physics", "biology", "maths", "chemistry"] as const;
+    const subjects = [PHY, BIO, MATHS, CHEM] as const;
     const base = rankRevisionActions(engine({ ...s, subjectIds: [...subjects] }));
     const ample = rankRevisionActions(engine({ ...s, subjectIds: [...subjects], availableMinutes: 1_000_000 }));
     expect(ids(ample)).toEqual(ids(base));
@@ -521,7 +576,7 @@ describe("available session length", () => {
 
   it("never empties Today for a very short session", () => {
     const s = scenario();
-    const subjects = ["physics", "biology", "maths", "chemistry"] as const;
+    const subjects = [PHY, BIO, MATHS, CHEM] as const;
     const full = rankRevisionActions(engine({ ...s, subjectIds: [...subjects] }));
     const tiny = rankRevisionActions(engine({ ...s, subjectIds: [...subjects], availableMinutes: 1 }));
     expect(tiny.top).not.toBeNull();

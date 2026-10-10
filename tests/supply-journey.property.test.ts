@@ -154,9 +154,9 @@ describe("scarce question supply", () => {
           //   (a) too few reviewed questions to build anything from, which the
           //       screen explains; or
           //   (b) nothing left to act on — every topic started, no mistakes to
-          //       repair, no cards due. (b) is a real reachability gap: a learner
-          //       in that state gets a bare screen. Recorded rather than papered
-          //       over, because closing it needs a new action, not a new message.
+          //       repair, no cards due, and no unseen question left to practise.
+          //       While unseen questions remain, the engine's "Keep practising"
+          //       fallback ranks instead (see the seed-1002749685 regression below).
           const supply = supplySnapshot(bank, []);
           const reviewable = Object.values(supply).reduce((sum, row) => sum + row.provable, 0);
           const note = reviewedSupplyNote({ supplyByTopic: supply, subjectLabels: ["A level Mathematics"] });
@@ -282,6 +282,23 @@ describe("scarce question supply", () => {
       expect(answered.every((id) => bank2.some((q) => q.id === id))).toBe(true);
     }), RUNS);
   }, 60_000);
+});
+
+describe("a learner who has started everything", () => {
+  it("still gets a next step while unseen questions remain (seed 1002749685)", () => {
+    // Shrunk counterexample: two topics, two reviewed questions each, a win in
+    // each topic. Nothing is due and no marks are lost, but four unseen
+    // questions remain — Today used to rank nothing and blame review supply.
+    const { cycles, bank } = runJourney(2, 2, 3, [true, true, false]);
+    const last = cycles[2]!;
+    expect(last.plan.top).not.toBeNull();
+    expect(last.plan.top!.type).toBe("adaptive-session");
+    expect(last.plan.top!.title).toMatch(/^Keep practising /);
+    expect(last.plan.top!.route.href).toMatch(/^\/adaptive-session\?topic=/);
+    const topic = last.plan.top!.topicIds[0]!;
+    expect(bank.some((q) => q.topicIds.includes(topic) && !last.seen.has(q.id))).toBe(true);
+    expect(last.plan.top!.proofStatus).toBeNull();
+  }, 30_000);
 });
 
 describe("what a brand-new learner is offered", () => {

@@ -4,14 +4,17 @@ import { buildMarkRecovery } from "@/domain/mark-recovery";
 import { buildPaperRecovery } from "@/domain/paper-recovery";
 import { buildSessionEvidence } from "@/domain/session-evidence";
 import { buildMistakePatterns } from "@/domain/mistake-patterns";
-import { attempt, bank, mistake } from "./helpers-recovery";
+// Proof lifecycle fixtures sit on a reviewed flagship: reference-tier content
+// can never prove a mark, and review-gated mistakes link to the exact attempt
+// that lost them.
+import { flagshipAttempt as attempt, flagshipBank as bank, flagshipMistake as mistake } from "./helpers-recovery";
 
 const NOW = new Date("2026-10-03T12:00:00.000Z");
 const unitMistakes = [
   mistake("m1", { workingErrorKind: "unit-error", questionId: "q-a1", createdAt: "2026-09-18T09:00:00.000Z", attemptId: "p1" }),
-  mistake("m2", { workingErrorKind: "conversion-error", questionId: "q-g1", topicId: "geometry", createdAt: "2026-09-20T09:00:00.000Z", attemptId: "p1" }),
+  mistake("m2", { workingErrorKind: "conversion-error", questionId: "q-g1", topicId: "geometry", createdAt: "2026-09-20T09:00:00.000Z", attemptId: "p2" }),
 ];
-const paperAttempts = [attempt("p1", "q-a1", 0, 3, "2026-09-18T08:00:00.000Z", { paperSpecId: "paper-1" })];
+const paperAttempts = [attempt("p1", "q-a1", 0, 3, "2026-09-18T08:00:00.000Z", { paperSpecId: "paper-1" }), attempt("p2", "q-g1", 0, 3, "2026-09-20T08:00:00.000Z", { paperSpecId: "paper-1", topicIds: ["geometry"] })];
 
 function input(attempts = paperAttempts, over: Partial<MissionInput> = {}, mistakes = unitMistakes) {
   const recovery = buildMarkRecovery({ mistakes, attempts, questions: bank, now: NOW });
@@ -86,7 +89,7 @@ describe("exam missions", () => {
       attempt("a1", "q-a2", 3, 3, "2026-09-22T09:00:00.000Z"), attempt("a2", "q-a3", 3, 3, "2026-09-30T09:00:00.000Z"),
       attempt("a3", "q-a4", 0, 3, "2026-10-02T09:00:00.000Z"),
     ];
-    const ms = [mistake("m1", { workingErrorKind: "unit-error" })];
+    const ms = [mistake("m1", { workingErrorKind: "unit-error", attemptId: "p1" })];
     const missions = buildExamMissions(input(attempts, {}, ms));
     expect(missions[0].status).toBe("regressed");
     expect(missions[0].current.kind).toBe("repair");
@@ -94,7 +97,7 @@ describe("exam missions", () => {
 
   it("is blocked, not secure, when there are too few unseen questions to prove improvement", () => {
     const attempts = [...paperAttempts, attempt("a1", "q-a2", 3, 3, "2026-09-25T09:00:00.000Z")];
-    const ms = [mistake("m1", { workingErrorKind: "unit-error" })];
+    const ms = [mistake("m1", { workingErrorKind: "unit-error", attemptId: "p1" })];
     const [m] = buildExamMissions(input(attempts, { unseenByTopic: { algebra: 0 } }, ms));
     expect(m.proofPossible).toBe(false);
     expect(m.status).toBe("blocked");

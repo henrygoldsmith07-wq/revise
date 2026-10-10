@@ -9,7 +9,7 @@
 // say so when the supply is not there.
 // ---------------------------------------------------------------------------
 
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted } from "./content-trust";
 import type { ExamMission, MissionStageKind } from "./exam-mission";
 import { isTransferQuestion, partLearningMetadata, questionFamilies, unseenQuestion } from "./learning-evidence";
 import type { RootCause } from "./mistake-patterns";
@@ -99,8 +99,8 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
   const pool = input.questions.filter((q) => !sourceIds.has(q.id) && q.topicIds.some((t) => topics.includes(t)) && unseenQuestion(q, input.attempts, input.questions));
   const unseenPick = ({ max, verifiedOnly, transferOnly }: Pick): Question[] => {
     const cand = pool
-      .filter((q) => !used.has(q.id) && (!verifiedOnly || trustedAssessmentContent(q)) && (!transferOnly || isTransferQuestion(q)))
-      .sort((a, b) => causeFit(b, mission.cause) - causeFit(a, mission.cause) || Number(trustedAssessmentContent(b)) - Number(trustedAssessmentContent(a)) || a.id.localeCompare(b.id));
+      .filter((q) => !used.has(q.id) && (!verifiedOnly || learnerEvidenceTrusted(q)) && (!transferOnly || isTransferQuestion(q)))
+      .sort((a, b) => causeFit(b, mission.cause) - causeFit(a, mission.cause) || Number(learnerEvidenceTrusted(b)) - Number(learnerEvidenceTrusted(a)) || a.id.localeCompare(b.id));
     const out: Question[] = [];
     const topicCount = new Map<Id, number>();
     while (out.length < max) {
@@ -133,7 +133,7 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     if (!qs.length) return;
     steps.push({
       id: `${mission.id}:${kind}`, kind, title, why, questionIds: qs.map((q) => q.id), hintBudget,
-      minutes: round1(qs.reduce((s, q) => s + minutesFor(q), 0)), verified: qs.every(trustedAssessmentContent), context: ctx(kind),
+      minutes: round1(qs.reduce((s, q) => s + minutesFor(q), 0)), verified: qs.every(learnerEvidenceTrusted), context: ctx(kind),
     });
   };
 

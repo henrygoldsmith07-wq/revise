@@ -4,7 +4,7 @@
 // Unverified questions can still be practised, but never inflate a claim.
 // ---------------------------------------------------------------------------
 
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted } from "./content-trust";
 import { isTransferQuestion, unseenQuestion } from "./learning-evidence";
 import type { Attempt, Id, Question } from "./types";
 
@@ -24,7 +24,7 @@ export function unseenSupplyByTopic(topicIds: Iterable<Id>, questions: readonly 
   for (const q of questions) {
     const hits = q.topicIds.filter((t) => topics.has(t));
     if (!hits.length || !unseenQuestion(q, attempts, questions)) continue;
-    const trusted = trustedAssessmentContent(q);
+    const trusted = learnerEvidenceTrusted(q);
     const transfer = trusted && isTransferQuestion(q);
     for (const t of hits) {
       const row = out[t]!;

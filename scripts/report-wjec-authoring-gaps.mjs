@@ -12,6 +12,7 @@ const bundle = await build({
       'export { allTopics } from "./src/domain/curriculum";',
       'export { FLAGSHIP_SUBJECTS } from "./src/domain/flagship";',
       'export { flagshipTrustReadiness } from "./src/domain/flagship-trust";',
+      'export { approvableByReview, blockingGates, gateContextFromTopics, questionGateIssues } from "./src/domain/review-gates";',
     ].join("\n"),
     resolveDir: process.cwd(),
     loader: "ts",
@@ -26,14 +27,30 @@ const data = await import(
 );
 
 const topics = data.allTopics();
+const gate = data.gateContextFromTopics(topics);
 const subjects = {};
 const summary = [];
+// The ceiling is "core statements if every current question were approved".
+// A question failing a blocking review gate cannot be approved until an
+// author fixes it, so it never counts towards the ceiling. Before 2026-10-10
+// every question counted, and Physics showed 108/108 statements resting on
+// transfer slots filled only by questions labelled "transfer" with no
+// baseline link — approvals the reviewer portal refuses.
+const gateBlocked = {};
 for (const flagship of data.FLAGSHIP_SUBJECTS) {
+  const blockedByCode = {};
+  for (const question of data.questions) {
+    if (question.subjectId !== flagship.subjectId) continue;
+    for (const code of new Set(data.blockingGates(data.questionGateIssues(question, gate)).map((issue) => issue.code))) {
+      blockedByCode[code] = (blockedByCode[code] ?? 0) + 1;
+    }
+  }
+  gateBlocked[flagship.subjectId] = Object.fromEntries(Object.entries(blockedByCode).sort(([a], [b]) => a.localeCompare(b)));
   const report = data.flagshipTrustReadiness({
     subjectId: flagship.subjectId,
     topics,
     questions: data.questions,
-    trustedQuestion: () => true,
+    trustedQuestion: (question) => data.approvableByReview(question, gate),
     releaseQuestion: () => true,
   });
   const gaps = report.statements
@@ -59,7 +76,9 @@ for (const flagship of data.FLAGSHIP_SUBJECTS) {
 const expected = {
   formatVersion: 1,
   coreQuestionCount: 4,
-  model: "part-level-depth-v1",
+  model: "part-level-depth-v2-approvable",
+  /** Questions per subject failing each blocking review gate; they are excluded from the ceiling. */
+  gateBlocked,
   subjects,
 };
 
@@ -76,6 +95,17 @@ if (args.has("--check")) {
     process.exit(1);
   }
   if (JSON.stringify(current) !== JSON.stringify(expected)) {
+    // Name the most likely author mistake plainly: new content that can never
+    // be approved as written (for example "transfer" with no baseline link).
+    for (const [subjectId, codes] of Object.entries(gateBlocked)) {
+      for (const [code, count] of Object.entries(codes)) {
+        const before = current?.gateBlocked?.[subjectId]?.[code] ?? 0;
+        if (count > before) {
+          console.error(`${subjectId}: ${count - before} more question(s) now fail the blocking review gate "${code}" (${before} -> ${count}). ` +
+            "They can never be approved as written; fix them (e.g. add a transferLink to a real baseline, or label the part by its true demand) rather than refreshing.");
+        }
+      }
+    }
     console.error("WJEC authoring backlog is stale. Run: npm run wjec:authoring:refresh");
     process.exit(1);
   }
@@ -88,7 +118,8 @@ if (args.has("--json")) {
   for (const row of summary) {
     console.log([
       row.subjectId,
-      "core if every current question were approved " + row.authoredCeilingCoreStatements + "/" + row.statementsTotal,
+      "core if every approvable question were approved " + row.authoredCeilingCoreStatements + "/" + row.statementsTotal,
+      "gate-blocked " + Object.entries(gateBlocked[row.subjectId] ?? {}).map(([code, count]) => code + " " + count).join(", "),
       "gap statements " + row.authoringGapStatements,
       "statement slots missing " + row.statementSlotDeficit,
     ].join(" | "));
