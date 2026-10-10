@@ -179,6 +179,18 @@ export function classifyMistake(
   return { ...common, state: "proven", provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Answered independently on a different question after a delay." };
 }
 
+/**
+ * What a single attempt proved: the lost marks whose delayed proof is exactly
+ * this attempt and that are still proven now. This is the only basis on which
+ * a marked answer may say "proven" — one full-marks answer on its own never
+ * is (it needs an earlier independent success, a delay, a different reviewed
+ * flagship question). Pure.
+ */
+export function marksProvenByAttempt(recovery: Pick<MarkRecovery, "items">, attemptId: Id): { marks: number; topicIds: Id[] } {
+  const items = recovery.items.filter((i) => i.state === "proven" && i.provenAttemptId === attemptId);
+  return { marks: Math.round(items.reduce((s, i) => s + i.marks, 0) * 10) / 10, topicIds: [...new Set(items.map((i) => i.topicId))] };
+}
+
 export interface MarkRecovery {
   items: MistakeRecovery[];
   now: Date;

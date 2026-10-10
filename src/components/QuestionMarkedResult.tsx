@@ -22,7 +22,11 @@ import { ProofCheckBanner } from "./ProofCheckBanner";
 import { InterventionPrescriptionPanel } from "./InterventionPrescriptionPanel";
 import { RichText } from "./RichText";
 import { ButtonLink, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
-import { trustedAssessmentContent } from "@/domain/physics-content-review";
+import { learnerEvidenceTrusted } from "@/domain/content-trust";
+import { buildMarkRecovery, marksProvenByAttempt } from "@/domain/mark-recovery";
+import { officialPaperContextFromSettings } from "@/domain/official-papers";
+import { getTopic } from "@/domain/curriculum";
+import { useStoreFields } from "@/state/store";
 import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
@@ -89,6 +93,27 @@ export function MarkedResult({
     // Once per marked result.
   }, [result.retest?.status]);
   const showSocratic = question.kind !== "mcq" && awarded < question.totalMarks && Boolean(answers);
+  // "Proven" is said only when the mark-recovery ledger says this exact
+  // attempt was the delayed proof of an earlier loss. Full marks alone is
+  // practice: it was previously shown as "now proven" for any unaided answer
+  // on content passing the permissive authoring predicate — reference-tier
+  // outlines included — with no delay, prior success or new-question check.
+  const store = useStoreFields("attempts", "mistakes", "questions", "settings");
+  const fullMarks = awarded >= question.totalMarks && question.totalMarks > 0;
+  const proved = useMemo(() => {
+    if (!fullMarks || !attempt) return null;
+    const recovery = buildMarkRecovery({
+      mistakes: store.mistakes, attempts: store.attempts, questions: store.questions, now: new Date(),
+      officialPaper: officialPaperContextFromSettings({
+        officialPaperTrust: store.settings.officialPaperTrust,
+        officialPaperTermsConfirmed: store.settings.officialPaperTermsConfirmed,
+      }),
+    });
+    const result = marksProvenByAttempt(recovery, attempt.id);
+    return result.marks > 0 ? result : null;
+  }, [fullMarks, attempt, store.mistakes, store.attempts, store.questions, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
+  const provedTopic = proved ? getTopic(proved.topicIds[0] ?? "")?.title : undefined;
+  const reviewedQuestion = learnerEvidenceTrusted(question);
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
     for (const part of plan.parts) {
@@ -376,15 +401,13 @@ export function MarkedResult({
         {awarded < question.totalMarks ? (
           <InterventionPrescriptionPanel topicId={question.topicIds[0] ?? question.subjectId} marksLost={question.totalMarks - awarded} />
         ) : (
-          // Full marks is only "proven" when the answer can actually count as
-          // evidence: trusted content, answered unaided, outside recall mode.
-          // On an unreviewed or hinted question the same score is practice.
-          attempt && trustedAssessmentContent(question) &&
-          !attempt.hintTier && !attempt.repairTeachingSeen &&
-          !attempt.copiedAnswer && attempt.mode !== "recall"
+          // Full marks is only "proven" when the recovery ledger says this
+          // attempt was the delayed proof of an earlier loss (marksProvenByAttempt).
+          // Otherwise the same score is practice, and says why.
+          proved
             ? (
               <ProofCheckBanner
-                topicTitle={question.topicIds[0]}
+                topicTitle={provedTopic}
                 href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
                 state="passed"
               />
@@ -392,8 +415,9 @@ export function MarkedResult({
               <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="What this answer establishes">
                 <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Full marks — practice, not proof</p>
                 <p className="text-sm text-ink2">
-                  Revise records this as a correct answer. It only becomes proof once the
-                  same skill is answered unaided on a different question, after a delay.
+                  {reviewedQuestion
+                    ? "Revise records this as a correct answer. It only becomes proof once the same skill is answered unaided on a different question, after a delay."
+                    : "Revise records this as a correct answer. This question has not been checked by a teacher yet, so it counts as practice; only answers on reviewed questions can prove a skill."}
                 </p>
                 <ButtonLink
                   href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}

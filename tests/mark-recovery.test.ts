@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildMarkRecovery, classifyMistake } from "@/domain/mark-recovery";
+import { buildMarkRecovery, classifyMistake, marksProvenByAttempt } from "@/domain/mark-recovery";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 // Proof lifecycle fixtures sit on a reviewed flagship: reference-tier content
 // can never prove a mark (see the last test in this file).
 import { flagshipAttempt as attempt, flagshipBank as bank, flagshipMistake as mistake, question, sourceAttempt, attempt as refAttempt, mistake as refMistake } from "./helpers-recovery";
@@ -114,5 +116,21 @@ describe("paper attribution", () => {
     expect(r.unverifiedOnly).toBe(true);
     expect(r.provenAt).toBeUndefined();
     expect(r.reason).toMatch(/not been checked against the specification/);
+  });
+
+  it("credits proof only to the attempt that was the delayed check", () => {
+    const m = mistake("m1");
+    const attempts = [sourceAttempt(m), attempt("a1", "q-a2", 3, 3, "2026-09-22T09:00:00.000Z"), attempt("a2", "q-a3", 3, 3, "2026-09-30T09:00:00.000Z")];
+    const recovery = buildMarkRecovery({ mistakes: [m], attempts, questions: bank, now: NOW });
+    expect(marksProvenByAttempt(recovery, "a2")).toEqual({ marks: 3, topicIds: ["algebra"] });
+    // The first full-marks success is not proof, however clean.
+    expect(marksProvenByAttempt(recovery, "a1")).toEqual({ marks: 0, topicIds: [] });
+  });
+
+  it("the marked result says 'proven' only on the ledger's word", () => {
+    const src = readFileSync(join(process.cwd(), "src/components/QuestionMarkedResult.tsx"), "utf8");
+    expect(src).toContain("marksProvenByAttempt(recovery, attempt.id)");
+    expect(src).not.toContain("trustedAssessmentContent(question)");
+    expect(src).not.toContain("topicTitle={question.topicIds[0]}");
   });
 });

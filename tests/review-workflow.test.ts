@@ -112,7 +112,7 @@ describe("content quality gates", () => {
   it("derives the same gate context from a curriculum as the reviewer portal uses", () => {
     const derived = gateContextFromTopics([T, { ...topic("calculus"), specVersion: undefined }]);
     expect([...derived.topicIds].sort()).toEqual([T.id, topic("calculus").id].sort());
-    expect(derived.specPointIds.has(T.specPoints[0]!.id)).toBe(true);
+    expect(derived.specPointIds.has(T.specPoints![0]!.id)).toBe(true);
     expect(derived.specVersionOf?.(T.subjectId)).toBe(gate.specVersionOf?.(T.subjectId));
   });
   it("never counts a gate-blocked question as approvable, so it cannot fill an authored-ceiling slot", () => {
