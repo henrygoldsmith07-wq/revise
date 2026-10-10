@@ -2780,15 +2780,6 @@
         ]
       },
       {
-        "specPointId": "wjec-alevel-physics.electric-circuits.sp-02",
-        "topicId": "wjec-alevel-physics.electric-circuits",
-        "currentQuestionCount": 25,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
         "specPointId": "wjec-alevel-physics.electric-circuits.sp-03",
         "topicId": "wjec-alevel-physics.electric-circuits",
         "currentQuestionCount": 14,
@@ -2828,15 +2819,6 @@
         "specPointId": "wjec-alevel-physics.electric-circuits.sp-07",
         "topicId": "wjec-alevel-physics.electric-circuits",
         "currentQuestionCount": 13,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.electromagnetic-induction.sp-01",
-        "topicId": "wjec-alevel-physics.electromagnetic-induction",
-        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"

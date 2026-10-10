@@ -337,4 +337,56 @@ export const physicsTransferLinkedQuestions: Question[] = [
     ],
     answer: "With no friction, kinetic plus elastic potential energy is constant, so ½mv₁² + ½kx₁² = ½mv₂² + ½kx₂². Rearranging, k = m(v₁² − v₂²)/(x₂² − x₁²) = 0.50 × (0.090 − 0.010)/(0.0064 − 0.0016) = 0.040/0.0048 = 8.3 N m⁻¹. At the amplitude the trolley is momentarily at rest, so ½kA² = ½mv₁² + ½kx₁², giving A² = 0.040² + 0.50 × 0.30²/8.33 = 0.0016 + 0.0054 = 0.0070 m² and A = 0.084 m. The second reading gives the same value (0.0064 + 0.0006 = 0.0070 m²), confirming it.",
   }),
+  // ---- Third batch (2026-10-10, fifth pass): electric circuits and
+  // electromagnetic induction, the next statements `wjec:authoring:plan --
+  // physics` ranks. Every number below was recomputed in code first.
+
+  // electric-circuits sp-02. Baseline: known resistor network -> currents.
+  // Transfer: the unknown is a component (a thermistor) found from a logged
+  // p.d., then the loading effect of a low-resistance voltmeter is predicted.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circuits-sp-02-sensor-loading",
+    topic: "electric-circuits",
+    point: "sp-02",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-electric-circuits-sp-02-resistor-network-solve-3"),
+    family: "physics-transfer:circuits-divider-inverse-and-loading",
+    context: "physics-transfer:circuits-divider-inverse-and-loading:thermistor-sensor",
+    move: "work back from a measured divider output to an unknown resistance, then predict how a meter's own resistance changes the reading",
+    prompt: "A temperature sensor uses a 9.0 V battery of negligible internal resistance, a fixed 2.2 kΩ resistor and a thermistor in series. A data logger of very high resistance connected across the fixed resistor reads 3.3 V. Determine the resistance of the thermistor. The logger is then replaced by a cheap voltmeter whose resistance is 2.2 kΩ. Calculate the reading on the voltmeter.",
+    scheme: [
+      "Current I = V/R = 3.3/2200 = 1.5×10⁻³ A (same through the thermistor)",
+      "Thermistor p.d. = 9.0 − 3.3 = 5.7 V, so R = 5.7/1.5×10⁻³ = 3.8 kΩ",
+      "Voltmeter in parallel with 2.2 kΩ gives 1.1 kΩ; total resistance = 1.1 + 3.8 = 4.9 kΩ",
+      "Reading = 9.0 × 1.1/4.9 = 2.0 V (the meter loads the circuit)",
+    ],
+    answer: "The logger draws no current, so the series current is I = 3.3 V/2200 Ω = 1.5×10⁻³ A. The thermistor takes the rest of the emf, 9.0 − 3.3 = 5.7 V, so its resistance is 5.7/1.5×10⁻³ = 3800 Ω = 3.8 kΩ. A 2.2 kΩ voltmeter across the 2.2 kΩ resistor makes a parallel combination of 1.1 kΩ, so the circuit totals 1.1 + 3.8 = 4.9 kΩ and the meter reads 9.0 × 1.1/4.9 = 2.0 V, well below 3.3 V, because the meter itself has changed the circuit.",
+  }),
+  // electric-circuits sp-04 was drafted (fixed 40 W from a 12 V, 0.80 Ω
+  // battery: P = ε²R/(R + r)² gives R = 1.6 Ω or 0.40 Ω, chosen on
+  // efficiency) and withheld. The structural-novelty comparison rated it not
+  // novel against its baseline (internal-loss-8): on Physics the derived
+  // reasoning graphs are almost empty, because the graph families are
+  // word-based, so the comparison cannot see the quadratic inverse step. An
+  // item that fails the check does not count here, and it was not reworded
+  // to satisfy the heuristic.
+  // electromagnetic-induction sp-01. Baseline: known B, N, A and time ->
+  // mean emf and charge. Transfer: B is the unknown, found from the charge a
+  // search coil drives (Q = NΔΦ/R, independent of time), then a 180° turn.
+  linkedTransferQuestion({
+    slug: "physics-transfer-induction-sp-01-search-coil",
+    topic: "electromagnetic-induction",
+    point: "sp-01",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-electromagnetic-induction-sp-01-coil-pullout-emf-6"),
+    family: "physics-transfer:induction-field-from-search-coil-charge",
+    context: "physics-transfer:induction-field-from-search-coil-charge:magnet-gap",
+    move: "infer a magnetic flux density from the charge a search coil drives when its flux linkage changes, and explain why the charge does not depend on time",
+    prompt: "To measure the field between the poles of a magnet, a 400-turn search coil of area 1.2×10⁻⁴ m² is placed with its plane perpendicular to the field and connected to a charge meter. The total resistance of the circuit is 60 Ω. When the coil is pulled quickly out of the field, the meter records 64 μC. Determine the magnetic flux density. Explain why the speed of removal does not affect the reading, and calculate the charge recorded if the coil had instead been turned through 180° while staying in the field.",
+    scheme: [
+      "Mean emf = NΔΦ/Δt and I = emf/R, so Q = IΔt = NΔΦ/R (Δt cancels)",
+      "ΔΦ = BA, so B = QR/(NA) = 64×10⁻⁶ × 60/(400 × 1.2×10⁻⁴)",
+      "B = 0.080 T",
+      "A 180° turn reverses the flux: ΔΦ = 2BA, so Q = 2 × 64 = 128 μC (1.3×10⁻⁴ C)",
+    ],
+    answer: "The induced emf is the rate of change of flux linkage, ε = NΔΦ/Δt, and drives I = ε/R. The charge is Q = IΔt = NΔΦ/R: the time cancels, so a faster pull gives a bigger current for a shorter time but the same charge. Removing the coil changes its flux by BA, so B = QR/(NA) = (64×10⁻⁶ × 60)/(400 × 1.2×10⁻⁴) = 3.84×10⁻³/0.048 = 0.080 T. Turning the coil through 180° takes its flux from +BA to −BA, a change of 2BA, so the meter would record twice the charge, 128 μC (1.3×10⁻⁴ C).",
+  }),
 ];
