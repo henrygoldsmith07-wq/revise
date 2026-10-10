@@ -148,7 +148,9 @@ function topicChain(topic: TopicGraph, graph: SubjectGraph): ChainNode[] {
       level: "exam",
       value: examValue,
       hint: outlook
-        ? `Subject most-likely band — ${outlook.grade} grade, driven by all topics' evidence`
+        ? outlook.referenceTier
+          ? "Practice estimate from reference questions not checked against the specification, not an exam prediction"
+          : `Subject most-likely band — ${outlook.grade} grade, driven by all topics' evidence`
         : "This subject needs marked answers before any band is honest",
     },
   ];
@@ -357,7 +359,9 @@ export function KnowledgeMap({
                     {outlook.low}–{outlook.high}% <span className="text-ink3 font-normal">· {outlook.grade}</span>
                   </p>
                   <p className="text-[11px] text-ink3 mt-0.5">
-                    most likely score on current evidence
+                    {outlook.referenceTier
+                      ? "practice estimate · reference questions, not checked against the specification"
+                      : "most likely score on current evidence"}
                     {exam.examDate ? ` · ${exam.examDate.label}` : ""}
                   </p>
                 </>

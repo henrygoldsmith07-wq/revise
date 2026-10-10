@@ -18,6 +18,7 @@ import { requiresWjecContentReview } from "./physics-content-review";
 // it must never produce a number. The UI gates rows on MIN_OUTLOOK_ATTEMPTS.
 // ---------------------------------------------------------------------------
 
+import { isFlagship } from "./flagship";
 import type { GradePrediction } from "./grades";
 import { authenticPaperEvidence, independentAttempt, trustedAssessmentAttempt, trustworthyAttempt } from "./learning-evidence";
 import { localDayOfInstant } from "./local-date";
@@ -53,6 +54,12 @@ export interface ExamOutlookRow {
   confidence: number;
   /** True when the band is provisional and must be labelled as such. */
   provisional: boolean;
+  /**
+   * Reference-tier subject: the band is built from questions that are not
+   * checked against the exam board's specification. Always provisional, and
+   * the UI must call it a practice estimate rather than an exam prediction.
+   */
+  referenceTier?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +167,10 @@ export function outlookRows(predictions: GradePrediction[], attempts: Attempt[],
     const band = percentBand(prediction);
     // Provisional until there is enough independent evidence to trust the
     // centre: assisted work may widen the sample but never confirms the band.
-    const provisional = prediction.confidence < 0.35 || independent < MIN_OUTLOOK_ATTEMPTS;
+    // Reference-tier evidence is never more than provisional, however much
+    // of it there is: volume cannot substitute for checked content.
+    const referenceTier = !isFlagship(prediction.subjectId);
+    const provisional = referenceTier || prediction.confidence < 0.35 || independent < MIN_OUTLOOK_ATTEMPTS;
     return {
       subjectId: prediction.subjectId,
       attempts: marked,
@@ -171,6 +181,7 @@ export function outlookRows(predictions: GradePrediction[], attempts: Attempt[],
       high: band.high,
       confidence: prediction.confidence,
       provisional,
+      referenceTier,
     };
   });
 }
