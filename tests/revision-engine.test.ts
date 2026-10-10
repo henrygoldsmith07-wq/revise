@@ -116,6 +116,23 @@ describe("next best action engine", () => {
     expect(later.actions.some((x) => x.type === "proof-check" && x.proofStatus === "awaiting-proof")).toBe(true);
   });
 
+  it("keeps a learner practising when nothing else ranks, without spending supply a delayed check needs", () => {
+    const s = scenario();
+    // Maths only, before the delay has passed: the calculus proof check is
+    // parked. "limits" has been started and won, nothing is due.
+    const limits = bank(MATHS, "limits", 4);
+    const questions = [...s.questions, ...limits];
+    const attempts = [...s.attempts, a("l0", MATHS, "limits", "maths-limits-0", 3, iso("2026-09-14"))];
+    const plan = rankRevisionActions(engine({ ...s, questions, attempts, subjectIds: [MATHS], now: new Date("2026-09-16T09:00:00.000Z") }));
+    expect(plan.deferred.some((d) => /Waiting for the delay/.test(d.reason))).toBe(true);
+    expect(plan.top?.title).toBe("Keep practising limits");
+    expect(plan.top!.topicIds).toEqual(["limits"]);
+    expect(plan.top!.explanation.why).toMatch(/3 questions you have not answered/);
+    // With only the reserved topic left, Today stays honest rather than spending it.
+    const reservedOnly = rankRevisionActions(engine({ ...s, subjectIds: [MATHS], now: new Date("2026-09-16T09:00:00.000Z") }));
+    expect(reservedOnly.top?.topicIds ?? []).not.toContain("calculus");
+  });
+
   it("plans a regressed topic before new work on it and never claims proof it lacks", () => {
     const questions = bank(MATHS, "calculus", 8);
     const mistakes = [m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10") })];

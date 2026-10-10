@@ -369,6 +369,59 @@ function commandCentreDrafts(input: EngineInput, enrolled: ReadonlySet<Id>, esti
   return out;
 }
 
+/**
+ * The last-resort next step: unseen practice in a started topic.
+ *
+ * Without it, a learner who has started every topic, has no lost marks
+ * waiting and no cards due was handed an empty Today while unseen questions
+ * were still in the bank — an action the app could perform but never named
+ * (found by tests/supply-journey.property.test.ts). Only used when nothing
+ * else ranks and the adaptive optimiser has no plan. Topics with open,
+ * waiting or regressed losses are left alone so practice never spends the
+ * unseen questions a delayed proof check needs.
+ */
+function keepPractisingDraft(input: EngineInput, enrolled: ReadonlySet<Id>, missions: readonly ExamMission[]): Draft | null {
+  const supply = input.supplyByTopic ?? {};
+  const reserved = new Set<Id>([
+    ...missions.flatMap((m) => m.topicIds),
+    ...input.recovery.items.filter((i) => i.state !== "proven").map((i) => i.topicId),
+  ]);
+  const subjectOf = new Map<Id, Id>();
+  for (const q of input.questions) {
+    if (!enrolled.has(q.subjectId)) continue;
+    for (const t of q.topicIds) if (!subjectOf.has(t)) subjectOf.set(t, q.subjectId);
+  }
+  const candidates = Object.entries(supply)
+    .filter(([topicId, s]) => subjectOf.has(topicId) && !reserved.has(topicId) && s.provable + s.practiceOnly > 0)
+    .map(([topicId, s]) => ({ topicId, s, share: input.topicWeight?.(topicId)?.share ?? 0 }))
+    .sort((a, b) => b.share - a.share || (b.s.provable + b.s.practiceOnly) - (a.s.provable + a.s.practiceOnly) || a.topicId.localeCompare(b.topicId));
+  const pick = candidates[0];
+  if (!pick) return null;
+  const subjectId = subjectOf.get(pick.topicId)!;
+  const topic = input.topicTitle?.(pick.topicId) ?? pick.topicId;
+  const unseen = pick.s.provable + pick.s.practiceOnly;
+  const days = daysToNearestExam(input.examDates, subjectId, input.now);
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  return {
+    id: `action:keep-practising:${pick.topicId}`, type: "adaptive-session", title: `Keep practising ${topic}`,
+    subjectId, topicIds: [pick.topicId], specPoints: [], minutes: 15,
+    marksRecoverable: null, examWeight: pick.share || null, daysToExam: days, evidenceStrength: 0.2, confidence: 0.3,
+    expectedLearningGain: 0.2, expectedMarks: round(pick.share * 100 * 0.1, 2), proofStatus: null, requiredFirst: false, effectiveness: null, mistakeIds: [],
+    explanation: {
+      why: `Nothing is due and no lost marks are waiting, so the next step is new questions: ${plural(unseen, "question")} you have not answered are left in ${topic}.`,
+      whyNow: days !== null ? `Your exam is ${days} day${days === 1 ? "" : "s"} away.` : "New answers are how Revise finds the next thing to fix.",
+      whyBefore: "", stake: `${plural(unseen, "unseen question")} in ${topic}.`,
+      evidence: [
+        `${plural(unseen, "unseen question")} left`,
+        pick.s.provable > 0 ? `${pick.s.provable} of them human-reviewed` : "none of them human-reviewed yet, so this is practice only",
+      ],
+      after: "Any mark you lose becomes a repair mission; Revise replans after each answer.",
+      proves: "Nothing on its own: practice finds gaps, and only a later independent check on a reviewed question proves a gain.",
+    },
+    route: { href: `/adaptive-session?topic=${encodeURIComponent(pick.topicId)}&start=1`, label: "Start session" },
+  };
+}
+
 export function rankRevisionActions(input: EngineInput): RevisionPlan {
   const enrolled = new Set(input.subjectIds);
   const scoped: EngineInput = { ...input, mistakes: input.mistakes.filter((m) => enrolled.has(m.subjectId)) };
@@ -485,6 +538,10 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       }
       ranked = fitting;
     }
+  }
+  if (ranked.length === 0 && !input.adaptive) {
+    const fallback = keepPractisingDraft(scoped, enrolled, missions);
+    if (fallback) ranked = [finalise(fallback, scoped)];
   }
   const first = ranked[0];
   ranked.forEach((a, i) => {
