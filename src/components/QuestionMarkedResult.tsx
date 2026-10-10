@@ -65,6 +65,8 @@ export function MarkedResult({
     farTransfer?: Attempt["farTransfer"];
     /** Post-marking error diagnosis; never changes the marks above. May be uncertain. */
     errorDiagnosis?: AttemptErrorDiagnosis;
+    /** The AI marker failed and this attempt is genuinely queued for an AI re-mark. */
+    aiRemarkQueued?: boolean;
     nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
@@ -180,6 +182,15 @@ export function MarkedResult({
           {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}
         </div>
       </div>
+      {result.source === "fallback" && result.aiRemarkQueued ? (
+        <div className="mb-3 rounded-[8px] border border-line bg-surface2 px-3 py-2.5 text-sm text-ink2" role="status">
+          <p className="font-semibold text-ink">AI marking did not respond</p>
+          <p className="text-xs mt-1">
+            This answer was marked against the mark scheme on your device instead. Revise will try the AI marker
+            again in the background while you are online and update this mark if it changes. You can carry on.
+          </p>
+        </div>
+      ) : null}
       {provisional ? (
         <div className="mb-3 rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Provisional mark</p>
