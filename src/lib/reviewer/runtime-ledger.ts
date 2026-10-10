@@ -56,6 +56,29 @@ export interface RuntimeEventInsert extends RuntimeEventRow {
   reviewer_user_id: string;
 }
 
+/**
+ * The one read of `public.review_audit_events`: these columns, ordered by seq,
+ * in pages of REVIEW_AUDIT_EVENT_PAGE rows. The reviewer portal reads it
+ * through the caller's Supabase session (RLS applies); the trust report reads
+ * it over Postgres. Both go through readRuntimeEventPages so there is one
+ * query shape, and both hand the rows to combineAuditLog, which verifies the
+ * chain before anything is derived from it.
+ */
+export const REVIEW_AUDIT_EVENT_COLUMNS = ["seq", "previous_hash", "hash", "event"] as const;
+export const REVIEW_AUDIT_EVENT_PAGE = 1000;
+
+/** Page through runtime events with any transport; `fetchPage(from, to)` is inclusive, like PostgREST ranges. */
+export async function readRuntimeEventPages(
+  fetchPage: (from: number, to: number) => Promise<readonly RuntimeEventRow[]>,
+): Promise<RuntimeEventRow[]> {
+  const rows: RuntimeEventRow[] = [];
+  for (let from = 0; ; from += REVIEW_AUDIT_EVENT_PAGE) {
+    const page = await fetchPage(from, from + REVIEW_AUDIT_EVENT_PAGE - 1);
+    rows.push(...page);
+    if (page.length < REVIEW_AUDIT_EVENT_PAGE) return rows;
+  }
+}
+
 export interface CombinedAuditLog {
   log: ReviewAuditLog;
   /** Integrity problems. Any entry means the runtime chain must not be trusted. */
