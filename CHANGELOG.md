@@ -1,5 +1,51 @@
 # Changelog
 
+## Marked answers stay on screen; Physics baseline integrity; two more Physics transfer items — 2026-10-10 (fifth pass)
+
+**A student never saw feedback in the two main flows.** `useQuestionExecution`
+calls `onFinished` the moment marking completes. The quick diagnostic (a new
+student's first marked questions) advanced to the next probe in that same
+render, and the adaptive session (Today's "Start session") recorded the step
+and replanned, swapping the step panel out. Either way the marked result —
+the mark, the points missed, the model answer, "How to fix it" — unmounted
+before it could be read. README promised "lost marks appear immediately".
+
+- `QuickDiagnostic` holds the marked attempt until the student taps
+  "Next question" / "See what I found" (sticky above the phone nav, mark
+  announced via `role="status"`).
+- The adaptive session holds a marked step (`heldStep`) on screen until
+  "Continue"; the record and the replan still happen at once, the completion
+  screen waits, and a retest that resolves its mistake no longer remounts the
+  question.
+- Tests: `tests/quick-diagnostic-feedback.test.ts`,
+  `tests/adaptive-session-feedback.test.ts` (source-level; there is no React
+  test renderer in the repo). The WJEC trusted-journey e2e now asserts the
+  mark is visible before continuing; it was not executed here (no Playwright
+  browsers in the sandbox).
+
+**Physics baseline integrity.** `validateBaselineIntegrity` rejected 9 of 11
+Physics transfer baselines because its step families only knew
+Maths/Biology/Chemistry vocabulary. For Physics only it now also accepts
+`physicsWorkingNodes`: a supplied quantity with a unit, a substitution into a
+relation (a number in standard form alone does not count) and a result with
+its unit, each bound to a real span. `deriveVerifiedGraph` and every novelty
+comparison are unchanged; other subjects' verdicts are unchanged (pinned by
+test). Physics transfer parts with an explicit baseline link now go through
+the transfer block of `auditFlagshipSubject`; all pass. The spring-period
+baseline's model answer now shows its working.
+
+**Reference-tier learning actions are practice-only.** `selectLearningAction`
+labelled any item passing the permissive `trustedAssessmentContent` as
+`trusted-assessment`; the label now requires `learnerEvidenceTrusted`, and
+reference items (still available, including transfer/retention practice) are
+`practice-only`.
+
+**Two more linked Physics transfer items** (electric circuits sp-02: divider
+worked backwards plus meter loading; electromagnetic induction sp-01: field
+from search-coil charge). Physics authored ceiling 11/108 → 13/108, all
+unreviewed. A drafted circuits sp-04 item was withheld: the novelty heuristic
+rated it not novel because Physics derived graphs are nearly empty.
+
 ## Reference-tier mastery says "practice"; nine more linked Physics transfer items — 2026-10-10 (fourth pass)
 
 **A reference-tier topic could still show "Proven".** `masteryStage`

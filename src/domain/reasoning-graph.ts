@@ -169,6 +169,40 @@ const CONCLUSION_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
   ["decision", /\b(?:decision|suitable|greener|better|valid|invalid|consistent|inconsistent)\b/i],
 ] as const;
 
+/**
+ * Physics working. The families above were written for the Maths, Biology
+ * and Chemistry depth packs and recognise words ("titre", "derivative",
+ * "membrane"); a Physics model answer shows its reasoning as quantities and
+ * substitutions instead ("I = P/V = 1000/230 = 4.35 A"). These three
+ * families recognise exactly that working. They are used only by the
+ * baseline integrity check, only for WJEC A-level Physics
+ * (`physicsWorkingNodes`), so no derived graph, novelty comparison or other
+ * subject's integrity verdict changes.
+ *
+ * - supplied-quantity (evidence): the prompt gives a numerical value with a
+ *   physical unit, the data the calculation must use.
+ * - substitute-relation (operation): the working writes a relation and puts
+ *   numbers into it, an "=" followed by arithmetic on numerical values.
+ * - physical-result / physical-comparison (conclusion): the model answer
+ *   states a result with its unit, or the comparison the task asked for.
+ * Each node still needs a concrete span; nothing is inferred from labels.
+ */
+const PHYSICS_NUMBER = String.raw`[-+]?\d+(?:\.\d+)?(?:\s*[×x]\s*10\s*(?:\^\s*)?[-−⁻]?\s*[\d⁰¹²³⁴⁵⁶⁷⁸⁹]+)?`;
+const PHYSICS_UNIT = String.raw`(?:[kMGmμnp]?(?:V|A|Ω|W|J|Hz|F|C|T|Wb|Pa|N|eV)|kg|g|mm|cm|km|nm|μm|m|s|ms|K|rad|rev|°C)(?![A-Za-z])`;
+const PHYSICS_QUANTITY = new RegExp(`${PHYSICS_NUMBER}\\s*${PHYSICS_UNIT}`);
+const PHYSICS_EVIDENCE_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
+  ["supplied-quantity", PHYSICS_QUANTITY],
+] as const;
+const PHYSICS_OPERATION_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
+  // "= <number> <operator> <number>", where "× 10^n" alone is a number in
+  // standard form, not arithmetic: "C = 2.0 × 10⁻⁴ F" is a stated result.
+  ["substitute-relation", /=\s*[^=\n]{0,40}?\d\s*π?\s*(?:\^?\s*[\d⁰¹²³⁴⁵⁶⁷⁸⁹]+\s*)?(?:[×x*\/÷+−]|-(?=\s*\d)|\()(?![×x]?\s*10\s*(?:\^|⁻|[⁰¹²³⁴⁵⁶⁷⁸⁹]))\s*[\d(√π]/],
+] as const;
+const PHYSICS_CONCLUSION_FAMILIES: ReadonlyArray<readonly [string, RegExp]> = [
+  ["physical-result", PHYSICS_QUANTITY],
+  ["physical-comparison", /\b(?:are|is)\s+(?:equal|the\s+same|greater|smaller|larger|twice|half)\b/i],
+] as const;
+
 /** Trivial verification steps that never establish a distinct route. */
 const TRIVIAL_CHECK_LABELS = new Set([
   "check-answer",
@@ -619,6 +653,23 @@ export function deriveVerifiedGraph(part: QuestionPart, subjectId?: string): Ver
   const kinds: ReasoningGraphNodeKind[] = ["evidence", "operation", "intermediate", "constraint", "conclusion"];
   const missing = kinds.filter((kind) => !nodes.some((node) => node.kind === kind));
   return { nodes, missing };
+}
+
+/**
+ * Physics working steps (supplied quantity, substitution into a relation,
+ * result with unit), each bound to a concrete span. Used by the baseline
+ * integrity check for WJEC A-level Physics only. Deliberately NOT merged into
+ * `deriveVerifiedGraph`: every Physics calculation shares these steps, so
+ * adding them to both sides of a novelty comparison would only measure that
+ * both are calculations, not whether the transfer changes the reasoning.
+ */
+export function physicsWorkingNodes(part: QuestionPart): EvidencedNode[] {
+  const solutionText = solutionStepsOf(part).join("\n");
+  return [
+    ...evidencedFamilies(part.prompt, "evidence", PHYSICS_EVIDENCE_FAMILIES, PHYSICS_EVIDENCE_FAMILIES.length),
+    ...evidencedOperationsInOrder(solutionText, PHYSICS_OPERATION_FAMILIES),
+    ...evidencedFamilies(part.modelAnswer, "conclusion", PHYSICS_CONCLUSION_FAMILIES, PHYSICS_CONCLUSION_FAMILIES.length),
+  ];
 }
 
 /** Strip evidence spans so a verified graph can enter graph-distance metrics. */

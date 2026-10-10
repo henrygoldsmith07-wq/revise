@@ -94,6 +94,10 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
   for (let n = 1; n <= total; n++) {
     await expect(page.getByText(new RegExp(`Question ${n} of ${total}`))).toBeVisible({ timeout: 60_000 });
     await answerOnScreen(page, false);
+    // The mark and what was missed stay on screen until the student moves on.
+    await expect(page.getByText(/on this one\. Read what you missed/)).toBeVisible({ timeout: 60_000 });
+    await expect(main).toContainText("Examiner marking");
+    await page.getByRole("button", { name: n === total ? "See what I found" : "Next question" }).click();
   }
   await expect(main).toContainText("What I found", { timeout: 60_000 });
   await expect(main).toContainText(/initial signal, not a predicted grade/i);
