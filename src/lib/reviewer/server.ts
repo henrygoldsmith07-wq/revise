@@ -6,6 +6,8 @@ import committedAuditLog from "@/content/reviews/wjec-review-audit-log.json";
 import committedLedger from "@/content/reviews/wjec-human-verification.json";
 import { seedQuestions } from "@/content";
 import { WJEC_REVIEWER_ROLES } from "@/domain/content-trust";
+import { reviewPriorityIndex, type ReviewPriorityIndex } from "./priority";
+import { reviewTopicContext } from "./view";
 import { combineAuditLog, effectiveLedger, readRuntimeEventPages, REVIEW_AUDIT_EVENT_COLUMNS, type CombinedAuditLog, type RuntimeEventInsert, type RuntimeEventRow, type ReviewerGrant } from "./runtime-ledger";
 
 // ---------------------------------------------------------------------------
@@ -105,4 +107,10 @@ export async function getPublicRuntimeLedger(admin: SupabaseClient | null) {
   if (!admin) return { ledger: effectiveLedger(reviewBank, committedLedger, combineAuditLog(committedAuditLog, [])), chainOk: true, runtimeEvents: 0 };
   const combined = await loadCombinedLog(admin);
   return { ledger: effectiveLedger(reviewBank, committedLedger, combined), chainOk: combined.issues.length === 0, runtimeEvents: combined.runtimeOnly };
+}
+
+/** Capability-first review order for one subject, against the verified combined chain (memoised). */
+export function getReviewPriority(combined: CombinedAuditLog, subjectId: string): ReviewPriorityIndex {
+  const { topics, gate } = reviewTopicContext();
+  return reviewPriorityIndex({ questions: reviewBank, combined, committedLedger, subjectId, topics, gate });
 }

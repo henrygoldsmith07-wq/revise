@@ -47,10 +47,22 @@ team needs a terminal, JSON or an HTML pack any more.
    and cannot grant itself access.
 2. **Queue** (`/reviewer?subject=physics`, also maths / biology / chemistry).
    A Server Component computes it on the server from the bundled bank and the
-   verified audit chain with `reviewStateOf`: questions one approval from
-   verified first, then unverified ones. Questions sent back for changes and
-   questions you already approved are listed separately, because you cannot act
-   on them.
+   verified audit chain with `reviewStateOf`. "Ready for you" is ordered
+   **capability-first** by the same plan as `wjec:review:priorities`
+   (`src/lib/reviewer/priority.ts` → `buildReviewPriorities`, see
+   *Prioritisation* below): the review that unlocks most for students leads
+   (finishing a half-reviewed question counts as cheaper), then reviews that
+   unlock nothing new (a reskin sibling or an already-covered topic), then
+   questions that fail a blocking content gate. Each row says why it is worth
+   reviewing; a panel shows topics where proof can begin, quick-check
+   readiness, the fastest route to the next provable topic, and gate-blocked
+   counts by reason. Trust is read exactly as students read it (effective
+   ledger applied with `applyHumanVerificationLedger`). The plan is memoised
+   per subject on the audit-chain tail (about 1.2 s cold for Physics). It only
+   orders the list: nothing is hidden and no rule changes. Questions sent back
+   for changes and questions you already approved are listed separately,
+   because you cannot act on them. Next/Skip on the review screen follow the
+   same order, and the screen says why that question matters.
 3. **Review screen.** Stem and options, each part beside its mark scheme and
    worked answer, mapped specification points with board refs, provenance,
    content-gate warnings, reskin siblings, the history on this exact content

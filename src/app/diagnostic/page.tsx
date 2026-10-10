@@ -63,7 +63,7 @@ function Diagnostic() {
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{quick ? "Optional · 5–10 minutes" : "Optional · 15–25 minutes"}</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Starting diagnostic</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered, so your answers count as unaided evidence.
+          A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered. Answers on teacher-reviewed questions count as unaided evidence; anything else is labelled practice, not proof.
         </p>
       </header>
 
@@ -87,7 +87,16 @@ function Diagnostic() {
       ) : quick && !records.length ? (
         <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} />
       ) : items.length === 0 ? (
-        <Panel><p className="text-sm text-ink3">There are no reviewed questions for this subject yet, so Revise will not run a diagnostic on unverified content.</p></Panel>
+        // Not a dead end: the full diagnostic needs reviewed questions, but the
+        // quick check has a labelled practice tier and practice always works.
+        <Panel className="space-y-3">
+          <p className="text-sm text-ink3">There are no reviewed questions for this subject yet, so Revise will not run the full diagnostic on unverified content.</p>
+          <p className="text-sm text-ink2">You can still find a starting point: the quick check uses authored questions, clearly labelled practice, not proof.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => setQuick(true)}>Take the quick check instead</Button>
+            <ButtonLink href={`/practice?subject=${encodeURIComponent(active)}`} variant="secondary">Practise this subject</ButtonLink>
+          </div>
+        </Panel>
       ) : pending ? (
         <Panel className="space-y-3">
           <p className="text-sm font-semibold text-ink">How sure were you of that answer?</p>
