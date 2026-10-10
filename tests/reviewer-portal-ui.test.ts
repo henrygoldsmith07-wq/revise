@@ -60,4 +60,15 @@ describe("reviewer portal accessibility", () => {
     expect(page).toContain("Provenance");
     expect(page).toContain("question.stem");
   });
+
+  it("puts the evidence for the capability-mapping and worked-solution checks on screen", () => {
+    // Check 4 "Skills mapped right" must show the skill mapping; check 3
+    // "Worked answer right" must not hide behind a collapsed toggle.
+    expect(page).toContain("capability mapping");
+    expect(page).toContain("part.capabilityIds");
+    expect(page).toContain("part.learningClaims");
+    expect(page).toContain("part.aoCodes");
+    expect(page).toContain('<details className="mt-2" open>');
+    expect(page).toContain(">Worked answer</summary>");
+  });
 });

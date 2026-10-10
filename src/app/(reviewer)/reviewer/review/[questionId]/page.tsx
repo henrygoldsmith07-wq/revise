@@ -87,8 +87,22 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
               <div className="p-3 bg-surface2/40">
                 <h3 className="text-xs font-semibold text-ink3 mb-1">Mark scheme</h3>
                 <ol className="list-decimal pl-4 space-y-0.5">{part.markScheme.map((point, index) => <li key={index}><RichText>{point}</RichText></li>)}</ol>
+                {/* Evidence for the "Skills mapped right" check: what the marks
+                    actually test, which assessment objectives they carry, and the
+                    explicit capability mapping. Without this the reviewer ticks a
+                    check they cannot see. */}
+                {part.learningClaims.length || part.aoCodes.length || part.capabilityIds.length ? (
+                  <div className="mt-2 rounded-md border border-line bg-surface px-2 py-1.5 space-y-1">
+                    <p className="text-[11px] font-semibold text-ink3">Skills &amp; capability mapping (check 4)</p>
+                    {part.learningClaims.length ? <p className="text-[11px] text-ink2">Assesses: {part.learningClaims.join("; ")}</p> : null}
+                    {part.aoCodes.length ? <p className="text-[11px] text-ink2">Objectives: {part.aoCodes.join(", ")}</p> : null}
+                    {part.capabilityIds.length ? <p className="text-[11px] text-ink3 break-words">Capabilities: {part.capabilityIds.join(", ")}</p> : null}
+                  </div>
+                ) : null}
+                {/* The worked answer is required to attest "Worked answer right",
+                    so it is open by default rather than hidden behind a toggle. */}
                 {part.modelAnswer ? (
-                  <details className="mt-2">
+                  <details className="mt-2" open>
                     <summary className="text-xs font-semibold text-ink3 cursor-pointer">Worked answer</summary>
                     <div className="mt-1"><RichText>{part.modelAnswer}</RichText></div>
                   </details>

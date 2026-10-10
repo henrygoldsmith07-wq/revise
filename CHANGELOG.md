@@ -1,5 +1,37 @@
 # Changelog
 
+## Reviewer checks now have evidence on screen — 2026-10-10
+
+**A reviewer could not verify two of the six approvals they were attesting
+to.** The review decision requires six checks, including "Worked answer
+right" and "Skills mapped right" (`capabilityMapping`). The review screen
+showed the mark scheme and spec refs, but the worked answer was collapsed
+and the skill mapping — `capabilityIds`, the `learningClaims` behind each
+mark, and the `aos` — was never surfaced anywhere. Two of the six
+attestations that turn authored content into student-trusted evidence were
+therefore signed off against nothing visible: a rubber stamp on the one
+promise the product rests on.
+
+`buildReviewScreen` now carries the capability evidence per part (explicit
+`capabilityIds`, `learningClaims`, AO codes) and the review page renders it
+as a "Skills & capability mapping" block beside the mark scheme; the worked
+answer is open by default rather than hidden behind a toggle. Nothing about
+the approval *rules* changed — this only makes the existing attestations
+verifiable.
+
+- `src/lib/reviewer/view.ts` — `parts` gains `capabilityIds` / `learningClaims` / `aoCodes`.
+- `src/app/(reviewer)/reviewer/review/[questionId]/page.tsx` — renders the block; worked answer `open` by default.
+- `tests/reviewer-runtime-ledger.test.ts` — behavioural: the screen surfaces (and defaults empty for) the skill-mapping evidence.
+- `tests/reviewer-portal-ui.test.ts` — pins that the capability-mapping block and open worked answer are on the page.
+
+Measured and deliberately not wired this pass: the capability-priority
+engine (`buildReviewPriorities`, which ranks questions by capability
+unlocked so reviewers unblock the most valuable first) is correct but costs
+~6.5s on the physics bank — far too slow for a per-request reviewer render,
+and its ranking is only reachable via CLI today. Wiring it safely needs a
+precompute/cache layer rather than a live call; recorded as the next
+reviewer-throughput priority.
+
 ## Onboarding honours the quick-check commitment — 2026-10-10
 
 **The final onboarding step now starts the check it promises.** The last

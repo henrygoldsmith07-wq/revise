@@ -6,6 +6,7 @@ import {
   buildReviewQueue, combineAuditLog, effectiveLedger, prepareDecision, reviewDecisionRequestSchema,
   type ReviewerGrant, type RuntimeEventRow,
 } from "@/lib/reviewer/runtime-ledger";
+import { buildReviewScreen } from "@/lib/reviewer/view";
 import { decision, NOW, PROMPTS, wq } from "./helpers-review";
 
 // The portal must use the SAME chain as the committed audit log: runtime rows
@@ -108,6 +109,39 @@ describe("runtime continuation of the review audit log", () => {
     expect(combined.issues.length).toBeGreaterThan(0);
     expect(effectiveLedger(bank, { formatVersion: 1, entries: [] }, combined).entries).toEqual([]);
     expect(prepareDecision(combined, request(q2.id), bank, grant("teacher-c"), at).ok).toBe(false);
+  });
+});
+
+describe("reviewer screen surfaces attestation evidence", () => {
+  // The capabilityMapping attestation ("Skills mapped right") is required to
+  // approve. The screen must show the skill mapping it asks a reviewer to
+  // confirm — capabilityIds, the learning claims behind the marks and the
+  // assessment objectives — or the approval is a rubber stamp.
+  const withSkills = wq("skills", "algebra", PROMPTS[2]!, {
+    parts: [{
+      id: "skills:a", label: "a", prompt: PROMPTS[2]!, marks: 2,
+      markScheme: ["Point 1", "Point 2"], modelAnswer: "Worked answer",
+      capabilityIds: ["wjec-alevel-maths.algebra.sp-1.prob-conditional"],
+      aos: ["AO2", "AO3"],
+      learningClaims: ["apply conditional probability", "justify independence"],
+    }],
+    totalMarks: 2,
+  });
+
+  it("exposes capability mapping, learning claims and AOs on each part", () => {
+    const screen = buildReviewScreen(withSkills, [withSkills], emptyAuditLog());
+    const part = screen.parts[0]!;
+    expect(part.capabilityIds).toEqual(["wjec-alevel-maths.algebra.sp-1.prob-conditional"]);
+    expect(part.learningClaims).toEqual(["apply conditional probability", "justify independence"]);
+    expect(part.aoCodes).toEqual(["AO2", "AO3"]);
+  });
+
+  it("defaults the visible evidence to empty rather than inventing it", () => {
+    const plain = buildReviewScreen(q1, bank, emptyAuditLog());
+    const part = plain.parts[0]!;
+    expect(part.capabilityIds).toEqual([]);
+    expect(part.learningClaims).toEqual([]);
+    expect(part.aoCodes).toEqual([]);
   });
 });
 

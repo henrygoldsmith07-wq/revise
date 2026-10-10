@@ -55,7 +55,7 @@ export interface ReviewScreen {
   fingerprint: string;
   topicLabel: string;
   specPoints: { id: Id; ref: string; text: string }[];
-  parts: { id: Id; label: string; prompt: string; marks: number; markScheme: string[]; modelAnswer: string; specRefs: string[] }[];
+  parts: { id: Id; label: string; prompt: string; marks: number; markScheme: string[]; modelAnswer: string; specRefs: string[]; capabilityIds: Id[]; aoCodes: string[]; learningClaims: string[] }[];
   provenance: { label: string; value: string }[];
   gateWarnings: { severity: "block" | "warn"; detail: string }[];
   reskinSiblings: string[];
@@ -112,6 +112,13 @@ export function buildReviewScreen(question: Question, bank: readonly Question[],
       markScheme: part.markScheme ?? [],
       modelAnswer: part.modelAnswer ?? "",
       specRefs: (part.specPointIds ?? []).map(specRef),
+      // Evidence for the "Skills mapped right" / capabilityMapping attestation:
+      // the explicit skill mapping (capabilityIds) and the learning claims and
+      // assessment objectives behind the marks. Without these on screen the
+      // reviewer is asked to tick a check they cannot see.
+      capabilityIds: part.capabilityIds ?? [],
+      aoCodes: (part.aos ?? []).map(String),
+      learningClaims: part.learningClaims ?? [],
     })),
     provenance: provenance.slice(0, 24),
     gateWarnings: questionGateIssues(question, gate).map((issue) => ({ severity: issue.severity, detail: issue.detail })),
