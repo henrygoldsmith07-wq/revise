@@ -24,7 +24,7 @@
 // ---------------------------------------------------------------------------
 
 import { applyHumanVerificationLedger } from "@/domain/human-verification-ledger";
-import { blockingGates, questionGateIssues, type GateContext } from "@/domain/review-gates";
+import { blockingGates, questionGateIssues, type GateCode, type GateContext } from "@/domain/review-gates";
 import {
   buildReviewPriorities, CAPABILITY_LABEL, REQUIRED_TRUSTED_DISTINCT,
   type Capability, type SubjectReviewSummary,
@@ -56,6 +56,8 @@ export interface ReviewPriorityIndex {
   byQuestion: ReadonlyMap<Id, ReviewPriorityEntry>;
   /** Fails a blocking authoring gate: an author must fix it before review is worth a teacher's time. */
   blocked: ReadonlySet<Id>;
+  /** Why questions are gate-blocked, most common first: an authoring worklist, not a review one. */
+  blockedReasons: { code: GateCode; label: string; count: number }[];
   summary: SubjectReviewSummary | null;
   fastestProof: FastestProofPath | null;
 }
@@ -68,6 +70,24 @@ export interface ReviewPriorityInput {
   topics: readonly Topic[];
   gate: GateContext;
 }
+
+/** Plain-language name for each gate, for counting across questions (per-question detail lives on the review screen). */
+export const GATE_LABEL: Record<GateCode, string> = {
+  "no-mark-scheme": "missing mark scheme",
+  "mark-total-mismatch": "part marks do not add up to the total",
+  "mark-scheme-thin": "thin mark scheme",
+  "mcq-mismatch": "multiple-choice key does not match the options",
+  "empty-prompt": "a part has no prompt",
+  "no-model-answer": "missing worked answer",
+  "no-spec-link": "no specification point linked",
+  "unknown-spec-point": "links a specification point that does not exist",
+  "unknown-topic": "linked to a missing topic",
+  "stale-spec-version": "written against an old specification",
+  "transfer-label-without-transfer": "labelled transfer but has no baseline link",
+  "data-label-without-data": "labelled data analysis but shows no data",
+  "insufficient-provenance": "source not accepted for trusted content",
+  "blocked-validation-stage": "validation stage is retired, rejected or needs changes",
+};
 
 export function unlockLabel(capability: Capability): string {
   return CAPABILITY_LABEL[capability];
@@ -92,9 +112,18 @@ export function buildReviewPriorityIndex(input: ReviewPriorityInput): ReviewPrio
     byQuestion.set(item.questionId, { rank: item.rank, topicId: item.topicId, unlocks: item.unlocks, reviewMinutes: item.reviewMinutes });
   }
   const blocked = new Set<Id>();
+  const reasons = new Map<GateCode, { code: GateCode; label: string; count: number }>();
   for (const question of questions) {
-    if (blockingGates(questionGateIssues(question, input.gate)).length) blocked.add(question.id);
+    const issues = blockingGates(questionGateIssues(question, input.gate));
+    if (!issues.length) continue;
+    blocked.add(question.id);
+    for (const code of new Set(issues.map((issue) => issue.code))) {
+      const row = reasons.get(code) ?? { code, label: GATE_LABEL[code], count: 0 };
+      row.count++;
+      reasons.set(code, row);
+    }
   }
+  const blockedReasons = [...reasons.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
 
   let fastestProof: FastestProofPath | null = null;
   let fastestFirstRank = Infinity;
@@ -116,7 +145,7 @@ export function buildReviewPriorityIndex(input: ReviewPriorityInput): ReviewPrio
     if (better) { fastestProof = path; fastestFirstRank = firstRank; }
   }
 
-  return { subjectId: input.subjectId, byQuestion, blocked, summary: report.subjects[0] ?? null, fastestProof };
+  return { subjectId: input.subjectId, byQuestion, blocked, blockedReasons, summary: report.subjects[0] ?? null, fastestProof };
 }
 
 // --- memo --------------------------------------------------------------------

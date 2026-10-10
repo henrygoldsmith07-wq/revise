@@ -53,6 +53,8 @@ describe("capability-first reviewer queue", () => {
     // The gate-blocked question is last and flagged, not dropped.
     expect(ids.at(-1)).toBe(blocked.id);
     expect(queue.ready.at(-1)).toMatchObject({ blocked: true, priorityRank: null, unlocks: [] });
+    // ...and the authoring worklist says why, counted per gate.
+    expect(priority.blockedReasons).toEqual([{ code: "mark-total-mismatch", label: "part marks do not add up to the total", count: 1 }]);
   });
 
   it("keeps the previous order when no priority index is supplied", () => {

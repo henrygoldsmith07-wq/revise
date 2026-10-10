@@ -50,6 +50,12 @@ function SubjectProgress({ priority, slug }: { priority: ReviewPriorityIndex; sl
       ) : summary.topicsNeedingNewAuthoring ? (
         <p>Every remaining topic needs newly authored questions before review alone can make it provable.</p>
       ) : null}
+      {priority.blocked.size ? (
+        <p>
+          <span className="font-semibold text-ink tabular-nums">{priority.blocked.size}</span> question{priority.blocked.size === 1 ? "" : "s"} fail a content gate and need an author fix before review is worth your time (listed last):{" "}
+          {priority.blockedReasons.slice(0, 3).map((reason) => `${reason.label} (${reason.count})`).join("; ")}.
+        </p>
+      ) : null}
     </section>
   );
 }
