@@ -70,7 +70,10 @@ The **reviewer portal** (`src/app/(reviewer)`, `/reviewer`) is the canonical
 path for humans. It appends to the same hash-chained audit log: runtime events
 live in Supabase `public.review_audit_events` as the continuation of
 `src/content/reviews/wjec-review-audit-log.json`, and every rule runs through
-`src/domain/review-workflow.ts`. Never add a parallel review store, and never
+`src/domain/review-workflow.ts`. Its "Ready for you" order comes from
+`src/lib/reviewer/priority.ts` (the domain `buildReviewPriorities` plan,
+memoised per subject on the chain tail); it orders only and must never hide a
+question or change a rule. Never add a parallel review store, and never
 record via the CLI against a live portal without `npm run wjec:review:pull`
 first (it would fork the chain).
 

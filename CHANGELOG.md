@@ -1,5 +1,45 @@
 # Changelog
 
+## Reviewer minutes go where students gain most — 2026-10-10
+
+**The biggest bottleneck is human review (0 reviewed flagship questions), and
+the portal was spending it in alphabetical order.** "Ready for you" sorted by
+question id, so a teacher's first reviews went to whatever id sorted first —
+often a reskin of a question already queued, or one of the 234 Physics
+questions that fail a blocking content gate. The domain already had a
+capability-first plan (`buildReviewPriorities`), but only the CLI used it.
+
+- **Queue and Next/Skip are capability-first.** `src/lib/reviewer/priority.ts`
+  runs the plan against the verified combined chain, with trust read exactly
+  as a student device reads it (effective ledger →
+  `applyHumanVerificationLedger`). `buildReviewQueue` takes the index and
+  orders ranked reviews first, then no-gain reviews, then gate-blocked ones.
+  Without an index the old order is unchanged. Memoised per subject on the
+  chain tail: ~1.2 s cold for Physics, ~0 warm, recomputed after any decision.
+- **Reviewers see why.** Each row has a "Why review it" column in the
+  domain's own words; the review screen has a "Why this question" note; the
+  subject panel shows topics where proof can begin, quick-check readiness, the
+  fastest route (approvals and estimated minutes) to the next provable topic,
+  and gate-blocked counts by reason. On today's bank that route is 4 approvals
+  (two questions × two reviewers) in every flagship.
+- **What the plan shows about the bank** (computed, not changed): of 1,629
+  Physics questions only 57 reviews are needed to reach every unlock the plan
+  values; 234 are gate-blocked, all "labelled transfer but has no baseline
+  link". Maths/Biology/Chemistry: 62/64/61 ranked reviews, 8/11/12 blocked.
+- **Diagnostic never dead-ends.** With no reviewed questions, "Full" on
+  `/diagnostic` said Revise would not run and offered nothing else; the empty
+  quick check said "Practice is still available" without a link. Both now
+  offer the labelled practice-tier quick check and/or practice for that
+  subject. The header no longer says every answer "counts as unaided
+  evidence": only answers on teacher-reviewed questions do.
+
+Nothing about trust, proof predicates, review rules or gates changed; this is
+ordering and copy. Not attempted again: the supply-layer consistency for
+reference subjects (`mission-session` still uses `trustedAssessmentContent`
+for `verifiedOnly`); switching it to `learnerEvidenceTrusted` fails
+`revision-engine.test.ts > builds a delayed check…` because the fixtures use a
+non-flagship subject id, exactly as the earlier attempt recorded.
+
 ## Reviewer checks now have evidence on screen — 2026-10-10
 
 **A reviewer could not verify two of the six approvals they were attesting
