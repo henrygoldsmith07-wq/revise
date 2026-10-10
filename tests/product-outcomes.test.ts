@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FunnelEvent } from "@/domain/funnel";
 import { buildMarkRecovery } from "@/domain/mark-recovery";
 import { aggregateOutcomes, measureLearnerOutcomes, sessionCount } from "@/domain/product-outcomes";
-import { attempt, bank, mistake } from "./helpers-recovery";
+import { flagshipAttempt as attempt, flagshipBank as bank, flagshipMistake as mistake } from "./helpers-recovery";
 
 const at = (h: number) => new Date(Date.UTC(2026, 9, 1, h)).toISOString();
 const ev = (type: FunnelEvent["type"], h: number, detail?: string): FunnelEvent => ({ anonId: "u1", type, at: at(h), ...(detail ? { detail } : {}) });

@@ -19,7 +19,8 @@
 // ---------------------------------------------------------------------------
 
 import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted, trustedAssessmentContent } from "./content-trust";
+import { isFlagship } from "./flagship";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import { officialPaperQuestionEligible, type OfficialPaperContext } from "./official-papers";
 import { isShallowReskin } from "./reskin";
@@ -115,7 +116,15 @@ export function classifyMistake(
     .filter((a) => a.createdAt > mistake.createdAt && a.topicIds.includes(mistake.topicId) && trustworthyAttempt(a))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const bank = [...questionsById.values()];
-  const verified = (a: Attempt) => trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank, officialPaper);
+  // Proof is a learner-facing claim, so the answering question must clear
+  // learner-evidence trust (flagship + human review), exactly as the proof
+  // ledger requires. Reference-tier outlines pass the permissive authoring
+  // predicate but can only ever leave a mark "provisional". The official-paper
+  // tier keeps its own, separately verified route.
+  const proofQuestion = (q: Question | undefined): boolean => Boolean(q) &&
+    (learnerEvidenceTrusted(q) || (officialPaper?.enabled === true && officialPaperQuestionEligible(q, officialPaper.manifest, true)));
+  const verified = (a: Attempt) => proofQuestion(questionsById.get(a.questionId)) &&
+    trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank, officialPaper);
   // trustedAssessmentMistake defaults to reviewer trust; the official-paper
   // tier ORs in only at the question level, per learner, with the flag on.
   // With no context the second disjunct is false, so behaviour is unchanged.
@@ -148,7 +157,9 @@ export function classifyMistake(
     return { ...common, state: "provisional", reason: "Succeeded, but on the same question, with help, or on a near-identical one. That is not proof." };
   }
   if (!provable.length) {
-    return { ...common, state: "provisional", unverifiedOnly: true, reason: "You improved here, but Revise does not yet have enough reviewed new questions to prove it." };
+    return { ...common, state: "provisional", unverifiedOnly: true, reason: isFlagship(mistake.subjectId)
+      ? "You improved here, but Revise does not yet have enough reviewed new questions to prove it."
+      : "You improved here. This subject's questions have not been checked against the specification, so Revise can track practice but not prove it." };
   }
   const firstFamilies = new Set(questionsById.has(first.questionId) ? questionFamilies(questionsById.get(first.questionId)!) : []);
   // The delayed check must also be new relative to the success it follows.

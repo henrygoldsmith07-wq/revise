@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildMarkRecovery, classifyMistake } from "@/domain/mark-recovery";
-import { attempt, bank, mistake } from "./helpers-recovery";
+// Proof lifecycle fixtures sit on a reviewed flagship: reference-tier content
+// can never prove a mark (see the last test in this file).
+import { flagshipAttempt as attempt, flagshipBank as bank, flagshipMistake as mistake, question, sourceAttempt, attempt as refAttempt, mistake as refMistake } from "./helpers-recovery";
 
 const NOW = new Date("2026-10-03T12:00:00.000Z");
 const run = (attempts = [] as ReturnType<typeof attempt>[], m = mistake("m1"), now = NOW) =>
-  classifyMistake(m, attempts, new Map(bank.map((q) => [q.id, q])), now);
+  classifyMistake(m, [sourceAttempt(m), ...attempts], new Map(bank.map((q) => [q.id, q])), now);
 
 describe("marks recovered", () => {
   it("leaves untouched marks open", () => {
@@ -97,5 +99,20 @@ describe("paper attribution", () => {
     const r = buildMarkRecovery({ mistakes: [mistake("m1", { attemptId: "p1" })], attempts, questions: bank, now: NOW });
     expect(r.byPaper("paper-2025").previouslyLost).toBe(3);
     expect(r.byPaper("unit-1").previouslyLost).toBe(0);
+  });
+
+  it("never proves a reference-tier mark, however good the evidence", () => {
+    // Reference-tier subjects are unreviewed outlines. The same delayed,
+    // independent, different-question success that proves a flagship mark
+    // leaves a reference-tier one provisional, and says why.
+    const refBank = ["q-a1", "q-a2", "q-a3"].map((id) => question(id, "algebra"));
+    const m = refMistake("m1");
+    const r = classifyMistake(m, [
+      refAttempt("a1", "q-a2", 3, 3, "2026-09-22T09:00:00.000Z"), refAttempt("a2", "q-a3", 3, 3, "2026-09-30T09:00:00.000Z"),
+    ], new Map(refBank.map((q) => [q.id, q])), NOW);
+    expect(r.state).toBe("provisional");
+    expect(r.unverifiedOnly).toBe(true);
+    expect(r.provenAt).toBeUndefined();
+    expect(r.reason).toMatch(/not been checked against the specification/);
   });
 });
