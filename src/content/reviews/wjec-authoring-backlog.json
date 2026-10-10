@@ -2753,90 +2753,9 @@
         ]
       },
       {
-        "specPointId": "wjec-alevel-physics.capacitance.sp-01",
-        "topicId": "wjec-alevel-physics.capacitance",
-        "currentQuestionCount": 10,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.capacitance.sp-02",
-        "topicId": "wjec-alevel-physics.capacitance",
-        "currentQuestionCount": 13,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.capacitance.sp-03",
-        "topicId": "wjec-alevel-physics.capacitance",
-        "currentQuestionCount": 11,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
         "specPointId": "wjec-alevel-physics.capacitance.sp-04",
         "topicId": "wjec-alevel-physics.capacitance",
         "currentQuestionCount": 12,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.circular-shm.sp-01",
-        "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 15,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.circular-shm.sp-02",
-        "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 12,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.circular-shm.sp-03",
-        "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 12,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.circular-shm.sp-04",
-        "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 14,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.circular-shm.sp-05",
-        "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 13,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.circular-shm.sp-06",
-        "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"

@@ -30,6 +30,12 @@ export interface PaperReadiness {
   paperId: Id;
   name: string;
   subjectId: Id;
+  /**
+   * Reference-tier subject (not a WJEC flagship): its statements and
+   * questions are unreviewed practice material, so "secure" and the
+   * unfamiliar-question count describe practice, never proof.
+   */
+  referenceTier: boolean;
   weight: number;
   examDate: string | null;
   /** Negative when the exam has passed; null with no date. */
@@ -211,7 +217,7 @@ export function buildPaperReadiness(input: PaperReadinessInput): PaperReadiness[
       .sort((a, b) => b.marks - a.marks || b.lacking - a.lacking || a.id.localeCompare(b.id))[0];
 
     const marksAtRisk = Math.round(open.reduce((sum, mistake) => sum + mistake.marksLost, 0) * 10) / 10;
-    const nextProof = pickNextProof({ known, points: points.length, missing, marksAtRisk, transferUnproven, paperAttempts, gapTopicId: gap?.id ?? null, days: upcoming?.days ?? null });
+    const nextProof = pickNextProof({ known, points: points.length, missing, marksAtRisk, transferUnproven, paperAttempts, gapTopicId: gap?.id ?? null, days: upcoming?.days ?? null, referenceTier: specMap.referenceTier });
 
     const days = upcoming?.days ?? null;
     const urgency = known && points.length && (days === null || days >= 0)
@@ -222,6 +228,7 @@ export function buildPaperReadiness(input: PaperReadinessInput): PaperReadiness[
       paperId: paper.id,
       name: paper.name,
       subjectId: subject.id,
+      referenceTier: specMap.referenceTier,
       weight: paper.weight,
       examDate: upcoming?.date ?? null,
       daysUntil: days,
@@ -257,9 +264,13 @@ function trustworthyPaper(attempt: Attempt): boolean {
 
 function pickNextProof(input: {
   known: boolean; points: number; missing: number; marksAtRisk: number; transferUnproven: number;
-  paperAttempts: number; gapTopicId: Id | null; days: number | null;
+  paperAttempts: number; gapTopicId: Id | null; days: number | null; referenceTier?: boolean;
 }): PaperReadiness["nextProof"] {
   if (!input.known || !input.points) return { kind: "unknown", topicId: null, text: "Which topics this paper covers is not recorded, so no paper-level proof can be chosen." };
+  // Reference-tier practice can stretch the learner, but cannot prove anything.
+  if (input.referenceTier && input.marksAtRisk <= 0 && input.missing <= 0 && input.transferUnproven > 0) {
+    return { kind: "transfer", topicId: input.gapTopicId, text: "Practise it on an unfamiliar-context question." };
+  }
   if (input.marksAtRisk > 0) return { kind: "repair", topicId: input.gapTopicId, text: "Clear the open mistakes with a different question." };
   if (input.missing > 0) return { kind: "first-evidence", topicId: input.gapTopicId, text: "Get first independent evidence on statements you have not touched." };
   if (input.transferUnproven > 0) return { kind: "transfer", topicId: input.gapTopicId, text: "Prove it on an unfamiliar-context question." };

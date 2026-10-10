@@ -33,7 +33,8 @@ describe("progress summary", () => {
     const s = buildProgressSummary({ subjectIds: ["maths"], topics: [topic("t1"), topic("t2")], attempts, questions: qs, mistakes: [], now: NOW });
     expect(s.coldStart).toBe(false);
     expect(s.strong.map((row) => row.topicId)).toEqual(["t1"]);
-    expect(s.strong[0]!.label).toBe("Secure");
+    // "maths" is not a WJEC flagship, so its strength is reference practice.
+    expect(s.strong[0]!.label).toBe("Secure in practice");
     expect(s.stageCounts.learning).toBe(1);
   });
 

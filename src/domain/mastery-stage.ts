@@ -11,6 +11,7 @@
 // (and, for unfamiliar, its context) is new relative to earlier work.
 // ---------------------------------------------------------------------------
 
+import { isFlagship } from "./flagship";
 import { independentAttempt, questionContexts, questionFamilies, trustedAssessmentAttempt } from "./learning-evidence";
 import type { Attempt, Id, Question } from "./types";
 
@@ -35,6 +36,31 @@ export const STAGE_MEANING: Record<MasteryStage, string> = {
   fading: "Was secure, but the last evidence is old enough that it needs refreshing.",
 };
 
+/**
+ * Reference-tier subjects (everything outside the four WJEC flagships) are
+ * practised on outline questions nobody has checked against the board's
+ * specification. Their evidence can show a topic is going well in practice,
+ * but it can never prove anything (`learnerEvidenceTrusted`), so a reference
+ * topic tops out at Secure, and that word is qualified wherever it is shown.
+ */
+export const REFERENCE_STAGE_LABEL: Partial<Record<MasteryStage, string>> = {
+  secure: "Secure in practice",
+};
+export const REFERENCE_STAGE_MEANING =
+  "Going well on reference practice questions. They have not been checked against this board's specification or reviewed by a teacher, so this can show practice, not prove learning.";
+export const REFERENCE_PROOF_NEXT =
+  "Keep practising. This subject's questions are reference practice, not teacher-reviewed, so this topic cannot be proven here.";
+
+/** Student-facing label for a stage, qualified for reference-tier evidence. */
+export function stageLabel(stage: MasteryStage, referenceTier = false): string {
+  return (referenceTier ? REFERENCE_STAGE_LABEL[stage] : undefined) ?? STAGE_LABEL[stage];
+}
+
+/** Student-facing meaning for a stage, qualified for reference-tier evidence. */
+export function stageMeaning(stage: MasteryStage, referenceTier = false): string {
+  return referenceTier && (stage === "secure" || stage === "fading") ? `${STAGE_MEANING[stage]} ${REFERENCE_STAGE_MEANING}` : STAGE_MEANING[stage];
+}
+
 export const MIN_DISTINCT_QUESTIONS = 3;
 export const MIN_MARKS = 8;
 export const PRACTISED_ACCURACY = 0.6;
@@ -50,6 +76,11 @@ export interface MasteryStageResult {
   reasons: string[];
   /** The single thing that would move it forward; null at Proven. */
   next: string | null;
+  /**
+   * The topic's answers are on a reference-tier subject: practice evidence
+   * only. Such a topic never reaches Proven and its labels say "in practice".
+   */
+  referenceTier: boolean;
   evidence: {
     distinctQuestions: number;
     independentQuestions: number;
@@ -113,6 +144,10 @@ export function masteryStage(input: MasteryStageInput): MasteryStageResult {
   }
 
   const rows = [...counted.values()];
+  // Subject-level, matching outlookRows/buildExamReadiness: proof is a claim
+  // about the four reviewed flagships only.
+  const subjectId = topicAttempts[0]?.subjectId;
+  const referenceTier = subjectId !== undefined && !isFlagship(subjectId);
   const marks = rows.reduce((sum, row) => sum + row.attempt.max, 0);
   const gained = rows.reduce((sum, row) => sum + row.attempt.awarded, 0);
   const accuracy = marks > 0 ? gained / marks : null;
@@ -141,7 +176,7 @@ export function masteryStage(input: MasteryStageInput): MasteryStageResult {
   if (!rows.length && !topicAttempts.length && !input.cardsReviewed) stage = "untouched";
   else if (!volume || !accurate) stage = "learning";
   else if (!novelWins.length || accuracy! < SECURE_ACCURACY) stage = "practised";
-  else if (!delayedNovel) stage = "secure";
+  else if (!delayedNovel || referenceTier) stage = "secure";
   else stage = "proven";
 
   const reasons: string[] = [];
@@ -158,15 +193,18 @@ export function masteryStage(input: MasteryStageInput): MasteryStageResult {
       ? `Answer ${Math.max(1, MIN_DISTINCT_QUESTIONS - rows.length)} more different question${MIN_DISTINCT_QUESTIONS - rows.length === 1 ? "" : "s"} without hints.`
       : "Raise accuracy on unaided answers before moving on.";
     else if (stage === "practised") next = "Succeed on a question in a pattern you have not seen.";
-    else if (stage === "secure") next = `Succeed on another new-pattern question at least ${PROVEN_DELAY_DAYS} days after your first unaided answer.`;
+    else if (stage === "secure" && referenceTier) {
+      next = REFERENCE_PROOF_NEXT;
+      reasons.push(REFERENCE_STAGE_MEANING);
+    } else if (stage === "secure") next = `Succeed on another new-pattern question at least ${PROVEN_DELAY_DAYS} days after your first unaided answer.`;
   }
 
   // Fading overrides only when there was real strength to lose.
   if ((stage === "secure" || stage === "proven") && daysSinceLast !== null && daysSinceLast > FADING_AFTER_DAYS) {
     reasons.push(`Last evidence was ${daysSinceLast} days ago.`);
-    return { topicId: input.topicId, stage: "fading", reasons: [STAGE_MEANING.fading, ...reasons], next: "Answer a fresh question to confirm it still holds.", evidence };
+    return { topicId: input.topicId, stage: "fading", reasons: [STAGE_MEANING.fading, ...reasons], next: "Answer a fresh question to confirm it still holds.", referenceTier, evidence };
   }
-  return { topicId: input.topicId, stage, reasons, next, evidence };
+  return { topicId: input.topicId, stage, reasons, next, referenceTier, evidence };
 }
 
 /** Stage for many topics at once. */

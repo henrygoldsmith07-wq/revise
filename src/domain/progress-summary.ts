@@ -11,13 +11,17 @@
 // ---------------------------------------------------------------------------
 
 import { buildMarksAtRisk } from "./marks-at-risk";
-import { masteryStages, STAGE_LABEL, type MasteryStage } from "./mastery-stage";
+import { masteryStages, stageLabel, type MasteryStage } from "./mastery-stage";
 import { buildMistakePatterns, type MistakePattern } from "./mistake-patterns";
 import { buildTopicLifecycles, type LifecycleStage } from "./proof-lifecycle";
 import type { ProofLedger } from "./proof-of-improvement";
 import type { Attempt, Id, Mistake, Question, Topic } from "./types";
 
-export interface StrongTopic { topicId: Id; title: string; stage: MasteryStage; label: string; reason: string }
+export interface StrongTopic {
+  topicId: Id; title: string; stage: MasteryStage; label: string; reason: string;
+  /** Reference-tier practice evidence: the label already says "in practice". */
+  referenceTier: boolean;
+}
 export interface LosingTopic { topicId: Id; title: string; marks: number }
 export interface ProvenTopic { topicId: Id; title: string; markPoints: number }
 
@@ -26,6 +30,8 @@ export interface ProgressSummary {
   coldStart: boolean;
   strong: StrongTopic[];
   stageCounts: Record<MasteryStage, number>;
+  /** How many of `stageCounts.secure` rest on reference-tier practice questions only. */
+  practiceOnlySecure: number;
   losing: { totalMarks: number; topics: LosingTopic[]; patterns: MistakePattern[] };
   proven: { topics: ProvenTopic[]; declined: number; awaiting: number; markPoints: number };
   /** Where topics stand on proof: states shown to students, never a score. */
@@ -64,12 +70,13 @@ export function buildProgressSummary(input: {
   });
   const stageCounts = Object.fromEntries(ORDER.map((stage) => [stage, 0])) as Record<MasteryStage, number>;
   for (const row of stages) stageCounts[row.stage] += 1;
+  const practiceOnlySecure = stages.filter((row) => row.stage === "secure" && row.referenceTier).length;
 
   const strong = stages
     .filter((row) => row.stage === "secure" || row.stage === "proven")
     .sort((a, b) => ORDER.indexOf(b.stage) - ORDER.indexOf(a.stage) || (b.evidence.accuracy ?? 0) - (a.evidence.accuracy ?? 0) || a.topicId.localeCompare(b.topicId))
     .slice(0, 5)
-    .map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId, stage: row.stage, label: STAGE_LABEL[row.stage], reason: row.reasons[0] ?? "" }));
+    .map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId, stage: row.stage, label: stageLabel(row.stage, row.referenceTier), reason: row.reasons[0] ?? "", referenceTier: row.referenceTier }));
 
   const risk = buildMarksAtRisk({
     mistakes: input.mistakes as Mistake[], attempts: input.attempts as Attempt[], questions: input.questions as Question[],
@@ -107,6 +114,7 @@ export function buildProgressSummary(input: {
     coldStart: stageCounts.practised + stageCounts.secure + stageCounts.proven + stageCounts.fading === 0,
     strong,
     stageCounts,
+    practiceOnlySecure,
     losing: {
       totalMarks: risk.totalMarks,
       topics: risk.topics.slice(0, 3).map((row) => ({ topicId: row.topicId, title: row.label, marks: row.marks })),
