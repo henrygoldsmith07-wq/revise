@@ -1,7 +1,10 @@
 import type { Question, QuestionPart, SetupFingerprint } from "@/domain/types";
 import { fingerprintSetup, reasoningGraphForPart } from "@/domain/reasoning-graph";
 import { defineQuestion } from "./authoring";
+import { physicsCapacitorEnergyQuestions } from "./physics-capacitors.generated";
 import { physicsDepth50CircuitsFieldsQuestions } from "./physics-depth-50-circuits-fields";
+import { physicsDepth50MechanicsQuestions } from "./physics-depth-50-mechanics";
+import { physicsDepthCompletionCircuitsMechanicsQuestions } from "./physics-depth-completion-circuits-mechanics";
 import { physicsReasoningDepthQuestions } from "./physics-reasoning-depth";
 
 // ---------------------------------------------------------------------------
@@ -10,12 +13,14 @@ import { physicsReasoningDepthQuestions } from "./physics-reasoning-depth";
 // Physics has 234 parts labelled "transfer" with no baseline link, so none of
 // them can be approved as transfer (review gate
 // `transfer-label-without-transfer`) and no statement meets the core bar.
-// These are new, separately authored transfer items for two of the three
-// statements `npm run wjec:authoring:plan -- physics` ranks first
-// (alternating currents sp-01 and sp-03). A drafted sp-02 item (series RC
-// crossover) was withheld: the repo's structural-novelty comparison, which
-// is not yet applied to Physics, rated it too close to its baseline, and an
-// item that would fail the stricter check should not count here. Each one:
+// These are new, separately authored transfer items for statements
+// `npm run wjec:authoring:plan -- physics` ranks first: alternating currents
+// sp-01 and sp-03 (first batch), then capacitance sp-01..03 and circular
+// motion / SHM sp-01..06 (second batch). A drafted sp-02 item (series RC
+// crossover) was withheld: the repo's structural-novelty comparison rated it
+// too close to its baseline, and an item that would fail the stricter check
+// should not count here. Every item here passes that comparison against its
+// baseline (`compareTransferStructures` on verified graphs). Each one:
 //   - links to an EXISTING application/calculation part of the same
 //     capability and statement (looked up below; the module throws if the
 //     baseline ever disappears, so a link can never point at nothing);
@@ -31,10 +36,10 @@ import { physicsReasoningDepthQuestions } from "./physics-reasoning-depth";
 
 const S = "wjec-alevel-physics";
 
-function baselinePart(questions: readonly Question[], questionId: string): QuestionPart {
+function baselinePart(questions: readonly Question[], questionId: string, partIndex = 0): QuestionPart {
   const question = questions.find((q) => q.id === questionId);
-  const part = question?.parts[0];
-  if (!question || !part) throw new Error(`Physics transfer baseline ${questionId} does not exist.`);
+  const part = question?.parts[partIndex];
+  if (!question || !part) throw new Error(`Physics transfer baseline ${questionId} part ${partIndex} does not exist.`);
   return part;
 }
 
@@ -143,5 +148,193 @@ export const physicsTransferLinkedQuestions: Question[] = [
       "Ns/Np = Vs/Vp = 44 700/690 ≈ 65",
     ],
     answer: "The permitted loss is 0.0050 × 2.0 MW = 10 kW. Since P_loss = I²R, I ≤ √(10 000/5.0) = 44.7 A. Sending 2.0 MW at that current needs V = P/I = 2.0×10⁶/44.7 = 4.5×10⁴ V, about 45 kV, as a minimum. For an ideal transformer Ns/Np = Vs/Vp = 44 700/690 ≈ 65.",
+  }),
+  // ---- Second batch (2026-10-10, fourth pass): capacitance and circular
+  // motion / SHM, the next statements `wjec:authoring:plan -- physics` ranks.
+  // Every number below was recomputed in code before it was written down.
+
+  // capacitance sp-01. Baseline: compare two plate capacitances by A/d ratio.
+  // Transfer: C is not given; it must be found from a coulombmeter reading,
+  // then inverted through C = ε₀A/d, then a dielectric applied.
+  linkedTransferQuestion({
+    slug: "physics-transfer-capacitance-sp-01-coulombmeter-plates",
+    topic: "capacitance",
+    point: "sp-01",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-capacitance-sp-01-plate-capacitance-compare-3"),
+    family: "physics-transfer:capacitance-separation-from-charge",
+    context: "physics-transfer:capacitance-separation-from-charge:coulombmeter",
+    move: "find a capacitance from measured charge and p.d., invert C = ε₀A/d for the plate separation, then predict the effect of a dielectric",
+    prompt: "Two square metal plates, each of area 0.040 m², are held parallel in air and connected to a 2.0 kV supply. A coulombmeter shows that 0.35 μC of charge is stored. Determine the separation of the plates. A sheet of polythene of relative permittivity 2.3 is then slid in to fill the gap while the supply stays connected. Calculate the charge now stored. (ε₀ = 8.85×10⁻¹² F m⁻¹)",
+    scheme: [
+      "C = Q/V = 0.35×10⁻⁶/2000 = 1.75×10⁻¹⁰ F",
+      "d = ε₀A/C = 8.85×10⁻¹² × 0.040/1.75×10⁻¹⁰",
+      "d = 2.0×10⁻³ m (2.0 mm)",
+      "Dielectric multiplies C by 2.3 at the same V, so Q = 2.3 × 0.35 μC = 0.81 μC",
+    ],
+    answer: "The capacitance follows from the measurement: C = Q/V = 0.35×10⁻⁶ C / 2000 V = 1.75×10⁻¹⁰ F (175 pF). For a parallel-plate capacitor in air C = ε₀A/d, so d = ε₀A/C = (8.85×10⁻¹² × 0.040)/1.75×10⁻¹⁰ = 2.0×10⁻³ m, about 2.0 mm. Filling the gap with polythene multiplies the capacitance by εᵣ = 2.3; the supply holds V at 2.0 kV, so Q = CV rises by the same factor to 2.3 × 0.35 μC = 0.81 μC.",
+  }),
+  // capacitance sp-02. Baseline: C from the gradient of a U-against-V² line.
+  // Transfer: a charge-p.d. record instead; the energy is the area under the
+  // line (not a gradient), and the learner then works back from a fraction of
+  // that energy to the remaining p.d. (The defibrillator ½CV² part was the
+  // obvious baseline, but the baseline-integrity check flags its "two
+  // significant figures" wording as a leak, so it was not used.)
+  linkedTransferQuestion({
+    slug: "physics-transfer-capacitance-sp-02-charge-pd-record",
+    topic: "capacitance",
+    point: "sp-02",
+    baseline: baselinePart(physicsCapacitorEnergyQuestions, "cnt:question:physics-energy-infer-capacitance-from-slope"),
+    family: "physics-transfer:capacitance-energy-from-q-v-area",
+    context: "physics-transfer:capacitance-energy-from-q-v-area:charging-record",
+    move: "use the area under a charge-p.d. line as stored energy, then work back from a fraction of that energy to the remaining p.d.",
+    prompt: "While a capacitor is charged, a student records that the charge on it rises in direct proportion to the p.d. across it, reaching 6.0 mC when the p.d. is 12 V. Use the area under the charge-p.d. line to find the energy stored at 12 V, and find the capacitance. The capacitor then releases half of this stored energy to a motor. Calculate the p.d. across the capacitor afterwards.",
+    scheme: [
+      "Energy = area under Q-V line = ½QV = ½ × 6.0×10⁻³ × 12 = 0.036 J",
+      "C = Q/V = 6.0×10⁻³/12 = 5.0×10⁻⁴ F (500 μF)",
+      "Remaining energy 0.018 J = ½CV², so V² = 2 × 0.018/5.0×10⁻⁴ = 72",
+      "V = 8.5 V (equivalently 12/√2, since E ∝ V²)",
+    ],
+    answer: "The work done charging is the area under the straight Q-V line, a triangle: E = ½QV = ½ × 6.0×10⁻³ C × 12 V = 0.036 J. The gradient gives C = Q/V = 6.0×10⁻³/12 = 5.0×10⁻⁴ F (500 μF). After half the energy is released, 0.018 J remains, so ½CV² = 0.018 gives V² = 2 × 0.018/5.0×10⁻⁴ = 72 V² and V = 8.5 V. Because stored energy is proportional to V², halving the energy divides the p.d. by √2 (12/√2 = 8.5 V), not by 2.",
+  }),
+  // capacitance sp-03. Baseline: two given capacitors in series, find C, Q
+  // and each p.d. Transfer: a design problem — choose the arrangement of
+  // identical rated capacitors that meets both a capacitance and a voltage
+  // constraint, then the energy stored.
+  linkedTransferQuestion({
+    slug: "physics-transfer-capacitance-sp-03-rated-bank-design",
+    topic: "capacitance",
+    point: "sp-03",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-capacitance-sp-03-series-combo-calc-6"),
+    family: "physics-transfer:capacitance-rated-bank-design",
+    context: "physics-transfer:capacitance-rated-bank-design:pulse-bank",
+    move: "design a series-parallel bank from identical rated capacitors to meet both a capacitance and a working-voltage constraint",
+    prompt: "A pulse circuit needs a capacitor bank of total capacitance 6.0 μF that will be charged to 400 V. The only capacitors available are identical 4.0 μF capacitors, each rated at a maximum of 250 V. The bank must be built as identical series strings connected in parallel. Determine the smallest number of capacitors needed and how they are arranged, and calculate the energy stored in the bank at 400 V.",
+    scheme: [
+      "400 V across a string with each capacitor ≤ 250 V needs at least 2 in series (200 V each)",
+      "A string of two 4.0 μF in series has C = 2.0 μF",
+      "6.0 μF needs 3 such strings in parallel: 6 capacitors in total",
+      "E = ½CV² = ½ × 6.0×10⁻⁶ × 400² = 0.48 J",
+    ],
+    answer: "The voltage rule fixes the strings: one capacitor would see 400 V, above its 250 V rating, so each string needs at least two in series, sharing 200 V each. Two equal 4.0 μF capacitors in series give 1/C = 1/4.0 + 1/4.0, so C = 2.0 μF per string. Parallel strings add, so 6.0 μF needs three strings: 3 × 2 = 6 capacitors. The bank stores E = ½CV² = ½ × 6.0×10⁻⁶ F × (400 V)² = 0.48 J.",
+  }),
+  // circular-shm sp-01. Baseline: rev min⁻¹ and radius -> ω and tip speed.
+  // Transfer: ω must be built from a pulse count, and the unknown is the
+  // radius, found from an independently measured linear speed.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circular-shm-sp-01-cycle-sensor",
+    topic: "circular-shm",
+    point: "sp-01",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-circular-shm-sp-01-omega-from-revs-3"),
+    family: "physics-transfer:circular-radius-from-pulse-count",
+    context: "physics-transfer:circular-radius-from-pulse-count:cycle-computer",
+    move: "build an angular velocity from a sensor pulse count, then use v = ωr in reverse to infer a radius",
+    prompt: "A bicycle wheel carries 4 magnets equally spaced around it, and a fixed sensor gives one pulse each time a magnet passes. Riding at a steady speed, the cycle computer counts 40 pulses in 4.0 s while a GPS unit shows the bicycle moving at 5.3 m s⁻¹. Assuming the tyre does not slip, determine the angular velocity of the wheel and the radius of the wheel.",
+    scheme: [
+      "Revolutions per second f = (40/4)/4.0 = 2.5 s⁻¹",
+      "ω = 2πf = 2π × 2.5 = 16 rad s⁻¹ (15.7)",
+      "No slip: v = ωr, so r = v/ω",
+      "r = 5.3/15.7 = 0.34 m",
+    ],
+    answer: "Four pulses make one revolution, so 40 pulses is 10 revolutions in 4.0 s: f = 2.5 revolutions per second. The angular velocity is ω = 2πf = 2π × 2.5 = 15.7 rad s⁻¹ (16 rad s⁻¹ to 2 s.f.). Without slipping, the bicycle's speed equals the tyre's rim speed, v = ωr, so r = v/ω = 5.3/15.7 = 0.34 m.",
+  }),
+  // circular-shm sp-02. Baseline: friction provides the centripetal force on
+  // a flat bend. Transfer: the normal reaction provides it and friction must
+  // hold the weight, so the inequality runs the other way (a minimum ω).
+  linkedTransferQuestion({
+    slug: "physics-transfer-circular-shm-sp-02-rotor-ride",
+    topic: "circular-shm",
+    point: "sp-02",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-circular-shm-sp-02-corner-acceleration-3"),
+    family: "physics-transfer:circular-minimum-rate-wall-ride",
+    context: "physics-transfer:circular-minimum-rate-wall-ride:rotor",
+    move: "identify the normal reaction as the centripetal force and friction as the support against weight, then find the minimum angular velocity",
+    prompt: "In a fairground 'rotor', riders stand against the inside wall of a vertical cylinder of radius 2.5 m. The cylinder spins and then the floor drops away. The coefficient of friction between a rider and the wall is 0.40. Find the minimum angular velocity, and the minimum rotation rate in revolutions per minute, for which riders do not slide down. (g = 9.81 m s⁻²)",
+    scheme: [
+      "The wall's normal reaction provides the centripetal force: N = mω²r",
+      "Friction must support the weight: μN ≥ mg, so μmω²r ≥ mg",
+      "ω ≥ √(g/(μr)) = √(9.81/(0.40 × 2.5)) = 3.1 rad s⁻¹",
+      "Rate = 3.13/(2π) × 60 = 30 rev min⁻¹",
+    ],
+    answer: "The wall pushes inwards on the rider, so the normal reaction is the centripetal force: N = mω²r. Friction acts upwards and can be at most μN, and it must at least balance the weight: μmω²r ≥ mg. The mass cancels, giving ω ≥ √(g/(μr)) = √(9.81/(0.40 × 2.5)) = 3.13 rad s⁻¹ (3.1 rad s⁻¹). That is 3.13/(2π) = 0.50 revolutions per second, about 30 rev min⁻¹. Spinning faster increases N and so the friction available; the mass of the rider does not matter.",
+  }),
+  // circular-shm sp-03. Baseline: one (a, x) pair -> ω and T. Transfer: a
+  // table of readings must be tested against the defining condition (a ∝ −x
+  // with the same constant) before ω and f are extracted.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circular-shm-sp-03-buoy-readings",
+    topic: "circular-shm",
+    point: "sp-03",
+    baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-circular-shm-sp-03-omega-from-measurements-6"),
+    family: "physics-transfer:shm-test-defining-condition",
+    context: "physics-transfer:shm-test-defining-condition:buoy-logger",
+    move: "test a data table against a = −ω²x (sign and constant ratio) before extracting ω and the frequency",
+    prompt: "An accelerometer inside a bobbing buoy logs its vertical displacement x from equilibrium and its acceleration a at three instants: x = +0.020 m, a = −0.79 m s⁻²; x = −0.010 m, a = +0.39 m s⁻²; x = +0.030 m, a = −1.18 m s⁻². Show that these readings are consistent with simple harmonic motion, and determine the frequency of the oscillation.",
+    scheme: [
+      "a/x = −39.5, −39.0 and −39.3 s⁻²: the same constant each time",
+      "a is always opposite in sign to x and proportional to it, so a = −ω²x (SHM)",
+      "ω² ≈ 39.3 s⁻², so ω = 6.3 rad s⁻¹",
+      "f = ω/(2π) = 6.27/(2π) = 1.0 Hz",
+    ],
+    answer: "Dividing each acceleration by its displacement gives a/x = −0.79/0.020 = −39.5 s⁻², +0.39/−0.010 = −39.0 s⁻² and −1.18/0.030 = −39.3 s⁻². The ratio is the same within reading precision and always negative, so the acceleration is proportional to the displacement and directed towards equilibrium: a = −ω²x, the defining condition for SHM. Taking ω² ≈ 39.3 s⁻² gives ω = 6.27 rad s⁻¹, and f = ω/(2π) = 1.0 Hz.",
+  }),
+  // circular-shm sp-04. Baseline: A and T -> maximum speed. Transfer: only
+  // the measured maxima of speed and acceleration are known; ω, T and A must
+  // all be recovered from their ratio.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circular-shm-sp-04-sensor-maxima",
+    topic: "circular-shm",
+    point: "sp-04",
+    baseline: baselinePart(physicsDepth50MechanicsQuestions, "cnt:question:physics-depth50-circular-shm-sp-04-amplitude-speed-4"),
+    family: "physics-transfer:shm-recover-from-maxima",
+    context: "physics-transfer:shm-recover-from-maxima:motion-sensor",
+    move: "recover ω, the period and the amplitude from measured maximum speed and maximum acceleration",
+    prompt: "A motion sensor and an accelerometer are attached to a glider oscillating with simple harmonic motion. The largest speed recorded is 0.60 m s⁻¹ and the largest acceleration is 4.8 m s⁻². Neither the amplitude nor the period was measured directly. Determine the angular frequency, the period and the amplitude of the motion.",
+    scheme: [
+      "v_max = ωA and a_max = ω²A, so ω = a_max/v_max",
+      "ω = 4.8/0.60 = 8.0 rad s⁻¹",
+      "T = 2π/ω = 2π/8.0 = 0.79 s",
+      "A = v_max/ω = 0.60/8.0 = 0.075 m",
+    ],
+    answer: "In SHM the maximum speed is v_max = ωA and the maximum acceleration is a_max = ω²A, so their ratio removes the amplitude: ω = a_max/v_max = 4.8/0.60 = 8.0 rad s⁻¹. The period is T = 2π/ω = 2π/8.0 = 0.79 s. The amplitude follows from A = v_max/ω = 0.60/8.0 = 0.075 m (check: ω²A = 64 × 0.075 = 4.8 m s⁻²).",
+  }),
+  // circular-shm sp-05. Baseline: mass and period -> spring constant.
+  // Transfer: an unfamiliar context (no weight in orbit) where the unknown is
+  // a mass, recovered from two periods and a calibration mass.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circular-shm-sp-05-orbit-mass-chair",
+    topic: "circular-shm",
+    point: "sp-05",
+    baseline: baselinePart(physicsDepthCompletionCircuitsMechanicsQuestions, "cnt:question:physics-depth50-circular-shm-sp-05-spring-period-5"),
+    family: "physics-transfer:shm-mass-from-two-periods",
+    context: "physics-transfer:shm-mass-from-two-periods:orbit-mass-chair",
+    move: "calibrate a spring from a known mass and period, then invert T = 2π√(m/k) to find an unknown mass where weighing is impossible",
+    prompt: "On a space station, bathroom scales cannot measure an astronaut's mass, so a chair mounted on springs is used instead. The empty chair, of mass 12 kg, oscillates with period 0.90 s. With an astronaut strapped in, the period is 2.2 s. Explain why scales do not work in orbit, and calculate the astronaut's mass.",
+    scheme: [
+      "Astronaut and scales are in free fall together, so there is no contact force to read (apparent weightlessness)",
+      "k = 4π²m/T² = 4π² × 12/0.90² = 585 N m⁻¹",
+      "Total mass = kT²/(4π²) = 585 × 2.2²/(4π²) = 72 kg",
+      "Astronaut's mass = 72 − 12 = 60 kg",
+    ],
+    answer: "Scales read the contact force needed to support you; in orbit the astronaut and the scales are both in free fall, so there is no supporting force and the reading is zero. A mass-spring oscillator depends on inertia, not weight: T = 2π√(m/k). The empty chair calibrates the springs: k = 4π²m/T² = 4π² × 12/0.90² = 585 N m⁻¹. With the astronaut, the total mass is kT²/(4π²) = 585 × 2.2²/(4π²) = 71.7 kg, so the astronaut's mass is 71.7 − 12 = 60 kg.",
+  }),
+  // circular-shm sp-06. Baseline: speed at one displacement from k, A and m.
+  // Transfer: k and A are both unknown; two (x, v) readings and energy
+  // conservation determine them.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circular-shm-sp-06-two-readings",
+    topic: "circular-shm",
+    point: "sp-06",
+    baseline: baselinePart(physicsDepthCompletionCircuitsMechanicsQuestions, "cnt:question:physics-depth50-circular-shm-sp-06-speed-4"),
+    family: "physics-transfer:shm-energy-two-readings",
+    context: "physics-transfer:shm-energy-two-readings:trolley-springs",
+    move: "use conservation of kinetic plus elastic potential energy between two readings to find an unknown spring constant and amplitude",
+    prompt: "A 0.50 kg trolley held between springs oscillates horizontally with negligible friction. A light gate shows its speed is 0.30 m s⁻¹ when it is 0.040 m from equilibrium and 0.10 m s⁻¹ when it is 0.080 m from equilibrium. Using the conservation of energy, determine the effective spring constant and the amplitude of the oscillation.",
+    scheme: [
+      "Total energy is constant: ½mv₁² + ½kx₁² = ½mv₂² + ½kx₂²",
+      "k = m(v₁² − v₂²)/(x₂² − x₁²) = 0.50 × 0.080/0.0048 = 8.3 N m⁻¹",
+      "At the amplitude all energy is elastic: ½kA² = ½mv₁² + ½kx₁²",
+      "A² = 0.040² + 0.50 × 0.30²/8.33 = 0.0070 m², so A = 0.084 m",
+    ],
+    answer: "With no friction, kinetic plus elastic potential energy is constant, so ½mv₁² + ½kx₁² = ½mv₂² + ½kx₂². Rearranging, k = m(v₁² − v₂²)/(x₂² − x₁²) = 0.50 × (0.090 − 0.010)/(0.0064 − 0.0016) = 0.040/0.0048 = 8.3 N m⁻¹. At the amplitude the trolley is momentarily at rest, so ½kA² = ½mv₁² + ½kx₁², giving A² = 0.040² + 0.50 × 0.30²/8.33 = 0.0016 + 0.0054 = 0.0070 m² and A = 0.084 m. The second reading gives the same value (0.0064 + 0.0006 = 0.0070 m²), confirming it.",
   }),
 ];
