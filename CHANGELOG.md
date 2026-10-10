@@ -1,5 +1,53 @@
 # Changelog
 
+## "Proven" means the same thing everywhere — 2026-10-10 (second pass)
+
+**Four places could tell a student something was proven, or provable, when
+the proof rules say it was not.** The proof ledger already required
+`learnerEvidenceTrusted` (flagship + human review); the layers around it did
+not.
+
+- **Reference-tier proof steps.** `mission-session` (apply / transfer /
+  delayed-proof picks) and `unseenSupplyByTopic` used the permissive
+  `trustedAssessmentContent`, so a reference-tier subject could be served
+  "Delayed check — this is what proves the marks are back" from unreviewed
+  outline content. Both now use `learnerEvidenceTrusted`. The
+  `revision-engine.test.ts` fixtures moved onto the four flagship ids with a
+  reviewed bank (same intent) — the blocker recorded by the last two passes.
+- **Reference-tier "Proven" marks.** `mark-recovery` reached `proven` on the
+  same permissive predicate, feeding "Proven on trusted unseen" (MarksLedger)
+  and "Proven improvement" (ExamCommandCentre). The answering question must
+  now clear `learnerEvidenceTrusted` (or the separately verified official-paper
+  tier); reference-tier marks stay provisional and say why. Proof-lifecycle
+  test fixtures use new reviewed-flagship helpers in `tests/helpers-recovery.ts`.
+- **"Proof check · passed" after any full-marks answer.** The marked result
+  showed "<topic id> is now proven on a new question" for any unaided full
+  marks on permissively-trusted content — first answers, no delay, no earlier
+  loss. It now shows only when `marksProvenByAttempt` says this attempt was the
+  delayed proof of an earlier loss, and uses the topic title.
+- **Authored ceiling.** `wjec:authoring:*` counted gate-blocked questions as
+  if they could be approved. None of the 234 Physics questions labelled
+  "transfer" has a baseline link, so the reviewer portal refuses all of them,
+  yet they filled every Physics statement's transfer slot: the backlog said
+  108/108. Counting only `approvableByReview` questions it is 0/108 (Maths
+  9→8, Biology 12→9, Chemistry 13→12 statements). The backlog
+  (`part-level-depth-v2-approvable`) pins gate-blocked counts per subject, and
+  `--check` names any rise in a blocking gate. No links were invented and no
+  content was relabelled: choosing a baseline is an authoring judgement, and
+  relabelling 234 items would rewrite authored design to make a number move.
+
+**Today no longer goes blank while unseen questions remain.** The flaky
+property `never headlines an action it cannot perform` (seed 1002749685) was a
+real gap: a learner who had started every topic, lost no marks and had
+nothing due got an empty Today and a note blaming review supply, with unseen
+questions still in the bank. `rankRevisionActions` now falls back to "Keep
+practising <topic>" when nothing else ranks and there is no adaptive plan; it
+skips topics with unproven losses so practice never spends the questions a
+delayed check needs, and it claims no proof.
+
+Nothing loosened: no gate, threshold, review rule or proof predicate was
+relaxed; every change above tightens a claim to match the existing rules.
+
 ## Reviewer minutes go where students gain most — 2026-10-10
 
 **The biggest bottleneck is human review (0 reviewed flagship questions), and

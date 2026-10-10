@@ -93,9 +93,15 @@ npm run wjec:review:pack      # offline HTML pack (developer fallback)
 
 ## Current honest position
 
-All four WJEC A-level flagships have **0 human-reviewed questions**. Physics is the
-only subject authored to all 108 of its specification statements; Mathematics,
-Biology and Chemistry still have 78, 102 and 95 statements to write. Practising
+All four WJEC A-level flagships have **0 human-reviewed questions**. Counting
+only questions a reviewer could actually approve (no blocking review gate),
+no flagship is close to fully authored: Physics meets the core bar on 0 of 108
+statements, because none of its 234 "transfer"-labelled questions has a
+baseline link, and Mathematics, Biology and Chemistry still have 79, 105 and
+96 statements to write (`src/content/reviews/wjec-authoring-backlog.json`).
+Earlier notes saying Physics was "authored to all 108" counted gate-blocked
+questions. Do not invent baseline links to close that: author real transfer
+families, or label a part by its true demand. Practising
 works. Proving an improvement does not yet, and the app says so rather than
 implying otherwise. Do not let a change quietly close that gap.
 
