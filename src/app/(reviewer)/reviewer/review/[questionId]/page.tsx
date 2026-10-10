@@ -4,7 +4,8 @@ import { RichText } from "@/components/RichText";
 import { ReviewDecisionForm } from "@/components/reviewer/ReviewDecisionForm";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
 import { buildReviewQueue } from "@/lib/reviewer/runtime-ledger";
-import { getReviewerContext, loadCombinedLog, reviewBank } from "@/lib/reviewer/server";
+import { unlockLabel } from "@/lib/reviewer/priority";
+import { getReviewerContext, getReviewPriority, loadCombinedLog, reviewBank } from "@/lib/reviewer/server";
 import { buildReviewScreen, shortId, subjectFromSlug } from "@/lib/reviewer/view";
 
 // One question, laid out for a < 15 second decision: stem and parts on the
@@ -33,7 +34,10 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
     return <main className="card p-5" role="alert"><h1 className="text-lg font-semibold text-ink">Review log needs attention</h1><p className="text-sm text-ink2">The audit chain failed verification; no decision can be recorded until it is repaired.</p></main>;
   }
   const screen = buildReviewScreen(question, reviewBank, combined.log);
-  const queue = buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId);
+  // Next/Skip follow the same capability-first order as the queue page.
+  const priority = getReviewPriority(combined, subject.subjectId);
+  const queue = buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId, priority);
+  const impact = (question.subjectId === subject.subjectId ? priority : getReviewPriority(combined, question.subjectId)).byQuestion.get(question.id);
   const next = queue.ready.find((item) => item.questionId !== question.id);
   const queueHref = `/reviewer?subject=${subject.slug}`;
   const nextHref = next ? `/reviewer/review/${encodeURIComponent(next.questionId)}?subject=${subject.slug}` : queueHref;
@@ -113,6 +117,17 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
         </section>
 
         <aside aria-label="Specification, provenance and history" className="space-y-2 text-xs">
+          <section className="card p-3" aria-label="Why this question">
+            <h2 className="font-semibold text-ink mb-1">Why this question</h2>
+            {impact ? (
+              <>
+                <p className="text-ink2">Priority #{impact.rank} in {subject.label.replace(/^WJEC A-level /, "")}. Approving it {impact.unlocks.map(unlockLabel).join("; ")}.</p>
+                <p className="mt-1 text-ink3">Ordering only: every check below still applies in full.</p>
+              </>
+            ) : (
+              <p className="text-ink2">Approving it unlocks nothing new for students yet: a sibling question covers the same reasoning, the topic already has what the next unlock needs, or a content gate needs an author fix first.</p>
+            )}
+          </section>
           <section className="card p-3">
             <h2 className="font-semibold text-ink mb-1">Specification points</h2>
             {screen.specPoints.length ? (

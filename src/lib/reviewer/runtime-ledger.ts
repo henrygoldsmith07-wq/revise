@@ -37,6 +37,7 @@ import {
   type ReviewStage,
 } from "@/domain/review-workflow";
 import type { HumanVerificationRecord, Id, Question } from "@/domain/types";
+import type { Capability } from "@/domain/review-priority";
 
 /** One row of `public.review_audit_events` as PostgREST returns it. */
 export interface RuntimeEventRow {
@@ -226,10 +227,27 @@ export interface ReviewQueueItem {
   needsReReview: boolean;
   totalMarks: number;
   stemPreview: string;
+  /** Rank in the capability-first review plan (1 = unlocks most); null when this review unlocks nothing new. */
+  priorityRank: number | null;
+  /** What approving this question unlocks for students, in the domain's own terms. */
+  unlocks: Capability[];
+  /** Fails a blocking authoring gate, so an author fix should come before review. */
+  blocked: boolean;
+}
+
+/** The parts of the priority index the queue needs (see ./priority.ts). */
+export interface QueuePriority {
+  byQuestion: ReadonlyMap<Id, { rank: number; unlocks: Capability[] }>;
+  blocked: ReadonlySet<Id>;
 }
 
 export interface ReviewQueue {
-  /** Ready for this reviewer, one-approval-from-verified first. */
+  /**
+   * Ready for this reviewer. With a priority index: capability-first (the
+   * review that unlocks most for students leads), then reviews that unlock
+   * nothing new, then gate-blocked questions. Without one: one-approval-from-
+   * verified first, then by id.
+   */
   ready: ReviewQueueItem[];
   /** Sent back for changes on the current content; waits for an author edit. */
   changesRequested: ReviewQueueItem[];
@@ -240,7 +258,7 @@ export interface ReviewQueue {
 
 const preview = (text: string) => (text.length > 140 ? `${text.slice(0, 137)}…` : text);
 
-export function buildReviewQueue(questions: readonly Question[], log: ReviewAuditLog, reviewerLabel: string, subjectId?: Id): ReviewQueue {
+export function buildReviewQueue(questions: readonly Question[], log: ReviewAuditLog, reviewerLabel: string, subjectId?: Id, priority?: QueuePriority): ReviewQueue {
   const queue: ReviewQueue = { ready: [], changesRequested: [], awaitingOtherReviewer: [], verified: 0 };
   for (const question of questions) {
     if (!requiresWjecContentReview(question.subjectId)) continue;
@@ -259,12 +277,21 @@ export function buildReviewQueue(questions: readonly Question[], log: ReviewAudi
       needsReReview: state.needsReReview,
       totalMarks: question.totalMarks,
       stemPreview: preview(question.stem),
+      priorityRank: priority?.byQuestion.get(question.id)?.rank ?? null,
+      unlocks: priority?.byQuestion.get(question.id)?.unlocks ?? [],
+      blocked: priority?.blocked.has(question.id) ?? false,
     };
     if (state.approvers.includes(reviewerLabel)) queue.awaitingOtherReviewer.push(item);
     else if (state.lastDecision === "revise" || state.lastDecision === "reject") queue.changesRequested.push(item);
     else queue.ready.push(item);
   }
-  queue.ready.sort((a, b) => a.approvalsNeeded - b.approvalsNeeded || a.questionId.localeCompare(b.questionId));
+  // Ordering only: every question stays in the list and reachable.
+  const tier = (item: ReviewQueueItem) => (item.blocked ? 2 : item.priorityRank !== null ? 0 : 1);
+  queue.ready.sort((a, b) =>
+    tier(a) - tier(b)
+    || (a.priorityRank ?? 0) - (b.priorityRank ?? 0)
+    || a.approvalsNeeded - b.approvalsNeeded
+    || a.questionId.localeCompare(b.questionId));
   return queue;
 }
 
