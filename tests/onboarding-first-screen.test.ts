@@ -94,6 +94,22 @@ describe("first screen collects board → subjects → optional exam dates", () 
     expect(srcText).not.toContain("Skip — I will set this up later");
     expect(srcText).not.toContain('aria-label="Skip onboarding"');
   });
+
+  it("starts the quick check the learner committed to, and only when they chose it", () => {
+    // The final step's primary button says "Start my quick check" and the copy
+    // promises "Revise will start with a quick check". finish() must honour
+    // that by routing to the diagnostic (autoStart via ?subject=) rather than
+    // silently dropping them on Today — where, before human review lands, the
+    // check is not even the lead. A skipped check stays on Today.
+    expect(srcText).toContain("const router = useRouter()");
+    expect(srcText).toContain('router.push(`/diagnostic?subject=');
+    // The navigation is gated on the quick choice, so a skipped check does not
+    // pull the learner out of Today.
+    const navLine = srcText.split("\n").find((l) => l.includes("router.push(`/diagnostic?subject="))!;
+    const beforeNav = srcText.slice(0, srcText.indexOf("router.push(`/diagnostic?subject="));
+    expect(beforeNav).toContain('if (diagnosticChoice === "quick" && subjectIds.length)');
+    expect(navLine).toContain("/diagnostic?subject=");
+  });
 });
 
 describe("everything else waits until onboarding completes", () => {

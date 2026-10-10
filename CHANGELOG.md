@@ -1,5 +1,26 @@
 # Changelog
 
+## Onboarding honours the quick-check commitment — 2026-10-10
+
+**The final onboarding step now starts the check it promises.** The last
+phase's primary button read "Start my quick check" and the copy promised
+"Revise will start with a quick check", but `finish()` only marked
+onboarding done and dropped the learner on Today — where, for a flagship
+subject with no human-reviewed questions yet, `planColdStart` returns null
+and the check is not even the lead. The commitment was silently unfulfilled,
+leaving the learner to hunt for `/diagnostic` through the Practice nav.
+
+`finish()` now routes straight to `/diagnostic?subject=<first subject>`,
+which auto-starts the check for the chosen subject (and, until review lands,
+falls back to the labelled "practice, not proof" tier — already built and
+honest). A learner who chose to **skip** still lands on Today, whose copy
+("a first step waiting on Today") already promised exactly that.
+
+- `src/components/Onboarding.tsx`: `useRouter`; `finish()` navigates to the
+  diagnostic only when `diagnosticChoice === "quick"`.
+- `tests/onboarding-first-screen.test.ts`: pins that the navigation exists,
+  targets `/diagnostic?subject=`, and is gated on the quick choice.
+
 ## Proof no longer overclaims on reference material — 2026-10-10
 
 **A trust inversion, found by audit and fixed.** `trustedAssessmentContent`

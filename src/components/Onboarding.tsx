@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
 import { isFlagship } from "@/domain/flagship";
 import { todayIso } from "@/domain/scheduling";
@@ -43,6 +44,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [diagnosticChoice, setDiagnosticChoice] = useState<"quick" | "skip">("quick");
   const [showReference, setShowReference] = useState(false);
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
   const boards = useMemo(() => availableBoards(), []);
   const today = todayIso();
@@ -144,7 +146,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       await store.upsertExamDate(exam);
     }
 
-    // Build the plan now, so Today has real work on it the moment they land.
+    // Build the plan now, so Today (or the check) has real work the moment they land.
     await store.regeneratePlan();
     if (diagnosticChoice === "quick" && subjectIds.length) {
       void store.recordFunnel("diagnostic_started", subjectIds[0]!);
@@ -152,6 +154,15 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       void store.recordFunnel("diagnostic_skipped", subjectIds[0] ?? "none");
     }
     onDone();
+    // Honour the "Start my quick check" commit. The final step promises
+    // "Revise will start with a quick check", so take them straight to it
+    // (with autoStart) instead of dropping them on Today, where the check
+    // is only one of several next actions and — before human review lands —
+    // is not even the lead. A skipped check stays on Today, whose copy
+    // already promises exactly that ("a first step waiting on Today").
+    if (diagnosticChoice === "quick" && subjectIds.length) {
+      router.push(`/diagnostic?subject=${encodeURIComponent(subjectIds[0]!)}`);
+    }
   }
 
   return (
