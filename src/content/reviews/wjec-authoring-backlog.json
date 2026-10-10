@@ -2735,25 +2735,7 @@
     ],
     "wjec-alevel-physics": [
       {
-        "specPointId": "wjec-alevel-physics.alternating-currents.sp-01",
-        "topicId": "wjec-alevel-physics.alternating-currents",
-        "currentQuestionCount": 12,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
         "specPointId": "wjec-alevel-physics.alternating-currents.sp-02",
-        "topicId": "wjec-alevel-physics.alternating-currents",
-        "currentQuestionCount": 13,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-physics.alternating-currents.sp-03",
         "topicId": "wjec-alevel-physics.alternating-currents",
         "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,

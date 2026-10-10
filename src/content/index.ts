@@ -44,6 +44,7 @@ import {
 import { physicsMotionGraphQuestions } from "./questions/physics-motion-graphs";
 import { physicsDepth50MechanicsQuestions } from "./questions/physics-depth-50-mechanics";
 import { physicsDepth50CircuitsFieldsQuestions } from "./questions/physics-depth-50-circuits-fields";
+import { physicsTransferLinkedQuestions } from "./questions/physics-transfer-linked";
 import { physicsDepth50AppliedQuestions } from "./questions/physics-depth-50-applied";
 import { physicsDepth50OrbitsQuestions } from "./questions/physics-depth-50-orbits";
 import { physicsDepthNearCompleteCoreQuestions } from "./questions/physics-depth-near-complete-core";
@@ -112,6 +113,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...physicsDepthCompletionCircuitsMechanicsQuestions,
   ...physicsDepthCompletionFieldsThermalNuclearQuestions,
   ...physicsDepthCompletionPracticalQuestions,
+  ...physicsTransferLinkedQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
