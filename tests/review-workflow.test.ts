@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyHumanVerificationLedger } from "@/domain/human-verification-ledger";
 import { physicsContentFingerprint, trustedAssessmentContent } from "@/domain/content-trust";
-import { blockingGates, questionGateIssues } from "@/domain/review-gates";
+import { approvableByReview, blockingGates, gateContextFromTopics, questionGateIssues } from "@/domain/review-gates";
 import {
   appendReviewDecisions, auditLogIssues, emptyAuditLog, parseReviewReturn, promotableLedgerEntries, promotionGateIssues, reviewReturnTemplate, reviewStateOf,
   REQUIRED_INDEPENDENT_APPROVALS,
@@ -109,6 +109,19 @@ describe("external review files", () => {
 
 describe("content quality gates", () => {
   const codes = (q: ReturnType<typeof wq>) => questionGateIssues(q, gate).map((i) => i.code);
+  it("derives the same gate context from a curriculum as the reviewer portal uses", () => {
+    const derived = gateContextFromTopics([T, { ...topic("calculus"), specVersion: undefined }]);
+    expect([...derived.topicIds].sort()).toEqual([T.id, topic("calculus").id].sort());
+    expect(derived.specPointIds.has(T.specPoints[0]!.id)).toBe(true);
+    expect(derived.specVersionOf?.(T.subjectId)).toBe(gate.specVersionOf?.(T.subjectId));
+  });
+  it("never counts a gate-blocked question as approvable, so it cannot fill an authored-ceiling slot", () => {
+    const fakeTransfer = wq("t-ceiling", "algebra", PROMPTS[2]!, { flavour: "transfer" });
+    fakeTransfer.learning!.transferLink = undefined;
+    expect(approvableByReview(fakeTransfer, gate)).toBe(false);
+    expect(approvableByReview(wq("t-linked", "algebra", PROMPTS[3]!, { flavour: "transfer" }), gate)).toBe(true);
+    expect(approvableByReview(q1, gate)).toBe(true);
+  });
   it("passes a well-formed question", () => expect(blockingGates(questionGateIssues(q1, gate))).toEqual([]));
   it("blocks missing mark schemes, wrong totals and broken links", () => {
     expect(codes({ ...q1, parts: [{ ...q1.parts[0]!, markScheme: [] }] })).toContain("no-mark-scheme");
