@@ -64,7 +64,12 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
   }, [finished]);
 
   if (!selection.items.length) {
-    return <Panel><p className="text-sm text-ink3">Revise does not have enough reviewed, unseen questions across different topics to run a reliable quick check in this subject yet, so it will not guess where to start. Practice is still available.</p></Panel>;
+    return (
+      <Panel className="space-y-3">
+        <p className="text-sm text-ink3">Revise does not have enough reviewed, unseen questions across different topics to run a reliable quick check in this subject yet, so it will not guess where to start. Practice is still available.</p>
+        <ButtonLink href={`/practice?subject=${encodeURIComponent(subjectId)}`} variant="primary">Practise this subject</ButtonLink>
+      </Panel>
+    );
   }
   if (!started) {
     return (
