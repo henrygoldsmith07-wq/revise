@@ -6,7 +6,7 @@ import committedAuditLog from "@/content/reviews/wjec-review-audit-log.json";
 import committedLedger from "@/content/reviews/wjec-human-verification.json";
 import { seedQuestions } from "@/content";
 import { WJEC_REVIEWER_ROLES } from "@/domain/content-trust";
-import { combineAuditLog, effectiveLedger, type CombinedAuditLog, type RuntimeEventInsert, type RuntimeEventRow, type ReviewerGrant } from "./runtime-ledger";
+import { combineAuditLog, effectiveLedger, readRuntimeEventPages, REVIEW_AUDIT_EVENT_COLUMNS, type CombinedAuditLog, type RuntimeEventInsert, type RuntimeEventRow, type ReviewerGrant } from "./runtime-ledger";
 
 // ---------------------------------------------------------------------------
 // Server-side access for the reviewer portal.
@@ -75,20 +75,16 @@ export async function getReviewerContext(): Promise<ReviewerContext> {
   };
 }
 
-const PAGE = 1000;
-
 export async function loadRuntimeRows(client: SupabaseClient): Promise<RuntimeEventRow[]> {
-  const rows: RuntimeEventRow[] = [];
-  for (let from = 0; ; from += PAGE) {
+  return readRuntimeEventPages(async (from, to) => {
     const { data, error } = await client
       .from("review_audit_events")
-      .select("seq, previous_hash, hash, event")
+      .select(REVIEW_AUDIT_EVENT_COLUMNS.join(", "))
       .order("seq", { ascending: true })
-      .range(from, from + PAGE - 1);
+      .range(from, to);
     if (error) throw new Error(`review audit events could not be read (${error.code ?? "unknown"})`);
-    rows.push(...((data ?? []) as RuntimeEventRow[]));
-    if (!data || data.length < PAGE) return rows;
-  }
+    return (data ?? []) as unknown as RuntimeEventRow[];
+  });
 }
 
 export async function loadCombinedLog(client: SupabaseClient): Promise<CombinedAuditLog> {
