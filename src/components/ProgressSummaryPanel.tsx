@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { allTopics } from "@/domain/curriculum";
-import { STAGE_LABEL, STAGE_MEANING, type MasteryStage } from "@/domain/mastery-stage";
+import { STAGE_LABEL, stageMeaning, type MasteryStage } from "@/domain/mastery-stage";
 import { buildProgressSummary } from "@/domain/progress-summary";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill } from "./ui";
@@ -39,7 +39,7 @@ export function ProgressSummaryPanel() {
           {summary.strong.length ? (
             <ul className="space-y-1.5 text-sm">
               {summary.strong.map((row) => (
-                <li key={row.topicId} className="flex flex-wrap items-center gap-2"><span className="text-ink">{row.title}</span><Pill tone={TONE[row.stage]} title={STAGE_MEANING[row.stage]}>{row.label}</Pill></li>
+                <li key={row.topicId} className="flex flex-wrap items-center gap-2"><span className="text-ink">{row.title}</span><Pill tone={TONE[row.stage]} title={stageMeaning(row.stage, row.referenceTier)}>{row.label}</Pill></li>
               ))}
             </ul>
           ) : (
@@ -83,7 +83,7 @@ export function ProgressSummaryPanel() {
       </div>
       {counts.length ? (
         <p className="text-xs text-ink3">
-          Topics by evidence: {counts.map((stage) => `${summary.stageCounts[stage]} ${STAGE_LABEL[stage].toLowerCase()}`).join(" · ")}.
+          Topics by evidence: {counts.map((stage) => `${summary.stageCounts[stage]} ${STAGE_LABEL[stage].toLowerCase()}${stage === "secure" && summary.practiceOnlySecure ? ` (${summary.practiceOnlySecure} in reference practice only)` : ""}`).join(" · ")}.
         </p>
       ) : null}
     </section>

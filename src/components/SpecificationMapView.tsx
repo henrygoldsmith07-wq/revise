@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
+import { REFERENCE_DISCLAIMER } from "@/domain/curriculum/honesty";
 import {
   buildSpecificationMap,
   ESTABLISHED_QUESTIONS,
-  STATUS_LABELS,
+  specStatusLabel,
   type SpecPointEvidence,
   type SpecRollup,
   type SpecStatus,
@@ -32,14 +33,14 @@ function evidenceLine(point: SpecPointEvidence): string {
   return `${point.distinctQuestions} question${point.distinctQuestions === 1 ? "" : "s"} · ${point.marksGained}/${point.marksAvailable} marks${when}`;
 }
 
-function RollupPills({ rollup }: { rollup: SpecRollup }) {
+function RollupPills({ rollup, referenceTier }: { rollup: SpecRollup; referenceTier: boolean }) {
   const parts: Array<[SpecStatus, number]> = (["secure", "stale", "developing", "weak", "insufficient", "no-evidence"] as const)
     .map((status) => [status, rollup.byStatus[status]] as [SpecStatus, number])
     .filter(([, count]) => count > 0);
   return (
     <span className="flex flex-wrap gap-1">
       {parts.map(([status, count]) => (
-        <Pill key={status} tone={TONE[status]}>{count} {STATUS_LABELS[status].toLowerCase()}</Pill>
+        <Pill key={status} tone={TONE[status]}>{count} {specStatusLabel(status, referenceTier).toLowerCase()}</Pill>
       ))}
     </span>
   );
@@ -54,15 +55,21 @@ export function SpecificationMapView() {
     [store.attempts, store.questions, subjectId],
   );
   const thinnest = map?.thinnestTopic ? getTopic(map.thinnestTopic.topicId) : undefined;
+  const referenceTier = map?.referenceTier ?? false;
 
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Proof layer</p>
+        <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{referenceTier ? "Practice layer" : "Proof layer"}</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Specification evidence</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
           Every specification statement, with how well it is going and how much evidence says so. One correct answer is not mastery: a statement is secure only after {ESTABLISHED_QUESTIONS}+ different questions, unaided, and recent retrieval.
         </p>
+        {referenceTier ? (
+          <p className="text-xs text-ink2 mt-2 max-w-3xl" role="note">
+            {REFERENCE_DISCLAIMER} Its questions are not teacher-reviewed, so &quot;secure&quot; here means secure in practice: it is not proof and not an exam prediction.
+          </p>
+        ) : null}
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -80,7 +87,7 @@ export function SpecificationMapView() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatTile label="Statements" value={map.rollup.total} />
-            <StatTile label="Secure" value={map.rollup.byStatus.secure} tone="success" sub={map.rollup.byStatus.stale ? `+${map.rollup.byStatus.stale} stale` : undefined} />
+            <StatTile label={specStatusLabel("secure", referenceTier)} value={map.rollup.byStatus.secure} tone="success" sub={map.rollup.byStatus.stale ? `+${map.rollup.byStatus.stale} stale` : undefined} />
             <StatTile label="Real evidence" value={map.rollup.evidenced} sub="building or established" />
             <StatTile label="No evidence" value={map.rollup.byStatus["no-evidence"]} tone={map.rollup.byStatus["no-evidence"] ? "review" : "success"} sub={`${map.rollup.total - map.rollup.withQuestions} have no question yet`} />
           </div>
@@ -91,14 +98,14 @@ export function SpecificationMapView() {
               <details key={unit.unit.id} className="card p-4" open={unitIndex === 0}>
                 <summary className="cursor-pointer select-none flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-ink">{unit.unit.title}</span>
-                  <RollupPills rollup={unit.rollup} />
+                  <RollupPills rollup={unit.rollup} referenceTier={referenceTier} />
                 </summary>
                 <div className="mt-3 space-y-2">
                   {unit.topics.map((topic) => (
                     <details key={topic.topic.id} className="rounded-[8px] border border-line px-3 py-2">
                       <summary className="cursor-pointer select-none flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm text-ink">{topic.topic.title}</span>
-                        <RollupPills rollup={topic.rollup} />
+                        <RollupPills rollup={topic.rollup} referenceTier={referenceTier} />
                       </summary>
                       <ul className="mt-2 divide-y divide-line">
                         {topic.points.map((point) => (
@@ -107,7 +114,7 @@ export function SpecificationMapView() {
                               <p className="text-xs text-ink2"><span className="text-ink3 tabular-nums mr-1.5">{point.ref}</span>{point.text}</p>
                               <p className="text-[11px] text-ink3 mt-0.5">{evidenceLine(point)}</p>
                             </div>
-                            <Pill tone={TONE[point.status]} className="shrink-0">{STATUS_LABELS[point.status]}</Pill>
+                            <Pill tone={TONE[point.status]} className="shrink-0">{specStatusLabel(point.status, referenceTier)}</Pill>
                           </li>
                         ))}
                       </ul>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { physicsContentFingerprint } from "@/domain/content-trust";
 import { classifyEvidence, masteryStage } from "@/domain/mastery-stage";
 import type { Attempt, Question } from "@/domain/types";
 
@@ -58,11 +59,31 @@ describe("mastery stage", () => {
   it("is secure after unaided success on a new pattern, before any delay", () => {
     const r = stage([att("1", A, 3, 4), att("2", B, 3, 3), att("3", C, 3, 2)], [A, B, C]);
     expect(r.stage).toBe("secure");
-    expect(r.next).toMatch(/7 days/);
+    // "maths" is not a WJEC flagship: a delayed check cannot prove anything
+    // there, so the next step says so instead of promising Proven in 7 days.
+    expect(r.referenceTier).toBe(true);
+    expect(r.next).toMatch(/cannot be proven here/);
   });
   it("is proven only when a new-pattern success comes a week after the first evidence", () => {
-    const r = stage([att("1", A, 3, 20), att("2", B, 3, 15), att("3", C, 3, 2)], [A, B, C]);
+    // Proven is a claim about reviewed flagship material (learnerEvidenceTrusted),
+    // so this models a WJEC flagship with a reviewed bank (test fixture only).
+    const FLAG = "wjec-alevel-physics";
+    const reviewed = (question: Question): Question => {
+      const base = { ...question, subjectId: FLAG };
+      return {
+        ...base, verification: "verified",
+        humanVerification: {
+          status: "approved", reviewerId: "test-reviewer", reviewerRole: "teacher", reviewerQualification: "Test fixture only",
+          reviewedAt: "2026-09-01T09:00:00.000Z", contentFingerprint: physicsContentFingerprint(base),
+          checks: { question: true, marking: true, workedSolution: true, capabilityMapping: true, specificationMapping: true, examRealism: true },
+        },
+      } as Question;
+    };
+    const [FA, FB, FC] = [reviewed(A), reviewed(B), reviewed(C)] as [Question, Question, Question];
+    const flag = (attempt: Attempt): Attempt => ({ ...attempt, subjectId: FLAG });
+    const r = stage([flag(att("1", FA, 3, 20)), flag(att("2", FB, 3, 15)), flag(att("3", FC, 3, 2))], [FA, FB, FC]);
     expect(r.stage).toBe("proven");
+    expect(r.referenceTier).toBe(false);
     expect(r.next).toBeNull();
   });
   it("does not prove from low accuracy on new patterns", () => {
