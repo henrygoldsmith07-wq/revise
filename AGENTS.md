@@ -95,12 +95,13 @@ npm run wjec:review:pack      # offline HTML pack (developer fallback)
 
 All four WJEC A-level flagships have **0 human-reviewed questions**. Counting
 only questions a reviewer could actually approve (no blocking review gate),
-no flagship is close to fully authored: Physics meets the core bar on 2 of 108
+no flagship is close to fully authored: Physics meets the core bar on 11 of 108
 statements, because none of its 234 original "transfer"-labelled questions has
-a baseline link; the two that do meet it (alternating currents sp-01, sp-03)
-rest on new transfer items in
-`src/content/questions/physics-transfer-linked.ts`, each linked to an existing
-baseline part and still unreviewed. Mathematics, Biology and Chemistry still
+a baseline link; the eleven that do meet it (alternating currents sp-01, sp-03;
+capacitance sp-01..03; circular motion/SHM sp-01..06) rest on new transfer
+items in `src/content/questions/physics-transfer-linked.ts`, each linked to an
+existing baseline part, passing the structural-novelty comparison against it,
+and still unreviewed. Mathematics, Biology and Chemistry still
 have 79, 105 and 96 statements to write
 (`src/content/reviews/wjec-authoring-backlog.json`).
 Earlier notes saying Physics was "authored to all 108" counted gate-blocked
@@ -109,7 +110,8 @@ families (that file is the pattern), or label a part by its true demand.
 Reference-tier subjects pass the permissive `trustedAssessmentContent`; use
 `learnerEvidenceTrusted` wherever a claim says proven or proof-capable, and
 keep their grade/readiness output labelled as a practice estimate (they are
-never "ready"). Practising
+never "ready"). The same holds for mastery wording: a reference topic tops out
+at "Secure in practice" (`stageLabel`, `specStatusLabel`), never "Proven". Practising
 works. Proving an improvement does not yet, and the app says so rather than
 implying otherwise. Do not let a change quietly close that gap.
 

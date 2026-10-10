@@ -353,7 +353,7 @@ statements), which are verified, and — per `SPEC_MANIFEST` — which unit/pape
 (duration, marks, weighting) each belongs to. The statement model now covers all
 **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
 
-Runtime inventory: **475 topics, 3925 materialised seed questions, 2240 WJEC flagship questions**.
+Runtime inventory: **475 topics, 3934 materialised seed questions, 2249 WJEC flagship questions**.
 The static source audit currently sees 869 authoring/catalogue records before
 runtime expansion; CI treats the materialised bank above as the authoritative
 question inventory. Every topic carries `specPoints` and every seed question part
