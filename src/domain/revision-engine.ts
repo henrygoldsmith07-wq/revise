@@ -299,7 +299,7 @@ function practiceRevisitDraft(mission: ExamMission, input: EngineInput, revisit:
       evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
       after: "If it holds, the next check comes back after twice the gap. If you lose marks, that becomes a repair mission.",
       proves: mission.proofBarrier
-        ? `Nothing: this cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}. It shows whether the fix is holding.`
+        ? `Nothing: this is practice, not proof. It cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}. It shows whether the fix is holding.`
         : "Nothing yet: these questions are not reviewed, so this is practice, not proof. It shows whether the fix is holding.",
       ...(mission.limitsSentence && mission.proofBarrier ? { limit: mission.limitsSentence } : {}),
     },
