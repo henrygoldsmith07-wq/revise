@@ -88,6 +88,9 @@ export function missionLearnerState(
   recovery?: { provisional: number; awaitingProof: number; proven: number },
 ): LearnerState {
   if (status === "active" && recovery && recovery.provisional + recovery.awaitingProof + recovery.proven === 0) return "needs-work";
+  // Blocked only limits proof: marks already recovered in practice still read as Improving, as each lost
+  // mark's own provisional state does, rather than being pushed back to Needs work.
+  if (status === "blocked" && recovery && recovery.provisional + recovery.awaitingProof > 0) return "improving";
   return ({ "not-started": "needs-work", active: "improving", "awaiting-proof": "awaiting-proof", proven: "proven", regressed: "regressed", blocked: "needs-work" } as const)[status];
 }
 

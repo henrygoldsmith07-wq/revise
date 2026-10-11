@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
-import { learnerEvidenceTrusted, trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted, requiresWjecContentReview, trustedAssessmentContent } from "./content-trust";
 import { isFlagship } from "./flagship";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import { officialPaperQuestionEligible, type OfficialPaperContext } from "./official-papers";
@@ -27,6 +27,26 @@ import { isShallowReskin } from "./reskin";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
 export type RecoveryState = "open" | "targeted" | "provisional" | "awaiting-proof" | "proven" | "regressed";
+
+/**
+ * Why a lost mark itself can never count towards proof, whatever is answered
+ * afterwards. Proof of recovery needs the loss to be trusted evidence too
+ * (`trustedAssessmentMistake`): a loss on an unreviewed question, an
+ * unverified paper, an unreliable mark, or with no link to the marked answer
+ * cannot be "recovered" provably, so asking for more questions would never
+ * help. Only set on review-gated (WJEC flagship) losses, and only when
+ * `trustedAssessmentMistake` already says no: it explains the existing gate,
+ * it never changes it.
+ */
+export type ProofBarrier = "loss-unlinked" | "loss-unreviewed-question" | "loss-unverified-paper" | "loss-untrusted-mark";
+
+/** Plain learner wording for each barrier, written to follow "because". */
+export const PROOF_BARRIER_TEXT: Record<ProofBarrier, string> = {
+  "loss-unverified-paper": "these marks were lost on a paper Revise cannot verify as an official WJEC paper with teacher-reviewed marking",
+  "loss-unreviewed-question": "the question these marks were lost on has not been reviewed by two teachers yet",
+  "loss-untrusted-mark": "the mark on the answer that lost them was not reliable enough to count (self-marked, low confidence, or waiting for a check)",
+  "loss-unlinked": "these lost marks are not linked to a marked answer Revise can check",
+};
 
 export const SUCCESS_RATIO = 0.75;
 export const REGRESSION_RATIO = 0.5;
@@ -57,6 +77,8 @@ export interface MistakeRecovery {
   regressedAt?: string;
   /** Success counts as proof only on verified content; otherwise it stays provisional. */
   unverifiedOnly?: boolean;
+  /** Set when the loss itself can never count towards proof (see ProofBarrier). Never changes state. */
+  proofBarrier?: ProofBarrier;
   /**
    * Spaced practice revisits for a mark recovered only on unreviewed
    * questions (`unverifiedOnly`). Proof is impossible there, but whether the
@@ -131,7 +153,7 @@ export function classifyMistake(
   now: Date = new Date(),
   officialPaper?: OfficialPaperContext,
 ): MistakeRecovery {
-  const base = { mistakeId: mistake.id, topicId: mistake.topicId, subjectId: mistake.subjectId, marks: mistake.marksLost };
+  const base: Pick<MistakeRecovery, "mistakeId" | "topicId" | "subjectId" | "marks" | "proofBarrier"> = { mistakeId: mistake.id, topicId: mistake.topicId, subjectId: mistake.subjectId, marks: mistake.marksLost };
   const sourceQuestion = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
   const sourceFamilies = new Set(sourceQuestion ? questionFamilies(sourceQuestion) : []);
   const after = attempts
@@ -166,8 +188,10 @@ export function classifyMistake(
     return !!q && !questionFamilies(q).some((f) => sourceFamilies.has(f)) && !(sourceQuestion && isShallowReskin(q, sourceQuestion));
   };
   const independentDifferent = successes.filter((a) => independentAttempt(a) && different(a));
-  const provable = independentDifferent.filter(a => verified(a) &&
-    trustedAssessmentMistake(mistake, bank, attempts, trustedQuestion) &&
+  const lossTrusted = trustedAssessmentMistake(mistake, bank, attempts, trustedQuestion);
+  const barrier = lossTrusted ? undefined : lossProofBarrier(mistake, questionsById, attempts, trustedQuestion);
+  if (barrier) base.proofBarrier = barrier;
+  const provable = independentDifferent.filter(a => verified(a) && lossTrusted &&
     unseenQuestion(questionsById.get(a.questionId)!, attempts.filter(prior => prior.userId === a.userId && prior.id !== a.id && prior.createdAt <= a.createdAt), bank));
   if (!first) {
     return { ...base, ...(targetedAt ? { targetedAt } : {}), state: targeted ? "targeted" : "open", reason: targeted
@@ -180,7 +204,9 @@ export function classifyMistake(
   }
   if (!provable.length) {
     const practiceRevisit = practiceRevisitFor(independentDifferent[0]!, after, different);
-    return { ...common, state: "provisional", unverifiedOnly: true, practiceRevisit, reason: isFlagship(mistake.subjectId)
+    return { ...common, state: "provisional", unverifiedOnly: true, practiceRevisit, reason: barrier
+      ? `You improved here, but this cannot count as proof because ${PROOF_BARRIER_TEXT[barrier]}. Revise will bring it back for spaced practice checks instead.`
+      : isFlagship(mistake.subjectId)
       ? "You improved here, but Revise does not yet have enough reviewed new questions to prove it."
       : "You improved here. This subject's questions have not been checked against the specification, so Revise can track practice but not prove it." };
   }
@@ -200,6 +226,27 @@ export function classifyMistake(
     return { ...common, state: "regressed", regressedAt: later.createdAt, provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Was proven, but a later independent attempt on this topic lost marks again." };
   }
   return { ...common, state: "proven", provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Answered independently on a different question after a delay." };
+}
+
+/**
+ * Which part of `trustedAssessmentMistake` a review-gated loss failed. Call
+ * only when that gate has already said no; returns undefined for losses that
+ * are not review-gated (their proof rules live elsewhere). Pure.
+ */
+export function lossProofBarrier(
+  mistake: Mistake,
+  questionsById: ReadonlyMap<Id, Question>,
+  attempts: readonly Attempt[],
+  trustedQuestion: (question: Question) => boolean = trustedAssessmentContent,
+): ProofBarrier | undefined {
+  if (!requiresWjecContentReview(mistake.subjectId)) return undefined;
+  const question = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
+  const attempt = mistake.attemptId ? attempts.find((a) => a.id === mistake.attemptId) : undefined;
+  if (!question || !attempt || attempt.questionId !== question.id ||
+    question.subjectId !== mistake.subjectId || attempt.subjectId !== mistake.subjectId) return "loss-unlinked";
+  if (!trustedQuestion(question)) return "loss-unreviewed-question";
+  if (attempt.mode === "paper" && trustworthyAttempt(attempt)) return "loss-unverified-paper";
+  return "loss-untrusted-mark";
 }
 
 /**

@@ -135,6 +135,12 @@ export interface SubjectLearnerModel {
   mistakes: Pick<RecoveryTotals, "previouslyLost" | "open" | "regressed" | "provisional" | "proven" | "evidence"> & {
     /** Topics with the most open marks, largest first. */
     topics: Array<TopicRef & { openMarks: number }>;
+    /**
+     * Of `provisional`, marks that can never be proven because the loss itself
+     * cannot count (ProofBarrier: unverified paper, unreviewed question, …).
+     * They are recovered in practice, not "waiting for a check".
+     */
+    provisionalUnprovable: number;
   };
   retention: { holding: TopicRef[]; fading: TopicRef[]; slipped: TopicRef[] };
   transfer: { memorised: TopicRef[]; proofDue: TopicRef[] };
@@ -227,6 +233,9 @@ export function projectSubjectModel(input: SubjectLearnerModelInput): SubjectLea
     mistakes: {
       previouslyLost: recovery.previouslyLost, open: recovery.open, regressed: recovery.regressed,
       provisional: recovery.provisional, proven: recovery.proven, evidence: recovery.evidence,
+      provisionalUnprovable: Math.round(input.recovery.items
+        .filter((i) => i.subjectId === subjectId && i.proofBarrier && (i.state === "provisional" || i.state === "awaiting-proof"))
+        .reduce((sum, i) => sum + i.marks, 0) * 10) / 10,
       topics: [...openByTopic]
         .map(([topicId, marks]) => ({ ...ref(topicId), openMarks: Math.round(marks * 10) / 10 }))
         .sort((a, b) => b.openMarks - a.openMarks || byTitle(a, b)),

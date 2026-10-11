@@ -36,7 +36,7 @@ export function unseenSupplyByTopic(topicIds: Iterable<Id>, questions: readonly 
 }
 
 export type EvidenceLimit =
-  | "no-unseen-verified" | "one-unseen-verified" | "only-unverified" | "no-transfer" | "exam-too-close" | "thin-evidence" | "no-delayed-evidence";
+  | "loss-not-provable" | "no-unseen-verified" | "one-unseen-verified" | "only-unverified" | "no-transfer" | "exam-too-close" | "thin-evidence" | "no-delayed-evidence";
 
 export interface EvidenceLimitNote { kind: EvidenceLimit; text: string }
 
@@ -49,9 +49,17 @@ export function evidenceLimits(input: {
   minProofDays: number;
   trustedAttempts: number;
   delayedChecked: boolean;
+  /**
+   * Why the lost marks themselves cannot count towards proof, in words that
+   * follow "because" (see ProofBarrier in mark-recovery.ts). When set, no
+   * amount of new questions makes proof possible, so it blocks proof and is
+   * named first.
+   */
+  lossNotProvable?: string | null;
 }): EvidenceLimitNote[] {
   const out: EvidenceLimitNote[] = [];
   const { supply } = input;
+  if (input.lossNotProvable) out.push({ kind: "loss-not-provable", text: input.lossNotProvable });
   if (supply.provable === 0 && supply.practiceOnly > 0) out.push({ kind: "only-unverified", text: "the remaining new questions have not been reviewed yet, so they can be practised but not used as proof" });
   else if (supply.provable === 0) out.push({ kind: "no-unseen-verified", text: "there are no new reviewed questions left" });
   else if (supply.provable < MIN_PROVABLE_QUESTIONS) out.push({ kind: "one-unseen-verified", text: "only one new reviewed question is left" });
@@ -64,10 +72,12 @@ export function evidenceLimits(input: {
 
 /** Blocks proof outright (as opposed to merely weakening it). */
 export function proofBlocked(notes: readonly EvidenceLimitNote[]): boolean {
-  return notes.some((n) => n.kind === "no-unseen-verified" || n.kind === "one-unseen-verified" || n.kind === "only-unverified" || n.kind === "exam-too-close");
+  return notes.some((n) => n.kind === "loss-not-provable" || n.kind === "no-unseen-verified" || n.kind === "one-unseen-verified" || n.kind === "only-unverified" || n.kind === "exam-too-close");
 }
 
 export function limitsSentence(notes: readonly EvidenceLimitNote[]): string | null {
+  const loss = notes.find((n) => n.kind === "loss-not-provable");
+  if (loss) return `You can still practise this, but Revise cannot prove these marks are recovered because ${loss.text}. More questions would not change that, so Revise tracks it as practice and brings it back for spaced checks.`;
   const blocking = notes.filter((n) => ["no-unseen-verified", "one-unseen-verified", "only-unverified", "exam-too-close"].includes(n.kind));
   if (!blocking.length) return null;
   return `You can still revise this, but Revise cannot currently prove the improvement because ${blocking.map((n) => n.text).join(" and ")}.`;

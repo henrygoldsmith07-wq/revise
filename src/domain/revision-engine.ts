@@ -36,6 +36,7 @@ import { timeBoxPlan, type TimeBox, type TimeBoxPlan } from "./pre-exam-plan";
 import type { TopicSupply } from "./supply";
 import type { Attempt, ExamDate, Id, Mistake, Question } from "./types";
 import { BLOCKED_PROOF_COPY } from "./proof-copy";
+import { PROOF_BARRIER_TEXT } from "./mark-recovery";
 
 export type ActionType =
   | "proof-check" | "regression-recovery" | "mission" | "paper-repair" | "recurring-error" | "exam-urgent"
@@ -51,6 +52,12 @@ export interface ActionExplanation {
   evidence: string[];
   after: string;
   proves: string;
+  /**
+   * Why proof is unavailable for this action when the reason is the lost marks
+   * themselves (see ProofBarrier), so the UI never falls back to blaming
+   * question supply for it.
+   */
+  limit?: string;
 }
 
 export interface RevisionAction {
@@ -246,7 +253,7 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     proofStatus: missionLearnerState(mission.status, mission.recovery), requiredFirst: regressed, effectiveness: eff, mistakeIds: mission.mistakeIds,
     explanation: {
       why: gap && r.provisional + r.awaitingProof > 0
-        ? BLOCKED_PROOF_COPY
+        ? (mission.proofBarrier ? `You improved on this topic. It cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}, so keep it in practice.` : BLOCKED_PROOF_COPY)
         : `${lost} mark${lost === 1 ? "" : "s"} were lost${where}${cause ? `, mainly through ${cause}` : ""}. ${stage.reason}`,
       whyNow: regressed ? "Marks you had recovered were lost again, so they are the most likely to cost you in the exam."
         : stage.kind === "delayed-proof" ? "Enough time has passed that a check on a different question now counts as proof."
@@ -256,6 +263,7 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
       evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
       after: next.after,
       proves: mission.completionCondition,
+      ...(mission.limitsSentence && mission.proofBarrier ? { limit: mission.limitsSentence } : {}),
     },
     route: { href: missionHref(mission.id, stage.kind), label: "Start session" },
     mission: { id: mission.id, stage: stage.kind },
@@ -290,7 +298,10 @@ function practiceRevisitDraft(mission: ExamMission, input: EngineInput, revisit:
       stake: `${plural(marks, "mark")} recovered in practice; this checks they stay recovered.`,
       evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
       after: "If it holds, the next check comes back after twice the gap. If you lose marks, that becomes a repair mission.",
-      proves: "Nothing yet: these questions are not reviewed, so this is practice, not proof. It shows whether the fix is holding.",
+      proves: mission.proofBarrier
+        ? `Nothing: this cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}. It shows whether the fix is holding.`
+        : "Nothing yet: these questions are not reviewed, so this is practice, not proof. It shows whether the fix is holding.",
+      ...(mission.limitsSentence && mission.proofBarrier ? { limit: mission.limitsSentence } : {}),
     },
     route: { href: missionHref(mission.id, "practise"), label: "Start session" },
     mission: { id: mission.id, stage: "practise" },

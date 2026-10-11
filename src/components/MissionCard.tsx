@@ -5,6 +5,7 @@
 
 import { useMemo } from "react";
 import { buildPaperMission, missionNextAction, type ExamMission } from "@/domain/exam-mission";
+import { missionHref } from "@/domain/mission-session";
 import { LEARNER_STATE_LABEL, LEARNER_STATE_TONE, missionLearnerState } from "@/domain/learner-state";
 import { ButtonLink, Pill } from "./ui";
 import { useRecoveryEvidence } from "./recovery-evidence";
@@ -29,7 +30,13 @@ export function MissionView({ mission }: { mission: ExamMission }) {
           {action.minutes > 0 ? `Start ${action.minutes}-minute step` : "See progress"}
         </ButtonLink>
       ) : (
-        <p className="text-xs text-ink3">{mission.evidence.at(-1)}. Revise cannot prove this yet.</p>
+        <div className="space-y-2">
+          <p className="text-xs text-ink3">{mission.limitsSentence ?? `${mission.evidence.at(-1)}. Revise cannot prove this yet.`}</p>
+          {/* Proof is blocked, practice is not: never leave the student without a next step. */}
+          <ButtonLink href={missionHref(mission.id, "practise")} variant="secondary" size="md" className="w-full sm:w-auto">
+            Practise it (not proof)
+          </ButtonLink>
+        </div>
       )}
       <details className="text-sm">
         <summary className="cursor-pointer select-none text-ink2">Plan and evidence</summary>

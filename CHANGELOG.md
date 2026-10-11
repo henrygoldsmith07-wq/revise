@@ -1,5 +1,41 @@
 # Changelog
 
+## Missions stop promising proof the lost marks can never give — 2026-10-11 (ninth pass)
+
+**"Awaiting proof" was a dead end.** A mission decided whether proof was
+possible only from question supply. But proof of recovery also needs the
+*loss itself* to be trusted evidence (`trustedAssessmentMistake`): a WJEC
+paper-mode loss needs a verified past paper and human-reviewed marking
+(`authenticPaperEvidence`), and any flagship loss needs a teacher-reviewed
+source question and a reliable mark. When that failed, an unaided success on
+a different reviewed question stayed "provisional" forever, yet the mission
+still read "Awaiting proof" and offered the apply step again.
+
+- `mark-recovery.ts`: each review-gated loss that fails the gate now carries a
+  `proofBarrier` (`loss-unverified-paper`, `loss-unreviewed-question`,
+  `loss-untrusted-mark`, `loss-unlinked`) with plain wording. It is computed
+  only after `trustedAssessmentMistake` has already said no: no state, total
+  or predicate changes.
+- `buildMission`: when every loss in a mission is barred, proof is reported
+  impossible whatever the supply (new evidence limit `loss-not-provable`,
+  named first), the mission is never "awaiting proof", the apply step becomes
+  "Answer unaided on a different question (practice)" (and runs on unreviewed
+  unseen questions rather than emptying), and the delayed check becomes
+  "Spaced practice checks", blocked with the reason. Today then routes to the
+  existing spaced practice Revisit ("Check it held: …") with the barrier as
+  the evidence limit, instead of blaming question supply.
+- The same supply-only reasoning was fixed on the mission card (no more
+  dead-end with no button: "Practise it (not proof)"), Today's "Evidence
+  limit", Progress's improvement story ("on the way … waiting for that check"
+  no longer counts barred marks), and the paper autopsy stage reason. A
+  blocked mission with marks recovered in practice now reads "Improving", as
+  each lost mark already did.
+- `e2e/paper-recovery-journey.spec.ts` now asserts this honest state instead
+  of a proof step it could never reach, and still fakes no reviewed paper.
+- Test fixtures in `tests/revision-engine.test.ts` now include the marked
+  attempts their losses link to; without them those losses could never have
+  been proven under the existing gate.
+
 ## Teachers can find, judge and finish the transfer pairs — 2026-10-11 (eighth pass)
 
 **The questions that most need two teachers were invisible to them.** A
