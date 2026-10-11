@@ -151,7 +151,11 @@ group): a server-rendered queue, one dense screen per question (stem, mark
 scheme, specification points, provenance) and keyboard decisions (`A` approve,
 `R` request changes). Decisions extend the same hash-chained audit log, and a
 question becomes trusted for students once two different reviewers approve the
-same content. Access is granted by the maintainer; see
+same content. Access is granted by the maintainer in one command
+(`npm run wjec:reviewer:grant`), and the first batch to send a teacher is
+`/reviewer/pairs?subject=physics`: the 14 Physics transfer questions with
+their 14 baselines, baseline first (`npm run wjec:review:pairs` shows the
+maintainer which question needs which reviewer); see
 [`docs/review-workflow.md`](docs/review-workflow.md) for the design, how to
 grant a teacher, and the developer-only CLI (`npm run wjec:review:priorities`,
 `npm run wjec:review:pull`, `npm run wjec:review:promote`,

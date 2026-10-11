@@ -124,9 +124,32 @@ every 10 minutes), without a new build.
 
 ### Granting and revoking a teacher
 
+One command, run by the maintainer with the service role key in their own
+shell (never committed):
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
+  --email teacher@school.org --label teacher-jsmith --role teacher \
+  --qualification "PGCE Physics; 8 years teaching WJEC A-level" \
+  --granted-by henry --invite --site https://revise-gray.vercel.app [--dry-run]
+
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- --email teacher@school.org --revoke
+```
+
+`scripts/grant-reviewer.mjs` finds the teacher's Supabase Auth account by
+email (with `--invite`, it sends Supabase's own invite email when there is
+none, landing on `/reviewer/pairs?subject=physics`), then calls
+`public.grant_reviewer_role` (or `revoke_reviewer_role`). It validates the
+same constraints as `public.reviewer_roles` first, refuses a label that reuses
+the email address, and refuses the obvious self-grant (the person granting is
+the maintainer who authored the questions; that is a guard against a mistake,
+not an identity proof). It prints the link to send the teacher.
+
+The manual route still works and is what the command does:
+
 1. The teacher needs a Supabase Auth account: invite them from the Supabase
    dashboard (Authentication → Users → Invite) or have them sign in once in the
-   app.
+   app. The portal's sign-in never creates an account (`shouldCreateUser: false`).
 2. In the Supabase SQL editor (runs as the database owner):
 
    ```sql
@@ -144,6 +167,37 @@ every 10 minutes), without a new build.
    Neither function can be called by a signed-in user.
 3. Reviewer ids are what students and the committed ledger see; use a stable
    pseudonym, not an email address.
+4. **Supabase redirect allow-list.** The portal's sign-in link (and the
+   invite) return the teacher to the portal page they opened, such as
+   `/reviewer/pairs?subject=physics`. Supabase only honours redirect URLs in
+   Authentication → URL Configuration; add `https://<site>/reviewer/**`
+   there, or Supabase falls back to the Site URL (the student app).
+   The link must be opened in the same browser that requested it (PKCE).
+
+### Transfer pairs: the first batch to send a teacher
+
+A transfer question can help prove a student improved only when it **and the
+baseline it is linked to** are each verified by two different reviewers. In
+the capability-first queue those questions are scattered (on the shipped
+Physics bank the 14 linked transfer items sat near position 1,370 of about
+1,640 rows, behind a list that renders 200), so `/reviewer/pairs?subject=physics`
+lists every linked (baseline, transfer) pair in one place, baseline first,
+with who still has to act on each ("needs 1 more reviewer, not teacher-a").
+Opened from there, the review screen keeps Next/Skip inside the batch, skips
+anything the reviewer already approved or that waits for an author edit, and
+shows the linked baseline (prompt, mark scheme, worked answer) beside a
+transfer question so "Genuine transfer" is judged with the baseline in view.
+It is ordering and context only (`src/lib/reviewer/batches.ts`): every state
+comes from `reviewStateOf`, every decision goes through the same route and
+domain rules.
+
+The maintainer, who authored the questions and so holds no reviewer grant,
+sees the same status from the command line:
+
+```bash
+npm run wjec:review:pairs                     # committed log only
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:review:pairs -- physics   # + portal decisions (read-only, chain verified)
+```
 
 ### Exporting back to the repository (developers)
 

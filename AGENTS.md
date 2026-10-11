@@ -87,7 +87,13 @@ npm run wjec:review:import    # applies it
 npm run wjec:review:batch     # -> content-review.json
 npm run wjec:review:apply     # applies it
 npm run wjec:review:pack      # offline HTML pack (developer fallback)
+npm run wjec:review:pairs     # owner status of the transfer-pair batch (read-only)
+npm run wjec:reviewer:grant   # maintainer: invite + grant/revoke a teacher (service role)
 ```
+
+The transfer-pair batch (`/reviewer/pairs`, `src/lib/reviewer/batches.ts`)
+is ordering and context only, like the priority plan: never use it to skip a
+check or count a pair as proven before both halves are verified.
 
 `docs/review-workflow.md` covers all of it.
 
