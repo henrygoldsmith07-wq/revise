@@ -35,7 +35,7 @@ interface SubjectRow {
   subjects: { id: Id; name: string; detail: string }[];
 }
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
+export function Onboarding({ onDone }: { onDone: () => void | Promise<void> }) {
   const store = useStoreFields("regeneratePlan", "updateSettings", "upsertExamDate", "userId", "recordFunnel");
   const [phase, setPhase] = useState(0);
   const [boardId, setBoardId] = useState<Id | null>(null);
@@ -153,7 +153,18 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     } else {
       void store.recordFunnel("diagnostic_skipped", subjectIds[0] ?? "none");
     }
-    onDone();
+    // Wait for the "onboarded" marker to land in IndexedDB before leaving.
+    // Online, router.push is a client-side transition and a fire-and-forget
+    // write finished anyway; offline, the RSC fetch for /diagnostic fails and
+    // Next falls back to a full browser navigation, which dropped the
+    // in-flight write, so the student landed back on step 1 of onboarding
+    // (e2e/offline.spec.ts "offline banner appears when offline").
+    try {
+      await onDone();
+    } catch {
+      // Settings, exam dates and the plan are already saved; if only the
+      // marker failed, onboarding reappears on the next load, as before.
+    }
     // Honour the "Start my quick check" commit. The final step promises
     // "Revise will start with a quick check", so take them straight to it
     // (with autoStart) instead of dropping them on Today, where the check
