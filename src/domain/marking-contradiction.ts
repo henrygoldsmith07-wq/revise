@@ -101,7 +101,7 @@ const OPPOSITES: Array<{ terms: RegExp[]; labels: string[] }> = [
   [["high\\b", "higher", "highest"], ["low\\b", "lower", "lowest"]],
   [["positive"], ["negative"]],
   [["thin\\b", "thinner"], ["thick\\b", "thicker"]],
-  [["short\\b", "shorter"], ["long\\b", "longer"]],
+  [["short\\b", "shorter", "shortens?\\b", "shortening"], ["long\\b", "longer", "lengthens?\\b", "lengthening"]],
   [["good\\b", "better\\b"], ["poor\\b", "worse\\b"]],
   [["once\\b"], ["twice\\b"]],
   [["alpha\\b"], ["beta\\b"]],
@@ -123,6 +123,11 @@ const OPPOSITES: Array<{ terms: RegExp[]; labels: string[] }> = [
   [["ionic\\b"], ["covalent"]],
   [["strong\\b", "strongly"], ["weak\\b", "weakly"]],
   [["absorb"], ["release"]],
+  // Eleventh pass, from wrong answers to the new recall probes.
+  [["rational"], ["irrational"]],
+  [["full\\b", "fully"], ["partial", "incomplete"]],
+  [["same\\b", "identical"], ["different\\b"]],
+  [["acidic"], ["basic\\b", "alkaline"], ["amphoteric"]],
 ].map((group) => ({
   terms: group.map((alts) => new RegExp("^(?:" + alts.join("|") + ")")),
   labels: group.map((alts) => alts[0]!.replace(/\\b|\(\?:.*$|\[.*?\]/g, "").replace(/s\?$/, "")),
@@ -339,9 +344,47 @@ function equationConflict(point: string, text: string): Contradiction | null {
   return null;
 }
 
+/**
+ * "dm/dt = −km" vs "dm/dt = km", "xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ)" vs "… + …":
+ * the same left side and the same right side apart from its + and − signs.
+ * Only an otherwise identical expression counts, so a rearranged or
+ * substituted answer is never read as a sign slip.
+ */
+function signOnlyEquations(text: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const clause of mathText(text).split(/[,;]|\.\s|\band\b|\bso\b|\bgives?\b|\bwhich\b|\bwhen\b|\bwith\b|\bwhere\b|\bfor\b/)) {
+    const m = clause.match(/(\S{1,12})\s*=\s*(\S(?:[^=<>!]{0,30}\S)?)\s*\.?\s*$/);
+    if (!m) continue;
+    const lhs = m[1]!.toLowerCase();
+    const rhs = m[2]!.replace(/\s+/g, "").replace(/\.$/, "").toLowerCase();
+    // Symbols only: a worded side ("energy lost") is prose, not an expression.
+    const worded = (side: string) => /[a-z]{4,}/.test(side.replace(/sin|cos|tan|ln|sqrt|exp/g, ""));
+    if (worded(lhs) || worded(rhs)) continue;
+    if (!/[a-zθλμρσ]/.test(rhs) || !/[a-zθλμρσ]/.test(lhs)) continue;
+    if (!out.has(lhs)) out.set(lhs, rhs);
+  }
+  return out;
+}
+
+function signOmissionConflict(point: string, text: string): Contradiction | null {
+  const wanted = signOnlyEquations(point);
+  if (!wanted.size) return null;
+  const given = signOnlyEquations(text);
+  const unsigned = (e: string) => e.replace(/[+-]/g, "");
+  const minus = (e: string) => (e.match(/-/g) ?? []).length;
+  for (const [lhs, rhs] of wanted) {
+    const actual = given.get(lhs);
+    if (!actual || actual === rhs) continue;
+    if (unsigned(actual) === unsigned(rhs) && minus(actual) !== minus(rhs)) {
+      return { kind: "sign", said: `${lhs} = ${actual}`, needed: `${lhs} = ${rhs}` };
+    }
+  }
+  return null;
+}
+
 const FLIP: Record<string, string> = { "<": ">", ">": "<", "<=": ">=", ">=": "<=", "=": "=", "!=": "!=" };
 
-const MATH_TOKEN = /^[A-Za-z0-9²³ⁿ+\-^.()]+$/;
+const MATH_TOKEN = /^[A-Za-z0-9²³ⁿ+\-^.()ρμσλ]+$/;
 
 function mathy(token: string): boolean {
   // Bare letters count only as single variables, so "or", "is" and "so" end an expression.
@@ -381,6 +424,19 @@ const OP_TEXT: Record<string, string> = { "<": "<", ">": ">", "<=": "≤", ">=":
 function relationConflict(point: string, text: string): Contradiction | null {
   const wanted = relations(point);
   const given = relations(text);
+  // "H₀: ρ = 0" vs "H₀: ρ = 1": a population parameter (ρ, μ, σ, λ) set
+  // equal to a different number. Parameters only: x and other unknowns
+  // take several values in working and roots ("x = 0 and x = 2").
+  for (const [key, ops] of wanted) {
+    if (!ops.has("=") || given.get(key)?.has("=")) continue;
+    const [lhs, rhs] = key.split("|");
+    if (!/[λμρσ]/.test(lhs!)) continue;
+    // Working often states other values: an answer that also sets the same
+    // symbol to the scheme's value (under any relation) does not conflict.
+    if ([...given].some(([k]) => k.split("|")[0] === lhs && Number(k.split("|")[1]) === Number(rhs))) continue;
+    const rival = [...given].find(([k, o]) => o.has("=") && k.split("|")[0] === lhs && Number(k.split("|")[1]) !== Number(rhs));
+    if (rival) return { kind: "value", said: `${lhs} = ${rival[0].split("|")[1]}`, needed: `${lhs} = ${rhs}` };
+  }
   for (const [key, ops] of wanted) {
     const actual = given.get(key);
     if (!actual) continue;
@@ -423,6 +479,41 @@ function namedValues(text: string): Map<string, number> {
   return out;
 }
 
+/** Words that are units: a different reading of a measured quantity is the numeric checks' job. */
+const UNIT_WORDS = new Set(["mol", "kpa", "atm", "cm", "mm", "dm", "km", "kg", "mg", "ml", "nm", "mv", "kj", "kw", "kv", "hz", "ms", "min", "hours", "hour", "seconds", "years", "days", "minutes", "per", "cent", "percent", "marks", "mark"]);
+
+/**
+ * "A net gain of 2 ATP" vs "a net gain of 38 ATP": the same counted thing
+ * with a different whole number, and the scheme's number nowhere in the
+ * answer. Whole numbers only, never a unit, so rounding and unit conversion
+ * stay with the numeric checks.
+ */
+function countConflict(point: string, text: string): Contradiction | null {
+  const counts = (t: string) => [...mathText(t).matchAll(/(?<![\d.,])(\d{1,4})\s+([A-Za-z]{3,})\b/g)]
+    .map((m) => ({ n: Number(m[1]), word: m[2]!.toLowerCase() }))
+    .filter((c) => !UNIT_WORDS.has(c.word) && !STOP.has(c.word));
+  const wanted = counts(point);
+  if (wanted.length !== 1) return null;
+  const w = wanted[0]!;
+  const stated = new Set([...mathText(text).matchAll(/(?<![\d.])\d+(?:\.\d+)?/g)].map((m) => Number(m[0])));
+  if (stated.has(w.n)) return null;
+  const rival = counts(text).find((c) => c.word === w.word && c.n !== w.n);
+  return rival ? { kind: "value", said: `${rival.n} ${rival.word}`, needed: `${w.n} ${w.word}` } : null;
+}
+
+/** "M : M+2 = 3 : 1" vs "1 : 1": a different numeric ratio, and the scheme's ratio nowhere in the answer. */
+function ratioConflict(point: string, text: string): Contradiction | null {
+  const ratios = (t: string) => [...mathText(t).matchAll(/(?<![\d.:])(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)(?![\d:]|\.\d)/g)]
+    .map((m) => ({ raw: `${m[1]} : ${m[2]}`, value: Number(m[2]) ? Number(m[1]) / Number(m[2]) : NaN }))
+    .filter((r) => Number.isFinite(r.value));
+  const wanted = ratios(point);
+  if (wanted.length !== 1) return null;
+  const w = wanted[0]!;
+  const given = ratios(text);
+  if (!given.length || given.some((g) => Math.abs(g.value - w.value) < 1e-9)) return null;
+  return { kind: "value", said: given[0]!.raw, needed: w.raw };
+}
+
 function valueConflict(point: string, text: string): Contradiction | null {
   const wantedPairs = coordinatePairs(point);
   if (wantedPairs.length) {
@@ -434,6 +525,8 @@ function valueConflict(point: string, text: string): Contradiction | null {
       return { kind: "value", said: `(${g[0]}, ${g[1]})`, needed: `(${w[0]}, ${w[1]})` };
     }
   }
+  const counted = countConflict(point, text) ?? ratioConflict(point, text);
+  if (counted) return counted;
   const wanted = namedValues(point);
   if (!wanted.size) return null;
   const given = namedValues(text);
@@ -555,7 +648,7 @@ export function schemeContradiction(point: string, answer: string): Contradictio
     const perClause = clauses.map((clause) => clauseContradiction(point, clause, text));
     if (perClause.every(Boolean)) return perClause[0]!;
   }
-  return signConflict(point, text) ?? equationConflict(point, text) ?? relationConflict(point, text) ??
+  return signConflict(point, text) ?? equationConflict(point, text) ?? signOmissionConflict(point, text) ?? relationConflict(point, text) ??
     valueConflict(point, text) ?? formulaConflict(point, text);
 }
 

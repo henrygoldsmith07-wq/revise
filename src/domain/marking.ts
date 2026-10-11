@@ -360,6 +360,34 @@ export function contradictionApplies(part: Pick<QuestionPart, "capabilityIds">, 
 }
 
 /** A scheme point that is prose around an expression ("Discriminant = b² − 4ac"), not a bare expression. */
+/**
+ * True when a scheme point states a number of its own, not only digits that
+ * belong to a name: subscripts (H₀, Al₂O₃, H₃N⁺CH₂COO⁻) or digits written
+ * inside a chemical formula (H2O, P4O10). A shared digit in a formula or a
+ * label is not evidence for the point on its own (see namedDigitsPresent).
+ * Powers (v², ½kx²) count as stated: formula points rely on them.
+ */
+export function pointStatesNumber(point: string): boolean {
+  return /[\d⁰¹²³⁴-⁹½¼¾⅓⅔]/.test(point.replace(/[₀-₉]+/g, "").replace(/(?<=\b[A-Z][a-z]?|[A-Z][a-z]?\d*[A-Z][a-z]?)\d+/g, ""));
+}
+
+const SUBSCRIPT_DIGITS: Record<string, string> = { "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9" };
+
+function plainSubscripts(text: string): string {
+  return text.replace(/[₀-₉]/g, (c) => SUBSCRIPT_DIGITS[c] ?? c).toLowerCase();
+}
+
+/**
+ * For a point whose only digits belong to names (V₁, A₀, CH₃CH₂), a numeric
+ * match counts only when one of those names is in the answer: "H₂NCH₂COOH"
+ * shares digits with "H₃N⁺CH₂COO⁻" but is a different formula.
+ */
+export function namedDigitsPresent(point: string, answer: string): boolean {
+  const names = point.match(/[A-Za-zα-ωΔε][A-Za-z0-9₀-₉⁺⁻]*[0-9₀-₉][A-Za-z0-9₀-₉⁺⁻]*/g) ?? [];
+  const given = plainSubscripts(answer);
+  return names.some((name) => given.includes(plainSubscripts(name)));
+}
+
 function proseEmbeddedPoint(point: string): boolean {
   return /[a-z]{3,}/i.test(point.replace(/\b(?:sin|cos|tan|ln|log|sqrt|exp|sec|cosec|cot)\b/gi, ""));
 }
@@ -400,7 +428,9 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
     const cov = pointCoverage(point, trimmed, thresh);
-    const num = numericMatch(point, trimmed);
+    // A digit inside a formula or label (H₃N⁺, V₁) is not a stated value: it
+    // is evidence only when that name itself is in the answer.
+    const num = numericMatch(point, trimmed) && (pointStatesNumber(point) || namedDigitsPresent(point, trimmed));
     // Symbolic layer: when both the point and the answer contain a parseable
     // algebra expression, accept equivalent forms (`(x+2)(x-3)` for `x^2 - x - 6`)
     // and reject a pure expression that differs, even if a stray digit matches.
@@ -435,7 +465,12 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     // The symbolic layer extracts a fragment from prose points, so it can call
     // "b² + 4ac" equivalent to "Discriminant = b² − 4ac"; it stays decisive
     // only for a point that is itself a pure expression.
-    if (ok && (sym !== "equivalent" || proseEmbeddedPoint(point)) && contradictionApplies(part, trimmed) && schemeContradiction(point, trimmed)) ok = false;
+    // A different stated value ("M : M+2 = 1 : 1" for "3 : 1") overrides the
+    // symbolic layer too, which can match on a shared fragment.
+    if (ok && contradictionApplies(part, trimmed)) {
+      const contradiction = schemeContradiction(point, trimmed);
+      if (contradiction && (sym !== "equivalent" || proseEmbeddedPoint(point) || contradiction.kind === "value")) ok = false;
+    }
     if (part.capabilityIds?.some(id => id.startsWith("phys."))) {
       if (explicitNegationConflict(point, trimmed)) ok = false;
       const resultMatches = physicsResultMatches(point, trimmed);

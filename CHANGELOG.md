@@ -1,5 +1,44 @@
 # Changelog
 
+## Fewer wrong answers earn offline marks — 2026-10-11 (eleventh pass)
+
+**Writing a plainly wrong answer for each of the 40 new recall probes showed
+the offline marker still crediting 19 of them.** "H₀: ρ = 1 and H₁: ρ < 0"
+scored 2/2 for "H₀: ρ = 0, H₁: ρ > 0"; "dm/dt = km, so m = Ae^(kt)" 2/2 for
+exponential decay; "Al₂O₃ is basic only. P₄O₁₀ is basic" 2/2 for
+"amphoteric … acidic".
+
+- A digit that belongs to a name is no longer numeric evidence on its own.
+  A scheme point whose only digits are subscripts or formula digits (H₀,
+  Al₂O₃, H₃N⁺CH₂COO⁻, V₁) used to be credited by any shared digit in the
+  answer; now that only counts when one of those names is in the answer
+  (`pointStatesNumber`, `namedDigitsPresent` in `src/domain/marking.ts`).
+  Powers (v², ½kx²) still count as stated numbers, because formula points
+  in the bank rely on them.
+- New contradiction checks in `src/domain/marking-contradiction.ts`, each
+  only removing credit: an equation identical to the scheme's apart from
+  its + and − signs ("dm/dt = km", "xₙ + f(xₙ)/f′(xₙ)"); a population
+  parameter set to a different value ("ρ = 1" for "ρ = 0"; ρ, μ, σ, λ only,
+  since unknowns such as x take several values in working); a different
+  numeric ratio ("1 : 1" for "3 : 1"); a different whole-number count of the
+  same thing ("38 ATP" for "2 ATP", never a unit); Greek letters inside
+  relations, so "ρ < 0" is read as the flip of "ρ > 0"; and opposite pairs
+  rational/irrational, full/partial, same/different and acidic/basic/
+  amphoteric, plus shortens/lengthens. A different stated value now
+  overrides the symbolic layer, which called "M : M+2 = 1 : 1" equivalent
+  to "3 : 1" through a shared fragment.
+- Regression set `tests/fixtures/marking-contradiction-set.ts` grows to 164
+  answers (67 model, 19 paraphrased-correct, 78 contradictory). Before:
+  24 contradictory answers over-credited (35 marks). After: 18 (23 marks),
+  every one a documented `knownGap` (swapped definitions, wrong structures
+  that are not opposites, quantifiers). No contradictory answer is
+  under-credited and all 19 paraphrases keep full marks.
+- Whole bank, every authored model answer submitted verbatim: no part loses
+  a mark. See the PR for the paraphrase-proxy measurement and the three
+  parts whose proxy credit came only from unrelated digits.
+- Not changed: proof predicates, review gates, the anti-recitation cap, the
+  Physics reversal guards and the structured-notation path (√2, ±, ≤).
+
 ## Every flagship topic has a recall question — 2026-10-11 (eleventh pass)
 
 **A recall gap and an application gap looked the same in 40 topics.** Early
