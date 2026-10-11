@@ -139,6 +139,9 @@ export function useQuestionExecution({
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
   const [choice, setChoice] = useState<number | null>(() => draft?.choice ?? null);
   const [marking, setMarking] = useState(false);
+  // Set when a submit fails outright, so the student is told and keeps their
+  // answer, instead of the button silently coming back as if never pressed.
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     attemptId: Id;
     /** The persisted attempt, so a learner can dispute a specific mark after it. */
@@ -236,9 +239,12 @@ export function useQuestionExecution({
   useEffect(() => () => { if (funnelTimer.current) clearTimeout(funnelTimer.current); }, []);
   async function submit() {
     setMarking(true);
+    setSubmitError(null);
     try {
       const finished = await runSubmit();
       onFinished?.(finished);
+    } catch {
+      setSubmitError("That answer was not marked or saved. It is still here, so you can submit it again.");
     } finally {
       // Whatever marking or persistence does, the runner must never stay
       // stuck on "Marking…" with the submit button disabled.
@@ -474,5 +480,5 @@ export function useQuestionExecution({
     return persistedAttempt;
   }
 
-  return { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, highestUsedTier, evidenceSource, ladder, submit };
+  return { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, highestUsedTier, evidenceSource, ladder, submit, submitError };
 }

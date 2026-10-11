@@ -1,6 +1,6 @@
 import { seedQuestionsForTopic } from "@/content";
 import { getTopic } from "@/domain/curriculum";
-import { markQuestion } from "@/domain/marking";
+import { deviceRubricMark } from "@/lib/offline-mark";
 import { mistakePatterns } from "@/domain/mistakes";
 import { makeCloze } from "@/content/seed-cards";
 import type { Mistake, Question, Topic } from "@/domain/types";
@@ -161,16 +161,7 @@ export function socraticExaminerFallback(examiner: SocraticExaminerPayload): Soc
 }
 
 export function markFallback(question: Question, answers: Record<string, string>): MarkResponse {
-  const result = markQuestion(question, answers);
-  const topic = getTopic(question.topicIds[0] ?? "");
-  const errorNote = topic?.commonErrors.length
-    ? ` Watch for the classic error on this topic: ${topic.commonErrors[0]}`
-    : "";
-  return {
-    marked: result.marked,
-    feedback: `${result.feedback}${errorNote}\n\n_Marked against the mark scheme on this device — no AI was involved._`,
-    confidence: 1,
-  };
+  return deviceRubricMark(question, answers);
 }
 
 export function generateCardsFallback(topicId: string, count: number): GeneratedCard[] {

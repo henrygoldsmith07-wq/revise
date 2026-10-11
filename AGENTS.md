@@ -111,9 +111,10 @@ worked solution uses, the unknowns each prompt asks for, and the context; it
 fails closed when it recognises no relation or unknown. The word-based
 reasoning graphs (`deriveVerifiedGraph`) are nearly empty for Physics and are
 no longer used for its novelty verdict; every other subject still uses them.
-Five of the fourteen pass only as inverse problems on the baseline's own
-relations (`rearrangementOnly`), which is weaker transfer; do not reword an
-item to pass the check. Mathematics, Biology and Chemistry still
+Until the seventh pass five circular motion/SHM items passed only as inverse
+problems on the baseline's own relations (`rearrangementOnly`); each now
+continues into a relation its baseline never uses (a test asserts none of the
+fourteen is `rearrangementOnly`). Do not reword an item to pass the check. Mathematics, Biology and Chemistry still
 have 79, 105 and 96 statements to write
 (`src/content/reviews/wjec-authoring-backlog.json`).
 Earlier notes saying Physics was "authored to all 108" counted gate-blocked

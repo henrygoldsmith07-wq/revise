@@ -1,5 +1,61 @@
 # Changelog
 
+## Full diagnostic no longer dead-ends without recall questions — 2026-10-11 (seventh pass)
+
+**The full diagnostic could finish before asking anything.** It opened each
+topic only with a trusted recall-level question. While only a handful of
+questions are teacher-reviewed, none of them may be recall-level (the e2e
+fixture's 24 trusted WJEC Maths questions are all application or harder), so
+the student chose "Full", saw "No diagnostic answers yet, so nothing can be
+said." and had nowhere to go.
+
+- `nextProbe` falls back to the lowest-demand trusted item for a topic when
+  the wanted depth has none (`fallbackDepths`): an opening or recall check
+  widens upwards; any other want steps down, but never to a depth the topic
+  has already answered correctly. The probe's reason says plainly that no
+  reviewed recall question exists yet. The record keeps the item's real depth,
+  and a miss is no longer described as "Recall is fine" when recall was never
+  tested. Untrusted items are still never used.
+- `diagnosticStartBlocker` names why a diagnostic cannot ask its first
+  question (`no-reviewed`, `all-seen`, `all-known`); the page explains it and
+  routes to Today or practice instead of showing an empty report.
+- No trust gate, proof predicate or review rule changes.
+  `tests/adaptive-diagnostic.test.ts` (6 new cases),
+  `tests/full-diagnostic-trusted-start.test.ts` (the 24-trusted Maths fixture).
+
+**Five circular motion/SHM transfer items were only rearrangements.** sp-01,
+sp-03, sp-04, sp-05 and sp-06 in `physics-transfer-linked.ts` passed the
+Physics novelty check only as inverse problems on their baseline's own
+relations (`rearrangementOnly`). Each now continues into a physical relation
+its baseline never uses, as one worked chain: sp-01 carries ω and r into the
+centripetal force on a stone in the tread (F = mω²r); sp-03 uses the largest
+logged acceleration for the amplitude and maximum speed (a_max = ω²A,
+v_max = ωA); sp-04 uses the glider's mass for k = mω² and the oscillation
+energy (½mv_max², checked as ½kA²); sp-05 finds the loaded chair's maximum
+speed by energy conservation (checked against ωA); sp-06 predicts the period
+from the k it found (T = 2π√(m/k)). Every new number is recomputed in
+`tests/physics-transfer-linked.test.ts`, which now also asserts that none of
+the fourteen linked items is `rearrangementOnly`. All stay `generated`,
+`unverified`, reviewer null. Physics stays 14/108 (same statements).
+
+**Submitting offline could silently do nothing.** The AI client is a separate
+chunk loaded on first use. If a student's first marked answer of the session
+happened offline, the import rejected, the submit promise rejected with no
+handler, and the button came back as if never pressed.
+`src/lib/optional-ai.ts` now marks against the mark scheme on this device
+when the chunk cannot load (`aiMarkerUnavailableMark` in
+`src/lib/offline-mark.ts`, the same deterministic marker and labelling as the
+existing rubric fallback, which now shares its code; nothing is sent, nothing
+queued). Any other submit failure now shows "That answer was not marked or
+saved. It is still here, so you can submit it again." (`role="alert"`)
+instead of nothing. `tests/offline-marking-fallback.test.ts`.
+
+**Browser checks brought up to date.** `e2e/marked-feedback-visible.spec.ts`
+now rates due retrieval cards and writes the explain-the-gap recall before
+revealing, so it reaches the marked step; `e2e/wjec-trusted-journey.spec.ts`
+asserts Today's current "Do this now" card and that its cold-start step names
+the reviewed questions it rests on. Every trust assertion is unchanged.
+
 ## Spaced revisits for the returning student; Physics-aware novelty; full-diagnostic feedback — 2026-10-11 (sixth pass)
 
 **A returning flagship student got the same Today action for ever.** Every

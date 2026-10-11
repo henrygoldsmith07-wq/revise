@@ -75,6 +75,19 @@ describe("linked Physics transfer items", () => {
     }
   });
 
+  it("none passes only as a rearrangement of its baseline's own relations", () => {
+    // Until the seventh pass, five circular motion/SHM items (sp-01, sp-03,
+    // sp-04, sp-05, sp-06) were novel only as inverse problems. Each now uses
+    // at least one physical relation its baseline never uses.
+    for (const question of physicsTransferLinkedQuestions) {
+      const part = question.parts[0]!;
+      const baseline = partById.get(part.learning!.transferLink!.baselinePartId)!.part;
+      const comparison = comparePhysicsTransfer(baseline, part);
+      expect(comparison.rearrangementOnly, question.id).toBe(false);
+      expect(comparison.newRelations.length, question.id).toBeGreaterThan(0);
+    }
+  });
+
   it("every worked number is recomputed here and appears in the mark scheme", () => {
     const e0 = 8.85e-12;
     const scheme = (slug: string) => physicsTransferLinkedQuestions.find((q) => q.id.endsWith(slug))!.parts[0]!.markScheme.join(" ");
@@ -101,6 +114,20 @@ describe("linked Physics transfer items", () => {
       ["circular-shm-sp-05-orbit-mass-chair", k * 2.2 ** 2 / (4 * Math.PI ** 2) - 12, 60, "60 kg"],
       ["circular-shm-sp-06-two-readings", k6, 8.3, "8.3 N m⁻¹"],
       ["circular-shm-sp-06-two-readings", Math.sqrt(0.04 ** 2 + 0.5 * 0.3 ** 2 / k6), 0.084, "0.084 m"],
+      // Seventh pass: each SHM item now continues into a relation its
+      // baseline never uses, so none passes novelty as a rearrangement only.
+      ["circular-shm-sp-01-cycle-sensor", 3e-3 * (5 * Math.PI) ** 2 * (5.3 / (5 * Math.PI)), 0.25, "= 0.25 N"],
+      ["circular-shm-sp-01-cycle-sensor", (3e-3 * (5 * Math.PI) ** 2 * (5.3 / (5 * Math.PI))) / (3e-3 * 9.81), 8.5, "8.5 times"],
+      ["circular-shm-sp-01-cycle-sensor", 3e-3 * 9.81, 0.029, "0.029 N"],
+      ["circular-shm-sp-03-buoy-readings", 2.4 / omega3 ** 2, 0.061, "A = 2.4/39.3 = 0.061 m"],
+      ["circular-shm-sp-03-buoy-readings", omega3 * (2.4 / omega3 ** 2), 0.38, "0.38 m s⁻¹"],
+      ["circular-shm-sp-04-sensor-maxima", 0.25 * (4.8 / 0.6) ** 2, 16, "16 N m⁻¹"],
+      ["circular-shm-sp-04-sensor-maxima", 0.5 * 0.25 * 0.6 ** 2, 0.045, "0.045 J"],
+      ["circular-shm-sp-04-sensor-maxima", 0.5 * (0.25 * (4.8 / 0.6) ** 2) * (0.6 / (4.8 / 0.6)) ** 2, 0.045, "½kA² = ½ × 16 × 0.075² = 0.045 J"],
+      ["circular-shm-sp-05-orbit-mass-chair", 0.5 * k * 0.1 ** 2, 2.92, "2.92 J"],
+      ["circular-shm-sp-05-orbit-mass-chair", Math.sqrt(2 * (0.5 * k * 0.1 ** 2) / (k * 2.2 ** 2 / (4 * Math.PI ** 2))), 0.286, "v = 0.286 m s⁻¹"],
+      ["circular-shm-sp-05-orbit-mass-chair", (2 * Math.PI / 2.2) * 0.1, 0.286, "(2π/2.2) × 0.10 = 0.286"],
+      ["circular-shm-sp-06-two-readings", 2 * Math.PI * Math.sqrt(0.5 / k6), 1.54, "1.54 s"],
       // Fifth pass: divider inverse + meter loading; search-coil field.
       ["circuits-sp-02-sensor-loading", 3.3 / 2200, 1.5e-3, "1.5×10⁻³ A"],
       ["circuits-sp-02-sensor-loading", (9.0 - 3.3) / (3.3 / 2200) / 1000, 3.8, "3.8 kΩ"],
