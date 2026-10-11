@@ -1,5 +1,67 @@
 # Changelog
 
+## The offline marker stops crediting answers that contradict the scheme — 2026-10-11 (tenth pass)
+
+**Short wrong answers were scoring full marks.** With no AI provider (or
+offline), the rubric marker credits a scheme point when enough of its words
+appear in the answer. Half of "Pulmonary vein" is "pulmonary", so
+"Pulmonary artery, right atrium" scored 2/2; "b² + 4ac" passed for
+"b² − 4ac", "< 0" for "> 0", "centre (−3, 2), radius 25" for "(3, −2), radius
+5", and "both alleles are not expressed" for "both alleles are expressed".
+
+- New pure module `src/domain/marking-contradiction.ts`. Per scheme point it
+  checks for an opposite term next to the point's subject (artery/vein,
+  left/right, atrium/ventricle, oxidised/reduced, anode/cathode,
+  endo/exothermic, nucleophilic/electrophilic, donor/acceptor, α/β cells,
+  insulin/glucagon and ~30 more groups), a negation of one of the point's
+  own words, a flipped sign in an expression, a flipped inequality, a
+  different coordinate or named value (radius, roots, gradient …) where the
+  scheme's value appears nowhere, and a different chemical formula (NH₂⁻ for
+  NH₃). It only fires when the scheme's own term or value is absent, so a
+  contrast ("the vein, not the artery") is left alone. It only ever removes
+  credit.
+- `markPart` applies it as a veto after the existing polarity check; the
+  authored-model-answer shortcut no longer passes an answer that contradicts
+  a point (its term-order canonicalisation made "1 − 2cos²θ" look like
+  "2cos²θ − 1"). The symbolic layer's "equivalent" stays decisive only for a
+  point that is a bare expression: on prose points it extracted a fragment
+  and called "b² + 4ac" equivalent to "Discriminant = b² − 4ac".
+- Scope, chosen from false-positive measurements on every model answer in
+  the bank: wording checks (opposite terms, negation) run on answers of up
+  to 40 words, whole-answer only up to 15; Physics parts, which have their
+  own reversal guards and long multi-claim answers, get the general veto
+  only for answers of up to 15 words.
+- Evidence now says why: "Not awarded: your answer says “artery” where the
+  mark scheme needs “vein”." A credited point whose answer hedges between the
+  right term and its opposite ("the pulmonary vein or the pulmonary artery")
+  is flagged `contested`, and the deterministic assessment then labels the
+  whole mark provisional instead of presenting it as firm.
+- `pointCoverage` no longer misses a short scheme term because the answer's
+  last word carries a full stop ("E(X) = np." scored 0 for "E(X) = np"). The
+  anti-recitation cap still reads `tokenise` exactly as before, so it is not
+  loosened.
+- Regression set `tests/fixtures/marking-contradiction-set.ts`: 27 real bank
+  questions, 74 answers (27 model, 9 paraphrased-correct, 38 contradictory)
+  with hand-judged examiner marks (not human-moderated). Before: 30 of 38
+  contradictory answers over-credited (35 marks), 8/9 paraphrases at full
+  marks. After: 5 over-credited (7 marks), all documented known gaps; 9/9
+  paraphrases at full marks; no contradictory answer under-credited. On
+  every model answer in the bank the veto fires on 2 of 13,288 scheme points.
+- Not changed: copied-mark-scheme detection (`textOverload`), the
+  anti-recitation cap, proof predicates and review gates. The veto can only
+  lower a rubric mark.
+
+## Readiness explains "Proven" next to unrecovered marks — 2026-10-11 (tenth pass)
+
+Both signals were right but scoped differently: "Proven"/"Secure" (and an
+"improved on new questions" claim) describe a topic as a whole, while "N
+marks lost and not yet recovered" counts specific questions not yet won back.
+`buildProgressSummary` now reports `losing.inStrongTopics` and a one-line
+`scopeNote` when they overlap, and each strong topic row carries its
+`openMarks`. The Progress summary shows "N lost marks here still to win back"
+beside the badge and the scope sentence under the lost-marks total. No stage,
+proof rule or total changed.
+
 ## Missions stop promising proof the lost marks can never give — 2026-10-11 (ninth pass)
 
 **"Awaiting proof" was a dead end.** A mission decided whether proof was
