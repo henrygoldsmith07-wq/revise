@@ -15,6 +15,7 @@ import type { QuestionPart } from "./types";
 import {
   deriveVerifiedGraph,
   fingerprintSetup,
+  physicsWorkingNodes,
   verifyStoredGraph,
 } from "./reasoning-graph";
 import {
@@ -151,6 +152,7 @@ export function verifyReasoningGraphFreshness(part: QuestionPart, subjectId?: st
 export function validateBaselineIntegrity(
   part: QuestionPart,
   baseline: QuestionPart | undefined,
+  subjectId?: string,
 ): string[] {
   const failures: string[] = [];
   const link = part.learning?.transferLink;
@@ -186,7 +188,12 @@ export function validateBaselineIntegrity(
     failures.push(`Transfer baseline leaks its answer (${leak}) (invalid-transfer-baseline).`);
     return failures;
   }
-  const derived = deriveVerifiedGraph(baseline);
+  // Physics working is quantities and substitutions, which the word-based
+  // families never see, so for Physics the integrity check also accepts the
+  // Physics working steps, each still bound to a real span. No other
+  // subject's verdict changes, and novelty comparisons are untouched.
+  const derived = deriveVerifiedGraph(baseline, subjectId);
+  if (subjectId === "wjec-alevel-physics") derived.nodes.push(...physicsWorkingNodes(baseline));
   if (!derived.nodes.some((node) => node.kind === "evidence") ||
     !derived.nodes.some((node) => node.kind === "operation") ||
     !derived.nodes.some((node) => node.kind === "conclusion")) {

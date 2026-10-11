@@ -4,6 +4,8 @@ import { isTransferQuestion, partLearningMetadata, questionCapabilities, questio
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
 import { trustedAssessmentContent } from "./physics-content-review";
+import { learnerEvidenceTrusted } from "./content-trust";
+import { isFlagship } from "./flagship";
 import type { Attempt, InterventionOutcomeRecord, Mistake, Question, InterventionPriorState } from "./types";
 
 export interface LearningAction {
@@ -23,7 +25,13 @@ export interface LearningAction {
   expectedDurableGain: number;
   calibrated: boolean;
   calibrationSampleSize: number;
-  contentTrust: "trusted-assessment" | "needs-human-review";
+  /**
+   * "trusted-assessment" only for flagship content with the human review
+   * contract (`learnerEvidenceTrusted`), the only content whose result can
+   * count as proof. Reference-tier content has no review gate: it stays
+   * available for practice and is labelled "practice-only", never trusted.
+   */
+  contentTrust: "trusted-assessment" | "needs-human-review" | "practice-only";
   /** Shared policy value, separate from the intervention's gain prior. */
   policy?: { score: number; evidenceLevel: "limited" | "developing" | "strong" };
 }
@@ -69,8 +77,12 @@ export function selectLearningAction(input: {
   const eligible = questions.filter((q) => q.topicIds.includes(topicId) && hasLearningMetadata(q) &&
     !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? ""));
   const add = (kind: LearningAction["kind"], capabilityId: string, pool: Question[], reason: string, mistake?: Mistake) => {
+    // Transfer and retention are proof steps. A flagship item feeds them only
+    // with the human review contract; a reference-tier item (no review gate
+    // exists) stays available as practice and is labelled practice-only
+    // below, so it can never be presented as trusted assessment.
     const trustedPool = (kind === "transfer" || kind === "retention")
-      ? pool.filter(trustedAssessmentContent)
+      ? pool.filter((question) => learnerEvidenceTrusted(question) || !isFlagship(question.subjectId))
       : pool;
     const selectedPool = trustedPool;
     for (const question of selectedPool) {
@@ -79,7 +91,8 @@ export function selectLearningAction(input: {
       const lost = mistake?.marksLost ?? evidence.get(capabilityId)?.lostMarks ?? 1;
       const gap = 1 - (evidence.get(capabilityId)?.accuracy ?? 0.35);
       const effect = effectivenessFor(kind, capabilityId, calibrations, question.subjectId);
-      const trust = trustedAssessmentContent(question) ? "trusted-assessment" as const : "needs-human-review" as const;
+      const trust = learnerEvidenceTrusted(question) ? "trusted-assessment" as const
+        : isFlagship(question.subjectId) ? "needs-human-review" as const : "practice-only" as const;
       // Rank by durable gain PER LEARNER MINUTE, the north-star metric. A
       // capability where many marks are at stake has more headroom, but the
       // influence is bounded (square root) so a five-mark loss does not

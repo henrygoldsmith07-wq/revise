@@ -104,6 +104,13 @@ describe("linked Physics transfer items", () => {
       ["circular-shm-sp-05-orbit-mass-chair", k * 2.2 ** 2 / (4 * Math.PI ** 2) - 12, 60, "60 kg"],
       ["circular-shm-sp-06-two-readings", k6, 8.3, "8.3 N m⁻¹"],
       ["circular-shm-sp-06-two-readings", Math.sqrt(0.04 ** 2 + 0.5 * 0.3 ** 2 / k6), 0.084, "0.084 m"],
+      // Fifth pass: divider inverse + meter loading; search-coil field.
+      ["circuits-sp-02-sensor-loading", 3.3 / 2200, 1.5e-3, "1.5×10⁻³ A"],
+      ["circuits-sp-02-sensor-loading", (9.0 - 3.3) / (3.3 / 2200) / 1000, 3.8, "3.8 kΩ"],
+      ["circuits-sp-02-sensor-loading", 1 / (1 / 2.2 + 1 / 2.2), 1.1, "1.1 kΩ"],
+      ["circuits-sp-02-sensor-loading", 9.0 * 1.1 / (1.1 + 3.8), 2.0, "2.0 V"],
+      ["induction-sp-01-search-coil", 64e-6 * 60 / (400 * 1.2e-4), 0.080, "B = 0.080 T"],
+      ["induction-sp-01-search-coil", 2 * 64, 128, "128 μC"],
     ];
     for (const [slug, computed, stated, text] of checks) {
       // Stated values are rounded to the precision shown: within 1.5%.

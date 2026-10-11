@@ -20,6 +20,17 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
   const { plan } = useRevisionPlan();
   const [started, setStarted] = useState(autoStart);
   const [done, setDone] = useState<Attempt[]>([]);
+  // The attempt just marked, held on screen until the student chooses to move
+  // on. Advancing straight to the next probe used to unmount the runner the
+  // moment marking finished, so a new student never saw their mark, the mark
+  // scheme points they missed or the model answer for any diagnostic question.
+  const [reviewing, setReviewing] = useState<Attempt | null>(null);
+  const advance = () => {
+    if (!reviewing) return;
+    setDone((prev) => [...prev, reviewing]);
+    setReviewing(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const [selection] = useState(() => {
     const pool = quickDiagnosticPool(store.questions, store.attempts, subjectId);
     const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
@@ -114,7 +125,19 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
       <p className="text-xs text-ink3">Question {index + 1} of {selection.items.length} · {title(item!.topicId)}{selection.practiceTier ? " · practice, not proof" : ""}</p>
       {index === 0 ? <p className="text-xs text-ink3">An initial signal about where to start, not a predicted grade. Skip any time from Today.</p> : null}
       {question ? (
-        <QuestionRunner key={question.id} question={question} hintBudget={0} onFinished={(attempt) => setDone((prev) => [...prev, attempt])} />
+        <QuestionRunner key={question.id} question={question} hintBudget={0} onFinished={(attempt) => setReviewing(attempt)} />
+      ) : null}
+      {reviewing ? (
+        // Kept in reach on a phone: the marked result can be long, so the way
+        // on sits above the bottom navigation instead of at the end of it.
+        <div className="sticky bottom-20 lg:bottom-4 z-10 card card-2 p-3 space-y-2 bg-surface">
+          <p className="text-sm text-ink2" role="status" aria-live="polite">
+            {reviewing.awarded}/{reviewing.max} on this one. Read what you missed and the model answer, then carry on.
+          </p>
+          <Button variant="primary" className="w-full min-h-11" onClick={advance}>
+            {index + 1 >= selection.items.length ? "See what I found" : "Next question"}
+          </Button>
+        </div>
       ) : null}
     </>
   );

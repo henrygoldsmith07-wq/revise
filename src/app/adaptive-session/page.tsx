@@ -125,6 +125,17 @@ function AdaptiveSession() {
   const [replanReason, setReplanReason] = useState<string | null>(null);
   const [justCompleted, setJustCompleted] = useState<AdaptiveStepRecord | null>(null);
   const [replanned, setReplanned] = useState(false);
+  // A marked question step stays on screen after it is recorded, so the
+  // student can read the mark, what was missed and the model answer before
+  // the next step replaces it. Recording still happens immediately (the
+  // evidence and the replan do not wait); only the screen waits for the
+  // student's "Continue". Previously the replan swapped the step panel out
+  // the moment marking finished, so no feedback was ever visible here.
+  const [heldStep, setHeldStep] = useState<AdaptiveSessionStep | null>(null);
+  const heldRef = useRef<AdaptiveSessionStep | null>(null);
+  useEffect(() => {
+    heldRef.current = heldStep;
+  }, [heldStep]);
   const bootstrapped = useRef(false);
 
   const subject = plan ? getSubject(plan.subjectId) : undefined;
@@ -180,6 +191,13 @@ function AdaptiveSession() {
         replanWithCurrentEvidence(plan, store, topics, run.completed),
       );
       if (cancelled) return;
+      if (result && result.steps.length === 0 && result.done && heldRef.current) {
+        // Finish once the student has read the marked result ("Finish session").
+        setSteps([]);
+        setReplanReason(result.reason);
+        setReplanned(true);
+        return;
+      }
       if (result && result.steps.length === 0 && result.done) {
         const finished: AdaptiveRunState = { ...run, finished: true };
         setRun(finished);
@@ -248,6 +266,8 @@ function AdaptiveSession() {
 
   const recordStep = (record: AdaptiveStepRecord) => {
     if (!run) return;
+    const marked = record.maxMarks > 0 ? steps.find((candidate) => candidate.id === record.stepId) : undefined;
+    if (marked) setHeldStep(marked);
     const next = { ...run, completed: [...run.completed, record] };
     setRun(next);
     setJustCompleted(record);
@@ -298,8 +318,12 @@ function AdaptiveSession() {
   }
 
   const activeStep = steps[0];
+  const displayStep = heldStep ?? activeStep;
   const spentMinutes = run.completed.reduce((sum, record) => sum + Math.max(0, record.minutes), 0);
-  const nextAfter = steps.length > 1 ? steps[1] : undefined;
+  const nextAfter = heldStep
+    ? steps.find((candidate) => candidate.id !== heldStep.id)
+    : steps.length > 1 ? steps[1] : undefined;
+  const holdReady = Boolean(heldStep && replanned);
   const lastRecord = run.completed.at(-1);
   const showContinue = Boolean(justCompleted && replanned && activeStep?.id !== justCompleted.stepId);
   const sessionFinished =
@@ -320,10 +344,10 @@ function AdaptiveSession() {
         label={`Step ${run.completed.length + 1} of ${Math.max(1, run.completed.length + steps.length)} · ${spentMinutes}/${plan.targetMinutes} minutes planned`}
       />
 
-      {activeStep ? (
+      {displayStep ? (
         <StepPanel
-          key={activeStep.id}
-          step={activeStep}
+          key={displayStep.id}
+          step={displayStep}
           plan={plan}
           store={store}
           replanReason={replanReason}
@@ -365,8 +389,10 @@ function AdaptiveSession() {
         </Panel>
       )}
 
-      {showContinue || sessionFinished ? (
-        <div className="rounded-[10px] border border-line bg-surface2/60 px-3 py-2.5">
+      {heldStep || showContinue || sessionFinished ? (
+        <div className={heldStep
+          ? "sticky bottom-20 lg:bottom-4 z-10 rounded-[10px] border border-line bg-surface px-3 py-2.5"
+          : "rounded-[10px] border border-line bg-surface2/60 px-3 py-2.5"}>
           <p className="text-[11px] uppercase tracking-wide text-ink2 font-bold">Next step</p>
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-1">
             {justCompleted?.result === "passed-independent"
@@ -379,11 +405,18 @@ function AdaptiveSession() {
                     ? "Check booked for later"
                     : "Step recorded"}
           </p>
+          {heldStep ? (
+            <p className="text-xs text-ink2 mt-1" role="status" aria-live="polite">
+              {justCompleted ? `${justCompleted.awardedMarks}/${justCompleted.maxMarks}. ` : ""}Read the marking above, then continue when you are ready.
+            </p>
+          ) : null}
           {replanReason ? <p className="text-xs text-ink2 mt-1">{replanReason}</p> : null}
           <Button
             variant="primary"
             className="w-full min-h-11 mt-3"
+            disabled={Boolean(heldStep) && !holdReady}
             onClick={() => {
+              setHeldStep(null);
               setJustCompleted(null);
               setReplanned(false);
               if (!steps.length) {
@@ -396,7 +429,7 @@ function AdaptiveSession() {
               }
             }}
           >
-            {nextAfter ? `Continue — ${nextAfter.label}` : steps.length === 0 ? "Finish session" : "Continue"}
+            {heldStep && !holdReady ? "Choosing your next step…" : nextAfter ? `Continue — ${nextAfter.label}` : steps.length === 0 ? "Finish session" : "Continue"}
           </Button>
         </div>
       ) : null}
@@ -426,9 +459,13 @@ function StepPanel({
   const availableCards: Card[] = step.cardIds.length
     ? store.cards.filter((card) => step.cardIds.includes(card.id) && !card.suspended)
     : [];
-  const mistake: Mistake | undefined = step.mistakeIds[0]
+  const liveMistake: Mistake | undefined = step.mistakeIds[0]
     ? store.mistakes.find((candidate) => candidate.id === step.mistakeIds[0] && !candidate.resolved)
     : undefined;
+  // Snapshot at mount: a retest that resolves the mistake must not remount
+  // the question (and wipe its marked result) while the step is held on screen.
+  const [mountMistake] = useState(liveMistake);
+  const mistake = mountMistake ?? liveMistake;
   const question: Question | undefined = step.questionIds[0]
     ? store.questions.find((candidate) => candidate.id === step.questionIds[0])
     : undefined;
