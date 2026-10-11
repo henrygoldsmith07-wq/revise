@@ -38,7 +38,9 @@ appear in the answer. Half of "Pulmonary vein" is "pulmonary", so
   mark scheme needs “vein”." A credited point whose answer hedges between the
   right term and its opposite ("the pulmonary vein or the pulmonary artery")
   is flagged `contested`, and the deterministic assessment then labels the
-  whole mark provisional instead of presenting it as firm.
+  whole mark provisional instead of presenting it as firm. The AI path's
+  `answer-evidence` check fails softly on the same flag, so an AI mark that
+  credits a contradicted point is shown as provisional, never as "checked".
 - `pointCoverage` no longer misses a short scheme term because the answer's
   last word carries a full stop ("E(X) = np." scored 0 for "E(X) = np"). The
   anti-recitation cap still reads `tokenise` exactly as before, so it is not

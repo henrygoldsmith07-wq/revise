@@ -7,6 +7,7 @@ import { withMarkEvidence } from "@/domain/marking";
 import { schemeContested, schemeContradiction } from "@/domain/marking-contradiction";
 import { aiMarkerUnavailableMark } from "@/lib/offline-mark";
 import type { Question } from "@/domain/types";
+import type { MarkedPart } from "@/domain/types-marking";
 import { contradictionCases, MODEL } from "./fixtures/marking-contradiction-set";
 
 // ---------------------------------------------------------------------------
@@ -148,7 +149,7 @@ describe("marking with the contradiction veto", () => {
     const part = q.parts[0]!;
     const answers = { [part.id]: "Pulmonary artery, right atrium" };
     // A (hypothetical) over-generous AI mark: both points credited, high self-confidence.
-    const aiMark = withMarkEvidence(q, answers, { marked: [{ partId: part.id, awarded: 2, max: 2, creditedPoints: [...part.markScheme], missedPoints: [], comment: "" }], confidence: 0.95 });
+    const aiMark = withMarkEvidence(q, answers, { marked: [{ partId: part.id, awarded: 2, max: 2, creditedPoints: [...part.markScheme], missedPoints: [], comment: "" } as MarkedPart], confidence: 0.95 });
     expect(aiMark.marked[0]!.evidence!.every((e) => e.contested)).toBe(true);
     const assessment = assessMarkConfidence({ question: q, answers, mark: aiMark, tier: "ai", rubric: markQuestion(q, answers).marked });
     expect(assessment.provisional).toBe(true);
