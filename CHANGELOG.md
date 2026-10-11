@@ -38,6 +38,24 @@ from the k it found (T = 2π√(m/k)). Every new number is recomputed in
 the fourteen linked items is `rearrangementOnly`. All stay `generated`,
 `unverified`, reviewer null. Physics stays 14/108 (same statements).
 
+**Submitting offline could silently do nothing.** The AI client is a separate
+chunk loaded on first use. If a student's first marked answer of the session
+happened offline, the import rejected, the submit promise rejected with no
+handler, and the button came back as if never pressed.
+`src/lib/optional-ai.ts` now marks against the mark scheme on this device
+when the chunk cannot load (`aiMarkerUnavailableMark` in
+`src/lib/offline-mark.ts`, the same deterministic marker and labelling as the
+existing rubric fallback, which now shares its code; nothing is sent, nothing
+queued). Any other submit failure now shows "That answer was not marked or
+saved. It is still here, so you can submit it again." (`role="alert"`)
+instead of nothing. `tests/offline-marking-fallback.test.ts`.
+
+**Browser checks brought up to date.** `e2e/marked-feedback-visible.spec.ts`
+now rates due retrieval cards and writes the explain-the-gap recall before
+revealing, so it reaches the marked step; `e2e/wjec-trusted-journey.spec.ts`
+asserts Today's current "Do this now" card and that its cold-start step names
+the reviewed questions it rests on. Every trust assertion is unchanged.
+
 ## Spaced revisits for the returning student; Physics-aware novelty; full-diagnostic feedback — 2026-10-11 (sixth pass)
 
 **A returning flagship student got the same Today action for ever.** Every

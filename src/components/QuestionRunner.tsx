@@ -72,7 +72,7 @@ export function QuestionRunner({
    */
   onConfidence?: (confident: boolean) => void;
 }) {
-  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
+  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit, submitError } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
   const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || Boolean(farTransfer));
   return (
     <div className="space-y-4">
@@ -254,6 +254,9 @@ export function QuestionRunner({
           >
             {marking ? "Marking…" : "Submit for marking"}
           </Button>
+        ) : null}
+        {submitError && !result && !marking ? (
+          <p className="mt-3 text-sm text-danger" role="alert">{submitError}</p>
         ) : null}
       </Panel>
 
