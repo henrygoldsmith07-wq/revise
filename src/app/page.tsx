@@ -126,7 +126,7 @@ export default function TodayPage() {
       {revisionCheckpoint ? null : (
         <p className="text-sm text-ink3">
           Prefer to pick for yourself?{" "}
-          <Link href="/study" className="font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
+          <Link href="/study" className="inline-flex min-h-11 items-center font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
         </p>
       )}
       {revisionCheckpoint ? null : <WeekLine />}
