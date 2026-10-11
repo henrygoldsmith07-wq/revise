@@ -1,5 +1,70 @@
 # Changelog
 
+## Spaced revisits for the returning student; Physics-aware novelty; full-diagnostic feedback — 2026-10-11 (sixth pass)
+
+**A returning flagship student got the same Today action for ever.** Every
+flagship question is still unreviewed, so a lost mark recovered on another
+question stays `provisional` (`unverifiedOnly`) and its mission is blocked on
+proof supply. The engine answered that by sending the student straight back
+to supported practice on the topic they had just fixed ("Recover 3 marks …"),
+an hour later, the next day and a fortnight later. Nothing was spaced, the
+Revisit step of the loop never happened, and repeating the practice could
+never change the state.
+
+- `mark-recovery` now derives a practice revisit schedule for those items
+  (`practiceRevisit`, `practiceRevisitFor`): first check 3 days after the
+  first unaided success on a different question; each unaided check on yet
+  another question that holds doubles the gap (capped at 30 days); a check
+  that loses marks stops the schedule, because that loss opens its own repair.
+  Hinted attempts, early attempts and repeats of the same question never count.
+- The engine waits ("Waiting for the delay to pass: … from <date>", shown on
+  Today under the next step) and then offers **"Check it held: <topic>"**,
+  labelled practice, not proof, ranked below open losses of the same stake.
+- No proof state, total, predicate or trust gate changes; reviewed content is
+  unaffected. `tests/practice-revisit.test.ts` (9 cases).
+
+**Physics transfer novelty compares physics.** The generic comparison reads
+reasoning from Maths/Biology/Chemistry vocabulary, so on Physics it matched
+chance words ("enzyme-mechanism" on an SHM energy answer, "stoichiometric" on
+a rotor ride). For WJEC A-level Physics only, the subject audit now uses
+`comparePhysicsTransfer` (`src/domain/physics-transfer-novelty.ts`): the
+physical relations each worked solution uses (bound to the step that shows
+them), the unknowns each prompt's instruction clauses ask for, and a context
+change. It fails closed when it recognises no relation or unknown, and
+rejects number swaps and renamed copies that solve the same relations for
+the same unknowns. Other subjects keep the graph comparison unchanged.
+
+- All 13 existing linked Physics transfers pass; 5 of them only as inverse
+  problems on the baseline's own relations (`rearrangementOnly`: circular
+  motion/SHM sp-01, sp-03, sp-04, sp-05, sp-06), reported as weaker transfer.
+- The electric circuits sp-04 draft withheld in the fifth pass (fixed 40 W
+  from a battery with internal resistance; a quadratic, chosen on efficiency)
+  is authored in full and passes: Physics authored ceiling 13/108 → 14/108,
+  all unreviewed and `source: "generated"`.
+
+**The full diagnostic shows the mark, and asks confidence first.** It used to
+unmount the marked result and ask "How sure were you of that answer?" in its
+place. Confidence is now captured with the submit, before the reveal
+(`QuestionRunner` `onConfidence`: "Not sure · submit" / "Confident · submit"),
+so each calibration record is a judgement of the answer rather than a
+reaction to the mark; the marked result stays mounted until "Continue".
+`tests/full-diagnostic-feedback.test.ts`.
+
+**Browser check for held feedback.** `e2e/marked-feedback-visible.spec.ts`
+drives the adaptive session and the full diagnostic and asserts the result is
+still visible after the replan, until Continue. The fixture-review helper the
+trusted journey used is shared as `e2e/review-fixture.ts`. `completeOnboarding`
+now walks the five-step onboarding: it re-clicks the board until it reports
+`aria-pressed` (the dialog can paint before hydration, which left the run on
+"Step 1 of 5 · Board"), steps through the quick-check and first-step phases,
+and returns to Today after "Start my quick check" redirects to `/diagnostic`.
+**Not yet green locally:** with that fix all three specs get past onboarding,
+then fail on spec drift — the adaptive-session walker does not rate retrieval
+cards; the trusted journey still expects the old "Your highest-value session"
+heading; and the fixture's trusted WJEC Maths items contain no recall-depth
+question, so the full diagnostic (which opens each topic with a recall probe)
+finishes with no questions.
+
 ## Marked answers stay on screen; Physics baseline integrity; two more Physics transfer items — 2026-10-10 (fifth pass)
 
 **A student never saw feedback in the two main flows.** `useQuestionExecution`
