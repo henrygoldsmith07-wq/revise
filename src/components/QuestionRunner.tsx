@@ -43,6 +43,7 @@ export function QuestionRunner({
   repairTeachingSeen = false,
   intervention,
   mission,
+  onConfidence,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -63,6 +64,13 @@ export function QuestionRunner({
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
   mission?: Attempt["mission"];
+  /**
+   * Ask how sure the student is as part of submitting, before the mark is
+   * revealed. A confidence rating given after seeing the mark is a judgement
+   * of the mark, not of the answer, so calibration data must be captured
+   * here. When set, "Submit for marking" becomes two submit buttons.
+   */
+  onConfidence?: (confident: boolean) => void;
 }) {
   const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
   const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || Boolean(farTransfer));
@@ -209,7 +217,35 @@ export function QuestionRunner({
             ) : null}
           </div>
         ) : null}
-        {!result && !retestMistake?.resolved ? (
+        {!result && !retestMistake?.resolved && onConfidence ? (
+          <div className="mt-5 space-y-2" role="group" aria-labelledby={`confidence-${question.id}`}>
+            <p id={`confidence-${question.id}`} className="text-sm font-semibold text-ink">Before you see the mark: how sure are you?</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                className="w-full min-h-11"
+                disabled={marking || (isMcq ? choice === null : !Object.values(answers).some((a) => a.trim()))}
+                onClick={() => {
+                  onConfidence(false);
+                  void submit();
+                }}
+              >
+                {marking ? "Marking…" : "Not sure · submit"}
+              </Button>
+              <Button
+                variant="primary"
+                className="w-full min-h-11"
+                disabled={marking || (isMcq ? choice === null : !Object.values(answers).some((a) => a.trim()))}
+                onClick={() => {
+                  onConfidence(true);
+                  void submit();
+                }}
+              >
+                {marking ? "Marking…" : "Confident · submit"}
+              </Button>
+            </div>
+          </div>
+        ) : !result && !retestMistake?.resolved ? (
           <Button
             variant="primary"
             className="w-full min-h-11 mt-5"
