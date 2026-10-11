@@ -1,5 +1,29 @@
 # Changelog
 
+## Every flagship topic has a recall question — 2026-10-11 (eleventh pass)
+
+**A recall gap and an application gap looked the same in 40 topics.** Early
+diagnostics probe recall first and escalate to application
+(`diagnostic-intake.ts`). Before this pass 12 of 23 Maths, 14 of 25 Biology
+and 14 of 23 Chemistry topics had no recall-level question, so those topics
+could only be probed at application level.
+
+- 40 new recall probes in `src/content/questions/wjec-recall-probes.ts`, one
+  for every remaining topic (Maths 12, Biology 14, Chemistry 14), using the
+  ninth-pass pattern: two-mark definitions or standard results mapped to one
+  capability node and its spec point, with a visible model answer. Examples:
+  Type I/II errors, Newton–Raphson, F ≤ μR, double fertilisation, Taq
+  polymerase, ΔG = ΔH − TΔS, the silver nitrate halide test.
+- Original practice content, not board questions: every item is
+  `unverified`, has no reviewer and is not proof-eligible until two
+  independent teachers approve it in the reviewer portal.
+- Recall coverage is now 23/23, 25/25 and 23/23 topics (Physics was already
+  19/19). Authoring backlog refreshed: "core if every approvable question
+  were approved" moves from 12/87 to 16/87 (Maths), 10/114 to 11/114
+  (Biology) and 14/108 to 17/108 (Chemistry); none of it is approved.
+- Writing them exposed a marker weakness: hand-written wrong answers to 17
+  of the 40 still earned marks offline (see the next entry).
+
 ## The offline marker stops crediting answers that contradict the scheme — 2026-10-11 (tenth pass)
 
 **Short wrong answers were scoring full marks.** With no AI provider (or

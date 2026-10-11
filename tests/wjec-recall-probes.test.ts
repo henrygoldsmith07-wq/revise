@@ -10,7 +10,7 @@ import { markQuestion } from "@/domain/marking";
 // a real spec point, and markable: the model answer earns full marks and a blank answer earns none.
 describe("WJEC recall probes", () => {
   it("are in the seed bank, recall-level, unverified and unreviewed", () => {
-    expect(wjecRecallProbeQuestions.length).toBe(18);
+    expect(wjecRecallProbeQuestions.length).toBe(58);
     const ids = new Set(seedQuestions.map((q) => q.id));
     for (const q of wjecRecallProbeQuestions) {
       expect(ids.has(q.id)).toBe(true);
