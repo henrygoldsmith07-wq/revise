@@ -95,19 +95,25 @@ npm run wjec:review:pack      # offline HTML pack (developer fallback)
 
 All four WJEC A-level flagships have **0 human-reviewed questions**. Counting
 only questions a reviewer could actually approve (no blocking review gate),
-no flagship is close to fully authored: Physics meets the core bar on 13 of 108
+no flagship is close to fully authored: Physics meets the core bar on 14 of 108
 statements, because none of its 234 original "transfer"-labelled questions has
-a baseline link; the thirteen that do meet it (alternating currents sp-01, sp-03;
-capacitance sp-01..03; circular motion/SHM sp-01..06; electric circuits sp-02;
-electromagnetic induction sp-01) rest on new transfer
+a baseline link; the fourteen that do meet it (alternating currents sp-01, sp-03;
+capacitance sp-01..03; circular motion/SHM sp-01..06; electric circuits sp-02,
+sp-04; electromagnetic induction sp-01) rest on new transfer
 items in `src/content/questions/physics-transfer-linked.ts`, each linked to an
-existing baseline part, passing the structural-novelty comparison and the
+existing baseline part, passing the Physics novelty check and the
 baseline integrity check (`validateBaselineIntegrity` with its Physics working
 recognisers, `physicsWorkingNodes`), and still unreviewed. Those linked items
-also go through the transfer block of `auditFlagshipSubject`. Known weakness:
-for Physics the derived reasoning graphs (`deriveVerifiedGraph`) are nearly
-empty because their families are word-based, so the novelty comparison is
-weak evidence there; do not reword an item to pass it. Mathematics, Biology and Chemistry still
+also go through the transfer block of `auditFlagshipSubject`. For Physics,
+transfer novelty is decided by `comparePhysicsTransfer`
+(`src/domain/physics-transfer-novelty.ts`): the physical relations each
+worked solution uses, the unknowns each prompt asks for, and the context; it
+fails closed when it recognises no relation or unknown. The word-based
+reasoning graphs (`deriveVerifiedGraph`) are nearly empty for Physics and are
+no longer used for its novelty verdict; every other subject still uses them.
+Five of the fourteen pass only as inverse problems on the baseline's own
+relations (`rearrangementOnly`), which is weaker transfer; do not reword an
+item to pass the check. Mathematics, Biology and Chemistry still
 have 79, 105 and 96 statements to write
 (`src/content/reviews/wjec-authoring-backlog.json`).
 Earlier notes saying Physics was "authored to all 108" counted gate-blocked

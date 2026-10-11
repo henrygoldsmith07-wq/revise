@@ -19,8 +19,12 @@ import { physicsReasoningDepthQuestions } from "./physics-reasoning-depth";
 // motion / SHM sp-01..06 (second batch). A drafted sp-02 item (series RC
 // crossover) was withheld: the repo's structural-novelty comparison rated it
 // too close to its baseline, and an item that would fail the stricter check
-// should not count here. Every item here passes that comparison against its
-// baseline (`compareTransferStructures` on verified graphs). Each one:
+// should not count here. Every item here passes the Physics novelty check
+// against its baseline (`comparePhysicsTransfer`: the physical relations the
+// worked solution uses, the unknowns the prompt asks for, and the context;
+// see src/domain/physics-transfer-novelty.ts). Until the sixth pass the
+// generic word-based comparison decided this, and on Physics it mostly
+// matched chance words. Each one:
 //   - links to an EXISTING application/calculation part of the same
 //     capability and statement (looked up below; the module throws if the
 //     baseline ever disappears, so a link can never point at nothing);
@@ -361,14 +365,32 @@ export const physicsTransferLinkedQuestions: Question[] = [
     ],
     answer: "The logger draws no current, so the series current is I = 3.3 V/2200 Ω = 1.5×10⁻³ A. The thermistor takes the rest of the emf, 9.0 − 3.3 = 5.7 V, so its resistance is 5.7/1.5×10⁻³ = 3800 Ω = 3.8 kΩ. A 2.2 kΩ voltmeter across the 2.2 kΩ resistor makes a parallel combination of 1.1 kΩ, so the circuit totals 1.1 + 3.8 = 4.9 kΩ and the meter reads 9.0 × 1.1/4.9 = 2.0 V, well below 3.3 V, because the meter itself has changed the circuit.",
   }),
-  // electric-circuits sp-04 was drafted (fixed 40 W from a 12 V, 0.80 Ω
-  // battery: P = ε²R/(R + r)² gives R = 1.6 Ω or 0.40 Ω, chosen on
-  // efficiency) and withheld. The structural-novelty comparison rated it not
-  // novel against its baseline (internal-loss-8): on Physics the derived
-  // reasoning graphs are almost empty, because the graph families are
-  // word-based, so the comparison cannot see the quadratic inverse step. An
-  // item that fails the check does not count here, and it was not reworded
-  // to satisfy the heuristic.
+  // electric-circuits sp-04. Baseline: known emf, internal resistance and
+  // load -> load power and internal loss. Transfer: the load power is fixed
+  // and the load is the unknown, so P = ε²R/(R + r)² becomes a quadratic with
+  // two roots, chosen between on efficiency. Drafted in the fifth pass and
+  // withheld because the generic word-based comparison could not see the
+  // inverse step; the Physics novelty check (relations, unknowns, context;
+  // `comparePhysicsTransfer`) rates it novel: a new unknown (resistance,
+  // efficiency) and a new relation (supply efficiency) in a new context.
+  linkedTransferQuestion({
+    slug: "physics-transfer-circuits-sp-04-fixed-power-heater",
+    topic: "electric-circuits",
+    point: "sp-04",
+    baseline: baselinePart(physicsDepthCompletionCircuitsMechanicsQuestions, "cnt:question:physics-depth50-electric-circuits-sp-04-internal-loss-8"),
+    family: "physics-transfer:circuits-load-for-fixed-power",
+    context: "physics-transfer:circuits-load-for-fixed-power:battery-heater",
+    move: "work backwards from a required load power to the two load resistances a source with internal resistance allows, and choose between them on efficiency",
+    prompt: "A heating element for a camping stove must dissipate exactly 40 W. It is powered by a 12 V battery of internal resistance 0.80 Ω. Find the two values of the element's resistance that give 40 W. Calculate the efficiency of the battery with each, and state which value the designer should choose.",
+    scheme: [
+      "P = I²R with I = ε/(R + r), so 40 = 144R/(R + 0.80)²",
+      "40R² − 80R + 25.6 = 0, i.e. R² − 2R + 0.64 = 0",
+      "R = 1.6 Ω or R = 0.40 Ω",
+      "Efficiency = R/(R + r): 1.6/2.4 = 67% against 0.40/1.2 = 33%",
+      "Choose 1.6 Ω: the same 40 W with 5.0 A instead of 10 A, so 20 W rather than 80 W is wasted in the battery",
+    ],
+    answer: "With I = ε/(R + r), the element's power is P = I²R = ε²R/(R + r)². Setting this to 40 W gives 40(R + 0.80)² = 144R, so 40R² + 64R + 25.6 = 144R and 40R² − 80R + 25.6 = 0, i.e. R² − 2R + 0.64 = 0. The roots are R = (2 ± 1.2)/2, so R = 1.6 Ω or R = 0.40 Ω. Both give 40 W: 1.6 Ω draws I = 12/2.4 = 5.0 A and 0.40 Ω draws I = 12/1.2 = 10 A. The efficiency is the fraction of the battery's power delivered to the element, R/(R + r): 1.6/2.4 = 67% against 0.40/1.2 = 33%. The designer should choose 1.6 Ω: it delivers the same 40 W while wasting 20 W inside the battery instead of 80 W, so the battery stays cooler and lasts longer.",
+  }),
   // electromagnetic-induction sp-01. Baseline: known B, N, A and time ->
   // mean emf and charge. Transfer: B is the unknown, found from the charge a
   // search coil drives (Q = NΔΦ/R, independent of time), then a 180° turn.
