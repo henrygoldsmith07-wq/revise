@@ -4,6 +4,7 @@ import { numericEquivalent, numericMatch, extractNumbersCached, requiresStructur
 export { numericEquivalent, isNumericPoint } from "./marking-numeric";
 import { symbolicMatch } from "./maths-equivalence";
 import { markCalculationWorking } from "./calculation-rubric";
+import { contradictionExplanation, schemeContested, schemeContradiction, VERY_SHORT_ANSWER_WORDS } from "./marking-contradiction";
 import type { MarkEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -109,10 +110,14 @@ export function rubricConfidence(marked: MarkedPart[]): number | null {
       n++;
       sum +=
         ev.status === "credited"
-          ? ev.evidenceStrength === "strong"
+          ? ev.contested
+            ? 0.3
+            : ev.evidenceStrength === "strong"
             ? 1
             : 0.6
-          : ev.evidenceStrength === "partial"
+          : ev.contradiction
+            ? 0.95
+            : ev.evidenceStrength === "partial"
             ? 0.45
             : 0.95;
     }
@@ -139,7 +144,7 @@ export function evidenceForMarkedPart(
     const match = bestEvidence(point, answer);
     const strength = evidenceStrength(point, match);
     const supportingEvidence = excerpt(match.text);
-    return {
+    const evidence: MarkEvidence = {
       point,
       status,
       evidence: supportingEvidence,
@@ -147,6 +152,21 @@ export function evidenceForMarkedPart(
       confidence: Math.round(match.score * 100) / 100,
       explanation: explanationFor(status, supportingEvidence, strength),
     };
+    // Say WHY a contradicted point was not awarded, and never let a credited
+    // point that the answer contradicts or hedges look like a firm mark.
+    const contradiction = status === "unreported" || !contradictionApplies(part, answer) ? null : schemeContradiction(point, answer);
+    if (contradiction) {
+      evidence.contradiction = contradictionExplanation(contradiction);
+      if (status === "missed") evidence.explanation = evidence.contradiction;
+      else {
+        evidence.contested = true;
+        evidence.explanation = `Awarded, but treat this mark as provisional: ${evidence.contradiction.replace(/^Not awarded: /, "")}`;
+      }
+    } else if (status === "credited" && contradictionApplies(part, answer) && schemeContested(point, answer)) {
+      evidence.contested = true;
+      evidence.explanation = `Awarded, but treat this mark as provisional: your answer also states the opposite of this point, so it may be hedging.`;
+    }
+    return evidence;
   });
 }
 
@@ -236,6 +256,12 @@ function canonicalAuthoredAnswer(text: string): string[] {
 
 const AUTHORED_CANONICAL_CACHE = new Map<string, string[]>();
 
+/** The authored model answer itself, verbatim apart from whitespace. */
+function sameAsAuthored(part: QuestionPart, answer: string): boolean {
+  const model = part.modelAnswer?.trim();
+  return Boolean(model) && model!.replace(/\s+/g, " ") === answer.trim().replace(/\s+/g, " ");
+}
+
 function authoredAnswerEquivalent(part: QuestionPart, answer: string): boolean {
   const model = part.modelAnswer?.trim();
   if (!model || !answer.trim()) return false;
@@ -322,6 +348,22 @@ function explicitNegationConflict(point: string, answer: string): boolean {
     withoutNegation(fragment) === expected);
 }
 
+/**
+ * Physics parts carry their own reversal and result guards (below) and are
+ * mostly multi-claim explanations, where an opposite word usually belongs to a
+ * different claim; the general contradiction veto covers only their very
+ * short answers. Every other subject gets it in full.
+ */
+export function contradictionApplies(part: Pick<QuestionPart, "capabilityIds">, answer: string): boolean {
+  if (!part.capabilityIds?.some((id) => id.startsWith("phys."))) return true;
+  return answer.trim().split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
+}
+
+/** A scheme point that is prose around an expression ("Discriminant = b² − 4ac"), not a bare expression. */
+function proseEmbeddedPoint(point: string): boolean {
+  return /[a-z]{3,}/i.test(point.replace(/\b(?:sin|cos|tan|ln|log|sqrt|exp|sec|cosec|cot)\b/gi, ""));
+}
+
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
   const calculation = markCalculationWorking(part, answer);
   if (calculation) return calculation;
@@ -329,8 +371,11 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // The authored complete answer must remain reachable. Its wording is not
   // evidence of cheating or support; the runner records actual hint exposure.
   // Limit this contract to explicitly skill-mapped content with one point per mark.
+  // Term order is canonicalised there, so "1 − 2cos²θ" and "2cos²θ − 1" look
+  // alike: an answer that contradicts any point never takes this shortcut.
   if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
-    authoredAnswerEquivalent(part, trimmed)) {
+    authoredAnswerEquivalent(part, trimmed) &&
+    (sameAsAuthored(part, trimmed) || !part.markScheme.some((point) => schemeContradiction(point, trimmed)))) {
     const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
       creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
     return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
@@ -384,6 +429,13 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     }
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
     if (ok && sym !== "equivalent" && polarityConflict(point, trimmed)) ok = false;
+    // Contradiction veto: an opposite term (artery for vein, left for right),
+    // a flipped sign or inequality, a different stated value or formula, or a
+    // negated claim. Only ever removes credit (marking-contradiction.ts).
+    // The symbolic layer extracts a fragment from prose points, so it can call
+    // "b² + 4ac" equivalent to "Discriminant = b² − 4ac"; it stays decisive
+    // only for a point that is itself a pure expression.
+    if (ok && (sym !== "equivalent" || proseEmbeddedPoint(point)) && contradictionApplies(part, trimmed) && schemeContradiction(point, trimmed)) ok = false;
     if (part.capabilityIds?.some(id => id.startsWith("phys."))) {
       if (explicitNegationConflict(point, trimmed)) ok = false;
       const resultMatches = physicsResultMatches(point, trimmed);

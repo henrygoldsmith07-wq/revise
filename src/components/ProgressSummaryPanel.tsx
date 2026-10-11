@@ -39,7 +39,7 @@ export function ProgressSummaryPanel() {
           {summary.strong.length ? (
             <ul className="space-y-1.5 text-sm">
               {summary.strong.map((row) => (
-                <li key={row.topicId} className="flex flex-wrap items-center gap-2"><span className="text-ink">{row.title}</span><Pill tone={TONE[row.stage]} title={stageMeaning(row.stage, row.referenceTier)}>{row.label}</Pill></li>
+                <li key={row.topicId} className="flex flex-wrap items-center gap-2"><span className="text-ink">{row.title}</span><Pill tone={TONE[row.stage]} title={stageMeaning(row.stage, row.referenceTier)}>{row.label}</Pill>{row.openMarks > 0 ? <span className="text-xs text-ink2">{row.openMarks} lost mark{row.openMarks === 1 ? "" : "s"} here still to win back</span> : null}</li>
               ))}
             </ul>
           ) : (
@@ -53,6 +53,7 @@ export function ProgressSummaryPanel() {
           {summary.losing.totalMarks > 0 || summary.losing.patterns.length ? (
             <>
               {summary.losing.totalMarks > 0 ? <p className="text-sm text-ink">{summary.losing.totalMarks} marks lost and not yet recovered{summary.losing.topics.length ? `, mostly in ${summary.losing.topics.map((row) => row.title).join(", ")}` : ""}.</p> : null}
+              {summary.losing.scopeNote ? <p className="text-xs text-ink2" data-testid="lost-marks-scope">{summary.losing.scopeNote}</p> : null}
               {summary.losing.patterns.map((row) => <p key={row.cause} className="text-xs text-ink2">{row.headline}</p>)}
             </>
           ) : (
