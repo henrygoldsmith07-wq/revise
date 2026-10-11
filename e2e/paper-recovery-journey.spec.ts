@@ -149,7 +149,7 @@ test("paper → lost marks → mission → repair → unaided success → delaye
   await page.goto("/");
   await expect(main).toContainText(/Prove it/, { timeout: 40_000 });
   await expect(main).toContainText("Awaiting proof");
-  await main.getByRole("link", { name: "Start session", exact: true }).click();
+  await main.getByRole("link", { name: "Start proof check", exact: true }).click();
   await page.getByRole("button", { name: /Start mission step/ }).click();
   await runQuestionSet(page, await count(), true);
   await expect(main).toContainText("delayed proof passed", { timeout: 30_000 });

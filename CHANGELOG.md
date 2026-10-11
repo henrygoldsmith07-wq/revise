@@ -23,14 +23,26 @@ teacher to tick "Genuine transfer" without showing the baseline.
 - `src/lib/reviewer/batches.ts` is ordering and context only: states come from
   `reviewStateOf`; no rule, gate or trust predicate changes.
 
-**Smaller fixes.** The "Skip the check" ghost button on Today's best next
-step is now at least 44px tall on phones (`min-h-11`), and the review screen
+**Smaller fixes.** Touch targets on Today at 360px: "Skip, just start
+revising", "Choose how to study", "Change subjects", "View my plan", "Set up
+my plan", "View full roadmap" and "Continue roadmap" are now at least 44px
+tall (`min-h-11`; `e2e/narrow-360.spec.ts` passes), and the review screen
 no longer tells a teacher that approving one half of a transfer pair "unlocks
 nothing new": it says the pair counts only once the other half is verified
 too. E2E specs updated to the current Today lead ("Do this now"), the Tools
 menu's "Review <count>" label, a settings toggle that waits for hydration, and
 proof journeys re-based on fixture-reviewed WJEC Biology content (approvals
-written only inside the test's own browser profile).
+written only inside the test's own browser profile), the quick check's
+"Next question" step (a marked answer stays on screen until the student
+continues), and the proof stage's "Start proof check" CTA.
+
+**Known: a paper's lost marks cannot reach delayed proof without an attested
+past paper.** `e2e/paper-recovery-journey.spec.ts` now runs through repair and
+the unaided step on fixture-reviewed content, then stops where the trust rule
+says it must: WJEC paper-mode mistakes count only through
+`authenticPaperEvidence` (verified past-paper provenance plus a human-reviewed
+marking attestation). The mission still labels that state "Awaiting proof" and
+offers the apply step again; that wording gap is recorded, not fixed here.
 
 **Onboarding offline sent the student back to step 1.** `finish()` called
 `onDone()` (which writes the "onboarded" marker) without waiting, then
