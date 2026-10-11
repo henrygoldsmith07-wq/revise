@@ -17,6 +17,7 @@ import {
   validateBaselineIntegrity,
   verifyTransferFingerprints,
 } from "./transfer-trust";
+import { comparePhysicsTransfer, physicsNoveltyDetail } from "./physics-transfer-novelty";
 export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export { fingerprintSetup, isDistinctReasoningRoute, isSupersetRoute, reasoningGraphForPart } from "./reasoning-graph";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
@@ -426,6 +427,20 @@ export function auditFlagshipSubject(input: {
           invalidParts.add(`${question.id}:${part.id}`);
         }
         if (invalidParts.has(`${question.id}:${part.id}`)) continue;
+        // Physics shows its reasoning as relations and substitutions, which
+        // the word-based reasoning graphs cannot see (they matched chance
+        // words such as "enzyme" on oscillation answers). For Physics the
+        // verdict compares the physical relations used, the unknowns asked
+        // for and the context instead, and fails closed when it cannot
+        // recognise them. Every other subject keeps the graph comparison.
+        if (physicsSubject) {
+          const physics = comparePhysicsTransfer(baselineEntry![1].part, part);
+          if (!physics.isNovel) {
+            addIssue(subjectIssues, question, part, "transfer-not-novel", "error", physicsNoveltyDetail(physics));
+            invalidParts.add(`${question.id}:${part.id}`);
+          }
+          continue;
+        }
         const comparison = compareTransferReasoningGraphs(
           fingerprintSetup(baselineEntry![1].part.prompt),
           fingerprintSetup(part.prompt, part.modelAnswer),

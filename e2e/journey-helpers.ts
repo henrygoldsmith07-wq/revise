@@ -8,7 +8,7 @@ import { expect, type Page } from "@playwright/test";
 // The marker caps answers that only recite the mark scheme, so a correct answer adds wording of its own.
 const OWN_WORDS = " In my own explanation, students compare several observations carefully, relate every stage to the underlying science, and justify conclusions with the evidence gathered during a practical investigation.";
 
-export async function answerOnScreen(page: Page, correct: boolean): Promise<void> {
+export async function answerOnScreen(page: Page, correct: boolean, submitName: RegExp = /submit for marking/i): Promise<void> {
   await page.waitForTimeout(2500);
   const plan = await page.evaluate(async () => {
     type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -35,7 +35,7 @@ export async function answerOnScreen(page: Page, correct: boolean): Promise<void
     const count = await boxes.count();
     for (let i = 0; i < count; i++) await boxes.nth(i).fill(correct ? `${plan!.parts[i] ?? plan!.parts[0]!}.${OWN_WORDS}` : "I do not know");
   }
-  const submit = page.getByRole("button", { name: /submit for marking/i }).first();
+  const submit = page.getByRole("button", { name: submitName }).first();
   await submit.scrollIntoViewIfNeeded();
   await submit.click();
 }

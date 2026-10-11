@@ -36,7 +36,12 @@ function Diagnostic() {
   const [subjectId, setSubjectId] = useState<string | null>(requested && subjectIds.includes(requested) ? requested : null);
   const [quick, setQuick] = useState(true);
   const [records, setRecords] = useState<ProbeRecord[]>([]);
+  // The attempt just marked, held on screen with its marked result until the
+  // student continues. Confidence is captured with the submit, before the
+  // mark is revealed (QuestionRunner `onConfidence`), so the calibration
+  // record is a judgement of the answer, not a reaction to the mark.
   const [pending, setPending] = useState<Attempt | null>(null);
+  const [confidence, setConfidence] = useState<boolean | null>(null);
   const active = subjectId ?? subjectIds[0] ?? null;
 
   const items = useMemo(() => (active ? diagnosticItems(active, store.questions) : []), [active, store.questions]);
@@ -46,15 +51,23 @@ function Diagnostic() {
   const input = { topicIds, items, records, seenItemIds: seen };
   const probe = !pending && active ? nextProbe(input) : null;
   const finished = !pending && (items.length === 0 || diagnosticFinished(input));
-  const question = probe ? store.questions.find((q) => q.id === probe.item.id) : undefined;
+  // While an attempt is held, keep its question mounted so the runner keeps
+  // showing the marked result (same key, same position in the tree).
+  const questionId = pending ? pending.questionId : probe?.item.id;
+  const question = questionId ? store.questions.find((q) => q.id === questionId) : undefined;
   const report = useMemo(() => diagnosticReport(records, topicIds, items), [records, topicIds, items]);
   const titleOf = (id: string) => getTopic(id)?.title ?? id;
 
-  function confirm(confident: boolean) {
+  function advance() {
     if (!pending) return;
     const item = items.find((i) => i.id === pending.questionId);
-    if (item) setRecords((prev) => [...prev, probeFromAttempt(pending, item, confident)]);
+    // Confidence is always captured by the submit buttons; without it there
+    // is no honest calibration record, so no probe is recorded rather than
+    // inventing one.
+    if (item && confidence !== null) setRecords((prev) => [...prev, probeFromAttempt(pending, item, confidence)]);
     setPending(null);
+    setConfidence(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
@@ -97,14 +110,6 @@ function Diagnostic() {
             <ButtonLink href={`/practice?subject=${encodeURIComponent(active)}`} variant="secondary">Practise this subject</ButtonLink>
           </div>
         </Panel>
-      ) : pending ? (
-        <Panel className="space-y-3">
-          <p className="text-sm font-semibold text-ink">How sure were you of that answer?</p>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => confirm(false)}>Not sure / guessed</Button>
-            <Button variant="primary" onClick={() => confirm(true)}>Confident</Button>
-          </div>
-        </Panel>
       ) : finished ? (
         <Panel className="space-y-4">
           <h2 className="text-base font-semibold text-ink">What this tells Revise</h2>
@@ -122,15 +127,26 @@ function Diagnostic() {
           <p className="text-xs text-ink3">These answers are saved as normal attempts, so Today and your readiness picture already use them.</p>
           <ButtonLink href="/" variant="primary">Back to Today</ButtonLink>
         </Panel>
-      ) : question && probe ? (
+      ) : question && (probe || pending) ? (
         <>
-          <p className="text-xs text-ink3">{records.length} answered · about {Math.round(report.minutes)} of 25 minutes · {probe.reason}</p>
+          <p className="text-xs text-ink3">{records.length} answered · about {Math.round(report.minutes)} of 25 minutes{probe ? ` · ${probe.reason}` : ""}</p>
           <QuestionRunner
             key={question.id}
             question={question}
             hintBudget={0}
+            onConfidence={setConfidence}
             onFinished={(attempt) => setPending(attempt)}
           />
+          {pending ? (
+            // Kept in reach on a phone: the marked result can be long, so the
+            // way on sits above the bottom navigation, not below the result.
+            <div className="sticky bottom-20 lg:bottom-4 z-10 card card-2 p-3 space-y-2 bg-surface">
+              <p className="text-sm text-ink2" role="status" aria-live="polite">
+                {pending.awarded}/{pending.max} on this one{confidence === true ? ", and you said you were confident" : confidence === false ? ", and you said you were not sure" : ""}. Read what you missed and the model answer, then carry on.
+              </p>
+              <Button variant="primary" className="w-full min-h-11" onClick={advance}>Continue</Button>
+            </div>
+          ) : null}
           <Link href="/" className="text-xs text-ink3 underline">Stop and go back to Today</Link>
         </>
       ) : null}

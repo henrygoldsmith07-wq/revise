@@ -5,7 +5,7 @@ import { allTopics } from "@/domain/curriculum";
 import { approvableByReview, gateContextFromTopics, hasActualTransfer, questionGateIssues } from "@/domain/review-gates";
 import { trustedAssessmentContent } from "@/domain/content-trust";
 import { verifyTransferFingerprints } from "@/domain/transfer-trust";
-import { compareTransferStructures, deriveVerifiedGraph, fingerprintSetup, verifiedGraphToPlain } from "@/domain/reasoning-graph";
+import { comparePhysicsTransfer } from "@/domain/physics-transfer-novelty";
 
 // Physics transfer items authored with a real baseline link. They must point
 // at parts that exist in the bank, stay unreviewed, and be approvable only
@@ -62,19 +62,16 @@ describe("linked Physics transfer items", () => {
     expect(approvableByReview(unlinked, gate)).toBe(false);
   });
 
-  it("each is structurally novel against its baseline on independently derived graphs", () => {
+  it("each is novel against its baseline by physical relation, unknown and context", () => {
     // The same comparison the subject assessment audit applies to a stored
-    // link: recomputed fingerprints and verified graphs, never stored metadata.
+    // Physics link, recomputed from current content (never stored metadata).
     for (const question of physicsTransferLinkedQuestions) {
       const part = question.parts[0]!;
       const baseline = partById.get(part.learning!.transferLink!.baselinePartId)!.part;
-      const comparison = compareTransferStructures(
-        fingerprintSetup(baseline.prompt),
-        fingerprintSetup(part.prompt, part.modelAnswer),
-        verifiedGraphToPlain(deriveVerifiedGraph(baseline, question.subjectId)),
-        verifiedGraphToPlain(deriveVerifiedGraph(part, question.subjectId)),
-      );
-      expect(comparison.isNovel, `${question.id}: ${comparison.structuralChanges.join(",")} / ${comparison.reasoningChanges.join(",")}`).toBe(true);
+      const comparison = comparePhysicsTransfer(baseline, part);
+      expect(comparison.isNovel, `${question.id}: ${comparison.reasons.join("; ")}`).toBe(true);
+      expect(comparison.contextChanged).toBe(true);
+      expect(comparison.newUnknowns.length + comparison.newRelations.length).toBeGreaterThan(0);
     }
   });
 
@@ -111,6 +108,17 @@ describe("linked Physics transfer items", () => {
       ["circuits-sp-02-sensor-loading", 9.0 * 1.1 / (1.1 + 3.8), 2.0, "2.0 V"],
       ["induction-sp-01-search-coil", 64e-6 * 60 / (400 * 1.2e-4), 0.080, "B = 0.080 T"],
       ["induction-sp-01-search-coil", 2 * 64, 128, "128 μC"],
+      // Sixth pass: fixed load power from a source with internal resistance.
+      ["circuits-sp-04-fixed-power-heater", 144 * 1.6 / (1.6 + 0.8) ** 2, 40, "40 = 144R/(R + 0.80)²"],
+      ["circuits-sp-04-fixed-power-heater", 144 * 0.4 / (0.4 + 0.8) ** 2, 40, "R = 1.6 Ω or R = 0.40 Ω"],
+      ["circuits-sp-04-fixed-power-heater", (2 + Math.sqrt(4 - 4 * 0.64)) / 2, 1.6, "R = 1.6 Ω"],
+      ["circuits-sp-04-fixed-power-heater", (2 - Math.sqrt(4 - 4 * 0.64)) / 2, 0.40, "R = 0.40 Ω"],
+      ["circuits-sp-04-fixed-power-heater", 1.6 / 2.4 * 100, 67, "67%"],
+      ["circuits-sp-04-fixed-power-heater", 0.4 / 1.2 * 100, 33, "33%"],
+      ["circuits-sp-04-fixed-power-heater", 12 / (1.6 + 0.8), 5.0, "5.0 A"],
+      ["circuits-sp-04-fixed-power-heater", 12 / (0.4 + 0.8), 10, "10 A"],
+      ["circuits-sp-04-fixed-power-heater", (12 / 2.4) ** 2 * 0.8, 20, "20 W"],
+      ["circuits-sp-04-fixed-power-heater", (12 / 1.2) ** 2 * 0.8, 80, "80 W"],
     ];
     for (const [slug, computed, stated, text] of checks) {
       // Stated values are rounded to the precision shown: within 1.5%.

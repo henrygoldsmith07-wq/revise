@@ -57,7 +57,29 @@ export interface MistakeRecovery {
   regressedAt?: string;
   /** Success counts as proof only on verified content; otherwise it stays provisional. */
   unverifiedOnly?: boolean;
+  /**
+   * Spaced practice revisits for a mark recovered only on unreviewed
+   * questions (`unverifiedOnly`). Proof is impossible there, but whether the
+   * fix held is still worth checking at expanding intervals. Never a proof
+   * state: it changes no state, total or claim.
+   */
+  practiceRevisit?: PracticeRevisit;
 }
+
+export interface PracticeRevisit {
+  /** When the next spaced practice check is due. */
+  dueAt: string;
+  /** Spaced checks already passed, unaided, on a different question. */
+  heldChecks: number;
+  /** When the last spaced check passed. */
+  lastHeldAt?: string;
+  /** A spaced check was answered unaided and lost marks: the new loss takes over. */
+  slipped: boolean;
+}
+
+/** First spaced practice check after the first recovery; each one passed doubles the gap (3, 6, 12, 24 days…). */
+export const PRACTICE_REVISIT_FIRST_DAYS = MIN_PROOF_DELAY_DAYS;
+export const PRACTICE_REVISIT_MAX_DAYS = 30;
 
 export interface RecoveryTotals {
   /** Every mark lost, recovered or not. */
@@ -157,7 +179,8 @@ export function classifyMistake(
     return { ...common, state: "provisional", reason: "Succeeded, but on the same question, with help, or on a near-identical one. That is not proof." };
   }
   if (!provable.length) {
-    return { ...common, state: "provisional", unverifiedOnly: true, reason: isFlagship(mistake.subjectId)
+    const practiceRevisit = practiceRevisitFor(independentDifferent[0]!, after, different);
+    return { ...common, state: "provisional", unverifiedOnly: true, practiceRevisit, reason: isFlagship(mistake.subjectId)
       ? "You improved here, but Revise does not yet have enough reviewed new questions to prove it."
       : "You improved here. This subject's questions have not been checked against the specification, so Revise can track practice but not prove it." };
   }
@@ -177,6 +200,45 @@ export function classifyMistake(
     return { ...common, state: "regressed", regressedAt: later.createdAt, provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Was proven, but a later independent attempt on this topic lost marks again." };
   }
   return { ...common, state: "proven", provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Answered independently on a different question after a delay." };
+}
+
+/**
+ * Spaced practice revisits after a recovery on unreviewed questions. The
+ * anchor is the first unaided success on a different question. A check is
+ * the first unaided attempt on yet another question once the current gap has
+ * passed: a pass doubles the gap (capped), a loss of marks stops the schedule
+ * because that attempt opened a new loss of its own. Hinted attempts and
+ * repeats of the anchor question never count. Pure.
+ */
+export function practiceRevisitFor(
+  anchor: Attempt,
+  after: readonly Attempt[],
+  differentFromSource: (a: Attempt) => boolean,
+): PracticeRevisit {
+  let anchorAt = anchor.createdAt;
+  let anchorQuestion = anchor.questionId;
+  let gapDays = PRACTICE_REVISIT_FIRST_DAYS;
+  let heldChecks = 0;
+  let lastHeldAt: string | undefined;
+  for (const attempt of after) {
+    if (attempt.createdAt <= anchorAt || !independentAttempt(attempt)) continue;
+    if (attempt.questionId === anchorQuestion || !differentFromSource(attempt)) continue;
+    if (daysBetween(anchorAt, attempt.createdAt) < gapDays) continue;
+    if (ratio(attempt) < SUCCESS_RATIO) {
+      return { dueAt: attempt.createdAt, heldChecks, ...(lastHeldAt ? { lastHeldAt } : {}), slipped: true };
+    }
+    heldChecks += 1;
+    lastHeldAt = attempt.createdAt;
+    anchorAt = attempt.createdAt;
+    anchorQuestion = attempt.questionId;
+    gapDays = Math.min(PRACTICE_REVISIT_MAX_DAYS, gapDays * 2);
+  }
+  return {
+    dueAt: new Date(Date.parse(anchorAt) + gapDays * DAY_MS).toISOString(),
+    heldChecks,
+    ...(lastHeldAt ? { lastHeldAt } : {}),
+    slipped: false,
+  };
 }
 
 /**
