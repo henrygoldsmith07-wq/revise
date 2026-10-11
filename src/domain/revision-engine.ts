@@ -180,7 +180,31 @@ export function collectMissions(input: MissionCollectInput): ExamMission[] {
   return out;
 }
 
+/**
+ * A mission whose lost marks are all recovered in practice but cannot be
+ * proven (no reviewed questions left to prove them on). Sending the student
+ * straight back to supported practice on every visit, as before, ignored that
+ * they had already fixed it and never spaced anything. Instead the topic comes
+ * back for a spaced practice check on the schedule `practiceRevisitFor`
+ * derives from their own attempts, labelled practice, not proof.
+ */
+function practiceRevisitOf(mission: ExamMission, input: EngineInput): { dueAt: string; heldChecks: number; firstSuccessAt?: string } | null {
+  const r = mission.recovery;
+  if (r.open > 0 || r.awaitingProof > 0 || r.regressed > 0 || r.provisional <= 0) return null;
+  const items = input.recovery.items.filter((i) => mission.mistakeIds.includes(i.mistakeId) && i.state === "provisional");
+  if (!items.length || items.some((i) => !i.unverifiedOnly || !i.practiceRevisit || i.practiceRevisit.slipped)) return null;
+  const next = [...items].sort((a, b) => a.practiceRevisit!.dueAt.localeCompare(b.practiceRevisit!.dueAt))[0]!;
+  return { dueAt: next.practiceRevisit!.dueAt, heldChecks: Math.min(...items.map((i) => i.practiceRevisit!.heldChecks)), firstSuccessAt: items.map((i) => i.firstSuccessAt).filter((t): t is string => Boolean(t)).sort()[0] };
+}
+
 function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estimate, ignoreWait = false): Draft | { skip: string } {
+  const revisit = (mission.current.blockedBy || mission.status === "blocked") ? practiceRevisitOf(mission, input) : null;
+  if (revisit) {
+    if (!ignoreWait && Date.parse(revisit.dueAt) > input.now.getTime()) {
+      return { skip: `Waiting for the delay to pass: recovered in practice, so Revise brings it back for a spaced check from ${revisit.dueAt.slice(0, 10)}.` };
+    }
+    return practiceRevisitDraft(mission, input, revisit);
+  }
   const blockedStage = mission.current.blockedBy;
   const stage = (blockedStage ? mission.stages.find((s) => s.kind === "practise") : undefined) ?? mission.current;
   if (!ignoreWait && stage.kind === "delayed-proof" && mission.proofDueAt && Date.parse(mission.proofDueAt) > input.now.getTime()) {
@@ -235,6 +259,41 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     },
     route: { href: missionHref(mission.id, stage.kind), label: "Start session" },
     mission: { id: mission.id, stage: stage.kind },
+  };
+}
+
+function practiceRevisitDraft(mission: ExamMission, input: EngineInput, revisit: { dueAt: string; heldChecks: number; firstSuccessAt?: string }): Draft {
+  const r = mission.recovery;
+  const names = mission.topicIds.map((t) => input.topicTitle?.(t) ?? t);
+  const topics = names.length ? `${names.slice(0, 3).join(", ")}${names.length > 3 ? " and more" : ""}` : mission.title;
+  const shares = mission.topicIds.map((t) => input.topicWeight?.(t) ?? { share: 0, relative: 1 });
+  const marks = round(r.provisional, 1);
+  const since = revisit.firstSuccessAt ? Math.max(1, Math.floor((input.now.getTime() - Date.parse(revisit.firstSuccessAt)) / DAY)) : null;
+  const sessionMinutes = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, "practise").minutes;
+  const checks = revisit.heldChecks;
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  return {
+    id: `action:${mission.id}:practice-revisit`,
+    type: "evidence-gap", title: `Check it held: ${topics}`, subjectId: mission.subjectId, topicIds: mission.topicIds, specPoints: [],
+    minutes: Math.max(3, Math.ceil(sessionMinutes) || 8), marksRecoverable: marks,
+    examWeight: shares.length === 1 ? shares[0]!.share : null,
+    daysToExam: daysToNearestExam(input.examDates, mission.subjectId, input.now),
+    evidenceStrength: 0.3, confidence: 0.4, expectedLearningGain: STAGE_SHARE.practise,
+    // Spaced retrieval of something already fixed is worth less than fixing
+    // open marks, so it ranks below open losses with the same stake.
+    expectedMarks: round(marks * STAGE_SHARE.practise * 0.5, 2),
+    proofStatus: missionLearnerState(mission.status, r), requiredFirst: false, effectiveness: null, mistakeIds: mission.mistakeIds,
+    explanation: {
+      why: `You recovered ${plural(marks, "mark")} here in practice${since ? ` ${since} day${since === 1 ? "" : "s"} ago` : ""}. A spaced check on a question you have not seen, answered without hints, shows whether the fix held.`,
+      whyNow: checks > 0 ? `It held on ${checks} spaced check${checks === 1 ? "" : "s"}; the gap doubles each time it holds, and this one is due.` : "Enough time has passed for the first spaced check.",
+      whyBefore: "",
+      stake: `${plural(marks, "mark")} recovered in practice; this checks they stay recovered.`,
+      evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
+      after: "If it holds, the next check comes back after twice the gap. If you lose marks, that becomes a repair mission.",
+      proves: "Nothing yet: these questions are not reviewed, so this is practice, not proof. It shows whether the fix is holding.",
+    },
+    route: { href: missionHref(mission.id, "practise"), label: "Start session" },
+    mission: { id: mission.id, stage: "practise" },
   };
 }
 
