@@ -51,6 +51,38 @@ describe("progress summary", () => {
     expect(s.next).toMatch(/application session/);
   });
 
+  it("explains, never hides, lost marks on a topic that shows as proven", () => {
+    const mistakes = [
+      { id: "m1", userId: "u", subjectId: "maths", topicId: "t1", questionId: "qa", marksLost: 2, description: "", category: "communication", resolved: false, createdAt: day(5) },
+      { id: "m2", userId: "u", subjectId: "maths", topicId: "t1", questionId: "qb", marksLost: 3, description: "", category: "communication", resolved: false, createdAt: day(2) },
+    ] as Mistake[];
+    const ledger = { topics: [proof("t1", { status: "proven-gain", markPoints: 1.5 })] } as ProofLedger;
+    const s = buildProgressSummary({ subjectIds: ["maths"], topics: [topic("t1"), topic("t2")], attempts: [], questions: [], mistakes, ledger, now: NOW });
+    // Both signals stay: the proven gain and the open marks.
+    expect(s.proven.topics.map((row) => row.topicId)).toEqual(["t1"]);
+    expect(s.losing.totalMarks).toBe(5);
+    expect(s.losing.inStrongTopics).toEqual([{ topicId: "t1", title: "Topic t1", marks: 5 }]);
+    expect(s.losing.scopeNote).toBe("5 of these marks are in Topic t1, which shows as strong or proven. Both are true: that label is about the topic as a whole, while each lost mark is a specific question you have not yet got right again.");
+  });
+
+  it("adds no scope note when the open marks are in topics that are not strong", () => {
+    const mistakes = [{ id: "m1", userId: "u", subjectId: "maths", topicId: "t2", questionId: "qa", marksLost: 2, description: "", category: "communication", resolved: false, createdAt: day(5) }] as Mistake[];
+    const ledger = { topics: [proof("t1", { status: "proven-gain", markPoints: 1.5 })] } as ProofLedger;
+    const s = buildProgressSummary({ subjectIds: ["maths"], topics: [topic("t1"), topic("t2")], attempts: [], questions: [], mistakes, ledger, now: NOW });
+    expect(s.losing.totalMarks).toBe(2);
+    expect(s.losing.inStrongTopics).toEqual([]);
+    expect(s.losing.scopeNote).toBeNull();
+  });
+
+  it("flags open marks on a strong topic in its own row", () => {
+    const qs = [q("a", "t1"), q("b", "t1"), q("c", "t1")];
+    const attempts = [att("1", qs[0]!, 3, 4), att("2", qs[1]!, 3, 3), att("3", qs[2]!, 3, 2)];
+    const mistakes = [{ id: "m1", userId: "u", subjectId: "maths", topicId: "t1", questionId: "qz", marksLost: 1, description: "", category: "communication", resolved: false, createdAt: day(1) }] as Mistake[];
+    const s = buildProgressSummary({ subjectIds: ["maths"], topics: [topic("t1")], attempts, questions: qs, mistakes, now: NOW });
+    expect(s.strong[0]).toMatchObject({ topicId: "t1", openMarks: 1 });
+    expect(s.losing.scopeNote).toMatch(/^1 of these marks is in Topic t1/);
+  });
+
   it("surfaces due checks, memorised topics, slips and only ledger-backed claims", () => {
     const win = (rate: number) => ({ rate, low: rate - 0.1, high: rate + 0.1, questions: 4, from: day(30), to: day(20) });
     const ledger = { topics: [
