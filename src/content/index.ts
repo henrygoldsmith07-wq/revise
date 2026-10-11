@@ -35,6 +35,7 @@ import { physicsStatementCoverageQuestions } from "./questions/physics-statement
 import { physicsReasoningDepthQuestions } from "./questions/physics-reasoning-depth";
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
+import { wjecRecallProbeQuestions } from "./questions/wjec-recall-probes";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
 import {
@@ -130,6 +131,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
   ...wjecRepairDepthQuestions,
+  ...wjecRecallProbeQuestions,
   // Keep the generated Physics depth pack after the curated bank so a fresh
   // learner sees reviewed authored items first. Coverage and adaptive
   // selection are keyed by ids, not array position.

@@ -133,7 +133,9 @@ export function ImprovementStory() {
   const proven = models.flatMap((m) => m.outcomes.proven);
   const recovered = Math.round(models.reduce((s, m) => s + m.mistakes.proven, 0) * 10) / 10;
   const due = models.flatMap((m) => m.transfer.proofDue);
-  const provisional = Math.round(models.reduce((s, m) => s + m.mistakes.provisional, 0) * 10) / 10;
+  // Marks whose loss can never count towards proof are recovered in practice, not "waiting for a check".
+  const unprovable = Math.round(models.reduce((s, m) => s + m.mistakes.provisionalUnprovable, 0) * 10) / 10;
+  const provisional = Math.round((models.reduce((s, m) => s + m.mistakes.provisional, 0) - unprovable) * 10) / 10;
   const anything = proven.length > 0 || recovered > 0;
   if (!ready) return null;
   return (
@@ -153,6 +155,7 @@ export function ImprovementStory() {
         <p className="text-sm text-ink2">
           Nothing proven yet. Improvement counts here once you do better on a question you have not seen, a few days after you studied it.
           {provisional > 0 ? ` ${provisional} mark${provisional === 1 ? " is" : "s are"} on the way: answered well once, waiting for that check.` : ""}
+          {unprovable > 0 ? ` ${unprovable} mark${unprovable === 1 ? " looks" : "s look"} recovered in practice, but cannot be proven: where they were lost (for example a paper Revise cannot verify, or a question not yet teacher-reviewed) cannot count as evidence. Revise brings them back for spaced checks instead.` : ""}
         </p>
       )}
       {due.length ? (

@@ -145,13 +145,22 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     add("repair", "Repair it", "Re-sit the highest-loss questions with help available, so the fix is applied to the exact place it went wrong.", resits(3), undefined);
   } else if (stage === "practise") {
     add("practise", "Supported practice", "New questions that exercise the same weakness, with limited help.", unseenPick({ max: 3, verifiedOnly: false }), undefined);
+  } else if (stage === "apply" && mission.proofBarrier) {
+    // The lost marks can never count as proof, so reviewed-only selection would only empty the step.
+    // Any unseen question works for an unaided practice check; it is labelled practice, not proof.
+    add("apply", "Unaided practice", "Different question families, no hints, so you can see whether the fix works on its own. Practice, not proof.", unseenPick({ max: 2, verifiedOnly: false }), 0);
   } else if (stage === "apply") {
     add("apply", "Independent application", "Different question families, no hints, so success counts as independent evidence.", unseenPick({ max: 2, verifiedOnly: true }), 0);
     add("transfer", "Unfamiliar context", "The same skill in a context you have not seen.", unseenPick({ max: 1, verifiedOnly: true, transferOnly: true }), 0);
+  } else if (stage === "delayed-proof" && mission.proofBarrier) {
+    // No proof check can run on a loss that cannot count; the limit below says why.
   } else if (stage === "delayed-proof") {
     add("delayed-proof", "Delayed check", "A separate question, later, answered independently. This is what proves the marks are back.", unseenPick({ max: 2, verifiedOnly: true }), 0);
   }
-  if (proofStage && !steps.length) {
+  if (proofStage && mission.proofBarrier) {
+    // With steps, the intro's completion condition already says why this is practice.
+    limit = steps.length ? null : mission.limitsSentence ?? mission.completionCondition;
+  } else if (proofStage && !steps.length) {
     limit = mission.limitsSentence ?? "Revise does not have enough reviewed new questions to prove improvement here yet.";
   } else if (proofStage && stage === "apply" && !steps.some((s) => s.kind === "transfer")) {
     limit = "Revise does not have a reviewed unfamiliar-context question for this yet, so transfer cannot be tested.";

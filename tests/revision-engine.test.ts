@@ -59,7 +59,13 @@ function scenario() {
     m("b2", BIO, "cells", "biology-cells-1", { marksLost: 6, category: "communication", workingErrorKind: undefined, createdAt: iso("2026-09-21") }),
     m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10") }),
   ];
+  // Every review-gated loss links to the marked attempt that lost it; without that link the loss itself
+  // can never count towards proof (ProofBarrier "loss-unlinked"), whatever is answered later.
   const attempts = [
+    a("att-p1", PHY, "circuits", "physics-circuits-0", 0, iso("2026-09-20")),
+    a("att-p2", PHY, "circuits", "physics-circuits-1", 0, iso("2026-09-21")),
+    a("att-b1", BIO, "cells", "biology-cells-0", 0, iso("2026-09-20")),
+    a("att-b2", BIO, "cells", "biology-cells-1", 0, iso("2026-09-21")),
     a("att-m1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10")),
     a("ms1", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-15")),
   ];
@@ -364,7 +370,13 @@ describe("marks recovered narrative", () => {
   const questions = bank(MATHS, "calculus", 6);
   const ms = [m("m1", MATHS, "calculus", "maths-calculus-0", { marksLost: 4, createdAt: iso("2026-09-10"), attemptId: "att-m1", ao: "AO2" }), m("m2", MATHS, "calculus", "maths-calculus-1", { marksLost: 2, createdAt: iso("2026-09-10"), attemptId: "att-m2" })];
   const ctx = { missionId: "mission:x", stage: "apply" as const, intervention: "independent-set", targetCause: "unit-error", sourceMistakeIds: ["m1"] };
+  // Every review-gated loss links to the marked attempt that lost it; without that link the loss itself
+  // can never count towards proof (ProofBarrier "loss-unlinked"), whatever is answered later.
   const attempts = [
+    a("att-p1", PHY, "circuits", "physics-circuits-0", 0, iso("2026-09-20")),
+    a("att-p2", PHY, "circuits", "physics-circuits-1", 0, iso("2026-09-21")),
+    a("att-b1", BIO, "cells", "biology-cells-0", 0, iso("2026-09-20")),
+    a("att-b2", BIO, "cells", "biology-cells-1", 0, iso("2026-09-21")),
     a("att-m1", MATHS, "calculus", "maths-calculus-0", 0, iso("2026-09-10")), a("att-m2", MATHS, "calculus", "maths-calculus-1", 0, iso("2026-09-10")),
     a("s1", MATHS, "calculus", "maths-calculus-2", 3, iso("2026-09-30"), { mission: ctx }),
   ];

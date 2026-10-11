@@ -42,14 +42,15 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
     void recordFunnel("next_action_shown", action.type);
     void recordFunnel("recommendation_displayed", action.id);
     captureProductEvent("recommendation.shown", { kind: action.type, minutes: Math.ceil(action.minutes) });
-    if (blockedTopic && action.type === "evidence-gap") {
+    // A barrier on the lost marks themselves is not a supply shortfall, so it is not counted as one.
+    if (blockedTopic && action.type === "evidence-gap" && !action.explanation.limit) {
       void recordFunnel("proof_blocked_by_supply", blockedTopic);
       if (pilotOn && userId) {
         recordPilotEvent(userId, { event: "proof.blocked", subjectId: action.subjectId });
         void flushPilotEvents(userId);
       }
     }
-  }, [action.id, action.type, action.subjectId, action.minutes, blockedTopic, pilotOn, recordFunnel, userId]);
+  }, [action.id, action.type, action.subjectId, action.minutes, action.explanation.limit, blockedTopic, pilotOn, recordFunnel, userId]);
   return (
     <section aria-label="What to do now" className="grid gap-4">
       <div className="min-w-0">
@@ -107,7 +108,9 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
             <div><dt className="font-semibold text-ink">Why before the others</dt><dd>{e.whyBefore}</dd></div>
             <div><dt className="font-semibold text-ink">What it is based on</dt><dd>{e.evidence.length ? <ul className="list-disc pl-5">{e.evidence.map((line) => <li key={line}>{line}</li>)}</ul> : "No checked answers yet — this step creates the first evidence."}</dd></div>
             <div><dt className="font-semibold text-ink">What will prove it worked</dt><dd>{e.proves}</dd></div>
-            {blockedTopic ? (
+            {e.limit ? (
+              <div><dt className="font-semibold text-ink">Evidence limit</dt><dd>{e.limit}</dd></div>
+            ) : blockedTopic ? (
               <div><dt className="font-semibold text-ink">Evidence limit</dt><dd>You improved here, but Revise does not yet have enough reviewed new questions to prove it.</dd></div>
             ) : null}
             {action.effectiveness && action.effectiveness.level !== "neutral" ? (
