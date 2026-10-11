@@ -88,7 +88,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
           <Button
             variant="ghost"
             size="sm"
-            className="mt-2 w-full sm:ml-2 sm:w-auto"
+            className="mt-2 w-full min-h-11 sm:ml-2 sm:w-auto"
             onClick={() => {
               void recordFunnel("diagnostic_skipped", action.subjectId);
               void updateSettings({ quickCheckSkipped: [...new Set([...(settings.quickCheckSkipped ?? []), ...settings.subjectIds])] });

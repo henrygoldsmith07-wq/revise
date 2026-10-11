@@ -94,7 +94,7 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
               Short written checkpoints, active recall and exam checks take you from foundations to exam-ready ideas.
             </p>
           </div>
-          <ButtonLink href={subjectHref} variant="secondary" size="sm" className="shrink-0">
+          <ButtonLink href={subjectHref} variant="secondary" size="sm" className="shrink-0 min-h-11">
             View full roadmap →
           </ButtonLink>
         </div>
@@ -122,7 +122,7 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
                 </p>
                 <p className="mt-1 line-clamp-2 text-xs text-ink3">{nextEntry.lesson.focus}</p>
               </div>
-              <ButtonLink href={nextHref} variant="primary" size="sm" className="shrink-0">
+              <ButtonLink href={nextHref} variant="primary" size="sm" className="shrink-0 min-h-11">
                 {roadmapComplete ? "Review roadmap" : "Continue roadmap"} →
               </ButtonLink>
             </div>

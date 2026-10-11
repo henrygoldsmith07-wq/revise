@@ -40,8 +40,19 @@ async function failMarksWith(page: Page, status: number, error: string): Promise
 async function enableAiConsent(page: Page): Promise<void> {
   await page.goto("/settings");
   const section = page.locator("section", { hasText: "Use AI for marking, explanations" });
-  const toggle = section.getByRole("button", { name: "Off" });
-  if (await toggle.count()) await toggle.click();
+  // Settings renders after the store loads, and its buttons can paint before
+  // React attaches handlers. `toggle.count()` right after goto raced that and
+  // skipped the click (0 matches), so wait for the toggle, then click until it
+  // reports pressed.
+  const toggle = section.getByRole("button", { name: /^(On|Off)$/ });
+  await expect(toggle).toBeVisible({ timeout: 30_000 });
+  await expect(async () => {
+    // Never click while a previous choice is still saving (disabled): the
+    // click would land after it settled and switch AI back off.
+    await expect(toggle).toBeEnabled({ timeout: 10_000 });
+    if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
   await expect(section.getByRole("button", { name: "On" })).toBeVisible({ timeout: 10_000 });
 }
 

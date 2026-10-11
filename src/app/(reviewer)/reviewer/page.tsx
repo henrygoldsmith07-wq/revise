@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
 import { buildReviewQueue, REQUIRED_INDEPENDENT_APPROVALS, type ReviewQueueItem } from "@/lib/reviewer/runtime-ledger";
 import { REQUIRED_TRUSTED_DISTINCT } from "@/domain/review-priority";
+import { buildTransferBatch, type TransferBatchView } from "@/lib/reviewer/batches";
 import { unlockLabel, type ReviewPriorityIndex } from "@/lib/reviewer/priority";
 import { getReviewerContext, getReviewPriority, loadCombinedLog, reviewBank } from "@/lib/reviewer/server";
 import { REVIEW_SUBJECTS, shortId, subjectFromSlug, topicTitles } from "@/lib/reviewer/view";
@@ -14,6 +15,8 @@ import { REVIEW_SUBJECTS, shortId, subjectFromSlug, topicTitles } from "@/lib/re
 // follow, and questions failing a blocking authoring gate sit last.
 
 export const dynamic = "force-dynamic";
+
+const QUEUE_ROWS = 200;
 
 const reviewHref = (item: ReviewQueueItem, slug: string) => `/reviewer/review/${encodeURIComponent(item.questionId)}?subject=${slug}`;
 
@@ -60,6 +63,23 @@ function SubjectProgress({ priority, slug }: { priority: ReviewPriorityIndex; sl
   );
 }
 
+/** The transfer-pair batch, which the capability-first list scatters across hundreds of rows. */
+function TransferPairsCallout({ batch, slug }: { batch: TransferBatchView; slug: string }) {
+  if (!batch.pairs.length) return null;
+  return (
+    <section aria-labelledby="pairs-callout-title" className="card p-3 text-xs text-ink2 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 id="pairs-callout-title" className="text-sm font-semibold text-ink">Transfer pairs: {batch.pairs.length} baseline + transfer pair{batch.pairs.length === 1 ? "" : "s"}</h2>
+        <p>
+          <span className="tabular-nums">{batch.readyPairs}</span> usable for proof · <span className="tabular-nums">{batch.approvalsRecorded} of {batch.approvalsNeeded}</span> approvals recorded · <span className="tabular-nums">{batch.actionable}</span> ready for you.
+          {" "}Reviewed together, with each baseline shown beside its transfer question.
+        </p>
+      </div>
+      <Link href={`/reviewer/pairs?subject=${slug}`} className="btn btn-secondary text-xs px-2.5 py-1.5">Review transfer pairs</Link>
+    </section>
+  );
+}
+
 function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[]; slug: string; caption: string; empty: string }) {
   return (
     <section aria-label={caption} className="card p-0 overflow-hidden">
@@ -79,7 +99,7 @@ function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[];
             </tr>
           </thead>
           <tbody>
-            {items.slice(0, 200).map((item) => (
+            {items.slice(0, QUEUE_ROWS).map((item) => (
               <tr key={item.questionId} className="border-t border-line align-top">
                 <td className="px-3 py-1.5">
                   <Link href={reviewHref(item, slug)} className="font-medium text-ink underline-offset-2 hover:underline focus-visible:underline">{shortId(item.questionId)}</Link>
@@ -101,6 +121,9 @@ function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[];
           </tbody>
         </table>
       )}
+      {items.length > QUEUE_ROWS ? (
+        <p className="px-3 py-2 border-t border-line text-[11px] text-ink3">Showing the first {QUEUE_ROWS} of {items.length}. “Start reviewing” and Next follow the full order, so nothing beyond this list is skipped.</p>
+      ) : null}
     </section>
   );
 }
@@ -121,6 +144,7 @@ export default async function ReviewerQueuePage({ searchParams }: { searchParams
   const priority = getReviewPriority(combined, subject.subjectId);
   const queue = buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId, priority);
   const first = queue.ready[0];
+  const pairs = buildTransferBatch(reviewBank, combined.log.events, subject.subjectId, context.grant.reviewerLabel);
 
   return (
     <main aria-labelledby="queue-title" className="space-y-3">
@@ -164,6 +188,7 @@ export default async function ReviewerQueuePage({ searchParams }: { searchParams
       </dl>
 
       <SubjectProgress priority={priority} slug={subject.slug} />
+      <TransferPairsCallout batch={pairs} slug={subject.slug} />
 
       <QueueTable items={queue.ready} slug={subject.slug} caption="Ready for you (highest student impact first)" empty="Nothing waiting in this subject." />
       <QueueTable items={queue.changesRequested} slug={subject.slug} caption="Changes requested (waiting for an author edit)" empty="No open change requests." />

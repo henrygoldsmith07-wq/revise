@@ -37,6 +37,15 @@ export function trustViaWorkflow(subjectId: string, questions: Question[], topic
   const { queue } = buildReviewPriorities({ topics, questions, gate, subjectIds: [subjectId], trusted: () => false });
   const firstTopics = [...new Set(queue.map((i) => i.topicId))].slice(0, topicCount);
   const ids = queue.filter((i) => firstTopics.includes(i.topicId)).map((i) => i.questionId);
+  return trustIdsViaWorkflow(questions, ids);
+}
+
+/**
+ * Fixture-only: two named fixture reviewers approve exactly these questions
+ * through the real workflow (audit log → ledger → trust predicate), inside the
+ * test's own browser profile once written back with putQuestions.
+ */
+export function trustIdsViaWorkflow(questions: Question[], ids: string[]): Question[] {
   let log = emptyAuditLog();
   for (const who of ["e2e-fixture-reviewer-a", "e2e-fixture-reviewer-b"]) {
     const result = appendReviewDecisions(log, ids.map((id) => {

@@ -157,7 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const toolsActive = TOOLS_NAV.some((item) => isActive(item.href));
 
   if (needsOnboarding) {
-    return <Onboarding onDone={() => void completeOnboarding()} />;
+    return <Onboarding onDone={completeOnboarding} />;
   }
 
   return (

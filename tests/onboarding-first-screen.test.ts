@@ -121,6 +121,19 @@ describe("everything else waits until onboarding completes", () => {
     expect(store).toContain("repo.hasOnboarded(");
     expect(store).toContain("repo.markOnboarded(");
   });
+
+  it("waits for the onboarded marker before navigating, so an offline full-page navigation cannot drop it", () => {
+    // Offline, the RSC fetch for /diagnostic fails and Next falls back to a
+    // hard navigation; a fire-and-forget marker write was lost and the
+    // student landed back on step 1 (e2e/offline.spec.ts).
+    const onboarding = readFileSync(src("src/components/Onboarding.tsx"), "utf8");
+    const awaited = onboarding.indexOf("await onDone();");
+    expect(awaited).toBeGreaterThan(-1);
+    expect(awaited).toBeLessThan(onboarding.indexOf("router.push(`/diagnostic?subject="));
+    const shell = readFileSync(src("src/components/AppShell.tsx"), "utf8");
+    expect(shell).toContain("<Onboarding onDone={completeOnboarding} />");
+    expect(shell).not.toContain("onDone={() => void completeOnboarding()}");
+  });
 });
 
 describe("optional onboarding exam-date behavior", () => {

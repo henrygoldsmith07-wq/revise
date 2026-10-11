@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { RichText } from "@/components/RichText";
 import { ReviewDecisionForm } from "@/components/reviewer/ReviewDecisionForm";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
+import { buildTransferBatch, linkedPartFor, needsLabel, nextInBatch } from "@/lib/reviewer/batches";
 import { buildReviewQueue } from "@/lib/reviewer/runtime-ledger";
 import { unlockLabel } from "@/lib/reviewer/priority";
 import { getReviewerContext, getReviewPriority, loadCombinedLog, reviewBank } from "@/lib/reviewer/server";
@@ -22,11 +23,13 @@ function decodeId(raw: string): string {
   }
 }
 
-export default async function ReviewQuestionPage({ params, searchParams }: { params: Promise<{ questionId: string }>; searchParams: Promise<{ subject?: string }> }) {
+export default async function ReviewQuestionPage({ params, searchParams }: { params: Promise<{ questionId: string }>; searchParams: Promise<{ subject?: string; batch?: string }> }) {
   const context = await getReviewerContext();
   if (context.status !== "ok") return <ReviewerGate status={context.status} email={"email" in context ? context.email : null} />;
   const questionId = decodeId((await params).questionId);
-  const subject = subjectFromSlug((await searchParams).subject);
+  const search = await searchParams;
+  const subject = subjectFromSlug(search.subject);
+  const inBatch = search.batch === "pairs";
   const question = reviewBank.find((entry) => entry.id === questionId);
   if (!question) notFound();
   const combined = await loadCombinedLog(context.supabase);
@@ -38,9 +41,19 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
   const priority = getReviewPriority(combined, subject.subjectId);
   const queue = buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId, priority);
   const impact = (question.subjectId === subject.subjectId ? priority : getReviewPriority(combined, question.subjectId)).byQuestion.get(question.id);
-  const next = queue.ready.find((item) => item.questionId !== question.id);
-  const queueHref = `/reviewer?subject=${subject.slug}`;
-  const nextHref = next ? `/reviewer/review/${encodeURIComponent(next.questionId)}?subject=${subject.slug}` : queueHref;
+  // Opened from the transfer-pair batch, Next/Skip stay inside the batch (in
+  // its baseline-first order, only questions this reviewer can still act on)
+  // and return to the batch page when nothing is left for them.
+  const batch = inBatch ? buildTransferBatch(reviewBank, combined.log.events, subject.subjectId, context.grant.reviewerLabel) : null;
+  const batchNext = batch ? nextInBatch(batch, question.id) : null;
+  const next = batch ? null : queue.ready.find((item) => item.questionId !== question.id);
+  const queueHref = batch ? `/reviewer/pairs?subject=${subject.slug}` : `/reviewer?subject=${subject.slug}`;
+  const nextHref = batchNext ? `/reviewer/review/${encodeURIComponent(batchNext)}?subject=${subject.slug}&batch=pairs`
+    : next ? `/reviewer/review/${encodeURIComponent(next.questionId)}?subject=${subject.slug}` : queueHref;
+  // The other half of a transfer pair, so "Genuine transfer" is judged with
+  // the baseline in view rather than ticked blind.
+  const linked = linkedPartFor(reviewBank, question);
+  const batchMember = batch?.members.find((entry) => entry.questionId === question.id) ?? null;
   const alreadyApproved = screen.state.approvers.includes(context.grant.reviewerLabel);
   const blocking = screen.gateWarnings.filter((warning) => warning.severity === "block");
 
@@ -48,7 +61,9 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
     <main aria-labelledby="review-title" className="space-y-3 pb-28">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11px] text-ink3"><Link href={queueHref} className="underline-offset-2 hover:underline">Queue</Link> · {subject.label} · {queue.ready.length} ready</p>
+          <p className="text-[11px] text-ink3">
+            <Link href={queueHref} className="underline-offset-2 hover:underline">{batch ? "Transfer pairs" : "Queue"}</Link> · {subject.label} · {batch ? `${batch.actionable} in this batch ready for you` : `${queue.ready.length} ready`}
+          </p>
           <h1 id="review-title" tabIndex={-1} className="text-base font-semibold tracking-tight text-ink outline-none">
             {shortId(question.id)} <span className="font-normal text-ink3">· {screen.topicLabel} · {question.totalMarks} marks · difficulty {question.difficulty}</span>
           </h1>
@@ -114,16 +129,48 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
               </div>
             </article>
           ))}
+          {linked ? (
+            <section aria-labelledby="linked-title" className="card p-3 text-sm border-l-4 border-l-[var(--accent)]">
+              <h2 id="linked-title" className="text-xs font-semibold text-ink">
+                {linked.role === "transfer" ? "Baseline this question transfers from" : `Transfer question${linked.links.length === 1 ? "" : "s"} built on this baseline`}
+              </h2>
+              <p className="text-[11px] text-ink3 mt-0.5">
+                {linked.role === "transfer"
+                  ? "Tick “Genuine transfer” only if this question needs the same skill in a setting a student who had only seen the baseline would find unfamiliar, not a reworded or renumbered copy."
+                  : "Students can only show transfer when this baseline and its transfer question are both verified. Check it as an ordinary question."}
+              </p>
+              {linked.links.map((entry) => (
+                <div key={entry.part.id} className="mt-2 grid md:grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-[11px] text-ink3">{shortId(entry.question.id)} · {entry.part.marks} mark{entry.part.marks === 1 ? "" : "s"}</p>
+                    <RichText>{entry.part.prompt}</RichText>
+                  </div>
+                  <div className="text-xs text-ink2">
+                    <p className="font-semibold text-ink3">Mark scheme</p>
+                    <ol className="list-decimal pl-4 space-y-0.5">{entry.part.markScheme.map((point, index) => <li key={index}><RichText>{point}</RichText></li>)}</ol>
+                    {entry.part.modelAnswer ? <><p className="font-semibold text-ink3 mt-1">Worked answer</p><RichText>{entry.part.modelAnswer}</RichText></> : null}
+                  </div>
+                </div>
+              ))}
+            </section>
+          ) : null}
         </section>
 
         <aside aria-label="Specification, provenance and history" className="space-y-2 text-xs">
           <section className="card p-3" aria-label="Why this question">
             <h2 className="font-semibold text-ink mb-1">Why this question</h2>
+            {batchMember ? (
+              <p className="text-ink2 mb-1">
+                {batchMember.role === "baseline" ? "Baseline" : "Transfer"} half of a transfer pair: the pair can carry transfer proof only when both halves are verified. This question: {needsLabel(batchMember)}.
+              </p>
+            ) : null}
             {impact ? (
               <>
                 <p className="text-ink2">Priority #{impact.rank} in {subject.label.replace(/^WJEC A-level /, "")}. Approving it {impact.unlocks.map(unlockLabel).join("; ")}.</p>
                 <p className="mt-1 text-ink3">Ordering only: every check below still applies in full.</p>
               </>
+            ) : linked ? (
+              <p className="text-ink2">The review plan counts nothing new from this question on its own: its value is as half of a transfer pair, which counts only once the other half is verified too.</p>
             ) : (
               <p className="text-ink2">Approving it unlocks nothing new for students yet: a sibling question covers the same reasoning, the topic already has what the next unlock needs, or a content gate needs an author fix first.</p>
             )}

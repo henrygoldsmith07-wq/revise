@@ -69,7 +69,7 @@ function RevisionPlanner({ exam, nextBlock, today }: { exam?: ExamDate; nextBloc
           ) : (
             <p className="mt-4 text-sm leading-6 text-ink2">Your exam date is saved. Add study time to see a manageable plan.</p>
           )}
-          <ButtonLink href="/schedule" variant="primary" size="sm" className="mt-5 w-full">
+          <ButtonLink href="/schedule" variant="primary" size="sm" className="mt-5 w-full min-h-11">
             View my plan <ForwardIcon size={15} aria-hidden />
           </ButtonLink>
         </div>
@@ -77,7 +77,7 @@ function RevisionPlanner({ exam, nextBlock, today }: { exam?: ExamDate; nextBloc
         <div className="mt-5">
           <h3 className="text-lg font-semibold text-ink">Make a plan that fits your week</h3>
           <p className="mt-2 text-sm leading-6 text-ink2">Add an exam date and the time you can study. We&apos;ll help break it into smaller steps.</p>
-          <ButtonLink href="/settings" variant="primary" size="sm" className="mt-5 w-full">
+          <ButtonLink href="/settings" variant="primary" size="sm" className="mt-5 w-full min-h-11">
             Set up my plan <ForwardIcon size={15} aria-hidden />
           </ButtonLink>
         </div>
@@ -128,7 +128,7 @@ export function TodayOverview() {
       <section aria-label="My subjects" className="min-w-0">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-ink">My subjects</h2>
-          <Link href="/settings" className="text-sm font-medium text-ink2 underline-offset-4 hover:text-ink hover:underline">
+          <Link href="/settings" className="inline-flex min-h-11 items-center text-sm font-medium text-ink2 underline-offset-4 hover:text-ink hover:underline">
             Change subjects
           </Link>
         </div>

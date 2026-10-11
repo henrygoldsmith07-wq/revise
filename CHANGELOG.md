@@ -1,5 +1,76 @@
 # Changelog
 
+## Teachers can find, judge and finish the transfer pairs — 2026-10-11 (eighth pass)
+
+**The questions that most need two teachers were invisible to them.** A
+transfer question can only help prove improvement once it and its baseline
+are each approved by two different reviewers. In the portal's
+capability-first queue the 14 linked Physics transfer items sat at about
+positions 1,371–1,384 of 1,643 "Ready for you" rows (the table renders 200)
+and their baselines anywhere from 123 to 1,273, and the review screen asked a
+teacher to tick "Genuine transfer" without showing the baseline.
+
+- `/reviewer/pairs?subject=<slug>`: every linked (baseline, transfer) pair in
+  a subject, baseline first, with pairs usable for proof, questions verified,
+  approvals recorded (of 56 for Physics) and who still has to act on each
+  question ("needs 1 more reviewer, not teacher-a"). Linked from the queue.
+- Opened from the batch, Next/Skip stay in batch order and skip anything the
+  reviewer already approved or that waits for an author edit
+  (`nextInBatch`); the review screen shows the linked baseline (prompt, mark
+  scheme, worked answer) beside a transfer question, and the transfer items
+  built on a baseline beside the baseline.
+- The queue table now says when it shows only the first 200 rows.
+- `src/lib/reviewer/batches.ts` is ordering and context only: states come from
+  `reviewStateOf`; no rule, gate or trust predicate changes.
+
+**Smaller fixes.** Touch targets on Today at 360px: "Skip, just start
+revising", "Choose how to study", "Change subjects", "View my plan", "Set up
+my plan", "View full roadmap" and "Continue roadmap" are now at least 44px
+tall (`min-h-11`; `e2e/narrow-360.spec.ts` passes), and the review screen
+no longer tells a teacher that approving one half of a transfer pair "unlocks
+nothing new": it says the pair counts only once the other half is verified
+too. E2E specs updated to the current Today lead ("Do this now"), the Tools
+menu's "Review <count>" label, a settings toggle that waits for hydration, and
+proof journeys re-based on fixture-reviewed WJEC Biology content (approvals
+written only inside the test's own browser profile), the quick check's
+"Next question" step (a marked answer stays on screen until the student
+continues), and the proof stage's "Start proof check" CTA.
+
+**Known: a paper's lost marks cannot reach delayed proof without an attested
+past paper.** `e2e/paper-recovery-journey.spec.ts` now runs through repair and
+the unaided step on fixture-reviewed content, then stops where the trust rule
+says it must: WJEC paper-mode mistakes count only through
+`authenticPaperEvidence` (verified past-paper provenance plus a human-reviewed
+marking attestation). The mission still labels that state "Awaiting proof" and
+offers the apply step again; that wording gap is recorded, not fixed here.
+
+**Onboarding offline sent the student back to step 1.** `finish()` called
+`onDone()` (which writes the "onboarded" marker) without waiting, then
+`router.push('/diagnostic?…')`. Online that is a client-side transition and
+the write finished anyway; offline the RSC fetch fails, Next falls back to a
+full browser navigation and the in-flight write was lost, so the reloaded app
+showed "Step 1 of 5 · Board" again. `finish()` now awaits the marker before
+navigating (`AppShell` passes `completeOnboarding` itself). Found by
+`e2e/offline.spec.ts` "offline banner appears when offline", which reproduced
+it deterministically and now passes.
+
+**A teacher following the sign-in link landed on the sign-in form again.**
+The gate is server-rendered before the browser finishes the magic-link
+exchange, and the link always returned to `/reviewer`. `ReviewerSignIn` now
+re-renders the server page once a session exists (the server still checks the
+grant), and the link returns to the portal page that was opened
+(`reviewerReturnPath`, portal paths only), so a shared batch link survives
+sign-in. Needs `https://<site>/reviewer/**` in Supabase's redirect allow-list.
+
+**Granting a teacher took the Supabase dashboard plus hand-written SQL.**
+`npm run wjec:reviewer:grant` (maintainer, service role in their own shell)
+finds or invites the auth account and calls `grant_reviewer_role` /
+`revoke_reviewer_role`, after validating the `reviewer_roles` constraints,
+refusing a label that reuses the email and the obvious self-grant.
+`npm run wjec:review:pairs` shows the maintainer, who holds no reviewer
+grant, which question needs which reviewer (committed log, plus verified
+portal events when the service role is set). No migration.
+
 ## Full diagnostic no longer dead-ends without recall questions — 2026-10-11 (seventh pass)
 
 **The full diagnostic could finish before asking anything.** It opened each

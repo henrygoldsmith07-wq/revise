@@ -1,14 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { getSupabase } from "@/data/supabase";
 import { Button } from "@/components/ui";
+import { reviewerReturnPath } from "@/lib/reviewer/return-path";
 
-/** Email one-time link that returns to the portal. Same auth as the student app. */
+/** Email one-time link that returns to the portal page the teacher opened. Same auth as the student app. */
 export function ReviewerSignIn() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // This gate is server-rendered before the browser client finishes the
+  // magic-link exchange (the session cookie lands a moment after the page),
+  // so a teacher arriving from the email used to see this sign-in form again
+  // until they reloaded. Re-render the server page once a session exists; the
+  // server still re-checks the session and the reviewer grant itself.
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    let refreshed = false;
+    const refresh = () => { if (!refreshed) { refreshed = true; router.refresh(); } };
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => { if (session) queueMicrotask(refresh); });
+    void supabase.auth.getSession().then(({ data: current }) => { if (current.session) refresh(); });
+    return () => data.subscription.unsubscribe();
+  }, [router]);
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
@@ -17,7 +35,7 @@ export function ReviewerSignIn() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${location.origin}/reviewer`, shouldCreateUser: false },
+      options: { emailRedirectTo: `${location.origin}${reviewerReturnPath(location.pathname, location.search)}`, shouldCreateUser: false },
     });
     setBusy(false);
     setMessage(error ? "That link could not be sent. Check the address, or ask the maintainer to invite you." : "Check your email for a sign-in link.");
