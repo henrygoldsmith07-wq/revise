@@ -30,7 +30,10 @@ appear in the answer. Half of "Pulmonary vein" is "pulmonary", so
   the bank: wording checks (opposite terms, negation) run on answers of up
   to 40 words, whole-answer only up to 15; Physics parts, which have their
   own reversal guards and long multi-claim answers, get the general veto
-  only for answers of up to 15 words.
+  only for answers of up to 15 words. A negation inside a conditional
+  sentence ("If substrate runs out, the rate need not double") is a
+  qualification, not a reversal, and the verbatim model answer always keeps
+  the authored-answer shortcut.
 - Evidence now says why: "Not awarded: your answer says “artery” where the
   mark scheme needs “vein”." A credited point whose answer hedges between the
   right term and its opposite ("the pulmonary vein or the pulmonary artery")
@@ -46,7 +49,7 @@ appear in the answer. Half of "Pulmonary vein" is "pulmonary", so
   contradictory answers over-credited (35 marks), 8/9 paraphrases at full
   marks. After: 5 over-credited (7 marks), all documented known gaps; 9/9
   paraphrases at full marks; no contradictory answer under-credited. On
-  every model answer in the bank the veto fires on 2 of 13,288 scheme points.
+  every model answer in the bank the veto fires on 1 of 13,288 scheme points.
 - Not changed: copied-mark-scheme detection (`textOverload`), the
   anti-recitation cap, proof predicates and review gates. The veto can only
   lower a rubric mark.

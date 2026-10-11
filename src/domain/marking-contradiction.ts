@@ -236,6 +236,9 @@ function negatedContent(point: string, text: string): string | null {
   const tw = words(text);
   for (const [i, w] of tw.entries()) {
     if (w !== "not" && w !== "never") continue;
+    // "if substrate runs out, the rate will not double" qualifies the point
+    // under another condition; it does not reverse it.
+    if (tw.slice(0, i).some((x) => x === "if" || x === "unless" || x === "otherwise")) continue;
     let j = i + 1;
     while (j < tw.length && NEGATION_SKIP.has(tw[j]!)) j++;
     const governed = tw[j];
@@ -513,10 +516,17 @@ function bestClauses(point: string, answer: string): string[] {
   return scored.filter((s) => s.score === top).map((s) => s.clause);
 }
 
-function clauseContradiction(point: string, clause: string): Contradiction | null {
+/** The clause sits in a sentence that sets another condition before it ("If substrate runs out, …"). */
+function conditionalClause(clause: string, answer: string): boolean {
+  const sentence = answer.split(/(?<=[.!?])\s+|\r?\n/).find((candidate) => candidate.includes(clause)) ?? clause;
+  const before = sentence.slice(0, Math.max(0, sentence.indexOf(clause)));
+  return /\b(?:if|unless|otherwise)\b/i.test(before);
+}
+
+function clauseContradiction(point: string, clause: string, answer: string): Contradiction | null {
   const opposite = oppositeHits(point, clause)[0];
   if (opposite) return { kind: "opposite-term", said: opposite.foundWord, needed: opposite.wantedWord };
-  const negation = negatedContent(point, clause);
+  const negation = conditionalClause(clause, answer) ? null : negatedContent(point, clause);
   return negation ? { kind: "negation", said: negation, needed: "the positive statement" } : null;
 }
 
@@ -542,7 +552,7 @@ export function schemeContradiction(point: string, answer: string): Contradictio
     // Clause level: only when every clause that matches the point best
     // contradicts it, so a tie can never turn on sentence order.
     const clauses = bestClauses(point, text);
-    const perClause = clauses.map((clause) => clauseContradiction(point, clause));
+    const perClause = clauses.map((clause) => clauseContradiction(point, clause, text));
     if (perClause.every(Boolean)) return perClause[0]!;
   }
   return signConflict(point, text) ?? equationConflict(point, text) ?? relationConflict(point, text) ??

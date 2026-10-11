@@ -13,7 +13,7 @@ import { contradictionCases, MODEL } from "./fixtures/marking-contradiction-set"
 // contradictory answers in the regression set were over-credited (35 marks),
 // including "Pulmonary artery, right atrium" at 2/2; after it, 5 answers
 // (7 marks) remain over-credited, all documented as known gaps in the
-// fixture. Across the whole bank the veto fires on 2 of 13,288 scheme points
+// fixture. Across the whole bank the veto fires on 1 of 13,288 scheme points
 // when the authored model answer is submitted. The numbers asserted
 // below are the measured state after the change; tightening them is welcome,
 // loosening them is a regression.

@@ -256,6 +256,12 @@ function canonicalAuthoredAnswer(text: string): string[] {
 
 const AUTHORED_CANONICAL_CACHE = new Map<string, string[]>();
 
+/** The authored model answer itself, verbatim apart from whitespace. */
+function sameAsAuthored(part: QuestionPart, answer: string): boolean {
+  const model = part.modelAnswer?.trim();
+  return Boolean(model) && model!.replace(/\s+/g, " ") === answer.trim().replace(/\s+/g, " ");
+}
+
 function authoredAnswerEquivalent(part: QuestionPart, answer: string): boolean {
   const model = part.modelAnswer?.trim();
   if (!model || !answer.trim()) return false;
@@ -368,7 +374,8 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // Term order is canonicalised there, so "1 − 2cos²θ" and "2cos²θ − 1" look
   // alike: an answer that contradicts any point never takes this shortcut.
   if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
-    authoredAnswerEquivalent(part, trimmed) && !part.markScheme.some((point) => schemeContradiction(point, trimmed))) {
+    authoredAnswerEquivalent(part, trimmed) &&
+    (sameAsAuthored(part, trimmed) || !part.markScheme.some((point) => schemeContradiction(point, trimmed)))) {
     const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
       creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
     return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
