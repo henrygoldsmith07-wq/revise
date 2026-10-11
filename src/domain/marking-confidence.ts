@@ -202,6 +202,7 @@ export function assessMarkConfidence(input: {
   let outOfScheme = 0;
   let overCounted = 0;
   let unsupported = 0;
+  let contested = 0;
 
   const corrected: MarkedPart[] = input.question.parts.map((part) => {
     const raw = byPart.get(part.id);
@@ -233,6 +234,9 @@ export function assessMarkConfidence(input: {
     if (part.markScheme.length >= part.marks && awarded > credited.length) overCounted++;
     // 6. Structured evidence: credited points with no supporting text in the answer.
     unsupported += (raw.evidence ?? []).filter((e) => e.status === "credited" && e.evidenceStrength === "none").length;
+    // The answer contradicts or hedges a point the AI credited (opposite term,
+    // flipped sign, negation): never present that credit as checked.
+    contested += (raw.evidence ?? []).filter((e) => e.status === "credited" && e.contested).length;
     return { ...raw, awarded, max: part.marks, creditedPoints: credited };
   });
 
@@ -268,11 +272,13 @@ export function assessMarkConfidence(input: {
   });
   checks.push({
     id: "answer-evidence",
-    passed: unsupported === 0,
+    passed: unsupported === 0 && contested === 0,
     severity: "soft",
-    detail: unsupported
-      ? "Some credit could not be matched to words in your answer on this device."
-      : "Credited points match words in your answer.",
+    detail: contested
+      ? "Your answer says the opposite of something the AI marker credited, so that credit may be wrong."
+      : unsupported
+        ? "Some credit could not be matched to words in your answer on this device."
+        : "Credited points match words in your answer.",
   });
 
   // 7. Agreement with the deterministic rubric over the whole question.

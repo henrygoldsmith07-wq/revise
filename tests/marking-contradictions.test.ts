@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { seedQuestions } from "@/content";
 import { markPart, markQuestion, rubricConfidence } from "@/domain/marking";
-import { assessDeterministicMark } from "@/domain/marking-confidence";
+
+import { assessDeterministicMark, assessMarkConfidence } from "@/domain/marking-confidence";
+import { withMarkEvidence } from "@/domain/marking";
 import { schemeContested, schemeContradiction } from "@/domain/marking-contradiction";
 import { aiMarkerUnavailableMark } from "@/lib/offline-mark";
 import type { Question } from "@/domain/types";
@@ -139,6 +141,18 @@ describe("marking with the contradiction veto", () => {
     const assessment = assessDeterministicMark({ marked: result.marked, rubricConfidence: rubricConfidence(result.marked) });
     expect(assessment.provisional).toBe(true);
     expect(assessment.checks.find((c) => c.id === "answer-evidence")?.passed).toBe(false);
+  });
+
+  it("an AI mark that credits a contradicted point is shown as provisional, never as checked", () => {
+    const q = question(pulmonary);
+    const part = q.parts[0]!;
+    const answers = { [part.id]: "Pulmonary artery, right atrium" };
+    // A (hypothetical) over-generous AI mark: both points credited, high self-confidence.
+    const aiMark = withMarkEvidence(q, answers, { marked: [{ partId: part.id, awarded: 2, max: 2, creditedPoints: [...part.markScheme], missedPoints: [], comment: "" }], confidence: 0.95 });
+    expect(aiMark.marked[0]!.evidence!.every((e) => e.contested)).toBe(true);
+    const assessment = assessMarkConfidence({ question: q, answers, mark: aiMark, tier: "ai", rubric: markQuestion(q, answers).marked });
+    expect(assessment.provisional).toBe(true);
+    expect(assessment.checks.find((c) => c.id === "answer-evidence")).toMatchObject({ passed: false });
   });
 
   it("the offline (no-AI) envelope uses the same veto", () => {
