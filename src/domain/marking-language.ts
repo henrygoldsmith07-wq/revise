@@ -82,10 +82,20 @@ export function withinEditDistance(a: string, b: string, maxEdits: number): bool
  * shared three-character prefix so sibling scheme points that happen to
  * sound alike are not credited by each other.
  */
+/**
+ * Tokens for coverage only. A full stop is punctuation, not part of the word:
+ * "np." must match "np" (an answer's last word always carries one). Kept out
+ * of `tokenise` itself so the anti-recitation cap in marking.ts, which also
+ * reads `tokenise`, behaves exactly as before.
+ */
+function coverageTokens(text: string): string[] {
+  return [...new Set([...tokenise(text)].map((w) => (/\.$/.test(w) && !/\d\.$/.test(w) ? stem(w.replace(/\.+$/, "")) : w)).filter((w) => w.length > 1))];
+}
+
 export function pointCoverage(point: string, answer: string, earlyExitAt?: number): number {
-  const wanted = [...tokenise(point)];
+  const wanted = coverageTokens(point);
   if (!wanted.length) return 0;
-  const given = [...tokenise(answer)];
+  const given = coverageTokens(answer);
   const exact = new Set(given);
   let exactHits = 0;
   for (const w of wanted) if (exact.has(w)) exactHits++;

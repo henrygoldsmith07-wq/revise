@@ -119,18 +119,24 @@ export function assessDeterministicMark(input: {
   /** Evidence-derived rubric confidence (marking.ts `rubricConfidence`), or null for exact marks such as MCQ. */
   rubricConfidence: number | null;
 }): MarkConfidenceAssessment {
-  const score = input.rubricConfidence == null ? 1 : clamp01(input.rubricConfidence);
+  // A credited point whose answer also states its opposite (a hedge, or a
+  // contrast the rubric cannot read) is never shown as a firm mark.
+  const contested = input.marked.some((part) => (part.evidence ?? []).some((ev) => ev.status === "credited" && ev.contested));
+  const rawScore = input.rubricConfidence == null ? 1 : clamp01(input.rubricConfidence);
+  const score = contested ? Math.min(rawScore, LOW_CONFIDENCE_MARK_THRESHOLD - 0.01) : rawScore;
   const level: MarkConfidenceLevel = score >= HIGH_MARK_CONFIDENCE ? "high" : score >= LOW_CONFIDENCE_MARK_THRESHOLD ? "medium" : "low";
   const provisional = level === "low";
-  const checks: MarkCheck[] = input.rubricConfidence == null
+  const checks: MarkCheck[] = input.rubricConfidence == null && !contested
     ? []
     : [{
         id: "answer-evidence",
         passed: !provisional,
         severity: "soft",
-        detail: provisional
-          ? "The answer only partly matched the mark scheme wording, so the automatic mark may have missed valid credit."
-          : "The answer matched the mark scheme wording clearly.",
+        detail: contested
+          ? "Your answer also states the opposite of a point it was credited for, so the automatic mark cannot be sure which you meant."
+          : provisional
+            ? "The answer only partly matched the mark scheme wording, so the automatic mark may have missed valid credit."
+            : "The answer matched the mark scheme wording clearly.",
       }];
   return {
     version: MARK_ASSESSMENT_VERSION,

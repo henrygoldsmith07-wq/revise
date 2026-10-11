@@ -18,6 +18,14 @@ export interface MarkEvidence {
   /** 0–1 score from the same matching primitives used by offline marking. */
   confidence: number;
   explanation: string;
+  /**
+   * Set by the deterministic marker when the answer contradicts this point
+   * (opposite term, flipped sign, wrong value, negation). On a missed point it
+   * is the reason; on a credited point (an AI mark) it makes the mark contested.
+   */
+  contradiction?: string;
+  /** The answer also states the opposite of this credited point (a hedge or a contrast); the mark is provisional. */
+  contested?: boolean;
 }
 
 export interface MarkedPart {
