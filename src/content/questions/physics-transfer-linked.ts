@@ -222,8 +222,10 @@ export const physicsTransferLinkedQuestions: Question[] = [
     answer: "The voltage rule fixes the strings: one capacitor would see 400 V, above its 250 V rating, so each string needs at least two in series, sharing 200 V each. Two equal 4.0 μF capacitors in series give 1/C = 1/4.0 + 1/4.0, so C = 2.0 μF per string. Parallel strings add, so 6.0 μF needs three strings: 3 × 2 = 6 capacitors. The bank stores E = ½CV² = ½ × 6.0×10⁻⁶ F × (400 V)² = 0.48 J.",
   }),
   // circular-shm sp-01. Baseline: rev min⁻¹ and radius -> ω and tip speed.
-  // Transfer: ω must be built from a pulse count, and the unknown is the
-  // radius, found from an independently measured linear speed.
+  // Transfer (strengthened in the seventh pass): ω must be built from a pulse
+  // count, the radius is the unknown, found from an independently measured
+  // linear speed, and the chain continues into a relation the baseline never
+  // uses: the centripetal force on a stone lodged in the tread (F = mω²r).
   linkedTransferQuestion({
     slug: "physics-transfer-circular-shm-sp-01-cycle-sensor",
     topic: "circular-shm",
@@ -231,15 +233,16 @@ export const physicsTransferLinkedQuestions: Question[] = [
     baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-circular-shm-sp-01-omega-from-revs-3"),
     family: "physics-transfer:circular-radius-from-pulse-count",
     context: "physics-transfer:circular-radius-from-pulse-count:cycle-computer",
-    move: "build an angular velocity from a sensor pulse count, then use v = ωr in reverse to infer a radius",
-    prompt: "A bicycle wheel carries 4 magnets equally spaced around it, and a fixed sensor gives one pulse each time a magnet passes. Riding at a steady speed, the cycle computer counts 40 pulses in 4.0 s while a GPS unit shows the bicycle moving at 5.3 m s⁻¹. Assuming the tyre does not slip, determine the angular velocity of the wheel and the radius of the wheel.",
+    move: "build an angular velocity from a sensor pulse count, use v = ωr in reverse to infer a radius, then carry ω and r into the force needed to keep a small mass on the rim",
+    prompt: "A bicycle wheel carries 4 magnets equally spaced around it, and a fixed sensor gives one pulse each time a magnet passes. Riding at a steady speed, the cycle computer counts 40 pulses in 4.0 s while a GPS unit shows the bicycle moving at 5.3 m s⁻¹. Assuming the tyre does not slip, determine the angular velocity of the wheel and the radius of the wheel. A small stone of mass 3.0 g is stuck in the tread. Calculate the force the tread must exert on the stone to keep it moving with the wheel, and compare it with the stone's weight. (g = 9.81 m s⁻²)",
     scheme: [
       "Revolutions per second f = (40/4)/4.0 = 2.5 s⁻¹",
       "ω = 2πf = 2π × 2.5 = 16 rad s⁻¹ (15.7)",
-      "No slip: v = ωr, so r = v/ω",
-      "r = 5.3/15.7 = 0.34 m",
+      "No slip: v = ωr, so r = v/ω = 5.3/15.7 = 0.34 m",
+      "Centripetal force F = mω²r = 3.0×10⁻³ × 15.7² × 0.337 = 0.25 N",
+      "Weight = 3.0×10⁻³ × 9.81 = 0.029 N, so the force is about 8.5 times the weight",
     ],
-    answer: "Four pulses make one revolution, so 40 pulses is 10 revolutions in 4.0 s: f = 2.5 revolutions per second. The angular velocity is ω = 2πf = 2π × 2.5 = 15.7 rad s⁻¹ (16 rad s⁻¹ to 2 s.f.). Without slipping, the bicycle's speed equals the tyre's rim speed, v = ωr, so r = v/ω = 5.3/15.7 = 0.34 m.",
+    answer: "Four pulses make one revolution, so 40 pulses is 10 revolutions in 4.0 s: f = 2.5 revolutions per second. The angular velocity is ω = 2πf = 2π × 2.5 = 15.7 rad s⁻¹ (16 rad s⁻¹ to 2 s.f.). Without slipping, the bicycle's speed equals the tyre's rim speed, v = ωr, so r = v/ω = 5.3/15.7 = 0.34 m. The stone moves in a circle of that radius, so the tread must supply a centripetal force F = mω²r = 3.0×10⁻³ × 15.7² × 0.337 = 0.25 N towards the axle. Its weight is only 3.0×10⁻³ × 9.81 = 0.029 N, so the grip needed is about 8.5 times its weight, which is why loose stones fly off a fast wheel.",
   }),
   // circular-shm sp-02. Baseline: friction provides the centripetal force on
   // a flat bend. Transfer: the normal reaction provides it and friction must
@@ -263,7 +266,10 @@ export const physicsTransferLinkedQuestions: Question[] = [
   }),
   // circular-shm sp-03. Baseline: one (a, x) pair -> ω and T. Transfer: a
   // table of readings must be tested against the defining condition (a ∝ −x
-  // with the same constant) before ω and f are extracted.
+  // with the same constant) before ω and f are extracted; strengthened in the
+  // seventh pass so the chain continues into a relation the baseline never
+  // uses: the amplitude and maximum speed from the largest logged acceleration
+  // (a_max = ω²A, v_max = ωA).
   linkedTransferQuestion({
     slug: "physics-transfer-circular-shm-sp-03-buoy-readings",
     topic: "circular-shm",
@@ -271,19 +277,22 @@ export const physicsTransferLinkedQuestions: Question[] = [
     baseline: baselinePart(physicsReasoningDepthQuestions, "cnt:question:physics-depth-circular-shm-sp-03-omega-from-measurements-6"),
     family: "physics-transfer:shm-test-defining-condition",
     context: "physics-transfer:shm-test-defining-condition:buoy-logger",
-    move: "test a data table against a = −ω²x (sign and constant ratio) before extracting ω and the frequency",
-    prompt: "An accelerometer inside a bobbing buoy logs its vertical displacement x from equilibrium and its acceleration a at three instants: x = +0.020 m, a = −0.79 m s⁻²; x = −0.010 m, a = +0.39 m s⁻²; x = +0.030 m, a = −1.18 m s⁻². Show that these readings are consistent with simple harmonic motion, and determine the frequency of the oscillation.",
+    move: "test a data table against a = −ω²x (sign and constant ratio), extract ω and the frequency, then use the largest logged acceleration to recover the amplitude and maximum speed",
+    prompt: "An accelerometer inside a bobbing buoy logs its vertical displacement x from equilibrium and its acceleration a at three instants: x = +0.020 m, a = −0.79 m s⁻²; x = −0.010 m, a = +0.39 m s⁻²; x = +0.030 m, a = −1.18 m s⁻². Show that these readings are consistent with simple harmonic motion, and determine the frequency of the oscillation. The largest acceleration the logger records during the whole oscillation is 2.4 m s⁻². Determine the amplitude of the oscillation and the buoy's maximum vertical speed.",
     scheme: [
       "a/x = −39.5, −39.0 and −39.3 s⁻²: the same constant each time",
       "a is always opposite in sign to x and proportional to it, so a = −ω²x (SHM)",
-      "ω² ≈ 39.3 s⁻², so ω = 6.3 rad s⁻¹",
-      "f = ω/(2π) = 6.27/(2π) = 1.0 Hz",
+      "ω² ≈ 39.3 s⁻², so ω = 6.3 rad s⁻¹ and f = ω/(2π) = 6.27/(2π) = 1.0 Hz",
+      "The largest acceleration occurs at the amplitude: a_max = ω²A, so A = 2.4/39.3 = 0.061 m",
+      "v_max = ωA = 6.27 × 0.061 = 0.38 m s⁻¹",
     ],
-    answer: "Dividing each acceleration by its displacement gives a/x = −0.79/0.020 = −39.5 s⁻², +0.39/−0.010 = −39.0 s⁻² and −1.18/0.030 = −39.3 s⁻². The ratio is the same within reading precision and always negative, so the acceleration is proportional to the displacement and directed towards equilibrium: a = −ω²x, the defining condition for SHM. Taking ω² ≈ 39.3 s⁻² gives ω = 6.27 rad s⁻¹, and f = ω/(2π) = 1.0 Hz.",
+    answer: "Dividing each acceleration by its displacement gives a/x = −0.79/0.020 = −39.5 s⁻², +0.39/−0.010 = −39.0 s⁻² and −1.18/0.030 = −39.3 s⁻². The ratio is the same within reading precision and always negative, so the acceleration is proportional to the displacement and directed towards equilibrium: a = −ω²x, the defining condition for SHM. Taking ω² ≈ 39.3 s⁻² gives ω = 6.27 rad s⁻¹, and f = ω/(2π) = 1.0 Hz. The acceleration is largest where the displacement is largest, at the amplitude, so a_max = ω²A and A = 2.4/39.3 = 0.061 m (larger than any logged displacement, as it must be). The speed is greatest at equilibrium: v_max = ωA = 6.27 × 0.061 = 0.38 m s⁻¹.",
   }),
   // circular-shm sp-04. Baseline: A and T -> maximum speed. Transfer: only
   // the measured maxima of speed and acceleration are known; ω, T and A must
-  // all be recovered from their ratio.
+  // all be recovered from their ratio. Strengthened in the seventh pass: with
+  // the glider's mass, the chain continues into relations the baseline never
+  // uses (k = mω², and the oscillation energy ½mv_max², cross-checked as ½kA²).
   linkedTransferQuestion({
     slug: "physics-transfer-circular-shm-sp-04-sensor-maxima",
     topic: "circular-shm",
@@ -291,19 +300,22 @@ export const physicsTransferLinkedQuestions: Question[] = [
     baseline: baselinePart(physicsDepth50MechanicsQuestions, "cnt:question:physics-depth50-circular-shm-sp-04-amplitude-speed-4"),
     family: "physics-transfer:shm-recover-from-maxima",
     context: "physics-transfer:shm-recover-from-maxima:motion-sensor",
-    move: "recover ω, the period and the amplitude from measured maximum speed and maximum acceleration",
-    prompt: "A motion sensor and an accelerometer are attached to a glider oscillating with simple harmonic motion. The largest speed recorded is 0.60 m s⁻¹ and the largest acceleration is 4.8 m s⁻². Neither the amplitude nor the period was measured directly. Determine the angular frequency, the period and the amplitude of the motion.",
+    move: "recover ω, the period and the amplitude from measured maximum speed and maximum acceleration, then use the mass to find the effective spring constant and the energy of the oscillation",
+    prompt: "A motion sensor and an accelerometer are attached to a 0.25 kg glider oscillating between two springs with simple harmonic motion. The largest speed recorded is 0.60 m s⁻¹ and the largest acceleration is 4.8 m s⁻². Neither the amplitude nor the period was measured directly. Determine the angular frequency, the period and the amplitude of the motion. Then determine the effective spring constant of the springs and the total energy of the oscillation.",
     scheme: [
-      "v_max = ωA and a_max = ω²A, so ω = a_max/v_max",
-      "ω = 4.8/0.60 = 8.0 rad s⁻¹",
+      "v_max = ωA and a_max = ω²A, so ω = a_max/v_max = 4.8/0.60 = 8.0 rad s⁻¹",
       "T = 2π/ω = 2π/8.0 = 0.79 s",
       "A = v_max/ω = 0.60/8.0 = 0.075 m",
+      "From T = 2π√(m/k): k = 4π²m/T² = mω² = 0.25 × 8.0² = 16 N m⁻¹",
+      "Total energy = ½mv_max² = ½ × 0.25 × 0.60² = 0.045 J (check ½kA² = ½ × 16 × 0.075² = 0.045 J)",
     ],
-    answer: "In SHM the maximum speed is v_max = ωA and the maximum acceleration is a_max = ω²A, so their ratio removes the amplitude: ω = a_max/v_max = 4.8/0.60 = 8.0 rad s⁻¹. The period is T = 2π/ω = 2π/8.0 = 0.79 s. The amplitude follows from A = v_max/ω = 0.60/8.0 = 0.075 m (check: ω²A = 64 × 0.075 = 4.8 m s⁻²).",
+    answer: "In SHM the maximum speed is v_max = ωA and the maximum acceleration is a_max = ω²A, so their ratio removes the amplitude: ω = a_max/v_max = 4.8/0.60 = 8.0 rad s⁻¹. The period is T = 2π/ω = 2π/8.0 = 0.79 s. The amplitude follows from A = v_max/ω = 0.60/8.0 = 0.075 m. For a mass on springs T = 2π√(m/k), so k = 4π²m/T² = mω² = 0.25 × 64 = 16 N m⁻¹. All the energy is kinetic as the glider passes equilibrium: E = ½mv_max² = ½ × 0.25 × 0.60² = 0.045 J, and the same energy is all elastic at the amplitude, ½kA² = ½ × 16 × 0.075² = 0.045 J.",
   }),
   // circular-shm sp-05. Baseline: mass and period -> spring constant.
   // Transfer: an unfamiliar context (no weight in orbit) where the unknown is
-  // a mass, recovered from two periods and a calibration mass.
+  // a mass, recovered from two periods and a calibration mass. Strengthened in
+  // the seventh pass: the chain continues into energy relations the baseline
+  // never uses (½kA² becomes ½mv², cross-checked against v_max = ωA).
   linkedTransferQuestion({
     slug: "physics-transfer-circular-shm-sp-05-orbit-mass-chair",
     topic: "circular-shm",
@@ -311,19 +323,22 @@ export const physicsTransferLinkedQuestions: Question[] = [
     baseline: baselinePart(physicsDepthCompletionCircuitsMechanicsQuestions, "cnt:question:physics-depth50-circular-shm-sp-05-spring-period-5"),
     family: "physics-transfer:shm-mass-from-two-periods",
     context: "physics-transfer:shm-mass-from-two-periods:orbit-mass-chair",
-    move: "calibrate a spring from a known mass and period, then invert T = 2π√(m/k) to find an unknown mass where weighing is impossible",
-    prompt: "On a space station, bathroom scales cannot measure an astronaut's mass, so a chair mounted on springs is used instead. The empty chair, of mass 12 kg, oscillates with period 0.90 s. With an astronaut strapped in, the period is 2.2 s. Explain why scales do not work in orbit, and calculate the astronaut's mass.",
+    move: "calibrate a spring from a known mass and period, invert T = 2π√(m/k) to find an unknown mass where weighing is impossible, then use energy conservation to find the speed of the oscillating chair",
+    prompt: "On a space station, bathroom scales cannot measure an astronaut's mass, so a chair mounted on springs is used instead. The empty chair, of mass 12 kg, oscillates with period 0.90 s. With an astronaut strapped in, the period is 2.2 s. Explain why scales do not work in orbit, and calculate the astronaut's mass. The loaded chair is pulled 0.10 m from its equilibrium position and released. Using energy conservation, calculate its maximum speed.",
     scheme: [
       "Astronaut and scales are in free fall together, so there is no contact force to read (apparent weightlessness)",
       "k = 4π²m/T² = 4π² × 12/0.90² = 585 N m⁻¹",
-      "Total mass = kT²/(4π²) = 585 × 2.2²/(4π²) = 72 kg",
-      "Astronaut's mass = 72 − 12 = 60 kg",
+      "Total mass = kT²/(4π²) = 585 × 2.2²/(4π²) = 72 kg, so the astronaut's mass = 72 − 12 = 60 kg",
+      "Elastic energy at release ½kA² = ½ × 585 × 0.10² = 2.92 J, all kinetic at equilibrium",
+      "½mv² = 2.92 J with m = 71.7 kg gives v = 0.286 m s⁻¹ (check v_max = ωA = (2π/2.2) × 0.10 = 0.286 m s⁻¹)",
     ],
-    answer: "Scales read the contact force needed to support you; in orbit the astronaut and the scales are both in free fall, so there is no supporting force and the reading is zero. A mass-spring oscillator depends on inertia, not weight: T = 2π√(m/k). The empty chair calibrates the springs: k = 4π²m/T² = 4π² × 12/0.90² = 585 N m⁻¹. With the astronaut, the total mass is kT²/(4π²) = 585 × 2.2²/(4π²) = 71.7 kg, so the astronaut's mass is 71.7 − 12 = 60 kg.",
+    answer: "Scales read the contact force needed to support you; in orbit the astronaut and the scales are both in free fall, so there is no supporting force and the reading is zero. A mass-spring oscillator depends on inertia, not weight: T = 2π√(m/k). The empty chair calibrates the springs: k = 4π²m/T² = 4π² × 12/0.90² = 585 N m⁻¹. With the astronaut, the total mass is kT²/(4π²) = 585 × 2.2²/(4π²) = 71.7 kg, so the astronaut's mass is 71.7 − 12 = 60 kg. Released from 0.10 m, the springs store ½kA² = ½ × 585 × 0.10² = 2.92 J, which is all kinetic as the chair passes equilibrium: ½ × 71.7 × v² = 2.92, so v = 0.286 m s⁻¹ (0.29 m s⁻¹ to 2 s.f.). The same value comes from v_max = ωA = (2π/2.2) × 0.10 = 0.286 m s⁻¹.",
   }),
   // circular-shm sp-06. Baseline: speed at one displacement from k, A and m.
   // Transfer: k and A are both unknown; two (x, v) readings and energy
-  // conservation determine them.
+  // conservation determine them. Strengthened in the seventh pass: the chain
+  // continues into a relation the baseline never uses, the period from the
+  // spring constant just found (T = 2π√(m/k)).
   linkedTransferQuestion({
     slug: "physics-transfer-circular-shm-sp-06-two-readings",
     topic: "circular-shm",
@@ -331,15 +346,16 @@ export const physicsTransferLinkedQuestions: Question[] = [
     baseline: baselinePart(physicsDepthCompletionCircuitsMechanicsQuestions, "cnt:question:physics-depth50-circular-shm-sp-06-speed-4"),
     family: "physics-transfer:shm-energy-two-readings",
     context: "physics-transfer:shm-energy-two-readings:trolley-springs",
-    move: "use conservation of kinetic plus elastic potential energy between two readings to find an unknown spring constant and amplitude",
-    prompt: "A 0.50 kg trolley held between springs oscillates horizontally with negligible friction. A light gate shows its speed is 0.30 m s⁻¹ when it is 0.040 m from equilibrium and 0.10 m s⁻¹ when it is 0.080 m from equilibrium. Using the conservation of energy, determine the effective spring constant and the amplitude of the oscillation.",
+    move: "use conservation of kinetic plus elastic potential energy between two readings to find an unknown spring constant and amplitude, then predict the period from them",
+    prompt: "A 0.50 kg trolley held between springs oscillates horizontally with negligible friction. A light gate shows its speed is 0.30 m s⁻¹ when it is 0.040 m from equilibrium and 0.10 m s⁻¹ when it is 0.080 m from equilibrium. Using the conservation of energy, determine the effective spring constant and the amplitude of the oscillation. Then determine the time the trolley takes to complete one oscillation.",
     scheme: [
       "Total energy is constant: ½mv₁² + ½kx₁² = ½mv₂² + ½kx₂²",
       "k = m(v₁² − v₂²)/(x₂² − x₁²) = 0.50 × 0.080/0.0048 = 8.3 N m⁻¹",
       "At the amplitude all energy is elastic: ½kA² = ½mv₁² + ½kx₁²",
       "A² = 0.040² + 0.50 × 0.30²/8.33 = 0.0070 m², so A = 0.084 m",
+      "T = 2π√(m/k) = 2π√(0.50/8.33) = 1.54 s",
     ],
-    answer: "With no friction, kinetic plus elastic potential energy is constant, so ½mv₁² + ½kx₁² = ½mv₂² + ½kx₂². Rearranging, k = m(v₁² − v₂²)/(x₂² − x₁²) = 0.50 × (0.090 − 0.010)/(0.0064 − 0.0016) = 0.040/0.0048 = 8.3 N m⁻¹. At the amplitude the trolley is momentarily at rest, so ½kA² = ½mv₁² + ½kx₁², giving A² = 0.040² + 0.50 × 0.30²/8.33 = 0.0016 + 0.0054 = 0.0070 m² and A = 0.084 m. The second reading gives the same value (0.0064 + 0.0006 = 0.0070 m²), confirming it.",
+    answer: "With no friction, kinetic plus elastic potential energy is constant, so ½mv₁² + ½kx₁² = ½mv₂² + ½kx₂². Rearranging, k = m(v₁² − v₂²)/(x₂² − x₁²) = 0.50 × (0.090 − 0.010)/(0.0064 − 0.0016) = 0.040/0.0048 = 8.3 N m⁻¹. At the amplitude the trolley is momentarily at rest, so ½kA² = ½mv₁² + ½kx₁², giving A² = 0.040² + 0.50 × 0.30²/8.33 = 0.0016 + 0.0054 = 0.0070 m² and A = 0.084 m. The second reading gives the same value (0.0064 + 0.0006 = 0.0070 m²), confirming it. The trolley and springs form a mass-spring oscillator, so one oscillation takes T = 2π√(m/k) = 2π√(0.50/8.33) = 1.54 s (1.5 s to 2 s.f.), whatever the amplitude.",
   }),
   // ---- Third batch (2026-10-10, fifth pass): electric circuits and
   // electromagnetic induction, the next statements `wjec:authoring:plan --

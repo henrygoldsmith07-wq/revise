@@ -23,6 +23,21 @@ said." and had nowhere to go.
   `tests/adaptive-diagnostic.test.ts` (6 new cases),
   `tests/full-diagnostic-trusted-start.test.ts` (the 24-trusted Maths fixture).
 
+**Five circular motion/SHM transfer items were only rearrangements.** sp-01,
+sp-03, sp-04, sp-05 and sp-06 in `physics-transfer-linked.ts` passed the
+Physics novelty check only as inverse problems on their baseline's own
+relations (`rearrangementOnly`). Each now continues into a physical relation
+its baseline never uses, as one worked chain: sp-01 carries ω and r into the
+centripetal force on a stone in the tread (F = mω²r); sp-03 uses the largest
+logged acceleration for the amplitude and maximum speed (a_max = ω²A,
+v_max = ωA); sp-04 uses the glider's mass for k = mω² and the oscillation
+energy (½mv_max², checked as ½kA²); sp-05 finds the loaded chair's maximum
+speed by energy conservation (checked against ωA); sp-06 predicts the period
+from the k it found (T = 2π√(m/k)). Every new number is recomputed in
+`tests/physics-transfer-linked.test.ts`, which now also asserts that none of
+the fourteen linked items is `rearrangementOnly`. All stay `generated`,
+`unverified`, reviewer null. Physics stays 14/108 (same statements).
+
 ## Spaced revisits for the returning student; Physics-aware novelty; full-diagnostic feedback — 2026-10-11 (sixth pass)
 
 **A returning flagship student got the same Today action for ever.** Every
