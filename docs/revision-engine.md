@@ -363,6 +363,18 @@ trust audit reports 0 verified questions in all four. The loop is therefore
 designed to run at the edge of its supply, and the policy for that edge is stated
 here rather than left to each screen.
 
+**Supply is not the only limit: the loss must count too.** A lost mark can be
+proven recovered only if the loss itself is trusted evidence
+(`trustedAssessmentMistake`: a teacher-reviewed source question, a reliable
+mark, a link to the marked answer, and for WJEC paper mode a verified past
+paper with human-reviewed marking, `authenticPaperEvidence`). When it is not,
+`classifyMistake` records a `proofBarrier` on the loss (it explains the gate
+and changes nothing), and a mission whose every loss is barred reports the
+`loss-not-provable` limit first, is never "awaiting proof", runs its apply step
+as labelled practice and replaces the delayed check with spaced practice
+checks (the practice Revisit). More questions would not help, so no screen
+says they would.
+
 **What counts as supply.** `unseenSupplyByTopic` splits a topic's unseen
 questions three ways:
 
