@@ -30,10 +30,12 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
   expect(trusted.length).toBeGreaterThanOrEqual(5);
   await putQuestions(page, trusted);
   await page.goto("/");
-  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
+  await expect(main).toContainText("Do this now", { timeout: 30_000 });
 
-  // Cold start with reviewed supply: one clear, skippable action above the fold.
+  // Cold start with reviewed supply: one clear, skippable action above the fold,
+  // and it says the answers count only because the questions are reviewed.
   await expect(main).toContainText("Find where to start");
+  await expect(main).toContainText(/\d+ reviewed questions? across \d+ topics?/);
   const start = main.getByRole("link", { name: "Start quick check" });
   const box = await start.boundingBox();
   expect(box!.y + box!.height).toBeLessThan(844);
@@ -59,7 +61,7 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
 
   // The same attempts feed recovery: Today changes immediately.
   await page.goto("/");
-  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
+  await expect(main).toContainText("Do this now", { timeout: 30_000 });
   await expect(main).not.toContainText("Find where to start");
   await expect(main).toContainText(/Recover \d+(\.\d)? marks?|marks/);
   const repair = main.getByRole("link", { name: "Start session", exact: true });
@@ -73,6 +75,6 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
 
   // Repair alone is never proof.
   await page.goto("/");
-  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
+  await expect(main).toContainText("Do this now", { timeout: 30_000 });
   await expect(main).not.toContainText("Proven");
 });

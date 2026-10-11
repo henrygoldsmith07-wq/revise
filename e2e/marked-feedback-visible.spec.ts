@@ -31,13 +31,25 @@ test("adaptive session: the marked result stays visible until Continue", async (
   await startAdaptiveSession(page);
   const main = page.locator("main#main");
 
-  // Walk to the first marked question step. Non-question steps (retrieval,
-  // explanation) are finished with their own primary control.
+  // Walk to the first marked question step. Non-question steps are finished
+  // with their own controls: a due retrieval card is revealed ("Show answer")
+  // and then rated (Again/Hard/Good/Easy) before the next card or step; an
+  // explanation step needs the student's own words before it reveals, then
+  // "Done — continue".
   const submit = page.getByRole("button", { name: /submit for marking/i }).first();
-  for (let i = 0; i < 6 && !(await submit.isVisible().catch(() => false)); i++) {
-    const advance = main.getByRole("button", { name: /^(Continue|Done|I've read this|Show answer|Skip this step|Mark as read)/ }).first();
-    if (await advance.isVisible().catch(() => false)) await advance.click();
-    await page.waitForTimeout(1500);
+  const rate = main.getByRole("group", { name: "How well did you recall it?" }).getByRole("button", { name: /^Good/ });
+  const recall = main.getByRole("textbox", { name: /^Before reading: explain/ });
+  for (let i = 0; i < 40 && !(await submit.isVisible().catch(() => false)); i++) {
+    if (await rate.isVisible().catch(() => false)) {
+      await rate.click();
+    } else if (await recall.isVisible().catch(() => false) && !(await recall.inputValue())) {
+      // "Explain the gap" asks for the student's own words before it reveals.
+      await recall.fill("What I remember about this topic, before reading the explanation.");
+    } else {
+      const advance = main.getByRole("button", { name: /^(Continue|Done|I've read this|Show answer|Reveal explanation|Skip this step|Mark as read)/ }).first();
+      if (await advance.isVisible().catch(() => false)) await advance.click();
+    }
+    await page.waitForTimeout(800);
   }
   await expect(submit, "the session should reach a marked question step").toBeVisible({ timeout: 30_000 });
 
