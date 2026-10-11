@@ -1,5 +1,28 @@
 # Changelog
 
+## Full diagnostic no longer dead-ends without recall questions — 2026-10-11 (seventh pass)
+
+**The full diagnostic could finish before asking anything.** It opened each
+topic only with a trusted recall-level question. While only a handful of
+questions are teacher-reviewed, none of them may be recall-level (the e2e
+fixture's 24 trusted WJEC Maths questions are all application or harder), so
+the student chose "Full", saw "No diagnostic answers yet, so nothing can be
+said." and had nowhere to go.
+
+- `nextProbe` falls back to the lowest-demand trusted item for a topic when
+  the wanted depth has none (`fallbackDepths`): an opening or recall check
+  widens upwards; any other want steps down, but never to a depth the topic
+  has already answered correctly. The probe's reason says plainly that no
+  reviewed recall question exists yet. The record keeps the item's real depth,
+  and a miss is no longer described as "Recall is fine" when recall was never
+  tested. Untrusted items are still never used.
+- `diagnosticStartBlocker` names why a diagnostic cannot ask its first
+  question (`no-reviewed`, `all-seen`, `all-known`); the page explains it and
+  routes to Today or practice instead of showing an empty report.
+- No trust gate, proof predicate or review rule changes.
+  `tests/adaptive-diagnostic.test.ts` (6 new cases),
+  `tests/full-diagnostic-trusted-start.test.ts` (the 24-trusted Maths fixture).
+
 ## Spaced revisits for the returning student; Physics-aware novelty; full-diagnostic feedback — 2026-10-11 (sixth pass)
 
 **A returning flagship student got the same Today action for ever.** Every

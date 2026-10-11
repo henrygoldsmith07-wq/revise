@@ -12,6 +12,13 @@
 //   incorrect             → find the cause (recall → application → prerequisite
 //                           → technique), then stop that branch once enough is known
 // Only trusted items are used, and the choice maximises information per minute.
+//
+// When a topic has no trusted item at the wanted depth (common while only a
+// few questions are teacher-reviewed: none of a subject's reviewed questions
+// may be recall-level), the probe falls back to the lowest-demand trusted item
+// that is still informative, rather than skipping the topic. The record keeps
+// the item's real depth, so the cause inference stays honest about what was
+// actually tested. Untrusted items are never a fallback.
 // ---------------------------------------------------------------------------
 
 import type { Id } from "./types";
@@ -60,6 +67,28 @@ export interface TopicState {
 
 const DEPTHS: ProbeDepth[] = ["recall", "application", "hard-application"];
 const higher = (d: ProbeDepth): ProbeDepth | null => DEPTHS[DEPTHS.indexOf(d) + 1] ?? null;
+
+/**
+ * Depths to try, best first, when `want` is the depth the policy asks for.
+ * Recall (an opening or a cause check) falls back upwards to the lowest demand
+ * available. Anything else falls back downwards, but never below `floor`, the
+ * lowest depth still worth asking (the policy sets it just above the highest
+ * depth already answered correctly, where an easier question tells us little).
+ */
+export function fallbackDepths(want: ProbeDepth, floor: ProbeDepth = "recall"): ProbeDepth[] {
+  const i = DEPTHS.indexOf(want);
+  if (want === "recall") return [...DEPTHS];
+  const lower = DEPTHS.slice(DEPTHS.indexOf(floor), i).reverse();
+  return [want, ...lower];
+}
+
+function lowestDemandItem(pool: readonly DiagnosticItem[], depths: readonly ProbeDepth[]): { item: DiagnosticItem; fellBack: boolean } | null {
+  for (const [index, depth] of depths.entries()) {
+    const item = pool.filter((i) => i.depth === depth).sort((a, b) => a.expectedSeconds - b.expectedSeconds || a.id.localeCompare(b.id))[0];
+    if (item) return { item, fellBack: index > 0 };
+  }
+  return null;
+}
 
 /** Independent, unhinted probes only; a hinted correct answer is not clean evidence. */
 function clean(p: ProbeRecord): boolean {
@@ -147,7 +176,7 @@ export function nextProbe(input: NextProbeInput): NextProbe | null {
         depth: state.nextDepth,
         reason: last.correct ? (harder ? "Correct and confident: trying something harder." : "Checking a further depth.")
           : state.cause === "recall" ? "Missed: checking whether recall is the problem."
-          : state.cause === "application" ? "Recall is fine; testing where application breaks." : "Narrowing down the cause.",
+          : state.cause === "application" && state.probes.some((p) => p.depth === "recall" && p.correct) ? "Recall is fine; testing where application breaks." : "Narrowing down the cause.",
         info: last.correct ? 0.6 : 0.9,
       });
     }
@@ -155,21 +184,55 @@ export function nextProbe(input: NextProbeInput): NextProbe | null {
     const lastWrongApp = last && !last.correct && last.depth !== "recall";
     if (lastWrongApp && state.cause === "application") {
       const prereq = pool.find((i) => i.prerequisiteTopicId)?.prerequisiteTopicId;
-      const prereqItem = prereq ? usable.find((i) => i.topicId === prereq && i.depth === "recall") : undefined;
+      const prereqItem = prereq ? lowestDemandItem(usable.filter((i) => i.topicId === prereq), DEPTHS)?.item : undefined;
       if (prereqItem && !asked.has(prereqItem.id) && !input.records.some((r) => r.topicId === prereq)) {
         candidates.push({ item: prereqItem, reason: "Checking whether a prerequisite is behind the miss.", score: 0.95 / (prereqItem.expectedSeconds / 60) });
       }
     }
     for (const want of wants) {
-      const item = pool.filter((i) => i.depth === want.depth).sort((a, b) => a.expectedSeconds - b.expectedSeconds || a.id.localeCompare(b.id))[0];
-      if (!item) continue;
+      // Never fall back to a depth this topic has already answered correctly:
+      // an easier question there would tell us nothing new.
+      const solid = state.probes.filter((p) => p.correct && clean(p)).map((p) => DEPTHS.indexOf(p.depth));
+      const floor = solid.length ? DEPTHS[Math.max(...solid) + 1] ?? null : "recall";
+      const picked = lowestDemandItem(pool, floor ? fallbackDepths(want.depth, floor) : [want.depth]);
+      if (!picked) continue;
+      const { item, fellBack } = picked;
       const mins = item.expectedSeconds / 60;
       if (mins > remainingMinutes && minutes >= DIAGNOSTIC_MIN_MINUTES) continue;
-      // Broad-first: unseen topics get a coverage bonus until every topic has a probe.
-      candidates.push({ item, reason: want.reason, score: want.info / Math.max(0.5, mins) });
+      const reason = !fellBack ? want.reason
+        : !last ? "First look at this topic. No reviewed recall question here yet, so this starts with the least demanding reviewed one."
+        : last.correct ? "No reviewed harder question here yet, so checking with another at the same level."
+        : "No reviewed recall question here yet, so checking with the least demanding reviewed one.";
+      // A fallback probe that checks a cause or depth is slightly less
+      // informative than the one wanted; a first look is still a first look.
+      candidates.push({ item, reason, score: (fellBack && last ? want.info * 0.85 : want.info) / Math.max(0.5, mins) });
     }
   }
   return candidates.sort((a, b) => b.score - a.score || a.item.id.localeCompare(b.item.id))[0] ?? null;
+}
+
+/**
+ * Why a diagnostic cannot ask its first question, so the page can say so and
+ * route the student somewhere useful instead of showing an empty report.
+ * - `no-reviewed`: the subject has no trusted (teacher-reviewed) questions.
+ * - `all-seen`: every trusted question was already answered before, and the
+ *   diagnostic only uses questions the student has not seen.
+ * - `all-known`: every topic with trusted questions already has solid evidence.
+ * Null once a probe is available or any answer has been recorded.
+ */
+export type DiagnosticStartBlocker = "no-reviewed" | "all-seen" | "all-known";
+
+export function diagnosticStartBlocker(input: NextProbeInput): DiagnosticStartBlocker | null {
+  if (input.records.length) return null;
+  const trusted = input.items.filter((i) => i.trusted);
+  if (!trusted.length) return "no-reviewed";
+  if (nextProbe(input)) return null;
+  const fresh = trusted.filter((i) => !input.seenItemIds?.has(i.id));
+  if (!fresh.length) return "all-seen";
+  if (fresh.every((i) => input.knownTopicIds?.has(i.topicId))) return "all-known";
+  // Not reachable with no records: the time budget cannot block a first probe,
+  // and every depth falls back. Treated as nothing fresh to ask.
+  return "all-seen";
 }
 
 export interface DiagnosticReport {

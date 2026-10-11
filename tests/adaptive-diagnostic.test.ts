@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DIAGNOSTIC_MAX_MINUTES, diagnosticFinished, diagnosticReport, inferCause, nextProbe, topicStates,
+  DIAGNOSTIC_MAX_MINUTES, diagnosticFinished, diagnosticReport, diagnosticStartBlocker, fallbackDepths, inferCause, nextProbe, topicStates,
   type DiagnosticItem, type ProbeRecord,
 } from "@/domain/adaptive-diagnostic";
 
@@ -76,5 +76,70 @@ describe("adaptive diagnostic", () => {
     expect(report.calibration.overconfident).toBe(1);
     expect(report.established.join(" ")).toMatch(/not a grade prediction/);
     expect(diagnosticReport([], ["A"]).established[0]).toMatch(/nothing can be said/);
+  });
+});
+
+describe("adaptive diagnostic without reviewed recall questions", () => {
+  // Real case: early on, every teacher-reviewed question in a subject can be
+  // application-level or harder. The diagnostic used to open a topic only with
+  // a recall question, so it finished before asking anything.
+  const noRecall = [
+    item("a-p1", "A", "application"), item("a-p2", "A", "application", { expectedSeconds: 120 }),
+    item("a-h1", "A", "hard-application", { expectedSeconds: 60 }),
+    item("b-h1", "B", "hard-application"), item("b-h2", "B", "hard-application"),
+  ];
+  const next = (records: ProbeRecord[], extra: object = {}) => nextProbe({ topicIds: topics, items: noRecall, records, ...extra });
+
+  it("opens each topic with its least demanding reviewed question", () => {
+    const first = next([])!;
+    expect(first.item.id).toBe("a-p1"); // lowest demand wins over a shorter, harder item
+    expect(first.reason).toMatch(/No reviewed recall question here yet/);
+    const second = next([rec("a-p1", "A", "application", true, true)])!;
+    expect(second.item.id).toBe("b-h1"); // then the other topic is opened
+  });
+
+  it("checks a miss with the least demanding reviewed question, recorded at its real depth", () => {
+    const records = [rec("a-p1", "A", "application", false), rec("b-h1", "B", "hard-application", true)];
+    const probe = next(records)!;
+    expect(probe.item.id).toBe("a-p2");
+    expect(probe.reason).not.toMatch(/Recall is fine/);
+    // Two clean misses settle the topic; nothing claims recall was tested.
+    const settled = topicStates([...records, rec("a-p2", "A", "application", false)], topics).find((s) => s.topicId === "A")!;
+    expect(settled.settled).toBe(true);
+    expect(settled.probes.every((p) => p.depth !== "recall")).toBe(true);
+  });
+
+  it("never falls back to an easier question after a correct answer", () => {
+    const records = [rec("a-p1", "A", "application", true), rec("b-h1", "B", "hard-application", true, false)];
+    const ids: string[] = [];
+    let r = records;
+    for (let i = 0; i < 6; i++) {
+      const p = next(r);
+      if (!p) break;
+      ids.push(p.item.id);
+      r = [...r, rec(p.item.id, p.item.topicId, p.item.depth, true, true)];
+    }
+    expect(ids).toContain("a-h1");
+    expect(ids).toContain("b-h2");
+  });
+
+  it("never uses an untrusted item as a fallback", () => {
+    const only = [item("a-r", "A", "recall", { trusted: false }), item("a-p", "A", "application", { trusted: false })];
+    expect(nextProbe({ topicIds: ["A"], items: only, records: [] })).toBeNull();
+    expect(diagnosticStartBlocker({ topicIds: ["A"], items: only, records: [] })).toBe("no-reviewed");
+  });
+
+  it("fallback order: recall widens upwards; harder wants step down no lower than the floor", () => {
+    expect(fallbackDepths("recall")).toEqual(["recall", "application", "hard-application"]);
+    expect(fallbackDepths("hard-application")).toEqual(["hard-application", "application", "recall"]);
+    expect(fallbackDepths("hard-application", "application")).toEqual(["hard-application", "application"]);
+  });
+
+  it("explains why it cannot start instead of reporting nothing", () => {
+    const input = { topicIds: topics, items: noRecall, records: [] as ProbeRecord[] };
+    expect(diagnosticStartBlocker(input)).toBeNull();
+    expect(diagnosticStartBlocker({ ...input, seenItemIds: new Set(noRecall.map((i) => i.id)) })).toBe("all-seen");
+    expect(diagnosticStartBlocker({ ...input, knownTopicIds: new Set(topics) })).toBe("all-known");
+    expect(diagnosticStartBlocker({ ...input, records: [rec("a-p1", "A", "application", true)] })).toBeNull();
   });
 });

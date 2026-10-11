@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { diagnosticFinished, diagnosticReport, nextProbe, type ProbeRecord } from "@/domain/adaptive-diagnostic";
+import { diagnosticFinished, diagnosticReport, diagnosticStartBlocker, nextProbe, type ProbeRecord } from "@/domain/adaptive-diagnostic";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { diagnosticItems, probeFromAttempt } from "@/domain/diagnostic-items";
 import { QuickDiagnostic } from "@/components/QuickDiagnostic";
@@ -51,6 +51,9 @@ function Diagnostic() {
   const input = { topicIds, items, records, seenItemIds: seen };
   const probe = !pending && active ? nextProbe(input) : null;
   const finished = !pending && (items.length === 0 || diagnosticFinished(input));
+  // Finished before a single question was asked: say why and route on,
+  // rather than showing an empty "No diagnostic answers yet" report.
+  const blocker = finished && !records.length ? diagnosticStartBlocker(input) : null;
   // While an attempt is held, keep its question mounted so the runner keeps
   // showing the marked result (same key, same position in the tree).
   const questionId = pending ? pending.questionId : probe?.item.id;
@@ -107,6 +110,20 @@ function Diagnostic() {
           <p className="text-sm text-ink2">You can still find a starting point: the quick check uses authored questions, clearly labelled practice, not proof.</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={() => setQuick(true)}>Take the quick check instead</Button>
+            <ButtonLink href={`/practice?subject=${encodeURIComponent(active)}`} variant="secondary">Practise this subject</ButtonLink>
+          </div>
+        </Panel>
+      ) : blocker ? (
+        <Panel className="space-y-3">
+          <h2 className="text-base font-semibold text-ink">Nothing new for the full diagnostic to ask</h2>
+          <p className="text-sm text-ink3">
+            {blocker === "all-known"
+              ? "You already have solid evidence on every topic that has teacher-reviewed questions, so a diagnostic would not tell Revise anything new."
+              : "The full diagnostic only uses teacher-reviewed questions you have not answered before, and you have already answered every one for this subject. Your earlier answers already count."}
+          </p>
+          <p className="text-sm text-ink2">Today already uses those answers to choose your next step. Practice questions there are labelled practice, not proof.</p>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/" variant="primary">See your next step on Today</ButtonLink>
             <ButtonLink href={`/practice?subject=${encodeURIComponent(active)}`} variant="secondary">Practise this subject</ButtonLink>
           </div>
         </Panel>
