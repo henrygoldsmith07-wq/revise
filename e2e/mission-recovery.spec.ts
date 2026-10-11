@@ -1,21 +1,49 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, todayOrOnboarding } from "./helpers";
+import { putQuestions, readSubjectQuestions, trustIdsViaWorkflow } from "./review-fixture";
 
 // Seeds lost marks (and, for the proof journey, an earlier independent success) straight into
 // IndexedDB with past dates, so the multi-day loop can be exercised in one run: lost marks →
 // mission → mission session → closure → next action, and delayed proof once the delay has passed.
+//
+// Proof is only possible on teacher-reviewed WJEC flagship questions (unreviewed or reference-tier
+// content can be practised and spaced-checked, never proven). So the two proof journeys onboard WJEC
+// Biology and give one topic's questions fixture approvals INSIDE THIS BROWSER PROFILE through the real
+// review workflow (two named fixture reviewers -> audit log -> ledger -> trust predicate); nothing is
+// written to the repository's ledger. The repair journey keeps the default (unreviewed) board.
 
-async function openToday(page: Page) {
+const PROOF_SUBJECT = "wjec-alevel-biology";
+
+async function openToday(page: Page, opts: { proofSubject?: boolean } = {}) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   if ((await todayOrOnboarding(page)) === "onboarding") {
-    await completeOnboarding(page, { examDate: new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10) });
+    await completeOnboarding(page, {
+      examDate: new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10),
+      ...(opts.proofSubject ? { board: "WJEC", subjectNames: ["Biology"] } : {}),
+    });
   }
   await page.waitForTimeout(3000);
 }
 
-async function seed(page: Page, opts: { withEarlierSuccess: boolean }) {
-  const info = await page.evaluate(async ({ withEarlierSuccess }) => {
+/** Fixture-review every written (non-MCQ, 2+ mark) question of the best-stocked topic; returns their ids. */
+async function trustOneTopic(page: Page): Promise<string[]> {
+  const questions = await readSubjectQuestions(page, PROOF_SUBJECT);
+  const byTopic = new Map<string, string[]>();
+  for (const q of questions) {
+    if (q.kind === "mcq" || q.totalMarks < 2) continue;
+    byTopic.set(q.topicIds[0]!, [...(byTopic.get(q.topicIds[0]!) ?? []), q.id]);
+  }
+  const [, ids] = [...byTopic].sort((a, b) => b[1].length - a[1].length)[0]!;
+  expect(ids.length, "the proof journey needs lost, earlier-success and unseen questions in one topic").toBeGreaterThanOrEqual(4);
+  const trusted = trustIdsViaWorkflow(questions, ids);
+  expect(trusted.every((q) => q.verification === "verified")).toBe(true);
+  await putQuestions(page, trusted);
+  return ids;
+}
+
+async function seed(page: Page, opts: { withEarlierSuccess: boolean; onlyIds?: string[] }) {
+  const info = await page.evaluate(async ({ withEarlierSuccess, onlyIds }) => {
     type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     const name = (await indexedDB.databases()).map((d) => d.name!).find((n) => n === "revise")!;
     const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open(name); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -23,7 +51,8 @@ async function seed(page: Page, opts: { withEarlierSuccess: boolean }) {
     const cards = await all("cards");
     const subject = cards[0]!.subjectId as string;
     const userId = cards[0]!.userId as string;
-    const questions = (await all("questions")).filter((q) => q.subjectId === subject && q.kind !== "mcq" && q.totalMarks >= 2);
+    const allowed = onlyIds ? new Set(onlyIds) : null;
+    const questions = (await all("questions")).filter((q) => (allowed ? allowed.has(q.id) : q.subjectId === subject) && q.kind !== "mcq" && q.totalMarks >= 2);
     const byTopic = new Map<string, Row[]>();
     for (const q of questions) byTopic.set(q.topicIds[0], [...(byTopic.get(q.topicIds[0]) ?? []), q]);
     const [topic, pool] = [...byTopic].sort((a, b) => b[1].length - a[1].length)[0]!;
@@ -73,7 +102,7 @@ test("lost marks become one mission that runs, closes honestly and leaves no sta
   const { lost } = await seed(page, { withEarlierSuccess: false });
   const main = page.locator("main#main");
 
-  await expect(main).toContainText("Your highest-value session");
+  await expect(main).toContainText("Do this now");
   await expect(main).toContainText(`Recover ${lost} marks`);
   const start = main.getByRole("link", { name: "Start session", exact: true });
   const box = await start.boundingBox();
@@ -92,15 +121,15 @@ test("lost marks become one mission that runs, closes honestly and leaves no sta
   await expect(main).toContainText("no delayed proof yet");
 
   await page.goto("/");
-  await expect(main).toContainText("Your highest-value session", { timeout: 20_000 });
+  await expect(main).toContainText("Do this now", { timeout: 20_000 });
   await expect(main).not.toContainText("Resume interrupted revision");
   await expect(main).toContainText(/Needs work|Improving/);
 });
 
 test("once the delay has passed the same mission offers a proof check, not new work", async ({ page }) => {
   test.setTimeout(240_000);
-  await openToday(page);
-  await seed(page, { withEarlierSuccess: true });
+  await openToday(page, { proofSubject: true });
+  await seed(page, { withEarlierSuccess: true, onlyIds: await trustOneTopic(page) });
   const main = page.locator("main#main");
 
   await expect(main).toContainText("Prove it");
@@ -151,8 +180,8 @@ async function answerCorrectly(page: Page, count: number) {
 
 test("a delayed independent success on a different question proves the marks, and Today moves on", async ({ page }) => {
   test.setTimeout(280_000);
-  await openToday(page);
-  await seed(page, { withEarlierSuccess: true });
+  await openToday(page, { proofSubject: true });
+  await seed(page, { withEarlierSuccess: true, onlyIds: await trustOneTopic(page) });
   const main = page.locator("main#main");
 
   await expect(main).toContainText("Prove it");

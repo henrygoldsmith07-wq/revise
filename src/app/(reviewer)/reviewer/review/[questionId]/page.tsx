@@ -169,6 +169,8 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
                 <p className="text-ink2">Priority #{impact.rank} in {subject.label.replace(/^WJEC A-level /, "")}. Approving it {impact.unlocks.map(unlockLabel).join("; ")}.</p>
                 <p className="mt-1 text-ink3">Ordering only: every check below still applies in full.</p>
               </>
+            ) : linked ? (
+              <p className="text-ink2">The review plan counts nothing new from this question on its own: its value is as half of a transfer pair, which counts only once the other half is verified too.</p>
             ) : (
               <p className="text-ink2">Approving it unlocks nothing new for students yet: a sibling question covers the same reasoning, the topic already has what the next unlock needs, or a content gate needs an author fix first.</p>
             )}

@@ -23,6 +23,25 @@ teacher to tick "Genuine transfer" without showing the baseline.
 - `src/lib/reviewer/batches.ts` is ordering and context only: states come from
   `reviewStateOf`; no rule, gate or trust predicate changes.
 
+**Smaller fixes.** The "Skip the check" ghost button on Today's best next
+step is now at least 44px tall on phones (`min-h-11`), and the review screen
+no longer tells a teacher that approving one half of a transfer pair "unlocks
+nothing new": it says the pair counts only once the other half is verified
+too. E2E specs updated to the current Today lead ("Do this now"), the Tools
+menu's "Review <count>" label, a settings toggle that waits for hydration, and
+proof journeys re-based on fixture-reviewed WJEC Biology content (approvals
+written only inside the test's own browser profile).
+
+**Onboarding offline sent the student back to step 1.** `finish()` called
+`onDone()` (which writes the "onboarded" marker) without waiting, then
+`router.push('/diagnostic?…')`. Online that is a client-side transition and
+the write finished anyway; offline the RSC fetch fails, Next falls back to a
+full browser navigation and the in-flight write was lost, so the reloaded app
+showed "Step 1 of 5 · Board" again. `finish()` now awaits the marker before
+navigating (`AppShell` passes `completeOnboarding` itself). Found by
+`e2e/offline.spec.ts` "offline banner appears when offline", which reproduced
+it deterministically and now passes.
+
 **A teacher following the sign-in link landed on the sign-in form again.**
 The gate is server-rendered before the browser finishes the magic-link
 exchange, and the link always returned to `/reviewer`. `ReviewerSignIn` now
