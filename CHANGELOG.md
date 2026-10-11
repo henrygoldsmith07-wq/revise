@@ -36,6 +36,21 @@ still read "Awaiting proof" and offered the apply step again.
   attempts their losses link to; without them those losses could never have
   been proven under the existing gate.
 
+**Recall-level probes where there were none.** Early diagnostics probe recall
+first and escalate to application (`diagnostic-intake.ts`), but most WJEC
+Maths, Biology and Chemistry topics had no recall-level question (by primary
+topic: 18 of 23, 20 of 25 and 20 of 23), so a recall gap and an application
+gap looked the same. `src/content/questions/wjec-recall-probes.ts` adds 18
+original, spec-mapped recall questions (one or two AO1 marks each) on the six
+highest reviewer-priority topics without one in each subject (Maths: algebra,
+integration, trigonometry, coordinate geometry, distributions, kinematics;
+Biology: nucleic acids, homeostasis, transport in animals, ecosystems, gas
+exchange, inheritance; Chemistry: bonding, acids and bases, kinetics,
+energetics, redox, hydrocarbons). All are `unverified` with no reviewer and
+pass the review gates, so they are approvable, never trusted, until two
+teachers approve them. Topics still without one: 12 of 23, 14 of 25, 14 of
+23. Authoring backlog refreshed (`wjec:authoring:refresh`).
+
 ## Teachers can find, judge and finish the transfer pairs — 2026-10-11 (eighth pass)
 
 **The questions that most need two teachers were invisible to them.** A
