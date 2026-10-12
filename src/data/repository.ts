@@ -1,5 +1,6 @@
 import { syncWireIdValue } from "./sync-contract";
-import { seedCards, seedQuestions } from "@/content";
+import { seedCards } from "@/content";
+import { loadQuestionRows } from "./authored-questions";
 import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
@@ -174,8 +175,9 @@ export async function ensureSeeded(userId: Id): Promise<void> {
   const installed = await readReviseMeta<number>("seedVersion");
   // putMissing skips ids already installed and ids the learner deleted (local
   // or wire tombstone), reading both inside its own write transaction.
+  // Authored questions are not copied: the bundle serves them (see
+  // ./authored-questions), so only cards, which carry FSRS state, install.
   await putMissing("cards", seedCards(allTopics(), userId), userId);
-  await putMissing("questions", seedQuestions, userId);
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
 }
 
@@ -192,11 +194,14 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
   // Keyed by store name rather than destructured positionally: COLLECTION_STORES
   // is ordered for sync replay, and tying the read order to it silently swaps
   // collections the moment that order changes.
-  const rows = Object.fromEntries(
-    await Promise.all(
-      COLLECTION_STORES.map(async (store) => [store, await db.getAll(store)] as const),
-    ),
-  ) as Record<CollectionStore, unknown[]>;
+  // Questions are the exception: current authored questions come from the
+  // bundle and only private/retired rows are read from the store.
+  const [questionRows, rows] = await Promise.all([
+    loadQuestionRows(userId),
+    Promise.all(
+      COLLECTION_STORES.filter((store) => store !== "questions").map(async (store) => [store, await db.getAll(store)] as const),
+    ).then((entries) => Object.fromEntries(entries) as Record<Exclude<CollectionStore, "questions">, unknown[]>),
+  ]);
 
   // The two append-only history logs are the ones that grow without bound, so
   // only their most recent `historyLimit` rows load synchronously — IndexedDB
@@ -238,7 +243,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
   const issues = validatePersistedStores({
     cards: rows.cards,
     reviewLogs: rows.reviewLogs,
-    questions: rows.questions,
+    questions: questionRows.stored,
     attempts: rows.attempts,
     mistakes: rows.mistakes,
     papers: rows.papers,
@@ -262,7 +267,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
 
   const runtimeLedger = await readRuntimeReviewLedger();
   const scoped = <T>(store: CollectionStore): T[] =>
-    rows[store].filter((value) => {
+    (store === "questions" ? questionRows.questions : rows[store]).filter((value) => {
       if (store === "questions") {
         const owner = value && typeof value === "object" ? (value as { userId?: unknown }).userId : undefined;
         return owner === undefined || owner === userId;
