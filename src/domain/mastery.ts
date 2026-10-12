@@ -1,7 +1,7 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { hintEvidenceMultiplier } from "./hint-tiers";
 import { exposureWeights } from "./evidence-weights";
-import { isDue, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { isDueReview, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
 import { todayLocal } from "./local-date";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
@@ -179,7 +179,8 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
       retention,
       confidence,
       cardsTotal: cards.length,
-      cardsDue: cards.filter((c) => isDue(c, today)).length,
+      // Owed reviews only: an installed, never-studied card is not "due" (isDueReview).
+      cardsDue: cards.filter((c) => isDueReview(c, today)).length,
       attempts: attempts.length,
       distinctQuestions: new Set(attempts.map((attempt) => attempt.questionId)).size,
       accuracy,

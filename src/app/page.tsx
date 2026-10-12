@@ -46,7 +46,7 @@ function SafeTodayRoadmap({ preferredSubjectId }: { preferredSubjectId?: string 
 // precedence so the student never loses their place.
 
 export default function TodayPage() {
-  const store = useStoreFields("adaptiveSession", "examDates", "experimentArm", "mastery", "proofLedger", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "attempts", "examDates", "experimentArm", "mastery", "proofLedger", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
   const {
     settings,
     recordFunnel,
@@ -61,7 +61,9 @@ export default function TodayPage() {
   // The Next Best Action engine ranks missions, paper recovery, proof checks, reviews and the
   // adaptive session together; Today shows only its winner.
   const { plan, supplyNote, evidence } = useRevisionPlan();
-  const context = todayContext(evidence.daysToExam);
+  // "Chosen from your answers" is only true once there are answers to choose from.
+  const hasAnswers = store.attempts.length > 0 || reviewLogs.length > 0;
+  const context = todayContext(evidence.daysToExam, hasAnswers);
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -155,8 +157,12 @@ export default function TodayPage() {
 // ---------------------------------------------------------------------------
 
 /** One line of context under the greeting: the nearest exam when there is one, never a made-up number. */
-function todayContext(daysToExam: number | null): string {
-  if (daysToExam === null) return "One session, chosen from your answers so far. Start it, and Revise adjusts as you go.";
+function todayContext(daysToExam: number | null, hasAnswers: boolean): string {
+  if (daysToExam === null) {
+    return hasAnswers
+      ? "One session, chosen from your answers so far. Start it, and Revise adjusts as you go."
+      : "One session to start with. Answer it, and Revise adjusts what comes next to how you did.";
+  }
   if (daysToExam === 0) return "Exam day. Keep it short and calm: one focused session.";
   return `Your next exam is in ${daysToExam} day${daysToExam === 1 ? "" : "s"}. This is the best use of your time right now.`;
 }

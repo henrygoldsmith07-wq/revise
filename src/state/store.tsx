@@ -38,7 +38,7 @@ import {
 } from "@/domain/paper-outcome";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
 import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
-import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
+import { gradeCard, isDueReview, todayIso } from "@/domain/scheduling";
 import { getDeviceIdentity, nextLamport } from "@/data/device";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
 import { calibrateDifficulty } from "@/domain/knowledge-tracing";
@@ -101,6 +101,7 @@ import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/gr
 import { policyTaskFor,
   type ExperimentAssignment, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { StorageRecovery } from "@/components/StorageRecovery";
+import { OnboardingFlow } from "@/components/Onboarding";
 import { estimateStorageQuota } from "@/data/storage-quota";
 import type { StorageQuota } from "@/data/storage-quota";
 import type {
@@ -256,6 +257,12 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     checkedAt: new Date().toISOString(),
   }));
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  // A profile that has never finished onboarding. Read from one meta row in
+  // parallel with boot (never ahead of it), so a fresh student sees the first
+  // onboarding step while the content bank installs, instead of a spinner
+  // for the whole seed. Latched: once true it stays true for this mount, so
+  // the onboarding instance (and the choices in it) survives boot finishing.
+  const [freshProfile, setFreshProfile] = useState(false);
   const [bootLoaded, setBootLoaded] = useState(false);
   const bootstrapped = useRef(false);
   // Boot must never fail silently. If IndexedDB or a migration rejects, keep
@@ -283,6 +290,19 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     leaveExperiment,
     recordExperimentEvent,
   } = useExperiments(userId);
+
+  useEffect(() => {
+    let active = true;
+    void repo
+      .hasOnboarded(userId)
+      .then((onboarded) => {
+        if (active && !onboarded) setFreshProfile(true);
+      })
+      .catch(() => undefined); // boot reports storage failures itself
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (bootstrapped.current) return;
@@ -366,7 +386,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const dueCards = useMemo(() => {
     if (!evidence) return [];
     const today = todayIso();
-    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
+    // Reviews owed, not cards installed: never-studied seeded cards are not
+    // "due" (isDueReview), so the nav badge and Practice's count stay honest
+    // on a fresh profile. /review still introduces new cards on its own.
+    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDueReview(c, today));
   }, [evidence, subjectIds]);
 
   // --- heavy analytics, off the main thread --------------------------------
@@ -1123,6 +1146,28 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
           bootstrapped.current = false;
           setBootAttempt((attempt) => attempt + 1);
         }}
+      />
+    );
+  }
+  // Fresh profile: onboarding renders here, at one fixed position, from the
+  // first frame until it completes. Before the store is ready it has no
+  // actions and holds a final click until they arrive; afterwards it gets the
+  // real ones. Returning students never take this branch.
+  if (freshProfile && (!value || value.needsOnboarding)) {
+    return (
+      <OnboardingFlow
+        actions={
+          value
+            ? {
+                regeneratePlan: value.regeneratePlan,
+                updateSettings: value.updateSettings,
+                upsertExamDate: value.upsertExamDate,
+                userId: value.userId,
+                recordFunnel: value.recordFunnel,
+              }
+            : null
+        }
+        onDone={completeOnboarding}
       />
     );
   }
