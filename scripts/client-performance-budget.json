@@ -12,30 +12,12 @@
     }
   },
   "optionalChunks": {
-    "pdfjs-dist": {
-      "maxBytes": 2500000,
-      "maxGzipBytes": 800000
-    },
-    "@huggingface/transformers": {
-      "maxBytes": 8000000,
-      "maxGzipBytes": 2500000
-    },
-    "@mlc-ai/web-llm": {
-      "maxBytes": 8000000,
-      "maxGzipBytes": 2500000
-    },
-    "onnxruntime": {
-      "maxBytes": 8000000,
-      "maxGzipBytes": 2500000
-    },
-    "tesseract.js": {
-      "maxBytes": 4000000,
-      "maxGzipBytes": 1200000
-    },
-    "katex": {
-      "maxBytes": 600000,
-      "maxGzipBytes": 220000
-    }
+    "pdfjs-dist": { "maxBytes": 2500000, "maxGzipBytes": 800000 },
+    "@huggingface/transformers": { "maxBytes": 8000000, "maxGzipBytes": 2500000 },
+    "@mlc-ai/web-llm": { "maxBytes": 8000000, "maxGzipBytes": 2500000 },
+    "onnxruntime": { "maxBytes": 8000000, "maxGzipBytes": 2500000 },
+    "tesseract.js": { "maxBytes": 4000000, "maxGzipBytes": 1200000 },
+    "katex": { "maxBytes": 600000, "maxGzipBytes": 220000 }
   },
   "forbiddenInitialImports": [
     "pdfjs-dist",
@@ -46,3 +28,4 @@
     "tesseract.js"
   ]
 }
+
