@@ -1,5 +1,39 @@
 # Changelog
 
+## A first visit opens in about 3 seconds, and "due" means owed everywhere — 2026-10-12 (thirteenth pass)
+
+**A brand-new profile on a 360px phone profile waited 8.8–9.0s (normal CPU)
+and ~19s (4× CPU throttle) behind "Loading your revision data…" before the
+first onboarding step appeared.** A CPU profile showed the main thread idle
+for most of that time: it was waiting on IndexedDB while the content bank
+(~4.6k cards and questions) installed, and `putAll` made two tombstone reads
+per row on top of each write.
+
+- Onboarding no longer waits for the bank. `StoreProvider` reads the one
+  `onboardedAt` row in parallel with boot and renders the onboarding flow
+  for a never-onboarded profile from the first frame; the store actions
+  arrive when the snapshot is ready, and a final click before then is held
+  ("Finishing setting up your subjects…") rather than dropped. Nothing is
+  saved early; returning students still wait for the full snapshot.
+- `putMissing` (`src/data/db.ts`) installs the bank in one transaction that
+  reads existing ids and tombstone keys itself, so existing rows are never
+  overwritten and deleted content is never resurrected, with two key-range
+  scans instead of ~9k per-row reads. The legacy content-id check on every
+  boot reads keys rather than whole rows.
+- Measured with the same script before and after (production build, 360px
+  mobile emulation): onboarding visible 8.8–9.0s → 2.9s at normal CPU and
+  19.0s → 8.9–10.0s at 4× CPU. Numbers and method are in PR #51.
+- The twelfth pass stopped Today counting installed, never-studied cards as
+  owed reviews; the rest of the app still did. The recommender
+  (`RecommendationCard`, `RevisionTwinCard`, `CountdownPhaseBanner`),
+  `store.dueCards` (the nav badge and Practice's "Review cards (N due)") and
+  per-topic `cardsDue` (Library pills, knowledge map, topic status) now use
+  `isDueReview` too. `/review` still introduces new cards itself.
+- Today's subtitle said "chosen from your answers so far" to a student with
+  no answers; it now says so only once there are answers.
+- Tests: `tests/seed-boot.test.ts`, plus recommender and mastery tests whose
+  fixtures had studied cards (`reps > 0`) still in the New state.
+
 ## A first visit no longer opens on a fake card backlog — 2026-10-12 (twelfth pass)
 
 **A phone walk-through of a brand-new profile (375 × 812 and 360 × 800)

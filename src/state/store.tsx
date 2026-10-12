@@ -38,7 +38,7 @@ import {
 } from "@/domain/paper-outcome";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
 import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
-import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
+import { gradeCard, isDueReview, todayIso } from "@/domain/scheduling";
 import { getDeviceIdentity, nextLamport } from "@/data/device";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
 import { calibrateDifficulty } from "@/domain/knowledge-tracing";
@@ -386,7 +386,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const dueCards = useMemo(() => {
     if (!evidence) return [];
     const today = todayIso();
-    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
+    // Reviews owed, not cards installed: never-studied seeded cards are not
+    // "due" (isDueReview), so the nav badge and Practice's count stay honest
+    // on a fresh profile. /review still introduces new cards on its own.
+    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDueReview(c, today));
   }, [evidence, subjectIds]);
 
   // --- heavy analytics, off the main thread --------------------------------

@@ -67,8 +67,8 @@ describe("recall mastery", () => {
     const rows = computeRecallMastery({
       topics: [topic("topic")],
       cards: [
-        card("topic", "c1", { stability: 10, reps: 3, lastReviewedAt: "2026-08-01T09:00:00.000Z", due: "2026-08-10" }),
-        card("topic", "c2", { stability: 10, reps: 3, lastReviewedAt: "2026-08-01T09:00:00.000Z", due: "2026-08-10" }),
+        card("topic", "c1", { stability: 10, reps: 3, state: 2, lastReviewedAt: "2026-08-01T09:00:00.000Z", due: "2026-08-10" }),
+        card("topic", "c2", { stability: 10, reps: 3, state: 2, lastReviewedAt: "2026-08-01T09:00:00.000Z", due: "2026-08-10" }),
       ],
       reviewLogs: Array.from({ length: 20 }, (_, index) => review(`r-${index}`, index % 2 ? "c1" : "c2", "topic", index < 10 ? "again" : "good")),
       now: NOW,
