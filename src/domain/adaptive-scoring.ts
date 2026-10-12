@@ -9,7 +9,7 @@
 
 import { daysToExam, examUrgency } from "./recommender";
 import { valueNextAction } from "./next-best-action";
-import { isDue, retrievability, todayIso } from "./scheduling";
+import { isDueReview, retrievability, todayIso } from "./scheduling";
 import {
   capabilityState,
   emptyProfile,
@@ -177,7 +177,9 @@ export interface ScoreData {
 }
 
 export function scoreTopic(topic: Topic, input: ScoreData): AdaptiveTopicCandidate {
-  const dueCards = input.cards.filter((card) => isDue(card, input.today));
+  // Owed reviews only: a never-studied (New) card is due from the day it is
+  // installed but holds nothing to retrieve yet (isDueReview).
+  const dueCards = input.cards.filter((card) => isDueReview(card, input.today));
   const overdueCards = dueCards.filter((card) => card.due < input.today);
   const openMistakes = input.mistakes.filter((mistake) => !mistake.resolved &&
     !(mistake.repair?.stage === "transfer" && mistake.repair.dueAt && Date.parse(mistake.repair.dueAt) > input.now.getTime()));

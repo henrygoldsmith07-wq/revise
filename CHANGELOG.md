@@ -1,5 +1,71 @@
 # Changelog
 
+## A first visit no longer opens on a fake card backlog — 2026-10-12 (twelfth pass)
+
+**A phone walk-through of a brand-new profile (375 × 812 and 360 × 800)
+that skipped the quick check landed on "Complete your Mathematics reviews —
+194 cards due; the later they are done, the more you forget", marked "This
+is backed by solid recent evidence."** None of it was true. The 194 were
+the seeded deck, which is installed due on day one and had never been
+studied; Today counted them as owed reviews, and because every topic had
+seeded cards it also treated every topic as already started, so the
+"learn an unstarted topic" candidates never reached the engine.
+
+- `isDueReview` and `studiedCardTopicIds` (`src/domain/scheduling.ts`): an
+  owed review is a card studied at least once whose interval has run out;
+  a topic counts as started only when one of its cards has been studied.
+  This is the line `subject-allocation.ts` and the daily queue already drew.
+- The adaptive session planner (`scoreTopic`, `src/domain/adaptive-scoring.ts`)
+  used the same count, so the session it built opened with "3 due
+  retrievals" and "9 cards are due for review" on a topic never studied; it
+  now counts owed reviews only.
+- Today's plan (`useRevisionPlan`, `src/components/recovery-evidence.ts`)
+  uses both. Re-walked on the rebuilt app, the same first visit now opens on
+  a marked session in Mathematics · Algebra and functions, labelled
+  "Provisional: you have no marked answers on this topic yet, so it was
+  chosen from how much of the specification this topic covers."
+  Cards still appear in their own review queue; nothing was deleted.
+- Removed a design note that had leaked into the last onboarding step ("you
+  will leave thinking that, not that you configured a dashboard").
+- Tests: `tests/first-visit-recommendation.test.ts`, and a 360px Playwright
+  check that a skip-path first visit is offered a marked session, not "cards
+  due".
+
+## Mark schemes can say "do not accept" — 2026-10-12 (twelfth pass)
+
+**Sixteen wrong answers in the regression set still earned offline marks
+because no general check can see them**: swapped Type I/II definitions keep
+every word of both points, "antipodal cells" is a wrong structure rather than
+an opposite word, and "Percentage uncertainty = measured value ÷ uncertainty"
+keeps every word of the right formula. WJEC mark schemes handle these with
+"do not accept" notes beside a point; the bank now can too.
+
+- `QuestionPart.rejects` (optional, backward compatible): per-point
+  `MarkSchemeReject` rules with phrases, an optional `except` list, an
+  optional whole-answer `scope` (for orderings) and a learner-facing reason.
+  Validated by `defineQuestion` and `contentQuestionPartSchema`.
+- `src/domain/marking-reject.ts` applies them. A phrase must appear in one
+  clause, in order ("…" skips up to six words; a word of four or more letters
+  covers its longer forms). A negated phrase ("not osmosis", "rather than",
+  "fail to reject") is a contrast and never vetoes. Rules only remove credit:
+  the offline marker drops the point and says "the mark scheme does not
+  accept “…” for this point" with the reason; on an AI mark the point is
+  contested, so the mark is provisional.
+- The AI marking prompt gets each rule as a "Do not accept" note under its
+  point (bounded in egress, schema-checked server-side; the student answer
+  stays in its untrusted fence). The semantic-cache and DLQ scheme hash
+  include the rules only when a part has some, so other parts' cached marks
+  are unaffected.
+- Rules authored for the 15 recall probes behind the regression set's known
+  gaps. Regression set: over-credited contradictions 18 answers (23 marks) →
+  **2 (3 marks)**, both Physics items that have no rules yet. Held-out
+  answers written for this pass (20 correct, 12 wrong, worded differently):
+  no correct answer loses a mark to a rule; wrong answers over-credited 7 →
+  0. No model answer in the bank trips a rule. Marks are hand-judged, not
+  moderated.
+- Not changed: proof predicates, review gates, verification status (every
+  probe is still unverified), the general contradiction checks.
+
 ## Fewer wrong answers earn offline marks — 2026-10-11 (eleventh pass)
 
 **Writing a plainly wrong answer for each of the 40 new recall probes showed

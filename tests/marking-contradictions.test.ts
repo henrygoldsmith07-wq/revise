@@ -28,6 +28,10 @@ import { contradictionCases, MODEL } from "./fixtures/marking-contradiction-set"
 // evidence, and sign-only equation slips, "ρ = 1" for "ρ = 0", "38 ATP" for
 // "2 ATP" and four new opposite pairs are vetoed: 18 answers (23 marks) remain
 // over-credited, every one a documented known gap.
+//
+// Twelfth pass: authored "do not accept" rules (MarkSchemeReject) on 15 recall
+// probes close 16 of those 18; 2 answers (3 marks) remain over-credited, both
+// Physics (see tests/mark-scheme-rejects.test.ts for the held-out checks).
 // ---------------------------------------------------------------------------
 
 const byId = new Map(seedQuestions.map((q) => [q.id, q]));
@@ -56,11 +60,11 @@ describe("contradiction regression set (real bank questions)", () => {
     expect(over.map((r) => `${r.questionId}: ${r.awarded} > ${r.examiner} for “${r.answer}”`)).toEqual([]);
   });
 
-  it("documented gaps are the only over-credited contradictions (18 answers, 23 marks)", () => {
+  it("documented gaps are the only over-credited contradictions (2 answers, 3 marks)", () => {
     const over = rows.filter((r) => r.kind === "contradiction" && r.awarded > r.examiner);
     expect(over.every((r) => r.knownGap)).toBe(true);
-    expect(over.length).toBeLessThanOrEqual(18);
-    expect(over.reduce((sum, r) => sum + r.awarded - r.examiner, 0)).toBeLessThanOrEqual(23);
+    expect(over.length).toBeLessThanOrEqual(2);
+    expect(over.reduce((sum, r) => sum + r.awarded - r.examiner, 0)).toBeLessThanOrEqual(3);
   });
 
   it("contradiction checks never take a mark an examiner would give", () => {

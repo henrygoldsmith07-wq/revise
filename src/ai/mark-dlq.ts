@@ -262,7 +262,8 @@ async function applyResolvedMark(item: AiDlqItem, data: unknown): Promise<boolea
     markProvenance: {
       tier: "ai",
       policyVersion: MARK_POLICY_VERSION,
-      schemeHash: `scheme-v1:${sha256Hex(canonicalJson(item.question.parts.map((part) => ({ id: part.id, marks: part.marks, markScheme: part.markScheme }))))}`,
+      schemeHash: `scheme-v1:${sha256Hex(canonicalJson(item.question.parts.map((part) => ({ id: part.id, marks: part.marks, markScheme: part.markScheme,
+        ...(part.rejects?.length ? { rejects: part.rejects } : {}) }))))}`,
     },
   };
   // Save through the repository (not raw IDB) so the upgrade enters the sync

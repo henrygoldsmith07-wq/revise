@@ -129,9 +129,15 @@ export interface CachePolicy {
   policyVersion: string;
 }
 
-/** Stable fingerprint of one part's tariff: id, marks and mark-scheme text. */
-export function schemeHashForPart(part: Pick<Question["parts"][number], "id" | "marks" | "markScheme">): string {
-  return `scheme-v1:${sha256Hex(canonicalJson({ id: part.id, marks: part.marks, markScheme: part.markScheme }))}`;
+/**
+ * Stable fingerprint of one part's tariff: id, marks, mark-scheme text and,
+ * when it has any, its "do not accept" lines (a new reject rule changes what
+ * earns a mark, so a mark cached before it must not be reused). A part with
+ * no rules hashes exactly as before.
+ */
+export function schemeHashForPart(part: Pick<Question["parts"][number], "id" | "marks" | "markScheme" | "rejects">): string {
+  return `scheme-v1:${sha256Hex(canonicalJson({ id: part.id, marks: part.marks, markScheme: part.markScheme,
+    ...(part.rejects?.length ? { rejects: part.rejects } : {}) }))}`;
 }
 
 export interface CachedMark {

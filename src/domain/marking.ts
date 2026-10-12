@@ -5,6 +5,7 @@ export { numericEquivalent, isNumericPoint } from "./marking-numeric";
 import { symbolicMatch } from "./maths-equivalence";
 import { markCalculationWorking } from "./calculation-rubric";
 import { contradictionExplanation, schemeContested, schemeContradiction, VERY_SHORT_ANSWER_WORDS } from "./marking-contradiction";
+import { rejectedStatement, rejectExplanation } from "./marking-reject";
 import type { MarkEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,26 @@ export function evidenceForMarkedPart(
       confidence: Math.round(match.score * 100) / 100,
       explanation: explanationFor(status, supportingEvidence, strength),
     };
+    // An authored "do not accept" line comes first: it is the scheme's own
+    // word on this point. On a missed point it is the reason; on a credited
+    // point (an AI mark, or a contrast the offline marker let through) it
+    // makes the mark provisional.
+    const pointIndex = part.markScheme.indexOf(point);
+    const rejected = status === "unreported" || pointIndex < 0 ? null : rejectedStatement(part, pointIndex, answer);
+    if (rejected && !rejected.contrastOnly) {
+      evidence.contradiction = rejectExplanation(rejected);
+      if (status === "missed") evidence.explanation = evidence.contradiction;
+      else {
+        evidence.contested = true;
+        evidence.explanation = `Awarded, but treat this mark as provisional: ${evidence.contradiction.replace(/^Not awarded: /, "")}`;
+      }
+      return evidence;
+    }
+    if (rejected && status === "credited") {
+      evidence.contested = true;
+      evidence.explanation = `Awarded, but treat this mark as provisional: your answer also mentions “${rejected.said}”, which the mark scheme does not accept for this point.`;
+      return evidence;
+    }
     // Say WHY a contradicted point was not awarded, and never let a credited
     // point that the answer contradicts or hedges look like a firm mark.
     const contradiction = status === "unreported" || !contradictionApplies(part, answer) ? null : schemeContradiction(point, answer);
@@ -403,7 +424,8 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // alike: an answer that contradicts any point never takes this shortcut.
   if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
     authoredAnswerEquivalent(part, trimmed) &&
-    (sameAsAuthored(part, trimmed) || !part.markScheme.some((point) => schemeContradiction(point, trimmed)))) {
+    (sameAsAuthored(part, trimmed) || !part.markScheme.some((point) => schemeContradiction(point, trimmed))) &&
+    !part.markScheme.some((_, index) => rejectedStatement(part, index, trimmed)?.contrastOnly === false)) {
     const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
       creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
     return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
@@ -479,6 +501,9 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
       if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(trimmed) &&
         !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(trimmed);
     }
+    // Last, so no earlier rule can restore the mark. Authored "do not accept" line for this point (marking-reject.ts): the
+    // answer states something the scheme names as wrong. Only removes credit.
+    if (ok && rejectedStatement(part, pointIndex, trimmed)?.contrastOnly === false) ok = false;
     (ok ? credited : missed).push(point);
   }
 

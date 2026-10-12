@@ -280,6 +280,34 @@ export interface QuestionPart {
   learning?: LearningPartMetadata;
   /** Optional explicit one-rule-per-mark calculation rubric. */
   calculationRules?: CalculationMarkRule[];
+  /**
+   * Optional "do not accept" lines, the deterministic counterpart of the
+   * reject notes in a WJEC mark scheme. Each rule guards one markScheme
+   * point; an answer that states one of its phrases does not earn that point
+   * (src/domain/marking-reject.ts). Rules only ever remove credit.
+   */
+  rejects?: MarkSchemeReject[];
+}
+
+/** One "do not accept" line for one mark-scheme point. */
+export interface MarkSchemeReject {
+  /** Index into `markScheme` of the point this rule guards. */
+  point: number;
+  /**
+   * Phrases that mean the point is not earned when an answer states them.
+   * Words must appear in order in one clause; "…" allows up to six words in
+   * between. A word of four or more letters also matches its longer forms
+   * ("accept" matches "accepting"). A phrase preceded by, or with a gap
+   * containing, a negator ("not", "rather than", "instead of", "fail to") is
+   * a contrast, not a claim, and does not veto.
+   */
+  phrases: string[];
+  /** Phrases that, anywhere in the answer, show it states the point correctly; any one cancels the rule. */
+  except?: string[];
+  /** Match phrases across the whole answer rather than within one clause (for orderings). */
+  scope?: "clause" | "answer";
+  /** Learner-facing reason, shown when the rule removes or contests a mark. */
+  reason: string;
 }
 
 export interface CalculationMarkRule {

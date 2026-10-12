@@ -90,6 +90,33 @@ test.describe("narrow phone — 360x800", () => {
     }
   });
 
+  test("a first visit that skips the quick check is offered a marked session, not a card backlog", async ({ page }) => {
+    // Twelfth pass: a fresh profile used to land on "194 cards due; the later
+    // they are done, the more you forget" — the seeded deck, never studied.
+    await page.goto("/");
+    if ((await todayOrOnboarding(page)) !== "onboarding") {
+      test.skip(true, "this profile has already been onboarded");
+    }
+    const wjec = page.getByRole("button", { name: /WJEC/i }).first();
+    await expect(async () => {
+      await wjec.click();
+      await expect(wjec).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /Mathematics/i }).first().click();
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("radio", { name: /Skip for now/i }).click();
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /Build my plan/i }).click();
+    const focus = page.locator(".today-focus").first();
+    await expect(focus).toBeVisible({ timeout: 60_000 });
+    await expect(focus).not.toContainText(/cards? (?:are )?due/i);
+    await expect(focus).not.toContainText(/solid recent evidence/i);
+    const start = focus.locator('a[href^="/"]').first();
+    await expect(start).toHaveAttribute("href", /^\/(?:adaptive-session|diagnostic)/);
+  });
+
   test("long review copy wraps instead of widening the page", async ({ page }) => {
     await settle(page);
     // Rotating to landscape is the other direction this can fail.

@@ -9,6 +9,10 @@
 //
 // `answer: MODEL` means "use the part's authored model answer".
 //
+// Twelfth pass: 16 former gaps on the recall probes are closed by authored
+// "do not accept" rules on their scheme points (MarkSchemeReject,
+// src/domain/marking-reject.ts); they keep the old reason in `wasGap`.
+//
 // Cases marked `knownGap` are contradictions the deterministic marker still
 // cannot see (they need comprehension, not wording). They stay in the set so
 // the numbers in tests/marking-contradictions.test.ts are honest.
@@ -26,6 +30,9 @@ export interface ContradictionCase {
   examiner: number;
   /** Why a contradiction case is still over-credited, when it is. */
   knownGap?: string;
+  /** What closed a former known gap; `wasGap` keeps the original reason. */
+  closedBy?: string;
+  wasGap?: string;
 }
 
 const R = "cnt:question:recall-probe-";
@@ -76,14 +83,14 @@ export const contradictionCases: ContradictionCase[] = [
   { questionId: `${R}bio-semi-conservative-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-semi-conservative-recall`, kind: "paraphrase", answer: "Each new DNA molecule keeps one original strand from the parent molecule and has one newly synthesised strand.", examiner: 2 },
   { questionId: `${R}bio-semi-conservative-recall`, kind: "contradiction", answer: "Each new DNA molecule contains two newly synthesised strands, and the original molecule is kept whole.", examiner: 0,
-    knownGap: "'two new strands' vs 'one original strand' is a counting contradiction the wording check cannot see" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'two new strands' vs 'one original strand' is a counting contradiction the wording check cannot see" },
   // --- Biology: GPP/NPP ----------------------------------------------------
   { questionId: `${R}bio-gpp-npp-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-gpp-npp-recall`, kind: "contradiction", answer: "GPP is the rate at which producers convert light energy into chemical energy in organic molecules by photosynthesis. NPP = GPP + R.", examiner: 1 },
   // --- Biology: alveoli ----------------------------------------------------
   { questionId: `${R}bio-alveoli-diffusion-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-alveoli-diffusion-recall`, kind: "contradiction", answer: "Osmosis. The alveoli have thick walls so the diffusion distance is long.", examiner: 0,
-    knownGap: "the one-word point 'Diffusion' is matched by 'diffusion distance'; osmosis is not treated as an opposite of diffusion" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "the one-word point 'Diffusion' is matched by 'diffusion distance'; osmosis is not treated as an opposite of diffusion" },
   // --- Biology: codominance ------------------------------------------------
   { questionId: `${R}bio-codominance-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-codominance-recall`, kind: "contradiction", answer: "In codominance both alleles are not expressed in the phenotype of a heterozygote. An example is blood group AB.", examiner: 1 },
@@ -121,7 +128,7 @@ export const contradictionCases: ContradictionCase[] = [
   // --- Chemistry: dative bond ----------------------------------------------
   { questionId: `${R}chem-dative-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-dative-recall`, kind: "contradiction", answer: "A shared pair of electrons where each atom provides one of the electrons. In NH₄⁺ the nitrogen atom provides its lone pair.", examiner: 1,
-    knownGap: "'each atom provides one electron' contradicts 'both electrons from the same atom' through quantifiers, not an opposite word" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'each atom provides one electron' contradicts 'both electrons from the same atom' through quantifiers, not an opposite word" },
   // --- Chemistry: cell with oxidation/reduction (bank) ---------------------
   { questionId: "cnt:question:authentic-source-wjec-alevel-chemistry-battery-safety-report", kind: "correct", answer: MODEL, examiner: 3 },
   { questionId: "cnt:question:authentic-source-wjec-alevel-chemistry-battery-safety-report", kind: "contradiction", answer: "M is reduced because it gains electrons; N ions are oxidised because they lose electrons; electrons flow through the external circuit from M to the positive electrode.", examiner: 1 },
@@ -147,23 +154,23 @@ export const contradictionCases: ContradictionCase[] = [
   { questionId: `${R}math-contradiction-proof-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-contradiction-proof-recall`, kind: "paraphrase", answer: "Suppose √2 is rational. Then √2 = p/q with p and q integers, q ≠ 0, and the fraction in its lowest terms.", examiner: 2 },
   { questionId: `${R}math-contradiction-proof-recall`, kind: "contradiction", answer: "Assume that √2 is irrational, so √2 cannot be written as a fraction.", examiner: 0,
-    knownGap: "the second point is matched on its notation (√2, ≠ 0) alone, and that structured-notation path is left as it was; the first point is now vetoed (rational/irrational)" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "the second point is matched on its notation (√2, ≠ 0) alone, and that structured-notation path is left as it was; the first point is now vetoed (rational/irrational)" },
   { questionId: `${R}math-vector-magnitude-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-vector-magnitude-recall`, kind: "contradiction", answer: "|xi + yj + zk| = x + y + z, so |a| = 5.", examiner: 0 },
   { questionId: `${R}math-newton-raphson-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-newton-raphson-recall`, kind: "paraphrase", answer: "Use xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ); it breaks down if f′(xₙ) = 0.", examiner: 2 },
   { questionId: `${R}math-newton-raphson-recall`, kind: "contradiction", answer: "xₙ₊₁ = xₙ + f(xₙ)/f′(xₙ). It fails when f(xₙ) = 1.", examiner: 0,
-    knownGap: "'f(xₙ) = 1' for 'f′(xₙ) = 0' changes both the function and the value, so no single check sees one swapped term; the sign slip in the formula is now caught" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'f(xₙ) = 1' for 'f′(xₙ) = 0' changes both the function and the value, so no single check sees one swapped term; the sign slip in the formula is now caught" },
   { questionId: `${R}math-probability-rules-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-probability-rules-recall`, kind: "contradiction", answer: "P(A ∪ B) = P(A) × P(B) and P(A ∩ B) = P(A) + P(B).", examiner: 0 },
   { questionId: `${R}math-friction-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-friction-recall`, kind: "contradiction", answer: "F ≥ μR, and F = μR whenever the box is at rest.", examiner: 0 },
   { questionId: `${R}math-poisson-conditions-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-poisson-conditions-recall`, kind: "contradiction", answer: "The emails arrive in groups that depend on each other, at a changing rate. The mean is λ and the variance is λ².", examiner: 0,
-    knownGap: "'the variance is λ²' sits beside 'the mean is λ' and the point is a chain of equalities the relation check does not split" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'the variance is λ²' sits beside 'the mean is λ' and the point is a chain of equalities the relation check does not split" },
   { questionId: `${R}math-error-types-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-error-types-recall`, kind: "contradiction", answer: "A Type I error is accepting H₀ when H₀ is false. A Type II error is rejecting H₀ when H₀ is true.", examiner: 0,
-    knownGap: "Type I and Type II definitions swapped: every word of both points is present, only their pairing is wrong" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "Type I and Type II definitions swapped: every word of both points is present, only their pairing is wrong" },
   { questionId: `${R}math-standardise-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}math-standardise-recall`, kind: "contradiction", answer: "Z = (X + μ)/σ² and Z ~ N(1, 0).", examiner: 0 },
   { questionId: `${R}math-correlation-hypotheses-recall`, kind: "correct", answer: MODEL, examiner: 2 },
@@ -188,37 +195,37 @@ export const contradictionCases: ContradictionCase[] = [
   { questionId: `${R}bio-hydrolysis-recall`, kind: "contradiction", answer: "Joining two molecules by removing water. Lipase.", examiner: 0 },
   { questionId: `${R}bio-growth-curve-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-growth-curve-recall`, kind: "contradiction", answer: "Death, stationary, lag, log. Fastest growth is in the stationary phase.", examiner: 0,
-    knownGap: "phases in the wrong order and 'stationary' for 'log' are not opposite words" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "phases in the wrong order and 'stationary' for 'log' are not opposite words" },
   { questionId: `${R}bio-resting-potential-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-resting-potential-recall`, kind: "contradiction", answer: "About +40 mV. Potassium ions diffuse in.", examiner: 0 },
   { questionId: `${R}bio-fertilisation-site-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-fertilisation-site-recall`, kind: "contradiction", answer: "In the ovary, and the blastocyst implants in the cervix.", examiner: 0 },
   { questionId: `${R}bio-double-fertilisation-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-double-fertilisation-recall`, kind: "contradiction", answer: "Both male nuclei fuse with the antipodal cells to form the seed coat.", examiner: 0,
-    knownGap: "'antipodal cells' and 'seed coat' are wrong structures, not opposites, and the shared words still reach the coverage threshold" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'antipodal cells' and 'seed coat' are wrong structures, not opposites, and the shared words still reach the coverage threshold" },
   { questionId: `${R}bio-pcr-enzyme-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-pcr-enzyme-recall`, kind: "contradiction", answer: "DNA ligase, because it joins the primers together at 20 °C.", examiner: 0 },
   { questionId: `${R}bio-secondary-response-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-secondary-response-recall`, kind: "contradiction", answer: "Red blood cells, which carry more oxygen to the infection.", examiner: 0 },
   { questionId: `${R}bio-sliding-filament-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-sliding-filament-recall`, kind: "contradiction", answer: "The A band shortens and the sarcomere gets longer.", examiner: 0,
-    knownGap: "'shortens' is in the answer (about the A band), so the clause-level check cannot tell which structure it describes" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'shortens' is in the answer (about the A band), so the clause-level check cannot tell which structure it describes" },
   { questionId: `${R}bio-innate-behaviour-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-innate-behaviour-recall`, kind: "contradiction", answer: "Innate behaviour is learned through experience, for example habituation.", examiner: 0 },
   { questionId: `${R}bio-eutrophication-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-eutrophication-recall`, kind: "contradiction", answer: "Sodium ions. Fish respiring.", examiner: 0 },
   { questionId: `${R}bio-variables-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}bio-variables-recall`, kind: "contradiction", answer: "The independent variable is the one that is measured, here the rate. A control variable is the one that is changed.", examiner: 0,
-    knownGap: "'measured' for 'changes' is not an opposite pair the marker knows" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'measured' for 'changes' is not an opposite pair the marker knows" },
   { questionId: `${R}chem-halide-test-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-halide-test-recall`, kind: "contradiction", answer: "Add hydrochloric acid then barium chloride. A yellow precipitate forms that does not dissolve in ammonia.", examiner: 0 },
   { questionId: `${R}chem-transition-definition-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-transition-definition-recall`, kind: "contradiction", answer: "A transition element is any metal. Zinc is not one because Zn²⁺ has a partially filled 3d sub-shell.", examiner: 0,
-    knownGap: "'any metal' is wrong, but the zinc sentence supplies 'partially filled d sub-shell' to the first point" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'any metal' is wrong, but the zinc sentence supplies 'partially filled d sub-shell' to the first point" },
   { questionId: `${R}chem-isomer-definitions-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-isomer-definitions-recall`, kind: "paraphrase", answer: "Structural isomers share a molecular formula but have different structural formulae; stereoisomers have the same structural formula with a different arrangement of atoms in space.", examiner: 2 },
   { questionId: `${R}chem-isomer-definitions-recall`, kind: "contradiction", answer: "Structural isomers have different molecular formulae. Stereoisomers have different structural formulae.", examiner: 0,
-    knownGap: "the scheme points themselves contain both 'same' and 'different', so the same/different check cannot apply" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "the scheme points themselves contain both 'same' and 'different', so the same/different check cannot apply" },
   { questionId: `${R}chem-hcn-addition-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-hcn-addition-recall`, kind: "contradiction", answer: "Electrophilic substitution, giving propanoic acid.", examiner: 0 },
   { questionId: `${R}chem-nitration-recall`, kind: "correct", answer: MODEL, examiner: 2 },
@@ -236,15 +243,15 @@ export const contradictionCases: ContradictionCase[] = [
   { questionId: `${R}chem-zwitterion-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-zwitterion-recall`, kind: "paraphrase", answer: "An ion that has both a positive charge and a negative charge, so it is neutral overall: H₃N⁺CH₂COO⁻.", examiner: 2 },
   { questionId: `${R}chem-zwitterion-recall`, kind: "contradiction", answer: "An ion with an overall positive charge, H₂NCH₂COOH.", examiner: 0,
-    knownGap: "'overall positive charge' for 'no overall charge' needs comprehension of the quantifier" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "'overall positive charge' for 'no overall charge' needs comprehension of the quantifier" },
   { questionId: `${R}chem-recrystallisation-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-recrystallisation-recall`, kind: "contradiction", answer: "Fractional distillation, then check that the solid melts over a wide range.", examiner: 0 },
   { questionId: `${R}chem-percentage-uncertainty-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-percentage-uncertainty-recall`, kind: "contradiction", answer: "Percentage uncertainty = measured value ÷ uncertainty. The titre uncertainty is ±0.05 cm³.", examiner: 0,
-    knownGap: "the reversed division keeps every word, and ±0.05 is matched through the shared 'cm³' superscript" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "the reversed division keeps every word, and ±0.05 is matched through the shared 'cm³' superscript" },
   { questionId: `${R}chem-halogenoalkane-substitution-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-halogenoalkane-substitution-recall`, kind: "contradiction", answer: "Elimination, giving ethene.", examiner: 0 },
   { questionId: `${R}chem-electrode-potential-recall`, kind: "correct", answer: MODEL, examiner: 2 },
   { questionId: `${R}chem-electrode-potential-recall`, kind: "contradiction", answer: "The voltage of a battery measured against a copper electrode at 373 K and 10 mol dm⁻³ acid.", examiner: 0,
-    knownGap: "the conditions point is numeric and matches on shared unit notation (dm⁻³) despite every value being wrong" },
+    closedBy: "authored reject rule (twelfth pass)", wasGap: "the conditions point is numeric and matches on shared unit notation (dm⁻³) despite every value being wrong" },
 ];
