@@ -488,11 +488,17 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
     if (ok && sym !== "equivalent" && polarityConflict(point, judged)) ok = false;
     // The same check after equivalent wording is canonicalised ("goes down"
-    // for "rises"), on the labelled case the point is about. Not for Physics,
-    // where "falls" and "rises" usually describe motion, not a change.
-    if (ok && sym !== "equivalent" && !isPhysicsPart(part) && canonicalDirectionConflict(point, scope)) ok = false;
-    // "Four times bigger" for "one quarter" is wrong in every subject.
-    if (ok && sym !== "equivalent" && isPhysicsPart(part) && canonicalScalingConflict(point, scope)) ok = false;
+    // for "rises", "four times bigger" for "one quarter"). Only where the
+    // answer's words are about this point: a very short answer, or the
+    // labelled case the point is about. In a longer answer an opposite word
+    // usually belongs to another claim ("the increased glucose ... returning
+    // it towards the set point"), and a ratio is often stated from the other
+    // side ("the nearer station measures four times the intensity"). Not the
+    // direction words in Physics, where "falls" and "rises" usually describe
+    // motion, not a change.
+    const focused = scope !== judged || judged.split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
+    if (ok && focused && sym !== "equivalent" && !isPhysicsPart(part) && canonicalDirectionConflict(point, scope)) ok = false;
+    if (ok && focused && sym !== "equivalent" && isPhysicsPart(part) && canonicalScalingConflict(point, scope)) ok = false;
     // Contradiction veto: an opposite term (artery for vein, left for right),
     // a flipped sign or inequality, a different stated value or formula, or a
     // negated claim. Only ever removes credit (marking-contradiction.ts).

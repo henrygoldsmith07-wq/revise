@@ -88,13 +88,10 @@ export function withinEditDistance(a: string, b: string, maxEdits: number): bool
  * of `tokenise` itself so the anti-recitation cap in marking.ts, which also
  * reads `tokenise`, behaves exactly as before.
  */
-/** Framing verbs and connectives: no content of their own, so coverage ignores them. */
-const COVERAGE_FILLER = new Set(["give", "giv", "given", "becom", "become", "therefore", "hence", "thus"]);
-
 function coverageTokens(text: string): string[] {
   const cached = COVERAGE_TOKEN_CACHE.get(text);
   if (cached) return cached;
-  const tokens = [...new Set([...tokenise(canonicalPhrases(text))].map(sentenceFinalStem).filter((w) => w.length > 1 && !COVERAGE_FILLER.has(w)))];
+  const tokens = [...new Set([...tokenise(canonicalPhrases(text))].map(sentenceFinalStem).filter((w) => w.length > 1))];
   if (COVERAGE_TOKEN_CACHE.size > 4096) COVERAGE_TOKEN_CACHE.clear();
   COVERAGE_TOKEN_CACHE.set(text, tokens);
   return tokens;
@@ -145,13 +142,13 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" inversesquare ", "(?:∝\\s*)?1\\s*/\\s*[rdx]\\s*(?:²|\\^\\s*2)"],
   // Scaling by four, in either direction. "four times the stress" is an
   // increase; "four times smaller" is a quarter.
-  [" fourfold increases ", "(?:four|4) times (?:" + BIGGER + ")"],
+  [" fourfoldup ", "(?:four|4) times (?:" + BIGGER + ")|fourfold"],
   [" quarter ", "(?:four|4) times (?:" + SMALLER + ")"],
-  [" fourfold increases ", "quadrupl(?:es|ed|ing|e)"],
+  [" fourfoldup ", "quadrupl(?:es|ed|ing|e)"],
   [" threequarters ", "three[- ]quarters"],
   [" quarter ", "(?<!by )(?:one|a) quarter|quartered|quartering"],
   [" half ", "(?:two|2) times (?:" + SMALLER + ")|halv(?:es|ed|ing|e)|one half"],
-  [" twofold increases ", "twice (?:" + BIGGER + ")|(?:two|2) times (?:" + BIGGER + ")"],
+  [" twofoldup ", "twice (?:" + BIGGER + ")|(?:two|2) times (?:" + BIGGER + ")"],
   // Inequalities said in words.
   [" ≤ 0 ", "(?:zero|0) or negative|negative or (?:zero|0)|less than or equal to (?:zero|0)"],
   [" ≥ 0 ", "(?:zero|0) or positive|positive or (?:zero|0)|greater than or equal to (?:zero|0)"],
@@ -163,7 +160,6 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" increases rate ", "more (?:often|frequently|frequent)"],
   [" faster ", "more (?:quickly|rapidly)|quicker"],
   [" rapidly ", "quickly"],
-  [" greater ", "bigger|larger"],
   // Movement across a boundary ("diffuses"/"osmosis" stay distinct).
   [" enter ", "(?:mov|go|flow|pass)(?:es|ed|ing|e)? into|goes into|went into|enters|entered|entering"],
   [" exit ", "(?:mov|go|flow|pass)(?:es|ed|ing|e)? out of|goes out of|went out of|is lost from|are lost from|lost from|exits|exited|leaves(?= (?:the|a|an|its|their|through|via) )"],
@@ -245,9 +241,9 @@ export function notationPresent(point: string, answer: string): boolean {
 const DIRECTION_PAIRS: Array<[RegExp, RegExp]> = [
   [/\bincreases?\b(?! rate)|\bincreas(?:ed|ing)\b/, /\bdecreases?\b|\bdecreas(?:ed|ing)\b/],
   [/\benter\b/, /\bexit\b/],
-  [/\bquarter\b/, /\bfourfold increases\b/],
+  [/\bquarter\b/, /\bfourfoldup\b/],
   [/\bquarter\b/, /\bhalf\b/],
-  [/\bfourfold\b/, /\btwofold\b/],
+  [/\bfourfoldup\b/, /\btwofoldup\b/],
 ];
 
 export function canonicalDirectionConflict(point: string, answer: string, pairs: Array<[RegExp, RegExp]> = DIRECTION_PAIRS): boolean {
