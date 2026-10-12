@@ -1,5 +1,47 @@
 # Changelog
 
+## Today about 3 seconds sooner on a first visit, no over-credited contradictions left, and a real "/" budget — 2026-10-12 (fifteenth pass)
+
+**After onboarding a fresh profile still waited 4.6–4.9s (normal CPU) for
+Today**, while ~4k authored questions (~15 MB) were copied into IndexedDB. A
+CPU profile of that window was 76% idle: the main thread was waiting on the
+writes. Those copies were also never refreshed (`putMissing` never
+overwrites), so a device that installed the bank kept that version, including
+any mark scheme fixed later.
+
+- Authored questions are served from the shipped bundle
+  (`src/data/authored-questions.ts`). They carry no learner state and never
+  sync; the `questions` store keeps private questions (AI, imported papers)
+  and retired rows. Only seed cards, which hold FSRS state, still install.
+- Local and wire tombstones still hide an authored id. Nothing on disk is
+  rewritten or dropped: an old device's copies stay where they are, unread,
+  and the current authored version supersedes them. Portable restore treats
+  authored ids as present and never writes an export's older copy.
+- Same snapshot: on a fresh profile the served questions deep-equal what the
+  old install-then-read path produced, in the same key order
+  (`tests/authored-questions.test.ts`).
+- Measured on production builds of `main` and this branch, same scripts as
+  pass 14, 360px mobile emulation, alternating runs: Today visible after
+  navigation 6.94/7.19s → 3.62/3.99s (normal CPU) and 11.85/11.40s →
+  7.57/8.39s (4× CPU); last onboarding tap → Today 4.60/4.90s → 1.28/1.81s
+  and 5.84/3.96s → 1.10/0.92s; quick-check path to the diagnostic
+  7.18/7.41s → 4.00/4.14s. Onboarding-visible and returning-visit times did
+  not change measurably. Numbers and method are in PR #53.
+
+**The last two contradictions in the marker regression set were
+over-credited (2 answers, 3 marks)**, both Physics. Authored "do not accept"
+rules now cover the inverse-square fallacy item (in the reasoning-depth JSON;
+`1/r` is rejected unless the answer states `1/r²`, `1/r^2` or "inverse
+square") and the thermal-storage log (all eight Physics specs). The set now
+has none; no model answer trips a rule; held-out correct answers lose no
+mark. The reasoning-depth fingerprint guard proves the rules are the only
+change to that item.
+
+**`perf:budget` reported the `/` route as 0.55 MB** because it counted only
+the root files. It now also measures the route's layout and page entry
+chunks from the client reference manifest: 5.12 MB raw / 1.35 MB gzip,
+budgeted at 5.4 MB / 1.42 MB. The content bank is still in the shell chunk.
+
 ## A cold start in about a second, and Start in the first viewport — 2026-10-12 (fourteenth pass)
 
 **After the thirteenth pass a fresh 360px profile still waited 2.6–2.8s
