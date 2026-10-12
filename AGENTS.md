@@ -30,8 +30,12 @@ background and do other work while it runs. On Windows, invoke npm through
   only tighten. `allPass=false` and `INSUFFICIENT DATA` are honest outputs.
 - **`src/domain` stays pure.** No IndexedDB, no network, no React. If a domain
   module needs to know about the clock or randomness, take it as an argument.
-- **IndexedDB is the source of truth.** The UI never awaits the network. Every
-  write lands in IndexedDB first and drains to Supabase through the outbox.
+- **IndexedDB is the source of truth** for learner data. The UI never awaits
+  the network. Every write lands in IndexedDB first and drains to Supabase
+  through the outbox. Current authored questions are the exception: they are
+  read from the bundle, not from a stored copy (`src/data/authored-questions.ts`),
+  so a content fix reaches every device. Never write them back into the
+  `questions` store.
 - **Schema changes are additive and ordered.** Bump
   `PERSISTED_SCHEMA_VERSION` in `src/data/persistence-schema.ts`, add a named
   entry to `PERSISTED_MIGRATIONS`, add the store to `PERSISTED_STORES`, and guard
@@ -57,6 +61,14 @@ background and do other work while it runs. On Windows, invoke npm through
   backtracking global patterns there cost seconds on a phone; the fourteenth
   pass cut the build from ~2.6s to ~0.8s (Node) without changing its output.
   Check `tests/content-boot-cost.test.ts` and measure before adding work there.
+  Since the fifteenth pass only the seed cards (~4.3k rows) are installed into
+  IndexedDB after onboarding; the questions are not, which took a fresh
+  profile's wait for Today after the last onboarding tap from ~4.6–4.9s to
+  ~1.3–1.8s.
+- **`perf:budget` has a route budget for `/`** (`routes` in
+  `scripts/client-performance-budget.json`): root files plus the route's
+  layout and page entry chunks. Lower it when the bank leaves the shell
+  chunk; never raise it to fit a regression.
 - **Watch for TDZ and memo ordering** when adding a `useMemo` that reads another
   one. Declare dependencies first, and gate an expensive memo on a cheap
   condition (`plan.top === null`) when the answer is only needed in the empty case.

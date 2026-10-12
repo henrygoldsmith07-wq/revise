@@ -25,6 +25,7 @@ import { validatePersistedStores, type PersistenceIssue } from "./persistence-sc
 import { REVISE_META_KEYS } from "./storage-namespace";
 import { remapPortableRecordIds } from "@/domain/portable-record-ids";
 import { isPrivateQuestion } from "./question-ownership";
+import { authoredQuestionIds } from "./authored-questions";
 
 export interface PortableRestoreValidation {
   ok: boolean;
@@ -266,9 +267,11 @@ export async function validatePortableRestore(
   // overwritten by restore. Snapshot questions cover user-authored/imported
   // question rows that cannot be reproduced from the shipped curriculum.
   const db = await getDb();
-  const existingQuestions = (await db.getAll("questions")) as Question[];
+  const existingQuestionKeys = (await db.getAllKeys("questions")).map(String);
   const questionIds = new Set([
-    ...existingQuestions.map((q) => q.id),
+    // Authored questions are served from the bundle, not stored (authored-questions.ts).
+    ...authoredQuestionIds(),
+    ...existingQuestionKeys,
     ...rows.questions.map((q) => q.id),
   ]);
   for (const attempt of rows.attempts) {
@@ -375,7 +378,9 @@ export async function restorePortableSnapshot(
     // non-seed/custom questions from the snapshot are inserted only when the
     // id does not already exist locally.
     const questionStore = tx.objectStore("questions");
-    const existingQuestionIds = new Set((await questionStore.getAll()).map((question) => question.id));
+    // Authored ids count as existing: the bundle serves the current version,
+    // so an export's older copy of one is never written.
+    const existingQuestionIds = new Set([...authoredQuestionIds(), ...(await questionStore.getAllKeys()).map(String)]);
 
     const outbox = tx.objectStore("outbox");
     for (const value of await outbox.getAll()) {

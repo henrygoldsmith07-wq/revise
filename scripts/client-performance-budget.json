@@ -4,6 +4,13 @@
     "maxGzipBytes": 950000,
     "manifestRoute": "/"
   },
+  "routes": {
+    "/": {
+      "maxBytes": 5400000,
+      "maxGzipBytes": 1420000,
+      "note": "Root files plus the layout and page entry chunks for /. Measured 2026-10-12: 5,124,216 raw / 1,351,190 gzip (the content bank chunk is ~3.6 MB of it). Lower these as the bank leaves the boot path; never raise them to fit a regression."
+    }
+  },
   "optionalChunks": {
     "pdfjs-dist": { "maxBytes": 2500000, "maxGzipBytes": 800000 },
     "@huggingface/transformers": { "maxBytes": 8000000, "maxGzipBytes": 2500000 },

@@ -164,6 +164,62 @@ describe("authored reject rules in the bank", () => {
   });
 });
 
+// Fifteenth pass: rules on two Physics parts outside the recall probes (the
+// inverse-square fallacy item, authored in the reasoning-depth JSON, and the
+// thermal-storage log in authentic-source.ts, shared by eight Physics specs).
+const INVERSE = "cnt:question:physics-depth-fields-sp-01-inverse-square-fallacy-3";
+const THERMAL = "cnt:question:authentic-source-wjec-alevel-physics-thermal-storage-log";
+const physicsRight: Array<[string, string]> = [
+  [INVERSE, "F ∝ 1/r², not 1/r. Doubling r makes the force a quarter (2² = 4), and halving r makes it four times bigger."],
+  [INVERSE, "The student assumed the force goes as 1/r, but Coulomb's law is an inverse square law, so doubling the distance gives one quarter of the force; halving the distance quadruples it."],
+  [INVERSE, "Coulomb's force varies as 1/r^2, so at double the distance it is F/4; at half the distance it is 4F."],
+  [INVERSE, "The student is wrong: the force is inversely proportional to the square of the distance, so doubling the distance gives one quarter of the force and halving it gives four times the force."],
+  [THERMAL, "The vacuum stops conduction and convection because there are no particles to carry the energy. The shiny surface is a poor emitter and a poor absorber of infrared. So the salt stays at a higher temperature for longer."],
+  [THERMAL, "Conduction and convection need particles, so the vacuum reduces both. The shiny surface reflects infrared and is a poor radiator, not a good emitter. Less energy is lost, so the salt keeps a higher temperature for longer."],
+];
+const physicsWrong: Array<[string, string, number]> = [
+  [INVERSE, "The force depends on 1/r, so doubling the separation halves it.", 0],
+  [INVERSE, "Since F is proportional to 1/r, halving the distance would double the force.", 0],
+  [INVERSE, "Doubling r halves the force and halving r doubles the force, because F ∝ 1/r.", 0],
+  [THERMAL, "The vacuum gives more conduction. The shiny surface is a good absorber of infrared radiation. The salt cools faster.", 0],
+  [THERMAL, "Vacuum increases convection; shiny surfaces emit more infrared; so the salt stays at a higher temperature for longer.", 1],
+];
+
+describe("Physics reject rules (fifteenth pass)", () => {
+  const bank = (id: string): Question => {
+    const q = byId.get(id);
+    if (!q) throw new Error(`missing ${id}`);
+    return q;
+  };
+
+  it("are on both parts, and on every Physics spec that shares the thermal-storage log", () => {
+    expect(bank(INVERSE).parts[0]!.rejects?.map((r) => r.point)).toEqual([0, 1, 2]);
+    const thermal = seedQuestions.filter((q) => q.id.startsWith("cnt:question:authentic-source-") && q.id.endsWith("-physics-thermal-storage-log"));
+    expect(thermal).toHaveLength(8);
+    for (const q of thermal) expect(q.parts[0]!.rejects?.map((r) => r.point), q.id).toEqual([0, 1, 2]);
+  });
+
+  it("the inverse-square rule spares the correct form however it is typed", () => {
+    const rule = bank(INVERSE).parts[0]!.rejects![0]!;
+    expect(ruleHit(rule, "F ∝ 1/r")).not.toBeNull();
+    expect(ruleHit(rule, "F ∝ 1/r²")).toBeNull();
+    expect(ruleHit(rule, "F ∝ 1/r^2")).toBeNull();
+    expect(ruleHit(rule, "It is not 1/r.")?.contrastOnly).toBe(true);
+  });
+
+  it("held-out correct answers never lose a mark to a rule", () => {
+    const lost = physicsRight.filter(([id, a]) => marks(bank(id), a) < marks(bank(id), a, false)).map(([, a]) => a);
+    expect(lost).toEqual([]);
+  });
+
+  it("held-out wrong answers are no longer over-credited, and never under-credited", () => {
+    const before = physicsWrong.filter(([id, a, ex]) => marks(bank(id), a, false) > ex).length;
+    // Measured 2026-10-12: 4 of these 5 were over-credited without the rules.
+    expect(before).toBeGreaterThanOrEqual(4);
+    expect(physicsWrong.filter(([id, a, ex]) => marks(bank(id), a) !== ex).map(([, a]) => a)).toEqual([]);
+  });
+});
+
 describe("feedback and the AI path", () => {
   const q = probe("math-error-types-recall");
   const part = q.parts[0]!;

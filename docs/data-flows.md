@@ -60,6 +60,12 @@ until the staging suite has passed against a migrated database.
   `examDates`.
 - Seven more: `settings`, `streak`, `lessonProgress`, `outbox`, `meta`,
   `aiCache`, `aiDlq`.
+- The `questions` store holds private questions (AI-generated, imported past
+  papers) and retired authored rows. Current authored questions are served
+  from the shipped bundle (`src/data/authored-questions.ts`), not copied into
+  the store; a local or wire tombstone still hides an authored id. Devices
+  that installed the bank before the fifteenth pass keep their old copies on
+  disk, unread.
 
 The last two are device-local by design and never synced. `aiCache` holds
 previously AI-graded answers plus the embedding used to find them; `aiDlq`

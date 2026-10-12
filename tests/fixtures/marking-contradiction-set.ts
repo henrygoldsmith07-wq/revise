@@ -13,6 +13,8 @@
 // "do not accept" rules on their scheme points (MarkSchemeReject,
 // src/domain/marking-reject.ts); they keep the old reason in `wasGap`.
 //
+// Fifteenth pass: the last two gaps (both Physics) are closed the same way.
+//
 // Cases marked `knownGap` are contradictions the deterministic marker still
 // cannot see (they need comprehension, not wording). They stay in the set so
 // the numbers in tests/marking-contradictions.test.ts are honest.
@@ -143,10 +145,10 @@ export const contradictionCases: ContradictionCase[] = [
   // --- Physics (bank) -------------------------------------------------------
   { questionId: "cnt:question:physics-depth-fields-sp-01-inverse-square-fallacy-3", kind: "correct", answer: MODEL, examiner: 3 },
   { questionId: "cnt:question:physics-depth-fields-sp-01-inverse-square-fallacy-3", kind: "contradiction", answer: "Coulomb's law gives F ∝ 1/r, so doubling r halves the force, and halving the distance doubles the force.", examiner: 0,
-    knownGap: "the scheme point itself quotes the wrong form ('1/r², not 1/r'), so '1/r' still matches its wording" },
+    closedBy: "authored reject rules (fifteenth pass)", wasGap: "the scheme point itself quotes the wrong form ('1/r², not 1/r'), so '1/r' still matches its wording" },
   { questionId: "cnt:question:authentic-source-wjec-alevel-physics-thermal-storage-log", kind: "correct", answer: MODEL, examiner: 3 },
   { questionId: "cnt:question:authentic-source-wjec-alevel-physics-thermal-storage-log", kind: "contradiction", answer: "The vacuum increases conduction and convection because there are few particles. The shiny surface is a good emitter and absorber of infrared radiation. The salt stays at a lower temperature for longer.", examiner: 0,
-    knownGap: "Physics explanations over 15 words keep only Physics' own reversal guards (the general veto misfired on 12 long Physics model answers), so 'increases' for 'reduces' is not caught here" },
+    closedBy: "authored reject rules (fifteenth pass)", wasGap: "Physics explanations over 15 words keep only Physics' own reversal guards (the general veto misfired on 12 long Physics model answers), so 'increases' for 'reduces' is not caught here" },
 
   // --- Eleventh pass: the 40 new recall probes ------------------------------
   // One plainly wrong answer per probe (examiner 0), every model answer, and

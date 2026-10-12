@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, todayOrOnboarding } from "./helpers";
 import { answerOnScreen } from "./journey-helpers";
-import { putQuestions, readSubjectQuestions, trustViaWorkflow } from "./review-fixture";
+import { installFixtureLedger, readSubjectQuestions, trustViaWorkflow } from "./review-fixture";
 
 // A marked answer must stay on screen until the student chooses to move on.
 // Until the fifth pass, the adaptive session swapped the step out the moment
@@ -81,7 +81,7 @@ test("full diagnostic: confidence is asked before the mark, and the mark stays u
   // this browser profile through the real workflow (fixture reviewers only).
   const trusted = trustViaWorkflow(SUBJECT, await readSubjectQuestions(page, SUBJECT), 8);
   expect(trusted.length).toBeGreaterThanOrEqual(5);
-  await putQuestions(page, trusted);
+  await installFixtureLedger(page, trusted);
 
   await page.goto(`/diagnostic?subject=${SUBJECT}`);
   const main = page.locator("main#main");

@@ -1,4 +1,4 @@
-import type { AoCode, LearningDemand, Question } from "@/domain/types";
+import type { AoCode, LearningDemand, Question, QuestionPart } from "@/domain/types";
 import { defineQuestion } from "./authoring";
 
 const S = "wjec-alevel-physics";
@@ -26,6 +26,8 @@ export type DepthPart = {
   scheme: string[];
   answer: string;
   aos?: AoCode[];
+  /** "Do not accept" lines for individual scheme points (MarkSchemeReject). */
+  rejects?: QuestionPart["rejects"];
 };
 
 export type DepthItem = { topic: string; point: number; capability?: string; parts: DepthPart[] };
@@ -58,6 +60,7 @@ export function reasoningDepthQuestions(items: DepthItem[]): Question[] {
         capabilityIds: [item.capability ?? `phys.${item.topic}.${point(item.point)}`],
         learningClaims: [part.move],
         learning: { familyId: part.family, contextId: part.context, demand: part.demand, reasoningMoves: [part.move] },
+        ...(part.rejects?.length ? { rejects: part.rejects } : {}),
       }],
       learning: { familyId: part.family, contextId: part.context, demand: part.demand, expectedMinutes: Math.max(1, part.marks), reasoningMoves: [part.move] },
     }),

@@ -1,4 +1,4 @@
-import type { AoCode, Question, QuestionKind } from "@/domain/types";
+import type { AoCode, Question, QuestionKind, QuestionPart } from "@/domain/types";
 import { defineQuestions } from "./authoring";
 import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
@@ -15,6 +15,8 @@ type SourcePart = {
   answer: string;
   claim: string;
   aos?: AoCode[];
+  /** "Do not accept" lines for individual scheme points (MarkSchemeReject). */
+  rejects?: QuestionPart["rejects"];
 };
 
 type SourceItem = {
@@ -65,6 +67,7 @@ function buildQuestions(subjectId: string, items: SourceItem[]): Question[] {
         aos: current.aos,
         specPointIds: [subjectId + "." + item.topic + ".sp-01"],
         learningClaims: [current.claim],
+        rejects: current.rejects,
       })),
     })),
   );
@@ -515,7 +518,16 @@ const physics: SourceItem[] = [
     topic: "thermal",
     stem: "Source extract: A thermal-storage log says a vacuum flask keeps molten salt hot because it has a vacuum gap and a shiny inner surface.",
     difficulty: 2,
-    parts: [part("Explain how each feature reduces energy transfer.", 3, ["The vacuum reduces conduction and convection because there are few particles", "The shiny surface is a poor emitter and absorber of infrared radiation", "The reduced heat loss keeps the salt at a higher temperature for longer"], "The vacuum gap reduces conduction and convection. The shiny inner surface emits and absorbs little infrared radiation, so less energy is transferred and the molten salt stays hot for longer.", "apply thermal-transfer mechanisms to an original engineering log")],
+    parts: [{
+      ...part("Explain how each feature reduces energy transfer.", 3, ["The vacuum reduces conduction and convection because there are few particles", "The shiny surface is a poor emitter and absorber of infrared radiation", "The reduced heat loss keeps the salt at a higher temperature for longer"], "The vacuum gap reduces conduction and convection. The shiny inner surface emits and absorbs little infrared radiation, so less energy is transferred and the molten salt stays hot for longer.", "apply thermal-transfer mechanisms to an original engineering log"),
+      // Long Physics explanations keep only Physics' own reversal guards, so
+      // the reversed direction of each mechanism is named here (fifteenth pass).
+      rejects: [
+        { point: 0, phrases: ["vacuum … increases", "increases conduction", "increases convection", "more conduction", "more convection"], reason: "A vacuum has almost no particles, so it reduces conduction and convection; it cannot increase them." },
+        { point: 1, phrases: ["good emitter", "good absorber", "better emitter", "better absorber", "emits more", "absorbs more"], reason: "A shiny surface is a poor emitter and a poor absorber of infrared radiation; that is why it reduces radiation transfer." },
+        { point: 2, phrases: ["salt … lower temperature", "stays at a lower temperature", "cools faster", "cools more quickly"], reason: "Less energy transfer keeps the salt at a higher temperature for longer, not a lower one." },
+      ],
+    }],
   },
   {
     slug: "radiotherapy-record",
