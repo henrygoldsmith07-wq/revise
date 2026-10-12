@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 
 const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const config = JSON.parse(readFileSync(path.join(appRoot, "scripts", "client-performance-budget.json"), "utf8"));
@@ -55,6 +56,38 @@ if (!manifestPath) {
     if (source.includes(name)) failures.push(`initial route bundle contains optional dependency ${name}`);
   }
 
+  // Route budgets: everything a first visit to the route downloads before it
+  // can hydrate — the root files above plus the layout and page entry chunks
+  // from the route's client reference manifest. The root files alone leave
+  // out the shell's own chunks (the content bank among them), so they
+  // understated "/" by roughly 9x (fifteenth pass, 2026-10-12).
+  for (const [route, budget] of Object.entries(config.routes ?? {})) {
+    const segment = route === "/" ? "page" : `${route.replace(/^\//, "")}/page`;
+    const referencePath = path.join(nextDir, "server", "app", `${segment}_client-reference-manifest.js`);
+    if (!existsSync(referencePath)) {
+      failures.push(`route ${route}: no client reference manifest at ${path.relative(appRoot, referencePath)}`);
+      continue;
+    }
+    const sandbox = { globalThis: {} };
+    sandbox.self = sandbox.globalThis;
+    vm.runInNewContext(readFileSync(referencePath, "utf8"), sandbox);
+    const reference = (sandbox.globalThis.__RSC_MANIFEST ?? {})[`/${segment}`];
+    const entry = reference?.entryJSFiles?.[`[project]/src/app/${segment}`];
+    if (!Array.isArray(entry) || !entry.length) {
+      failures.push(`route ${route}: its client reference manifest lists no entry chunks`);
+      continue;
+    }
+    const routeFiles = [...new Set([...files, ...entry.map((file) => path.join(nextDir, file))])].filter((file) => /\.js$/.test(file));
+    const missing = routeFiles.filter((file) => !existsSync(file));
+    if (missing.length) failures.push(`route ${route}: ${missing.length} listed chunk(s) missing from the build`);
+    const present = routeFiles.filter(existsSync);
+    const routeBytes = present.reduce((sum, file) => sum + statSync(file).size, 0);
+    const routeGzip = present.reduce((sum, file) => sum + gzipSync(readFileSync(file), { level: 9 }).length, 0);
+    console.log(`Route ${route}: ${routeBytes} bytes raw / ${routeGzip} bytes gzip (${present.length} files)`);
+    if (routeBytes > budget.maxBytes) failures.push(`route ${route} raw assets exceed ${budget.maxBytes} bytes`);
+    if (routeGzip > budget.maxGzipBytes) failures.push(`route ${route} gzip assets exceed ${budget.maxGzipBytes} bytes`);
+  }
+
   // Optional dependencies get their own budget as soon as the build emits a
   // chunk that identifies them. A dependency can be absent in a local build
   // (for example an OCR adapter behind a feature flag), so no-match is
@@ -92,5 +125,5 @@ if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);
 }
-console.log("Client performance budget passed (route imports, raw and gzip initial assets).");
+console.log("Client performance budget passed (route imports, raw and gzip initial assets, route budgets).");
 
