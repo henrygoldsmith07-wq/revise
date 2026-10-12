@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seedQuestions } from "@/content";
-import { markPart, markQuestion, rubricConfidence } from "@/domain/marking";
+import { markPart, markQuestion, pointStatesNumber, rubricConfidence } from "@/domain/marking";
 
 import { assessDeterministicMark, assessMarkConfidence } from "@/domain/marking-confidence";
 import { withMarkEvidence } from "@/domain/marking";
@@ -20,6 +20,14 @@ import { contradictionCases, MODEL } from "./fixtures/marking-contradiction-set"
 // when the authored model answer is submitted. The numbers asserted
 // below are the measured state after the change; tightening them is welcome,
 // loosening them is a regression.
+//
+// Eleventh pass: the set gained the 40 new recall probes (model answer, one
+// plainly wrong answer each, and 10 paraphrases). Wrong answers to 19 of them
+// were over-credited (24 over-credited answers, 35 marks, across the whole
+// set). Digits inside formulae and labels no longer count as numeric
+// evidence, and sign-only equation slips, "ρ = 1" for "ρ = 0", "38 ATP" for
+// "2 ATP" and four new opposite pairs are vetoed: 18 answers (23 marks) remain
+// over-credited, every one a documented known gap.
 // ---------------------------------------------------------------------------
 
 const byId = new Map(seedQuestions.map((q) => [q.id, q]));
@@ -48,11 +56,11 @@ describe("contradiction regression set (real bank questions)", () => {
     expect(over.map((r) => `${r.questionId}: ${r.awarded} > ${r.examiner} for “${r.answer}”`)).toEqual([]);
   });
 
-  it("documented gaps are the only over-credited contradictions (5 answers, 7 marks)", () => {
+  it("documented gaps are the only over-credited contradictions (18 answers, 23 marks)", () => {
     const over = rows.filter((r) => r.kind === "contradiction" && r.awarded > r.examiner);
     expect(over.every((r) => r.knownGap)).toBe(true);
-    expect(over.length).toBeLessThanOrEqual(5);
-    expect(over.reduce((sum, r) => sum + r.awarded - r.examiner, 0)).toBeLessThanOrEqual(7);
+    expect(over.length).toBeLessThanOrEqual(18);
+    expect(over.reduce((sum, r) => sum + r.awarded - r.examiner, 0)).toBeLessThanOrEqual(23);
   });
 
   it("contradiction checks never take a mark an examiner would give", () => {
@@ -62,7 +70,7 @@ describe("contradiction regression set (real bank questions)", () => {
 
   it("every correct paraphrase keeps full marks", () => {
     const paraphrases = rows.filter((r) => r.kind === "paraphrase");
-    expect(paraphrases.length).toBeGreaterThanOrEqual(9);
+    expect(paraphrases.length).toBeGreaterThanOrEqual(19);
     expect(paraphrases.filter((r) => r.awarded !== r.examiner).map((r) => r.answer)).toEqual([]);
   });
 
@@ -107,6 +115,27 @@ describe("schemeContradiction", () => {
     expect(schemeContradiction("The quadratic is negative between the roots: 2 < x < 3", "x < 2 or x > 3")).toMatchObject({ kind: "relation" });
     expect(schemeContradiction("Centre (3, −2) and radius 5", "Centre (−3, 2), radius 25.")).toMatchObject({ kind: "value" });
     expect(schemeContradiction("NH₃", "The conjugate base is NH₂⁻.")).toMatchObject({ kind: "formula", said: "NH2-", needed: "NH3" });
+  });
+
+  it("catches sign-only equation slips, a symbol set to another value, a different count and the new opposite pairs", () => {
+    expect(schemeContradiction("dm/dt = −km", "dm/dt = km, so m = Ae^(kt).")).toMatchObject({ kind: "sign" });
+    expect(schemeContradiction("m = Ae^(−kt)", "dm/dt = km, so m = Ae^(kt).")).toMatchObject({ kind: "sign" });
+    expect(schemeContradiction("xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ)", "xₙ₊₁ = xₙ + f(xₙ)/f′(xₙ).")).toMatchObject({ kind: "sign" });
+    expect(schemeContradiction("H₀: ρ = 0", "H₀: ρ = 1 and H₁: ρ < 0.")).toMatchObject({ kind: "value" });
+    expect(schemeContradiction("H₁: ρ > 0", "H₀: ρ = 0 and H₁: ρ < 0.")).toMatchObject({ kind: "relation" });
+    expect(schemeContradiction("M : M+2 = 3 : 1", "M : M+2 = 1 : 1.")).toMatchObject({ kind: "value" });
+    expect(schemeContradiction("A net gain of 2 ATP", "In the mitochondrial matrix, with a net gain of 38 ATP.")).toMatchObject({ kind: "value", said: "38 atp" });
+    expect(schemeContradiction("Assume that √2 is rational", "Assume that √2 is irrational.")).toMatchObject({ kind: "opposite-term" });
+    expect(schemeContradiction("Zinc only forms Zn²⁺, which has a full 3d sub-shell (3d¹⁰)", "Zn²⁺ has a partially filled 3d sub-shell.")).toMatchObject({ kind: "opposite-term" });
+  });
+
+  it("leaves equivalent values, working and correct counts alone", () => {
+    expect(schemeContradiction("dm/dt = −km", "dm/dt = −km, so m = Ae^(−kt).")).toBeNull();
+    expect(schemeContradiction("H₀: ρ = 0", "H₀: ρ = 0 and H₁: ρ > 0.")).toBeNull();
+    expect(schemeContradiction("x = 2", "x = 2.0")).toBeNull();
+    expect(schemeContradiction("x = 2", "First x = 5 − 3, so x = 2.")).toBeNull();
+    expect(schemeContradiction("A net gain of 2 ATP", "4 ATP are made and 2 ATP are used, a net gain of 2 ATP.")).toBeNull();
+    expect(schemeContradiction("v² = u² + 2as", "v² = u² + 2as")).toBeNull();
   });
 
   it("leaves correct answers, contrasts and paraphrases alone", () => {
@@ -172,5 +201,20 @@ describe("marking with the contradiction veto", () => {
     const q = question("cnt:question:recall-probe-math-binomial-conditions-recall");
     const result = mark(q.id, "A fixed number n of trials which are independent; each trial has only two outcomes, success or failure, and the probability p of success is constant. E(X) = np.");
     expect(result.awarded).toBe(3);
+  });
+});
+
+describe("digits inside formulae and labels", () => {
+  it("are not a stated number, so a shared subscript cannot credit a prose point", () => {
+    expect(pointStatesNumber("Al₂O₃ is amphoteric: it reacts with both acids and bases")).toBe(false);
+    expect(pointStatesNumber("H₃N⁺CH₂COO⁻")).toBe(false);
+    expect(pointStatesNumber("A Type I error is rejecting H₀ when H₀ is true")).toBe(false);
+    expect(pointStatesNumber("A net gain of 2 ATP")).toBe(true);
+    expect(pointStatesNumber("H₀: ρ = 0")).toBe(true);
+    expect(pointStatesNumber("Centre (3, −2) and radius 5")).toBe(true);
+    const q = question("cnt:question:recall-probe-chem-period3-oxides-recall");
+    const part = q.parts[0]!;
+    expect(markPart(part, "Al₂O₃ is basic only. P₄O₁₀ is basic and forms a hydroxide.").awarded).toBe(0);
+    expect(markPart(part, "Al₂O₃ is amphoteric because it reacts with both acids and bases, and P₄O₁₀ is acidic, reacting with water to give phosphoric acid.").awarded).toBe(2);
   });
 });
