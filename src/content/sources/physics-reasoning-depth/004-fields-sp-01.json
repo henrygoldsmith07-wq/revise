@@ -57,7 +57,27 @@
         "Doubling r reduces the force by 2² = 4, so the force becomes one quarter of its previous value",
         "Conversely halving the distance would increase the force fourfold"
       ],
-      "answer": "The force falls as the inverse square of the separation, not linearly with distance. Doubling the separation quarters the force (F/4), and halving it would make the force four times larger."
+      "answer": "The force falls as the inverse square of the separation, not linearly with distance. Doubling the separation quarters the force (F/4), and halving it would make the force four times larger.",
+      "rejects": [
+        {
+          "point": 0,
+          "phrases": ["1/r"],
+          "except": ["1/r²", "1/r^2", "inverse square"],
+          "reason": "Coulomb's law is an inverse-square law, F ∝ 1/r²; a force proportional to 1/r is the error the question asks you to correct."
+        },
+        {
+          "point": 1,
+          "phrases": ["doubling … halves", "halves the force", "force halves", "half the force"],
+          "except": ["quarter", "F/4", "factor of 4", "factor of four", "divided by 4", "divided by four"],
+          "reason": "Doubling r divides the force by 2² = 4, so it becomes one quarter, not one half."
+        },
+        {
+          "point": 2,
+          "phrases": ["halving … doubles", "halving … double the force", "doubles the force", "double the force", "force doubles", "twice the force"],
+          "except": ["four times", "fourfold", "4F", "quadruple", "factor of 4", "factor of four"],
+          "reason": "Halving r multiplies the force by 2² = 4, so it becomes four times larger, not twice as large."
+        }
+      ]
     },
     {
       "demand": "transfer",
