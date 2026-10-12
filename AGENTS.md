@@ -69,6 +69,17 @@ background and do other work while it runs. On Windows, invoke npm through
   `scripts/client-performance-budget.json`): root files plus the route's
   layout and page entry chunks. Lower it when the bank leaves the shell
   chunk; never raise it to fit a regression.
+- **Equivalent wording in the offline marker is a curated list**
+  (`PHRASE_EQUIVALENTS` in `src/domain/marking-language.ts`, sixteenth pass).
+  It rewrites both the scheme point and the answer, for keyword coverage only.
+  Add a group only when every alternative means the same thing, direction
+  included, in every A-level context; never merge opposites, ambiguous words
+  ("fall", "left", "leaves", "double") or a mark-earning term into a vaguer
+  one ("diffuses into" is not "moves into"). The opposite-wording veto
+  (`canonicalDirectionConflict`) applies only to very short or labelled
+  answers: in longer answers it took marks from correct ones. Measure with
+  `tests/marking-paraphrases.test.ts` (design, held-out and wrong sets) and
+  `tests/marking-contradictions.test.ts`; neither may get worse.
 - **Watch for TDZ and memo ordering** when adding a `useMemo` that reads another
   one. Declare dependencies first, and gate an expensive memo on a cheap
   condition (`plan.top === null`) when the answer is only needed in the empty case.
