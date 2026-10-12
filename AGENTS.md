@@ -49,6 +49,14 @@ background and do other work while it runs. On Windows, invoke npm through
   makes it look like a dead end when it is not. `src/components/recovery-evidence.ts` is the reference call.
 - **`unseenQuestion` is O(questions × topics).** Never call it over the whole
   bank in a React hook; it caused real render timeouts.
+- **The whole authored bank is built at boot.** `@/content` is statically
+  imported by the app shell (`src/state/store.tsx`, `src/data/repository.ts`),
+  so every authoring helper that runs while the bank is built (`defineQuestion`,
+  `qualityItem`, `capabilityEvidenceFor`, `provenanceFor`, the subject audits)
+  runs before the app can hydrate. Per-phrase `new RegExp(...)` and
+  backtracking global patterns there cost seconds on a phone; the fourteenth
+  pass cut the build from ~2.6s to ~0.8s (Node) without changing its output.
+  Check `tests/content-boot-cost.test.ts` and measure before adding work there.
 - **Watch for TDZ and memo ordering** when adding a `useMemo` that reads another
   one. Declare dependencies first, and gate an expensive memo on a cheap
   condition (`plan.top === null`) when the answer is only needed in the empty case.

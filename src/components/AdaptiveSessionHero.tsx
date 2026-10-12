@@ -55,16 +55,24 @@ export function AdaptiveSessionHero({
           <p className="text-sm font-semibold text-speak">Your highest-value session</p>
           <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">About {Math.ceil(session.totalMinutes)} min</span>
         </div>
-        <h2 className="mt-4 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">
           Your next session is ready
         </h2>
-        <p className="mt-2 text-base font-medium text-ink sm:text-lg">{subject?.name ?? session.subjectId} · {session.topicTitle}</p>
+        <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{subject?.name ?? session.subjectId} · {session.topicTitle}</p>
 
         <p className="mt-1 text-sm text-ink2">
           {[brief.paperName, brief.examLabel].filter(Boolean).join(" · ") || "No exam date set"}
           {brief.marksAtRisk ? ` · ${brief.marksAtRisk} marks at risk here` : ""}
         </p>
-        {brief.provisional ? <p className="mt-1 text-sm text-ink2" role="note">{brief.provisional}</p> : <p className="mt-1 text-sm text-ink2">{explanation.stakes}</p>}
+
+        {/* Start sits straight under what and where, as on BestNextStep, so it is
+            in the first viewport on a 360 x 760 phone (it was at y=876, under the
+            bottom nav). The reasons follow it, unchanged and always visible. */}
+        <ButtonLink href={session.startHref} variant="primary" size="md" className="mt-4 min-h-[3rem] w-full text-base sm:mt-5 sm:w-auto">
+          Start session <ForwardIcon size={17} aria-hidden />
+        </ButtonLink>
+
+        {brief.provisional ? <p className="mt-3 text-sm text-ink2" role="note">{brief.provisional}</p> : <p className="mt-3 text-sm text-ink2">{explanation.stakes}</p>}
         {brief.lifecycle ? (
           <p className="mt-1 text-sm text-ink2">
             <span className="font-medium text-ink">{brief.lifecycle.label}.</span> {brief.lifecycle.line}
@@ -84,9 +92,6 @@ export function AdaptiveSessionHero({
           <span className="font-medium text-ink">How:</span> {pathway.steps.join(" → ")}
         </p>
 
-        <ButtonLink href={session.startHref} variant="primary" size="md" className="mt-5 min-h-[3rem] w-full text-base sm:w-auto">
-          Start session <ForwardIcon size={17} aria-hidden />
-        </ButtonLink>
         {pathway.endsWithDelayedCheck ? (
           <p className="mt-3 max-w-2xl text-sm text-ink2">
             <span className="font-medium text-ink">After this:</span> a check in a few days, on a question you have not seen, shows whether it stuck.
