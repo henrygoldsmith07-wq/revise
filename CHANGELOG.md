@@ -1,5 +1,49 @@
 # Changelog
 
+## A cold start in about a second, and Start in the first viewport — 2026-10-12 (fourteenth pass)
+
+**After the thirteenth pass a fresh 360px profile still waited 2.6–2.8s
+(normal CPU) and 10.4–10.8s (4× CPU throttle) before onboarding appeared,
+and returning visits waited the same.** A CPU profile of the boot showed the
+main thread busy, not waiting: the content bank is built when the content
+module first evaluates, the app shell imports it statically, and most of that
+build was spent in authoring helpers rather than in the content itself.
+
+- `hasPhrase` (`src/content/questions/wjec-quality-authoring.ts`)
+  re-normalised the same prompt and compiled a fresh `RegExp` for every
+  candidate phrase. It now normalises each prompt once and compiles each
+  pattern once; the matching rules are unchanged.
+- `provenanceFor` scanned every operation word even when a carried reasoning
+  token made the result unused; it now scans only when it is needed.
+- `equationFragments` (`src/domain/subject-assessment-semantic.ts`) used a
+  global pattern whose backtracking was quadratic in sentence length; it now
+  splits on the same delimiters, with identical results.
+- Same output: the sha256 of the serialised authored questions, seeded cards
+  and misconceptions is unchanged. `tests/content-boot-cost.test.ts` checks
+  the new `equationFragments` against the old pattern on every authored text
+  plus 2,000 generated strings, and the cached matcher against stale state.
+- Measured on production builds of `main` and this branch, same script, 360px
+  mobile emulation: bank build in Node 2.6–2.7s → 0.8s; onboarding visible
+  2.6–2.8s → 1.0–1.3s at normal CPU and 10.4–10.8s → 3.4–4.7s at 4× CPU;
+  a returning visit's main view 2.7s → 1.2–1.3s (normal) and 9.2s → 3.6s (4×).
+  Numbers and method are in PR #52.
+- The bank is still in the shell's 3.6 MB chunk and is still installed into
+  IndexedDB after onboarding (about 4.7s before Today on a first visit).
+  Moving it off the boot path is the next step, not done here.
+
+**Today's Start button was below the fold on a 360 × 760 phone** (it ended
+at y=876; the fixed bottom nav starts at y=694), behind a tall greeting card
+and four lines of reasons.
+
+- `AdaptiveSessionHero` puts Start straight under the subject, topic and exam
+  line, as `BestNextStep` already did. The provisional note, lifecycle, "In
+  this session" and "How" lines follow it, unchanged and still visible.
+- `TodayWelcome` is compact below the `sm` breakpoint (no "Today" eyebrow,
+  which the bottom nav already shows; smaller heading and padding).
+- Start now ends at y=483 (y=462 at 360 × 640). A new check in
+  `e2e/narrow-360.spec.ts` fails on `main` ("Start ends at y=876, fold at
+  694") and passes here.
+
 ## A first visit opens in about 3 seconds, and "due" means owed everywhere — 2026-10-12 (thirteenth pass)
 
 **A brand-new profile on a 360px phone profile waited 8.8–9.0s (normal CPU)
