@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { completeOnboarding, todayOrOnboarding } from "./helpers";
 import { answerOnScreen, runQuestionSet } from "./journey-helpers";
-import { putQuestions, readSubjectQuestions, trustViaWorkflow } from "./review-fixture";
+import { installFixtureLedger, readSubjectQuestions, trustViaWorkflow } from "./review-fixture";
 
 // WJEC A-level Mathematics, on a phone: cold start → trusted quick diagnostic → wrong answers → lost marks →
 // Today leads with recovery → repair is still not "Proven".
@@ -28,7 +28,7 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
 
   const trusted = trustViaWorkflow(SUBJECT, await readSubjectQuestions(page, SUBJECT));
   expect(trusted.length).toBeGreaterThanOrEqual(5);
-  await putQuestions(page, trusted);
+  await installFixtureLedger(page, trusted);
   await page.goto("/");
   await expect(main).toContainText("Do this now", { timeout: 30_000 });
 

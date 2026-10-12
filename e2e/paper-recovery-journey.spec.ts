@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, todayOrOnboarding } from "./helpers";
 import { runQuestionSet } from "./journey-helpers";
-import { putQuestions, readSubjectQuestions, trustIdsViaWorkflow } from "./review-fixture";
+import { appQuestions, installFixtureLedger, readSubjectQuestions, trustIdsViaWorkflow } from "./review-fixture";
 
 // A persisted paper becomes lost marks, then one recovery mission: repair, an unaided answer on
 // different questions, then (after the delay) a spaced practice check. Time is moved by back-dating
@@ -37,7 +37,7 @@ async function trustOneTopic(page: Page): Promise<string[]> {
   expect(ids.length, "the paper journey needs sat, apply and delayed-proof questions in one topic").toBeGreaterThanOrEqual(4);
   const trusted = trustIdsViaWorkflow(questions, ids);
   expect(trusted.every((q) => q.verification === "verified")).toBe(true);
-  await putQuestions(page, trusted);
+  await installFixtureLedger(page, trusted);
   return ids;
 }
 
@@ -52,13 +52,15 @@ async function openDb(page: Page) {
 
 async function seedPaper(page: Page, onlyIds: string[]) {
   expect(await openDb(page)).toBe("revise");
-  return page.evaluate(async (onlyIds) => {
+  // Authored questions come from the bundle, not the profile's store (see review-fixture.ts).
+  const allowedIds = new Set(onlyIds);
+  const candidates = (await appQuestions(page)).filter((q) => allowedIds.has(q.id) && q.kind !== "mcq" && q.totalMarks >= 2);
+  return page.evaluate(async (candidates) => {
     const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open("revise"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
     const all = (store: string): Promise<Row[]> => new Promise((res) => { const r = db.transaction(store).objectStore(store).getAll(); r.onsuccess = () => res(r.result as Row[]); });
     const cards = await all("cards");
     const userId = cards[0]!.userId as string;
-    const allowed = new Set(onlyIds);
-    const questions = (await all("questions")).filter((q) => allowed.has(q.id) && q.kind !== "mcq" && q.totalMarks >= 2);
+    const questions = candidates as Row[];
     const byTopic = new Map<string, Row[]>();
     for (const q of questions) byTopic.set(q.topicIds[0], [...(byTopic.get(q.topicIds[0]) ?? []), q]);
     const [topic, pool] = [...byTopic].sort((a, b) => b[1].length - a[1].length)[0]!;
@@ -85,7 +87,7 @@ async function seedPaper(page: Page, onlyIds: string[]) {
     });
     await new Promise((r) => { tx.oncomplete = r; });
     return { lost: sat.reduce((s, q) => s + q.totalMarks, 0) };
-  }, onlyIds);
+  }, candidates);
 }
 
 /** Moves every mission attempt back in time so the proof delay has genuinely passed. */

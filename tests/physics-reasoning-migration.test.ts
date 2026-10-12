@@ -18,7 +18,10 @@ describe("structured flagship reasoning migration", () => {
     // the rules stripped, the fingerprint is the original one.
     const withRules = physicsReasoningDepthQuestions.filter(question => question.parts.some(part => part.rejects?.length)).map(question => question.id);
     expect(withRules).toEqual(["cnt:question:physics-depth-fields-sp-01-inverse-square-fallacy-3"]);
-    const stripped = (question: Question): Question => ({ ...question, parts: question.parts.map(({ rejects: _rejects, ...part }) => part) });
+    const stripped = (question: Question): Question => ({
+      ...question,
+      parts: question.parts.map((part) => Object.fromEntries(Object.entries(part).filter(([key]) => key !== "rejects")) as typeof part),
+    });
     expect(Object.fromEntries(physicsReasoningDepthQuestions.map(question => [question.id, physicsContentFingerprint(stripped(question))]))).toEqual(original);
     expect(physicsReasoningDepthQuestions.every(question => question.verification === "unverified")).toBe(true);
   });

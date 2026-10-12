@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, todayOrOnboarding } from "./helpers";
 import { runQuestionSet } from "./journey-helpers";
-import { putQuestions, readSubjectQuestions, trustIdsViaWorkflow } from "./review-fixture";
+import { appQuestions, firstCard, installFixtureLedger, readSubjectQuestions, trustIdsViaWorkflow } from "./review-fixture";
 
 // Seeds lost marks (and, for the proof journey, an earlier independent success) straight into
 // IndexedDB with past dates, so the multi-day loop can be exercised in one run: lost marks →
@@ -39,21 +39,23 @@ async function trustOneTopic(page: Page): Promise<string[]> {
   expect(ids.length, "the proof journey needs lost, earlier-success and unseen questions in one topic").toBeGreaterThanOrEqual(4);
   const trusted = trustIdsViaWorkflow(questions, ids);
   expect(trusted.every((q) => q.verification === "verified")).toBe(true);
-  await putQuestions(page, trusted);
+  await installFixtureLedger(page, trusted);
   return ids;
 }
 
 async function seed(page: Page, opts: { withEarlierSuccess: boolean; onlyIds?: string[] }) {
-  const info = await page.evaluate(async ({ withEarlierSuccess, onlyIds }) => {
+  // Authored questions come from the bundle, not the profile's store (see review-fixture.ts).
+  const subject = opts.onlyIds ? null : (await firstCard(page)).subjectId;
+  const allowedIds = opts.onlyIds ? new Set(opts.onlyIds) : null;
+  const candidates = (await appQuestions(page)).filter((q) => (allowedIds ? allowedIds.has(q.id) : q.subjectId === subject) && q.kind !== "mcq" && q.totalMarks >= 2);
+  const info = await page.evaluate(async ({ withEarlierSuccess, candidates }) => {
     type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     const name = (await indexedDB.databases()).map((d) => d.name!).find((n) => n === "revise")!;
     const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open(name); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
     const all = (store: string): Promise<Row[]> => new Promise((res) => { const r = db.transaction(store).objectStore(store).getAll(); r.onsuccess = () => res(r.result as Row[]); });
     const cards = await all("cards");
-    const subject = cards[0]!.subjectId as string;
     const userId = cards[0]!.userId as string;
-    const allowed = onlyIds ? new Set(onlyIds) : null;
-    const questions = (await all("questions")).filter((q) => (allowed ? allowed.has(q.id) : q.subjectId === subject) && q.kind !== "mcq" && q.totalMarks >= 2);
+    const questions = candidates as Row[];
     const byTopic = new Map<string, Row[]>();
     for (const q of questions) byTopic.set(q.topicIds[0], [...(byTopic.get(q.topicIds[0]) ?? []), q]);
     const [topic, pool] = [...byTopic].sort((a, b) => b[1].length - a[1].length)[0]!;
@@ -75,7 +77,7 @@ async function seed(page: Page, opts: { withEarlierSuccess: boolean; onlyIds?: s
     if (withEarlierSuccess) tx.objectStore("attempts").put(attempt("seed-success", q2!, q2!.totalMarks, ago(8)));
     await new Promise((r) => { tx.oncomplete = r; });
     return { lost: q0!.totalMarks + q1!.totalMarks };
-  }, opts);
+  }, { withEarlierSuccess: opts.withEarlierSuccess, candidates });
   await page.goto("/");
   await page.locator("main#main").waitFor();
   await page.waitForTimeout(3500);
