@@ -1,4 +1,4 @@
-import type { Question } from "@/domain/types";
+import type { MarkSchemeReject, Question } from "@/domain/types";
 import { wjecCapabilities } from "../capabilities";
 import { defineQuestion } from "./authoring";
 
@@ -29,6 +29,8 @@ type Item = {
   scheme: string[];
   answer: string;
   move: string;
+  /** "Do not accept" lines for individual scheme points (twelfth pass). */
+  rejects?: MarkSchemeReject[];
 };
 
 const items: Item[] = [
@@ -76,7 +78,10 @@ const items: Item[] = [
     prompt: "State what is meant by semi-conservative replication.",
     scheme: ["Each new DNA molecule contains one original (parental) strand", "and one newly synthesised strand"],
     answer: "Each daughter DNA molecule is made of one strand from the original molecule and one newly made strand.",
-    move: "state what is conserved in each daughter DNA molecule" },
+    move: "state what is conserved in each daughter DNA molecule",
+    rejects: [
+      { point: 0, phrases: ["two new", "two newly", "both new", "both newly", "kept whole", "kept intact", "remains whole", "remains intact", "stays intact"], reason: "Semi-conservative means every new molecule keeps one parental strand; two new strands with the original molecule kept whole would be conservative replication." },
+      { point: 1, phrases: ["two new", "two newly", "both new", "both newly"], reason: "Each new molecule has exactly one newly made strand, not two." } ] },
   { slug: "bio-insulin-recall", skill: "bio.homeostasis.sp-02", context: "glucose-hormone-source",
     stem: "After a meal, the concentration of glucose in the blood rises.",
     prompt: "Name the hormone released in response to this rise, and name the cells that secrete it.",
@@ -100,7 +105,10 @@ const items: Item[] = [
     prompt: "Name the process by which oxygen moves, and state one feature of the alveoli that increases the rate of this process.",
     scheme: ["Diffusion", "Any one of: large surface area; thin walls (one cell thick) giving a short diffusion distance; extensive capillary network maintaining a steep concentration gradient"],
     answer: "Diffusion. The alveoli have a very large surface area (also accept: walls one cell thick so the diffusion distance is short, or a dense capillary network that maintains the concentration gradient).",
-    move: "name the transport process and link one alveolar feature to its rate" },
+    move: "name the transport process and link one alveolar feature to its rate",
+    rejects: [
+      { point: 0, phrases: ["osmosis", "active transport"], reason: "Oxygen and carbon dioxide cross the alveolar wall by diffusion; osmosis is the movement of water, and gas exchange uses no active transport." },
+      { point: 1, phrases: ["thick wall", "walls are thick", "thick epithelium", "distance … long", "long diffusion distance", "small surface area"], reason: "The adaptation must make exchange faster: a thick wall, a long diffusion distance or a small surface area would slow it." } ] },
   { slug: "bio-codominance-recall", skill: "bio.genetics-inheritance.sp-03", context: "codominance-definition",
     stem: "Some genes show codominance.",
     prompt: "State what is meant by codominance, and give one example.",
@@ -114,7 +122,9 @@ const items: Item[] = [
     prompt: "State what is meant by a dative covalent (coordinate) bond, and identify which atom provides the electrons for the new bond in NH₄⁺.",
     scheme: ["A shared pair of electrons in which both electrons are provided by the same atom", "The nitrogen atom (its lone pair)"],
     answer: "A dative covalent bond is a shared pair of electrons where both electrons come from one atom. In NH₄⁺ the nitrogen atom donates its lone pair to H⁺.",
-    move: "define a dative bond and locate the donated lone pair" },
+    move: "define a dative bond and locate the donated lone pair",
+    rejects: [
+      { point: 0, phrases: ["each atom provides one", "each atom … one electron", "one electron from each", "one from each atom", "each atom donates one", "each atom contributes one"], reason: "One electron from each atom is an ordinary covalent bond; in a dative bond both electrons come from the same atom." } ] },
   { slug: "chem-bronsted-recall", skill: "chem.acids-bases.sp-01", context: "conjugate-pairs",
     stem: "NH₄⁺(aq) + H₂O(l) ⇌ NH₃(aq) + H₃O⁺(aq)",
     prompt: "State the Brønsted–Lowry definition of an acid, and give the conjugate base of NH₄⁺.",
@@ -159,7 +169,9 @@ const items: Item[] = [
     prompt: "State the assumption you begin with, and write it in terms of two integers a and b.",
     scheme: ["Assume that √2 is rational", "√2 = a/b where a and b are integers with no common factor and b ≠ 0"],
     answer: "Assume that √2 is rational, so √2 = a/b where a and b are integers with no common factor and b ≠ 0.",
-    move: "open a proof by contradiction by assuming the negation in fraction form" },
+    move: "open a proof by contradiction by assuming the negation in fraction form",
+    rejects: [
+      { point: 1, phrases: ["cannot be written as a fraction", "can not be written as a fraction", "cannot be expressed as a fraction", "can not be expressed as a fraction", "cannot be written as a/b", "cannot be written in the form"], reason: "The proof starts by writing √2 = a/b; saying √2 cannot be a fraction assumes what has to be proved." } ] },
   { slug: "math-vector-magnitude-recall", skill: "math.vectors.sp-01", context: "magnitude-3d",
     stem: "The vector a = 2i − 3j + 6k.",
     prompt: "Write down the formula for the magnitude of xi + yj + zk, and find |a|.",
@@ -171,7 +183,9 @@ const items: Item[] = [
     prompt: "Write down the Newton–Raphson iteration formula, and state the value of f′(xₙ) for which the method fails.",
     scheme: ["xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ)", "The method fails when f′(xₙ) = 0"],
     answer: "xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ). The method fails when f′(xₙ) = 0, because the tangent is horizontal.",
-    move: "recall the tangent-based iteration and where it breaks down" },
+    move: "recall the tangent-based iteration and where it breaks down",
+    rejects: [
+      { point: 1, phrases: ["when f(xₙ) = 1", "when f(x) = 1", "when f(xₙ) = 0", "when f(x) = 0", "if f(xₙ) = 1", "if f(xₙ) = 0", "if f(x) = 0"], reason: "The method fails when the derivative f′(xₙ) is zero (division by zero); f(xₙ) = 0 means xₙ is already a root." } ] },
   { slug: "math-probability-rules-recall", skill: "math.probability.sp-01", context: "addition-multiplication-rules",
     stem: "A and B are two events.",
     prompt: "Write down P(A ∪ B) when A and B are mutually exclusive, and P(A ∩ B) when A and B are independent.",
@@ -189,13 +203,19 @@ const items: Item[] = [
     prompt: "State the conditions for a Poisson model to be suitable, and state the mean and variance of X.",
     scheme: ["Events occur singly, independently and at a constant average rate", "Mean = variance = λ"],
     answer: "Emails must arrive singly, independently of each other and at a constant average rate. The mean and the variance are both λ.",
-    move: "list the Poisson conditions and recall that its mean equals its variance" },
+    move: "list the Poisson conditions and recall that its mean equals its variance",
+    rejects: [
+      { point: 0, phrases: ["in groups", "in clusters", "depend on each other", "dependent on each other", "changing rate", "varying rate", "rate changes", "rate varies"], reason: "A Poisson model needs events that occur singly, independently and at a constant average rate." },
+      { point: 1, phrases: ["variance is λ2", "variance = λ2", "variance … λ2", "variance is √λ", "variance … 2λ"], reason: "For a Poisson distribution the variance equals the mean, λ, not λ² or another function of λ." } ] },
   { slug: "math-error-types-recall", skill: "math.inference-errors.sp-03", context: "type-one-two-definitions",
     stem: "A hypothesis test is carried out with null hypothesis H₀.",
     prompt: "Define a Type I error and a Type II error.",
     scheme: ["A Type I error is rejecting H₀ when H₀ is true", "A Type II error is not rejecting H₀ when H₀ is false"],
     answer: "A Type I error is rejecting H₀ when H₀ is actually true. A Type II error is not rejecting H₀ when H₀ is actually false.",
-    move: "pair each error type with the decision and the true state of H₀" },
+    move: "pair each error type with the decision and the true state of H₀",
+    rejects: [
+      { point: 0, phrases: ["type i error is accept", "type i … accepting h0", "type 1 … accepting h0", "type i … not rejecting", "type 1 … not rejecting", "type i … h0 is false", "type 1 … h0 is false"], reason: "A Type I error is rejecting H₀ when H₀ is true; accepting a false H₀ is a Type II error." },
+      { point: 1, phrases: ["type ii error is rejecting", "type ii … rejecting h0 when", "type 2 … rejecting h0 when", "type ii … h0 is true", "type 2 … h0 is true"], reason: "A Type II error is not rejecting H₀ when H₀ is false; rejecting a true H₀ is a Type I error." } ] },
   { slug: "math-standardise-recall", skill: "math.continuous-distributions.sp-02", context: "standardising",
     stem: "X ~ N(μ, σ²).",
     prompt: "Write down the formula used to standardise X, and state the distribution of the standardised variable Z.",
@@ -257,7 +277,10 @@ const items: Item[] = [
     prompt: "Name the four phases of the growth curve in order, and state in which phase the population grows fastest.",
     scheme: ["Lag, log (exponential), stationary, death", "Fastest growth is in the log (exponential) phase"],
     answer: "Lag, log (exponential), stationary and death phases. The population grows fastest in the log (exponential) phase.",
-    move: "recall the closed-culture growth phases" },
+    move: "recall the closed-culture growth phases",
+    rejects: [
+      { point: 0, phrases: ["death … lag", "death … log", "death … stationary", "stationary … lag", "stationary … log", "log … lag"], scope: "answer", reason: "The phases come in the order lag, log (exponential), stationary, death." },
+      { point: 1, phrases: ["fastest … stationary", "fastest … lag", "fastest … death", "fastest … decline", "stationary phase … fastest", "lag phase … fastest"], reason: "Growth is fastest in the log (exponential) phase." } ] },
   { slug: "bio-resting-potential-recall", skill: "bio.nervous-coordination.sp-01", context: "resting-depolarisation",
     stem: "An axon at rest has a potential difference across its membrane.",
     prompt: "State a typical value of the resting potential, and name the ions that diffuse into the axon during depolarisation.",
@@ -275,7 +298,10 @@ const items: Item[] = [
     prompt: "State what each of the two male nuclei fuses with, and what each fusion forms.",
     scheme: ["One male nucleus fuses with the egg cell to form the diploid zygote", "The other male nucleus fuses with the two polar nuclei to form the triploid endosperm nucleus"],
     answer: "One male nucleus fuses with the egg cell to form a diploid zygote. The other male nucleus fuses with the two polar nuclei to form a triploid endosperm nucleus.",
-    move: "follow both male nuclei to their two fusion products" },
+    move: "follow both male nuclei to their two fusion products",
+    rejects: [
+      { point: 0, phrases: ["antipodal", "seed coat", "synergid"], reason: "One male nucleus fuses with the egg cell to form the zygote; the antipodal cells and synergids are not fertilised, and the seed coat develops from the integuments." },
+      { point: 1, phrases: ["antipodal", "seed coat", "synergid"], reason: "The second male nucleus fuses with the two polar nuclei to form the triploid endosperm nucleus, not with the antipodal cells or synergids." } ] },
   { slug: "bio-pcr-enzyme-recall", skill: "bio.genetic-applications.sp-01", context: "pcr-polymerase",
     stem: "The polymerase chain reaction (PCR) amplifies a target DNA sequence.",
     prompt: "Name the enzyme that builds the new DNA strands in PCR, and explain why this enzyme is used.",
@@ -293,7 +319,10 @@ const items: Item[] = [
     prompt: "State what happens to the length of the A band and to the length of the sarcomere during contraction.",
     scheme: ["The A band stays the same length", "The sarcomere shortens"],
     answer: "The A band stays the same length, while the sarcomere shortens (as do the I band and H zone).",
-    move: "recall that filaments slide rather than shorten" },
+    move: "recall that filaments slide rather than shorten",
+    rejects: [
+      { point: 0, phrases: ["a band shortens", "a band shorten", "a band gets shorter", "a band becomes shorter", "a band … decreases", "a band … narrower"], reason: "The A band is the length of the myosin filaments, so it stays the same; the I band and H zone shorten." },
+      { point: 1, phrases: ["sarcomere … longer", "sarcomere lengthens", "sarcomere … lengthen", "sarcomere … stays the same", "sarcomere … increases"], reason: "During contraction the sarcomere shortens." } ] },
   { slug: "bio-innate-behaviour-recall", skill: "bio.neurobiology-behaviour.sp-03", context: "innate-definition",
     stem: "Animal behaviour can be innate or learned.",
     prompt: "State what is meant by innate behaviour, and give one example.",
@@ -311,7 +340,10 @@ const items: Item[] = [
     prompt: "Define the independent variable and a control variable, and give the independent variable in this investigation.",
     scheme: ["The independent variable is the one the investigator changes, here temperature", "A control variable is kept constant so that it does not affect the dependent variable"],
     answer: "The independent variable is the one the investigator changes, here temperature. A control variable, such as pH, is kept constant so that it does not affect the dependent variable.",
-    move: "separate the variable you change from the ones you keep constant" },
+    move: "separate the variable you change from the ones you keep constant",
+    rejects: [
+      { point: 0, phrases: ["independent … measured", "independent … kept constant", "independent … controlled"], reason: "The independent variable is the one the investigator changes; the dependent variable is the one measured." },
+      { point: 1, phrases: ["control … changed", "control … varied", "control … measured", "control variable is the one that changes"], reason: "A control variable is kept constant; the variable that is changed is the independent variable." } ] },
 
   // --- Chemistry -----------------------------------------------------------
   { slug: "chem-halide-test-recall", skill: "chem.periodicity.sp-05", context: "silver-nitrate-test",
@@ -325,13 +357,19 @@ const items: Item[] = [
     prompt: "Define a transition element, and explain why zinc is not one.",
     scheme: ["An element that forms at least one stable ion with a partially filled d sub-shell", "Zinc only forms Zn²⁺, which has a full 3d sub-shell (3d¹⁰)"],
     answer: "A transition element forms at least one stable ion with a partially filled d sub-shell. Zinc only forms Zn²⁺, which has a full 3d sub-shell (3d¹⁰).",
-    move: "apply the ion-based definition to the zinc ion" },
+    move: "apply the ion-based definition to the zinc ion",
+    rejects: [
+      { point: 0, phrases: ["any metal", "all metals", "any d block", "any element in the d block", "every d block"], reason: "Not every metal or d-block element is a transition element: it must form at least one stable ion with a partially filled d sub-shell." },
+      { point: 1, phrases: ["zn2 … partially filled", "zinc … partially filled", "zn2 … incomplete", "zinc … incomplete"], reason: "Zn²⁺ is 3d¹⁰, a full d sub-shell, which is why zinc is not a transition element." } ] },
   { slug: "chem-isomer-definitions-recall", skill: "chem.organic-basics.sp-02", context: "isomer-definitions",
     stem: "Isomers can be structural isomers or stereoisomers.",
     prompt: "Define structural isomers and stereoisomers.",
     scheme: ["Structural isomers have the same molecular formula but different structural formulae", "Stereoisomers have the same structural formula but a different arrangement of atoms in space"],
     answer: "Structural isomers have the same molecular formula but different structural formulae. Stereoisomers have the same structural formula but a different arrangement of their atoms in space.",
-    move: "separate a different structure from a different spatial arrangement" },
+    move: "separate a different structure from a different spatial arrangement",
+    rejects: [
+      { point: 0, phrases: ["structural isomers have different molecular", "structural isomers … different molecular formula"], reason: "Structural isomers have the same molecular formula; it is their structural formulae that differ." },
+      { point: 1, phrases: ["stereoisomers have different structural", "stereoisomers … different structural formula"], reason: "Stereoisomers have the same structural formula; only the arrangement of atoms in space differs." } ] },
   { slug: "chem-hcn-addition-recall", skill: "chem.carbonyls-acids.sp-01", context: "propanal-hcn",
     stem: "Propanal, CH₃CH₂CHO, reacts with HCN in the presence of KCN.",
     prompt: "Name the type of mechanism, and name the organic product.",
@@ -373,7 +411,9 @@ const items: Item[] = [
     prompt: "State what is meant by a zwitterion, and give the structure of the glycine zwitterion.",
     scheme: ["An ion with both a positive and a negative charge but no overall charge", "H₃N⁺CH₂COO⁻"],
     answer: "A zwitterion has both a positive and a negative charge but no overall charge. The glycine zwitterion is H₃N⁺CH₂COO⁻.",
-    move: "move a proton from the acid group to the amine group" },
+    move: "move a proton from the acid group to the amine group",
+    rejects: [
+      { point: 0, phrases: ["overall positive", "overall negative", "positive overall", "negative overall", "net positive", "net negative", "positively charged overall", "negatively charged overall"], reason: "A zwitterion carries both a positive and a negative charge, so it has no overall charge." } ] },
   { slug: "chem-recrystallisation-recall", skill: "chem.organic-synthesis.sp-03", context: "solid-purification",
     stem: "A synthesis produces an impure organic solid.",
     prompt: "Name the technique used to purify the solid, and state how you would check that the purified solid is pure.",
@@ -385,7 +425,10 @@ const items: Item[] = [
     prompt: "State how percentage uncertainty is calculated, and give the uncertainty in the titre.",
     scheme: ["Percentage uncertainty = (uncertainty ÷ measured value) × 100", "The titre has an uncertainty of ±0.10 cm³ because two readings are combined"],
     answer: "Percentage uncertainty = (uncertainty ÷ measured value) × 100. The titre comes from two readings, each ±0.05 cm³, so its uncertainty is ±0.10 cm³.",
-    move: "combine the uncertainty of two readings before dividing by the value" },
+    move: "combine the uncertainty of two readings before dividing by the value",
+    rejects: [
+      { point: 0, phrases: ["measured value ÷ uncertainty", "measured value / uncertainty", "measured value divided by … uncertainty", "value ÷ uncertainty", "value / uncertainty"], reason: "Percentage uncertainty is the uncertainty divided by the measured value, then × 100, not the other way round." },
+      { point: 1, phrases: ["titre … 0.05", "titre … ±0.05", "0.05 cm3 for the titre"], except: ["0.10", "0.1 cm3"], reason: "Each burette reading is ±0.05 cm³, but a titre combines two readings, so its uncertainty is ±0.10 cm³." } ] },
   { slug: "chem-halogenoalkane-substitution-recall", skill: "chem.organic-mechanisms.sp-01", context: "bromoethane-hydroxide",
     stem: "Bromoethane is warmed with aqueous sodium hydroxide.",
     prompt: "Name the type of mechanism, and name the organic product.",
@@ -397,7 +440,10 @@ const items: Item[] = [
     prompt: "Define standard electrode potential, and state the conditions of the standard hydrogen electrode.",
     scheme: ["The potential of a half-cell measured relative to the standard hydrogen electrode under standard conditions", "298 K, 1 mol dm⁻³ H⁺(aq), hydrogen gas at 100 kPa and a platinum electrode"],
     answer: "The potential of a half-cell measured relative to the standard hydrogen electrode under standard conditions. The hydrogen electrode uses 1 mol dm⁻³ H⁺(aq), hydrogen gas at 100 kPa, a platinum electrode and 298 K.",
-    move: "define E⦵ against the hydrogen reference and list its conditions" },
+    move: "define E⦵ against the hydrogen reference and list its conditions",
+    rejects: [
+      { point: 0, phrases: ["copper electrode", "zinc electrode", "silver electrode", "carbon electrode", "graphite electrode", "voltage of a battery", "emf of a battery"], reason: "A standard electrode potential is measured against the standard hydrogen electrode, not another metal electrode or a battery." },
+      { point: 1, phrases: ["copper electrode", "zinc electrode", "silver electrode", "carbon electrode", "graphite electrode", "room temperature"], reason: "Standard conditions are 298 K, 1 mol dm⁻³ H⁺(aq) and hydrogen at 100 kPa over a platinum electrode." } ] },
 ];
 
 export const wjecRecallProbeQuestions: Question[] = items.map((item) => {
@@ -414,6 +460,7 @@ export const wjecRecallProbeQuestions: Question[] = items.map((item) => {
     parts: [{ prompt: item.prompt, marks: item.scheme.length, scheme: item.scheme, answer: item.answer,
       aos: ["AO1"],
       specPointIds: node.specPointIds, learningClaims: item.scheme, capabilityIds: [node.id],
-      learning: { familyId: item.slug, contextId: item.context, demand: "recall", reasoningMoves: [item.move] } }],
+      learning: { familyId: item.slug, contextId: item.context, demand: "recall", reasoningMoves: [item.move] },
+      ...(item.rejects ? { rejects: item.rejects } : {}) }],
   });
 });

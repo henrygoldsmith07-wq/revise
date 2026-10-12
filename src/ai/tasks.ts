@@ -15,6 +15,7 @@ import {
 } from "./fallback";
 import { extractJson, getProvider } from "./provider";
 import { UNTRUSTED_RULE, untrusted } from "./untrusted";
+import { doNotAcceptLines } from "@/domain/marking-reject";
 import type { AiEnvelope, AiTask, SocraticExaminerPayload, SocraticResponse } from "./types";
 import { RESPONSE_SCHEMAS, socraticExaminerPayloadSchema } from "./types";
 import { checkSocraticReply } from "@/domain/socratic-examiner";
@@ -183,6 +184,16 @@ export const payloadSchemas = {
             prompt: z.string().max(4000),
             marks: z.number().min(0).max(30),
             markScheme: z.array(z.string().max(1000)).max(20),
+            rejects: z
+              .array(
+                z.object({
+                  point: z.number().int().min(0).max(19),
+                  phrases: z.array(z.string().max(120)).min(1).max(12),
+                  reason: z.string().max(300),
+                }),
+              )
+              .max(12)
+              .optional(),
           }),
         )
         .min(1)
@@ -438,7 +449,7 @@ export async function mark(question: Question, answers: Record<string, string>) 
     .map(
       (part) =>
         `Part id ${part.id} ${part.label} [${part.marks} marks]\nQuestion: ${part.prompt}\nMark scheme:\n${part.markScheme
-          .map((s) => `  • ${s}`)
+          .map((s, index) => `  • ${s}${doNotAcceptLines(part.rejects, index)}`)
           .join("\n")}\nStudent answer:\n${untrusted(`answer to part ${part.id}`, answers[part.id]?.trim() || "(no answer given)")}`,
     )
     .join("\n\n");
@@ -455,6 +466,7 @@ export async function mark(question: Question, answers: Record<string, string>) 
       "",
       "Mark each part. Credit a mark-scheme point only if the student's answer contains it —",
       "reward correct alternative wording, never reward what is merely implied.",
+      "A \"Do not accept\" note under a point lists answers that do not earn that point: never credit the point for them.",
     "Return one entry per part with its exact partId, one overall examiner-style feedback paragraph, and confidence from 0 to 1 in the mark.",
     ].join("\n"),
     `{ "marked": [{ "partId": string, "awarded": number, "max": number, "creditedPoints": string[], "missedPoints": string[], "comment": string }], "feedback": string, "confidence": number }`,

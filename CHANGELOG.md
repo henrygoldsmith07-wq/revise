@@ -1,5 +1,40 @@
 # Changelog
 
+## Mark schemes can say "do not accept" — 2026-10-12 (twelfth pass)
+
+**Sixteen wrong answers in the regression set still earned offline marks
+because no general check can see them**: swapped Type I/II definitions keep
+every word of both points, "antipodal cells" is a wrong structure rather than
+an opposite word, and "Percentage uncertainty = measured value ÷ uncertainty"
+keeps every word of the right formula. WJEC mark schemes handle these with
+"do not accept" notes beside a point; the bank now can too.
+
+- `QuestionPart.rejects` (optional, backward compatible): per-point
+  `MarkSchemeReject` rules with phrases, an optional `except` list, an
+  optional whole-answer `scope` (for orderings) and a learner-facing reason.
+  Validated by `defineQuestion` and `contentQuestionPartSchema`.
+- `src/domain/marking-reject.ts` applies them. A phrase must appear in one
+  clause, in order ("…" skips up to six words; a word of four or more letters
+  covers its longer forms). A negated phrase ("not osmosis", "rather than",
+  "fail to reject") is a contrast and never vetoes. Rules only remove credit:
+  the offline marker drops the point and says "the mark scheme does not
+  accept “…” for this point" with the reason; on an AI mark the point is
+  contested, so the mark is provisional.
+- The AI marking prompt gets each rule as a "Do not accept" note under its
+  point (bounded in egress, schema-checked server-side; the student answer
+  stays in its untrusted fence). The semantic-cache and DLQ scheme hash
+  include the rules only when a part has some, so other parts' cached marks
+  are unaffected.
+- Rules authored for the 15 recall probes behind the regression set's known
+  gaps. Regression set: over-credited contradictions 18 answers (23 marks) →
+  **2 (3 marks)**, both Physics items that have no rules yet. Held-out
+  answers written for this pass (20 correct, 12 wrong, worded differently):
+  no correct answer loses a mark to a rule; wrong answers over-credited 7 →
+  0. No model answer in the bank trips a rule. Marks are hand-judged, not
+  moderated.
+- Not changed: proof predicates, review gates, verification status (every
+  probe is still unverified), the general contradiction checks.
+
 ## Fewer wrong answers earn offline marks — 2026-10-11 (eleventh pass)
 
 **Writing a plainly wrong answer for each of the 40 new recall probes showed
