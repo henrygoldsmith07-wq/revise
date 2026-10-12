@@ -459,9 +459,6 @@ export function Onboarding({ onDone }: { onDone: () => void | Promise<void> }) {
                 <li>Mistakes turn into targeted repair, then an unseen proof check.</li>
               </ol>
             </div>
-            <p className="text-xs text-ink3">
-              Revise already understands where to look first — you will leave thinking that, not that you configured a dashboard.
-            </p>
           </Panel>
         ) : null}
 

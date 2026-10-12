@@ -15,7 +15,7 @@ import { buildMarkRecovery, type MarkRecovery } from "@/domain/mark-recovery";
 import { officialPaperContextFromSettings } from "@/domain/official-papers";
 import { buildMistakePatterns, type MistakePattern } from "@/domain/mistake-patterns";
 import { daysToNearestExam, rankRevisionActions, type RevisionPlan } from "@/domain/revision-engine";
-import { isDue } from "@/domain/scheduling";
+import { isDueReview, studiedCardTopicIds } from "@/domain/scheduling";
 import { reviewedSupplyNote, unseenSupplyByTopic, type TopicSupply } from "@/domain/supply";
 import { topicShares } from "@/domain/topic-weight";
 import { useStoreFields } from "@/state/store";
@@ -85,12 +85,16 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
     };
     const due = new Map<string, { count: number; overdue: number }>();
     for (const card of store.cards) {
-      if (!subjectIds.includes(card.subjectId) || !isDue(card, today)) continue;
+      // Only reviews of cards already studied are owed. The seeded deck is
+      // installed "due" on day one; counting it told a brand-new learner that
+      // 194 cards were due and "the later they are done, the more you forget".
+      if (!subjectIds.includes(card.subjectId) || !isDueReview(card, today)) continue;
       const row = due.get(card.subjectId) ?? { count: 0, overdue: 0 };
       due.set(card.subjectId, { count: row.count + 1, overdue: row.overdue + (card.due < today ? 1 : 0) });
     }
     const touched = new Set(store.attempts.flatMap((a) => a.topicIds));
-    const cardTopics = new Set(store.cards.map((c) => c.topicId));
+    // A topic whose only cards are installed-but-unstudied is still untouched.
+    const cardTopics = studiedCardTopicIds(store.cards);
     const untouched = topics.filter((t) => !touched.has(t.id) && !cardTopics.has(t.id)).map((t) => ({ subjectId: t.subjectId, topicId: t.id, label: t.title, share: shares.get(t.id) ?? 0 }));
     const papers = subjectIds.flatMap((subjectId) => {
       const pick = selectNextPaper({
