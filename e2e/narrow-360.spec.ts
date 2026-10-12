@@ -117,6 +117,38 @@ test.describe("narrow phone — 360x800", () => {
     await expect(start).toHaveAttribute("href", /^\/(?:adaptive-session|diagnostic)/);
   });
 
+  test("a first visit's Start button is in the first viewport at 360 x 760, clear of the bottom nav", async ({ page }) => {
+    // Fourteenth pass: on a fresh skip-path profile Start sat at y≈876, under
+    // the fixed bottom nav, behind the greeting card and four lines of reasons.
+    await page.setViewportSize({ width: 360, height: 760 });
+    await page.goto("/");
+    if ((await todayOrOnboarding(page)) !== "onboarding") {
+      test.skip(true, "this profile has already been onboarded");
+    }
+    const wjec = page.getByRole("button", { name: /WJEC/i }).first();
+    await expect(async () => {
+      await wjec.click();
+      await expect(wjec).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /Mathematics/i }).first().click();
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("radio", { name: /Skip for now/i }).click();
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+    await page.getByRole("button", { name: /Build my plan/i }).click();
+    const start = page.locator(".today-focus").getByRole("link", { name: /^Start/i }).first();
+    await expect(start).toBeVisible({ timeout: 60_000 });
+    expect(await page.evaluate(() => window.scrollY), "Today should open at the top").toBe(0);
+    const box = await start.boundingBox();
+    const nav = await page.getByRole("navigation", { name: "Primary sections (mobile)" }).boundingBox();
+    expect(box).not.toBeNull();
+    const fold = nav ? nav.y : 760;
+    expect(box!.y + box!.height, `Start ends at y=${Math.round(box!.y + box!.height)}, fold at ${Math.round(fold)}`).toBeLessThanOrEqual(fold);
+    // The reason it was chosen still shows without a tap, now under the button.
+    await expect(page.locator(".today-focus [role=note]").first()).toBeVisible();
+  });
+
   test("long review copy wraps instead of widening the page", async ({ page }) => {
     await settle(page);
     // Rotating to landscape is the other direction this can fail.

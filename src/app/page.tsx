@@ -171,11 +171,13 @@ function TodayWelcome({ name, greeting, hasSession = true, context }: { name: st
   const salutation = greeting ? "Good " + greeting.toLowerCase() : "Welcome back";
   return (
     <header className="today-welcome">
-      <span className="relative z-10 text-xs font-bold uppercase tracking-[0.13em] text-ink2">Today</span>
-      <h1 className="relative z-10 mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+      {/* Narrow phones get a compact header (no eyebrow: the bottom nav already
+          says Today) so the session's Start button stays in the first viewport. */}
+      <span className="relative z-10 hidden text-xs font-bold uppercase tracking-[0.13em] text-ink2 sm:inline">Today</span>
+      <h1 className="relative z-10 text-xl font-semibold tracking-tight text-ink sm:mt-1 sm:text-3xl">
         {salutation}{name ? ", " + name : ""}
       </h1>
-      <p className="relative z-10 mt-2 max-w-xl text-sm leading-6 text-ink2 sm:text-base">
+      <p className="relative z-10 mt-1 max-w-xl text-sm leading-6 text-ink2 sm:mt-2 sm:text-base">
         {hasSession ? context ?? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
       </p>
     </header>
