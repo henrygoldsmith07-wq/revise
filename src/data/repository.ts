@@ -25,7 +25,7 @@ import {
 import { validatePersistedStores, type PersistenceIssue } from "./persistence-schema";
 import { StorageRecoveryError } from "./storage-recovery";
 import { isRevisionTwinState, type RevisionTwinState } from "@/domain/revision-twin";
-import { COLLECTION_STORES, activeDatabaseProfile, getAll, getDb, putAll, putOne, streamAttempts, streamReviewLogs } from "./db";
+import { COLLECTION_STORES, activeDatabaseProfile, getDb, putAll, putMissing, putOne, streamAttempts, streamReviewLogs } from "./db";
 import { deleteReplicaRows } from "./sync-deletions";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import type { CollectionStore } from "./db";
@@ -172,19 +172,10 @@ const SEED_VERSION = 2;
 export async function ensureSeeded(userId: Id): Promise<void> {
   await migrateContentIds();
   const installed = await readReviseMeta<number>("seedVersion");
-  const existing = await getAll<Card>("cards");
-  const known = new Set(existing.map((c) => c.id));
-
-  const wanted = seedCards(allTopics(), userId);
-  const deleted = new Set((await (await getDb()).getAll("meta")).filter(row => (row.key.startsWith("revise.deleted.v1:") || row.key.startsWith("revise.deletedWire.v1:"))).map(row => row.key));
-  const missing = wanted.filter((c) => !known.has(c.id) && !deleted.has(tombstoneKey("cards", c.id)) && !deleted.has(wireTombstoneKey("cards", syncWireIdValue(userId, c.id))));
-  if (missing.length) await putAll("cards", missing);
-
-  const existingQuestions = await getAll<Question>("questions");
-  const knownQuestions = new Set(existingQuestions.map((q) => q.id));
-  const missingQuestions = seedQuestions.filter((q) => !knownQuestions.has(q.id) && !deleted.has(tombstoneKey("questions", q.id)) && !deleted.has(wireTombstoneKey("questions", syncWireIdValue(userId, q.id))));
-  if (missingQuestions.length) await putAll("questions", missingQuestions);
-
+  // putMissing skips ids already installed and ids the learner deleted (local
+  // or wire tombstone), reading both inside its own write transaction.
+  await putMissing("cards", seedCards(allTopics(), userId), userId);
+  await putMissing("questions", seedQuestions, userId);
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
 }
 

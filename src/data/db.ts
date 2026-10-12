@@ -308,6 +308,49 @@ export async function putAll<T extends { id: Id }>(store: CollectionStore, rows:
   await tx.done;
 }
 
+/**
+ * Install content rows that are not already on the device, in one readwrite
+ * transaction. Seeding only: a row whose id already exists is never
+ * overwritten (its FSRS history stays untouched), and an id the learner
+ * deleted (local or wire tombstone) is skipped rather than resurrected.
+ *
+ * The existing ids and the tombstone keys are read inside the same
+ * transaction as the writes, so nothing can slip in between the check and
+ * the put. putAll's per-row tombstone lookups (two meta reads per row, ~9k
+ * requests for a fresh bank) are what made first boot slow; two key-range
+ * scans answer the same question.
+ */
+export async function putMissing<T extends { id: Id }>(store: CollectionStore, rows: T[], wireUserId: string): Promise<number> {
+  if (!rows.length) return 0;
+  const db = await getDb();
+  const tx = db.transaction([store, "meta"], "readwrite");
+  try {
+    const target = tx.objectStore(store);
+    const [existingIds, deletedKeys] = await Promise.all([
+      target.getAllKeys(),
+      // Both tombstone families ("revise.deleted.v1:" and "revise.deletedWire.v1:") share this prefix.
+      tx.objectStore("meta").getAllKeys(IDBKeyRange.bound("revise.deleted", "revise.deleted\uffff")),
+    ]);
+    const known = new Set(existingIds.map(String));
+    const deleted = new Set(deletedKeys.map(String));
+    const missing = rows.filter(
+      (row) =>
+        !known.has(row.id) &&
+        !deleted.has(tombstoneKey(store, row.id)) &&
+        !deleted.has(wireTombstoneKey(store, syncWireIdValue(wireUserId, row.id))),
+    );
+    // Queue every put without awaiting each one; a failed put aborts the
+    // transaction and tx.done rejects, so nothing is half-installed.
+    for (const row of missing) void target.put(row as never).catch(() => undefined);
+    await tx.done;
+    return missing.length;
+  } catch (error) {
+    try { tx.abort(); } catch { /* already finished or aborted */ }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function putOne<T extends { id: Id }>(store: CollectionStore, row: T): Promise<void> {
   await putAll(store, [row]);
 }

@@ -217,9 +217,11 @@ export async function migrateContentIds(): Promise<ContentIdMigrationReport> {
     // content and double the bank. A scan of the two stores that hold the
     // bank settles it cheaply; the remap itself is idempotent.
     const db = await getDb();
-    const [questions, cards] = await Promise.all([db.getAll("questions"), db.getAll("cards")]);
+    // Keys only: both stores are keyed by id, and reading the full rows here
+    // structured-cloned the whole bank on every boot just to look at ids.
+    const [questionIds, cardIds] = await Promise.all([db.getAllKeys("questions"), db.getAllKeys("cards")]);
     const hasLegacy =
-      questions.some((q) => isLegacyContentId(q.id)) || cards.some((c) => isLegacyContentId(c.id));
+      questionIds.some((id) => isLegacyContentId(String(id))) || cardIds.some((id) => isLegacyContentId(String(id)));
     if (!hasLegacy) {
       return { migrated: false, rowsRewritten: 0, idsRemapped: 0 };
     }
