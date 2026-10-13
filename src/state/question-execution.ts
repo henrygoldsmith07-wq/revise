@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { aiDiagnoseError, aiMark } from "@/lib/optional-ai";
 import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
-import { misconceptionsForTopic } from "@/content";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 
 import { getTopic } from "@/domain/curriculum";
 import { buildHintLadder, HINT_TIERS, hintEvidenceSource, type HintTier } from "@/domain/hints";

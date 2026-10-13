@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { aiExplain, aiGenerateCards, aiSummarise } from "@/lib/optional-ai";
 import type { ExplainResponse } from "@/ai/types";
-import { misconceptionsForTopic } from "@/content";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";
 import { knowledgeVsAnswering } from "@/domain/exam-technique";
 import { buildSubjectGraph } from "@/domain/knowledge-graph";

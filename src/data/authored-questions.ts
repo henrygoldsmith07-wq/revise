@@ -24,9 +24,9 @@
 // ---------------------------------------------------------------------------
 
 import type { Id, Question } from "@/domain/types";
-import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
-import { syncWireIdValue } from "./sync-contract";
-import { getDb } from "./db";
+import { tombstoneKey } from "@/domain/sync-tombstone";
+import { getDb, wireTombstoneCheck } from "./db";
+import { isBankMessage } from "./content-bank-protocol";
 
 // The authored bank (~3.6 MB of the client bundle) is loaded on demand rather
 // than statically imported (seventeenth pass, 2026-10-13). Statically importing
@@ -61,19 +61,121 @@ function importBank(): Promise<readonly Question[]> {
   return import("@/content").then((content) => content.seedQuestions);
 }
 
-/**
- * The current authored question bank. One request per page load; a failed
- * request (a chunk that was never cached, opened offline) is retried once and
- * then forgotten, so a later call can try again instead of replaying the error.
- */
-export function loadAuthoredQuestions(): Promise<readonly Question[]> {
-  bank ??= importBank()
-    .catch(() => importBank())
+// Building the bank is ~1 s of JavaScript on a normal phone CPU and ~3.6 s at
+// 4× throttling (nineteenth pass, 2026-10-13). For a fresh profile that ran on
+// the main thread while onboarding was open, so the first taps waited for it.
+// A fresh profile now builds it in a dedicated worker, which posts the
+// plain-data questions back once (structured clone keeps them identical; the
+// main thread only pays the deserialisation). Anything that stops the worker
+// (no Worker support, a CSP or bundling surprise, an error, no answer) falls
+// back to the main-thread import, so the worker can never leave a student
+// without questions.
+//
+// A returning visit keeps the main-thread import on purpose: it shows a boot
+// screen with nothing to tap, and the worker delivered the bank later than the
+// main thread builds it (no V8 code cache for the worker's copy of the chunk:
+// returning visit ~1.45 s vs ~1.2 s to Today at 1× CPU, measured). Where the
+// worker helps is keeping onboarding responsive, not raw speed.
+
+/** Generous: a slow phone builds the bank in seconds, not tens of seconds. */
+export const BANK_WORKER_TIMEOUT_MS = 30_000;
+
+let bankSource: "worker" | "main-thread" | null = null;
+
+/** How this page got its bank (diagnostics and e2e): built in the worker or on the main thread. */
+export function authoredBankSource(): "worker" | "main-thread" | null {
+  return bankSource;
+}
+
+function bankFromWorker(): Promise<readonly Question[]> | null {
+  if (typeof window === "undefined" || typeof Worker === "undefined") return null;
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("../worker/content-bank.worker.ts", import.meta.url), { type: "module", name: "content-bank" });
+  } catch {
+    return null;
+  }
+  return new Promise<readonly Question[]>((resolve, reject) => {
+    const finish = () => {
+      clearTimeout(timer);
+      worker.terminate();
+    };
+    const timer = setTimeout(() => {
+      finish();
+      reject(new Error("The content-bank worker did not answer."));
+    }, BANK_WORKER_TIMEOUT_MS);
+    worker.onmessage = (event: MessageEvent<unknown>) => {
+      finish();
+      if (isBankMessage(event.data)) resolve(event.data.questions);
+      else reject(new Error("The content-bank worker could not build the bank."));
+    };
+    worker.onmessageerror = () => {
+      finish();
+      reject(new Error("The content-bank worker's answer could not be read."));
+    };
+    worker.onerror = (event) => {
+      // Handled here (main-thread fallback); keep it out of the console as an uncaught error.
+      event.preventDefault();
+      finish();
+      reject(new Error("The content-bank worker failed to start."));
+    };
+  });
+}
+
+function noteSource(source: "worker" | "main-thread"): void {
+  bankSource = source;
+  // Observable in a real browser (e2e asserts the worker path); display-free.
+  if (typeof document !== "undefined") document.documentElement.dataset.questionBank = source;
+}
+
+function mainThreadBank(): Promise<readonly Question[]> {
+  return importBank().then((questions) => {
+    noteSource("main-thread");
+    return questions;
+  });
+}
+
+function fetchBank(inWorker: boolean): Promise<readonly Question[]> {
+  const viaWorker = inWorker ? bankFromWorker() : null;
+  if (!viaWorker) return mainThreadBank();
+  return viaWorker.then(
+    (questions) => {
+      noteSource("worker");
+      return questions;
+    },
+    () => mainThreadBank(),
+  );
+}
+
+function requestBank(inWorker: boolean): Promise<readonly Question[]> {
+  bank ??= fetchBank(inWorker)
+    .catch(() => mainThreadBank())
     .catch((error: unknown) => {
       bank = null;
       throw new ContentBankUnavailableError(error);
     });
   return bank;
+}
+
+/**
+ * The current authored question bank. One request per page load (whichever
+ * started it, this or startAuthoredQuestionsInWorker); a failed request (a
+ * chunk that was never cached, opened offline) is retried once on the main
+ * thread and then forgotten, so a later call can try again instead of
+ * replaying the error.
+ */
+export function loadAuthoredQuestions(): Promise<readonly Question[]> {
+  return requestBank(false);
+}
+
+/**
+ * Start building the bank in its worker, for a fresh profile whose onboarding
+ * is on screen: the main thread stays free for the student's taps. Later
+ * loadAuthoredQuestions() calls share this request. Without Worker support it
+ * imports on the main thread, as before.
+ */
+export function startAuthoredQuestionsInWorker(): void {
+  void requestBank(true).catch(() => undefined);
 }
 
 /** Start fetching the bank without waiting for it (it is needed before Today). */
@@ -122,10 +224,10 @@ export async function loadQuestionRows(userId: Id): Promise<QuestionRows> {
   ) as unknown[];
   await tx.done;
   const deleted = new Set(deletedKeys.map(String));
+  // No wire tombstone for questions (the usual case): no per-question SHA-256.
+  const wireDeleted = wireTombstoneCheck("questions", deleted, userId);
   const authored = seedQuestions.filter(
-    (question) =>
-      !deleted.has(tombstoneKey("questions", question.id)) &&
-      !deleted.has(wireTombstoneKey("questions", syncWireIdValue(userId, question.id))),
+    (question) => !deleted.has(tombstoneKey("questions", question.id)) && !wireDeleted(question.id),
   );
   return { questions: [...authored, ...(stored as Question[])].sort(byKey), stored };
 }

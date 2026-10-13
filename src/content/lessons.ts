@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Id, Topic } from "@/domain/types";
-import { misconceptionsForTopic } from "@/content";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 
 export interface LessonStep {
   id: Id;

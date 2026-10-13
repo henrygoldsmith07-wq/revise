@@ -9,6 +9,7 @@ import {
   summariseFallback,
   tutorFallback,
 } from "./fallback";
+import { loadAuthoredQuestions } from "@/data/authored-questions";
 import { resilientMark } from "./marking-resilience";
 import { maskChatHistory, maskPii, maskStudentText, maskSummaryMany } from "./pii";
 import { localAiConsentGranted } from "./consent-client";
@@ -220,9 +221,12 @@ export function aiGenerateCards(topicId: string, count = 8) {
   }));
 }
 
-export function aiGenerateQuestions(topicId: string, count = 2, difficulty?: number) {
+export async function aiGenerateQuestions(topicId: string, count = 2, difficulty?: number) {
+  // The bank is loaded on demand (built in a worker, already in memory once the
+  // store has booted); a missing chunk just means no offline substitutes.
+  const bank = await loadAuthoredQuestions().catch((): readonly Question[] => []);
   return call<{ questions: GeneratedQuestion[] }>("generate-questions", { topicId, count, difficulty }, () => ({
-    questions: generateQuestionsFallback(topicId, count),
+    questions: generateQuestionsFallback(topicId, count, bank),
   }));
 }
 

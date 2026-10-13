@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { getTopic, subjectLabel } from "@/domain/curriculum";
+import { seedQuestions } from "@/content";
 import type { Question, Topic } from "@/domain/types";
 import {
   diagnoseFallback,
@@ -534,7 +535,7 @@ export async function generateQuestions(topicId: string, count: number, difficul
       "Do not reproduce any real past paper question verbatim.",
     ].join("\n"),
     `{ "questions": [{ "stem": string, "kind": string, "options": string[]?, "correctIndex": number?, "difficulty": number, "parts": [{ "label": string, "prompt": string, "marks": number, "markScheme": string[], "modelAnswer": string }] }] }`,
-    () => ({ questions: generateQuestionsFallback(topicId, count) }),
+    () => ({ questions: generateQuestionsFallback(topicId, count, seedQuestions) }),
     2400,
   );
 }

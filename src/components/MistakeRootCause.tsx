@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { seedMisconceptions } from "@/content";
+import { seedMisconceptions } from "@/content/misconceptions";
 import { allTopics, getTopic } from "@/domain/curriculum";
 import {
   buildMistakeRootCauseReport,

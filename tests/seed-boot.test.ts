@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearAll, getDb, putMissing } from "@/data/db";
+import { clearAll, getDb, putMissing, wireTombstoneCheck } from "@/data/db";
 import { syncWireIdValue } from "@/data/sync-contract";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import { seedCards } from "@/content";
@@ -56,6 +56,46 @@ describe("putMissing (seed install)", () => {
     const cards = someCards(4);
     await putMissing("cards", cards, USER);
     expect(await putMissing("cards", cards, USER)).toBe(0);
+  });
+});
+
+describe("putMissing in chunks (nineteenth pass)", () => {
+  it("installs every row across chunks and keeps every integrity rule in each chunk", async () => {
+    const cards = someCards(7);
+    const db = await getDb();
+    await db.put("cards", { ...cards[3]!, reps: 9 } as never);
+    await db.put("meta", { key: tombstoneKey("cards", cards[1]!.id), value: true } as never);
+    await db.put("meta", { key: wireTombstoneKey("cards", syncWireIdValue(USER, cards[5]!.id)), value: true } as never);
+    // Chunks of two: the existing row, the local and the wire tombstone sit in different chunks.
+    expect(await putMissing("cards", cards, USER, 2)).toBe(4);
+    const keys = (await db.getAllKeys("cards")).map(String).sort();
+    expect(keys).toEqual([cards[0]!, cards[2]!, cards[3]!, cards[4]!, cards[6]!].map((c) => c.id).sort());
+    expect(((await db.get("cards", cards[3]!.id)) as Card).reps).toBe(9);
+    expect(await putMissing("cards", cards, USER, 2)).toBe(0);
+  });
+
+  it("the full seed set installs in the default chunks exactly as one transaction did", async () => {
+    const cards = seedCards(allTopics(), USER);
+    expect(await putMissing("cards", cards, USER)).toBe(cards.length);
+    const db = await getDb();
+    expect(await db.count("cards")).toBe(cards.length);
+  }, 60_000);
+});
+
+describe("wireTombstoneCheck", () => {
+  const id = "cnt:card:example";
+  it("matches exactly the ids whose wire tombstone is present, for that store only", () => {
+    const deleted = new Set([tombstoneKey("cards", "other"), wireTombstoneKey("questions", syncWireIdValue(USER, id))]);
+    expect(wireTombstoneCheck("cards", deleted, USER)(id)).toBe(false);
+    expect(wireTombstoneCheck("questions", deleted, USER)(id)).toBe(true);
+    expect(wireTombstoneCheck("questions", deleted, USER)("cnt:card:another")).toBe(false);
+    // Owner matters: the wire id is per user.
+    expect(wireTombstoneCheck("questions", deleted, "someone-else")(id)).toBe(false);
+  });
+
+  it("answers no for every id when the store has no wire tombstones", () => {
+    const check = wireTombstoneCheck("cards", new Set([tombstoneKey("cards", id)]), USER);
+    expect(check(id)).toBe(false);
   });
 });
 

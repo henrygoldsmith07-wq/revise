@@ -309,19 +309,79 @@ export async function putAll<T extends { id: Id }>(store: CollectionStore, rows:
 }
 
 /**
- * Install content rows that are not already on the device, in one readwrite
- * transaction. Seeding only: a row whose id already exists is never
- * overwritten (its FSRS history stays untouched), and an id the learner
- * deleted (local or wire tombstone) is skipped rather than resurrected.
- *
- * The existing ids and the tombstone keys are read inside the same
- * transaction as the writes, so nothing can slip in between the check and
- * the put. putAll's per-row tombstone lookups (two meta reads per row, ~9k
- * requests for a fresh bank) are what made first boot slow; two key-range
- * scans answer the same question.
+ * "Does this id have a wire tombstone in `store`?", answered from tombstone
+ * keys already read. A wire id is a pure-JS SHA-256 per row, and boot asked
+ * for one for every seed card and every authored question (~8.3k hashes,
+ * ~0.13 s on a normal phone CPU, ~0.5 s at 4x; nineteenth pass). With no wire
+ * tombstone for the store, which is every fresh profile and most devices, no
+ * row can match, so nothing is hashed. With one, every row is checked exactly
+ * as before.
  */
-export async function putMissing<T extends { id: Id }>(store: CollectionStore, rows: T[], wireUserId: string): Promise<number> {
+export function wireTombstoneCheck(store: string, deleted: ReadonlySet<string>, wireUserId: string): (id: Id) => boolean {
+  const prefix = wireTombstoneKey(store, "");
+  for (const key of deleted) {
+    if (key.startsWith(prefix)) return (id) => deleted.has(wireTombstoneKey(store, syncWireIdValue(wireUserId, id)));
+  }
+  return () => false;
+}
+
+/** Rows per putMissing transaction; the main thread is handed back between them. */
+export const PUT_MISSING_CHUNK = 500;
+
+/**
+ * Hand the main thread back so a pending tap or paint can run. Not setTimeout:
+ * a background tab clamps it to a second per call.
+ */
+function yieldToMain(): Promise<void> {
+  const scheduler = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (typeof scheduler?.yield === "function") return scheduler.yield();
+  if (typeof MessageChannel === "function") {
+    return new Promise((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = () => {
+        channel.port1.close();
+        resolve();
+      };
+      channel.port2.postMessage(null);
+    });
+  }
+  return Promise.resolve();
+}
+
+/**
+ * Install content rows that are not already on the device. Seeding only: a
+ * row whose id already exists is never overwritten (its FSRS history stays
+ * untouched), and an id the learner deleted (local or wire tombstone) is
+ * skipped rather than resurrected.
+ *
+ * Rows go in chunks of PUT_MISSING_CHUNK, one readwrite transaction each, with
+ * the main thread handed back between chunks (nineteenth pass). Queuing all
+ * ~4.3k seed-card puts in one task serialised every card in a single ~0.3 s
+ * (1x CPU) / ~1 s (4x) long task right after onboarding painted, so the first
+ * taps waited. Each chunk reads the existing ids and the tombstone keys inside
+ * its own transaction, so nothing can slip in between a check and its put. A
+ * chunk that fails aborts only itself and rejects; chunks already written stay,
+ * and the next call installs the rest (rows that exist are skipped). putAll's
+ * per-row tombstone lookups (two meta reads per row) are what made first boot
+ * slow before that; two key-range scans per chunk answer the same question.
+ */
+export async function putMissing<T extends { id: Id }>(
+  store: CollectionStore,
+  rows: T[],
+  wireUserId: string,
+  chunkSize = PUT_MISSING_CHUNK,
+): Promise<number> {
   if (!rows.length) return 0;
+  const size = Math.max(1, Math.floor(chunkSize));
+  let installed = 0;
+  for (let start = 0; start < rows.length; start += size) {
+    if (start > 0) await yieldToMain();
+    installed += await putMissingChunk(store, rows.slice(start, start + size), wireUserId);
+  }
+  return installed;
+}
+
+async function putMissingChunk<T extends { id: Id }>(store: CollectionStore, rows: T[], wireUserId: string): Promise<number> {
   const db = await getDb();
   const tx = db.transaction([store, "meta"], "readwrite");
   try {
@@ -333,14 +393,10 @@ export async function putMissing<T extends { id: Id }>(store: CollectionStore, r
     ]);
     const known = new Set(existingIds.map(String));
     const deleted = new Set(deletedKeys.map(String));
-    const missing = rows.filter(
-      (row) =>
-        !known.has(row.id) &&
-        !deleted.has(tombstoneKey(store, row.id)) &&
-        !deleted.has(wireTombstoneKey(store, syncWireIdValue(wireUserId, row.id))),
-    );
+    const wireDeleted = wireTombstoneCheck(store, deleted, wireUserId);
+    const missing = rows.filter((row) => !known.has(row.id) && !deleted.has(tombstoneKey(store, row.id)) && !wireDeleted(row.id));
     // Queue every put without awaiting each one; a failed put aborts the
-    // transaction and tx.done rejects, so nothing is half-installed.
+    // transaction and tx.done rejects, so nothing in this chunk is half-installed.
     for (const row of missing) void target.put(row as never).catch(() => undefined);
     await tx.done;
     return missing.length;

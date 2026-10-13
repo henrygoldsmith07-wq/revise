@@ -60,20 +60,36 @@ background and do other work while it runs. On Windows, invoke npm through
   `loadAuthoredQuestions()` in `src/data/authored-questions.ts`, misconceptions
   from `@/content/misconceptions` and seed cards from `@/content/seed-cards`.
   Resolve the bank *before* opening an IndexedDB transaction: awaiting the
-  import inside one lets it auto-commit. Other routes may still import
-  `@/content` statically; the bank is the same shared chunk either way.
-- **The whole authored bank is still built before Today.** It is loaded as
-  soon as the store starts (onboarding paints first), so every authoring
-  helper that runs while the bank is built (`defineQuestion`, `qualityItem`,
-  `capabilityEvidenceFor`, `provenanceFor`, the subject audits) still runs
-  before Today can render, and on the main thread while onboarding is open. Per-phrase `new RegExp(...)` and
-  backtracking global patterns there cost seconds on a phone; the fourteenth
-  pass cut the build from ~2.6s to ~0.8s (Node) without changing its output.
-  Check `tests/content-boot-cost.test.ts` and measure before adding work there.
-  Since the fifteenth pass only the seed cards (~4.3k rows) are installed into
-  IndexedDB after onboarding; the questions are not, which took a fresh
-  profile's wait for Today after the last onboarding tap from ~4.6–4.9s to
-  ~1.3–1.8s.
+  import inside one lets it auto-commit. A route that still imports
+  `@/content` itself builds the bank again on the main thread when it loads
+  (the worker's copy is not shared); prefer `loadAuthoredQuestions()`.
+- **The whole authored bank is still built before Today; for a fresh profile
+  in a worker** (nineteenth pass). Once onboarding has painted, the store calls
+  `startAuthoredQuestionsInWorker()`, which builds it in
+  `src/worker/content-bank.worker.ts` (Turbopack bundles it from
+  `new Worker(new URL(...))`, so it shares the hashed bank chunk) and receives
+  the plain-data questions by structured clone; if the worker cannot start,
+  errors or stays silent for 30s it imports the bank on the main thread
+  instead. A returning visit calls `loadAuthoredQuestions()` alone and imports
+  on the main thread: measured, that reached Today sooner (the worker's copy of
+  the chunk gets no V8 code cache). `<html data-question-bank>` says which path
+  ran (`e2e/content-bank-worker.spec.ts`). Two consequences: question objects must stay
+  structured-cloneable plain data (no functions, class instances or getters;
+  `tests/content-bank-worker.test.ts` round-trips the bank), and nothing the
+  "/" route can reach, statically or lazily, may import `@/content` besides the
+  loader, or the bank is built a second time on the main thread
+  (`tests/shell-content-boundary.test.ts`; import misconceptions from
+  `@/content/misconceptions`). Every authoring helper that runs while the bank
+  is built (`defineQuestion`, `qualityItem`, `capabilityEvidenceFor`,
+  `provenanceFor`, the subject audits) still delays when Today can render.
+  Per-phrase `new RegExp(...)` and backtracking global patterns there cost
+  seconds on a phone; the fourteenth pass cut the build from ~2.6s to ~0.8s
+  (Node) without changing its output. Check `tests/content-boot-cost.test.ts`
+  and measure before adding work there. Only the seed cards (~4.3k rows) are
+  installed into IndexedDB; `putMissing` writes them in chunks of 500 with the
+  main thread handed back between chunks, and wire-tombstone ids (a SHA-256
+  each) are only computed when the store has a wire tombstone at all
+  (`wireTombstoneCheck`).
 - **`perf:budget` has a route budget for `/`** (`routes` in
   `scripts/client-performance-budget.json`): root files plus the route's
   layout and page entry chunks. The bank left it in the seventeenth pass
