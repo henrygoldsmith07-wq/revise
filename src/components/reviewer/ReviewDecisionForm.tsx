@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useShortcuts } from "@/components/shortcuts";
 import { Button } from "@/components/ui";
+import { withDecisionNotice } from "@/lib/reviewer/notice";
 
 // Decision bar for one question. Keyboard first, built for a < 15 s review:
 //   1–6  toggle each of the six required checks
@@ -104,7 +105,9 @@ export function ReviewDecisionForm(props: {
       setStatus(decision === "approve"
         ? body.stage === "verified" ? "Approved — this question is now verified for students." : "Approved — waiting on a second reviewer."
         : "Change request recorded.");
-      router.push(props.nextHref);
+      // The next page says this again (the notice rides on its URL), since
+      // this bar unmounts as soon as the next question opens.
+      router.push(withDecisionNotice(props.nextHref, decision === "revise" ? "changes" : body.stage === "verified" ? "verified" : "approved"));
     } catch {
       setStatus(null);
       setError("You appear to be offline. Nothing was recorded.");

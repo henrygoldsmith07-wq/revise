@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DecisionNotice } from "@/components/reviewer/DecisionNotice";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
 import { buildReviewQueue, REQUIRED_INDEPENDENT_APPROVALS, type ReviewQueueItem } from "@/lib/reviewer/runtime-ledger";
 import { REQUIRED_TRUSTED_DISTINCT } from "@/domain/review-priority";
@@ -128,10 +129,11 @@ function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[];
   );
 }
 
-export default async function ReviewerQueuePage({ searchParams }: { searchParams: Promise<{ subject?: string }> }) {
+export default async function ReviewerQueuePage({ searchParams }: { searchParams: Promise<{ subject?: string; recorded?: string }> }) {
   const context = await getReviewerContext();
   if (context.status !== "ok") return <ReviewerGate status={context.status} email={"email" in context ? context.email : null} />;
-  const subject = subjectFromSlug((await searchParams).subject);
+  const search = await searchParams;
+  const subject = subjectFromSlug(search.subject);
   const combined = await loadCombinedLog(context.supabase);
   if (combined.issues.length) {
     return (
@@ -159,6 +161,8 @@ export default async function ReviewerQueuePage({ searchParams }: { searchParams
           <Link href={reviewHref(first, subject.slug)} className="btn btn-primary text-sm">Start reviewing</Link>
         ) : null}
       </header>
+
+      <DecisionNotice recorded={search.recorded} />
 
       <nav aria-label="Subject" className="flex flex-wrap gap-1.5">
         {REVIEW_SUBJECTS.map((entry) => (
