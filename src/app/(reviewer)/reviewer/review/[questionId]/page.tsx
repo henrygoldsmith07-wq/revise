@@ -60,7 +60,7 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
   const tally = reviewerTally(combined.log.events, context.grant.reviewerLabel);
 
   return (
-    <main aria-labelledby="review-title" className="space-y-3 pb-28">
+    <main aria-labelledby="review-title" className="space-y-3 pb-4 sm:pb-40">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] text-ink3">

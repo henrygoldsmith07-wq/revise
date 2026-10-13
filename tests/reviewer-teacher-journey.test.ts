@@ -108,3 +108,20 @@ describe("a recorded decision is confirmed on the next page", () => {
     expect(reviewerTally(events, "teacher-c")).toEqual({ decisions: 0, approvals: 0 });
   });
 });
+
+describe("the decision bar works at phone width", () => {
+  const form = read("src/components/reviewer/ReviewDecisionForm.tsx");
+  const page = read("src/app/(reviewer)/reviewer/review/[questionId]/page.tsx");
+
+  it("is fixed only from sm up, so a phone can read the whole question", () => {
+    expect(form).toContain("sm:fixed sm:inset-x-0 sm:bottom-0");
+    expect(form).not.toMatch(/className="fixed inset-x-0/);
+    expect(page).toContain('className="space-y-3 pb-4 sm:pb-40"');
+  });
+
+  it("gives every check and button a 44px target on a phone", () => {
+    expect(form.match(/flex min-h-11 items-center/g)?.length).toBe(3);
+    expect(form).toContain("[&>button]:min-h-11");
+    expect(form).toContain("w-full sm:w-auto sm:flex-1 min-h-11");
+  });
+});

@@ -143,13 +143,18 @@ export function ReviewDecisionForm(props: {
     <form
       aria-label="Review decision"
       onSubmit={(event) => { event.preventDefault(); void submit("approve"); }}
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur px-3 py-2 shadow-[var(--shadow-md)]"
+      // Phone width: the bar sits in the page flow after the question, so the
+      // whole question can be read and every control has a 44px target. As a
+      // fixed 177px bar at 360px it hid the end of the question and squeezed
+      // the comment box to ~26px. From `sm` up it is the fixed bottom bar.
+      className="mt-3 rounded-xl border border-line bg-surface p-3 sm:mt-0 sm:rounded-none sm:border-x-0 sm:border-b-0 sm:fixed sm:inset-x-0 sm:bottom-0 sm:z-30 sm:bg-surface/95 sm:backdrop-blur sm:px-3 sm:py-2 sm:shadow-[var(--shadow-md)]"
     >
-      <div className="mx-auto max-w-6xl flex flex-wrap items-start gap-x-4 gap-y-2">
-        <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+      <div className="mx-auto max-w-6xl flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
+        <p className="text-xs font-semibold text-ink sm:sr-only">Tick all six checks to approve</p>
+        <fieldset className="grid grid-cols-2 gap-x-3 text-[13px] sm:flex sm:flex-wrap sm:gap-y-1 sm:text-xs">
           <legend className="sr-only">All six checks are required to approve</legend>
           {CHECKS.map(([key, label], index) => (
-            <label key={key} className="inline-flex items-center gap-1.5 text-ink2 cursor-pointer">
+            <label key={key} className="flex min-h-11 items-center gap-2 text-ink2 cursor-pointer sm:inline-flex sm:min-h-0 sm:gap-1.5">
               <input
                 ref={(element) => { checkRefs.current[index] = element; }}
                 type="checkbox"
@@ -162,14 +167,14 @@ export function ReviewDecisionForm(props: {
             </label>
           ))}
           {props.transferClaimed ? (
-            <label className="inline-flex items-center gap-1.5 text-ink2"><input type="checkbox" checked={transferConfirmed} onChange={(event) => setTransferConfirmed(event.target.checked)} className="h-4 w-4" />Genuine transfer</label>
+            <label className="flex min-h-11 items-center gap-2 text-ink2 sm:inline-flex sm:min-h-0 sm:gap-1.5"><input type="checkbox" checked={transferConfirmed} onChange={(event) => setTransferConfirmed(event.target.checked)} className="h-4 w-4" />Genuine transfer</label>
           ) : null}
           {props.dataClaimed ? (
-            <label className="inline-flex items-center gap-1.5 text-ink2"><input type="checkbox" checked={dataConfirmed} onChange={(event) => setDataConfirmed(event.target.checked)} className="h-4 w-4" />Genuine data analysis</label>
+            <label className="flex min-h-11 items-center gap-2 text-ink2 sm:inline-flex sm:min-h-0 sm:gap-1.5"><input type="checkbox" checked={dataConfirmed} onChange={(event) => setDataConfirmed(event.target.checked)} className="h-4 w-4" />Genuine data analysis</label>
           ) : null}
         </fieldset>
 
-        <div className="flex flex-1 min-w-[16rem] items-start gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-1 sm:min-w-[16rem] sm:items-start">
           <label htmlFor="review-comment" className="sr-only">Comment (required to request changes)</label>
           <textarea
             id="review-comment"
@@ -180,8 +185,9 @@ export function ReviewDecisionForm(props: {
             onChange={(event) => setComment(event.target.value)}
             onKeyDown={(event) => { if (event.key === "Escape") (event.target as HTMLTextAreaElement).blur(); }}
             placeholder="Comment (required to request changes)"
-            className="field text-xs flex-1 min-h-[2.25rem] resize-y"
+            className="field text-sm sm:text-xs w-full sm:w-auto sm:flex-1 min-h-11 sm:min-h-[2.25rem] resize-y"
           />
+          <div className="flex flex-wrap gap-2 [&>button]:min-h-11 sm:[&>button]:min-h-0">
           <Button type="submit" variant="primary" disabled={busy || props.alreadyApproved} aria-keyshortcuts="A" title={props.alreadyApproved ? "You already approved this content" : "Approve (A)"}>
             Approve <kbd className="ml-1 text-[10px] opacity-70" aria-hidden="true">A</kbd>
           </Button>
@@ -189,6 +195,7 @@ export function ReviewDecisionForm(props: {
             Request changes <kbd className="ml-1 text-[10px] opacity-70" aria-hidden="true">R</kbd>
           </Button>
           <Button variant="ghost" onClick={() => router.push(props.nextHref)} aria-keyshortcuts="J" title="Skip (J)">Skip</Button>
+          </div>
         </div>
       </div>
       <div className="mx-auto max-w-6xl min-h-[1rem] text-xs">

@@ -106,6 +106,13 @@ background and do other work while it runs. On Windows, invoke npm through
   machine (`vitest.config.mts`), and wall-clock compile assertions
   (`tests/perf.test.ts`).
 
+- **The reviewer portal is not inside the student shell** (eighteenth pass).
+  `src/components/RouteShell.tsx` renders `/reviewer/**` without
+  `AccountBoundary`/`StoreProvider`/`AppShell`; anything a portal page needs
+  from the root must work without the store (only `ShortcutProvider` is
+  there). `ReviewerSessionKeeper` keeps the session cookie fresh. Use
+  `isReviewerPath` (exact segment; `/review` is the student flashcard route).
+
 ## Review workflow
 
 The **reviewer portal** (`src/app/(reviewer)`, `/reviewer`) is the canonical
