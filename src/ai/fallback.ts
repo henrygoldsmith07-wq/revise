@@ -1,4 +1,3 @@
-import { seedQuestionsForTopic } from "@/content";
 import { getTopic } from "@/domain/curriculum";
 import { deviceRubricMark } from "@/lib/offline-mark";
 import { mistakePatterns } from "@/domain/mistakes";
@@ -187,9 +186,11 @@ export function generateCardsFallback(topicId: string, count: number): Generated
  * authored bank that the student has not seen recently" — which is what a
  * revision guide does anyway.
  */
-export function generateQuestionsFallback(topicId: string, count: number): GeneratedQuestion[] {
-  const bank = seedQuestionsForTopic(topicId);
-  return bank.slice(0, count).map((q) => ({
+export function generateQuestionsFallback(topicId: string, count: number, bank: readonly Question[]): GeneratedQuestion[] {
+  // The caller passes the authored bank: importing `@/content` here would put
+  // the whole bank behind every marked answer in the browser (this module loads
+  // with the AI client), building it a second time on the main thread.
+  return bank.filter((q) => q.topicIds.includes(topicId)).slice(0, count).map((q) => ({
     stem: q.stem,
     kind: q.kind,
     options: q.options,

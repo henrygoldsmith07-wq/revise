@@ -90,7 +90,7 @@ import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type { MasteryInterval } from "@/domain/mastery-uncertainty";
 import * as repo from "@/data/repository";
-import { isContentBankUnavailable } from "@/data/authored-questions";
+import { isContentBankUnavailable, startAuthoredQuestionsInWorker } from "@/data/authored-questions";
 import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { domainEngine } from "@/data/domain-engine";
@@ -340,6 +340,9 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
           setFreshProfile(true);
           await Promise.race([onboardingShown.promise, new Promise((done) => setTimeout(done, 3000))]);
           await afterNextPaint();
+          // Onboarding is open and interactive: build the bank off the main
+          // thread so the student's taps are not held up by it (nineteenth pass).
+          startAuthoredQuestionsInWorker();
         }
         const loaded = await repo.loadSnapshot(userId);
         setSnapshot(loaded);

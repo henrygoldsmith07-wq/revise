@@ -20,7 +20,7 @@
 // Pure domain: no React, no storage; `now` is passed in.
 // ---------------------------------------------------------------------------
 
-import { misconceptionsForTopic } from "@/content";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 import { trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Id, Mistake, Question, Topic } from "./types";
 
