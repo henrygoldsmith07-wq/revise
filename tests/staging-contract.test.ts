@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // The CI runner is native ESM; test its actual preflight and catalog checker.
 // @ts-expect-error Native tooling module has no TypeScript declaration.
-import { CONTINUITY_COLUMNS, DELETION_TABLES, validateStagingFunctions, REQUIRED_STAGING_SECRETS, STAGING_TABLES, SINGLETON_TABLES, stagingConfiguration, validateStagingCatalog } from "../scripts/staging-contract.mjs";
+import { CONTINUITY_COLUMNS, DELETION_TABLES, validateStagingFunctions, REQUIRED_STAGING_SECRETS, STAGING_TABLES, SINGLETON_TABLES, stagingConfiguration, stagingFailureMessage, validateStagingCatalog } from "../scripts/staging-contract.mjs";
 
 function catalog() {
   return (STAGING_TABLES as string[]).map((table) => ({
@@ -27,6 +27,28 @@ describe("required staging infrastructure and schema diagnostics", () => {
     expect(() => stagingConfiguration(env)).toThrow("Two independent");
     env.REVISE_STAGING_USER_B_EMAIL = "b@example.com";
     expect(() => stagingConfiguration(env)).not.toThrow();
+  });
+
+  it("says which secrets are missing without ever printing a value or a driver error", () => {
+    const failure = (env: Record<string, string>) => { try { stagingConfiguration(env); } catch (error) { return stagingFailureMessage("infrastructure", error); } return ""; };
+    const none = failure({});
+    expect(none).toContain("all seven are unset");
+    for (const key of REQUIRED_STAGING_SECRETS as string[]) expect(none).toContain(key);
+    expect(none).toContain("docs/operations-runbook.md");
+    const partial = Object.fromEntries((REQUIRED_STAGING_SECRETS as string[]).map((key) => [key, "s3cret-value"]));
+    delete partial.REVISE_STAGING_DATABASE_URL;
+    const one = failure(partial);
+    expect(one).toContain("(1 of 7 unset): REVISE_STAGING_DATABASE_URL");
+    expect(one).not.toContain("s3cret-value");
+    partial.REVISE_STAGING_DATABASE_URL = "not a url s3cret-value";
+    const bad = failure({ ...partial, REVISE_STAGING_SUPABASE_URL: "https://staging.example.com" });
+    expect(bad).toContain("REVISE_STAGING_DATABASE_URL is not a valid URL");
+    expect(bad).not.toContain("s3cret-value");
+    // A pg/TLS error after preflight can carry a connection string: never echoed.
+    const driver = stagingFailureMessage("infrastructure", new Error("connect ECONNREFUSED postgresql://user:s3cret-value@db"));
+    expect(driver).not.toContain("s3cret-value");
+    expect(driver).toContain("secrets are present");
+    expect(stagingFailureMessage("schema-drift", new Error("cards: RLS disabled"))).toBe("cards: RLS disabled");
   });
 
   it("detects missing tables, column drift, RLS drift and inactive triggers", () => {
