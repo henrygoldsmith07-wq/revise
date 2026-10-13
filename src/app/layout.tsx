@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/AppShell";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { PwaInstallProvider } from "@/components/PwaInstall";
-import { ShortcutProvider } from "@/components/shortcuts";
-import { AccountBoundary } from "@/state/account";
+import { RouteShell } from "@/components/RouteShell";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
@@ -88,11 +86,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </noscript>
         <PwaInstallProvider>
-          <AccountBoundary>
-            <ShortcutProvider>
-              <AppShell>{children}</AppShell>
-            </ShortcutProvider>
-          </AccountBoundary>
+          {/* The student app runs inside AccountBoundary + AppShell; the
+              reviewer portal (/reviewer/**) renders on its own (RouteShell). */}
+          <RouteShell>{children}</RouteShell>
         </PwaInstallProvider>
         <ServiceWorker />
       </body>

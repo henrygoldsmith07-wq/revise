@@ -1,5 +1,50 @@
 # Changelog
 
+## A teacher's invite link opens the reviewer portal — 2026-10-13 (eighteenth pass)
+
+**The reviewer portal never reached a teacher on a fresh browser.** Every
+route, `/reviewer/**` included, rendered inside the student shell
+(`AccountBoundary` → `StoreProvider` → `AppShell`). A teacher opening
+`/reviewer/pairs?subject=physics` from their invite saw "Opening your
+revision profile…", then (signed in) "Use your local revision?", then the
+student onboarding ("Which exam board are you studying with?"), and their
+browser got a learner database in IndexedDB. The portal's server HTML was
+never shown, because the account boundary renders a placeholder until a
+client effect resolves. Reproduced on a production build of `main`: at
+360px and desktop the onboarding showed (0.5–1.3s) and the portal text
+never appeared in 8s.
+
+- `src/components/RouteShell.tsx`: the portal renders on its own (shortcut
+  registry only); every other route keeps the student shell unchanged. No
+  learner profile, IndexedDB or student sync runs for a teacher. Every
+  portal page and the decision API still re-check the session and the
+  reviewer grant on the server; RLS is unchanged.
+- `ReviewerSessionKeeper` starts the Supabase browser client on portal
+  pages, which refreshes the session cookie. The student shell used to do
+  this as a side effect; Server Components cannot write a refreshed cookie.
+- Sign-in links that fail now say why: expired or already used
+  (`error_code=otp_expired`), or opened in a different browser from the one
+  that asked (Supabase's PKCE verifier lives only there). Before, the
+  teacher landed silently on the same form.
+- A "Code from the email" box appears after the email is sent
+  (`verifyOtp`, type `email`); it works on any device once the Supabase
+  Magic Link template includes `{{ .Token }}` (maintainer step,
+  `docs/review-workflow.md` → *First teacher approvals*).
+- After Approve / Request changes the next page says what was recorded and
+  what happens next (one whitelisted word on the URL, display only); the
+  confirmation used to unmount with the bar. The review screen shows how
+  many decisions this reviewer has recorded and that each one saves
+  immediately, so short sessions are safe.
+- At phone width the decision bar is in the page flow instead of a fixed
+  177px bar that hid the end of the question and squeezed the comment box
+  to ~26px; checks and buttons get 44px targets. From `sm` up it is the
+  same fixed bar as before.
+- `e2e/reviewer-first-visit.spec.ts` (fresh 360px browser sees the portal
+  from server HTML, no `revise` IndexedDB, no onboarding; the student app
+  still onboards) and `tests/reviewer-teacher-journey.test.ts`.
+- Not changed: two independent approvals, the six checks, every domain rule
+  in `decisionProblems`, grants, RLS and the audit chain.
+
 ## The first screen paints before the question bank loads — 2026-10-13 (seventeenth pass)
 
 **The whole authored question bank sat in the "/" shell chunk.** `@/content`

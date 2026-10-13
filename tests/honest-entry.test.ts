@@ -18,7 +18,8 @@ describe("no-JS entry point", () => {
     const noscript = layout.indexOf("<noscript>");
     expect(noscript).toBeGreaterThan(-1);
     expect(noscript).toBeLessThan(layout.indexOf("<PwaInstallProvider>"));
-    expect(noscript).toBeLessThan(layout.indexOf("<AccountBoundary>"));
+    // The student shell (AccountBoundary) now sits inside RouteShell.
+    expect(noscript).toBeLessThan(layout.indexOf("<RouteShell>"));
     // It says why the app cannot start, instead of showing a dead shell.
     expect(layout).toContain("needs JavaScript");
     expect(layout).toMatch(/href="\/welcome"/);

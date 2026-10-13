@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RichText } from "@/components/RichText";
+import { DecisionNotice, reviewerTally } from "@/components/reviewer/DecisionNotice";
 import { ReviewDecisionForm } from "@/components/reviewer/ReviewDecisionForm";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
 import { buildTransferBatch, linkedPartFor, needsLabel, nextInBatch } from "@/lib/reviewer/batches";
@@ -23,7 +24,7 @@ function decodeId(raw: string): string {
   }
 }
 
-export default async function ReviewQuestionPage({ params, searchParams }: { params: Promise<{ questionId: string }>; searchParams: Promise<{ subject?: string; batch?: string }> }) {
+export default async function ReviewQuestionPage({ params, searchParams }: { params: Promise<{ questionId: string }>; searchParams: Promise<{ subject?: string; batch?: string; recorded?: string }> }) {
   const context = await getReviewerContext();
   if (context.status !== "ok") return <ReviewerGate status={context.status} email={"email" in context ? context.email : null} />;
   const questionId = decodeId((await params).questionId);
@@ -56,9 +57,10 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
   const batchMember = batch?.members.find((entry) => entry.questionId === question.id) ?? null;
   const alreadyApproved = screen.state.approvers.includes(context.grant.reviewerLabel);
   const blocking = screen.gateWarnings.filter((warning) => warning.severity === "block");
+  const tally = reviewerTally(combined.log.events, context.grant.reviewerLabel);
 
   return (
-    <main aria-labelledby="review-title" className="space-y-3 pb-28">
+    <main aria-labelledby="review-title" className="space-y-3 pb-4 sm:pb-40">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] text-ink3">
@@ -73,6 +75,13 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
           {screen.state.approvers.length ? <> · approved by {screen.state.approvers.join(", ")}</> : null}
         </p>
       </header>
+
+      <DecisionNotice recorded={search.recorded} />
+      {tally.decisions ? (
+        <p className="text-[11px] text-ink3">You have recorded <span className="tabular-nums text-ink2">{tally.decisions}</span> decision{tally.decisions === 1 ? "" : "s"} so far (<span className="tabular-nums">{tally.approvals}</span> approval{tally.approvals === 1 ? "" : "s"}). Each one is saved the moment you press Approve or Request changes, so you can stop at any point and pick up from the same list later.</p>
+      ) : (
+        <p className="text-[11px] text-ink3">Each decision is saved the moment you press Approve or Request changes, so you can stop at any point and pick up from the same list later.</p>
+      )}
 
       {blocking.length ? (
         <div role="note" className="card p-3 border-l-4 border-l-[var(--review)] text-xs text-ink2">

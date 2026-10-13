@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DecisionNotice } from "@/components/reviewer/DecisionNotice";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
 import { buildTransferBatch, needsLabel, nextInBatch, type BatchMember, type BatchPairView } from "@/lib/reviewer/batches";
 import { REQUIRED_INDEPENDENT_APPROVALS } from "@/lib/reviewer/runtime-ledger";
@@ -52,10 +53,11 @@ function PairRow({ pair, slug }: { pair: BatchPairView; slug: string }) {
   );
 }
 
-export default async function TransferPairsPage({ searchParams }: { searchParams: Promise<{ subject?: string }> }) {
+export default async function TransferPairsPage({ searchParams }: { searchParams: Promise<{ subject?: string; recorded?: string }> }) {
   const context = await getReviewerContext();
   if (context.status !== "ok") return <ReviewerGate status={context.status} email={"email" in context ? context.email : null} />;
-  const subject = subjectFromSlug((await searchParams).subject);
+  const search = await searchParams;
+  const subject = subjectFromSlug(search.subject);
   const combined = await loadCombinedLog(context.supabase);
   if (combined.issues.length) {
     return (
@@ -82,6 +84,8 @@ export default async function TransferPairsPage({ searchParams }: { searchParams
         </div>
         {first ? <Link href={reviewHref(first, subject.slug)} className="btn btn-primary text-sm">{batch.approvalsRecorded ? "Continue this batch" : "Start this batch"}</Link> : null}
       </header>
+
+      <DecisionNotice recorded={search.recorded} />
 
       <nav aria-label="Subject" className="flex flex-wrap gap-1.5">
         {REVIEW_SUBJECTS.map((entry) => (

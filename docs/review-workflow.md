@@ -37,14 +37,76 @@ approvals stay in the log as history and never apply to the new content.
 | `public.review_audit_events` (Supabase) | The **runtime continuation of the same audit log**, written by the reviewer portal. Same event objects, same hash, chained onto the committed tail. Insert-only. |
 | `public.reviewer_roles` (Supabase) | Who may review, with the role and qualification stamped on their decisions. Granted only by the service role. |
 
+## First teacher approvals: the maintainer's runbook
+
+Nothing can be Proven until two different teachers approve the same
+questions. These are the only steps that need the maintainer; each one is
+something the code cannot do for you. In order:
+
+1. **Redirect allow-list (once).** Supabase dashboard → Authentication → URL
+   Configuration → Redirect URLs → add `https://revise-gray.vercel.app/reviewer/**`.
+   Without it the sign-in link returns the teacher to the Site URL (the
+   student app), not the portal.
+2. **A code in the sign-in email (once, recommended).** Supabase dashboard →
+   Authentication → Email Templates → *Magic Link*: keep the link and add the
+   code, for example
+
+   ```html
+   <h2>Sign in to the Revise reviewer portal</h2>
+   <p><a href="{{ .ConfirmationURL }}">Sign in</a> (open it in the browser where you asked for it)</p>
+   <p>Or type this code on the sign-in page: <strong>{{ .Token }}</strong></p>
+   ```
+
+   The link only works in the browser that requested it (Supabase's PKCE
+   flow keeps its verifier there), so a teacher who reads school email on a
+   phone and reviews on a laptop is otherwise stuck. The portal shows a
+   "Code from the email" box after it sends the email; the code works on any
+   device. Without the template change the box is harmless and the link
+   still works in the same browser. This template is shared with the student
+   app's sign-in email, which does not ask for the code; the extra line is
+   all students see.
+3. **Grant two teachers** (different people; one approval is only
+   *checked*). Use pseudonymous labels, never an email address:
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
+     --email teacher@school.org --label teacher-a --role teacher \
+     --qualification "PGCE Physics; N years teaching WJEC A-level" \
+     --granted-by henry --invite --site https://revise-gray.vercel.app
+   ```
+
+   Add `--dry-run` first if unsure. The command prints `sendThisLink`.
+4. **Send each teacher the printed link** (`/reviewer/pairs?subject=physics`),
+   with a line such as: "Open this on the computer you will review on. Sign in
+   with your school email (no password). Each question has six checks; tick
+   all six to approve, or write what needs changing. Every decision saves
+   immediately, so ten minutes at a time is fine."
+5. **Watch progress without a grant:**
+   `NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:review:pairs -- physics`.
+   A pair counts for transfer proof only when both halves have two
+   approvals from different reviewers. Students' devices pick up verified
+   questions the next time they are online (`GET /api/review-ledger`).
+
+What a teacher meets, so you can tell them: the link opens the portal itself
+(since the eighteenth pass it no longer renders inside the student app, so
+there is no student onboarding and no learner profile on their device); a
+sign-in box for their school email; then the batch list with "Start this
+batch". After each Approve or Request changes the next question opens with a
+line saying what was recorded and what happens next.
+
 ## Reviewer portal (the canonical path)
 
 Teachers review in the browser at `/reviewer`. Nobody outside the development
 team needs a terminal, JSON or an HTML pack any more.
 
 1. **Access.** The maintainer grants access (below). The teacher signs in with
-   the email one-time link at `/reviewer`; the portal never creates accounts
-   and cannot grant itself access.
+   the email one-time link at `/reviewer`, or with the code from the same
+   email when the template carries one (runbook above); the portal never
+   creates accounts and cannot grant itself access. The portal renders
+   outside the student shell (`src/components/RouteShell.tsx`): no account
+   boundary, IndexedDB or onboarding runs for a teacher, and a small client
+   (`ReviewerSessionKeeper`) keeps the session cookie refreshed. A link that
+   fails says why (expired or used, or opened in another browser).
 2. **Queue** (`/reviewer?subject=physics`, also maths / biology / chemistry).
    A Server Component computes it on the server from the bundled bank and the
    verified audit chain with `reviewStateOf`. "Ready for you" is ordered
