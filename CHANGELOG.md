@@ -23,6 +23,13 @@ overstated); longest task after onboarding 449 ms → 119 ms.
   visit) and writes them in chunks of 500, handing the main thread back
   between chunks; each chunk re-checks inside its write transaction. Wire
   tombstone hashing is skipped when there are no tombstones.
+- Offline after onboarding: Turbopack bundles the worker's copy of the bank
+  chunks separately from the page's, so a profile onboarded while the worker
+  built the bank had only the worker's copy cached, and a later offline visit
+  (main-thread import) showed "needs a connection". CI's
+  `e2e/offline.spec.ts` caught it. A returning visit whose main-thread import
+  fails now tries the worker before reporting the bank unavailable; the spec
+  also waits for the warm load's bank before cutting the network.
 - Known cost: the first returning visit after onboarding reached Today in
   1.40–1.47 s against 1.20–1.23 s on `main`, because the main thread has no V8
   code cache for the bank chunk yet (the worker built it). Later visits are

@@ -149,9 +149,26 @@ function fetchBank(inWorker: boolean): Promise<readonly Question[]> {
   );
 }
 
+// The retry after a failed first request. A returning visit whose main-thread
+// import failed tries the worker: a profile onboarded while the worker built the
+// bank has only the worker's copy of the bank chunks in the service worker's
+// cache (Turbopack bundles them separately from the page's copy), so offline the
+// worker is the copy that is actually on the device. Without this, a student who
+// onboarded online and opened Revise offline later got "needs a connection"
+// (found by e2e/offline.spec.ts in CI, nineteenth pass). A fresh-profile request
+// already tried both, so it retries the main thread once, as before.
+function retryBank(inWorker: boolean): Promise<readonly Question[]> {
+  const viaWorker = inWorker ? null : bankFromWorker();
+  if (!viaWorker) return mainThreadBank();
+  return viaWorker.then((questions) => {
+    noteSource("worker");
+    return questions;
+  });
+}
+
 function requestBank(inWorker: boolean): Promise<readonly Question[]> {
   bank ??= fetchBank(inWorker)
-    .catch(() => mainThreadBank())
+    .catch(() => retryBank(inWorker))
     .catch((error: unknown) => {
       bank = null;
       throw new ContentBankUnavailableError(error);

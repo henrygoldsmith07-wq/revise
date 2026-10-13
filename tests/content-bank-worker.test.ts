@@ -140,6 +140,28 @@ describe("content-bank worker", () => {
     expect(loader.authoredBankSource()).toBe("main-thread");
   }, 60_000);
 
+  it("a returning visit whose main-thread import fails (offline, only the worker's chunks cached) gets the bank from the worker", async () => {
+    vi.resetModules();
+    vi.doMock("@/content", () => {
+      throw new Error("chunk not downloaded");
+    });
+    const loader = await import("@/data/authored-questions");
+    const questions = await loader.loadAuthoredQuestions();
+    expect(loader.authoredBankSource()).toBe("worker");
+    expect(FakeWorker.instances).toHaveLength(1);
+    expect(questions).toEqual(seedQuestions);
+  }, 60_000);
+
+  it("a returning visit whose main-thread import and worker both fail reports the bank unavailable", async () => {
+    FakeWorker.behaviour = "error-event";
+    vi.resetModules();
+    vi.doMock("@/content", () => {
+      throw new Error("chunk not downloaded");
+    });
+    const loader = await import("@/data/authored-questions");
+    await expect(loader.loadAuthoredQuestions()).rejects.toBeInstanceOf(loader.ContentBankUnavailableError);
+  }, 60_000);
+
   it("a returning visit (no fresh-profile start) imports on the main thread and starts no worker", async () => {
     const loader = await freshLoader();
     await loader.loadAuthoredQuestions();
