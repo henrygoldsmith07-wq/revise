@@ -67,12 +67,15 @@ background and do other work while it runs. On Windows, invoke npm through
   in a worker** (nineteenth pass). Once onboarding has painted, the store calls
   `startAuthoredQuestionsInWorker()`, which builds it in
   `src/worker/content-bank.worker.ts` (Turbopack bundles it from
-  `new Worker(new URL(...))`, so it shares the hashed bank chunk) and receives
-  the plain-data questions by structured clone; if the worker cannot start,
-  errors or stays silent for 30s it imports the bank on the main thread
-  instead. A returning visit calls `loadAuthoredQuestions()` alone and imports
-  on the main thread: measured, that reached Today sooner (the worker's copy of
-  the chunk gets no V8 code cache). `<html data-question-bank>` says which path
+  `new Worker(new URL(...))`; the worker gets its own hashed copy of the bank
+  chunks, not the page's) and receives the plain-data questions by structured
+  clone; if the worker cannot start, errors or stays silent for 30s it imports
+  the bank on the main thread instead. A returning visit calls
+  `loadAuthoredQuestions()` alone and imports on the main thread: measured,
+  that reached Today sooner (the worker's copy gets no V8 code cache). If that
+  import fails (offline on a profile onboarded via the worker, so only the
+  worker's copy is cached) it tries the worker before showing "needs a
+  connection" (`e2e/offline.spec.ts` caught this). `<html data-question-bank>` says which path
   ran (`e2e/content-bank-worker.spec.ts`). Two consequences: question objects must stay
   structured-cloneable plain data (no functions, class instances or getters;
   `tests/content-bank-worker.test.ts` round-trips the bank), and nothing the
