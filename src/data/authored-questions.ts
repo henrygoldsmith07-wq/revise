@@ -41,6 +41,22 @@ import { getDb } from "./db";
 let bank: Promise<readonly Question[]> | null = null;
 let authoredIds: Set<string> | null = null;
 
+/**
+ * The bank chunk could not be fetched: opened offline before the service
+ * worker had cached it, or a deploy replaced it mid-session. Nothing on the
+ * device is wrong, so this must never be presented as damaged storage.
+ */
+export class ContentBankUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super("The question bank has not been downloaded to this device yet.", { cause });
+    this.name = "ContentBankUnavailableError";
+  }
+}
+
+export function isContentBankUnavailable(error: unknown): error is ContentBankUnavailableError {
+  return error instanceof ContentBankUnavailableError;
+}
+
 function importBank(): Promise<readonly Question[]> {
   return import("@/content").then((content) => content.seedQuestions);
 }
@@ -55,7 +71,7 @@ export function loadAuthoredQuestions(): Promise<readonly Question[]> {
     .catch(() => importBank())
     .catch((error: unknown) => {
       bank = null;
-      throw error;
+      throw new ContentBankUnavailableError(error);
     });
   return bank;
 }
