@@ -61,7 +61,7 @@ import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
 import { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts } from "./questions/wjec-flagship-depth";
-import { seedMisconceptions } from "./misconceptions";
+import { misconceptionsForTopic, seedMisconceptions } from "./misconceptions";
 import humanVerificationLedger from "./reviews/wjec-human-verification.json";
 import wjecReleaseSet from "./reviews/wjec-release-set.json";
 import { applyHumanVerificationLedger } from "@/domain/human-verification-ledger";
@@ -186,9 +186,7 @@ export function misconceptionsForSubject(subjectId: Id): Misconception[] {
   return seedMisconceptions.filter((m) => m.subjectId === subjectId);
 }
 
-export function misconceptionsForTopic(topicId: Id): Misconception[] {
-  return seedMisconceptions.filter((m) => m.topicIds.includes(topicId));
-}
+export { misconceptionsForTopic };
 
 export function misconceptionById(id: Id): Misconception | undefined {
   return seedMisconceptions.find((m) => m.id === id);

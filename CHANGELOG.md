@@ -1,5 +1,46 @@
 # Changelog
 
+## The first screen paints before the question bank loads — 2026-10-13 (seventeenth pass)
+
+**The whole authored question bank sat in the "/" shell chunk.** `@/content`
+was statically imported by the store, the repository, the authored-question
+reader and the search overlay, so a first visit downloaded, parsed and
+evaluated ~2.2 MB of minified questions before React could paint anything:
+about a second on a normal CPU, over three at 4× throttling.
+
+- `src/data/authored-questions.ts` loads the bank on demand
+  (`loadAuthoredQuestions()`): one request per page, retried once, and a
+  failure is forgotten so a later call can try again. Snapshot reads and
+  portable restore resolve it before opening an IndexedDB transaction.
+  Misconceptions and seed cards are imported from their own small modules.
+- A fresh profile's boot waits for the commit that shows onboarding and one
+  painted frame before it starts the snapshot (and so the bank), so the first
+  step reaches the screen first. Returning students are unaffected.
+- If the bank chunk cannot be downloaded (offline before the service worker
+  cached it), the student sees "Revise needs a connection to finish setting
+  up", with a working Try again, instead of the storage-recovery screen and
+  its "Reset this device" button. Covered by
+  `e2e/content-bank-unavailable.spec.ts`.
+- `tests/shell-content-boundary.test.ts` walks the real import graph
+  (esbuild metafile) and fails, printing the chain, if the "/" route ever
+  reaches `@/content` statically again.
+- `perf:budget` route "/": 5,131,397 → 2,969,938 bytes raw, 1,353,778 →
+  733,372 gzip; budget lowered from 5.4 MB / 1.42 MB to 3.06 MB / 760 kB.
+- Measured on production builds of `main` and this branch, alternating runs,
+  360px mobile emulation, the pass-14/15 scripts plus a DOM-insertion mark
+  (Playwright's own visibility probe cannot run while the bank evaluates, so
+  it reads late on this branch; a compositor screencast at 4× confirmed the
+  step on screen at ~1.0–1.4s against ~3.2–3.5s on `main`). Onboarding in the
+  page: 0.92–1.00s → 0.34–0.39s (normal CPU), 3.31–3.32s → 0.96–0.97s (4×).
+  Unchanged within noise: the earliest a tap registers (1.42–1.52s →
+  1.41–1.49s; 4.67–5.08s → 4.62–4.78s), Today after a scripted
+  as-fast-as-possible onboarding (3.60–3.95s → 3.13–3.92s; 7.35–7.86s →
+  7.72–7.74s) and a returning visit (1.11–1.42s → 1.16–1.46s; 3.17–3.98s →
+  3.51–3.65s). With a human-paced last step the final tap reaches Today in
+  0.24–0.25s → 0.20–0.23s (normal) and 0.95–1.05s → 0.57–0.64s (4×), two
+  runs each. The "~1s after the last tap" from earlier passes only exists
+  when a script taps faster than the bank can install.
+
 ## Correct answers in a student's own words get the marks — 2026-10-12 (sixteenth pass)
 
 **The offline marker under-credited correct paraphrases.** It reads keyword

@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearAll, getDb, putMissing } from "@/data/db";
 import { ensureSeeded, loadSnapshot } from "@/data/repository";
-import { authoredQuestionIds, loadQuestionRows } from "@/data/authored-questions";
+import { loadAuthoredQuestionIds, loadQuestionRows } from "@/data/authored-questions";
 import { applyDeletionPage } from "@/data/sync-deletions";
 import { syncWireId, syncWireIdValue } from "@/data/sync-contract";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
@@ -85,8 +85,8 @@ describe("authored questions come from the bundle", () => {
     expect((await loadSnapshot(USER)).questions.some((q) => q.id === target.id)).toBe(false);
   }, 30000);
 
-  it("an authored id can never be a private question (private ones are minted as UUIDs)", () => {
-    for (const id of authoredQuestionIds()) expect(id.startsWith("cnt:question:")).toBe(true);
+  it("an authored id can never be a private question (private ones are minted as UUIDs)", async () => {
+    for (const id of await loadAuthoredQuestionIds()) expect(id.startsWith("cnt:question:")).toBe(true);
     expect(seedQuestions.every((q) => q.origin === "seed")).toBe(true);
   });
 });
