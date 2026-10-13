@@ -354,8 +354,9 @@ function yieldToMain(): Promise<void> {
  * untouched), and an id the learner deleted (local or wire tombstone) is
  * skipped rather than resurrected.
  *
- * Rows go in chunks of PUT_MISSING_CHUNK, one readwrite transaction each, with
- * the main thread handed back between chunks (nineteenth pass). Queuing all
+ * One read finds the rows that are missing (none on a returning visit). They
+ * go in chunks of PUT_MISSING_CHUNK, one readwrite transaction each, with the
+ * main thread handed back between chunks (nineteenth pass). Queuing all
  * ~4.3k seed-card puts in one task serialised every card in a single ~0.3 s
  * (1x CPU) / ~1 s (4x) long task right after onboarding painted, so the first
  * taps waited. Each chunk reads the existing ids and the tombstone keys inside
@@ -372,13 +373,41 @@ export async function putMissing<T extends { id: Id }>(
   chunkSize = PUT_MISSING_CHUNK,
 ): Promise<number> {
   if (!rows.length) return 0;
+  // One read first: on a returning visit every seed row already exists, and
+  // re-reading the store's keys once per chunk cost ~0.3 s for nothing.
+  const candidates = await missingRows(store, rows, wireUserId);
+  if (!candidates.length) return 0;
   const size = Math.max(1, Math.floor(chunkSize));
   let installed = 0;
-  for (let start = 0; start < rows.length; start += size) {
+  for (let start = 0; start < candidates.length; start += size) {
     if (start > 0) await yieldToMain();
-    installed += await putMissingChunk(store, rows.slice(start, start + size), wireUserId);
+    installed += await putMissingChunk(store, candidates.slice(start, start + size), wireUserId);
   }
   return installed;
+}
+
+async function missingRows<T extends { id: Id }>(store: CollectionStore, rows: T[], wireUserId: string): Promise<T[]> {
+  const db = await getDb();
+  const tx = db.transaction([store, "meta"], "readonly");
+  const [existingIds, deletedKeys] = await Promise.all([
+    tx.objectStore(store).getAllKeys(),
+    tx.objectStore("meta").getAllKeys(IDBKeyRange.bound("revise.deleted", "revise.deleted\uffff")),
+  ]);
+  await tx.done;
+  return withoutKnownOrDeleted(store, rows, existingIds, deletedKeys, wireUserId);
+}
+
+function withoutKnownOrDeleted<T extends { id: Id }>(
+  store: CollectionStore,
+  rows: T[],
+  existingIds: IDBValidKey[],
+  deletedKeys: IDBValidKey[],
+  wireUserId: string,
+): T[] {
+  const known = new Set(existingIds.map(String));
+  const deleted = new Set(deletedKeys.map(String));
+  const wireDeleted = wireTombstoneCheck(store, deleted, wireUserId);
+  return rows.filter((row) => !known.has(row.id) && !deleted.has(tombstoneKey(store, row.id)) && !wireDeleted(row.id));
 }
 
 async function putMissingChunk<T extends { id: Id }>(store: CollectionStore, rows: T[], wireUserId: string): Promise<number> {
@@ -391,10 +420,8 @@ async function putMissingChunk<T extends { id: Id }>(store: CollectionStore, row
       // Both tombstone families ("revise.deleted.v1:" and "revise.deletedWire.v1:") share this prefix.
       tx.objectStore("meta").getAllKeys(IDBKeyRange.bound("revise.deleted", "revise.deleted\uffff")),
     ]);
-    const known = new Set(existingIds.map(String));
-    const deleted = new Set(deletedKeys.map(String));
-    const wireDeleted = wireTombstoneCheck(store, deleted, wireUserId);
-    const missing = rows.filter((row) => !known.has(row.id) && !deleted.has(tombstoneKey(store, row.id)) && !wireDeleted(row.id));
+    // Checked again inside the write transaction, so nothing can slip in between check and put.
+    const missing = withoutKnownOrDeleted(store, rows, existingIds, deletedKeys, wireUserId);
     // Queue every put without awaiting each one; a failed put aborts the
     // transaction and tx.done rejects, so nothing in this chunk is half-installed.
     for (const row of missing) void target.put(row as never).catch(() => undefined);

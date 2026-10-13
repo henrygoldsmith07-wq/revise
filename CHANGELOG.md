@@ -1,5 +1,35 @@
 # Changelog
 
+## A fresh profile's first taps no longer wait for the question bank — 2026-10-13 (nineteenth pass)
+
+**On a fresh profile the first taps in onboarding waited for the question
+bank.** Building `@/content` is ~1 s of main-thread JavaScript at 1× CPU and
+~3.6 s at 4×, and it ran while onboarding was on screen; the 4.3k seed cards
+were then installed in one ~0.3 s (1×) / ~1 s (4×) task. Measured on a
+production build at 360px, alternating against `main` (0033352): first tap
+1.41–1.81 s → 0.94–1.27 s at 1×, 4.68–5.45 s → 1.84–2.21 s at 4× (CDP
+throttling probably does not slow the worker, so the 4× gain is likely
+overstated); longest task after onboarding 449 ms → 119 ms.
+
+- `src/worker/content-bank.worker.ts` builds the bank for a fresh profile
+  once onboarding has painted and posts the plain-data questions back once.
+  Any worker error, 30 s of silence or missing `Worker` support falls back to
+  the main-thread import. Returning visits keep the main-thread import.
+- Modules that imported `@/content` themselves (Today's roadmap lessons, the
+  marked-answer panels, the revision sheet, question execution, the AI client)
+  read `@/content/misconceptions` or the loader instead, so nothing rebuilds the
+  bank on the main thread; the boundary test covers every student route.
+- `putMissing` does one read to find the missing rows (none on a returning
+  visit) and writes them in chunks of 500, handing the main thread back
+  between chunks; each chunk re-checks inside its write transaction. Wire
+  tombstone hashing is skipped when there are no tombstones.
+- Known cost: the first returning visit after onboarding reached Today in
+  1.40–1.47 s against 1.20–1.23 s on `main`, because the main thread has no V8
+  code cache for the bank chunk yet (the worker built it). Later visits are
+  cached again. No cheap fix was found: warming the cache means evaluating the
+  bank on the main thread (~0.55 s), which would bring back the long task on
+  Today that this pass removed.
+
 ## A teacher's invite link opens the reviewer portal — 2026-10-13 (eighteenth pass)
 
 **The reviewer portal never reached a teacher on a fresh browser.** Every

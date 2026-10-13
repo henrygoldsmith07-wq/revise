@@ -72,10 +72,12 @@ function importBank(): Promise<readonly Question[]> {
 // without questions.
 //
 // A returning visit keeps the main-thread import on purpose: it shows a boot
-// screen with nothing to tap, and the worker delivered the bank later than the
-// main thread builds it (no V8 code cache for the worker's copy of the chunk:
-// returning visit ~1.45 s vs ~1.2 s to Today at 1× CPU, measured). Where the
-// worker helps is keeping onboarding responsive, not raw speed.
+// screen with nothing to tap, and there the main thread builds the bank sooner
+// than the worker delivers it, because Chrome keeps a V8 code cache for the
+// page's own copy of the chunk (~0.32 s to evaluate at 1× CPU with it) and not
+// for the worker's. One cost of this split, measured: the first returning visit
+// after onboarding has no code cache yet (the worker built the bank during
+// onboarding), so it evaluates in ~0.55 s; later visits are cached again.
 
 /** Generous: a slow phone builds the bank in seconds, not tens of seconds. */
 export const BANK_WORKER_TIMEOUT_MS = 30_000;
