@@ -1,4 +1,5 @@
 import { getTopic } from "@/domain/curriculum";
+import { relevantCommonError } from "@/domain/common-error-relevance";
 import { markQuestion, rubricConfidence, withMarkEvidence } from "@/domain/marking";
 import { assessMarkConfidence } from "@/domain/marking-confidence";
 import type { MarkedPart, Question } from "@/domain/types";
@@ -15,14 +16,20 @@ import type { MarkedPart, Question } from "@/domain/types";
 // exactly as the existing rubric fallback is. Nothing is sent anywhere.
 // ---------------------------------------------------------------------------
 
-export const DEVICE_MARK_FOOTER = "_Marked against the mark scheme on this device — no AI was involved._";
+// Asterisks, not underscores: RichText renders *emphasis*; underscores showed literally.
+export const DEVICE_MARK_FOOTER = "*Marked against the mark scheme on this device — no AI was involved.*";
 export const AI_MARKER_UNAVAILABLE_NOTE = "The AI marker could not be loaded (you may be offline), so this was marked against the mark scheme on this device.";
 
-/** The deterministic mark-scheme mark, with the topic's classic error as a pointer. */
+/**
+ * The deterministic mark-scheme mark, with a topic common error as a pointer
+ * only when it is about something this question asks (see
+ * common-error-relevance.ts); it is never presented as the student's error.
+ */
 export function deviceRubricMark(question: Question, answers: Record<string, string>): { marked: MarkedPart[]; feedback: string; confidence: number } {
   const result = markQuestion(question, answers);
   const topic = getTopic(question.topicIds[0] ?? "");
-  const errorNote = topic?.commonErrors.length ? ` Watch for the classic error on this topic: ${topic.commonErrors[0]}` : "";
+  const commonError = topic ? relevantCommonError(question, topic) : null;
+  const errorNote = commonError ? ` A common slip on this topic: ${commonError}.`.replace(/\.\.$/, ".") : "";
   return { marked: result.marked, feedback: `${result.feedback}${errorNote}\n\n${DEVICE_MARK_FOOTER}`, confidence: 1 };
 }
 

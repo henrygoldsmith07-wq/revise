@@ -125,7 +125,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
       <p className="text-xs text-ink3">Question {index + 1} of {selection.items.length} · {title(item!.topicId)}{selection.practiceTier ? " · practice, not proof" : ""}</p>
       {index === 0 ? <p className="text-xs text-ink3">An initial signal about where to start, not a predicted grade. Skip any time from Today.</p> : null}
       {question ? (
-        <QuestionRunner key={question.id} question={question} hintBudget={0} onFinished={(attempt) => setReviewing(attempt)} />
+        <QuestionRunner key={question.id} question={question} hintBudget={0} inDiagnostic onFinished={(attempt) => setReviewing(attempt)} />
       ) : null}
       {reviewing ? (
         // Kept in reach on a phone: the marked result can be long, so the way

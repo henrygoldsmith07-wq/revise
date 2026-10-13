@@ -151,6 +151,7 @@ function Diagnostic() {
             key={question.id}
             question={question}
             hintBudget={0}
+            inDiagnostic
             onConfidence={setConfidence}
             onFinished={(attempt) => setPending(attempt)}
           />
