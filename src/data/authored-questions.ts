@@ -23,17 +23,52 @@
 // stopped putMissing re-installing it.
 // ---------------------------------------------------------------------------
 
-import { seedQuestions } from "@/content";
 import type { Id, Question } from "@/domain/types";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import { syncWireIdValue } from "./sync-contract";
 import { getDb } from "./db";
 
+// The authored bank (~3.6 MB of the client bundle) is loaded on demand rather
+// than statically imported (seventeenth pass, 2026-10-13). Statically importing
+// `@/content` from the app shell put the whole bank in the "/" entry chunk, so
+// the landing and onboarding screens could not paint until a phone had
+// downloaded, parsed and evaluated it. Every learner still needs it before
+// Today (the snapshot serves it), so it is requested as soon as the store
+// starts loading; the service worker caches the chunk like any other script,
+// so it keeps working offline. Only the questions come from here: misconceptions
+// and seed cards are imported from their own small modules.
+
+let bank: Promise<readonly Question[]> | null = null;
 let authoredIds: Set<string> | null = null;
 
+function importBank(): Promise<readonly Question[]> {
+  return import("@/content").then((content) => content.seedQuestions);
+}
+
+/**
+ * The current authored question bank. One request per page load; a failed
+ * request (a chunk that was never cached, opened offline) is retried once and
+ * then forgotten, so a later call can try again instead of replaying the error.
+ */
+export function loadAuthoredQuestions(): Promise<readonly Question[]> {
+  bank ??= importBank()
+    .catch(() => importBank())
+    .catch((error: unknown) => {
+      bank = null;
+      throw error;
+    });
+  return bank;
+}
+
+/** Start fetching the bank without waiting for it (it is needed before Today). */
+export function preloadAuthoredQuestions(): void {
+  void loadAuthoredQuestions().catch(() => undefined);
+}
+
 /** Ids of the questions shipped in the current bundle. */
-export function authoredQuestionIds(): ReadonlySet<string> {
-  authoredIds ??= new Set(seedQuestions.map((question) => question.id));
+export async function loadAuthoredQuestionIds(): Promise<ReadonlySet<string>> {
+  const questions = await loadAuthoredQuestions();
+  authoredIds ??= new Set(questions.map((question) => question.id));
   return authoredIds;
 }
 
@@ -55,8 +90,10 @@ export interface QuestionRows {
  * copies of authored ids are not read at all (keys only).
  */
 export async function loadQuestionRows(userId: Id): Promise<QuestionRows> {
+  // Resolve the bank before opening the transaction: an IndexedDB transaction
+  // commits itself if it is left waiting on anything that is not a request.
+  const [seedQuestions, ids] = await Promise.all([loadAuthoredQuestions(), loadAuthoredQuestionIds()]);
   const db = await getDb();
-  const ids = authoredQuestionIds();
   const tx = db.transaction(["questions", "meta"], "readonly");
   const [keys, deletedKeys] = await Promise.all([
     tx.objectStore("questions").getAllKeys(),

@@ -6,7 +6,7 @@ import { useAssessmentModels } from "./assessment-models";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { allTopics } from "@/domain/curriculum";
-import { misconceptionsForTopic, seedMisconceptions } from "@/content";
+import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
 
 import type { GradePrediction } from "@/domain/grades";
 import { officialPaperContextFromSettings } from "@/domain/official-papers";
@@ -310,6 +310,15 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
       try {
+        // A fresh profile's first onboarding screen must reach the glass before
+        // the authored bank chunk is fetched and evaluated: evaluating it holds
+        // the main thread for about a second on a phone (several at 4x CPU
+        // throttling), and it used to sit in the shell chunk, ahead of any paint.
+        // Returning students skip the wait; they see the boot screen either way.
+        if (!(await repo.hasOnboarded(userId).catch(() => true))) {
+          setFreshProfile(true);
+          await afterNextPaint();
+        }
         const loaded = await repo.loadSnapshot(userId);
         setSnapshot(loaded);
         // First page is on screen; stream the rest of history in the background.
@@ -1173,6 +1182,26 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   }
   if (!value) return <BootScreen />;
   return <StoreSubscriptionsProvider value={value}>{children}</StoreSubscriptionsProvider>;
+}
+
+/**
+ * Resolves once the frame after the current one has been presented (two
+ * animation frames, then a task), or after 150 ms when frames are not being
+ * produced (a background tab, a test environment), so boot never stalls on it.
+ */
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    const fallback = setTimeout(resolve, 150);
+    if (typeof requestAnimationFrame !== "function") return;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setTimeout(() => {
+          clearTimeout(fallback);
+          resolve();
+        }, 0),
+      ),
+    );
+  });
 }
 
 function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () => void } = {}) {

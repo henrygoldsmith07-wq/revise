@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { seedMisconceptions } from "@/content";
+import { seedMisconceptions } from "@/content/misconceptions";
 import { allTopics } from "@/domain/curriculum";
 import { buildSearchIndex, searchIndex } from "@/domain/search";
 import type { SearchResult } from "@/domain/search";

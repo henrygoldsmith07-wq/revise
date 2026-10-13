@@ -1,6 +1,6 @@
 import { syncWireIdValue } from "./sync-contract";
-import { seedCards } from "@/content";
-import { loadQuestionRows } from "./authored-questions";
+import { seedCards } from "@/content/seed-cards";
+import { loadQuestionRows, preloadAuthoredQuestions } from "./authored-questions";
 import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
@@ -187,6 +187,8 @@ export const HISTORY_FIRST_PAGE = 500;
 export const HISTORY_CHUNK = 500;
 
 export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number }): Promise<Snapshot> {
+  // The authored bank is a separate chunk; start fetching it while the cards install.
+  preloadAuthoredQuestions();
   await ensureSeeded(userId);
   const db = await getDb();
   const historyLimit = opts?.historyLimit ?? HISTORY_FIRST_PAGE;

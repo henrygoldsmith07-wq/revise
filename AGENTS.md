@@ -53,11 +53,20 @@ background and do other work while it runs. On Windows, invoke npm through
   makes it look like a dead end when it is not. `src/components/recovery-evidence.ts` is the reference call.
 - **`unseenQuestion` is O(questions × topics).** Never call it over the whole
   bank in a React hook; it caused real render timeouts.
-- **The whole authored bank is built at boot.** `@/content` is statically
-  imported by the app shell (`src/state/store.tsx`, `src/data/repository.ts`),
-  so every authoring helper that runs while the bank is built (`defineQuestion`,
-  `qualityItem`, `capabilityEvidenceFor`, `provenanceFor`, the subject audits)
-  runs before the app can hydrate. Per-phrase `new RegExp(...)` and
+- **The authored question bank is a lazy chunk** (seventeenth pass). Nothing
+  reachable by a static import from `src/app/layout.tsx` or `src/app/page.tsx`
+  may import `@/content` (`tests/shell-content-boundary.test.ts` walks the real
+  graph and prints the chain). The shell reads questions through
+  `loadAuthoredQuestions()` in `src/data/authored-questions.ts`, misconceptions
+  from `@/content/misconceptions` and seed cards from `@/content/seed-cards`.
+  Resolve the bank *before* opening an IndexedDB transaction: awaiting the
+  import inside one lets it auto-commit. Other routes may still import
+  `@/content` statically; the bank is the same shared chunk either way.
+- **The whole authored bank is still built before Today.** It is loaded as
+  soon as the store starts (onboarding paints first), so every authoring
+  helper that runs while the bank is built (`defineQuestion`, `qualityItem`,
+  `capabilityEvidenceFor`, `provenanceFor`, the subject audits) still runs
+  before Today can render, and on the main thread while onboarding is open. Per-phrase `new RegExp(...)` and
   backtracking global patterns there cost seconds on a phone; the fourteenth
   pass cut the build from ~2.6s to ~0.8s (Node) without changing its output.
   Check `tests/content-boot-cost.test.ts` and measure before adding work there.
@@ -67,8 +76,10 @@ background and do other work while it runs. On Windows, invoke npm through
   ~1.3–1.8s.
 - **`perf:budget` has a route budget for `/`** (`routes` in
   `scripts/client-performance-budget.json`): root files plus the route's
-  layout and page entry chunks. Lower it when the bank leaves the shell
-  chunk; never raise it to fit a regression.
+  layout and page entry chunks. The bank left it in the seventeenth pass
+  (5.13 MB → 2.97 MB raw); the curriculum topic tree (~0.85 MB) is the
+  largest piece left. Lower it as more leaves; never raise it to fit a
+  regression.
 - **Equivalent wording in the offline marker is a curated list**
   (`PHRASE_EQUIVALENTS` in `src/domain/marking-language.ts`, sixteenth pass).
   It rewrites both the scheme point and the answer, for keyword coverage only.
