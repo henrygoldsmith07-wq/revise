@@ -1,5 +1,41 @@
 # Changelog
 
+## Correct answers in a student's own words get the marks — 2026-10-12 (sixteenth pass)
+
+**The offline marker under-credited correct paraphrases.** It reads keyword
+coverage against the scheme's own wording, so "goes up" for "rises", "four
+times smaller" for "one quarter", "zero or negative" for "≤ 0" or
+"inversely proportional to the square of the distance" for "∝ 1/r²" earned
+nothing. The reported inverse-square answer scored 0/3.
+
+- Equivalent wording (`PHRASE_EQUIVALENTS`, `src/domain/marking-language.ts`):
+  a curated list rewrites phrases that mean the same thing in every A-level
+  context to one form, on both scheme point and answer, for coverage only.
+  Opposites, ambiguous words ("fall", "left", "leaves", "double", "by a
+  quarter") and mark-earning terms ("diffuses into") are never merged.
+- "Zero or negative" / "less than or equal to" are read as `≤` by every check,
+  so the relation veto rejects "zero or positive" for a `≤ 0` point.
+- An opposite claim in the new wording ("goes down" for an increase, "four
+  times bigger" for a quarter) is vetoed in very short answers and in the
+  labelled case a point is about ("In A, …" is judged on the sentences about A).
+- Two silent zero-credit bugs: the scaffolding guard read a sentence's last
+  word with its full stop ("genus." never matched the point "Genus"), and a
+  point written only in notation ("P(A ∩ B) = P(A)P(B|A)") could not be
+  credited even verbatim.
+- Measured on a new paraphrase set of real flagship questions
+  (`tests/fixtures/marking-paraphrase-set.ts`; every answer and examiner mark
+  is author judgement, not a moderated mark): 50 design paraphrases
+  under-credited 11 → 4 (103 → 111 of 115 marks); 13 held-out paraphrases
+  written after the change 3 → 2 (26 → 27 of 29); 11 wrong answers in the new
+  wording over-credited 4 → 2 (15 → 13 marks where an examiner gives 10).
+  Whole flagship bank (3,170 parts): no verbatim model answer loses a mark
+  (8,103 → 8,106); rubric-only model answers 71.96% → 72.27%; a same-topic
+  wrong-answer probe 1,497 → 1,496 marks. The contradiction regression set
+  still has no over-credited answer.
+- Not fixed: answers that need comprehension rather than wording ("closer
+  together" for "the gap gets smaller", "cosmological component" for "the
+  expansion of the universe", number words against digits).
+
 ## Today about 3 seconds sooner on a first visit, no over-credited contradictions left, and a real "/" budget — 2026-10-12 (fifteenth pass)
 
 **After onboarding a fresh profile still waited 4.6–4.9s (normal CPU) for

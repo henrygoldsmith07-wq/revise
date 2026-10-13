@@ -1,4 +1,4 @@
-import { tokenise, pointCoverage, stem, STOP_WORDS, withinEditDistance } from "./marking-language";
+import { tokenise, pointCoverage, stem, STOP_WORDS, withinEditDistance, canonicalTokenSet, inequalityWordsToSymbols, notationOnlyPoint, notationPresent, canonicalDirectionConflict, canonicalScalingConflict, labelledAnswerScope } from "./marking-language";
 export { tokenise, pointCoverage } from "./marking-language";
 import { numericEquivalent, numericMatch, extractNumbersCached, requiresStructuredNumericMatch, isNumericPoint, sameToTwoSigFigs } from "./marking-numeric";
 export { numericEquivalent, isNumericPoint } from "./marking-numeric";
@@ -375,6 +375,10 @@ function explicitNegationConflict(point: string, answer: string): boolean {
  * different claim; the general contradiction veto covers only their very
  * short answers. Every other subject gets it in full.
  */
+function isPhysicsPart(part: Pick<QuestionPart, "capabilityIds">): boolean {
+  return Boolean(part.capabilityIds?.some((id) => id.startsWith("phys.")));
+}
+
 export function contradictionApplies(part: Pick<QuestionPart, "capabilityIds">, answer: string): boolean {
   if (!part.capabilityIds?.some((id) => id.startsWith("phys."))) return true;
   return answer.trim().split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
@@ -432,32 +436,34 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   }
   const credited: string[] = [];
   const missed: string[] = [];
-  const givenTokens = new Set(
-    [...tokenise(trimmed)].map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean),
-  );
+  // Same tokens as coverage (equivalent wording canonicalised, a sentence's
+  // last word stemmed without its full stop), so the guard below never vetoes
+  // a point that coverage credited through "genus." or "goes up".
+  const givenTokens = canonicalTokenSet(trimmed);
 
   // Scaffolding guard: sibling scheme points often share most vocabulary
   // ("chlorine is reduced to chloride…" vs "chlorine is oxidised to
   // chlorate(I)…"). When a point has distinctive tokens — unique to it across
   // the whole scheme — and the answer contains NONE of them, coverage came
   // from shared scaffolding alone and cannot credit the point.
-  const pointTokenSets = part.markScheme.map((p) =>
-    new Set([...tokenise(p)].map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean)),
-  );
+  const pointTokenSets = part.markScheme.map((p) => canonicalTokenSet(p));
   const documentFrequency = new Map<string, number>();
   for (const set of pointTokenSets) for (const t of set) documentFrequency.set(t, (documentFrequency.get(t) ?? 0) + 1);
 
+  // "ΔG is zero or negative" is judged exactly as "ΔG ≤ 0" by every check below.
+  const judged = inequalityWordsToSymbols(trimmed);
   for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
-    const cov = pointCoverage(point, trimmed, thresh);
+    const scope = labelledAnswerScope(point, judged);
+    const cov = notationOnlyPoint(point) ? (notationPresent(point, judged) ? 1 : 0) : pointCoverage(point, scope, thresh);
     // A digit inside a formula or label (H₃N⁺, V₁) is not a stated value: it
     // is evidence only when that name itself is in the answer.
-    const num = numericMatch(point, trimmed) && (pointStatesNumber(point) || namedDigitsPresent(point, trimmed));
+    const num = numericMatch(point, judged) && (pointStatesNumber(point) || namedDigitsPresent(point, judged));
     // Symbolic layer: when both the point and the answer contain a parseable
     // algebra expression, accept equivalent forms (`(x+2)(x-3)` for `x^2 - x - 6`)
     // and reject a pure expression that differs, even if a stray digit matches.
     // Unknown (unparseable/prose) never hurts: it falls through to the rubric.
-    const sym = symbolicMatch(trimmed, point);
+    const sym = symbolicMatch(judged, point);
     const structuredNumeric = requiresStructuredNumericMatch(point);
     const numeric = isNumericPoint(point);
     const strict = Boolean(calibration?.strictNumericPoints && numeric);
@@ -480,7 +486,19 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
       if (discriminative.length >= 1 && !discriminative.some((t) => givenTokens.has(t))) ok = false;
     }
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
-    if (ok && sym !== "equivalent" && polarityConflict(point, trimmed)) ok = false;
+    if (ok && sym !== "equivalent" && polarityConflict(point, judged)) ok = false;
+    // The same check after equivalent wording is canonicalised ("goes down"
+    // for "rises", "four times bigger" for "one quarter"). Only where the
+    // answer's words are about this point: a very short answer, or the
+    // labelled case the point is about. In a longer answer an opposite word
+    // usually belongs to another claim ("the increased glucose ... returning
+    // it towards the set point"), and a ratio is often stated from the other
+    // side ("the nearer station measures four times the intensity"). Not the
+    // direction words in Physics, where "falls" and "rises" usually describe
+    // motion, not a change.
+    const focused = scope !== judged || judged.split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
+    if (ok && focused && sym !== "equivalent" && !isPhysicsPart(part) && canonicalDirectionConflict(point, scope)) ok = false;
+    if (ok && focused && sym !== "equivalent" && isPhysicsPart(part) && canonicalScalingConflict(point, scope)) ok = false;
     // Contradiction veto: an opposite term (artery for vein, left for right),
     // a flipped sign or inequality, a different stated value or formula, or a
     // negated claim. Only ever removes credit (marking-contradiction.ts).
@@ -489,21 +507,21 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     // only for a point that is itself a pure expression.
     // A different stated value ("M : M+2 = 1 : 1" for "3 : 1") overrides the
     // symbolic layer too, which can match on a shared fragment.
-    if (ok && contradictionApplies(part, trimmed)) {
-      const contradiction = schemeContradiction(point, trimmed);
+    if (ok && contradictionApplies(part, judged)) {
+      const contradiction = schemeContradiction(point, judged);
       if (contradiction && (sym !== "equivalent" || proseEmbeddedPoint(point) || contradiction.kind === "value")) ok = false;
     }
     if (part.capabilityIds?.some(id => id.startsWith("phys."))) {
-      if (explicitNegationConflict(point, trimmed)) ok = false;
-      const resultMatches = physicsResultMatches(point, trimmed);
+      if (explicitNegationConflict(point, judged)) ok = false;
+      const resultMatches = physicsResultMatches(point, judged);
       if (resultMatches === false) ok = false;
       const selected = point.match(/^Only ([A-D]) is suitable\.?$/);
-      if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(trimmed) &&
-        !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(trimmed);
+      if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(judged) &&
+        !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(judged);
     }
     // Last, so no earlier rule can restore the mark. Authored "do not accept" line for this point (marking-reject.ts): the
     // answer states something the scheme names as wrong. Only removes credit.
-    if (ok && rejectedStatement(part, pointIndex, trimmed)?.contrastOnly === false) ok = false;
+    if (ok && rejectedStatement(part, pointIndex, judged)?.contrastOnly === false) ok = false;
     (ok ? credited : missed).push(point);
   }
 
