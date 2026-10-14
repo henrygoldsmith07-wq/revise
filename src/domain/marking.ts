@@ -592,12 +592,17 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     max: part.marks,
     creditedPoints: credited,
     missedPoints: missed,
-    comment: buildComment(awarded, part.marks, missed),
+    comment: rubricPartComment(awarded, part.marks, missed),
   };
   return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
 }
 
-function buildComment(awarded: number, max: number, missed: string[]): string {
+/**
+ * The device marker's per-part comment. Exported so the marked-result view
+ * can recognise a comment that only restates the missed points it already
+ * lists (see marked-feedback-display.ts).
+ */
+export function rubricPartComment(awarded: number, max: number, missed: string[]): string {
   if (!missed.length) return "Full marks — every mark-scheme point is there.";
   if (awarded === 0) return `No marks yet. The scheme wants: ${missed.slice(0, 2).join("; ")}.`;
   return `${awarded}/${max}. Still missing: ${missed.slice(0, 2).join("; ")}.`;
@@ -656,6 +661,15 @@ export function markQuestion(question: Question, answers: Record<string, string>
 
 /** Examiner-voice summary: what was earned, what was dropped, what to do. */
 export function examinerSummary(awarded: number, max: number, marked: MarkedPart[]): string {
+  const { score, opening, detail, advice } = examinerSummaryParts(awarded, max, marked);
+  return `${score} ${opening}${detail}${advice}`;
+}
+
+/**
+ * The pieces of examinerSummary. `score` and `detail` restate the mark and the
+ * missed points, which the marked-result view already shows on their own.
+ */
+export function examinerSummaryParts(awarded: number, max: number, marked: MarkedPart[]): { score: string; opening: string; detail: string; advice: string } {
   const pct = max ? awarded / max : 0;
   const missed = marked.flatMap((m) => m.missedPoints);
   const opening =
@@ -674,5 +688,5 @@ export function examinerSummary(awarded: number, max: number, marked: MarkedPart
     ? " Write the missing points explicitly — examiners award the statement, not the implication."
     : " Keep this structure under timed conditions.";
 
-  return `${awarded}/${max}. ${opening}${detail}${advice}`;
+  return { score: `${awarded}/${max}.`, opening, detail, advice };
 }

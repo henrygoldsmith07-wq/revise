@@ -157,7 +157,9 @@ export function QuestionRunner({
                   <RichText className="text-sm leading-6 flex-1 min-w-0">{part.prompt}</RichText>
                   <span className="text-xs text-ink3 shrink-0 pt-0.5">[{part.marks}]</span>
                 </div>
-                <CommandWordCheck validation={validateCommandWord(question, part, answers[part.id] ?? "")} />
+                {/* A live check while writing. Once marked, the mark supersedes it:
+                    "Verb covered" beside a 0/2 read as a contradiction. */}
+                {result ? null : <CommandWordCheck validation={validateCommandWord(question, part, answers[part.id] ?? "")} />}
                 {result ? (
                   <div className="card card-2 p-3 text-sm text-ink2 whitespace-pre-wrap break-words">
                     {answers[part.id]?.trim() || "(no answer given)"}
@@ -271,7 +273,7 @@ export function QuestionRunner({
           answers={answers}
           attempt={result.lastAttempt}
           inDiagnostic={inDiagnostic}
-          improvableAnswers={mode === "practice" && !farTransfer && !retestMistake ? answers : undefined}
+          improvableAnswers={mode === "practice" && !farTransfer && !retestMistake && !inDiagnostic ? answers : undefined}
         />
       ) : null}
     </div>
