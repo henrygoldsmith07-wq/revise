@@ -70,6 +70,7 @@ function TechniqueExercises({ context }: { context: TechniqueRouteContext }) {
         {destination ? <>
           <p className="text-sm text-ink2 mt-2">{destination.why}</p>
           <p className="text-xs text-ink3 mt-2">The link selected a drill, not a diagnosis, mark or a confirmed improvement. You can choose a different shape below.</p>
+          <Link href={destination.href} className="inline-flex min-h-11 items-center underline text-sm mt-1">{destination.label}</Link>
         </> : <>
           <p className="text-sm text-ink2 mt-2">The source question or topic is no longer available on this profile. It may have been retired, removed or belong to another subject. You can still use these fictional drills.</p>
           <Link href="/practice" className="inline-flex min-h-11 items-center underline text-sm">Choose current practice questions</Link>
@@ -110,7 +111,6 @@ function TechniqueExercises({ context }: { context: TechniqueRouteContext }) {
         </ul>
         {destination ? <div className="mt-4 border-t border-line pt-3">
           <p className="text-xs text-ink3">A detected wording signal does not show that the loss is repaired. Apply the shape to the real prompt; only an answered question produces marking feedback.</p>
-          <Link href={destination.href} className="inline-flex min-h-11 items-center underline text-sm mt-1">{destination.label}</Link>
         </div> : null}
       </Panel> : null}
 
