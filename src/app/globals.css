@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./le-studio.css";
+@import "./fonts.css";
 @import "katex/dist/katex.min.css";
 
 /* KaTeX inherits the ink token so equations match body text in both themes. */

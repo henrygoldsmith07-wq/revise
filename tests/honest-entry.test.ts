@@ -66,7 +66,7 @@ describe("no-JS entry point", () => {
     // the cache version is pinned. Bump it deliberately (and here) whenever
     // the shell list changes, so a stale cache is invalidated rather than
     // silently leaving new routes unavailable offline.
-    expect(sw).toContain('const CACHE_VERSION = "revise-v7"');
+    expect(sw).toContain('const CACHE_VERSION = "revise-v8"');
     expect(read("public/manifest.webmanifest")).toContain('"start_url": "/"');
     expect(read("public/manifest.webmanifest")).toContain('"scope": "/"');
   });
