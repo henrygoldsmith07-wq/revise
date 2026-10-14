@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
+import { adaptiveReturnHref } from "@/domain/study-navigation";
 import { buildReviewQueue, buryCard, isDue, previewIntervals, reinsert, setSuspended, todayIso } from "@/domain/scheduling";
 import { CUSTOM_STUDY_KEY } from "@/components/CustomStudyDialog";
 import { useShortcuts } from "@/components/shortcuts";
@@ -52,7 +53,7 @@ function ReviewSession() {
   // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
   // finishing here hands the student back to the same tutor step — the loop
   // continues inside one flow instead of stranding them on a queue page.
-  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
+  const returnHref = params.get("from") === "adaptive" ? adaptiveReturnHref(params.get("return")) : null;
   const limitParam = params.get("limit");
   const parsedLimit = limitParam ? Number.parseInt(limitParam, 10) : NaN;
   const limitOverride = Number.isFinite(parsedLimit) ? Math.min(50, Math.max(1, parsedLimit)) : null;
@@ -70,6 +71,9 @@ function ReviewSession() {
     totalMs: 0,
   }));
   const cardShownAt = useRef(0);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // After each graded card, one official-style exam question that tests the
   // card's spec point appears before the next card. The queue has already
   // advanced; "Next card" (or Enter) reveals it.
@@ -114,21 +118,22 @@ function ReviewSession() {
 
   // The queue is built once, at mount: rebuilding it as cards are graded would
   // reshuffle the deck underneath the student mid-session.
-  const [queue, setQueue] = useState<Card[]>(() => {
+  const [queue, setQueue] = useState<string[]>(() => {
     if (savedCheckpoint?.queueIds?.length) {
-      const byId = new Map(store.cards.map((card) => [card.id, card] as const));
-      const restored = savedCheckpoint.queueIds.map((id) => byId.get(id)).filter((card): card is Card => Boolean(card));
+      const available = new Set(store.cards.map((card) => card.id));
+      const restored = savedCheckpoint.queueIds.filter((id) => available.has(id));
       if (restored.length) return restored;
     }
     // A custom session is already ordered and limited by the dialog; passing it
     // back through the scheduler's queue builder would undo both.
-    if (custom) return pool;
+    if (custom) return pool.map((card) => card.id);
     const limit =
       limitOverride ?? (mode === "mistakes" ? 20 : Math.max(10, Math.ceil(store.settings.sessionLengthMinutes * 2.5)));
-    return buildReviewQueue(pool, limit);
+    return buildReviewQueue(pool, limit).map((card) => card.id);
   });
 
-  const current = queue[0];
+  // Hold order, not card objects: an Again retry sees the committed FSRS state.
+  const current = store.cards.find((card) => card.id === queue[0]);
   const total = queue.length + done.reviewed;
   const isPreview = Boolean(custom?.preview);
 
@@ -190,7 +195,7 @@ function ReviewSession() {
 
   useEffect(() => {
     if (!current) {
-      if (resumeRequested || done.reviewed > 0) void clearRevisionCheckpoint();
+      if (!queue.length && (resumeRequested || done.reviewed > 0)) void clearRevisionCheckpoint();
       return;
     }
     void saveRevisionCheckpoint({
@@ -199,7 +204,7 @@ function ReviewSession() {
       href: checkpointHref,
       position: done.reviewed,
       total,
-      queueIds: queue.map((card) => card.id),
+      queueIds: queue,
       repeatCount: done.again,
     });
   }, [checkpointHref, clearRevisionCheckpoint, custom, current, done, mode, queue, resumeRequested, saveRevisionCheckpoint, total]);
@@ -208,19 +213,34 @@ function ReviewSession() {
     cardShownAt.current = Date.now();
   }, []);
 
+  useEffect(() => {
+    // Keep a successful activation latched until React presents the next item.
+    if (!revealed) savingRef.current = false;
+  }, [current?.id, revealed]);
+
   // useCallback rather than a plain declaration: these read the clock and the
   // card-shown ref, which only makes sense once an interaction has happened,
   // never while rendering.
   const skipCurrent = useCallback(
     async (transform: (card: Card) => Card) => {
-      if (!current) return;
-      await store.updateCards([transform(current)]);
-      setQueue((q) => q.slice(1));
-      setRevealed(false);
-      setConfidence(null);
-      setExamCheck(null);
-      setGradedCard(null);
-      cardShownAt.current = Date.now();
+      if (!current || savingRef.current) return;
+      savingRef.current = true;
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await store.updateCards([transform(current)]);
+        setQueue((q) => q.slice(1));
+        setRevealed(false);
+        setConfidence(null);
+        setExamCheck(null);
+        setGradedCard(null);
+        cardShownAt.current = Date.now();
+      } catch {
+        setSaveError("Could not save this card. It is still here — please try again.");
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
     },
     [current, store],
   );
@@ -238,70 +258,78 @@ function ReviewSession() {
         key: " ",
         group: "Review",
         label: examCheck ? "Next card" : "Show answer",
-        disabled: Boolean(!examCheck && revealed),
+        disabled: saving || Boolean(!examCheck && revealed),
         run: () => (examCheck ? continueFromCheck() : setRevealed(true)),
       },
       {
         key: "enter",
         group: "Review",
         label: examCheck ? "Next card" : "Show answer",
-        disabled: Boolean(!examCheck && revealed),
+        disabled: saving || Boolean(!examCheck && revealed),
         run: () => (examCheck ? continueFromCheck() : setRevealed(true)),
       },
       ...GRADES.map((option, i) => ({
         key: String(i + 1),
         group: "Review",
         label: `Grade "${option.label}"`,
-        disabled: !revealed || Boolean(examCheck),
+        disabled: !revealed || Boolean(examCheck) || saving,
         run: () => void grade(option.grade),
       })),
       {
         key: "s",
         group: "Review",
         label: "Suspend this card",
-        disabled: Boolean(examCheck),
+        disabled: Boolean(examCheck) || saving,
         run: () => void skipCurrent((c) => setSuspended(c, true)),
       },
       {
         key: "b",
         group: "Review",
         label: "Bury until tomorrow",
-        disabled: Boolean(examCheck),
+        disabled: Boolean(examCheck) || saving,
         run: () => void skipCurrent((c) => buryCard(c)),
       },
     ],
-    [current, revealed, confidence, isPreview, examCheck, continueFromCheck],
+    [current, revealed, confidence, isPreview, examCheck, continueFromCheck, saving],
   );
 
   const grade = useCallback(
     async (value: RecallGrade) => {
-    if (!current) return;
-    const elapsed = cardShownAt.current ? Date.now() - cardShownAt.current : 0;
-    // Preview sessions are cramming: grading a card that is not due would
-    // shorten every future interval on it, so the schedule is left alone.
-    if (!isPreview) {
-      await store.reviewCard(current, value, elapsed, confidence ?? undefined);
-    }
+      if (!current || !revealed || examCheck || savingRef.current) return;
+      savingRef.current = true;
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const elapsed = cardShownAt.current ? Date.now() - cardShownAt.current : 0;
+        // Preview sessions are cramming: grading a card that is not due would
+        // shorten every future interval on it, so the schedule is left alone.
+        if (!isPreview) {
+          await store.reviewCard(current, value, elapsed, confidence ?? undefined);
+        }
 
-    // "Again" cards come back inside this session — tomorrow is too late to
-    // repair a card you have just proved you cannot recall.
-    const rest = queue.slice(1);
-    setQueue(value === "again" ? reinsert(rest, current, 4) : rest);
-    // After each card: one official-style exam question that uses this card's
-    // spec point (null when no authored question tests that exact point — the
-    // session then flows straight to the next card).
-    setGradedCard(current);
-    setExamCheck(pickExamQuestionForCard(current, store.questions));
-    setDone((d) => ({
-      reviewed: d.reviewed + 1,
-      again: d.again + (value === "again" ? 1 : 0),
-      totalMs: d.totalMs + elapsed,
-    }));
-    setRevealed(false);
-    setConfidence(null);
-    cardShownAt.current = Date.now();
+        // "Again" cards come back inside this session — tomorrow is too late to
+        // repair a card you have just proved you cannot recall.
+        const rest = queue.slice(1);
+        setQueue(value === "again" ? reinsert(rest, current.id, 4) : rest);
+        // An authored question checks this card's spec point between cards.
+        setGradedCard(current);
+        setExamCheck(pickExamQuestionForCard(current, store.questions));
+        setDone((d) => ({
+          reviewed: d.reviewed + 1,
+          again: d.again + (value === "again" ? 1 : 0),
+          totalMs: d.totalMs + elapsed,
+        }));
+        setRevealed(false);
+        setConfidence(null);
+        cardShownAt.current = Date.now();
+      } catch {
+        setSaveError("Could not save your grade. This card is still here — please try again.");
+        savingRef.current = false;
+      } finally {
+        setSaving(false);
+      }
     },
-    [current, queue, confidence, isPreview, store],
+    [current, queue, confidence, isPreview, store, revealed, examCheck],
   );
 
   if (examCheck) {
@@ -333,6 +361,20 @@ function ReviewSession() {
 
         <ExamCheckPanel question={examCheck} onNext={continueFromCheck} />
       </div>
+    );
+  }
+
+  if (!current && queue.length) {
+    return (
+      <Panel>
+        <p className="text-sm text-ink2" role="status">This card is no longer available. No grade has been recorded.</p>
+        <Button className="mt-3" onClick={() => {
+          setQueue((q) => q.slice(1));
+          setRevealed(false);
+          setConfidence(null);
+          setSaveError(null);
+        }}>Skip unavailable card</Button>
+      </Panel>
     );
   }
 
@@ -373,6 +415,8 @@ function ReviewSession() {
       ) : null}
 
       <ProgressBar value={total ? done.reviewed / total : 0} label={`${done.reviewed} of ${total}`} />
+
+      {saveError ? <p className="text-sm text-danger" role="alert">{saveError}</p> : null}
 
       <Panel className="min-h-[16rem] flex flex-col">
         <div className="flex items-center gap-2 mb-3">
@@ -467,6 +511,7 @@ function ReviewSession() {
                 key={option.grade}
                 type="button"
                 onClick={() => void grade(option.grade)}
+                disabled={saving}
                 // min-h keeps these comfortably tappable on a phone, where
                 // this is the single most-used control in the app.
                 className="card p-2 min-h-[4.25rem] flex flex-col justify-center text-center hover:border-ink3 active:scale-[0.98] transition-all"

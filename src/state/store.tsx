@@ -16,7 +16,7 @@ import {
   evaluateMistakeRetest,
   mistakesFromAttempt,
 } from "@/domain/mistakes";
-import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
+import { advanceMistakeRepair, repairTargetParts } from "@/domain/repair-evidence";
 
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
 
@@ -39,8 +39,9 @@ import {
 } from "@/domain/paper-outcome";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
 import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
-import { gradeCard, isDueReview, todayIso } from "@/domain/scheduling";
-import { getDeviceIdentity, nextLamport } from "@/data/device";
+import { isDueReview, todayIso } from "@/domain/scheduling";
+import { saveCardReview } from "@/data/card-review";
+import { mergeCard } from "@/domain/sync-crdt";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
 import { calibrateDifficulty } from "@/domain/knowledge-tracing";
 import type { DifficultyCalibrationReport, QuestionTrace } from "@/domain/knowledge-tracing";
@@ -81,7 +82,6 @@ import type {
   Question,
   Recommendation,
   RecallGrade,
-  ReviewLog,
   StreakState,
   TopicMastery,
   UserSettings,
@@ -770,37 +770,15 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
 
   const reviewCard = useCallback<StoreValue["reviewCard"]>(
     async (card, grade, elapsedMs, confidence) => {
-      const now = new Date();
-      touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
-      // CRDT: every grade gets a Lamport stamp so concurrent reviews on two
-      // devices merge by replay instead of last-write-wins discarding one.
-      const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
-      const updated = gradeCard(card, grade, now, { deviceId, lamport });
-      const log: ReviewLog = {
-        id: crypto.randomUUID(),
-        userId,
-        cardId: card.id,
-        topicId: card.topicId,
-        grade,
-        confidence,
-        elapsedMs,
-        reviewedAt: now.toISOString(),
-      };
-      await repo.saveCard(updated);
-      await repo.saveReviewLog(log);
-
       // Card recall updates retention, but cannot prove independent exam repair.
-      const deferred = (snapshot?.mistakes ?? []).flatMap((mistake) => {
-        const next = deferRepairAfterRetrieval(mistake, updated, log);
-        return next === mistake ? [] : [next];
-      });
-      if (deferred.length) await repo.saveMistakes(deferred);
+      const { card: updated, log, mistakes: deferred } = await saveCardReview(card, userId, grade, elapsedMs, confidence);
+      touchSessionClock(); // count only a saved retrieval decision
 
       setSnapshot((prev) => {
         if (!prev) return prev;
         const next: Snapshot = {
           ...prev,
-          cards: prev.cards.map((c) => (c.id === updated.id ? updated : c)),
+          cards: prev.cards.map((c) => (c.id === updated.id ? mergeCard(c, updated) : c)),
           reviewLogs: [...prev.reviewLogs, log],
           mistakes: prev.mistakes.map((mistake) => deferred.find((m) => m.id === mistake.id) ?? mistake),
         };
@@ -813,7 +791,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
         return next;
       });
     },
-    [userId, snapshot, bumpGamification, patch],
+    [userId, bumpGamification, patch],
   );
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
