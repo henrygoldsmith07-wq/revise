@@ -41,7 +41,10 @@ export function checkTechniqueDrill(id: TechniqueDrillId, answer: string): Techn
   add("response", "A response was written", Boolean(answer.trim()), "Write a response before checking its structure.");
   if (id !== "explain") add("data", "Supplied waiting-time values mentioned", /\b12\b/.test(answer) && /\b8\b/.test(answer), "Refer to the supplied 12-minute and 8-minute means; check the direction yourself.");
   if (id === "describe") {
-    add("observation", "Observation wording", command.evidence.includes("observation"), "Say what changes, rather than only giving a reason.");
+    // Generic drills discuss a completed trial, so past-tense observations
+    // are valid shape signals too. This still does not check their truth.
+    const observation = command.evidence.includes("observation") || /\b(increased|decreased|rose|fell|changed|was|were)\b/i.test(answer);
+    add("observation", "Observation wording", observation, "Say what changes, rather than only giving a reason.");
   } else if (id === "explain" || id === "six-mark") {
     add("reason", "An explicit reason link", /\b(because|therefore|since|due to|so that|as a result)\b/i.test(answer), "Link a proposed reason to the result, not just a statement that the wait changed.");
   }

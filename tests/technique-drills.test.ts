@@ -37,6 +37,12 @@ describe("generic exam technique drills", () => {
     }
   });
 
+  it("recognises past-tense observations without relying on one exact inflection", () => {
+    expect(detected("describe", "The mean wait decreased from 12 minutes to 8 minutes, a decrease of 4 minutes.")).toContain("observation");
+    expect(detected("describe", "The waiting time fell from 12 minutes to 8 minutes.")).toContain("observation");
+    expect(detected("describe", "The time changed from 12 to 8 minutes.")).toContain("observation");
+  });
+
   it("distinguishes describing observations from linking a reason", () => {
     expect(detected("describe", "The wait decreases from 12 minutes to 8 minutes.")).toEqual(["response", "data", "observation"]);
     expect(detected("explain", "The wait decreases from 12 to 8 minutes.")).not.toContain("reason");
