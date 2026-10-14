@@ -60,6 +60,9 @@ const TOOLS_NAV: NavItem[] = [
   { href: "/study", label: "Choose how to study", Icon: ModesIcon },
   { href: "/tutor", label: "Tutor", Icon: TutorIcon },
   { href: "/schedule", label: "Schedule", Icon: PlanIcon },
+  { href: "/technique", label: "Exam-technique drills", Icon: PracticeIcon },
+  { href: "/practicals", label: "Practical skills", Icon: LessonsIcon },
+  { href: "/classes", label: "Your classes", Icon: LibraryIcon },
 ];
 
 const SETTINGS_NAV: NavItem[] = [{ href: "/settings", label: "Settings", Icon: SettingsIcon }];
@@ -157,7 +160,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const toolsActive = TOOLS_NAV.some((item) => isActive(item.href));
 
   if (needsOnboarding) {
-    return <Onboarding onDone={completeOnboarding} />;
+    // Teachers can open their roster without enrolling in student revision.
+    if (pathname !== "/classes" && pathname !== "/settings") return <Onboarding onDone={completeOnboarding} />;
   }
 
   return (

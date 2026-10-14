@@ -107,6 +107,27 @@ is generated on the device and stored in the local `meta` store under
 `revise.e2ee.key.v1`; it is never transmitted, except through the explicit
 "reveal key" backup flow the learner initiates.
 
+### Live teacher classes
+
+`src/data/classes.ts` uses the signed-in learner/teacher session directly, never
+service credentials or the synthetic demo roster. Explicit class join collects
+an alias, self-declared age band and sharing consent. Under-13 joins are blocked;
+under-18 membership stays pending until the owning teacher records per-pupil
+school/guardian authorization. This is not age verification or a legal-compliance
+claim. Only active teacher grants can manage their own classes; students cannot
+browse join codes or peer rosters.
+
+Only explicit, assignment-scoped metadata snapshots are shared: attempt UUID,
+learner UUID, question/topic IDs, awarded/max marks, a fixed misconception category
+and timestamp. No answers, feedback, arbitrary text fields or broad attempt-table
+access are shared. SQL checks membership on read/write, consent/authorization
+timestamps and bounded payloads; class evidence remains learner-supplied, not
+verified examination evidence. Leaving deletes membership and snapshots
+synchronously. Account deletion cascades all class rows and the existing
+`account_residual_rows` discovers each table through `user_id`. Shared data has
+no term-end expiry yet. See [live class controls and limits](teacher-classes.md)
+for retention, authorization, anti-guessing, deployment and legal-review gaps.
+
 ### Reviewer portal (teachers only)
 
 Teachers, not learners. `public.reviewer_roles` holds the reviewer's auth user
