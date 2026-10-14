@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (needsOnboarding) {
     // Teachers can open their roster without enrolling in student revision.
-    if (pathname !== "/classes") return <Onboarding onDone={completeOnboarding} />;
+    if (pathname !== "/classes" && pathname !== "/settings") return <Onboarding onDone={completeOnboarding} />;
   }
 
   return (

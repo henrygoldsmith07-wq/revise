@@ -77,6 +77,7 @@ test("WJEC Physics practical stages have supported destinations and Sunday plan 
     await expect(subject).toHaveValue("wjec-alevel-physics");
   }
   await page.goto("/");
+  await page.locator("summary").filter({ hasText: /^(Plan, pace and outlook|Sunday plan)$/ }).click();
   const plan = page.getByRole("region", { name: "Sunday plan: what moved, what’s next", exact: true });
   const optIn = plan.getByRole("button", { name: "Turn on weekly plan", exact: true });
   await expect(optIn).toHaveAttribute("aria-pressed", "false");
@@ -95,6 +96,7 @@ test("WJEC Physics practical stages have supported destinations and Sunday plan 
   const weekText = await savedWeek.textContent();
   const capturedText = await captured.textContent();
   await page.reload();
+  await page.locator("summary").filter({ hasText: /^(Plan, pace and outlook|Sunday plan)$/ }).click();
   await expect(plan.getByRole("button", { name: "Turn off weekly plan", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(savedWeek).toHaveText(weekText!);
   await expect(captured).toHaveText(capturedText!);
@@ -112,4 +114,8 @@ test("anonymous classes entry shows the real account boundary, never a demo rost
   await expect(page.getByRole("table")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Open account settings", exact: true })).toHaveAttribute("href", "/settings");
   await expect(page.getByText(/Revision that knows what to do next/i)).toHaveCount(0);
+  await page.getByRole("link", { name: "Open account settings", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.getByText(/Which exam board are you studying with/i)).toHaveCount(0);
 });

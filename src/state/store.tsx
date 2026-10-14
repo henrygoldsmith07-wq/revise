@@ -1206,9 +1206,9 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   // actions and holds a final click until they arrive; afterwards it gets the
   // real ones. Returning students never take this branch.
   if (freshProfile && (!value || value.needsOnboarding)) {
-    // Class management does not require student onboarding. All other routes
-    // keep the first-paint onboarding flow and its durable completion gate.
-    if (pathname !== "/classes") return (
+    // Class management and sign-in settings do not require student onboarding.
+    // Learning routes keep the first-paint flow and durable completion gate.
+    if (pathname !== "/classes" && pathname !== "/settings") return (
       <OnboardingFlow
         actions={
           value

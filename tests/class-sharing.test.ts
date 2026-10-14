@@ -41,6 +41,6 @@ describe("minimal opt-in class evidence", () => {
     expect(page).toContain("classEvidenceSnapshot");
     expect(page).toContain("Leave and delete shared evidence");
     const shell = readFileSync("src/components/AppShell.tsx", "utf8");
-    expect(shell).toContain('if (pathname !== "/classes") return <Onboarding');
+    expect(shell).toContain('if (pathname !== "/classes" && pathname !== "/settings") return <Onboarding');
   });
 });
