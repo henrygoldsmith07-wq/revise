@@ -15,6 +15,7 @@ import { markAssessmentLabel, type MarkConfidenceAssessment } from "@/domain/mar
 import { ERROR_CATEGORY_MEANING } from "@/domain/error-taxonomy";
 import { isActionable as isErrorDiagnosisActionable } from "@/domain/error-diagnosis-plan";
 import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
+import { techniqueRepairForDiagnosis, techniqueShapeSuggestionForAnswer } from "@/domain/technique-repair";
 import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
@@ -96,6 +97,12 @@ export function MarkedResult({
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
   const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
   const plan = result.remediation;
+  const techniqueRepair = !inDiagnostic && awarded < question.totalMarks
+    ? techniqueRepairForDiagnosis(question, result.errorDiagnosis)
+    : null;
+  const techniqueShapeSuggestion = !inDiagnostic && !techniqueRepair && awarded < question.totalMarks
+    ? techniqueShapeSuggestionForAnswer({ question, marked: result.marked, answers: attempt?.answers ?? answers, copiedAnswer: result.copiedAnswer || attempt?.copiedAnswer })
+    : null;
   useEffect(() => {
     if (result.retest?.status === "resolved") {
       captureProductEvent("mistake.repaired", { count: 1 });
@@ -417,6 +424,21 @@ export function MarkedResult({
             </p>
           ) : null}
         </div>
+        {techniqueRepair ? (
+          <div className="rounded-[8px] border border-line bg-surface2 px-3 py-2.5" data-testid="technique-repair">
+            <p className="text-sm font-semibold">Practise the response shape</p>
+            <p className="text-xs text-ink2 mt-1">{techniqueRepair.why}</p>
+            <p className="text-[11px] text-ink3 mt-1">A fictional writing drill — no marks, mastery or proof. Then return to this question.</p>
+            <ButtonLink href={techniqueRepair.href} size="sm" className="mt-2">Try the {techniqueRepair.drillId === "six-mark" ? "extended evaluation" : techniqueRepair.drillId} drill</ButtonLink>
+          </div>
+        ) : techniqueShapeSuggestion ? (
+          <div className="rounded-[8px] border border-line bg-surface2 px-3 py-2.5" data-testid="technique-shape-suggestion">
+            <p className="text-sm font-semibold">Optional response-shape practice</p>
+            <p className="text-xs text-ink2 mt-1">{techniqueShapeSuggestion.why}</p>
+            <p className="text-[11px] text-ink3 mt-1">A fictional writing exercise, not a diagnosis, mark or proof of improvement.</p>
+            <ButtonLink href={techniqueShapeSuggestion.href} size="sm" className="mt-2">{techniqueShapeSuggestion.title}</ButtonLink>
+          </div>
+        ) : null}
         {awarded < question.totalMarks && inDiagnostic ? (
           <p className="text-xs text-ink2" data-testid="diagnostic-repair-deferred">
             Revise plans the repair for this when the check is finished, using all of your answers, not just this one.

@@ -1,19 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { Button, Panel } from "@/components/ui";
 import { checkTechniqueDrill, TECHNIQUE_CONTEXT, TECHNIQUE_DRILLS, techniqueDrillHistory, techniqueSubmissionPatch, type TechniqueDrillId, type TechniqueFeedback } from "@/domain/technique-drills";
 import { useStoreFields } from "@/state/store";
+import { parseTechniqueContext, techniquePracticeDestination, type TechniqueRouteContext } from "@/domain/technique-repair";
 
 export default function TechniquePage() {
   const { userId } = useStoreFields("userId");
-  return <TechniqueExercises key={userId} />;
+  return <Suspense fallback={null}><TechniqueRoute key={userId} /></Suspense>;
 }
 
-function TechniqueExercises() {
-  const store = useStoreFields("settings", "updateSettings");
-  const [drillId, setDrillId] = useState<TechniqueDrillId>("describe");
+function TechniqueRoute() {
+  const params = useSearchParams();
+  const context = useMemo(() => parseTechniqueContext(params), [params]);
+  return <TechniqueExercises key={`${context.drillId}:${context.questionId}:${context.partId}:${context.topicId}:${context.requestedContext}:${context.invalidContext}`} context={context} />;
+}
+
+function TechniqueExercises({ context }: { context: TechniqueRouteContext }) {
+  const store = useStoreFields("settings", "updateSettings", "questions");
+  const destination = useMemo(() => techniquePracticeDestination({ context, questions: store.questions, subjectIds: store.settings.subjectIds }), [context, store.questions, store.settings.subjectIds]);
+  const [drillId, setDrillId] = useState<TechniqueDrillId>(context.drillId);
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<TechniqueFeedback | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
@@ -56,6 +65,17 @@ function TechniqueExercises() {
         <Link href="/practicals" className="inline-flex min-h-11 items-center underline text-sm">Explore practical-topic pathways</Link>
       </header>
 
+      {context.requestedContext ? <Panel>
+        <h2 className="text-sm font-semibold">Why this drill, then what?</h2>
+        {destination ? <>
+          <p className="text-sm text-ink2 mt-2">{destination.why}</p>
+          <p className="text-xs text-ink3 mt-2">The link selected a drill, not a diagnosis, mark or a confirmed improvement. You can choose a different shape below.</p>
+        </> : <>
+          <p className="text-sm text-ink2 mt-2">The source question or topic is no longer available on this profile. It may have been retired, removed or belong to another subject. You can still use these fictional drills.</p>
+          <Link href="/practice" className="inline-flex min-h-11 items-center underline text-sm">Choose current practice questions</Link>
+        </>}
+      </Panel> : null}
+
       <Panel>
         <h2 className="font-semibold text-sm">Choose a structure drill</h2>
         <div role="group" aria-label="Technique drill" className="flex flex-wrap gap-2 mt-3">
@@ -88,6 +108,10 @@ function TechniqueExercises() {
             <p className="text-ink3 text-xs mt-1">{check.detected ? "Check whether this wording actually supports your answer; a keyword alone is not enough." : check.nextStep}</p>
           </li>)}
         </ul>
+        {destination ? <div className="mt-4 border-t border-line pt-3">
+          <p className="text-xs text-ink3">A detected wording signal does not show that the loss is repaired. Apply the shape to the real prompt; only an answered question produces marking feedback.</p>
+          <Link href={destination.href} className="inline-flex min-h-11 items-center underline text-sm mt-1">{destination.label}</Link>
+        </div> : null}
       </Panel> : null}
 
       <Panel>

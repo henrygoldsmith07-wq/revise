@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { knowledgeVsAnswering, timedSessionRecommendation } from "@/domain/exam-technique";
+import { techniqueRepairForMistakes } from "@/domain/technique-repair";
 import { useStoreFields } from "@/state/store";
 import { Button, Panel, Pill, SectionHeading } from "./ui";
 
@@ -14,7 +15,7 @@ import { Button, Panel, Pill, SectionHeading } from "./ui";
  * has at least one marked loss, so the index never invents a signal.
  */
 export function TechniqueSignal({ subjectId }: { subjectId: string }) {
-  const store = useStoreFields("attempts", "mistakes", "questions");
+  const store = useStoreFields("attempts", "mistakes", "questions", "userId");
   const report = useMemo(
     () =>
       knowledgeVsAnswering({
@@ -25,8 +26,11 @@ export function TechniqueSignal({ subjectId }: { subjectId: string }) {
       }),
     [store.attempts, store.mistakes, store.questions, subjectId],
   );
-  // An answering leak gets a time-boxed prescription: a concrete timed run
-  // the app can start right now, not an open-ended "practise technique".
+  // Only a supported structure loss gets a generic drill. Timing, working,
+  // unsupported commands and missing evidence retain the timed-run fallback.
+  const techniqueRepair = useMemo(() => report.verdict === "answering" && ["command word", "structure"].includes(report.drivers[0]?.klass ?? "")
+    ? techniqueRepairForMistakes({ subjectId, userId: store.userId, mistakes: store.mistakes, questions: store.questions, attempts: store.attempts })
+    : null, [report, subjectId, store.userId, store.mistakes, store.questions, store.attempts]);
   const timedRun = useMemo(() => timedSessionRecommendation(report), [report]);
 
   if (report.verdict === "none") return null;
@@ -68,7 +72,16 @@ export function TechniqueSignal({ subjectId }: { subjectId: string }) {
           </div>
         </div>
 
-        {timedRun ? (
+        {techniqueRepair ? (
+          <div className="mt-3 rounded border border-line bg-surface2 p-3">
+            <p className="text-sm text-ink font-medium">Start with a response-shape drill</p>
+            <p className="text-[11px] text-ink2 mt-1">{techniqueRepair.why}</p>
+            <p className="text-[11px] text-ink3 mt-1">Fictional writing practice, not marks or proof; return to the real question afterwards.</p>
+            <div className="mt-2">
+              <Link href={techniqueRepair.href}><Button size="sm">Try the {techniqueRepair.drillId === "six-mark" ? "extended evaluation" : techniqueRepair.drillId} drill →</Button></Link>
+            </div>
+          </div>
+        ) : timedRun ? (
           <div className="mt-3 rounded border border-line bg-surface2 p-3">
             <p className="text-sm text-ink font-medium">Start with {timedRun.headline}</p>
             <p className="text-[11px] text-ink2 mt-1">{timedRun.rationale}</p>
