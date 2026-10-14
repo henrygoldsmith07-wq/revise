@@ -37,6 +37,11 @@ test("onboarding → quick check → Today → repair → independent success �
     // Marked, not skipped: a wrong answer scores 0 and the result is announced before moving on.
     await expect(page.getByRole("status").filter({ hasText: /^0\/\d+ on this one/ })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(new RegExp(`Question ${n} of ${total}`))).toBeVisible();
+    // Inside the check, no repair plan with its own Start button (it would leave the check after one
+    // answer); the summary plans from every answer instead.
+    await expect(main.getByTestId("diagnostic-repair-deferred")).toBeVisible();
+    await expect(main.getByLabel("Your repair plan")).toHaveCount(0);
+    await expect(main).not.toContainText("Watch for the classic error");
     const next = page.getByRole("button", { name: n === total ? "See what I found" : "Next question" });
     await next.scrollIntoViewIfNeeded();
     await next.click();

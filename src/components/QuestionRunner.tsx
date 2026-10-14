@@ -44,8 +44,11 @@ export function QuestionRunner({
   intervention,
   mission,
   onConfidence,
+  inDiagnostic = false,
 }: {
   question: Question;
+  /** Answered inside a diagnostic check; see MarkedResult's `inDiagnostic`. */
+  inDiagnostic?: boolean;
   mode?: Attempt["mode"];
   paperId?: Id;
   paperSpecId?: Id;
@@ -267,6 +270,7 @@ export function QuestionRunner({
           awarded={awarded}
           answers={answers}
           attempt={result.lastAttempt}
+          inDiagnostic={inDiagnostic}
           improvableAnswers={mode === "practice" && !farTransfer && !retestMistake ? answers : undefined}
         />
       ) : null}

@@ -1,5 +1,37 @@
 # Changelog
 
+## Marked feedback in the first check stops naming unrelated errors and pulling students out — 2026-10-13 (twentieth pass)
+
+**A wrong answer in the quick check got feedback that contradicted itself and
+a way out of the check.** Walked as a fresh Biology student at 360px on a
+production build: every device-marked answer appended "Watch for the classic
+error on this topic: <the topic's first common error>" — on the three-domains
+recall probe that was "Confusing species richness with diversity", directly
+below "No known misconception matches this answer". Each wrong answer also
+showed a full repair plan with its own "Start: Guided application" button
+after question 1 of 4, and the device footer printed literal underscores.
+
+- `src/domain/common-error-relevance.ts`: a topic common error is offered only
+  when it shares two specific words (not title words or generic verbs) with
+  the question's stem, prompts or mark scheme, worded "A common slip on this
+  topic", never as the student's error. Flagship bank: 2,310 questions all
+  got the note before; 863 now (scratch measurement, author-judged spot check:
+  mostly on-point, a few still loose).
+- `inDiagnostic` on `QuestionRunner`/`MarkedResult` (quick and full
+  diagnostic): no repair plan or Start button mid-check; one line says the
+  repair is planned from all answers when the check ends. Feedback per wrong
+  answer at 360px: 3,273–4,069 px → 2,819–3,548 px tall.
+- `DEVICE_MARK_FOOTER` uses `*…*`, which RichText renders as emphasis.
+
+## Staging RLS workflow names the missing secrets — 2026-10-13 (twentieth pass)
+
+The scheduled "Revise staging sync and RLS" run of 2026-10-13 failed because
+all seven `REVISE_STAGING_*` secrets are unset (not a code or RLS bug), but
+the runner printed a generic sentence. Preflight failures now name the unset
+secret *names* (never values) in an error annotation, the step summary and
+the artifact; driver/TLS errors still get a fixed sentence. The runbook says
+how to clear it.
+
 ## A fresh profile's first taps no longer wait for the question bank — 2026-10-13 (nineteenth pass)
 
 **On a fresh profile the first taps in onboarding waited for the question

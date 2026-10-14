@@ -102,6 +102,20 @@ schema and test diagnostics. Credentials never appear in those artifacts.
 A local missing-credential check is evidence that the runner fails closed, not
 proof that deployed staging RLS works. Live staging must pass before rollout.
 
+**Reading a failed weekly run.** The step summary and the run's error
+annotation name the failing stage and, for a preflight failure, exactly which
+secret names are unset (never their values). As of the scheduled run of
+2026-10-13 (run 38401133547 on `f5bf623`) all seven secrets were unset in the
+repository, so no deployed RLS has been verified by this workflow yet; that is
+an infrastructure gap, not a code or migration failure. To clear it: create a
+dedicated staging Supabase project, apply `supabase/schema.sql` (it already
+includes the files in `supabase/migrations/`, which are for upgrading an
+existing database), create the two users above, add the seven
+secrets under Settings → Secrets and variables → Actions, then run the
+workflow manually (Actions → Revise staging sync and RLS → Run workflow). The
+job keeps failing every Tuesday until then, by design: a skipped RLS check
+must not look like a passed one.
+
 ## Account recovery
 
 Sign-out opens the separate local profile and preserves the account database.

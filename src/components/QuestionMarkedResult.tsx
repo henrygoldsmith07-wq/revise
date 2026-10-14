@@ -38,7 +38,15 @@ export function MarkedResult({
   improvableAnswers,
   answers,
   attempt,
+  inDiagnostic = false,
 }: {
+  /**
+   * Answered inside a diagnostic check. The repair plan is not offered here:
+   * its "Start" button would take the student out of the check after one
+   * question, and the check's own summary chooses the first step from all
+   * of its answers instead of one.
+   */
+  inDiagnostic?: boolean;
   /** Submitted answers by part id, used for long-answer feedback. */
   answers?: Record<string, string>;
   /** The persisted attempt. Set when one exists, which is what makes a mark disputable. */
@@ -409,7 +417,11 @@ export function MarkedResult({
             </p>
           ) : null}
         </div>
-        {awarded < question.totalMarks ? (
+        {awarded < question.totalMarks && inDiagnostic ? (
+          <p className="text-xs text-ink2" data-testid="diagnostic-repair-deferred">
+            Revise plans the repair for this when the check is finished, using all of your answers, not just this one.
+          </p>
+        ) : awarded < question.totalMarks ? (
           <InterventionPrescriptionPanel topicId={question.topicIds[0] ?? question.subjectId} marksLost={question.totalMarks - awarded} />
         ) : (
           // Full marks is only "proven" when the recovery ledger says this

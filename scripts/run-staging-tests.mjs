@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { stagingConfiguration, STAGING_CATALOG_SQL, validateStagingCatalog, validateStagingFunctions, STAGING_TABLES, PRIVACY_TABLES, PRIVACY_FUNCTIONS, validatePrivacyCatalog, validatePrivacyFunctions } from "./staging-contract.mjs";
+import { stagingConfiguration, stagingFailureMessage, STAGING_CATALOG_SQL, validateStagingCatalog, validateStagingFunctions, STAGING_TABLES, PRIVACY_TABLES, PRIVACY_FUNCTIONS, validatePrivacyCatalog, validatePrivacyFunctions } from "./staging-contract.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 mkdirSync(path.join(root, "artifacts"), { recursive: true });
@@ -31,9 +31,14 @@ try {
   writeFileSync(path.join(root, "artifacts/staging-schema.json"), JSON.stringify({ status: "passed", tables: [...STAGING_TABLES, ...PRIVACY_TABLES] }, null, 2));
 } catch (error) {
   // Connection strings, passwords and server error details must never be logged.
-  const message = stage === "infrastructure" ? "Missing/misconfigured staging infrastructure. Check all seven secrets, the TLS database connection and runner network access." : error.message;
+  const message = stagingFailureMessage(stage, error);
   writeFileSync(path.join(root, "artifacts/staging-schema.json"), JSON.stringify({ status: "failed", category: stage, message }, null, 2));
   console.error(`[${stage}] ${message}`);
+  // Surface the reason on the run page, not only in the raw log.
+  console.log(`::error title=Staging ${stage}::${message.replace(/[\r\n]+/g, " | ")}`);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Staging sync and RLS: ${stage} failure\n\n${message.split("\n").map((line) => `- ${line}`).join("\n")}\n\nThis job verifies deployed RLS with two real staging users; it cannot pass without a dedicated staging project.\n`);
+  }
   process.exit(1);
 }
 const vitest = path.join(root, "node_modules/.bin", process.platform === "win32" ? "vitest.cmd" : "vitest");
