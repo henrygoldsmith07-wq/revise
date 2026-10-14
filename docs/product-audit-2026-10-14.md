@@ -77,8 +77,28 @@ do not promote every tool into another competing primary action.
 
 ## Verification record
 
-The pull request records the exact final commands and results, including
-before/after regressions and visible evidence. Source tests, SQL/PGlite execution,
-normal production build, performance budget and real browser journeys are separate
-claims; none establishes a production rollout. See the final PR description for
-the checks actually completed and remaining gaps.
+- `npm run verify`: passed all gates, **3,519 tests passed / 29 skipped**
+  across 376 passing files and one skipped file, then the normal production build
+  and performance budget. Live throughput/staging skips are not deployment proof.
+- Final-source `npm run lint:check`, `npm run type-check`,
+  `npm run type-check:strict` and `git diff --check`: passed.
+- After the final copy/stylesheet updates, the focused technique/content/cache
+  checks passed **90 tests**. The normal production build and budget also passed.
+- `TMPDIR=/tmp PORT=3005 PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium
+  npx playwright test e2e/repair-loop.spec.ts e2e/revision-paths.spec.ts
+  --project=chromium`: **5 passed**, using the existing production-build web-server
+  configuration inside the preview process, with no auth, learner-data or AI stubs.
+  Covers actual marked Physics loss → tentative Explain drill → submission →
+  reload → real question → finished session → Today; topic-only second-subject
+  lessons, 390px/no-overflow layout, unavailable contexts, practical links,
+  Sunday persistence and anonymous class boundaries.
+- Browser testing first failed because the contextual return link disappeared
+  after reload. Moved it out of transient feedback; the same journey then passed.
+- Desktop/mobile screenshots were inspected and attached to PR #63.
+
+Before/after persistence, class batch, consent and approval-validation regressions
+are recorded with exact commands in the PR. Actual PostgreSQL/PGlite execution,
+normal production build, performance budgets and browser journeys are separate
+claims; none establishes live Supabase rollout or measured learner benefit.
+The additive reviewer guard migration must be applied through the normal operator
+release process; no migration or production deployment was performed here.

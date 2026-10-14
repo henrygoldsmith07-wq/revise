@@ -167,7 +167,7 @@ export function techniquePracticeDestination(input: {
     const part = context.partId ? question?.parts.find((entry) => entry.id === context.partId) : question?.parts[0];
     if (!question || !part || (context.topicId && !question.topicIds.includes(context.topicId))) return null;
     const command = commandWordIn(question, part);
-    return { href: `/practice?question=${encodeURIComponent(question.id)}`, label: "Return to the real question", why: `Your source question${part.label ? `, part ${part.label}` : ""}${command ? `, asks you to ${command}` : ""}. Use this fictional drill to practise response shape, then use the real prompt and mark scheme to check what is required.` };
+    return { href: `/practice?question=${encodeURIComponent(question.id)}`, label: "Return to the real question", why: `Your source question${part.label ? ` (part ${part.label})` : ""}${command ? ` asks you to ${command}` : ""}. Use this fictional drill to practise response shape, then use the real prompt and mark scheme to check what is required.` };
   }
   if (context.partId || !context.topicId) return null;
   const question = input.questions.find((entry) => entry.topicIds.includes(context.topicId!) && isCurrent(entry));

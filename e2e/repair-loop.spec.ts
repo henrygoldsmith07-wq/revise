@@ -34,7 +34,7 @@ test("a real offline marked response offers tentative structure practice and a s
   await page.getByRole("button", { name: "Check response structure", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Submission saved on this device" })).toBeVisible();
   await expect(page.getByText("Explain: 1 submissions", { exact: true })).toBeVisible();
-  await page.getByText("Structure feedback — not a mark", { exact: true }).scrollIntoViewIfNeeded();
+  await page.getByText("Structure feedback — not a mark", { exact: true }).evaluate(element => element.scrollIntoView({ block: "start" }));
   await page.screenshot({ path: "artifacts/technique-repair-feedback.png" });
   const returnLink = page.locator(`a[href="/practice?question=${encodeURIComponent(QUESTION)}"]`);
   await expect(returnLink).toBeVisible();
@@ -49,6 +49,15 @@ test("a real offline marked response offers tentative structure practice and a s
   await returnLink.click();
   await expect(page).toHaveURL(new RegExp(encodeURIComponent(QUESTION)));
   await expect(page.locator("textarea").first()).toBeVisible();
+  await page.locator("textarea").first().fill("It is moving upwards and speeding up.");
+  await page.getByRole("button", { name: /^(Not sure · submit|Submit for marking)$/ }).click();
+  const finish = page.getByRole("button", { name: "Finish session", exact: true });
+  await finish.click();
+  await expect(finish).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.locator("main#main")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resume interrupted revision", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "artifacts/practice-finished-mobile.png" });
 });
 
 test("unavailable technique context stays honest and never opens an external return URL", async ({ page }) => {
