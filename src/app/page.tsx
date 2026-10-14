@@ -19,6 +19,7 @@ import { useRevisionPlan } from "@/components/recovery-evidence";
 import { WeekLine } from "@/components/RecoverySummary";
 import { ExamDateNudge } from "@/components/ExamDateNudge";
 import { TodayOverview } from "@/components/TodayOverview";
+import { SundayPlan } from "@/components/SundayPlan";
 import { todayLocal } from "@/domain/local-date";
 
 // The roadmap derives lessons from the authored curriculum, which is a much
@@ -138,6 +139,7 @@ export default function TodayPage() {
           Plan, pace and outlook
         </summary>
         <div className="mt-4 space-y-5">
+          <SundayPlan />
           <CommandCentreCard />
           <TodayOverview />
           <SafeTodayRoadmap preferredSubjectId={adaptiveSession?.subjectId ?? plan.top?.subjectId} />
@@ -212,6 +214,10 @@ function EmptyToday({ name, greeting, pace, supplyNote }: { name: string; greeti
         </div>
         <p className="mt-3 text-xs text-ink3">Not a grade. Unreviewed questions are practice only — Revise says so rather than guessing.</p>
       </div>
+      <details className="card p-4 sm:p-5">
+        <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Sunday plan</summary>
+        <div className="mt-4"><SundayPlan /></div>
+      </details>
       <TodayOverview />
       <SafeTodayRoadmap />
       {pace ? <PaceForecastLine forecast={pace} /> : null}

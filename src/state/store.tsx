@@ -4,6 +4,7 @@ import { writeLearnerHistory } from "@/data/learner-history";
 import { useAssessmentModels } from "./assessment-models";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { allTopics } from "@/domain/curriculum";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
@@ -249,6 +250,7 @@ export interface StoreValue extends Snapshot {
 // ./sync-engine (pure moves + responsibility modules).
 
 export function StoreProvider({ children, userId }: { children: ReactNode; userId: Id }) {
+  const pathname = usePathname();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [storageQuota, setStorageQuota] = useState<StorageQuota>(() => ({
     usageBytes: null,
@@ -1204,7 +1206,9 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   // actions and holds a final click until they arrive; afterwards it gets the
   // real ones. Returning students never take this branch.
   if (freshProfile && (!value || value.needsOnboarding)) {
-    return (
+    // Class management does not require student onboarding. All other routes
+    // keep the first-paint onboarding flow and its durable completion gate.
+    if (pathname !== "/classes") return (
       <OnboardingFlow
         actions={
           value

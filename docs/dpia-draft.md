@@ -118,11 +118,21 @@ UK secondary-school students, nominally aged 15–18, who use Revise for their o
 revision. No age is collected, no date of birth is collected, and no age
 verification exists beyond what happens during onboarding.
 
-No parent, guardian, teacher or school staff account exists in the shipped
-product. `src/domain/teacher.ts` defines class-workflow types and says so
-itself: *"the student product has no school roster or SIS connector yet"*, and
-the demo cohort it works over is synthetic. The module that would persist it
-(`src/data/teacher-workspace.ts`) is not imported anywhere in `src/`.
+The legacy `src/domain/teacher.ts` demo cohort remains synthetic, but the
+separate live-class workflow now uses actual account-linked memberships.
+`src/data/classes.ts` collects a chosen pseudonym, self-declared age band and
+explicit sharing consent. Under-13 joins are blocked; 13–17-year-old membership
+is pending until the owning teacher records per-pupil school/guardian
+authorization. There is no age/guardian identity verification and this teacher
+confirmation is not proof of lawful authorization. Active members may explicitly
+share assignment-scoped attempt metadata (not raw answers) with their class
+teacher. Leaving deletes membership and snapshots; account deletion cascades
+class rows. These controls are not a lawful-basis decision, a completed DPIA or
+a claim of legal compliance. Class data lacks a term-end expiry. Controller,
+school, child/guardian notice, lawful-basis, retention and authorization-process
+review remain launch requirements. See [teacher classes](teacher-classes.md).
+
+Outside class joining, revision onboarding still collects no verified age.
 
 ### 3.2 Data types
 

@@ -5,6 +5,7 @@ import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-rev
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
+import { buildSundayPlan, retainedSundayPlan, type SundayPlanSnapshot } from "@/domain/sunday-plan";
 import type {
   Attempt,
   Card,
@@ -132,6 +133,7 @@ export function defaultSettings(userId: Id): UserSettings {
     aiEnabled: false,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
+    sundayPlanEnabled: false,
     // Pilot telemetry never leaves the device until it is switched on.
     pilotTelemetry: false,
     // Official-paper matching stays off until the owner confirms the terms.
@@ -224,6 +226,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
         accessibility: { ...fallback.accessibility, ...stored.accessibility },
         labMode: stored.labMode === true,
         pulseEnabled: stored.pulseEnabled === true,
+        sundayPlanEnabled: stored.sundayPlanEnabled === true,
         pilotTelemetry: stored.pilotTelemetry === true,
         officialPaperTrust: stored.officialPaperTrust === true,
         officialPaperTermsConfirmed: stored.officialPaperTermsConfirmed === true,
@@ -526,8 +529,65 @@ export async function deleteExamDate(id: Id, ownerId?: Id): Promise<void> {
 
 export async function saveSettings(settings: UserSettings): Promise<void> {
   const db = await getDb();
-  await db.put("settings", settings);
-  await enqueue("settings", "upsert", settings);
+  const tx = db.transaction("settings", "readwrite");
+  const stored = await tx.store.get(settings.userId) as UserSettings | undefined;
+  // A stale view saving another setting must not discard or rewrite a weekly
+  // snapshot. The first snapshot wins, including concurrent tabs.
+  const existing = stored?.sundayPlanSnapshot;
+  const incoming = settings.sundayPlanSnapshot;
+  const next = existing && (!incoming || existing.weekStart >= incoming.weekStart)
+    ? { ...settings, sundayPlanSnapshot: existing }
+    : settings;
+  await tx.store.put(next);
+  await tx.done;
+  await enqueue("settings", "upsert", next);
+}
+
+/** Reads complete persisted local history, not the store's partial boot window.
+ * A preview never writes. Recurring capture is opt-in and atomic per week. */
+export async function loadSundayPlan(userId: Id, now: Date, timeZone: string, preview = false): Promise<SundayPlanSnapshot | null> {
+  const db = await getDb();
+  const initial = await db.get("settings", userId) as UserSettings | undefined;
+  if (!initial || (!preview && initial.sundayPlanEnabled !== true)) return null;
+  if (!preview) {
+    const retained = retainedSundayPlan(initial.sundayPlanSnapshot, now, timeZone);
+    if (retained) return retained;
+  }
+  const tx = db.transaction(["settings", "attempts", "reviewLogs", "cards", "examDates"], "readonly");
+  const [settings, attempts, reviewLogs, cards, examDates] = await Promise.all([
+    tx.objectStore("settings").get(userId) as Promise<UserSettings | undefined>,
+    tx.objectStore("attempts").getAll() as Promise<Attempt[]>,
+    tx.objectStore("reviewLogs").getAll() as Promise<ReviewLog[]>,
+    tx.objectStore("cards").getAll() as Promise<Card[]>,
+    tx.objectStore("examDates").getAll() as Promise<ExamDate[]>,
+  ]);
+  await tx.done;
+  if (!settings || (!preview && settings.sundayPlanEnabled !== true)) return null;
+  if (!preview) {
+    const retained = retainedSundayPlan(settings.sundayPlanSnapshot, now, timeZone);
+    if (retained) return retained;
+  }
+  const snapshot = buildSundayPlan({
+    now, timeZone, subjectIds: settings.subjectIds,
+    subjectTopicIds: allTopics(settings.subjectIds).map((topic) => topic.id),
+    attempts: attempts.filter((row) => row.userId === userId),
+    reviewLogs: reviewLogs.filter((row) => row.userId === userId),
+    cards: cards.filter((row) => row.userId === userId),
+    examDates: examDates.filter((row) => row.userId === userId),
+  });
+  if (preview) return snapshot;
+  const write = db.transaction("settings", "readwrite");
+  const latest = await write.store.get(userId) as UserSettings | undefined;
+  if (!latest || latest.sundayPlanEnabled !== true) { await write.done; return null; }
+  const retained = retainedSundayPlan(latest.sundayPlanSnapshot, now, timeZone);
+  if (retained) { await write.done; return retained; }
+  const next: UserSettings = { ...latest, sundayPlanSnapshot: snapshot, updatedAt: now.toISOString() };
+  await write.store.put(next);
+  await write.done;
+  // Same IndexedDB-first/outbox path as every other settings update. No send
+  // to a notification service; configured account sync may replicate settings.
+  await enqueue("settings", "upsert", next);
+  return snapshot;
 }
 
 export async function saveStreak(streak: StreakState): Promise<void> {
