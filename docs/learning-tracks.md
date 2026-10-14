@@ -27,6 +27,21 @@ is last-write-wins, not an append-only CRDT: simultaneous settings edits across
 devices can replace the short history. Counts are activity only, not evidence
 of improvement. No database store/schema or server migration is added.
 
+## From feedback back to practice
+
+Supported actionable command-word/answer-structure diagnoses can offer a matching
+structure drill. When confidence is insufficient, an optional suggestion may
+instead report a literal response-shape signal (for example, no explicit causal
+wording was detected). That is not a finding about why marks were lost, and valid
+alternative wording may be missed. The diagnosis threshold is unchanged.
+
+The route accepts only known drill identifiers and current enrolled
+question/topic/part context. It never accepts an arbitrary return URL. A learner
+can return to the relevant question/topic; missing or unavailable questions do not
+resurrect content or borrow another profile's work. No repair link interrupts a
+diagnostic check. A submitted drill remains activity metadata only: it cannot
+change a mark, resolve a mistake or establish proof.
+
 ## Practical topics
 
 `/practicals` currently covers enrolled **WJEC A-level Biology, Chemistry and

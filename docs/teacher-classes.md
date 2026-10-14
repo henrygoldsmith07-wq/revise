@@ -64,6 +64,13 @@ most 100 closed-shape metadata snapshots in one atomic request:
 No answer, feedback, working, email, free-text misconception, full attempt JSON
 or other extra key is accepted. The adapter reconstructs this allowlisted
 shape, and SQL independently rejects unknown keys and another learner's UUID.
+The join form accepts the generated 64-character code. On an explicit share,
+`loadClassEvidenceSnapshot` reads the complete owner-scoped persisted attempts
+and mistakes, not the progressively hydrated UI window. The adapter sends
+100-record batches and rechecks caller identity between requests. Each request
+is atomic, not the entire multi-batch share: a later failure can leave earlier
+batches shared. The UI reports that possibility; retrying is safe because the
+server deduplicates attempt IDs. No background or automatic sharing is added.
 Each snapshot must match an assignment's question list or topic, and its
 attempt timestamp must be at or after consent **and** teacher authorization
 where recorded, never in the future. The `(class, learner, attempt)` key dedupes
@@ -105,7 +112,9 @@ is not server-side consent revocation or account deletion.
 ## Verification and deployment limits
 
 `tests/classes.test.ts` covers pure heatmap aggregation, canonical review links,
-caller-session adapter behavior and metadata-only payloads.
+caller-session adapter behavior, bounded batches, partial failures and metadata-only
+payloads. `tests/class-sharing-persistence.test.ts` checks complete persisted
+history beyond the boot window and fixed-profile isolation.
 `tests/classes-sql.test.ts` executes the real schema and migration in PGlite,
 including cross-user attacks, join guessing, authorization, snapshot boundaries,
 revocation and deletion cascades/residuals. This is local PostgreSQL evidence,
