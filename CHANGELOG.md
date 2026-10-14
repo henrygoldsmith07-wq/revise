@@ -1,5 +1,36 @@
 # Changelog
 
+## Wrong-answer feedback lists what you missed once, and a check keeps to its own next step — 2026-10-14 (twenty-first pass)
+
+**A wrong answer got 1.8–2.4k px of marking that said the same thing about
+five times.** Walked as a fresh Biology student at 360px on a production
+build (quick check, deliberately wrong answers): each missed mark-scheme point
+appeared in the part list, the part comment ("No marks yet. The scheme wants:
+…"), the examiner summary ("The scheme still wants: …"), an open evidence
+list, a remediation card and the guiding-question panel. Inside the check it
+also promised "Micro-practice the missed point" (which the check never does),
+offered "Improve my answer", repeated an AO/level pill per missed point, and
+left the live "Verb covered" chip beside a 0/2.
+
+- `src/domain/marked-feedback-display.ts`: recognises the device marker's own
+  restatements by exact match with the text it generates
+  (`rubricPartComment`, `examinerSummaryParts` in `marking.ts`, output
+  unchanged), so they are dropped; AI or any other wording is shown as is.
+  The "no AI was involved" provenance line and any relevant common slip stay.
+- `QuestionMarkedResult.tsx`: one "What you missed" list (missed first, then
+  credited), evidence and model answer folded away, one objective pill per
+  objective, remediation card only where "How to fix it" is not shown. Inside
+  a check (`inDiagnostic`): no guiding-question panel, fix list, "What this
+  taught us" box, pills or mistake-log footnote; the deferral line and the
+  check's own Continue are the next step. The result heading is now an `h2`
+  that takes focus when submitting dropped it to the page body.
+- `QuestionRunner.tsx`: the live verb check hides once the answer is marked;
+  Improve my answer is not offered inside a check (still offered in practice).
+- Measured (scratch, same 3 questions, production builds): marked-result panel
+  1,797 / 2,367 / 1,813 px → 558 / 724 / 558 px; whole page 2,824 / 3,548 /
+  2,819 px → 1,585 / 1,790 / 1,506 px. Guards: `tests/marked-feedback-display.test.ts`,
+  `e2e/marked-feedback-compact.spec.ts`.
+
 ## Marked feedback in the first check stops naming unrelated errors and pulling students out — 2026-10-13 (twentieth pass)
 
 **A wrong answer in the quick check got feedback that contradicted itself and
