@@ -1,6 +1,6 @@
 # Changelog
 
-## Repair-plan links do what their labels say — 2026-10-15 (twenty-third pass)
+## Repair-plan links do what their labels say, and Schedule shows one plan — 2026-10-15 (twenty-third pass)
 
 **"Guided application", "Unaided exam question" and "Timed question" all
 opened the same plain practice hub.** After #64 "Start: Guided application" is
@@ -23,6 +23,24 @@ at risk, ledger and quick sessions above the question.
 - A step page is the one question: the hub cards, subject switcher and
   "other ways to practise" are hidden, with "Practise normally instead".
 - The plan's exam-style link now carries `unaided=1`.
+
+**A fresh student's Schedule showed two blocks at the same time.** Onboarding
+saves exam dates (which fires the dynamic replan) and then rebuilds the plan
+from a callback captured before those saves. Both `replacePlan` calls read the
+existing rows before either wrote, so neither removed the other's: a fresh
+four-flagship profile had 238 rows with 14 exact duplicates and two blocks at
+16:00 and 16:30 today (probed in IndexedDB on a production build).
+
+- `src/data/repository.ts`: plan replacements run one at a time, so the later
+  plan replaces the earlier one (a failed write does not block the next).
+- `src/state/planning.ts`: `regeneratePlan` reads the latest committed
+  snapshot, so onboarding's rebuild includes the exam dates it just saved.
+  Existing doubled plans clear on the next rebuild.
+- Schedule week headers read "Week of 12 Oct – 18 Oct" (was
+  "WEEK OF 12 OCT – 2026-10-18"), and Today's blocks say they are the
+  long-range plan and link to the Today screen's one recommendation, which
+  is chosen from the latest answers and can differ.
+- `/teacher` redirects (temporary) to `/classes` instead of a 404.
 
 ## A lost practice mark gets one next step, and the repair plan stops calling a first mistake a repeat — 2026-10-15 (twenty-second pass)
 

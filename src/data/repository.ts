@@ -506,7 +506,20 @@ export async function savePlan(sessions: PlannedSession[]): Promise<void> {
   for (const s of sessions) await enqueue("plannedSessions", "upsert", s);
 }
 
-export async function replacePlan(userId: Id, sessions: PlannedSession[]): Promise<void> {
+// Plan replacements run one at a time. Onboarding saves exam dates (which
+// fires the dynamic replan) and then rebuilds the plan itself; run together,
+// each read "existing" before the other had written, neither deleted the
+// other's rows, and a fresh student's Schedule showed two blocks at 16:00
+// (twenty-third pass). Serialised, the later plan replaces the earlier one.
+let planWrites: Promise<void> = Promise.resolve();
+
+export function replacePlan(userId: Id, sessions: PlannedSession[]): Promise<void> {
+  const run = planWrites.then(() => replacePlanNow(userId, sessions));
+  planWrites = run.catch(() => undefined);
+  return run;
+}
+
+async function replacePlanNow(userId: Id, sessions: PlannedSession[]): Promise<void> {
   const db = await getDb();
   const existing = (await db.getAll("plannedSessions")) as PlannedSession[];
   const keep = new Set(sessions.map((s) => s.id));

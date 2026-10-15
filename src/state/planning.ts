@@ -64,6 +64,13 @@ export function usePlanning(input: {
   const [planChangelog, setPlanChangelog] = useState<string[]>([]);
   const [examPhaseNotice, setExamPhaseNotice] = useState<PhaseNotice | null>(null);
   const lastFingerprint = useRef<ReplanFingerprint | null>(null);
+  // The latest committed snapshot. Onboarding saves exam dates and then calls
+  // regeneratePlan from a callback captured before those saves; reading the
+  // snapshot it closed over built the plan as if no exam dates existed.
+  const latestSnapshot = useRef(snapshot);
+  useEffect(() => {
+    latestSnapshot.current = snapshot;
+  }, [snapshot]);
 
   // Dynamic replanning: when an input the plan depends on changes (exam date,
   // target grade, availability, session length or subject set), rebuild the
@@ -109,6 +116,7 @@ export function usePlanning(input: {
   }, [snapshot, userId, topics, mastery, setSnapshot]);
 
   const regeneratePlan = useCallback(async () => {
+    const snapshot = latestSnapshot.current ?? input.snapshot;
     if (!snapshot) return;
     const subjects = allSubjects().filter((s) => snapshot.settings.subjectIds.includes(s.id));
     const plan = buildPlan({
@@ -134,7 +142,7 @@ export function usePlanning(input: {
     await repo.replacePlan(userId, plan);
     setPlanChangelog(changelog);
     patch((prev) => ({ ...prev, plannedSessions: plan }));
-  }, [snapshot, userId, topics, mastery, patch, setPlanChangelog]);
+  }, [input.snapshot, userId, topics, mastery, patch, setPlanChangelog]);
 
   const rescheduleMissedSessions = useCallback(async () => {
     if (!snapshot) return;

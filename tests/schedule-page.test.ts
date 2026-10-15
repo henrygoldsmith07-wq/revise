@@ -38,6 +38,14 @@ describe("Schedule — page wiring", () => {
     expect(src).toContain("Exam run-up");
     expect(src).toContain("Planned days");
     expect(src).toContain("Week of ");
+    // One date format at both ends ("12 Oct – 18 Oct"), not "12 OCT – 2026-10-18".
+    expect(src).toContain("Week of {dayMonth(monday)} – {dayMonth(sunday)}");
+  });
+
+  it("says Today's blocks are the long-range plan and points to Today's one recommendation", () => {
+    const src = page();
+    expect(src).toContain('data-testid="schedule-today-note"');
+    expect(src).toContain("picks the single best next step from your latest answers");
   });
 
   it("deep-links every actionable block so finishing it ticks the plan", () => {
