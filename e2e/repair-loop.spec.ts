@@ -20,8 +20,15 @@ test("a real offline marked response offers tentative structure practice and a s
   await expect(page.locator("textarea").first()).toBeVisible({ timeout: 30_000 });
   await page.locator("textarea").first().fill("It is moving upwards and speeding up.");
   await page.getByRole("button", { name: /^(Not sure · submit|Submit for marking)$/ }).click();
+  // One next step is shown; the heuristic shape drill is never that step, so
+  // it waits, collapsed, under "More help with this answer".
+  const nextStep = page.getByTestId("practice-next-step");
+  await expect(nextStep).toBeVisible({ timeout: 30_000 });
+  await expect(nextStep).not.toHaveAttribute("data-step-kind", "technique");
   const suggestion = page.getByTestId("technique-shape-suggestion");
-  await expect(suggestion).toBeVisible({ timeout: 30_000 });
+  await expect(suggestion).toBeHidden();
+  await page.getByTestId("practice-more-help").getByText("More help with this answer", { exact: true }).click();
+  await expect(suggestion).toBeVisible();
   await expect(suggestion).toContainText("This does not establish why marks were lost");
   await suggestion.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "artifacts/repair-suggestion-desktop.png" });

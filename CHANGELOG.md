@@ -1,5 +1,43 @@
 # Changelog
 
+## A lost practice mark gets one next step, and the repair plan stops calling a first mistake a repeat — 2026-10-15 (twenty-second pass)
+
+**After a wrong practice answer, five blocks competed to be the next step.**
+Walked as a fresh four-flagship student at 360px on a production build
+(`/practice?question=…`, deliberately wrong answers, real offline marking):
+the result stacked a guiding question (whose authored text repeats the missed
+points), "What you missed", "How to fix it", "What this taught us" (promising
+"two targeted items on exactly this point" that practice never delivers, then
+giving a below-threshold possible cause twice), the optional structure drill
+added in #61/#63, and a four-step repair plan with its own Start and Then
+buttons. The plan led with "Fix the misconception — the same wrong idea has
+cost marks more than once here" after the student's first wrong answer, while
+the guiding-question panel above said no known misconception matched.
+
+- `src/domain/practice-next-step.ts` + `src/components/PracticeNextStep.tsx`:
+  one "Your next step" card with one primary button. An actionable
+  (above-threshold) structure diagnosis of this answer opens its technique
+  drill; otherwise the repair plan's first step; otherwise no button. The
+  guiding question, fix list, heuristic shape drill (never primary), the rest
+  of the plan, objective pills and the mistake-log note are under "More help
+  with this answer". The guiding question mounts only when that is opened, so
+  an opted-in AI request is never made for a closed panel. Full-mark and
+  in-check results are unchanged.
+- `src/state/question-execution.ts`: the lost-mark default now says what
+  happens (missed points saved as mistakes that come back for review) instead
+  of promising micro-practice; the uncertain cause is no longer appended to
+  the action text (the result shows it once, marked "not certain").
+- `src/domain/learner-intelligence.ts`: `recurringMistakes` counts open
+  mistakes whose misconception (library entry, else tag; "other" excluded)
+  appears on at least two different questions. It counted every labelled
+  mistake, which is what made a first loss a "repeat".
+- At 360px the marked result went **2,165 → 906 px** (Physics explain,
+  0/3) and **2,054 → 1,087 px** (Maths show-that, 0/6). Measured on the
+  production build before and after both changes.
+- Tests: `tests/practice-next-step.test.ts`, `tests/recurring-mistakes.test.ts`,
+  `e2e/practice-next-step.spec.ts`; `e2e/repair-loop.spec.ts` opens "More help"
+  to reach the tentative drill.
+
 ## Wrong-answer feedback lists what you missed once, and a check keeps to its own next step — 2026-10-14 (twenty-first pass)
 
 **A wrong answer got 1.8–2.4k px of marking that said the same thing about

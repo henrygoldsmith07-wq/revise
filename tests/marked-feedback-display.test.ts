@@ -100,12 +100,14 @@ describe("marked result inside a check", () => {
   });
 
   it("makes no micro-practice promise, guiding-question panel or fix list mid-check", () => {
-    expect(view).toContain("{inDiagnostic ? null : (");
-    expect(view).toContain("&& !inDiagnostic;");
-    expect(view).toContain('question.kind !== "mcq" && actions.length && !inDiagnostic');
+    // Guiding question, fix list, pills and the mistake-log note all live in
+    // PracticeNextStep, which is only rendered outside a check.
+    expect(view).toContain("{marksLost && !inDiagnostic ? (");
+    expect(view).toContain("&& !inDiagnostic;"); // showSocratic
+    expect(view).toContain("{!inDiagnostic && !marksLost ? ("); // full-marks taught-us card only
     expect(view).toContain("result.remediation.headline && !inDiagnostic");
-    expect(view).toContain("anyMissed && !inDiagnostic");
-    expect(view).toContain("awarded < question.totalMarks && !inDiagnostic");
+    expect(view).not.toContain("<SocraticExaminerPanel");
+    expect(view).not.toContain("How to fix it");
   });
 
   it("offers Improve my answer in practice but not inside a check", () => {
@@ -122,7 +124,7 @@ describe("marked result inside a check", () => {
   });
 
   it("shows one objective pill per objective, not one per missed point", () => {
-    expect(view).toContain("[...new Set(");
+    expect(read("src/components/PracticeNextStep.tsx")).toContain("[...new Set(");
     expect(view).not.toContain(".flatMap((m) => m.missedPoints).slice(0, 3)");
   });
 });

@@ -69,6 +69,11 @@ export interface TopicIntelligence {
   marksLost: number;
   marksRecoverable: number;
   openMistakes: number;
+  /**
+   * Open mistakes whose misconception (library entry, else tag; "other"
+   * excluded) recurs on at least two different questions. One wrong answer
+   * is never a repeat, however many points it missed.
+   */
   recurringMistakes: number;
   daysSinceSuccess: number | null;
   daysToExam: number | null;
@@ -249,7 +254,7 @@ export function buildLearnerIntelligence(
       marksLost: Math.round(marksLost * 10) / 10,
       marksRecoverable: Math.round(marksLost * 10) / 10,
       openMistakes: open.length,
-      recurringMistakes: open.filter((x) => x.misconceptionEntryId || (x.misconception && x.misconception !== "other")).length,
+      recurringMistakes: recurringOpenMistakes(open),
       daysSinceSuccess,
       daysToExam: daysToExamFor(input.examDates, subjectId, now),
       proofStatus: proof?.status ?? null,
@@ -375,4 +380,27 @@ export function describeTopicIntelligence(
       : `${topicTitle} is improving on checked answers.`;
   }
   return `${topicTitle}: ${parts.join("; ")}.`;
+}
+
+/**
+ * Count open mistakes whose misconception recurs across at least two
+ * different questions. It previously counted every labelled mistake, so a
+ * single wrong first answer was described downstream as "the same wrong idea
+ * has cost marks more than once" (intervention-engine misconception-repair).
+ */
+export function recurringOpenMistakes(open: readonly Mistake[]): number {
+  const key = (x: Mistake) => x.misconceptionEntryId ? `entry:${x.misconceptionEntryId}` : x.misconception && x.misconception !== "other" ? `tag:${x.misconception}` : null;
+  const sources = new Map<string, Set<string>>();
+  for (const x of open) {
+    const k = key(x);
+    if (!k) continue;
+    const source = x.questionId ?? x.attemptId ?? x.id;
+    const set = sources.get(k) ?? new Set<string>();
+    set.add(source);
+    sources.set(k, set);
+  }
+  return open.filter((x) => {
+    const k = key(x);
+    return k !== null && (sources.get(k)?.size ?? 0) >= 2;
+  }).length;
 }

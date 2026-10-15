@@ -29,7 +29,7 @@ import { diagnoseAttemptErrors, isActionable } from "@/domain/error-diagnosis-pl
 import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
 import { MARK_POLICY_VERSION } from "@/ai/task-policy";
 import { canonicalJson, sha256Hex } from "@/domain/content-fingerprint";
-import { ERROR_CATEGORY_MEANING, isErrorCategory } from "@/domain/error-taxonomy";
+import { isErrorCategory } from "@/domain/error-taxonomy";
 import type { ErrorCategory } from "@/domain/error-taxonomy";
 import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
@@ -393,9 +393,12 @@ export function useQuestionExecution({
     const nextAction: { label: string; href: null; why: string } =
       awarded < max
         ? {
-            label: "Micro-practice the missed point",
+            // Practice delivers no in-place micro-practice, so promise none:
+            // what really happens is that the missed points are saved as
+            // mistakes and come back for review.
+            label: "Repair the missed points",
             href: null,
-            why: `You dropped ${max - awarded} of ${max} marks here — two targeted items on exactly this point, then an unaided retry.`,
+            why: `You dropped ${max - awarded} of ${max} marks here. Each missed point is saved as a mistake and comes back for review until you can answer it unaided.`,
           }
         : supportUsed
           ? {
@@ -429,10 +432,9 @@ export function useQuestionExecution({
       if (isActionable(diagnosisHeadline)) {
         nextAction.label = diagnosisHeadline.intervention.action;
         nextAction.why = `${diagnosisHeadline.intervention.action} (${diagnosisHeadline.label}, ${diagnosisHeadline.awarded}/${diagnosisHeadline.max} — diagnosed as ${diagnosisHeadline.category}${diagnosisHeadline.provenance === "classifier-dev" ? "" : " on-device"}).`;
-      } else if (diagnosisHeadline.category !== "other") {
-        const meaning = ERROR_CATEGORY_MEANING[diagnosisHeadline.category];
-        nextAction.why = `${nextAction.why} One possibility is ${meaning.charAt(0).toLowerCase()}${meaning.replace(/\.$/, "").slice(1)} — but there is not enough evidence yet to say for sure.`;
       }
+      // A below-threshold read is shown once, by the marked result, as
+      // "Possible cause, not certain" — not appended here a second time.
     }
     // A rubric fallback grade (the AI never ran, or the provider failed) gets a
     // second chance: queue the persisted attempt for an AI re-grade. The drain

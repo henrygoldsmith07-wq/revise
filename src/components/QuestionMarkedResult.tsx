@@ -20,7 +20,7 @@ import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { ProofCheckBanner } from "./ProofCheckBanner";
-import { InterventionPrescriptionPanel } from "./InterventionPrescriptionPanel";
+import { PracticeNextStep } from "./PracticeNextStep";
 import { RichText } from "./RichText";
 import { ButtonLink, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
 import { learnerEvidenceTrusted } from "@/domain/content-trust";
@@ -28,7 +28,6 @@ import { buildMarkRecovery, marksProvenByAttempt } from "@/domain/mark-recovery"
 import { officialPaperContextFromSettings } from "@/domain/official-papers";
 import { getTopic } from "@/domain/curriculum";
 import { useStoreFields } from "@/state/store";
-import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { commentRestatesMarkedPoints, condenseMarkedFeedback } from "@/domain/marked-feedback-display";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
@@ -101,6 +100,7 @@ export function MarkedResult({
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
   const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
   const plan = result.remediation;
+  const marksLost = awarded < question.totalMarks;
   const techniqueRepair = !inDiagnostic && awarded < question.totalMarks
     ? techniqueRepairForDiagnosis(question, result.errorDiagnosis)
     : null;
@@ -247,10 +247,6 @@ export function MarkedResult({
       ) : null}
       <ProgressBar value={pct} tone={pct >= 0.8 ? "success" : pct >= 0.5 ? "review" : "danger"} />
 
-      {/* Below full marks on a written answer: one guiding question before the
-          mark scheme. MCQs are excluded — marking already reveals the key. */}
-      {showSocratic ? <SocraticExaminerPanel question={question} marked={result.marked} answers={answers ?? {}} /> : null}
-
       {result.retest ? (
         <div
           className={cx(
@@ -288,9 +284,10 @@ export function MarkedResult({
         </div>
       ) : null}
 
-      {/* The headline is also the first entry of "How to fix it" on written
+      {/* The headline is also the first entry of the fix list on written
           answers, so the card is shown only where that list is not. */}
-      {result.remediation.headline && !inDiagnostic && (question.kind === "mcq" || !actions.length) ? (
+      {/* Below full marks this card moves into "More help with this answer". */}
+      {result.remediation.headline && !inDiagnostic && !marksLost && (question.kind === "mcq" || !actions.length) ? (
         <div className="mt-4 card card-2 p-3 bg-surface2">
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone="review">Remediation</Pill>
@@ -404,76 +401,41 @@ export function MarkedResult({
       </div>
       </section>
 
-      {question.kind !== "mcq" && actions.length && !inDiagnostic ? (
-        <details className="mt-4 pt-4 border-t border-line" open={!showSocratic}>
-          <summary className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2 cursor-pointer select-none">How to fix it</summary>
-          <ul className="space-y-2.5">
-            {actions.map((action) => (
-              <li key={action.misconception} className="card card-2 p-3">
-                <div className="flex items-start gap-2">
-                  <MissedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-0.5 text-danger" />
-                  <p className="text-sm font-semibold text-ink">{action.misconception}</p>
-                </div>
-                {action.misconceptionEntry ? (
-                  <>
-                    <p className="text-xs text-ink3 mt-2">
-                      <span className="font-semibold">What it looks like: </span>
-                      {action.misconceptionEntry.example}
-                    </p>
-                    <p className="text-sm text-ink2 mt-1.5">{action.misconceptionEntry.explanation}</p>
-                    <div className="flex items-start gap-2 mt-1.5">
-                      <CreditedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-0.5 text-success" />
-                      <p className="text-sm text-ink2 flex-1">{action.misconceptionEntry.correction}</p>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-ink2 mt-1.5">{action.action}</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
       <div className="mt-4 pt-4 border-t border-line space-y-3">
         <RichText className="text-sm">{feedbackText}</RichText>
-        {/* Inside a check there is no micro-practice to promise and the cause
-            is not diagnosed from one answer: the check's summary does both. */}
-        {inDiagnostic ? null : (
-        <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
-          <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
-          <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
-          {uncertainCause ? (
-            <p className="text-xs text-ink2 mt-1.5">
-              <span className="font-medium text-ink">Possible cause, not certain: </span>
-              {uncertainCause}
-            </p>
-          ) : null}
-        </div>
-        )}
-        {techniqueRepair ? (
-          <div className="rounded-[8px] border border-line bg-surface2 px-3 py-2.5" data-testid="technique-repair">
-            <p className="text-sm font-semibold">Practise the response shape</p>
-            <p className="text-xs text-ink2 mt-1">{techniqueRepair.why}</p>
-            <p className="text-[11px] text-ink3 mt-1">A fictional writing drill — no marks, mastery or proof. Then return to this question.</p>
-            <ButtonLink href={techniqueRepair.href} size="sm" className="mt-2">Try the {techniqueRepair.drillId === "six-mark" ? "extended evaluation" : techniqueRepair.drillId} drill</ButtonLink>
-          </div>
-        ) : techniqueShapeSuggestion ? (
-          <div className="rounded-[8px] border border-line bg-surface2 px-3 py-2.5" data-testid="technique-shape-suggestion">
-            <p className="text-sm font-semibold">Optional response-shape practice</p>
-            <p className="text-xs text-ink2 mt-1">{techniqueShapeSuggestion.why}</p>
-            <p className="text-[11px] text-ink3 mt-1">A fictional writing exercise, not a diagnosis, mark or proof of improvement.</p>
-            <ButtonLink href={techniqueShapeSuggestion.href} size="sm" className="mt-2">{techniqueShapeSuggestion.title}</ButtonLink>
+        {/* Outside a check, a lost mark gets ONE next step; the guiding question,
+            fix list, optional drill and the rest of the repair plan sit under
+            "More help with this answer". Inside a check the deferral line
+            below is the one next step. */}
+        {marksLost && !inDiagnostic ? (
+          <PracticeNextStep
+            question={question}
+            marked={result.marked}
+            answers={answers}
+            remediation={result.remediation}
+            actions={actions}
+            nextAction={result.nextAction}
+            uncertainCause={uncertainCause}
+            techniqueRepair={techniqueRepair}
+            techniqueShapeSuggestion={techniqueShapeSuggestion}
+            showSocratic={showSocratic}
+            showMistakesLogged={!result.retest}
+          />
+        ) : null}
+        {/* Full marks keeps its short "what this taught us" read (support used,
+            familiar question or bank it); a lost mark folds it into the next step. */}
+        {!inDiagnostic && !marksLost ? (
+          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
+            <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
+            <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
           </div>
         ) : null}
         {awarded < question.totalMarks && inDiagnostic ? (
           <p className="text-xs text-ink2" data-testid="diagnostic-repair-deferred">
             Revise plans the repair for this when the check is finished, using all of your answers, not just this one.
           </p>
-        ) : awarded < question.totalMarks ? (
-          <InterventionPrescriptionPanel topicId={question.topicIds[0] ?? question.subjectId} marksLost={question.totalMarks - awarded} />
-        ) : (
+        ) : marksLost ? null : (
           // Full marks is only "proven" when the recovery ledger says this
           // attempt was the delayed proof of an earlier loss (marksProvenByAttempt).
           // Otherwise the same score is practice, and says why.
@@ -503,26 +465,6 @@ export function MarkedResult({
               </div>
             )
         )}
-        {/* Ask: what did this one attempt teach us? One pill per objective, not per missed point. */}
-        {anyMissed && !inDiagnostic ? (
-          <div className="flex flex-wrap gap-1.5">
-            {[...new Set(
-              question.parts
-                .filter((p) => result.marked.some((m) => m.partId === p.id && m.missedPoints.length))
-                .map((p) => p.aos?.[0])
-                .filter((ao): ao is NonNullable<typeof ao> => Boolean(ao)),
-            )].map((ao) => (
-              <Pill key={ao} tone="danger">{ao}</Pill>
-            ))}
-            <Pill>Lvl {question.difficulty}</Pill>
-          </div>
-        ) : null}
-        {/* Mid-check the deferral line above is the one next step. */}
-        {!result.retest && awarded < question.totalMarks && !inDiagnostic ? (
-          <p className="text-[11px] text-ink3">
-            The dropped marks have been logged as mistakes — with AO, command word and timing — and turned into cards that will reappear until you can answer them. See <span className="font-semibold">Progress</span> for expected marks per hour.
-          </p>
-        ) : null}
       </div>
     </Panel>
   );

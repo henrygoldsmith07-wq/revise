@@ -8,9 +8,13 @@ describe("Socratic examiner panel", () => {
   const panel = read("src/components/SocraticExaminerPanel.tsx");
   const result = read("src/components/QuestionMarkedResult.tsx");
 
-  it("appears below full marks on written answers, before the mark scheme detail", () => {
+  it("is offered below full marks on written answers, under More help, mounted only when opened", () => {
     expect(result).toContain('question.kind !== "mcq" && awarded < question.totalMarks');
-    expect(result.indexOf("<SocraticExaminerPanel")).toBeLessThan(result.indexOf("result.marked.map"));
+    expect(result).toContain("showSocratic={showSocratic}");
+    const next = read("src/components/PracticeNextStep.tsx");
+    // Mounting can call the opted-in AI, so a closed disclosure never mounts it.
+    expect(next).toContain("{showSocratic && moreOpen ? <SocraticExaminerPanel");
+    expect(next.indexOf("More help with this answer")).toBeLessThan(next.indexOf("<SocraticExaminerPanel"));
   });
 
   it("renders the authored guidance without waiting for any request", () => {
