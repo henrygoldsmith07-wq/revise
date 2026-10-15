@@ -15,7 +15,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
-import { orderByCommand, parseCommandParam, parsePracticeStepMode, questionUsesCommand, stepModeApplies, stepModeHintBudget } from "@/domain/practice-step-mode";
+import { limitStepQueue, orderByCommand, parseCommandParam, parsePracticeStepMode, questionUsesCommand, stepModeApplies, stepModeHintBudget } from "@/domain/practice-step-mode";
 import { commandWordLabel } from "@/domain/command-word-validation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
@@ -274,7 +274,7 @@ function Practice() {
     });
     // A command-word check puts questions using that verb first; it never
     // removes the rest, so a topic without one still has a queue.
-    return orderByCommand(ranked, timedCommand).ordered.map((q) => q.id);
+    return limitStepQueue(orderByCommand(ranked, timedCommand).ordered.map((q) => q.id), stepMode);
   };
 
   const [index, setIndex] = useState(() => savedCheckpoint?.position ?? 0);
@@ -717,6 +717,7 @@ function Practice() {
       <QuickSessionPicker onSelect={setQuickMinutes} />
       </>)}
 
+      {stepMode ? null : (
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
         <select
           value={topicId}
@@ -752,6 +753,7 @@ function Practice() {
           </span>
         ) : null}
       </div>
+      )}
 
       {note ? <p className="text-xs text-ink3">{note}</p> : null}
 

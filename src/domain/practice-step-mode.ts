@@ -54,6 +54,18 @@ export function stepModeApplies(input: {
 }
 
 /**
+ * A plan step is a short, focused try (8–10 minutes in the plan; one 4-mark
+ * question is six at exam pace), not the whole topic bank: three questions
+ * leaves room to skip one that does not suit, and "Practise normally instead"
+ * opens the full queue.
+ */
+export const STEP_QUEUE_LIMIT = 3;
+
+export function limitStepQueue<T>(ids: readonly T[], mode: PracticeStepMode | null): T[] {
+  return mode ? ids.slice(0, STEP_QUEUE_LIMIT) : [...ids];
+}
+
+/**
  * Hint tiers the page allows. Timed and unaided allow none, so the attempt
  * stays independent evidence. Guided keeps the full ladder (the worked
  * solution stays behind its own button). `undefined` means "page default".

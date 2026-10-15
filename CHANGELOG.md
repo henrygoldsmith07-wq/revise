@@ -20,8 +20,11 @@ at risk, ledger and quick sessions above the question.
   response-time calibration already uses), never auto-submits, and freezes
   at marking. `command=` (from the plan's command-word check) puts questions
   using that verb first and says so when the topic has none.
-- A step page is the one question: the hub cards, subject switcher and
-  "other ways to practise" are hidden, with "Practise normally instead".
+- A step page is a short focused try: at most three questions
+  (`STEP_QUEUE_LIMIT`), with the hub cards, topic filter, subject switcher
+  and "other ways to practise" hidden and "Practise normally instead" to
+  leave. At 360×760 the question now starts at y≈380 (was below ~1,500 px
+  of hub cards and a 151-question navigator).
 - The plan's exam-style link now carries `unaided=1`.
 
 **A fresh student's Schedule showed two blocks at the same time.** Onboarding

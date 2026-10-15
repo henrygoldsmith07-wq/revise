@@ -37,6 +37,10 @@ test("repair-plan practice links honour guided, unaided and timed at 360px", asy
   await expect(steps).toContainText("Small cue:");
   await expect(steps).toContainText("Practice, not proof");
   await expect(page.getByText("Do only questions I got wrong")).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Topic" })).toHaveCount(0);
+  // Above the fold at 360×760: the question starts before the bottom nav.
+  expect((await page.getByText(/^\d+ marks?$/).first().boundingBox())!.y).toBeLessThan(700);
+  await steps.screenshot({ path: "artifacts/guided-steps-360.png" });
   const stepsBox = await steps.boundingBox();
   const answerBox = await page.locator("textarea, [role=radiogroup]").first().boundingBox();
   expect(stepsBox && answerBox && stepsBox.y < answerBox.y).toBeTruthy();

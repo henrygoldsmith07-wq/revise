@@ -9,6 +9,8 @@ import {
   orderByCommand,
   parseCommandParam,
   parsePracticeStepMode,
+  limitStepQueue,
+  STEP_QUEUE_LIMIT,
   questionUsesCommand,
   stepModeApplies,
   stepModeHintBudget,
@@ -79,6 +81,15 @@ describe("practice step modes (repair-plan links)", () => {
   });
 });
 
+describe("a plan step is a short focused try", () => {
+  it("caps the queue only in a step mode", () => {
+    const ids = ["a", "b", "c", "d", "e"];
+    expect(limitStepQueue(ids, "guided")).toEqual(ids.slice(0, STEP_QUEUE_LIMIT));
+    expect(limitStepQueue(ids, "timed")).toHaveLength(3);
+    expect(limitStepQueue(ids, null)).toEqual(ids);
+  });
+});
+
 describe("the repair plan's practice links carry the mode their label promises", () => {
   const topic = {
     topicId: "t1", subjectId: "s1", mastery: 0.4, recall: 0.8, application: 0.3, applicationGap: 0.5,
@@ -102,7 +113,7 @@ describe("practice honours the flags (source wiring)", () => {
     expect(page).toContain("parsePracticeStepMode(params)");
     expect(page).toContain("hintBudget={adaptiveHintBudget ?? stepModeHintBudget(stepMode)}");
     expect(page).toContain("stepMode={stepMode}");
-    expect(page).toContain("orderByCommand(ranked, timedCommand)");
+    expect(page).toContain("limitStepQueue(orderByCommand(ranked, timedCommand)");
   });
   it("the question shows guided steps and an exam-pace clock", () => {
     expect(runner).toContain('data-testid="guided-steps"');
