@@ -47,7 +47,10 @@ test("a real offline marked response offers tentative structure practice and a s
   await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 390);
   await page.screenshot({ path: "artifacts/technique-context-mobile.png" });
   await returnLink.click();
-  await expect(page).toHaveURL(new RegExp(encodeURIComponent(QUESTION)));
+  // The technique URL also carries ?question=, so wait for the practice route
+  // itself; otherwise the still-mounted technique textarea can be filled.
+  await expect(page).toHaveURL((url) => url.pathname === "/practice" && url.searchParams.get("question") === QUESTION);
+  await expect(page.locator("#technique-answer")).toHaveCount(0);
   await expect(page.locator("textarea").first()).toBeVisible();
   await page.locator("textarea").first().fill("It is moving upwards and speeding up.");
   await page.getByRole("button", { name: /^(Not sure · submit|Submit for marking)$/ }).click();
