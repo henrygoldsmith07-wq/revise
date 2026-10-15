@@ -29,6 +29,7 @@ test("practice: a lost mark gets one next step at 360px", async ({ page }) => {
   await expect(main.getByText("Think it through", { exact: true })).toHaveCount(0);
   await expect(main.getByText("How to fix it", { exact: true })).toBeHidden();
   await expect(main).not.toContainText("two targeted items");
+  await expect(main).not.toContainText("cost marks more than once");
   await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 360);
 
   // The rest is one tap away, guiding question included (authored text offline / without AI consent).
