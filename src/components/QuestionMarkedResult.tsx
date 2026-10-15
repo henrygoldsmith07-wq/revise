@@ -284,7 +284,7 @@ export function MarkedResult({
         </div>
       ) : null}
 
-      {/* The headline is also the first entry of "How to fix it" on written
+      {/* The headline is also the first entry of the fix list on written
           answers, so the card is shown only where that list is not. */}
       {/* Below full marks this card moves into "More help with this answer". */}
       {result.remediation.headline && !inDiagnostic && !marksLost && (question.kind === "mcq" || !actions.length) ? (
