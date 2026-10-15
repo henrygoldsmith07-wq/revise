@@ -103,7 +103,9 @@ describe("a11y scaffolding", () => {
     expect(i18n.DEFAULT_LOCALE).toBe("en-GB");
   });
   it("QuestionRunner: remediation renders the misconception explanation with a fix", async () => {
-    const src = readFileSync(join(process.cwd(), "src/components/QuestionMarkedResult.tsx"), "utf8");
+    // The fix list lives in the practice next-step disclosure (PracticeNextStep).
+    const src = readFileSync(join(process.cwd(), "src/components/PracticeNextStep.tsx"), "utf8")
+      + readFileSync(join(process.cwd(), "src/components/QuestionMarkedResult.tsx"), "utf8");
     expect(src).toContain("How to fix it");
     expect(src).toContain("misconceptionEntry.explanation");
     expect(src).toContain("misconceptionEntry.correction");

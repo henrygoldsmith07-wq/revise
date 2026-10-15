@@ -216,10 +216,15 @@ describe("technique UI safety wiring", () => {
     expect(source).toContain("techniqueRepairForDiagnosis(question, result.errorDiagnosis)");
     expect(source).toContain("const techniqueShapeSuggestion = !inDiagnostic && !techniqueRepair && awarded < question.totalMarks");
     expect(source).toContain("answers: attempt?.answers ?? answers");
-    expect(source).toContain('data-testid="technique-shape-suggestion"');
-    expect(source).toContain("Optional response-shape practice");
     expect(source).toContain('data-testid="diagnostic-repair-deferred"');
-    expect(source).toContain("<InterventionPrescriptionPanel");
+    // One next step: the drill or the repair plan's first step, chosen in
+    // PracticeNextStep; the tentative suggestion stays optional and collapsed.
+    expect(source).toContain("<PracticeNextStep");
+    expect(source).toContain("techniqueShapeSuggestion={techniqueShapeSuggestion}");
+    const next = readFileSync("src/components/PracticeNextStep.tsx", "utf8");
+    expect(next).toContain('data-testid="technique-shape-suggestion"');
+    expect(next).toContain("Optional response-shape practice");
+    expect(next).toContain("useInterventionPrescription(");
   });
   it("retains timed-run fallback and limits aggregate drills to structure drivers", () => {
     const source = readFileSync("src/components/TechniqueSignal.tsx", "utf8");
