@@ -172,7 +172,11 @@ describe("security — RLS + schema invariants", () => {
 
   it("batched sync RPC runs as the caller so table RLS still applies", () => {
     const sql = schema();
-    const fn = sql.slice(sql.indexOf("create or replace function public.sync_push_batch"));
+    const start = sql.indexOf("create or replace function public.sync_push_batch");
+    const end = sql.indexOf("\n$$;", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const fn = sql.slice(start, end + 4);
     expect(fn).toContain("security invoker");
     expect(fn).not.toMatch(/^\s*security definer/m);
     expect(fn).toContain("is distinct from uid::text");

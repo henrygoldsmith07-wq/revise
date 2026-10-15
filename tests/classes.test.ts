@@ -42,6 +42,7 @@ describe("caller-session class adapter", () => {
   const getUser = vi.fn();
   beforeEach(() => {
     vi.clearAllMocks();
+    rpc.mockReset(); getUser.mockReset();
     getUser.mockResolvedValue({ data: { user: { id: A } }, error: null });
     rpc.mockResolvedValue({ data: null, error: null });
     getSupabase.mockReturnValue({ auth: { getUser }, rpc });
@@ -72,6 +73,23 @@ describe("caller-session class adapter", () => {
     await shareClassEvidence("c", [{ ...snapshot(), answers: { p: "PRIVATE ANSWER" }, feedback: "PRIVATE FEEDBACK" } as ClassEvidence]);
     expect(rpc).toHaveBeenCalledWith("share_class_evidence", { p_class_id: "c", p_evidence: [snapshot()] });
     expect(JSON.stringify(rpc.mock.calls)).not.toContain("PRIVATE");
+  });
+  it("shares complete histories in bounded, idempotently retryable metadata batches", async () => {
+    const rows = Array.from({ length: 205 }, (_, i) => snapshot({ attemptId: `attempt-${i}` }));
+    await shareClassEvidence("c", rows);
+    expect(rpc.mock.calls.map((call) => call[1].p_evidence.length)).toEqual([100, 100, 5]);
+    expect(rpc.mock.calls.flatMap((call) => call[1].p_evidence)).toEqual(rows);
+  });
+  it("stops subsequent batches after a failure and reports partial progress honestly", async () => {
+    rpc.mockResolvedValueOnce({ error: null }).mockResolvedValueOnce({ error: { message: "offline" } });
+    await expect(shareClassEvidence("c", Array.from({ length: 205 }, (_, i) => snapshot({ attemptId: `attempt-${i}` })))).rejects.toThrow(/already.*shared.*Retry/i);
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+  it("checks account identity before every subsequent batch", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: { id: A } }, error: null })
+      .mockResolvedValueOnce({ data: { user: { id: "other" } }, error: null });
+    await expect(shareClassEvidence("c", Array.from({ length: 205 }, (_, i) => snapshot({ attemptId: `attempt-${i}` })))).rejects.toThrow(/Account changed/);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
   it("does not impersonate another student's evidence", async () => {
     await expect(shareClassEvidence("c", [snapshot({ studentId: "other" })])).rejects.toThrow(/own attempt/);

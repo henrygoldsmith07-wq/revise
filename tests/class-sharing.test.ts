@@ -38,7 +38,9 @@ describe("minimal opt-in class evidence", () => {
     const page = readFileSync("src/app/classes/page.tsx", "utf8");
     expect(page).not.toContain("demoTeacher");
     expect(page).toContain("/reviewer/review/");
-    expect(page).toContain("classEvidenceSnapshot");
+    expect(page).toContain("loadClassEvidenceSnapshot");
+    expect(page).toMatch(/maxLength=\{64\}/);
+    expect(page).not.toContain("store.attempts");
     expect(page).toContain("Leave and delete shared evidence");
     const shell = readFileSync("src/components/AppShell.tsx", "utf8");
     expect(shell).toContain('if (pathname !== "/classes" && pathname !== "/settings") return <Onboarding');

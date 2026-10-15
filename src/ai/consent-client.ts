@@ -26,14 +26,23 @@ import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 
 /**
  * Whether this device may send anything to the AI route right now. Every
- * settings row in the active profile must carry an explicit, current opt-in;
- * an unreadable database means "no".
+ * settings row in the active profile must carry an explicit, current opt-in,
+ * and an unsettled opt-out for that owner vetoes a synced settings opt-in.
+ * An unreadable database or pending-consent record means "no".
  */
 export async function localAiConsentGranted(): Promise<boolean> {
   try {
     const db = await getDb();
     const rows = (await db.getAll("settings")) as unknown[];
-    return rows.length > 0 && rows.every((row) => aiConsentGrantedInSettings(row));
+    if (!rows.length || !rows.every((row) => aiConsentGrantedInSettings(row))) return false;
+    for (const row of rows) {
+      const userId = (row as { userId?: unknown }).userId;
+      if (typeof userId !== "string" || !userId.trim()) return false;
+      // Generic settings sync is not acknowledgement of a pending consent
+      // choice. Keep the local egress veto until OFF reaches the consent row.
+      if ((await readPending(userId))?.enabled === false) return false;
+    }
+    return true;
   } catch {
     return false;
   }

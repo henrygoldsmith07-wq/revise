@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAccount } from "@/state/account";
 import { useStoreFields } from "@/state/store";
 import { allTopics } from "@/domain/curriculum";
-import { classEvidenceSnapshot } from "@/domain/class-sharing";
+import { loadClassEvidenceSnapshot } from "@/data/class-sharing";
 import { buildClassHeatmap, type Classroom, type ClassMembership, type ClassAssignment, type ClassEvidence } from "@/domain/classes";
 import * as classes from "@/data/classes";
 import { Button, ButtonLink, Panel, SectionHeading } from "@/components/ui";
@@ -15,7 +15,7 @@ type ClassDetail = { members: ClassMembership[]; assignments: ClassAssignment[];
 
 export default function ClassesPage() {
   const account = useAccount();
-  const store = useStoreFields("attempts", "mistakes", "questions", "settings");
+  const store = useStoreFields("questions");
   const [owned, setOwned] = useState<Classroom[]>([]);
   const [memberships, setMemberships] = useState<ClassMembership[]>([]);
   const [studentAssignments, setStudentAssignments] = useState<ClassAssignment[]>([]);
@@ -81,8 +81,8 @@ export default function ClassesPage() {
       <div className="grid md:grid-cols-2 gap-5">
         <Panel><SectionHeading title="Join your class" hint="Ask your teacher for the join code." />
           <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (ageBand === "under13") { setError("Class sharing is not available for under-13s."); return; } void run(() => classes.joinClass(code.trim(), alias.trim(), ageBand, consent), "Join request saved. Under-18 sharing stays off until your teacher confirms authorization."); }}>
-            <label className="block text-sm">Class join code<input required maxLength={40} className={inputClass} value={code} onChange={(event) => setCode(event.target.value)} autoComplete="off" /></label>
-            <label className="block text-sm">Class alias (not your full name)<input required maxLength={40} className={inputClass} value={alias} onChange={(event) => setAlias(event.target.value)} /></label>
+            <label className="block text-sm">Class join code<input required minLength={64} maxLength={64} pattern="[a-fA-F0-9]{64}" className={inputClass} value={code} onChange={(event) => setCode(event.target.value)} autoComplete="off" /></label>
+            <label className="block text-sm">Class alias (not your full name)<input required minLength={2} maxLength={32} className={inputClass} value={alias} onChange={(event) => setAlias(event.target.value)} /></label>
             <label className="block text-sm">Age group<select className={inputClass} value={ageBand} onChange={(event) => setAgeBand(event.target.value as typeof ageBand)}><option value="under13">Under 13</option><option value="13-17">13–17</option><option value="18+">18 or over</option></select></label>
             <label className="flex gap-2 text-sm"><input required type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />I agree to share the limited assigned-work progress described above with this teacher.</label>
             <p className="text-xs text-ink3">Under 18? Your teacher must confirm the school/guardian authorization process before any work can be shared. Do not enter personal details in your alias.</p>
@@ -101,14 +101,17 @@ export default function ClassesPage() {
         {!memberships.length && <p className="text-sm text-ink2">No class joined yet.</p>}
         <ul className="space-y-4">{memberships.map((member) => {
           const assignments = studentAssignments.filter((item) => item.classId === member.classId);
-          const snapshot = classEvidenceSnapshot(member, assignments, store.attempts, store.mistakes);
           return <li key={member.classId} className="border-t border-line pt-3 space-y-2">
             <p className="font-medium">{member.className ?? "Your class"} · {member.alias}</p>
             <p className="text-sm text-ink2">{member.status === "active" ? "Sharing authorized — you choose when to send assigned-work progress." : "Pending teacher authorization. No evidence shared."}</p>
             <ul className="space-y-2">{assignments.map((assignment) => <li key={assignment.id} className="text-sm"><p>{assignment.title} · due {assignment.dueDate}</p>
               {assignment.kind === "topic" && assignment.topicId ? <ButtonLink size="sm" href={`/practice?topic=${encodeURIComponent(assignment.topicId)}`}>Practise topic</ButtonLink> : <div className="flex flex-wrap gap-2">{assignment.questionIds.map((id, index) => <ButtonLink size="sm" key={id} href={`/practice?question=${encodeURIComponent(id)}`}>Start question {index + 1}</ButtonLink>)}</div>}
             </li>)}</ul>
-            <div className="flex flex-wrap gap-2"><Button disabled={busy || member.status !== "active" || !snapshot.length} onClick={() => void run(() => classes.shareClassEvidence(member.classId, snapshot), "Assigned-work progress shared. No answers were sent.")}>Share assigned progress ({snapshot.length})</Button>
+            <div className="flex flex-wrap gap-2"><Button disabled={busy || member.status !== "active"} onClick={() => void run(async () => {
+                const snapshot = await loadClassEvidenceSnapshot(member, assignments);
+                if (!snapshot.length) throw new Error("No eligible assigned work is saved on this device after consent and authorization. Complete an assigned question first.");
+                await classes.shareClassEvidence(member.classId, snapshot);
+              }, "Assigned-work progress shared. No answers were sent.")}>Share assigned progress</Button>
               <Button disabled={busy} onClick={() => void run(() => classes.leaveClass(member.classId), "Left class. Its shared evidence has been deleted.")}>Leave and delete shared evidence</Button></div>
           </li>;
         })}</ul>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { countdownGuidance } from "@/domain/exam-countdown";
+import { plannedSessionHref } from "@/domain/study-navigation";
 import { buildIcsCalendar } from "@/domain/calendar-export";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { formatTime } from "@/domain/planner";
@@ -13,7 +14,7 @@ import { Button, EmptyState, Pill, SectionHeading } from "@/components/ui";
 
 // The personalised schedule: the planner's output over the whole remaining
 // run-up to each exam. Everything here is derived state — the planner rebuilds
-// it whenever availability, exam dates, targets or evidence change, and Review
+// it whenever availability, exam dates or targets change, and Review
 // and Practice tick blocks off as they are finished. This page only reads and
 // groups that plan; the one mutation is an explicit rebuild.
 
@@ -43,21 +44,6 @@ function dayDiff(a: string, b: string): number {
 function humanDate(key: string): string {
   const d = new Date(`${key}T00:00:00Z`);
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
-}
-
-/** Where a planned block actually runs, so starting it ticks it off on finish. */
-function hrefForSession(session: PlannedSession): string {
-  const base: Record<ActivityKind, string> = {
-    learn: `/lesson?subject=${session.subjectId}`,
-    flashcards: "/review",
-    recall: `/practice?mode=recall${session.topicId ? `&topic=${encodeURIComponent(session.topicId)}` : ""}`,
-    practice: `/practice?topic=${encodeURIComponent(session.topicId ?? session.subjectId)}`,
-    paper: "/papers",
-    mistakes: "/review?mode=mistakes",
-  };
-  const href = base[session.activity];
-  const marksDone = session.activity === "flashcards" || session.activity === "recall" || session.activity === "practice";
-  return marksDone ? `${href}${href.includes("?") ? "&" : "?"}session=${session.id}` : href;
 }
 
 export default function SchedulePage() {
@@ -128,7 +114,7 @@ export default function SchedulePage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Schedule</h1>
           <p className="text-sm text-ink3 mt-0.5">
-            The whole run-up to each exam, rebuilt automatically as dates, availability and evidence change.
+            Your exam run-up adapts to dates, availability and targets. Rebuild to include your latest answers.
           </p>
         </div>
         <div className="flex gap-2">
@@ -342,7 +328,7 @@ function DayCard({ date, sessions, exams, today }: { date: string; sessions: Pla
           return (
             <li key={session.id}>
               {session.status === "pending" ? (
-                <Link href={hrefForSession(session)} className="block hover:bg-surface2 transition-colors">
+                <Link href={plannedSessionHref(session)} className="block hover:bg-surface2 transition-colors">
                   {content}
                 </Link>
               ) : (

@@ -145,7 +145,14 @@ export async function shareClassEvidence(classId: string, snapshots: ClassEviden
   const payload = snapshots.map((item) => ({ attemptId: item.attemptId, studentId: userId, questionId: item.questionId, topicId: item.topicId,
     awarded: item.awarded, max: item.max, attemptedAt: item.attemptedAt,
     ...(item.misconception ? { misconception: item.misconception } : {}) }));
-  const result = await client.rpc("share_class_evidence", { p_class_id: classId, p_evidence: payload });
-  if (result.error) throw new Error("Evidence was not shared. An active, authorized membership and post-consent metadata are required.");
-  await stillCaller(client, userId);
+  // SQL bounds each transaction to 100 rows. Each batch is an idempotent
+  // upsert; a retry after partial success cannot double-count the heatmap.
+  for (let start = 0; start < payload.length; start += 100) {
+    const result = await client.rpc("share_class_evidence", { p_class_id: classId, p_evidence: payload.slice(start, start + 100) });
+    if (result.error) throw new Error(start
+      ? "Some assigned progress may already be shared. Retry safely to finish; duplicates will not be counted twice."
+      : "Evidence was not shared. An active, authorized membership and post-consent metadata are required.");
+    // Stop before another batch if the signed-in account changed.
+    await stillCaller(client, userId);
+  }
 }

@@ -171,6 +171,12 @@ portal **continues the existing hash chain** in `public.review_audit_events`:
   the service role), a trigger that serialises appends and refuses a row that
   does not continue the current tail, and a binding that a signed-in reviewer
   can only record as themselves with their granted role and qualification.
+  The additive `supabase/migrations/20261014000200_reviewer_validation.sql`
+  also validates approval structure (all six checks, identity and date) on direct
+  inserts; the consumer revalidates every approval, not just the final reviewer.
+  Apply it through the operator release process before relying on this database
+  guard in a deployed environment. It was executed locally in PostgreSQL/PGlite,
+  not applied to live Supabase by this change.
 
 ### How decisions reach students
 
@@ -182,7 +188,11 @@ every snapshot load with `applyHumanVerificationLedger`, which re-checks the
 exact content fingerprint and the trust contract. The applied result is never
 written back to question rows. A verified question therefore joins the
 `provable` supply on the next fetch (within seconds of opening the app, then
-every 10 minutes), without a new build.
+every 10 minutes), without a new build. Each refresh restores the pristine
+approval baseline before applying the new runtime ledger, so an empty or partial
+withdrawal removes the previous overlay instead of leaving stale trust in the
+open learner session. Legitimate bundled approvals are preserved. Offline clients
+retain their last good ledger; withdrawal is not instant on disconnected devices.
 
 ### Granting and revoking a teacher
 

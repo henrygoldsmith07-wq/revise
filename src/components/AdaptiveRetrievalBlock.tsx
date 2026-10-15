@@ -36,19 +36,25 @@ export function AdaptiveRetrievalBlock({
   cards: Card[];
   onComplete: (outcome: RetrievalOutcome) => void | Promise<void>;
 }) {
-  const store = useStoreFields("reviewCard");
+  const store = useStoreFields("cards", "reviewCard");
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [grades, setGrades] = useState<RecallGrade[]>([]);
   const finishedRef = useRef(false);
+  const savingRef = useRef(false);
+  const completionRef = useRef<RetrievalOutcome | null>(null);
+  const finishingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const cardShownAt = useRef(0);
 
-  const current = cards[index];
+  const current = store.cards.find((card) => card.id === cards[index]?.id);
   const done = grades.length;
 
   useEffect(() => {
     cardShownAt.current = Date.now();
+    savingRef.current = false;
   }, [index]);
 
   const remaining = cards.slice(index + 1);
@@ -59,27 +65,54 @@ export function AdaptiveRetrievalBlock({
   // useCallback rather than a plain function: this reads the clock and the
   // card-shown ref, which only makes sense once an interaction has happened,
   // never while rendering.
+  const finish = useCallback(async (outcome: RetrievalOutcome) => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onComplete(outcome);
+      completionRef.current = null;
+    } catch {
+      setSaveError("Your grades are saved, but the session could not finish. Please try again.");
+    } finally {
+      finishingRef.current = false;
+      setSaving(false);
+    }
+  }, [onComplete]);
+
   const grade = useCallback(
     async (value: RecallGrade) => {
-      if (!current || finishedRef.current) return;
-      const elapsed = cardShownAt.current ? Date.now() - cardShownAt.current : 0;
-      // Same persistence path as /review: FSRS grade + review log + session clock.
-      await store.reviewCard(current, value, elapsed, confidence ?? undefined);
-      const nextGrades = [...grades, value];
-      setGrades(nextGrades);
-      setRevealed(false);
-      setConfidence(null);
-      if (index >= cards.length - 1) {
-        finishedRef.current = true;
-        await onComplete({
-          grades: nextGrades,
-          missedItemIds: cards.filter((_, i) => nextGrades[i] === "again").map((card) => card.id),
-        });
-      } else {
+      if (!current || !revealed || finishedRef.current || savingRef.current) return;
+      savingRef.current = true;
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const elapsed = cardShownAt.current ? Date.now() - cardShownAt.current : 0;
+        // Same persistence path as /review: FSRS grade + review log + session clock.
+        await store.reviewCard(current, value, elapsed, confidence ?? undefined);
+        const nextGrades = [...grades, value];
+        setGrades(nextGrades);
+        setRevealed(false);
+        setConfidence(null);
         setIndex((i) => i + 1);
+        if (index >= cards.length - 1) {
+          finishedRef.current = true;
+          const outcome = {
+            grades: nextGrades,
+            missedItemIds: cards.filter((_, i) => nextGrades[i] === "again").map((card) => card.id),
+          };
+          completionRef.current = outcome;
+          await finish(outcome);
+        }
+      } catch {
+        setSaveError("Could not save your grade. This card is still here — please try again.");
+        savingRef.current = false;
+      } finally {
+        setSaving(false);
       }
     },
-    [cards, confidence, current, grades, index, onComplete, store],
+    [cards, confidence, current, finish, grades, index, revealed, store],
   );
 
   const intervals = current ? previewIntervals(current) : null;
@@ -87,6 +120,12 @@ export function AdaptiveRetrievalBlock({
   return (
     <div className="space-y-4">
       <ProgressBar value={progressTotal ? done / progressTotal : 0} label={`${done} of ${cards.length} recalled`} />
+      {saveError ? <p className="text-sm text-danger" role="alert">{saveError}</p> : null}
+      {done === cards.length && saveError ? (
+        <Button disabled={saving} onClick={() => {
+          if (completionRef.current && !saving) void finish(completionRef.current);
+        }}>Try finishing again</Button>
+      ) : null}
       {current ? (
         <Panel className="min-h-[15rem] flex flex-col">
           <div className="flex items-center gap-2 mb-3">
@@ -148,6 +187,7 @@ export function AdaptiveRetrievalBlock({
                   key={option.grade}
                   type="button"
                   onClick={() => void grade(option.grade)}
+                  disabled={saving}
                   className="card p-2 min-h-[4.25rem] flex flex-col justify-center text-center hover:border-ink3 active:scale-[0.98] transition-all"
                 >
                   <span className="block text-xs font-semibold text-ink">{option.label}</span>
@@ -164,7 +204,9 @@ export function AdaptiveRetrievalBlock({
         </Panel>
       ) : (
         <p className="text-xs text-ink3" role="status">
-          All {cards.length} cards handled.
+          {done === cards.length
+            ? `All ${cards.length} cards handled.`
+            : "This card is no longer available. Return to the session to replan; no grade has been recorded."}
         </p>
       )}
       {revealed && examinerNote ? (

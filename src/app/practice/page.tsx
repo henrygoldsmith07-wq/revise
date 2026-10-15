@@ -13,6 +13,8 @@ import { rankQuestionsForExposure } from "@/domain/question-exposure";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
+import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
+import { adaptiveReturnHref } from "@/domain/study-navigation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
 import { MissionSessionMode } from "@/components/MissionSessionMode";
@@ -67,7 +69,7 @@ function Practice() {
   // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
   // marking here replans the runner's next step and hands the student back
   // to it — one tutor flow, not a redirect between pages.
-  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
+  const returnHref = params.get("from") === "adaptive" ? adaptiveReturnHref(params.get("return")) : null;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "practice" ? store.revisionCheckpoint : null;
@@ -86,7 +88,13 @@ function Practice() {
   // (see src/data/content-ids.ts) — remap so they keep resolving to the
   // seeded bank instead of landing on an empty queue.
   const requestedQuestionParam = farTransferRetest?.candidateQuestionId ?? (questionParam ? remapContentIdString(questionParam) : questionParam);
-  const [subjectId, setSubjectId] = useState(subjectParam ?? farTransferRetest?.subjectId ?? subjects[0]?.id ?? "");
+  const [subjectId, setSubjectId] = useState(() => initialPracticeSubject({
+    enrolledSubjectIds: subjects.map((subject) => subject.id),
+    subjectParam,
+    questionSubjectId: store.questions.find((question) => question.id === requestedQuestionParam)?.subjectId,
+    topicSubjectId: getTopic(topicParam ?? "")?.subjectId,
+    retestSubjectId: farTransferRetest?.subjectId,
+  }));
   const [topicId, setTopicId] = useState(topicParam ?? farTransferRetest?.topicIds[0] ?? "");
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
@@ -154,7 +162,9 @@ function Practice() {
   const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
   const [sessionStartedAt, setSessionStartedAt] = useState(() => Date.now());
   const closing = useRef(false);
+  const completedPlanRef = useRef<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
 
   const masteryByTopic = useMemo(() => new Map(store.mastery.map((m) => [m.topicId, m])), [store.mastery]);
   const questionsById = useMemo(
@@ -299,10 +309,6 @@ function Practice() {
       if (resumeRequested && !current) void clearRevisionCheckpoint();
       return;
     }
-    if (retestMistake?.resolved) {
-      void clearRevisionCheckpoint();
-      return;
-    }
     void saveRevisionCheckpoint({
       activity: "practice",
       title: retestMistake ? "Retest a mistake" : mode === "recall" ? "Active recall" : "Exam questions",
@@ -321,26 +327,41 @@ function Practice() {
     setSessionElapsedMs(0);
     setSessionStartedAt(Date.now());
     closing.current = false;
+    completedPlanRef.current = null;
     setFinishing(false);
+    setFinishError(null);
   }
 
   async function finishSession() {
     if (!sessionAttempts.length || closing.current) return;
     closing.current = true;
     setFinishing(true);
-    setSessionElapsedMs(Date.now() - sessionStartedAt);
-    if (sessionId) await store.completeSession(sessionId);
-    setClosed(true);
+    setFinishError(null);
+    try {
+      if (sessionId && completedPlanRef.current !== sessionId) {
+        await store.completeSession(sessionId);
+        completedPlanRef.current = sessionId;
+      }
+      await clearRevisionCheckpoint();
+      setSessionElapsedMs(Date.now() - sessionStartedAt);
+      setClosed(true);
+    } catch {
+      setFinishError("Your answers are still recorded, but the session could not finish saving. Try again.");
+    } finally {
+      closing.current = false;
+      setFinishing(false);
+    }
   }
 
-  const sessionAwarded = sessionAttempts.reduce((sum, attempt) => sum + attempt.awarded, 0);
-  const sessionAvailable = sessionAttempts.reduce((sum, attempt) => sum + attempt.max, 0);
-  // Re-attempts of the same question signal fragility even when the score
-  // looks fine, so the closure's repair rule sees them.
-  const sessionRetries = sessionAttempts.length - new Set(sessionAttempts.map((attempt) => attempt.questionId)).size;
+  const summary = practiceSessionSummary(sessionAttempts, queue.map((question) => question.id));
+  const sessionAwarded = summary.awarded;
+  const sessionAvailable = summary.available;
+  // Re-attempts of the same question signal fragility even when the latest
+  // score looks fine, so retain them in the closure's repair rule.
+  const sessionRetries = summary.retryCount;
   const closure = buildPostSessionClosure({
     session: "practice",
-    attempted: sessionAttempts.length,
+    attempted: summary.attempted,
     total: queue.length,
     awarded: sessionAwarded,
     available: sessionAvailable,
@@ -352,7 +373,8 @@ function Practice() {
         ? { href: store.adaptiveSession.startHref, label: "Start next session", reason: store.adaptiveSession.reason }
         : undefined,
   });
-  const answered = queue.map((question) => sessionAttempts.some((attempt) => attempt.questionId === question.id));
+  const answered = summary.answered;
+  const latestCurrentAttempt = current ? summary.latestByQuestion.get(current.id) : undefined;
   const drafted = queue.map((question) => {
     const draft = questionDrafts[question.id];
     return Boolean(draft && (draft.choice !== null || Object.values(draft.answers).some((answer) => answer.trim())));
@@ -521,6 +543,15 @@ function Practice() {
           </Button>
         ) : null}
       </header>
+
+      {finishError ? (
+        <Panel className="border-danger">
+          <p role="alert" className="text-sm text-ink">{finishError}</p>
+          <Button size="sm" variant="primary" className="mt-3" disabled={finishing} onClick={() => void finishSession()}>
+            Retry finishing session
+          </Button>
+        </Panel>
+      ) : null}
 
       {farTransferRetest ? (
         <Panel className="border-accent bg-accentsoft">
@@ -736,17 +767,22 @@ function Practice() {
             total={queue.length}
             answered={answered}
             drafted={drafted}
-            onSelect={setIndex}
+            onSelect={(nextIndex) => { if (!finishing) setIndex(nextIndex); }}
             onPrevious={() => setIndex((i) => Math.max(0, i - 1))}
             onNext={() => {
               if (index >= queue.length - 1) void finishSession();
               else setIndex((i) => Math.min(queue.length - 1, i + 1));
             }}
-            previousDisabled={index === 0}
-            nextDisabled={index >= queue.length - 1 && !currentAnswered}
+            previousDisabled={finishing || index === 0}
+            nextDisabled={finishing || (index >= queue.length - 1 && !currentAnswered)}
             nextLabel={index >= queue.length - 1 ? "Finish session" : currentAnswered ? "Next question" : "Skip question"}
             controlsClassName="grid grid-cols-2 gap-2"
           />
+          {latestCurrentAttempt ? (
+            <p className="text-sm text-ink2" aria-live="polite">
+              Latest attempt: {latestCurrentAttempt.awarded}/{latestCurrentAttempt.max} marks. Earlier attempts stay in your session history.
+            </p>
+          ) : null}
           <QuestionRunner
             key={`${current.id}:${retestMistake?.id ?? "practice"}`}
             question={current}
@@ -758,10 +794,7 @@ function Practice() {
             draft={questionDrafts[current.id]}
             onDraftChange={(draft) => setQuestionDrafts((previous: Record<string, QuestionDraft>) => ({ ...previous, [current.id]: draft }))}
             onFinished={(attempt) => {
-              setSessionAttempts((previous) => [
-                ...previous.filter((existing) => existing.questionId !== attempt.questionId),
-                attempt,
-              ]);
+              setSessionAttempts((previous) => recordPracticeAttempt(previous, attempt));
               setQuestionDrafts((previous: Record<string, QuestionDraft>) => {
                 const next = { ...previous };
                 delete next[attempt.questionId];

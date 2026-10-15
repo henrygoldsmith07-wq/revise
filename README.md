@@ -14,6 +14,13 @@ Internal operations now include cross-subject reviewer campaigns, deterministic
 flagship readiness, blind human marking intake and learner-level pilot reports.
 Implementation and synthetic tests demonstrate behaviour, not learner benefit.
 
+Real teacher classes, generic exam-technique drills, WJEC science practical-skill
+paths and opt-in in-app Sunday plans are available. Diagnosed command-word losses
+can lead into a matching structure drill and back to relevant practice; the drill
+never awards marks, mastery or proof. [Product audit and scope](docs/product-audit-2026-10-14.md)
+and [competitor research](docs/competitive-research-2026-10.md) explain the priorities
+and remaining evidence gaps.
+
 ### Blocked by external evidence
 
 The flagship banks still require genuine qualified human reviews. Authored volume
@@ -68,7 +75,8 @@ when it changes what it can claim ("You improved here, but Revise does not yet
 have enough reviewed new questions to prove it.").
 
 Manual modes (Review, Study, Lessons, Practice, Past papers, Session) stay in
-Tools. The main navigation is **Today, Subjects, Readiness, Tools**.
+Tools. The main navigation is **Today, Learn, Practice, Progress, Library**, with
+manual and specialist tools kept secondary.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are

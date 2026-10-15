@@ -4,7 +4,7 @@ import { physicsContentFingerprint, trustedAssessmentContent } from "@/domain/co
 import { approvableByReview, blockingGates, gateContextFromTopics, questionGateIssues } from "@/domain/review-gates";
 import {
   appendReviewDecisions, auditLogIssues, emptyAuditLog, parseReviewReturn, promotableLedgerEntries, promotionGateIssues, reviewReturnTemplate, reviewStateOf,
-  REQUIRED_INDEPENDENT_APPROVALS,
+  eventHash, type ReviewAuditEvent, type ReviewDecisionInput, REQUIRED_INDEPENDENT_APPROVALS,
 } from "@/domain/review-workflow";
 import { decision, gateFor, NOW, PROMPTS, topic, verifyThroughWorkflow, wq } from "./helpers-review";
 
@@ -29,6 +29,18 @@ describe("review workflow stages", () => {
     expect(again.accepted).toBe(0);
     expect(again.problems[0]?.detail).toMatch(/different reviewer/);
     expect(again.log).toBe(first.log);
+  });
+
+  it("uses the supplied review clock consistently when checking independent approvals", () => {
+    const now = Date.parse("2999-01-02T00:00:00Z");
+    const review = decision(q1, "reviewer-a", { reviewedAt: "2999-01-01T00:00:00Z" });
+    const first = appendReviewDecisions(emptyAuditLog(), [review], [q1], now);
+    expect(first.accepted).toBe(1);
+    expect(reviewStateOf(q1, first.log.events, now).stage).toBe("checked");
+    expect(auditLogIssues(first.log, now)).toEqual([]);
+    const repeated = appendReviewDecisions(first.log, [review], [q1], now);
+    expect(repeated.accepted).toBe(0);
+    expect(repeated.problems[0]?.detail).toMatch(/different reviewer/);
   });
 
   it("rejects incomplete reviewer metadata, incomplete checks and comment-free rejections", () => {
@@ -67,6 +79,56 @@ describe("review workflow stages", () => {
     expect(data.problems[0]?.detail).toMatch(/no authored data representation/);
     const real = wq("q-transfer", "algebra", PROMPTS[1]!, { flavour: "transfer" });
     expect(appendReviewDecisions(emptyAuditLog(), [decision(real, "a", { classification: { transferConfirmed: true } })], [real], at).problems).toEqual([]);
+  });
+});
+
+describe("defensive review consumption", () => {
+  const chainWith = (first: Partial<ReviewDecisionInput>): ReturnType<typeof emptyAuditLog> => {
+    const firstBase = { ...decision(q1, "reviewer-a", first), seq: 1, subjectId: q1.subjectId, previousHash: "genesis" };
+    const firstEvent: ReviewAuditEvent = { ...firstBase, hash: eventHash(firstBase) };
+    const secondBase = { ...decision(q1, "reviewer-b"), seq: 2, subjectId: q1.subjectId, previousHash: firstEvent.hash };
+    return { formatVersion: 1, events: [firstEvent, { ...secondBase, hash: eventHash(secondBase) }] };
+  };
+
+  it.each([
+    ["missing check", { checks: { ...decision(q1, "r").checks, marking: false } }],
+    ["blank reviewer", { reviewerId: " " }],
+    ["unknown role", { reviewerRole: "student" as ReviewDecisionInput["reviewerRole"] }],
+    ["blank qualification", { reviewerQualification: "" }],
+    ["invalid date", { reviewedAt: "yesterday" }],
+    ["future date", { reviewedAt: "2999-01-01T00:00:00Z" }],
+    ["nonboolean classification", { classification: { transferConfirmed: "true" } as unknown as ReviewDecisionInput["classification"] }],
+  ] as const)("does not trust a hashed but invalid first approval: %s", (_name, invalid) => {
+    const log = chainWith(invalid);
+    expect(auditLogIssues(log).length).toBeGreaterThan(0);
+    expect(reviewStateOf(q1, log.events).stage).not.toBe("verified");
+    expect(promotableLedgerEntries([q1], log)).toEqual([]);
+  });
+
+  it("revalidates every classification against the current question, not only the final approval", () => {
+    const log = chainWith({ classification: { transferConfirmed: true } });
+    expect(reviewStateOf(q1, log.events).stage).not.toBe("verified");
+    expect(promotableLedgerEntries([q1], log)).toEqual([]);
+  });
+
+  it("does not consume approval events for the wrong subject", () => {
+    const log = chainWith({});
+    log.events[0]!.subjectId = "wjec-alevel-physics";
+    const { hash: _hash, ...base } = log.events[0]!;
+    log.events[0]!.hash = eventHash(base);
+    expect(log.events[0]!.hash).not.toBe(_hash);
+    log.events[1]!.previousHash = log.events[0]!.hash;
+    const { hash: _secondHash, ...secondBase } = log.events[1]!;
+    log.events[1]!.hash = eventHash(secondBase);
+    expect(log.events[1]!.hash).not.toBe(_secondHash);
+    expect(reviewStateOf(q1, log.events).stage).not.toBe("verified");
+  });
+
+  it("reports malformed events instead of crashing", () => {
+    expect(auditLogIssues({ formatVersion: 1, events: [null] }).length).toBeGreaterThan(0);
+    const log = chainWith({});
+    log.events[0]!.decision = "bogus" as ReviewDecisionInput["decision"];
+    expect(auditLogIssues(log).join(";")).toMatch(/decision must/);
   });
 });
 

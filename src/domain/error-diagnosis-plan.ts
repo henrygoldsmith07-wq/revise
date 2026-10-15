@@ -40,10 +40,10 @@ export interface AttemptErrorDiagnosis {
   clean: boolean;
 }
 
-function commandWordIn(question: Question, part: QuestionPart): string | null {
-  const match = `${question.stem} ${part.prompt}`.match(
-    /\b(state|describe|explain|calculate|suggest|compare|evaluate|discuss|justify|deduce|predict|outline|show that)\b/i,
-  );
+/** A multipart question's own command takes precedence over the general stem. */
+export function commandWordIn(question: Pick<Question, "stem">, part: Pick<QuestionPart, "prompt">): string | null {
+  const command = /\b(state|describe|explain|calculate|suggest|compare|evaluate|discuss|justify|deduce|predict|outline|show that|identify|define|name)\b/i;
+  const match = part.prompt.match(command) ?? question.stem.match(command);
   return match?.[1]?.toLowerCase() ?? null;
 }
 
