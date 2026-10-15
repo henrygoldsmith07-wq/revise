@@ -69,7 +69,13 @@ export const INTERVENTION_STEP_LABEL: Record<InterventionStepKind, string> = {
   revisit: "Revisit",
 };
 
-function topicHref(topicId: Id, kind: InterventionStepKind): string {
+/**
+ * Each practice link carries the mode its label promises, and /practice
+ * honours it (src/domain/practice-step-mode.ts): guided=1 opens the question
+ * with its steps shown, unaided=1 and timed=1 remove hints, timed=1 adds an
+ * exam-pace clock and command= puts questions using that verb first.
+ */
+function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | null): string {
   switch (kind) {
     case "retrieve":
       return `/review?topic=${encodeURIComponent(topicId)}`;
@@ -82,9 +88,9 @@ function topicHref(topicId: Id, kind: InterventionStepKind): string {
     case "guided-question":
       return `/practice?topic=${encodeURIComponent(topicId)}&guided=1`;
     case "exam-style-question":
-      return `/practice?topic=${encodeURIComponent(topicId)}`;
+      return `/practice?topic=${encodeURIComponent(topicId)}&unaided=1`;
     case "timed-question":
-      return `/practice?topic=${encodeURIComponent(topicId)}&timed=1`;
+      return `/practice?topic=${encodeURIComponent(topicId)}&timed=1${command ? `&command=${encodeURIComponent(command)}` : ""}`;
     case "far-transfer-question":
       return `/practice?topic=${encodeURIComponent(topicId)}&transfer=1`;
     case "delayed-proof":
@@ -221,7 +227,7 @@ export function prescribeIntervention(
       minutes: 8,
       countsAsProof: true,
       why: `“${topic.commandWeakness}” questions cost the most here, so one timed answer checks the technique under pressure.`,
-      href: topicHref(topic.topicId, "timed-question"),
+      href: topicHref(topic.topicId, "timed-question", topic.commandWeakness),
     });
     reasons.push(`“${topic.commandWeakness}” questions cost marks`);
   }

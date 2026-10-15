@@ -20,6 +20,8 @@ import { ProofCheckBanner } from "./ProofCheckBanner";
 import { useQuestionExecution, type QuestionDraft } from "@/state/question-execution";
 export type { QuestionDraft } from "@/state/question-execution";
 import { MarkedResult } from "./QuestionMarkedResult";
+import { ExamPaceTimer } from "./ExamPaceTimer";
+import type { PracticeStepMode } from "@/domain/practice-step-mode";
 const TIER_HINT_CTA: Record<HintTier, string> = {
   cue: "Reveal a small cue",
   prompt: "Reveal what to think about",
@@ -45,7 +47,15 @@ export function QuestionRunner({
   mission,
   onConfidence,
   inDiagnostic = false,
+  stepMode = null,
 }: {
+  /**
+   * The repair-plan step this question was opened for (/practice?guided=1,
+   * ?timed=1, ?unaided=1). Guided shows the hint steps before the answer
+   * box; timed shows an exam-pace clock. The page sets hintBudget to 0 for
+   * timed and unaided, so neither offers help.
+   */
+  stepMode?: PracticeStepMode | null;
   question: Question;
   /** Answered inside a diagnostic check; see MarkedResult's `inDiagnostic`. */
   inDiagnostic?: boolean;
@@ -75,7 +85,8 @@ export function QuestionRunner({
    */
   onConfidence?: (confident: boolean) => void;
 }) {
-  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit, submitError } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
+  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit, submitError } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission, guided: stepMode === "guided" });
+  const guided = stepMode === "guided";
   const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || Boolean(farTransfer));
   return (
     <div className="space-y-4">
@@ -99,6 +110,13 @@ export function QuestionRunner({
 
         <TrustDetails question={question} />
 
+        {stepMode === "timed" ? <ExamPaceTimer marks={question.totalMarks} stopped={Boolean(result)} /> : null}
+        {stepMode === "unaided" && !result ? (
+          <p className="text-xs text-ink3 mb-3" data-testid="unaided-step-note">
+            Unaided: no hints on this one, so the mark counts as your own evidence.
+          </p>
+        ) : null}
+
         {farTransfer ? (
           <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mb-4 text-sm text-ink2">
             <p className="font-semibold text-ink">Does it hold in a new context?</p>
@@ -110,6 +128,24 @@ export function QuestionRunner({
         ) : null}
 
         <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>
+
+        {guided && !result ? (
+          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mt-4 space-y-2" data-testid="guided-steps" aria-live="polite">
+            <p className="text-sm font-semibold text-ink">Guided try: use these steps as you write</p>
+            {visibleHints.length ? (
+              <ol className="space-y-1.5 list-decimal pl-5">
+                {visibleHints.map((hint) => (
+                  <li key={hint.tier} className="text-sm text-ink2">{formatHint(hint)}</li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-ink2">This question has no step-by-step support yet; answer it as normal.</p>
+            )}
+            <p className="text-[11px] text-ink3">
+              Practice, not proof: a guided answer is marked as normal but counts at reduced weight. Only an unaided answer counts as evidence.
+            </p>
+          </div>
+        ) : null}
 
         {isMcq ? (
           <ul className="mt-4 space-y-1.5" role="radiogroup" aria-label="Choose one answer">
@@ -208,7 +244,7 @@ export function QuestionRunner({
             </Button>
           </div>
         ) : null}
-        {hintsOpen && visibleHints.length ? (
+        {hintsOpen && visibleHints.length && !(guided && !result) ? (
           <div className="mt-2 space-y-2" aria-live="polite">
             {visibleHints.map((hint) => (
               <p key={hint.tier} className="card card-2 p-3 text-sm text-ink2">

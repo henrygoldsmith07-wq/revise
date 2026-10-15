@@ -1,5 +1,29 @@
 # Changelog
 
+## Repair-plan links do what their labels say — 2026-10-15 (twenty-third pass)
+
+**"Guided application", "Unaided exam question" and "Timed question" all
+opened the same plain practice hub.** After #64 "Start: Guided application" is
+often the one next step after a lost mark, but `/practice` ignored `guided=1`
+and `timed=1` (and the unaided step had hints on offer). At 360px the student
+landed on "Exam questions" with the wrong-answers card, weak-topic exam, marks
+at risk, ledger and quick sessions above the question.
+
+- `src/domain/practice-step-mode.ts` (pure): parses `guided=1` / `timed=1` /
+  `unaided=1` and `command=`; a flag never overrides a retest, far-transfer
+  check, recall mode or adaptive rung. Timed and unaided allow no hints.
+- Guided: the question's own hint rungs below the worked solution (cue,
+  "think about", answer structure, all from `buildHintLadder`) are shown
+  before the answer box, and recorded on the attempt as used, so mastery
+  weights it as supported practice. Nothing new is authored.
+- Timed: `ExamPaceTimer` counts up against 90 s a mark (the baseline the
+  response-time calibration already uses), never auto-submits, and freezes
+  at marking. `command=` (from the plan's command-word check) puts questions
+  using that verb first and says so when the topic has none.
+- A step page is the one question: the hub cards, subject switcher and
+  "other ways to practise" are hidden, with "Practise normally instead".
+- The plan's exam-style link now carries `unaided=1`.
+
 ## A lost practice mark gets one next step, and the repair plan stops calling a first mistake a repeat — 2026-10-15 (twenty-second pass)
 
 **After a wrong practice answer, five blocks competed to be the next step.**
