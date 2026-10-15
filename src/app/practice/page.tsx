@@ -45,9 +45,22 @@ import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented 
 export default function PracticePage() {
   return (
     <Suspense fallback={null}>
-      <Practice />
+      <PracticeForRequest />
     </Suspense>
   );
+}
+
+/**
+ * A repair-plan step link is clicked from a marked practice answer on this
+ * same route, so Next keeps the page mounted and the held queue would still be
+ * the question just answered ("Question 1 of 1", already marked). Keying on
+ * the step (mode, topic, command) starts the step with its own queue; every
+ * other in-page navigation keeps the existing held-queue behaviour.
+ */
+function PracticeForRequest() {
+  const params = useSearchParams();
+  const step = parsePracticeStepMode(params);
+  return <Practice key={step ? `step:${step}:${params.get("topic") ?? ""}:${params.get("command") ?? ""}` : "practice"} />;
 }
 
 function Practice() {

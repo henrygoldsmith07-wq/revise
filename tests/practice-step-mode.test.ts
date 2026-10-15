@@ -111,6 +111,9 @@ describe("practice honours the flags (source wiring)", () => {
   const runner = readFileSync("src/components/QuestionRunner.tsx", "utf8");
   it("the page reads the step mode and hands it to the question", () => {
     expect(page).toContain("parsePracticeStepMode(params)");
+    // Clicked from a marked answer on the same route: the step must remount
+    // with its own queue, not keep the answered question.
+    expect(page).toContain("<Practice key={step ? `step:${step}:");
     expect(page).toContain("hintBudget={adaptiveHintBudget ?? stepModeHintBudget(stepMode)}");
     expect(page).toContain("stepMode={stepMode}");
     expect(page).toContain("limitStepQueue(orderByCommand(ranked, timedCommand)");
