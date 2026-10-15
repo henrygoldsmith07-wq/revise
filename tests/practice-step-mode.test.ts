@@ -124,3 +124,17 @@ describe("practice honours the flags (source wiring)", () => {
     expect(runner).toContain('guided: stepMode === "guided"');
   });
 });
+
+describe("hint text shown in a guided try reads cleanly", () => {
+  it("does not repeat the tier label or double a full stop", async () => {
+    const { buildHintLadder, formatHint } = await import("@/domain/hints");
+    const ladder = buildHintLadder(
+      { stem: "A ball is thrown.", parts: [{ id: "p", prompt: "Explain.", marks: 2, markScheme: ["a", "b"] }] } as never,
+      { keyPoints: ["Velocity is the gradient."], commonErrors: ["Treating weight and normal force as a pair."] },
+    );
+    const lines = ladder.map(formatHint);
+    expect(lines.find((line) => line.startsWith("Think about"))).toBe("Think about: Velocity is the gradient.");
+    expect(lines.find((line) => line.startsWith("Scaffold"))).toMatch(/a pair\.$/);
+    expect(lines.some((line) => line.includes(".."))).toBe(false);
+  });
+});
