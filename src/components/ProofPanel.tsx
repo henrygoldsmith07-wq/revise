@@ -6,6 +6,7 @@ import { evidenceGapReport, type SubjectGapSummary } from "@/domain/marks-value"
 import { learnerState, topicEvidenceSummary, type LearnerState } from "@/domain/learner-state";
 import { topicLifecycle } from "@/domain/proof-lifecycle";
 import { shortDate, type ProofStatus, type TopicProof } from "@/domain/proof-of-improvement";
+import { proofHref } from "@/domain/mission-session";
 import { topicShares } from "@/domain/topic-weight";
 import { auditTopicSupply, capabilityGapsForTopic, type TopicCapabilityGap } from "@/domain/supply-audit";
 import { newlyProvenTopics, nextSeenProofStates, parseSeenProofStates } from "@/domain/proof-moment";
@@ -76,7 +77,9 @@ const STATE_TONE: Record<LearnerState, "success" | "review" | "danger" | "neutra
 };
 
 const pct = (value: number | null) => (value === null ? "" : `${Math.round(value * 100)}%`);
-const startHref = (topicId: string) => `/adaptive-session?topic=${encodeURIComponent(topicId)}&start=1`;
+// One route for every proof entry point, so the questions offered here are the
+// same reviewed, unseen, unhinted ones Today's Proof action runs.
+const startHref = (row: TopicProof) => proofHref(row.subjectId, row.topicId);
 
 function detail(row: TopicProof): string {
   if (row.illusory) {
@@ -178,7 +181,7 @@ export function ProofPanel() {
           ) : (
             <Pill tone={STATE_TONE[view.state]}>{view.label}</Pill>
           )}
-          {act ? <ButtonLink href={startHref(row.topicId)} size="sm" variant="primary">Prove it</ButtonLink> : null}
+          {act ? <ButtonLink href={startHref(row)} size="sm" variant="primary">Prove it</ButtonLink> : null}
         </div>
       </li>
     );
