@@ -10,7 +10,9 @@ import { formatTime } from "@/domain/planner";
 import type { ActivityKind, ExamDate, PlannedSession } from "@/domain/types";
 import { addLocalDays, todayLocal, toLocalDateKey } from "@/domain/local-date";
 import { useStoreFields, useSubjects } from "@/state/store";
-import { Button, EmptyState, Pill, SectionHeading } from "@/components/ui";
+import { Button, ButtonLink, EmptyState, Pill, SectionHeading } from "@/components/ui";
+import { useRevisionPlan } from "@/components/recovery-evidence";
+import { todayPick, type TodayPick } from "@/domain/today-pick";
 
 // The personalised schedule: the planner's output over the whole remaining
 // run-up to each exam. Everything here is derived state — the planner rebuilds
@@ -52,7 +54,14 @@ function humanDate(key: string): string {
 }
 
 export default function SchedulePage() {
-  const store = useStoreFields("examDates", "planChangelog", "plannedSessions", "regeneratePlan", "settings");
+  const store = useStoreFields("adaptiveSession", "examDates", "planChangelog", "plannedSessions", "regeneratePlan", "revisionCheckpoint", "settings");
+  // Today's one recommendation, read from the same ranked plan and the same
+  // choice Today makes (todayPick), so Schedule's "Today" names the same next
+  // step instead of only warning that the two can differ.
+  const { plan } = useRevisionPlan();
+  const pick: TodayLead | null = store.revisionCheckpoint
+    ? { kind: "resume" }
+    : (() => { const p = todayPick(plan.top, store.adaptiveSession); return p ? { kind: "pick", pick: p } : null; })();
   const subjects = useSubjects();
   const [rebuilding, setRebuilding] = useState(false);
   const autoBuilt = useRef(false);
@@ -209,7 +218,7 @@ export default function SchedulePage() {
       {sessions.length ? (
         <section aria-label="Planned days">
           <SectionHeading title="Planned days" hint={`${pendingCount} block${pendingCount === 1 ? "" : "s"} to do from ${today === sessions[0]?.date ? "today" : humanDate(sessions[0]?.date ?? today)}`} />
-          <CalendarDays sessions={sessions} exams={exams} today={today} calendarEnd={calendarEnd} />
+          <CalendarDays sessions={sessions} exams={exams} today={today} calendarEnd={calendarEnd} lead={pick} />
         </section>
       ) : null}
 
@@ -223,16 +232,21 @@ export default function SchedulePage() {
   );
 }
 
+/** What Today leads with: a session in progress, or its one recommendation. */
+type TodayLead = { kind: "resume" } | { kind: "pick"; pick: TodayPick };
+
 function CalendarDays({
   sessions,
   exams,
   today,
   calendarEnd,
+  lead,
 }: {
   sessions: PlannedSession[];
   exams: ExamDate[];
   today: string;
   calendarEnd: string;
+  lead: TodayLead | null;
 }) {
   const byDate = new Map<string, PlannedSession[]>();
   for (const session of sessions) {
@@ -251,7 +265,8 @@ function CalendarDays({
   const weeks = new Map<string, { start: string; days: string[] }>();
   for (let offset = 0; offset <= dayDiff(today, calendarEnd); offset++) {
     const key = addDays(today, offset);
-    if (!byDate.has(key) && !examByDate.has(key)) continue;
+    // Today is always shown when Today has something to lead with.
+    if (!byDate.has(key) && !examByDate.has(key) && !(key === today && lead)) continue;
     const d = new Date(`${key}T00:00:00Z`);
     const monday = dateKey(new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86_400_000));
     const week = weeks.get(monday) ?? { start: monday, days: [] };
@@ -270,7 +285,7 @@ function CalendarDays({
             </p>
             <div className="space-y-2">
               {week.days.map((key) => (
-                <DayCard key={key} date={key} sessions={byDate.get(key) ?? []} exams={examByDate.get(key) ?? []} today={today} />
+                <DayCard key={key} date={key} sessions={byDate.get(key) ?? []} exams={examByDate.get(key) ?? []} today={today} lead={key === today ? lead : null} />
               ))}
             </div>
           </section>
@@ -280,8 +295,9 @@ function CalendarDays({
   );
 }
 
-function DayCard({ date, sessions, exams, today }: { date: string; sessions: PlannedSession[]; exams: ExamDate[]; today: string }) {
+function DayCard({ date, sessions, exams, today, lead }: { date: string; sessions: PlannedSession[]; exams: ExamDate[]; today: string; lead: TodayLead | null }) {
   const isToday = date === today;
+  const pickTopics = new Set(lead?.kind === "pick" ? lead.pick.topicIds : []);
   return (
     <article className="card" aria-label={`${humanDate(date)}${isToday ? " (today)" : ""}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5 pb-1">
@@ -302,17 +318,7 @@ function DayCard({ date, sessions, exams, today }: { date: string; sessions: Pla
           );
         })}
       </div>
-      {isToday && sessions.some((session) => session.status === "pending") ? (
-        // Two different "today"s used to sit side by side: Today's one
-        // recommended session (chosen from the latest answers) and these
-        // planned blocks (the long-range plan). Say which is which, and point
-        // to the one recommendation, rather than let them silently disagree.
-        <p className="px-4 pb-1.5 text-[11px] text-ink3 leading-snug" data-testid="schedule-today-note">
-          These blocks are your long-range plan. Your{" "}
-          <Link href="/" className="underline underline-offset-4 text-ink2 hover:text-ink">Today screen</Link>{" "}
-          picks the single best next step from your latest answers, so it can differ. Start there.
-        </p>
-      ) : null}
+      {isToday && lead ? <TodayLeadRow lead={lead} hasBlocks={sessions.some((session) => session.status === "pending")} /> : null}
       <ul className="divide-y divide-line">
         {sessions.map((session) => {
           const topic = session.topicId ? getTopic(session.topicId) : undefined;
@@ -328,6 +334,9 @@ function DayCard({ date, sessions, exams, today }: { date: string; sessions: Pla
                   <span className="text-xs font-medium text-ink shrink-0">{subject?.name ?? session.subjectId}</span>
                   <Pill>{ACTIVITY_LABEL[session.activity]}</Pill>
                   {topic ? <span className="text-xs text-ink2 truncate">{topic.title}</span> : null}
+                  {isToday && session.topicId && pickTopics.has(session.topicId) && session.status === "pending" ? (
+                    <span data-testid="schedule-block-is-pick"><Pill tone="accent">Today&apos;s pick</Pill></span>
+                  ) : null}
                 </div>
                 <p className="text-[11px] text-ink3 mt-0.5 leading-snug">{session.reason}</p>
               </div>
@@ -354,5 +363,45 @@ function DayCard({ date, sessions, exams, today }: { date: string; sessions: Pla
         })}
       </ul>
     </article>
+  );
+}
+
+/**
+ * Today's lead, inside Schedule's Today card: the same next step and Start
+ * link the Today screen shows, then what the planned blocks are.
+ */
+function TodayLeadRow({ lead, hasBlocks }: { lead: TodayLead; hasBlocks: boolean }) {
+  if (lead.kind === "resume") {
+    return (
+      <div className="mx-4 mb-2 rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source="resume">
+        <p className="text-sm font-semibold text-ink">Finish the session you started</p>
+        <p className="text-[11px] text-ink2 mt-0.5">Your Today screen picks up where you left off.</p>
+        <ButtonLink href="/" size="sm" variant="primary" className="mt-2">Resume on Today</ButtonLink>
+        {hasBlocks ? <TodayBlocksNote resume /> : null}
+      </div>
+    );
+  }
+  const { pick } = lead;
+  const subject = getSubject(pick.subjectId)?.name ?? pick.subjectId;
+  const topic = pick.topicIds.length === 1 ? getTopic(pick.topicIds[0]!)?.title : undefined;
+  return (
+    <div className="mx-4 mb-2 rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source={pick.source}>
+      <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Do this first · About {Math.max(1, Math.ceil(pick.minutes))} min</p>
+      <p className="text-sm font-semibold text-ink mt-0.5">{pick.title}</p>
+      <p className="text-xs text-ink2">{topic ? `${subject} · ${topic}` : subject}</p>
+      <ButtonLink href={pick.href} size="sm" variant="primary" className="mt-2">Start</ButtonLink>
+      {hasBlocks ? <TodayBlocksNote /> : null}
+    </div>
+  );
+}
+
+function TodayBlocksNote({ resume = false }: { resume?: boolean }) {
+  return (
+    <p className="text-[11px] text-ink3 leading-snug mt-2" data-testid="schedule-today-note">
+      {resume ? "Your " : "This is the same next step as your "}
+      <Link href="/" className="underline underline-offset-4 text-ink2 hover:text-ink">Today screen</Link>
+      {resume ? " shows this first." : ", chosen from your latest answers."} The blocks below are your long-range plan for
+      the rest of today.
+    </p>
   );
 }

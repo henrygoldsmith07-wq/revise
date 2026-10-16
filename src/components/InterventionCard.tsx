@@ -7,7 +7,8 @@
 import { useMemo } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { buildLearnerIntelligence } from "@/domain/learner-intelligence";
-import { prescribeIntervention, INTERVENTION_STEP_LABEL } from "@/domain/intervention-engine";
+import { prescribeIntervention, interventionStepLabel } from "@/domain/intervention-engine";
+import { reviewedQuestionCount } from "@/domain/content-trust";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel } from "./ui";
 import { captureProductEvent } from "@/lib/product-telemetry";
@@ -23,6 +24,7 @@ export function InterventionCard({ topicId }: { topicId: string }) {
     "proofLedger",
     "reviewLogs",
     "plannedSessions",
+    "questions",
   );
   const topic = getTopic(topicId);
 
@@ -44,7 +46,7 @@ export function InterventionCard({ topicId }: { topicId: string }) {
     });
     const row = intel.subjects.flatMap((s) => s.topics).find((t) => t.topicId === topicId);
     if (!row) return null;
-    return prescribeIntervention(row, topic.title);
+    return prescribeIntervention(row, topic.title, { reviewedQuestions: reviewedQuestionCount(store.questions, topicId) });
   }, [
     topic,
     topicId,
@@ -57,6 +59,7 @@ export function InterventionCard({ topicId }: { topicId: string }) {
     store.examDates,
     store.reviewLogs,
     store.plannedSessions,
+    store.questions,
   ]);
 
   if (!topic || !prescription) return null;
@@ -79,7 +82,7 @@ export function InterventionCard({ topicId }: { topicId: string }) {
               {i + 1}
             </span>
             <span className="min-w-0">
-              <span className="font-medium text-ink">{INTERVENTION_STEP_LABEL[step.kind]}</span>
+              <span className="font-medium text-ink">{interventionStepLabel(step)}</span>
               {" — "}
               {step.why}
               {step.countsAsProof ? "" : " (practice, not proof)"}
@@ -95,11 +98,11 @@ export function InterventionCard({ topicId }: { topicId: string }) {
           className="min-h-[3rem]"
           onClick={() => captureProductEvent("intervention.started", { kind: first.kind })}
         >
-          Start: {INTERVENTION_STEP_LABEL[first.kind]}
+          Start: {interventionStepLabel(first)}
         </ButtonLink>
         {rest[0] ? (
           <ButtonLink href={rest[0].href} variant="ghost" size="sm" className="min-h-[3rem] inline-flex items-center justify-center">
-            Then: {INTERVENTION_STEP_LABEL[rest[0].kind]} →
+            Then: {interventionStepLabel(rest[0])} →
           </ButtonLink>
         ) : null}
       </div>

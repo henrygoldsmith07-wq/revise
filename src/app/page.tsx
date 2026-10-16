@@ -16,6 +16,7 @@ import { ResumeRevisionCard } from "@/components/ResumeRevisionCard";
 import { BestNextStep } from "@/components/BestNextStep";
 import { CommandCentreCard } from "@/components/CommandCentreCard";
 import { useRevisionPlan } from "@/components/recovery-evidence";
+import { todayPick } from "@/domain/today-pick";
 import { WeekLine } from "@/components/RecoverySummary";
 import { ExamDateNudge } from "@/components/ExamDateNudge";
 import { TodayOverview } from "@/components/TodayOverview";
@@ -119,7 +120,7 @@ export default function TodayPage() {
         <ResumeRevisionCard />
       ) : (
         <div className="today-focus card p-5 sm:p-7">
-          {plan.top && (!adaptiveSession || plan.top.route.href !== adaptiveSession.startHref) ? (
+          {todayPick(plan.top, adaptiveSession)?.source === "plan" && plan.top ? (
             <BestNextStep action={plan.top} plan={plan} />
           ) : (
             <AdaptiveSessionHero session={adaptiveSession!} displayName={settings.displayName} greeting="" proof={proofLedger} />

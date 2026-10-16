@@ -42,10 +42,12 @@ describe("Schedule — page wiring", () => {
     expect(src).toContain("Week of {dayMonth(monday)} – {dayMonth(sunday)}");
   });
 
-  it("says Today's blocks are the long-range plan and points to Today's one recommendation", () => {
+  it("leads Today's card with Today's one recommendation and calls the blocks the long-range plan", () => {
     const src = page();
+    expect(src).toContain('data-testid="schedule-today-pick"');
     expect(src).toContain('data-testid="schedule-today-note"');
-    expect(src).toContain("picks the single best next step from your latest answers");
+    expect(src).toContain("This is the same next step as your ");
+    expect(src).toContain("The blocks below are your long-range plan");
   });
 
   it("deep-links every actionable block so finishing it ticks the plan", () => {

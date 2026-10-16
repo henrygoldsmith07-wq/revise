@@ -1,5 +1,41 @@
 # Changelog
 
+## Evidence wording matches what is recorded; Schedule's Today leads with Today's recommendation — 2026-10-16 (twenty-fifth pass)
+
+**Unaided and timed steps promised evidence on questions labelled "practice
+evidence only".** No flagship question has two teacher approvals yet, so no
+answer anywhere can prove a skill, but the "Unaided exam question" step said
+"No hints, so this mark counts as your own evidence" directly under "Needs
+human review · practice evidence only", and the repair plan listed its unaided,
+timed and proof-check steps as counting ("This is the first answer that counts
+as evidence", "Your answer will count as evidence") with no "(practice, not
+proof)" tag.
+
+- `prescribeIntervention` takes the topic's count of learner-evidence
+  questions (`reviewedQuestionCount`, the same `learnerEvidenceTrusted`
+  predicate proof uses). At 0, every step is `countsAsProof: false`, the
+  unaided, timed and delayed steps say "No question on this topic has been
+  checked by a teacher yet, so it is recorded as practice", a delayed step is
+  labelled "Delayed check" rather than "Proof check", and `proofRequired` is
+  false. Steps, links and minutes are unchanged.
+- The unaided note in `QuestionRunner` depends on the question's own trust
+  state: reviewed questions keep "counts as your own evidence"; unreviewed ones
+  say the mark "counts as practice, not proof". The step heading no longer
+  makes a claim for questions it has not seen. Guided and worked copy say only
+  an unaided answer on a teacher-reviewed question can count as proof.
+- No predicate, gate or review rule changed; this is wording and the plan's
+  `countsAsProof` flag only.
+
+**Schedule's "Today" could name a different topic from Today.** Schedule's
+Today card listed the long-range planner's blocks and only warned that the
+Today screen "can differ". Today's choice (the ranked plan's top action, or the
+adaptive session when that is the top action) is now a pure function,
+`todayPick` (`src/domain/today-pick.ts`), read by both screens. Schedule's
+Today card leads with that same step and Start link (or "Finish the session
+you started" when Today shows the resume card), marks a planned block on the
+same topic "Today's pick", and calls the rest the long-range plan. The planner
+and the ranking are untouched.
+
 ## The "Worked example" step shows a worked example, and plan steps fit their stated minutes — 2026-10-16 (twenty-fourth pass)
 
 **"Worked example" opened the same lesson as "Targeted explanation".** On the

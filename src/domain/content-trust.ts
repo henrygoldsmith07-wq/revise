@@ -135,6 +135,20 @@ export function learnerEvidenceTrusted(question: Question | undefined): boolean 
 }
 
 /**
+ * How many questions on a topic can carry learner evidence. Zero means
+ * nothing answered on this topic can prove a skill, so plan and step copy
+ * must call every answer practice. Linear in the bank; call it for one
+ * topic, never per topic over the whole curriculum in a render.
+ */
+export function reviewedQuestionCount(questions: readonly Question[], topicId: Id): number {
+  let count = 0;
+  for (const question of questions) {
+    if (question.topicIds.includes(topicId) && learnerEvidenceTrusted(question)) count++;
+  }
+  return count;
+}
+
+/**
  * A paper item is authentic only when its WJEC source manifest was checked by
  * a named reviewer. This is deliberately separate from question-content
  * approval: provenance and marking quality are two independent gates.

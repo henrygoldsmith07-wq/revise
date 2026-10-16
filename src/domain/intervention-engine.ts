@@ -119,6 +119,63 @@ function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | n
 export function prescribeIntervention(
   topic: TopicIntelligence,
   topicTitle: string,
+  options: PrescribeOptions = {},
+): InterventionPrescription {
+  const prescription = prescribeFromEvidence(topic, topicTitle);
+  return options.reviewedQuestions === 0 ? practiceOnlyPrescription(prescription) : prescription;
+}
+
+/** What the caller knows about the topic's question supply. */
+export interface PrescribeOptions {
+  /**
+   * Questions on this topic that can carry learner evidence
+   * (`learnerEvidenceTrusted`: a flagship question with two-check teacher
+   * review). When 0, no step can count as proof whatever the learner does,
+   * so the plan must not say an unaided or timed answer "counts as
+   * evidence". Omitted when the caller does not know; the plan then keeps
+   * the generic wording, which elsewhere is hedged "where reviewed
+   * questions exist".
+   */
+  reviewedQuestions?: number;
+}
+
+/**
+ * Wording for the steps that would count as proof on reviewed questions,
+ * when the topic has none. Each still says what the step does (no hints,
+ * timed, after a delay) and that the mark is recorded; none promises proof.
+ * The " (practice, not proof)" suffix the panels add follows each.
+ */
+const PRACTICE_ONLY_WHY: Partial<Record<InterventionStepKind, string>> = {
+  "exam-style-question": "An unseen exam question with no hints, so the mark shows what you can do on your own. No question on this topic has been checked by a teacher yet, so it is recorded as practice",
+  "timed-question": "One timed answer with no hints checks the technique under pressure. No question on this topic has been checked by a teacher yet, so it is recorded as practice",
+  "delayed-proof": "A new question after a delay, with no hints, checks whether it stuck. No question on this topic has been checked by a teacher yet, so it is recorded as practice",
+};
+
+function practiceOnlyPrescription(prescription: InterventionPrescription): InterventionPrescription {
+  const steps = prescription.steps.map((step) =>
+    step.countsAsProof ? { ...step, countsAsProof: false, why: PRACTICE_ONLY_WHY[step.kind] ?? step.why } : step);
+  return {
+    ...prescription,
+    steps,
+    headline: prescription.headline.startsWith("Proof check: ")
+      ? `Check it held: ${prescription.headline.slice("Proof check: ".length)}`
+      : prescription.headline,
+    proofRequired: false,
+  };
+}
+
+/**
+ * The label a panel shows for a step. A delayed check that cannot prove
+ * anything (no reviewed questions on the topic) is not called a "Proof check".
+ */
+export function interventionStepLabel(step: Pick<InterventionStep, "kind" | "countsAsProof">): string {
+  if (step.kind === "delayed-proof" && !step.countsAsProof) return "Delayed check";
+  return INTERVENTION_STEP_LABEL[step.kind];
+}
+
+function prescribeFromEvidence(
+  topic: TopicIntelligence,
+  topicTitle: string,
 ): InterventionPrescription {
   const steps: InterventionStep[] = [];
   const reasons: string[] = [];
@@ -208,7 +265,7 @@ export function prescribeIntervention(
       title: `Unaided exam question: ${topicTitle}`,
       minutes: 10,
       countsAsProof: true,
-      why: "An unseen exam question with no hints. This is the first answer that counts as evidence.",
+      why: "An unseen exam question with no hints. This is the first answer that can count as evidence.",
       href: topicHref(topic.topicId, "exam-style-question", null, 10),
     });
     reasons.push("recall is strong but application is weaker");
@@ -250,7 +307,7 @@ export function prescribeIntervention(
       title: `Proof check: ${topicTitle}`,
       minutes: 8,
       countsAsProof: true,
-      why: "This question is new and you have no hints. Your answer will count as evidence.",
+      why: "This question is new and you have no hints, so on a teacher-reviewed question your answer counts as evidence.",
       href: topicHref(topic.topicId, "delayed-proof"),
     });
   }
@@ -309,8 +366,9 @@ function finish(
 export function prescriptionAfterFailedProof(
   topic: TopicIntelligence,
   topicTitle: string,
+  options: PrescribeOptions = {},
 ): InterventionPrescription {
-  const base = prescribeIntervention(topic, topicTitle);
+  const base = prescribeIntervention(topic, topicTitle, options);
   return {
     ...base,
     headline: `Not yet — repair again: ${topicTitle}`,

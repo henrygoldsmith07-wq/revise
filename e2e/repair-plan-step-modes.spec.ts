@@ -24,6 +24,9 @@ test("repair-plan practice links honour guided, unaided and timed at 360px", asy
   await expect(nextStep).toBeVisible({ timeout: 30_000 });
   // Clicked, not typed: the step opens on the same route, which used to keep
   // the just-answered question as the "guided" one.
+  // No question in the shipped bank has two teacher approvals yet, so the
+  // plan's unaided and timed steps must say "practice", never "evidence".
+  await expect(nextStep).not.toContainText(/counts as (your own )?evidence|will count as evidence/);
   const guidedLink = nextStep.getByRole("link", { name: /Guided application/ });
   await expect(guidedLink).toHaveAttribute("href", `/practice?topic=${encodeURIComponent(TOPIC)}&guided=1&minutes=8`);
   await guidedLink.click();
@@ -51,7 +54,15 @@ test("repair-plan practice links honour guided, unaided and timed at 360px", asy
   // Unaided: no hint ladder at all.
   await page.goto(`/practice?topic=${encodeURIComponent(TOPIC)}&unaided=1`);
   await expect(page.getByRole("heading", { level: 1, name: "Unaided exam question" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("unaided-step-note")).toBeVisible();
+  const unaidedNote = page.getByTestId("unaided-step-note");
+  await expect(unaidedNote).toBeVisible();
+  // The note matches what is recorded: this question is unreviewed ("practice
+  // evidence only" beside it), so its mark is practice, not "your own evidence".
+  await expect(page.getByText("Needs human review · practice evidence only")).toBeVisible();
+  await expect(unaidedNote).toHaveAttribute("data-evidence", "practice");
+  await expect(unaidedNote).toContainText("counts as practice, not proof");
+  await expect(page.getByText(/counts as your own evidence/)).toHaveCount(0);
+  await unaidedNote.screenshot({ path: "artifacts/unaided-note-360.png" });
   await expect(page.getByRole("button", { name: /^Reveal / })).toHaveCount(0);
 
   // Timed: a visible exam-pace clock that ticks, no hints, and it stops at marking.

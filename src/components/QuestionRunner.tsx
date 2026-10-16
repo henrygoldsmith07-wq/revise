@@ -2,6 +2,7 @@
 
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
 import { getSubject } from "@/domain/curriculum";
+import { learnerEvidenceTrusted } from "@/domain/content-trust";
 import { formatHint, nextHint, type HintTier } from "@/domain/hints";
 import { type DelayedFarTransferRetest } from "@/domain/delayed-far-transfer";
 
@@ -112,8 +113,14 @@ export function QuestionRunner({
 
         {stepMode === "timed" ? <ExamPaceTimer marks={question.totalMarks} stopped={Boolean(result)} /> : null}
         {stepMode === "unaided" && !result ? (
-          <p className="text-xs text-ink3 mb-3" data-testid="unaided-step-note">
-            Unaided: no hints on this one, so the mark counts as your own evidence.
+          // What the mark will be recorded as depends on this question's
+          // review state (learnerEvidenceTrusted), not on the step: an unaided
+          // answer on an unreviewed question is labelled "practice evidence
+          // only" above, so it must not be promised as evidence here.
+          <p className="text-xs text-ink3 mb-3" data-testid="unaided-step-note" data-evidence={learnerEvidenceTrusted(question) ? "reviewed" : "practice"}>
+            {learnerEvidenceTrusted(question)
+              ? "Unaided: no hints on this one, so the mark counts as your own evidence."
+              : "Unaided: no hints on this one, so the mark shows what you can do on your own. This question has not been checked by a teacher yet, so it counts as practice, not proof."}
           </p>
         ) : null}
 
@@ -142,7 +149,7 @@ export function QuestionRunner({
               <p className="text-sm text-ink2">This question has no step-by-step support yet; answer it as normal.</p>
             )}
             <p className="text-[11px] text-ink3">
-              Practice, not proof: a guided answer is marked as normal but counts at reduced weight. Only an unaided answer counts as evidence.
+              Practice, not proof: a guided answer is marked as normal but counts at reduced weight. Only an unaided answer on a teacher-reviewed question can count as proof.
             </p>
           </div>
         ) : null}

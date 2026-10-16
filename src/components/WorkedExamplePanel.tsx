@@ -44,7 +44,7 @@ export function WorkedExamplePanel({ choice }: { choice: WorkedExampleChoice }) 
           </div>
         ))}
         <p className="text-xs text-ink2 border-t border-line pt-2">
-          Now try the question below yourself. Practice, not proof: after studying an example it counts as supported practice. Only an unaided answer counts as evidence.
+          Now try the question below yourself. Practice, not proof: after studying an example it counts as supported practice. Only an unaided answer on a teacher-reviewed question can count as proof.
         </p>
       </div>
     </details>

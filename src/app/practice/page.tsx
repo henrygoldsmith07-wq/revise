@@ -608,7 +608,7 @@ function Practice() {
               : stepMode === "timed"
               ? "Exam pace with a visible clock and no hints. Running over is shown, never penalised."
               : stepMode === "unaided"
-              ? "No hints, so this mark counts as your own evidence."
+              ? "No hints: answer it the way you would in the exam."
               : "Answer as you would in the exam. Every dropped mark becomes a card."}
           </p>
           {!wrongOnly && !retestMistake && !farTransferRetest && !stepMode ? (
