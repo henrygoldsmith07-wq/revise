@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missionCheckpoint, missionResumePosition, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
+import { missionCheckpoint, missionContinuation, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
 import { createRevisionCheckpoint, isLocalRoute, isRevisionCheckpoint } from "@/domain/revision-checkpoint";
 import { attempt } from "./helpers-recovery";
 
@@ -54,5 +54,46 @@ describe("a mission step survives a refresh", () => {
     expect(src).toContain("saveRevisionCheckpoint(missionCheckpoint(");
     expect(src).toContain("restoreMissionSession(");
     expect(src).toMatch(/onFinished = useCallback\(\(\) => \{[\s\S]*?void clearRevisionCheckpoint\(\)/);
+  });
+});
+
+describe("Today offers to continue a mission step saved mid-way", () => {
+  const at = (minutes: number) => new Date(Date.parse(START) + minutes * 60_000).toISOString();
+  const inRun = (id: string, q: string, minutes: number, missionId = "m1") => attempt(id, q, 1, 3, at(minutes), { mission: { ...ctx("repair"), missionId } });
+  const saved = createRevisionCheckpoint("u1", missionCheckpoint(session, { stage: "repair" }, START, 1), START);
+
+  it("appears only for a mission checkpoint with a question still unanswered in its own run", () => {
+    expect(missionContinuation(saved, [inRun("a1", "q1", 5)])).toEqual({ missionId: "m1", stage: "repair", href: "/practice?mission=m1&stage=repair", position: 1, total: 3 });
+    expect(missionContinuation(null, [])).toBeNull();
+    expect(missionContinuation({ ...saved, mission: undefined }, [])).toBeNull();
+    expect(missionContinuation({ ...saved, href: "/practice?mission=m2&stage=repair" }, [])).toBeNull();
+    expect(missionContinuation({ ...saved, href: "/practice?mission=m1&stage=apply" }, [])).toBeNull();
+    expect(missionContinuation(saved, ["q1", "q2", "q3"].map((q, i) => inRun(`d${i}`, q, 5 + i)))).toBeNull();
+  });
+
+  it("counts the position the runner resumes at, ignoring older answers and other missions", () => {
+    const attempts = [attempt("old", "q1", 3, 3, at(-60), { mission: ctx("repair") }), inRun("other", "q1", 2, "m2"), inRun("a1", "q1", 5), inRun("a2", "q2", 8)];
+    const run = missionRunAttempts(saved.mission!, attempts);
+    expect(run.map((a) => a.id)).toEqual(["a1", "a2"]);
+    expect(missionContinuation(saved, attempts)?.position).toBe(missionResumePosition(saved.mission!.questionIds, run, START));
+    expect(missionContinuation(saved, attempts)?.position).toBe(2);
+  });
+
+  it("routes back into the saved step, same order and hint budget, not a re-planned or re-shuffled one", () => {
+    const next = missionContinuation(JSON.parse(JSON.stringify(saved)), [inRun("a1", "q1", 5)])!;
+    const route = new URLSearchParams(next.href.split("?")[1]);
+    const rebuilt: MissionSession = { ...session, questionIds: ["q3", "q1", "q2"], hintBudgetFor: { q1: 0, q2: undefined, q3: undefined }, contextFor: {} };
+    const restored = restoreMissionSession(rebuilt, saved.mission, { missionId: route.get("mission")!, stage: route.get("stage") }, () => true)!;
+    expect(restored.questionIds).toEqual(["q1", "q2", "q3"]);
+    expect(restored.hintBudgetFor).toEqual({ q1: undefined, q2: 0, q3: 0 });
+    expect(restored.questionIds[next.position]).toBe("q2");
+  });
+
+  it("is wired into the Today resume card and the runner shares its attempt filter", async () => {
+    const { readFileSync } = await import("node:fs");
+    const card = readFileSync("src/components/ResumeRevisionCard.tsx", "utf8");
+    expect(card).toContain("missionContinuation(checkpoint, store.attempts)");
+    expect(card).toContain("Continue mission");
+    expect(readFileSync("src/components/MissionSessionMode.tsx", "utf8")).toContain("missionRunAttempts(saved, store.attempts)");
   });
 });
