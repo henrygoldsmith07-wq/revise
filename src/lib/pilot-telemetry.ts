@@ -1,5 +1,6 @@
 // ---------------------------------------------------------------------------
-// Opt-in anonymous pilot telemetry.
+// Opt-in pilot telemetry. Pseudonymous, not anonymous: the server stores
+// each event against the signed-in account (user_id) alongside the pseudonym.
 //
 // Default off. When the learner switches pilot telemetry on in
 // Settings → Data, outcome events are queued on device and POSTed to

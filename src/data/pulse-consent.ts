@@ -13,3 +13,14 @@ export function pulseEnabledValue(data: unknown): boolean {
 export function pulseHistoryAllowed(data: unknown): boolean {
   return pulseEnabledValue(data);
 }
+
+/**
+ * The settings row is end-to-end encrypted, so the server cannot read the
+ * Pulse choice (and the history rows are ciphertext too). Same shape test as
+ * `isEncryptedPayload` in ./e2ee, which is a client module.
+ */
+export function pulseSettingsEncrypted(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  const v = data as Record<string, unknown>;
+  return v.v === 1 && v.alg === "AES-GCM" && typeof v.iv === "string" && typeof v.ct === "string";
+}

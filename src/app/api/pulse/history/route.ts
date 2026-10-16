@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { pulseHistoryAllowed } from "@/data/pulse-consent";
+import { pulseHistoryAllowed, pulseSettingsEncrypted } from "@/data/pulse-consent";
 import {
   decodePulseCursor,
   encodePulseCursor,
@@ -138,6 +138,15 @@ export async function GET(request: Request) {
     .maybeSingle();
   const settingsData =
     settingsRow && typeof settingsRow === "object" && "data" in settingsRow ? (settingsRow as { data: unknown }).data : null;
+  if (pulseSettingsEncrypted(settingsData)) {
+    return NextResponse.json(
+      {
+        error: "Sync encryption is on, so Revise's server cannot read your study history for Pulse. Turn off sync encryption in Revise settings to use Pulse.",
+        code: "e2ee",
+      },
+      { status: 409 },
+    );
+  }
   if (!pulseHistoryAllowed(settingsData)) {
     return NextResponse.json(
       { error: "Sharing study history with Pulse is turned off. Enable it in Revise settings." },
