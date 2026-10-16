@@ -1,6 +1,6 @@
 # Changelog
 
-## Evidence wording matches what is recorded — 2026-10-16 (twenty-fifth pass)
+## Evidence wording matches what is recorded; Schedule's Today leads with Today's recommendation — 2026-10-16 (twenty-fifth pass)
 
 **Unaided and timed steps promised evidence on questions labelled "practice
 evidence only".** No flagship question has two teacher approvals yet, so no
@@ -25,6 +25,16 @@ proof)" tag.
   an unaided answer on a teacher-reviewed question can count as proof.
 - No predicate, gate or review rule changed; this is wording and the plan's
   `countsAsProof` flag only.
+
+**Schedule's "Today" could name a different topic from Today.** Schedule's
+Today card listed the long-range planner's blocks and only warned that the
+Today screen "can differ". Today's choice (the ranked plan's top action, or the
+adaptive session when that is the top action) is now a pure function,
+`todayPick` (`src/domain/today-pick.ts`), read by both screens. Schedule's
+Today card leads with that same step and Start link (or "Finish the session
+you started" when Today shows the resume card), marks a planned block on the
+same topic "Today's pick", and calls the rest the long-range plan. The planner
+and the ranking are untouched.
 
 ## The "Worked example" step shows a worked example, and plan steps fit their stated minutes — 2026-10-16 (twenty-fourth pass)
 

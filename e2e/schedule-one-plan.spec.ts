@@ -29,10 +29,24 @@ test("a fresh four-flagship plan has no overlapping blocks and one date format a
   expect(headers.length).toBeGreaterThan(0);
   for (const header of headers) expect(header).not.toMatch(/\d{4}-\d{2}-\d{2}/);
 
-  // Today's blocks say they are the long-range plan and link to Today.
+  // Today's card leads with Today's own recommendation (same Start link as
+  // the Today screen), and says the blocks are the long-range plan.
+  const pick = page.getByTestId("schedule-today-pick");
+  await expect(pick).toBeVisible();
   const note = page.getByTestId("schedule-today-note");
   await expect(note).toBeVisible();
   await expect(note.getByRole("link", { name: "Today screen" })).toHaveAttribute("href", "/");
+  const source = await pick.getAttribute("data-source");
+  const scheduleStart = await pick.getByRole("link", { name: /^(Start|Resume on Today)$/ }).getAttribute("href");
+  await pick.screenshot({ path: "artifacts/schedule-today-pick-360.png" });
+  if (source !== "resume") {
+    // The Today screen's own Start button goes to the same place.
+    await page.goto("/");
+    await expect(page.locator(".today-focus")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(`.today-focus a[href="${scheduleStart}"]`).first()).toBeVisible();
+  }
+  await page.goto("/schedule");
+  await expect(page.getByTestId("schedule-today-pick")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 360);
 });
 
