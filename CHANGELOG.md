@@ -33,6 +33,15 @@ states its real length ("1 question, about 6 min at exam pace").
 `transfer=1` (the "Unfamiliar-context question" kind) is not emitted by any
 plan; a test now fails if one starts emitting it before `/practice` reads it.
 
+**Two open tabs could still double the plan.** The twenty-third pass queued
+`replacePlan` within a tab, but two tabs (or a tab and the installed app) have
+separate queues over one IndexedDB; replanning in both at once kept both
+plans (reproduced in `tests/plan-replace-serial.test.ts` with two module
+instances: all four rows survived). Each replacement now also holds an
+origin-wide Web Lock (`revise:replace-plan`) where the browser has the API,
+so the later plan replaces the earlier one across tabs; without it,
+behaviour is the single-tab queue as before.
+
 ## Repair-plan links do what their labels say, and Schedule shows one plan — 2026-10-15 (twenty-third pass)
 
 **"Guided application", "Unaided exam question" and "Timed question" all
