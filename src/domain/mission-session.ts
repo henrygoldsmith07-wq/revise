@@ -264,6 +264,28 @@ export function missionResumePosition(questionIds: readonly Id[], attempts: read
   return next === -1 ? questionIds.length : next;
 }
 
+/** Answers from a saved mission step's own run: the ones a resume keeps and counts its position from. */
+export function missionRunAttempts(saved: MissionCheckpointState, attempts: readonly Attempt[]): Attempt[] {
+  return attempts.filter((a) => a.createdAt >= saved.startedAt && a.mission?.missionId === saved.missionId && saved.questionIds.includes(a.questionId));
+}
+
+export interface MissionContinuation { missionId: Id; stage: string; href: string; position: number; total: number }
+
+/**
+ * The mission step Today can send the learner back into, or null. Only a checkpoint that carries its
+ * saved step (so the route restores those exact questions rather than re-planning), whose route still
+ * names that mission and stage, and that has a question left unanswered in this run.
+ */
+export function missionContinuation(checkpoint: RevisionCheckpointInput | null | undefined, attempts: readonly Attempt[]): MissionContinuation | null {
+  const saved = checkpoint?.activity === "practice" ? checkpoint.mission : undefined;
+  if (!checkpoint || !saved || !saved.questionIds.length) return null;
+  const route = new URLSearchParams(checkpoint.href.split("?")[1] ?? "");
+  if (route.get("mission") !== saved.missionId || (route.get("stage") ?? "") !== saved.stage) return null;
+  const position = missionResumePosition(saved.questionIds, missionRunAttempts(saved, attempts), saved.startedAt);
+  if (position >= saved.questionIds.length) return null;
+  return { missionId: saved.missionId, stage: saved.stage, href: checkpoint.href, position, total: saved.questionIds.length };
+}
+
 export function missionCheckpoint(session: MissionSession, route: { stage: string | null }, startedAt: string, position: number): RevisionCheckpointInput {
   const stage = route.stage ?? "";
   return {

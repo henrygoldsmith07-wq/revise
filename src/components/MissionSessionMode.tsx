@@ -5,7 +5,7 @@
 // the mission, stage, method, target cause and source mistakes.
 
 import { useCallback, useState } from "react";
-import { stageForRoute, buildMissionSession, missionCheckpoint, missionResumePosition, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
+import { stageForRoute, buildMissionSession, missionCheckpoint, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
 import { collectMissions } from "@/domain/revision-engine";
 import { useStoreFields } from "@/state/store";
 import { QuestionSetSession } from "./QuestionSetSession";
@@ -30,7 +30,7 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
     const saved = store.revisionCheckpoint?.mission;
     const restored = fresh ? restoreMissionSession(fresh, saved, { missionId, stage }, (id) => known.has(id)) : null;
     if (fresh && restored && saved) {
-      const done = store.attempts.filter((a) => a.createdAt >= saved.startedAt && a.mission?.missionId === missionId && restored.questionIds.includes(a.questionId));
+      const done = missionRunAttempts(saved, store.attempts);
       return { session: restored, resume: { index: missionResumePosition(restored.questionIds, done, saved.startedAt), attempts: done }, startedAt: saved.startedAt };
     }
     return { session: fresh, resume: undefined, startedAt: new Date().toISOString() };
