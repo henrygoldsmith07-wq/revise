@@ -40,7 +40,7 @@ export const ROOT_CAUSE_LABEL: Record<RootCause, string> = {
   "command-word-error": "not doing what the command word asks",
   "poor-application": "knowing the idea but not applying it to the question",
   "misread-question": "misreading the question",
-  timing: "running short of time",
+  timing: "spending too long on some parts",
   "prerequisite-weakness": "a weak prerequisite",
   unclassified: "causes not yet classified",
 };
@@ -116,7 +116,12 @@ export function rootCauseOf(mistake: Mistake, opts: { prerequisiteWeakTopics?: R
     case "arithmetic": return "arithmetic-slip";
     case "interpretation": return "misread-question";
     case "communication": return mistake.command && EVALUATIVE.has(mistake.command) ? "poor-evaluation" : "insufficient-explanation";
-    default: return mistake.timing === "rushed" || mistake.timing === "slow" ? "timing" : "unclassified";
+    // A fast answer that lost marks is not evidence of time pressure: with no
+    // other signal it is far more often a gap the learner skipped past. It
+    // used to read as "running short of time" on untimed checks, sending a
+    // learner who did not know the content to a pacing drill. Genuine
+    // rushing on a mostly-earned part is diagnosed in mistake-classification.
+    default: return mistake.timing === "slow" ? "timing" : "unclassified";
   }
 }
 
