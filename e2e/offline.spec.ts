@@ -85,6 +85,15 @@ test.describe("offline walk", () => {
     // offline reload does not depend on how fast the worker happened to install.
     await page.reload();
     await todayOrOnboarding(page);
+    // Cut the network only once this warm load has the question bank (the app
+    // asks for one online load to download it; content-bank-unavailable.spec
+    // covers the case where it never arrived). Onboarding no longer waits on the
+    // bank (nineteenth pass: a fresh profile builds it in a worker), so it can
+    // be on screen before the bank chunk has finished downloading and been
+    // cached; going offline then would test that other case by accident.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.questionBank ?? null), { timeout: 60_000 })
+      .not.toBeNull();
     await context.setOffline(true);
     await page.reload();
     // A fresh profile re-opens onboarding after reload; the banner lives in the

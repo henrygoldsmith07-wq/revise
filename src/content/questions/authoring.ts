@@ -27,6 +27,8 @@ export interface PartSpec {
   /** Part-level demand/family metadata for structured quality questions. */
   learning?: LearningPartMetadata;
   calculationRules?: QuestionPart["calculationRules"];
+  /** "Do not accept" lines for individual scheme points (see MarkSchemeReject). */
+  rejects?: QuestionPart["rejects"];
 }
 
 export interface QuestionSpec {
@@ -73,7 +75,15 @@ export function defineQuestion(spec: QuestionSpec): Question {
     ...(part.capabilityIds ? { capabilityIds: part.capabilityIds } : {}),
     ...(part.learning ? { learning: part.learning } : {}),
     ...(part.calculationRules ? { calculationRules: part.calculationRules } : {}),
+    ...(part.rejects?.length ? { rejects: part.rejects } : {}),
   }));
+  for (const [i, part] of parts.entries()) {
+    for (const rule of part.rejects ?? []) {
+      if (!Number.isInteger(rule.point) || rule.point < 0 || rule.point >= part.markScheme.length || !rule.phrases.length || !rule.reason.trim()) {
+        throw new Error(`defineQuestion(${spec.slug}): part ${i} has an invalid reject rule for point ${rule.point}`);
+      }
+    }
+  }
 
   const aos =
     spec.aos ?? [...new Set(parts.flatMap((p) => p.aos ?? []))] as AoCode[];

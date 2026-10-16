@@ -1,9 +1,11 @@
-import { tokenise, pointCoverage, stem, STOP_WORDS, withinEditDistance } from "./marking-language";
+import { tokenise, pointCoverage, stem, STOP_WORDS, withinEditDistance, canonicalTokenSet, inequalityWordsToSymbols, notationOnlyPoint, notationPresent, canonicalDirectionConflict, canonicalScalingConflict, labelledAnswerScope } from "./marking-language";
 export { tokenise, pointCoverage } from "./marking-language";
 import { numericEquivalent, numericMatch, extractNumbersCached, requiresStructuredNumericMatch, isNumericPoint, sameToTwoSigFigs } from "./marking-numeric";
 export { numericEquivalent, isNumericPoint } from "./marking-numeric";
 import { symbolicMatch } from "./maths-equivalence";
 import { markCalculationWorking } from "./calculation-rubric";
+import { contradictionExplanation, schemeContested, schemeContradiction, VERY_SHORT_ANSWER_WORDS } from "./marking-contradiction";
+import { rejectedStatement, rejectExplanation } from "./marking-reject";
 import type { MarkEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -109,10 +111,14 @@ export function rubricConfidence(marked: MarkedPart[]): number | null {
       n++;
       sum +=
         ev.status === "credited"
-          ? ev.evidenceStrength === "strong"
+          ? ev.contested
+            ? 0.3
+            : ev.evidenceStrength === "strong"
             ? 1
             : 0.6
-          : ev.evidenceStrength === "partial"
+          : ev.contradiction
+            ? 0.95
+            : ev.evidenceStrength === "partial"
             ? 0.45
             : 0.95;
     }
@@ -139,7 +145,7 @@ export function evidenceForMarkedPart(
     const match = bestEvidence(point, answer);
     const strength = evidenceStrength(point, match);
     const supportingEvidence = excerpt(match.text);
-    return {
+    const evidence: MarkEvidence = {
       point,
       status,
       evidence: supportingEvidence,
@@ -147,6 +153,41 @@ export function evidenceForMarkedPart(
       confidence: Math.round(match.score * 100) / 100,
       explanation: explanationFor(status, supportingEvidence, strength),
     };
+    // An authored "do not accept" line comes first: it is the scheme's own
+    // word on this point. On a missed point it is the reason; on a credited
+    // point (an AI mark, or a contrast the offline marker let through) it
+    // makes the mark provisional.
+    const pointIndex = part.markScheme.indexOf(point);
+    const rejected = status === "unreported" || pointIndex < 0 ? null : rejectedStatement(part, pointIndex, answer);
+    if (rejected && !rejected.contrastOnly) {
+      evidence.contradiction = rejectExplanation(rejected);
+      if (status === "missed") evidence.explanation = evidence.contradiction;
+      else {
+        evidence.contested = true;
+        evidence.explanation = `Awarded, but treat this mark as provisional: ${evidence.contradiction.replace(/^Not awarded: /, "")}`;
+      }
+      return evidence;
+    }
+    if (rejected && status === "credited") {
+      evidence.contested = true;
+      evidence.explanation = `Awarded, but treat this mark as provisional: your answer also mentions “${rejected.said}”, which the mark scheme does not accept for this point.`;
+      return evidence;
+    }
+    // Say WHY a contradicted point was not awarded, and never let a credited
+    // point that the answer contradicts or hedges look like a firm mark.
+    const contradiction = status === "unreported" || !contradictionApplies(part, answer) ? null : schemeContradiction(point, answer);
+    if (contradiction) {
+      evidence.contradiction = contradictionExplanation(contradiction);
+      if (status === "missed") evidence.explanation = evidence.contradiction;
+      else {
+        evidence.contested = true;
+        evidence.explanation = `Awarded, but treat this mark as provisional: ${evidence.contradiction.replace(/^Not awarded: /, "")}`;
+      }
+    } else if (status === "credited" && contradictionApplies(part, answer) && schemeContested(point, answer)) {
+      evidence.contested = true;
+      evidence.explanation = `Awarded, but treat this mark as provisional: your answer also states the opposite of this point, so it may be hedging.`;
+    }
+    return evidence;
   });
 }
 
@@ -236,6 +277,12 @@ function canonicalAuthoredAnswer(text: string): string[] {
 
 const AUTHORED_CANONICAL_CACHE = new Map<string, string[]>();
 
+/** The authored model answer itself, verbatim apart from whitespace. */
+function sameAsAuthored(part: QuestionPart, answer: string): boolean {
+  const model = part.modelAnswer?.trim();
+  return Boolean(model) && model!.replace(/\s+/g, " ") === answer.trim().replace(/\s+/g, " ");
+}
+
 function authoredAnswerEquivalent(part: QuestionPart, answer: string): boolean {
   const model = part.modelAnswer?.trim();
   if (!model || !answer.trim()) return false;
@@ -322,6 +369,54 @@ function explicitNegationConflict(point: string, answer: string): boolean {
     withoutNegation(fragment) === expected);
 }
 
+/**
+ * Physics parts carry their own reversal and result guards (below) and are
+ * mostly multi-claim explanations, where an opposite word usually belongs to a
+ * different claim; the general contradiction veto covers only their very
+ * short answers. Every other subject gets it in full.
+ */
+function isPhysicsPart(part: Pick<QuestionPart, "capabilityIds">): boolean {
+  return Boolean(part.capabilityIds?.some((id) => id.startsWith("phys.")));
+}
+
+export function contradictionApplies(part: Pick<QuestionPart, "capabilityIds">, answer: string): boolean {
+  if (!part.capabilityIds?.some((id) => id.startsWith("phys."))) return true;
+  return answer.trim().split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
+}
+
+/** A scheme point that is prose around an expression ("Discriminant = b² − 4ac"), not a bare expression. */
+/**
+ * True when a scheme point states a number of its own, not only digits that
+ * belong to a name: subscripts (H₀, Al₂O₃, H₃N⁺CH₂COO⁻) or digits written
+ * inside a chemical formula (H2O, P4O10). A shared digit in a formula or a
+ * label is not evidence for the point on its own (see namedDigitsPresent).
+ * Powers (v², ½kx²) count as stated: formula points rely on them.
+ */
+export function pointStatesNumber(point: string): boolean {
+  return /[\d⁰¹²³⁴-⁹½¼¾⅓⅔]/.test(point.replace(/[₀-₉]+/g, "").replace(/(?<=\b[A-Z][a-z]?|[A-Z][a-z]?\d*[A-Z][a-z]?)\d+/g, ""));
+}
+
+const SUBSCRIPT_DIGITS: Record<string, string> = { "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9" };
+
+function plainSubscripts(text: string): string {
+  return text.replace(/[₀-₉]/g, (c) => SUBSCRIPT_DIGITS[c] ?? c).toLowerCase();
+}
+
+/**
+ * For a point whose only digits belong to names (V₁, A₀, CH₃CH₂), a numeric
+ * match counts only when one of those names is in the answer: "H₂NCH₂COOH"
+ * shares digits with "H₃N⁺CH₂COO⁻" but is a different formula.
+ */
+export function namedDigitsPresent(point: string, answer: string): boolean {
+  const names = point.match(/[A-Za-zα-ωΔε][A-Za-z0-9₀-₉⁺⁻]*[0-9₀-₉][A-Za-z0-9₀-₉⁺⁻]*/g) ?? [];
+  const given = plainSubscripts(answer);
+  return names.some((name) => given.includes(plainSubscripts(name)));
+}
+
+function proseEmbeddedPoint(point: string): boolean {
+  return /[a-z]{3,}/i.test(point.replace(/\b(?:sin|cos|tan|ln|log|sqrt|exp|sec|cosec|cot)\b/gi, ""));
+}
+
 export function markPart(part: QuestionPart, answer: string, calibration?: PartialCreditCalibration): MarkedPart {
   const calculation = markCalculationWorking(part, answer);
   if (calculation) return calculation;
@@ -329,38 +424,46 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // The authored complete answer must remain reachable. Its wording is not
   // evidence of cheating or support; the runner records actual hint exposure.
   // Limit this contract to explicitly skill-mapped content with one point per mark.
+  // Term order is canonicalised there, so "1 − 2cos²θ" and "2cos²θ − 1" look
+  // alike: an answer that contradicts any point never takes this shortcut.
   if (part.capabilityIds?.length && part.markScheme.length === part.marks && trimmed.length > 0 &&
-    authoredAnswerEquivalent(part, trimmed)) {
+    authoredAnswerEquivalent(part, trimmed) &&
+    (sameAsAuthored(part, trimmed) || !part.markScheme.some((point) => schemeContradiction(point, trimmed))) &&
+    !part.markScheme.some((_, index) => rejectedStatement(part, index, trimmed)?.contrastOnly === false)) {
     const marked: MarkedPart = { partId: part.id, awarded: part.marks, max: part.marks,
       creditedPoints: [...part.markScheme], missedPoints: [], comment: "Complete authored answer — every point is present." };
     return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
   }
   const credited: string[] = [];
   const missed: string[] = [];
-  const givenTokens = new Set(
-    [...tokenise(trimmed)].map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean),
-  );
+  // Same tokens as coverage (equivalent wording canonicalised, a sentence's
+  // last word stemmed without its full stop), so the guard below never vetoes
+  // a point that coverage credited through "genus." or "goes up".
+  const givenTokens = canonicalTokenSet(trimmed);
 
   // Scaffolding guard: sibling scheme points often share most vocabulary
   // ("chlorine is reduced to chloride…" vs "chlorine is oxidised to
   // chlorate(I)…"). When a point has distinctive tokens — unique to it across
   // the whole scheme — and the answer contains NONE of them, coverage came
   // from shared scaffolding alone and cannot credit the point.
-  const pointTokenSets = part.markScheme.map((p) =>
-    new Set([...tokenise(p)].map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean)),
-  );
+  const pointTokenSets = part.markScheme.map((p) => canonicalTokenSet(p));
   const documentFrequency = new Map<string, number>();
   for (const set of pointTokenSets) for (const t of set) documentFrequency.set(t, (documentFrequency.get(t) ?? 0) + 1);
 
+  // "ΔG is zero or negative" is judged exactly as "ΔG ≤ 0" by every check below.
+  const judged = inequalityWordsToSymbols(trimmed);
   for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
-    const cov = pointCoverage(point, trimmed, thresh);
-    const num = numericMatch(point, trimmed);
+    const scope = labelledAnswerScope(point, judged);
+    const cov = notationOnlyPoint(point) ? (notationPresent(point, judged) ? 1 : 0) : pointCoverage(point, scope, thresh);
+    // A digit inside a formula or label (H₃N⁺, V₁) is not a stated value: it
+    // is evidence only when that name itself is in the answer.
+    const num = numericMatch(point, judged) && (pointStatesNumber(point) || namedDigitsPresent(point, judged));
     // Symbolic layer: when both the point and the answer contain a parseable
     // algebra expression, accept equivalent forms (`(x+2)(x-3)` for `x^2 - x - 6`)
     // and reject a pure expression that differs, even if a stray digit matches.
     // Unknown (unparseable/prose) never hurts: it falls through to the rubric.
-    const sym = symbolicMatch(trimmed, point);
+    const sym = symbolicMatch(judged, point);
     const structuredNumeric = requiresStructuredNumericMatch(point);
     const numeric = isNumericPoint(point);
     const strict = Boolean(calibration?.strictNumericPoints && numeric);
@@ -383,15 +486,42 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
       if (discriminative.length >= 1 && !discriminative.some((t) => givenTokens.has(t))) ok = false;
     }
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
-    if (ok && sym !== "equivalent" && polarityConflict(point, trimmed)) ok = false;
+    if (ok && sym !== "equivalent" && polarityConflict(point, judged)) ok = false;
+    // The same check after equivalent wording is canonicalised ("goes down"
+    // for "rises", "four times bigger" for "one quarter"). Only where the
+    // answer's words are about this point: a very short answer, or the
+    // labelled case the point is about. In a longer answer an opposite word
+    // usually belongs to another claim ("the increased glucose ... returning
+    // it towards the set point"), and a ratio is often stated from the other
+    // side ("the nearer station measures four times the intensity"). Not the
+    // direction words in Physics, where "falls" and "rises" usually describe
+    // motion, not a change.
+    const focused = scope !== judged || judged.split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
+    if (ok && focused && sym !== "equivalent" && !isPhysicsPart(part) && canonicalDirectionConflict(point, scope)) ok = false;
+    if (ok && focused && sym !== "equivalent" && isPhysicsPart(part) && canonicalScalingConflict(point, scope)) ok = false;
+    // Contradiction veto: an opposite term (artery for vein, left for right),
+    // a flipped sign or inequality, a different stated value or formula, or a
+    // negated claim. Only ever removes credit (marking-contradiction.ts).
+    // The symbolic layer extracts a fragment from prose points, so it can call
+    // "b² + 4ac" equivalent to "Discriminant = b² − 4ac"; it stays decisive
+    // only for a point that is itself a pure expression.
+    // A different stated value ("M : M+2 = 1 : 1" for "3 : 1") overrides the
+    // symbolic layer too, which can match on a shared fragment.
+    if (ok && contradictionApplies(part, judged)) {
+      const contradiction = schemeContradiction(point, judged);
+      if (contradiction && (sym !== "equivalent" || proseEmbeddedPoint(point) || contradiction.kind === "value")) ok = false;
+    }
     if (part.capabilityIds?.some(id => id.startsWith("phys."))) {
-      if (explicitNegationConflict(point, trimmed)) ok = false;
-      const resultMatches = physicsResultMatches(point, trimmed);
+      if (explicitNegationConflict(point, judged)) ok = false;
+      const resultMatches = physicsResultMatches(point, judged);
       if (resultMatches === false) ok = false;
       const selected = point.match(/^Only ([A-D]) is suitable\.?$/);
-      if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(trimmed) &&
-        !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(trimmed);
+      if (selected) ok = new RegExp("\\b(?:only|choose|select)\\s+" + selected[1] + "\\b", "i").test(judged) &&
+        !new RegExp("\\b(?:only|choose|select)\\s+[" + "ABCD".replace(selected[1]!, "") + "]\\b", "i").test(judged);
     }
+    // Last, so no earlier rule can restore the mark. Authored "do not accept" line for this point (marking-reject.ts): the
+    // answer states something the scheme names as wrong. Only removes credit.
+    if (ok && rejectedStatement(part, pointIndex, judged)?.contrastOnly === false) ok = false;
     (ok ? credited : missed).push(point);
   }
 
@@ -462,12 +592,17 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
     max: part.marks,
     creditedPoints: credited,
     missedPoints: missed,
-    comment: buildComment(awarded, part.marks, missed),
+    comment: rubricPartComment(awarded, part.marks, missed),
   };
   return { ...marked, evidence: evidenceForMarkedPart(part, trimmed, marked) };
 }
 
-function buildComment(awarded: number, max: number, missed: string[]): string {
+/**
+ * The device marker's per-part comment. Exported so the marked-result view
+ * can recognise a comment that only restates the missed points it already
+ * lists (see marked-feedback-display.ts).
+ */
+export function rubricPartComment(awarded: number, max: number, missed: string[]): string {
   if (!missed.length) return "Full marks — every mark-scheme point is there.";
   if (awarded === 0) return `No marks yet. The scheme wants: ${missed.slice(0, 2).join("; ")}.`;
   return `${awarded}/${max}. Still missing: ${missed.slice(0, 2).join("; ")}.`;
@@ -526,6 +661,15 @@ export function markQuestion(question: Question, answers: Record<string, string>
 
 /** Examiner-voice summary: what was earned, what was dropped, what to do. */
 export function examinerSummary(awarded: number, max: number, marked: MarkedPart[]): string {
+  const { score, opening, detail, advice } = examinerSummaryParts(awarded, max, marked);
+  return `${score} ${opening}${detail}${advice}`;
+}
+
+/**
+ * The pieces of examinerSummary. `score` and `detail` restate the mark and the
+ * missed points, which the marked-result view already shows on their own.
+ */
+export function examinerSummaryParts(awarded: number, max: number, marked: MarkedPart[]): { score: string; opening: string; detail: string; advice: string } {
   const pct = max ? awarded / max : 0;
   const missed = marked.flatMap((m) => m.missedPoints);
   const opening =
@@ -544,5 +688,5 @@ export function examinerSummary(awarded: number, max: number, marked: MarkedPart
     ? " Write the missing points explicitly — examiners award the statement, not the implication."
     : " Keep this structure under timed conditions.";
 
-  return `${awarded}/${max}. ${opening}${detail}${advice}`;
+  return { score: `${awarded}/${max}.`, opening, detail, advice };
 }

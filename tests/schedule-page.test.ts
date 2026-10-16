@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { plannedSessionHref } from "@/domain/study-navigation";
+import type { PlannedSession } from "@/domain/types";
 
 describe("Schedule — nav entry", () => {
   const shell = () => readFileSync(join(process.cwd(), "src/components/AppShell.tsx"), "utf8");
@@ -36,16 +38,29 @@ describe("Schedule — page wiring", () => {
     expect(src).toContain("Exam run-up");
     expect(src).toContain("Planned days");
     expect(src).toContain("Week of ");
+    // One date format at both ends ("12 Oct – 18 Oct"), not "12 OCT – 2026-10-18".
+    expect(src).toContain("Week of {dayMonth(monday)} – {dayMonth(sunday)}");
+  });
+
+  it("says Today's blocks are the long-range plan and points to Today's one recommendation", () => {
+    const src = page();
+    expect(src).toContain('data-testid="schedule-today-note"');
+    expect(src).toContain("picks the single best next step from your latest answers");
   });
 
   it("deep-links every actionable block so finishing it ticks the plan", () => {
     const src = page();
-    // Cards / recall / exam questions carry the planned-session id…
-    expect(src).toContain("session=${session.id}");
-    // …and each activity maps to the flow that does that work.
-    expect(src).toContain('/lesson?subject=${session.subjectId}');
-    expect(src).toContain('/practice?mode=recall');
-    expect(src).toContain('"/review"');
+    expect(src).toContain("href={plannedSessionHref(session)}");
+    const base = { id: "planned-2", subjectId: "physics", topicId: "waves" };
+    for (const activity of ["flashcards", "recall", "practice"] as const) {
+      const url = new URL(plannedSessionHref({ ...base, activity } as PlannedSession), "https://revise.invalid");
+      expect(url.searchParams.get("session")).toBe(base.id);
+      expect(url.searchParams.get("subject")).toBe(base.subjectId);
+      expect(url.searchParams.get("topic")).toBe(base.topicId);
+      expect(url.pathname).toBe(activity === "flashcards" ? "/review" : "/practice");
+      expect(url.searchParams.get("mode")).toBe(activity === "recall" ? "recall" : null);
+    }
+    expect(plannedSessionHref({ ...base, activity: "learn" } as PlannedSession)).toBe("/lesson?subject=physics&topic=waves");
   });
 
   it("is honest when there is nothing to schedule yet", () => {

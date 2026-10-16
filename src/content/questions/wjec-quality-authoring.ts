@@ -91,24 +91,52 @@ const CAPABILITY_STRUCTURE_HINTS: Array<{ match: RegExp; entities: string[] }> =
   { match: /^chem\.acids-bases\.sp-01$/, entities: ["acid", "base", "proton"] },
 ];
 
+// hasPhrase runs for every candidate phrase against the same prompt while the
+// bank is built, which happens when the content module first evaluates (on
+// the boot path). Normalising the prompt once per text and compiling each
+// pattern once keeps that cheap; the matching rules below are unchanged.
+let lastPhraseText: string | undefined;
+let lastNormalised = "";
+let lastCompact: string | undefined;
+const phrasePatterns = new Map<string, RegExp>();
+
+function phrasePattern(source: string): RegExp {
+  let pattern = phrasePatterns.get(source);
+  if (!pattern) {
+    // Case-insensitive, no global flag: RegExp#test is stateless here.
+    pattern = new RegExp(source, "i");
+    phrasePatterns.set(source, pattern);
+  }
+  return pattern;
+}
+
+function normalisedPhraseText(text: string): string {
+  if (text !== lastPhraseText) {
+    lastPhraseText = text;
+    lastNormalised = text.toLowerCase().replace(/[−–—]/g, "-").replace(/\s+/g, " ");
+    lastCompact = undefined;
+  }
+  return lastNormalised;
+}
+
 function hasPhrase(text: string, phrase: string): boolean {
   const escaped = phrase.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (!escaped) return false;
-  const normalised = text.toLowerCase().replace(/[−–—]/g, "-").replace(/\s+/g, " ");
+  const normalised = normalisedPhraseText(text);
   const wordPhrase = /^[a-z0-9]+(?:[ -][a-z0-9]+)*$/i.test(phrase.trim());
   if (!wordPhrase) {
-    const compactText = normalised.replace(/\s+/g, "");
+    lastCompact ??= normalised.replace(/\s+/g, "");
     const compactPhrase = phrase.toLowerCase().replace(/\s+/g, "");
-    if (compactText.includes(compactPhrase)) return true;
+    if (lastCompact.includes(compactPhrase)) return true;
   }
   const suffix = /\s/.test(phrase.trim()) ? "" : "(?:s|es|ed|d)?";
-  if (new RegExp(`(?:^|[^a-z0-9])${escaped}${suffix}(?:$|[^a-z0-9])`, "i").test(normalised)) return true;
+  if (phrasePattern(`(?:^|[^a-z0-9])${escaped}${suffix}(?:$|[^a-z0-9])`).test(normalised)) return true;
   if (!/\s/.test(phrase) && phrase.trim().length >= 5) {
     // A small explicit inflection set covers common authoring forms without
     // allowing a substring such as “optim” to match “optimum”.
     const word = phrase.trim().toLowerCase();
     const variants = word.endsWith("e") ? [word, `${word}d`, `${word}s`, `${word.slice(0, -1)}ing`] : [word, `${word}s`, `${word}ed`, `${word}ing`];
-    return variants.some((variant) => new RegExp(`(?:^|[^a-z0-9])${variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^a-z0-9])`, "i").test(normalised));
+    return variants.some((variant) => phrasePattern(`(?:^|[^a-z0-9])${variant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|[^a-z0-9])`).test(normalised));
   }
   return false;
 }
@@ -315,8 +343,10 @@ export function provenanceFor(
     const stem = word.slice(0, Math.max(5, word.length - 2));
     return new RegExp(`\\b${stem.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\w*`, "i").test(workedText);
   }).slice(0, 3);
-  const workedOperations = uniqueStrings(OPERATION_WORDS.filter((operationWord) => hasPhrase(workedText, operationWord)));
-  const operation = carriedTokens.join(" ") || workedOperations.slice(0, 2).join(" ") || reasoning.trim() || "Author-specified subject operation";
+  // The operation-word scan is only the fallback when no reasoning token is
+  // carried into the worked text, so it runs only then.
+  const workedOperations = (): string[] => uniqueStrings(OPERATION_WORDS.filter((operationWord) => hasPhrase(workedText, operationWord)));
+  const operation = carriedTokens.join(" ") || workedOperations().slice(0, 2).join(" ") || reasoning.trim() || "Author-specified subject operation";
   return {
     sourceEvidence: sourceEvidence.length ? sourceEvidence : [prompt.slice(0, 120).trim()],
     operation,

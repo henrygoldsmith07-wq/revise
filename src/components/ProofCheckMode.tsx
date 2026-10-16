@@ -9,7 +9,8 @@
 
 import { useCallback, useState } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
-import { buildProofCheck, proofHref, missionResumePosition } from "@/domain/mission-session";
+import { buildProofCheck, proofCheckCheckpoint, restoreProofCheck } from "@/domain/mission-session";
+import { MIN_PROOF_DELAY_DAYS } from "@/domain/proof-of-improvement";
 import { proofOutcomeFor } from "@/domain/proof-action";
 import type { Id } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
@@ -30,39 +31,25 @@ export function ProofCheckMode({ topicId, onExit }: { topicId: string; onExit: (
   const { saveRevisionCheckpoint, clearRevisionCheckpoint, recordFunnel } = store;
   const { plan } = useRevisionPlan();
   const topic = getTopic(topicId);
-  const href = proofHref(topic?.subjectId ?? "", topicId);
 
-  const [{ check, resume }] = useState(() => {
+  const [{ check, resume, startedAt }] = useState(() => {
+    // A refresh mid-check resumes the saved run exactly: same questions, same
+    // order, no hints, and the answers already given. Rebuilding would exclude
+    // what was just answered and swap the set; dating the run by the
+    // checkpoint's updatedAt (which moves on every save) would drop answers.
+    const restored = restoreProofCheck(store.revisionCheckpoint, {
+      topicId, subjectId: topic?.subjectId ?? "", questions: store.questions, attempts: store.attempts,
+    });
+    if (restored) return restored;
     const fresh = buildProofCheck({ topicId, questions: store.questions, attempts: store.attempts });
-    // A refresh mid-check must resume the same questions: rebuilding now would
-    // exclude what has just been answered and silently swap the set.
-    const saved = store.revisionCheckpoint;
-    const savedIds = saved?.queueIds ?? [];
-    const resumable = saved !== null && saved.href === href && !saved.mission &&
-      savedIds.length === fresh.questionIds.length &&
-      fresh.questionIds.every((id) => savedIds.includes(id));
-    if (resumable && saved) {
-      const startedAt = saved.updatedAt;
-      const known = new Set(store.questions.map((q) => q.id));
-      const done = store.attempts.filter((a) => a.createdAt >= startedAt && known.has(a.questionId) && savedIds.includes(a.questionId));
-      return { check: fresh, resume: { index: missionResumePosition(fresh.questionIds, done, startedAt), attempts: done } };
-    }
-    return { check: fresh, resume: undefined };
+    return { check: fresh, resume: undefined, startedAt: new Date().toISOString() };
   });
 
   const onProgress = useCallback((position: number) => {
     if (position >= check.questionIds.length) return;
     if (position === 0) void recordFunnel("revision_task_started", `proof:${topicId}`);
-    void saveRevisionCheckpoint({
-      activity: "practice",
-      title: `Prove ${topic?.title ?? topicId}`,
-      href,
-      topicId,
-      position,
-      total: check.questionIds.length,
-      queueIds: [...check.questionIds],
-    });
-  }, [check.questionIds, href, recordFunnel, saveRevisionCheckpoint, topic?.title, topicId]);
+    void saveRevisionCheckpoint(proofCheckCheckpoint(check, { title: `Prove ${topic?.title ?? topicId}`, subjectId: topic?.subjectId ?? "" }, startedAt, position));
+  }, [check, recordFunnel, saveRevisionCheckpoint, startedAt, topic?.subjectId, topic?.title, topicId]);
 
   const onFinished = useCallback(() => {
     void clearRevisionCheckpoint();
@@ -104,8 +91,8 @@ export function ProofCheckMode({ topicId, onExit }: { topicId: string; onExit: (
       hintBudgetFor={hintBudgetFor}
       intro={(
         <>
-          <p>You revised {label} at least three days ago. These questions check whether it held.</p>
-          <p><span className="font-semibold">How this works:</span> new questions you have not seen, marked by a human, with no hints available. Answer them as you would in the exam.</p>
+          <p>You revised {label} at least {MIN_PROOF_DELAY_DAYS} days ago. These questions check whether it held.</p>
+          <p><span className="font-semibold">How this works:</span> new teacher-reviewed questions you have not seen, with no hints available. Answer them as you would in the exam.</p>
           <p>A score here moves your proof of improvement. It does not by itself show you will hold this in a different part of the paper.</p>
         </>
       )}

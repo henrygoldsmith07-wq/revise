@@ -41,6 +41,14 @@ describe("reviewer portal accessibility", () => {
     expect(queue).toContain('aria-current={entry.subjectId === subject.subjectId ? "page" : undefined}');
   });
 
+  it("orders the queue and Next/Skip by what each review unlocks for students", () => {
+    expect(queue).toContain("const priority = getReviewPriority(combined, subject.subjectId);");
+    expect(queue).toContain("buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId, priority)");
+    expect(page).toContain("buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId, priority)");
+    expect(queue).toContain('<th scope="col" className="px-3 py-1.5 font-medium">Why review it</th>');
+    expect(page).toContain('aria-label="Why this question"');
+  });
+
   it("keeps shortcuts live on checkboxes but never while typing a comment", () => {
     const shortcuts = read("src/components/shortcuts.tsx");
     expect(shortcuts).toContain('["checkbox", "radio", "button", "submit", "reset"].includes(target.type)');

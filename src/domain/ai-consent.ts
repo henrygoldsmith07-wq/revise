@@ -145,10 +145,10 @@ function instant(value: string | null | undefined): number {
  * Settle device and server after a consent change, a sign-in or a reconnect.
  *
  * The server row is authoritative (it is what the route enforces), with one
- * exception: a change made on this device while it could not reach the server
- * is pushed, unless the server holds a strictly newer decision. Ties resolve
- * to "off" — when two decisions cannot be ordered, the privacy-protective one
- * wins. A missing server row means "never opted in".
+ * exception: a pending opt-out always wins, regardless of either clock. An
+ * offline opt-in is pushed only when the server does not hold a newer opt-out.
+ * Ties resolve to "off" — when two decisions cannot be ordered, the
+ * privacy-protective one wins. A missing server row means "never opted in".
  */
 export function reconcileAiConsent(input: {
   pending: PendingAiConsent | null;
@@ -158,6 +158,11 @@ export function reconcileAiConsent(input: {
   const pending = input.pending;
   if (!pending) {
     return { local: server.enabled, push: null, clearPending: false };
+  }
+  // Device and server wall clocks are not a causal ordering. In particular,
+  // an offline revocation must not be undone by an ahead-of-device server.
+  if (!pending.enabled) {
+    return { local: false, push: server.enabled || !input.server ? false : null, clearPending: true };
   }
   const pendingAt = instant(pending.at);
   const serverAt = instant(server.updatedAt);

@@ -336,6 +336,17 @@ step "practice, not proof" or "counts as evidence", so help is never
 mistaken for proof. The same modules drive the Library topic sheet; the mark
 result is now the primary place a learner meets them.
 
+Each practice step link carries its mode and its stated minutes
+(`/practice?topic=…&guided=1&minutes=8`), read by
+`src/domain/practice-step-mode.ts`: guided shows the question's own hint
+rungs first; unaided and timed allow no hints (timed adds an exam-pace clock);
+worked shows one question with its authored model answer and mark-scheme
+points, then one fresh question outside its family, recorded as viewed
+support. The worked example is a question the student has already answered,
+or one that could never be served as unseen proof, so showing it spends no
+proof supply. A step's questions fit its minutes at 90 s a mark (at most
+three) and the page states the real length.
+
 ## Exam technique vs knowledge separation
 
 `src/domain/retention-analytics.ts`, `src/domain/assessment.ts` and
@@ -362,6 +373,18 @@ Every flagship subject is currently authored but **not yet human-reviewed**: the
 trust audit reports 0 verified questions in all four. The loop is therefore
 designed to run at the edge of its supply, and the policy for that edge is stated
 here rather than left to each screen.
+
+**Supply is not the only limit: the loss must count too.** A lost mark can be
+proven recovered only if the loss itself is trusted evidence
+(`trustedAssessmentMistake`: a teacher-reviewed source question, a reliable
+mark, a link to the marked answer, and for WJEC paper mode a verified past
+paper with human-reviewed marking, `authenticPaperEvidence`). When it is not,
+`classifyMistake` records a `proofBarrier` on the loss (it explains the gate
+and changes nothing), and a mission whose every loss is barred reports the
+`loss-not-provable` limit first, is never "awaiting proof", runs its apply step
+as labelled practice and replaces the delayed check with spaced practice
+checks (the practice Revisit). More questions would not help, so no screen
+says they would.
 
 **What counts as supply.** `unseenSupplyByTopic` splits a topic's unseen
 questions three ways:

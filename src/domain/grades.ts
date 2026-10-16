@@ -1,3 +1,4 @@
+import { isFlagship } from "./flagship";
 import { requiresWjecContentReview } from "./physics-content-review";
 import { daysToExam } from "./recommender";
 import { hintEvidenceMultiplier } from "./hint-tiers";
@@ -48,6 +49,8 @@ export interface NextGradeTarget {
 }
 
 const ASSESSMENT_PRIOR_SAMPLES = 8;
+export const REFERENCE_TIER_UNCERTAINTY =
+  "Built from reference questions that are not checked against the exam board's specification, so treat it as a practice guide.";
 
 export function gradeForPercent(subject: Subject, percent: number): string {
   const sorted = [...subject.gradeBoundaries].sort((a, b) => b.percent - a.percent);
@@ -161,6 +164,9 @@ export function predictGrade(
     ...(timedPapers === 0 ? ["No timed paper evidence yet."] : []),
     ...(effectiveSamples < ASSESSMENT_PRIOR_SAMPLES ? ["Few independently marked exam answers."] : []),
     ...(assessedShare < 0.5 ? ["Much of the specification has limited assessment evidence."] : []),
+    // Reference-tier questions are not checked against the specification, so
+    // however much evidence there is, the estimate is a practice guide.
+    ...(!isFlagship(subject.id) ? [REFERENCE_TIER_UNCERTAINTY] : []),
   ];
 
   return {

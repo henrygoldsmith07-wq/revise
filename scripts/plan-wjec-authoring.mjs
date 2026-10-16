@@ -23,7 +23,7 @@ if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
 }
 
 const backlog = JSON.parse(await readFile(resolve("src/content/reviews/wjec-authoring-backlog.json"), "utf8"));
-if (backlog.formatVersion !== 1 || backlog.model !== "part-level-depth-v1" || !Array.isArray(backlog.subjects?.[subjectId])) {
+if (backlog.formatVersion !== 1 || backlog.model !== "part-level-depth-v2-approvable" || !Array.isArray(backlog.subjects?.[subjectId])) {
   console.error(`Unknown subject or incompatible authoring backlog: ${subjectId}`);
   process.exit(1);
 }

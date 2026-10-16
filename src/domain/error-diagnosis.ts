@@ -3,6 +3,7 @@
 
 import { ERROR_CONFIDENCE_THRESHOLD, ERROR_TAXONOMY_VERSION } from "./error-taxonomy";
 import { remediationFor } from "./error-remediation";
+import { commandWordIn } from "./error-diagnosis-plan";
 import type { ErrorCategory } from "./error-taxonomy";
 import type { Attempt, MarkedPart, Mistake, Question, QuestionPart } from "./types";
 
@@ -44,14 +45,13 @@ export function needsDiagnosis(marked: MarkedPart): boolean {
 export function diagnosisSignal(input: DiagnosisInput): {
   prompt: string; point: string; answer: string; awarded: number; maxMarks: number; command: string | null;
 } {
-  const cmd = (input.question.stem + " " + input.part.prompt).match(/\b(state|describe|explain|calculate|suggest|compare|evaluate|discuss|justify|deduce|predict|outline|show that)\b/i);
   return {
     prompt: `${input.question.stem}\n${input.part.prompt}`,
     point: input.marked.missedPoints[0] ?? input.part.markScheme[0] ?? "",
     answer: input.answer,
     awarded: input.marked.awarded,
     maxMarks: input.marked.max,
-    command: cmd?.[1]?.toLowerCase() ?? null,
+    command: commandWordIn(input.question, input.part),
   };
 }
 

@@ -1,6 +1,6 @@
 import { applyTechniqueSteering, applyPhase4Overlays } from "./recommendation-overlays";
 import { valueNextAction, type NextActionKind } from "./next-best-action";
-import { isDue, retrievability } from "./scheduling";
+import { isDueReview, retrievability } from "./scheduling";
 import { untouchedTopics, weakTopics } from "./mastery";
 import { buildRecommendationNarrative } from "./explainability";
 import type { RecallMasteryRow } from "./recall-mastery";
@@ -244,9 +244,12 @@ export function recommend(input: RecommendInput): Recommendation[] {
   }
 
   // --- 1. Due reviews. Each due card protects ~0.35 marks from forgetting.
+  // Only cards the learner has actually studied are owed a review: a seeded,
+  // never-studied card holds nothing to forget yet (isDueReview), so a fresh
+  // profile is not told it has hundreds of cards "due".
   const dueBySubject = new Map<Id, Card[]>();
   for (const card of input.cards) {
-    if (!isDue(card, today)) continue;
+    if (!isDueReview(card, today)) continue;
     if (!input.subjectIds.includes(card.subjectId)) continue;
     const list = dueBySubject.get(card.subjectId) ?? [];
     list.push(card);

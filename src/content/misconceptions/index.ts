@@ -1,4 +1,4 @@
-import type { Misconception } from "@/domain/types";
+import type { Id, Misconception } from "@/domain/types";
 import { biologyMisconceptions } from "./biology";
 import { chemistryMisconceptions } from "./chemistry";
 import { mathsMisconceptions } from "./maths";
@@ -13,3 +13,9 @@ export const seedMisconceptions: Misconception[] = [
   ...chemistryMisconceptions,
   ...biologyMisconceptions,
 ];
+
+// Kept here, not only in `@/content`, so the app shell can read the library
+// without importing (and shipping) the whole authored question bank.
+export function misconceptionsForTopic(topicId: Id): Misconception[] {
+  return seedMisconceptions.filter((m) => m.topicIds.includes(topicId));
+}

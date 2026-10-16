@@ -38,6 +38,7 @@ import type { Attempt, ExamDate, Id, Mistake, Question } from "./types";
 import { BLOCKED_PROOF_COPY } from "./proof-copy";
 import { MIN_PROOF_DELAY_DAYS, type ProofLedger, type TopicProof } from "./proof-of-improvement";
 import { needsBaselineBeforeProof, proofFacts, proofOutcomeFor } from "./proof-action";
+import { PROOF_BARRIER_TEXT } from "./mark-recovery";
 
 export type ActionType =
   | "proof-check" | "regression-recovery" | "mission" | "paper-repair" | "recurring-error" | "exam-urgent"
@@ -53,6 +54,12 @@ export interface ActionExplanation {
   evidence: string[];
   after: string;
   proves: string;
+  /**
+   * Why proof is unavailable for this action when the reason is the lost marks
+   * themselves (see ProofBarrier), so the UI never falls back to blaming
+   * question supply for it.
+   */
+  limit?: string;
 }
 
 export interface RevisionAction {
@@ -190,7 +197,31 @@ export function collectMissions(input: MissionCollectInput): ExamMission[] {
   return out;
 }
 
+/**
+ * A mission whose lost marks are all recovered in practice but cannot be
+ * proven (no reviewed questions left to prove them on). Sending the student
+ * straight back to supported practice on every visit, as before, ignored that
+ * they had already fixed it and never spaced anything. Instead the topic comes
+ * back for a spaced practice check on the schedule `practiceRevisitFor`
+ * derives from their own attempts, labelled practice, not proof.
+ */
+function practiceRevisitOf(mission: ExamMission, input: EngineInput): { dueAt: string; heldChecks: number; firstSuccessAt?: string } | null {
+  const r = mission.recovery;
+  if (r.open > 0 || r.awaitingProof > 0 || r.regressed > 0 || r.provisional <= 0) return null;
+  const items = input.recovery.items.filter((i) => mission.mistakeIds.includes(i.mistakeId) && i.state === "provisional");
+  if (!items.length || items.some((i) => !i.unverifiedOnly || !i.practiceRevisit || i.practiceRevisit.slipped)) return null;
+  const next = [...items].sort((a, b) => a.practiceRevisit!.dueAt.localeCompare(b.practiceRevisit!.dueAt))[0]!;
+  return { dueAt: next.practiceRevisit!.dueAt, heldChecks: Math.min(...items.map((i) => i.practiceRevisit!.heldChecks)), firstSuccessAt: items.map((i) => i.firstSuccessAt).filter((t): t is string => Boolean(t)).sort()[0] };
+}
+
 function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estimate, ignoreWait = false): Draft | { skip: string } {
+  const revisit = (mission.current.blockedBy || mission.status === "blocked") ? practiceRevisitOf(mission, input) : null;
+  if (revisit) {
+    if (!ignoreWait && Date.parse(revisit.dueAt) > input.now.getTime()) {
+      return { skip: `Waiting for the delay to pass: recovered in practice, so Revise brings it back for a spaced check from ${revisit.dueAt.slice(0, 10)}.` };
+    }
+    return practiceRevisitDraft(mission, input, revisit);
+  }
   const blockedStage = mission.current.blockedBy;
   const stage = (blockedStage ? mission.stages.find((s) => s.kind === "practise") : undefined) ?? mission.current;
   if (!ignoreWait && stage.kind === "delayed-proof" && mission.proofDueAt && Date.parse(mission.proofDueAt) > input.now.getTime()) {
@@ -220,7 +251,12 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     : `${shown > 0 ? `Recover ${shown} marks: ` : ""}${mission.title}`;
   const share = STAGE_SHARE[stage.kind];
   // The time shown must be the time the session takes, so it comes from the questions it will run.
-  const sessionMinutes = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, stage.kind).minutes;
+  const session = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, stage.kind);
+  const sessionMinutes = session.minutes;
+  // "Counts as proof" only when the delayed check would actually run on
+  // teacher-reviewed flagship questions (a step's `verified` is
+  // learnerEvidenceTrusted on every question it holds).
+  const proofEligible = session.steps.some((s) => s.kind === "delayed-proof" && s.verified);
   return {
     id: `action:${mission.id}:${stage.kind}`,
     type, title, subjectId: mission.subjectId, topicIds: mission.topicIds, specPoints: [],
@@ -232,16 +268,19 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     proofStatus: missionLearnerState(mission.status, mission.recovery), requiredFirst: regressed, effectiveness: eff, mistakeIds: mission.mistakeIds,
     explanation: {
       why: gap && r.provisional + r.awaitingProof > 0
-        ? BLOCKED_PROOF_COPY
+        ? (mission.proofBarrier ? `You improved on this topic. It cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}, so keep it in practice.` : BLOCKED_PROOF_COPY)
         : `${lost} mark${lost === 1 ? "" : "s"} were lost${where}${cause ? `, mainly through ${cause}` : ""}. ${stage.reason}`,
       whyNow: regressed ? "Marks you had recovered were lost again, so they are the most likely to cost you in the exam."
-        : stage.kind === "delayed-proof" ? "Enough time has passed that a check on a different question now counts as proof."
+        : stage.kind === "delayed-proof" ? (proofEligible
+          ? "Enough time has passed that a check on a different question now counts as proof."
+          : "Enough time has passed for a check on a different question. Until its questions are teacher-reviewed it is practice, not proof.")
         : mission.status === "not-started" ? "These marks are open and nothing has been done about them yet."
         : "The previous stage is done, so this is the next thing the evidence needs.",
       whyBefore: "", stake: regressed ? `${shown} marks you had recovered are lost again.` : stage.kind === "delayed-proof" ? `${shown} marks only count as recovered once they hold on a new question.` : shown > 0 ? `${shown} mark${shown === 1 ? "" : "s"} you lost are still open.` : "Nothing is at stake yet; this builds the evidence.",
       evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
       after: next.after,
       proves: mission.completionCondition,
+      ...(mission.limitsSentence && mission.proofBarrier ? { limit: mission.limitsSentence } : {}),
     },
     route: { href: missionHref(mission.id, stage.kind), label: "Start session" },
     mission: { id: mission.id, stage: stage.kind },
@@ -274,6 +313,9 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
   const eff = estimate("delayed-proof-retest", null);
   const gained = row.after && row.before ? Math.round((row.after.rate - row.before.rate) * 100) : 0;
   const marks = round(Math.abs(gained) * share * 1.0, 2);
+  // Evidence wording follows trust: only a check made entirely of
+  // teacher-reviewed flagship questions may say an answer counts.
+  const eligible = check.verified && check.questionIds.length > 0;
 
   const draft: Draft = {
     id: `action:proof:${row.topicId}`,
@@ -300,7 +342,9 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
       why: row.illusory
         ? `You answer ${label} well on questions you have seen, but not on new ones. Revise cannot count that as proof.`
         : `You revised ${label} at least ${MIN_PROOF_DELAY_DAYS} days ago. Revise now needs to check whether it held.`,
-      whyNow: `Enough time has passed that a check on a new question would count as evidence.`,
+      whyNow: eligible
+        ? `Enough time has passed that a check on a new question would count as evidence.`
+        : `Enough time has passed for a check, but there is no teacher-reviewed new question on ${label} yet, so a check could not count as evidence.`,
       whyBefore: "",
       stake: row.after
         ? `About ${Math.round(share * 100)}% of the exam, and the difference between calling this improved and calling it unproven.`
@@ -309,16 +353,54 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
       // UI already has one place to render "what this will not prove".
       evidence: [
         `${check.questionIds.length} new question${check.questionIds.length === 1 ? "" : "s"} you have not seen, with no hints available`,
-        `reviewed by a human, so a correct answer counts as evidence`,
+        eligible ? `reviewed by teachers, so a correct answer counts as evidence` : `no teacher-reviewed question is available, so nothing here can count as evidence yet`,
         `before: ${row.before?.questions ?? 0} independent answers at ${Math.round((row.before?.rate ?? 0) * 100)}%`,
         outcome.limits,
       ],
       after: `Revise marks it against the scheme, then says whether the skill held.`,
-      proves: `That ${label} survived on a question you had not seen, without hints.`,
+      proves: eligible ? `That ${label} survived on a question you had not seen, without hints.` : "Nothing yet: without teacher-reviewed questions this cannot count as proof.",
     },
     route: { href: proofHref(row.subjectId, row.topicId), label: "Start the check" },
   };
   return { draft, blockedBy };
+}
+
+function practiceRevisitDraft(mission: ExamMission, input: EngineInput, revisit: { dueAt: string; heldChecks: number; firstSuccessAt?: string }): Draft {
+  const r = mission.recovery;
+  const names = mission.topicIds.map((t) => input.topicTitle?.(t) ?? t);
+  const topics = names.length ? `${names.slice(0, 3).join(", ")}${names.length > 3 ? " and more" : ""}` : mission.title;
+  const shares = mission.topicIds.map((t) => input.topicWeight?.(t) ?? { share: 0, relative: 1 });
+  const marks = round(r.provisional, 1);
+  const since = revisit.firstSuccessAt ? Math.max(1, Math.floor((input.now.getTime() - Date.parse(revisit.firstSuccessAt)) / DAY)) : null;
+  const sessionMinutes = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, "practise").minutes;
+  const checks = revisit.heldChecks;
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  return {
+    id: `action:${mission.id}:practice-revisit`,
+    type: "evidence-gap", title: `Check it held: ${topics}`, subjectId: mission.subjectId, topicIds: mission.topicIds, specPoints: [],
+    minutes: Math.max(3, Math.ceil(sessionMinutes) || 8), marksRecoverable: marks,
+    examWeight: shares.length === 1 ? shares[0]!.share : null,
+    daysToExam: daysToNearestExam(input.examDates, mission.subjectId, input.now),
+    evidenceStrength: 0.3, confidence: 0.4, expectedLearningGain: STAGE_SHARE.practise,
+    // Spaced retrieval of something already fixed is worth less than fixing
+    // open marks, so it ranks below open losses with the same stake.
+    expectedMarks: round(marks * STAGE_SHARE.practise * 0.5, 2),
+    proofStatus: missionLearnerState(mission.status, r), requiredFirst: false, effectiveness: null, mistakeIds: mission.mistakeIds,
+    explanation: {
+      why: `You recovered ${plural(marks, "mark")} here in practice${since ? ` ${since} day${since === 1 ? "" : "s"} ago` : ""}. A spaced check on a question you have not seen, answered without hints, shows whether the fix held.`,
+      whyNow: checks > 0 ? `It held on ${checks} spaced check${checks === 1 ? "" : "s"}; the gap doubles each time it holds, and this one is due.` : "Enough time has passed for the first spaced check.",
+      whyBefore: "",
+      stake: `${plural(marks, "mark")} recovered in practice; this checks they stay recovered.`,
+      evidence: [...mission.evidence, ...(mission.limitsSentence ? [mission.limitsSentence] : [])],
+      after: "If it holds, the next check comes back after twice the gap. If you lose marks, that becomes a repair mission.",
+      proves: mission.proofBarrier
+        ? `Nothing: this is practice, not proof. It cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}. It shows whether the fix is holding.`
+        : "Nothing yet: these questions are not reviewed, so this is practice, not proof. It shows whether the fix is holding.",
+      ...(mission.limitsSentence && mission.proofBarrier ? { limit: mission.limitsSentence } : {}),
+    },
+    route: { href: missionHref(mission.id, "practise"), label: "Start session" },
+    mission: { id: mission.id, stage: "practise" },
+  };
 }
 
 function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput, estimate: Estimate): Draft {
@@ -452,6 +534,59 @@ function commandCentreDrafts(input: EngineInput, enrolled: ReadonlySet<Id>, esti
   return out;
 }
 
+/**
+ * The last-resort next step: unseen practice in a started topic.
+ *
+ * Without it, a learner who has started every topic, has no lost marks
+ * waiting and no cards due was handed an empty Today while unseen questions
+ * were still in the bank — an action the app could perform but never named
+ * (found by tests/supply-journey.property.test.ts). Only used when nothing
+ * else ranks and the adaptive optimiser has no plan. Topics with open,
+ * waiting or regressed losses are left alone so practice never spends the
+ * unseen questions a delayed proof check needs.
+ */
+function keepPractisingDraft(input: EngineInput, enrolled: ReadonlySet<Id>, missions: readonly ExamMission[]): Draft | null {
+  const supply = input.supplyByTopic ?? {};
+  const reserved = new Set<Id>([
+    ...missions.flatMap((m) => m.topicIds),
+    ...input.recovery.items.filter((i) => i.state !== "proven").map((i) => i.topicId),
+  ]);
+  const subjectOf = new Map<Id, Id>();
+  for (const q of input.questions) {
+    if (!enrolled.has(q.subjectId)) continue;
+    for (const t of q.topicIds) if (!subjectOf.has(t)) subjectOf.set(t, q.subjectId);
+  }
+  const candidates = Object.entries(supply)
+    .filter(([topicId, s]) => subjectOf.has(topicId) && !reserved.has(topicId) && s.provable + s.practiceOnly > 0)
+    .map(([topicId, s]) => ({ topicId, s, share: input.topicWeight?.(topicId)?.share ?? 0 }))
+    .sort((a, b) => b.share - a.share || (b.s.provable + b.s.practiceOnly) - (a.s.provable + a.s.practiceOnly) || a.topicId.localeCompare(b.topicId));
+  const pick = candidates[0];
+  if (!pick) return null;
+  const subjectId = subjectOf.get(pick.topicId)!;
+  const topic = input.topicTitle?.(pick.topicId) ?? pick.topicId;
+  const unseen = pick.s.provable + pick.s.practiceOnly;
+  const days = daysToNearestExam(input.examDates, subjectId, input.now);
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  return {
+    id: `action:keep-practising:${pick.topicId}`, type: "adaptive-session", title: `Keep practising ${topic}`,
+    subjectId, topicIds: [pick.topicId], specPoints: [], minutes: 15,
+    marksRecoverable: null, examWeight: pick.share || null, daysToExam: days, evidenceStrength: 0.2, confidence: 0.3,
+    expectedLearningGain: 0.2, expectedMarks: round(pick.share * 100 * 0.1, 2), proofStatus: null, requiredFirst: false, effectiveness: null, mistakeIds: [],
+    explanation: {
+      why: `Nothing is due and no lost marks are waiting, so the next step is new questions: ${plural(unseen, "question")} you have not answered are left in ${topic}.`,
+      whyNow: days !== null ? `Your exam is ${days} day${days === 1 ? "" : "s"} away.` : "New answers are how Revise finds the next thing to fix.",
+      whyBefore: "", stake: `${plural(unseen, "unseen question")} in ${topic}.`,
+      evidence: [
+        `${plural(unseen, "unseen question")} left`,
+        pick.s.provable > 0 ? `${pick.s.provable} of them human-reviewed` : "none of them human-reviewed yet, so this is practice only",
+      ],
+      after: "Any mark you lose becomes a repair mission; Revise replans after each answer.",
+      proves: "Nothing on its own: practice finds gaps, and only a later independent check on a reviewed question proves a gain.",
+    },
+    route: { href: `/adaptive-session?topic=${encodeURIComponent(pick.topicId)}&start=1`, label: "Start session" },
+  };
+}
+
 export function rankRevisionActions(input: EngineInput): RevisionPlan {
   const enrolled = new Set(input.subjectIds);
   const scoped: EngineInput = { ...input, mistakes: input.mistakes.filter((m) => enrolled.has(m.subjectId)) };
@@ -583,6 +718,10 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       }
       ranked = fitting;
     }
+  }
+  if (ranked.length === 0 && !input.adaptive) {
+    const fallback = keepPractisingDraft(scoped, enrolled, missions);
+    if (fallback) ranked = [finalise(fallback, scoped)];
   }
   const first = ranked[0];
   ranked.forEach((a, i) => {

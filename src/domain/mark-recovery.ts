@@ -19,13 +19,34 @@
 // ---------------------------------------------------------------------------
 
 import { independentAttempt, questionFamilies, trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt, unseenQuestion } from "./learning-evidence";
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted, requiresWjecContentReview, trustedAssessmentContent } from "./content-trust";
+import { isFlagship } from "./flagship";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import { officialPaperQuestionEligible, type OfficialPaperContext } from "./official-papers";
 import { isShallowReskin } from "./reskin";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
 export type RecoveryState = "open" | "targeted" | "provisional" | "awaiting-proof" | "proven" | "regressed";
+
+/**
+ * Why a lost mark itself can never count towards proof, whatever is answered
+ * afterwards. Proof of recovery needs the loss to be trusted evidence too
+ * (`trustedAssessmentMistake`): a loss on an unreviewed question, an
+ * unverified paper, an unreliable mark, or with no link to the marked answer
+ * cannot be "recovered" provably, so asking for more questions would never
+ * help. Only set on review-gated (WJEC flagship) losses, and only when
+ * `trustedAssessmentMistake` already says no: it explains the existing gate,
+ * it never changes it.
+ */
+export type ProofBarrier = "loss-unlinked" | "loss-unreviewed-question" | "loss-unverified-paper" | "loss-untrusted-mark";
+
+/** Plain learner wording for each barrier, written to follow "because". */
+export const PROOF_BARRIER_TEXT: Record<ProofBarrier, string> = {
+  "loss-unverified-paper": "these marks were lost on a paper Revise cannot verify as an official WJEC paper with teacher-reviewed marking",
+  "loss-unreviewed-question": "the question these marks were lost on has not been reviewed by two teachers yet",
+  "loss-untrusted-mark": "the mark on the answer that lost them was not reliable enough to count (self-marked, low confidence, or waiting for a check)",
+  "loss-unlinked": "these lost marks are not linked to a marked answer Revise can check",
+};
 
 export const SUCCESS_RATIO = 0.75;
 export const REGRESSION_RATIO = 0.5;
@@ -56,7 +77,31 @@ export interface MistakeRecovery {
   regressedAt?: string;
   /** Success counts as proof only on verified content; otherwise it stays provisional. */
   unverifiedOnly?: boolean;
+  /** Set when the loss itself can never count towards proof (see ProofBarrier). Never changes state. */
+  proofBarrier?: ProofBarrier;
+  /**
+   * Spaced practice revisits for a mark recovered only on unreviewed
+   * questions (`unverifiedOnly`). Proof is impossible there, but whether the
+   * fix held is still worth checking at expanding intervals. Never a proof
+   * state: it changes no state, total or claim.
+   */
+  practiceRevisit?: PracticeRevisit;
 }
+
+export interface PracticeRevisit {
+  /** When the next spaced practice check is due. */
+  dueAt: string;
+  /** Spaced checks already passed, unaided, on a different question. */
+  heldChecks: number;
+  /** When the last spaced check passed. */
+  lastHeldAt?: string;
+  /** A spaced check was answered unaided and lost marks: the new loss takes over. */
+  slipped: boolean;
+}
+
+/** First spaced practice check after the first recovery; each one passed doubles the gap (3, 6, 12, 24 days…). */
+export const PRACTICE_REVISIT_FIRST_DAYS = MIN_PROOF_DELAY_DAYS;
+export const PRACTICE_REVISIT_MAX_DAYS = 30;
 
 export interface RecoveryTotals {
   /** Every mark lost, recovered or not. */
@@ -108,14 +153,22 @@ export function classifyMistake(
   now: Date = new Date(),
   officialPaper?: OfficialPaperContext,
 ): MistakeRecovery {
-  const base = { mistakeId: mistake.id, topicId: mistake.topicId, subjectId: mistake.subjectId, marks: mistake.marksLost };
+  const base: Pick<MistakeRecovery, "mistakeId" | "topicId" | "subjectId" | "marks" | "proofBarrier"> = { mistakeId: mistake.id, topicId: mistake.topicId, subjectId: mistake.subjectId, marks: mistake.marksLost };
   const sourceQuestion = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
   const sourceFamilies = new Set(sourceQuestion ? questionFamilies(sourceQuestion) : []);
   const after = attempts
     .filter((a) => a.createdAt > mistake.createdAt && a.topicIds.includes(mistake.topicId) && trustworthyAttempt(a))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const bank = [...questionsById.values()];
-  const verified = (a: Attempt) => trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank, officialPaper);
+  // Proof is a learner-facing claim, so the answering question must clear
+  // learner-evidence trust (flagship + human review), exactly as the proof
+  // ledger requires. Reference-tier outlines pass the permissive authoring
+  // predicate but can only ever leave a mark "provisional". The official-paper
+  // tier keeps its own, separately verified route.
+  const proofQuestion = (q: Question | undefined): boolean => Boolean(q) &&
+    (learnerEvidenceTrusted(q) || (officialPaper?.enabled === true && officialPaperQuestionEligible(q, officialPaper.manifest, true)));
+  const verified = (a: Attempt) => proofQuestion(questionsById.get(a.questionId)) &&
+    trustedAssessmentAttempt(a, questionsById.get(a.questionId), attempts, bank, officialPaper);
   // trustedAssessmentMistake defaults to reviewer trust; the official-paper
   // tier ORs in only at the question level, per learner, with the flag on.
   // With no context the second disjunct is false, so behaviour is unchanged.
@@ -135,8 +188,10 @@ export function classifyMistake(
     return !!q && !questionFamilies(q).some((f) => sourceFamilies.has(f)) && !(sourceQuestion && isShallowReskin(q, sourceQuestion));
   };
   const independentDifferent = successes.filter((a) => independentAttempt(a) && different(a));
-  const provable = independentDifferent.filter(a => verified(a) &&
-    trustedAssessmentMistake(mistake, bank, attempts, trustedQuestion) &&
+  const lossTrusted = trustedAssessmentMistake(mistake, bank, attempts, trustedQuestion);
+  const barrier = lossTrusted ? undefined : lossProofBarrier(mistake, questionsById, attempts, trustedQuestion);
+  if (barrier) base.proofBarrier = barrier;
+  const provable = independentDifferent.filter(a => verified(a) && lossTrusted &&
     unseenQuestion(questionsById.get(a.questionId)!, attempts.filter(prior => prior.userId === a.userId && prior.id !== a.id && prior.createdAt <= a.createdAt), bank));
   if (!first) {
     return { ...base, ...(targetedAt ? { targetedAt } : {}), state: targeted ? "targeted" : "open", reason: targeted
@@ -148,7 +203,12 @@ export function classifyMistake(
     return { ...common, state: "provisional", reason: "Succeeded, but on the same question, with help, or on a near-identical one. That is not proof." };
   }
   if (!provable.length) {
-    return { ...common, state: "provisional", unverifiedOnly: true, reason: "You improved here, but Revise does not yet have enough reviewed new questions to prove it." };
+    const practiceRevisit = practiceRevisitFor(independentDifferent[0]!, after, different);
+    return { ...common, state: "provisional", unverifiedOnly: true, practiceRevisit, reason: barrier
+      ? `You improved here, but this cannot count as proof because ${PROOF_BARRIER_TEXT[barrier]}. Revise will bring it back for spaced practice checks instead.`
+      : isFlagship(mistake.subjectId)
+      ? "You improved here, but Revise does not yet have enough reviewed new questions to prove it."
+      : "You improved here. This subject's questions have not been checked against the specification, so Revise can track practice but not prove it." };
   }
   const firstFamilies = new Set(questionsById.has(first.questionId) ? questionFamilies(questionsById.get(first.questionId)!) : []);
   // The delayed check must also be new relative to the success it follows.
@@ -166,6 +226,78 @@ export function classifyMistake(
     return { ...common, state: "regressed", regressedAt: later.createdAt, provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Was proven, but a later independent attempt on this topic lost marks again." };
   }
   return { ...common, state: "proven", provenAt: delayed.createdAt, provenAttemptId: delayed.id, reason: "Answered independently on a different question after a delay." };
+}
+
+/**
+ * Which part of `trustedAssessmentMistake` a review-gated loss failed. Call
+ * only when that gate has already said no; returns undefined for losses that
+ * are not review-gated (their proof rules live elsewhere). Pure.
+ */
+export function lossProofBarrier(
+  mistake: Mistake,
+  questionsById: ReadonlyMap<Id, Question>,
+  attempts: readonly Attempt[],
+  trustedQuestion: (question: Question) => boolean = trustedAssessmentContent,
+): ProofBarrier | undefined {
+  if (!requiresWjecContentReview(mistake.subjectId)) return undefined;
+  const question = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
+  const attempt = mistake.attemptId ? attempts.find((a) => a.id === mistake.attemptId) : undefined;
+  if (!question || !attempt || attempt.questionId !== question.id ||
+    question.subjectId !== mistake.subjectId || attempt.subjectId !== mistake.subjectId) return "loss-unlinked";
+  if (!trustedQuestion(question)) return "loss-unreviewed-question";
+  if (attempt.mode === "paper" && trustworthyAttempt(attempt)) return "loss-unverified-paper";
+  return "loss-untrusted-mark";
+}
+
+/**
+ * Spaced practice revisits after a recovery on unreviewed questions. The
+ * anchor is the first unaided success on a different question. A check is
+ * the first unaided attempt on yet another question once the current gap has
+ * passed: a pass doubles the gap (capped), a loss of marks stops the schedule
+ * because that attempt opened a new loss of its own. Hinted attempts and
+ * repeats of the anchor question never count. Pure.
+ */
+export function practiceRevisitFor(
+  anchor: Attempt,
+  after: readonly Attempt[],
+  differentFromSource: (a: Attempt) => boolean,
+): PracticeRevisit {
+  let anchorAt = anchor.createdAt;
+  let anchorQuestion = anchor.questionId;
+  let gapDays = PRACTICE_REVISIT_FIRST_DAYS;
+  let heldChecks = 0;
+  let lastHeldAt: string | undefined;
+  for (const attempt of after) {
+    if (attempt.createdAt <= anchorAt || !independentAttempt(attempt)) continue;
+    if (attempt.questionId === anchorQuestion || !differentFromSource(attempt)) continue;
+    if (daysBetween(anchorAt, attempt.createdAt) < gapDays) continue;
+    if (ratio(attempt) < SUCCESS_RATIO) {
+      return { dueAt: attempt.createdAt, heldChecks, ...(lastHeldAt ? { lastHeldAt } : {}), slipped: true };
+    }
+    heldChecks += 1;
+    lastHeldAt = attempt.createdAt;
+    anchorAt = attempt.createdAt;
+    anchorQuestion = attempt.questionId;
+    gapDays = Math.min(PRACTICE_REVISIT_MAX_DAYS, gapDays * 2);
+  }
+  return {
+    dueAt: new Date(Date.parse(anchorAt) + gapDays * DAY_MS).toISOString(),
+    heldChecks,
+    ...(lastHeldAt ? { lastHeldAt } : {}),
+    slipped: false,
+  };
+}
+
+/**
+ * What a single attempt proved: the lost marks whose delayed proof is exactly
+ * this attempt and that are still proven now. This is the only basis on which
+ * a marked answer may say "proven" — one full-marks answer on its own never
+ * is (it needs an earlier independent success, a delay, a different reviewed
+ * flagship question). Pure.
+ */
+export function marksProvenByAttempt(recovery: Pick<MarkRecovery, "items">, attemptId: Id): { marks: number; topicIds: Id[] } {
+  const items = recovery.items.filter((i) => i.state === "proven" && i.provenAttemptId === attemptId);
+  return { marks: Math.round(items.reduce((s, i) => s + i.marks, 0) * 10) / 10, topicIds: [...new Set(items.map((i) => i.topicId))] };
 }
 
 export interface MarkRecovery {

@@ -22,6 +22,8 @@ function strongCard(topicId: string, id: string): Card {
     ...createCard({ id, userId: "u", subjectId: "subject", topicId, front: "f", back: "b" }, NOW),
     stability: 30,
     reps: 5,
+    // Studied five times, so it is in Review state (a New card has never been studied).
+    state: 2,
     lastReviewedAt: NOW.toISOString(),
     due: "2025-07-01",
   };
@@ -74,7 +76,8 @@ describe("computeTopicMastery", () => {
     expect(row.weak).toBe(false);
     expect(row.lastStudiedAt).toBeNull();
     expect(row.cardsTotal).toBe(8);
-    expect(row.cardsDue).toBe(8);
+    // Installed but never studied: nothing is owed a review yet (isDueReview).
+    expect(row.cardsDue).toBe(0);
   });
 
   it("stays cautious when evidence is thin, even if that evidence is perfect", () => {

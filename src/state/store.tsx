@@ -4,9 +4,10 @@ import { writeLearnerHistory } from "@/data/learner-history";
 import { useAssessmentModels } from "./assessment-models";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { allTopics } from "@/domain/curriculum";
-import { misconceptionsForTopic, seedMisconceptions } from "@/content";
+import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
 
 import type { GradePrediction } from "@/domain/grades";
 import { officialPaperContextFromSettings } from "@/domain/official-papers";
@@ -15,7 +16,7 @@ import {
   evaluateMistakeRetest,
   mistakesFromAttempt,
 } from "@/domain/mistakes";
-import { advanceMistakeRepair, deferRepairAfterRetrieval, repairTargetParts } from "@/domain/repair-evidence";
+import { advanceMistakeRepair, repairTargetParts } from "@/domain/repair-evidence";
 
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
 
@@ -38,8 +39,9 @@ import {
 } from "@/domain/paper-outcome";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
 import type { RevisionTwinChoice, RevisionTwinReport, RevisionTwinSession, RevisionTwinState } from "@/domain/revision-twin";
-import { gradeCard, isDue, todayIso } from "@/domain/scheduling";
-import { getDeviceIdentity, nextLamport } from "@/data/device";
+import { isDueReview, todayIso } from "@/domain/scheduling";
+import { saveCardReview } from "@/data/card-review";
+import { mergeCard } from "@/domain/sync-crdt";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
 import { calibrateDifficulty } from "@/domain/knowledge-tracing";
 import type { DifficultyCalibrationReport, QuestionTrace } from "@/domain/knowledge-tracing";
@@ -80,7 +82,6 @@ import type {
   Question,
   Recommendation,
   RecallGrade,
-  ReviewLog,
   StreakState,
   TopicMastery,
   UserSettings,
@@ -90,6 +91,7 @@ import type { ApplicationMasteryRow } from "@/domain/application-mastery";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type { MasteryInterval } from "@/domain/mastery-uncertainty";
 import * as repo from "@/data/repository";
+import { isContentBankUnavailable, startAuthoredQuestionsInWorker } from "@/data/authored-questions";
 import { LOCAL_USER_ID, defaultLessonProgress } from "@/data/repository";
 import type { Snapshot } from "@/data/repository";
 import { domainEngine } from "@/data/domain-engine";
@@ -101,6 +103,7 @@ import { type ActualResultRecord, type GradePredictionRecord } from "@/domain/gr
 import { policyTaskFor,
   type ExperimentAssignment, type ExperimentEventType } from "@/domain/recommendation-experiment";
 import { StorageRecovery } from "@/components/StorageRecovery";
+import { OnboardingFlow } from "@/components/Onboarding";
 import { estimateStorageQuota } from "@/data/storage-quota";
 import type { StorageQuota } from "@/data/storage-quota";
 import type {
@@ -247,6 +250,7 @@ export interface StoreValue extends Snapshot {
 // ./sync-engine (pure moves + responsibility modules).
 
 export function StoreProvider({ children, userId }: { children: ReactNode; userId: Id }) {
+  const pathname = usePathname();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [storageQuota, setStorageQuota] = useState<StorageQuota>(() => ({
     usageBytes: null,
@@ -256,12 +260,33 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     checkedAt: new Date().toISOString(),
   }));
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  // A profile that has never finished onboarding. Read from one meta row in
+  // parallel with boot (never ahead of it), so a fresh student sees the first
+  // onboarding step while the content bank installs, instead of a spinner
+  // for the whole seed. Latched: once true it stays true for this mount, so
+  // the onboarding instance (and the choices in it) survives boot finishing.
+  const [freshProfile, setFreshProfile] = useState(false);
+  // Resolved by the commit that first shows onboarding. Boot waits on it (and a
+  // painted frame) before loading the bank: React renders in yielding slices,
+  // so without it the bank chunk's evaluation can land between two slices and
+  // hold the first onboarding screen back for seconds on a slow phone.
+  const [onboardingShown] = useState(() => {
+    let resolve = () => {};
+    const promise = new Promise<void>((done) => {
+      resolve = done;
+    });
+    return { promise, resolve };
+  });
   const [bootLoaded, setBootLoaded] = useState(false);
   const bootstrapped = useRef(false);
   // Boot must never fail silently. If IndexedDB or a migration rejects, keep
   // the reason visible so the student can retry instead of staring at a
   // spinner forever.
   const [bootError, setBootError] = useState<string | null>(null);
+  // The question bank chunk could not be downloaded (offline before it was
+  // cached). Local data is fine, so this gets a calm retry screen, never the
+  // storage-recovery one with its repair and reset buttons.
+  const [bankUnavailable, setBankUnavailable] = useState(false);
   const [bootAttempt, setBootAttempt] = useState(0);
   // Plan/phase state lives in usePlanning (composed below, after mastery).
   // Heavy analytics run off-thread (Comlink worker) and land here when ready;
@@ -285,11 +310,42 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   } = useExperiments(userId);
 
   useEffect(() => {
+    let active = true;
+    void repo
+      .hasOnboarded(userId)
+      .then((onboarded) => {
+        if (active && !onboarded) setFreshProfile(true);
+      })
+      .catch(() => undefined); // boot reports storage failures itself
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    // This commit rendered the onboarding branch below (freshProfile and no store yet, or one that needs onboarding).
+    if (freshProfile) onboardingShown.resolve();
+  }, [freshProfile, onboardingShown]);
+
+  useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
     void recordFunnel("app_opened").catch(() => undefined);
     void (async () => {
       try {
+        // A fresh profile's first onboarding screen must reach the glass before
+        // the authored bank chunk is fetched and evaluated: evaluating it holds
+        // the main thread for about a second on a phone (several at 4x CPU
+        // throttling), and it used to sit in the shell chunk, ahead of any paint.
+        // Returning students skip the wait; they see the boot screen either way.
+        if (!(await repo.hasOnboarded(userId).catch(() => true))) {
+          setFreshProfile(true);
+          await Promise.race([onboardingShown.promise, new Promise((done) => setTimeout(done, 3000))]);
+          await afterNextPaint();
+          // Onboarding is open and interactive: build the bank off the main
+          // thread so the student's taps are not held up by it (nineteenth pass).
+          startAuthoredQuestionsInWorker();
+        }
         const loaded = await repo.loadSnapshot(userId);
         setSnapshot(loaded);
         // First page is on screen; stream the rest of history in the background.
@@ -309,6 +365,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
         }
         setNeedsOnboarding(!(await repo.hasOnboarded(userId)));
         setBootError(null);
+        setBankUnavailable(false);
         // A plan that has drifted into the past is worse than no plan: fold
         // missed sessions forward before the dashboard renders anything.
         const today = todayIso();
@@ -323,13 +380,17 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
         setBootLoaded(false);
         console.error("[store] boot failed", error);
         bootstrapped.current = false;
+        if (isContentBankUnavailable(error)) {
+          setBankUnavailable(true);
+          return;
+        }
         setBootError(error instanceof Error ? error.message : "Could not load your revision data.");
       }
     })();
     // recordFunnel is a stable useCallback; startHydration likewise. The
     // exhaustive-deps lint flags them anyway on this long-lived boot effect
     // (pre-existing pattern in this file); both are intentionally stable.
-  }, [userId, startHydration, recordFunnel, bootAttempt]);
+  }, [userId, startHydration, recordFunnel, bootAttempt, onboardingShown]);
 
   const refreshStorageQuota = useCallback(async () => {
     setStorageQuota(await estimateStorageQuota());
@@ -366,7 +427,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const dueCards = useMemo(() => {
     if (!evidence) return [];
     const today = todayIso();
-    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDue(c, today));
+    // Reviews owed, not cards installed: never-studied seeded cards are not
+    // "due" (isDueReview), so the nav badge and Practice's count stay honest
+    // on a fresh profile. /review still introduces new cards on its own.
+    return evidence.cards.filter((c) => subjectIds.includes(c.subjectId) && isDueReview(c, today));
   }, [evidence, subjectIds]);
 
   // --- heavy analytics, off the main thread --------------------------------
@@ -706,37 +770,15 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
 
   const reviewCard = useCallback<StoreValue["reviewCard"]>(
     async (card, grade, elapsedMs, confidence) => {
-      const now = new Date();
-      touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
-      // CRDT: every grade gets a Lamport stamp so concurrent reviews on two
-      // devices merge by replay instead of last-write-wins discarding one.
-      const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
-      const updated = gradeCard(card, grade, now, { deviceId, lamport });
-      const log: ReviewLog = {
-        id: crypto.randomUUID(),
-        userId,
-        cardId: card.id,
-        topicId: card.topicId,
-        grade,
-        confidence,
-        elapsedMs,
-        reviewedAt: now.toISOString(),
-      };
-      await repo.saveCard(updated);
-      await repo.saveReviewLog(log);
-
       // Card recall updates retention, but cannot prove independent exam repair.
-      const deferred = (snapshot?.mistakes ?? []).flatMap((mistake) => {
-        const next = deferRepairAfterRetrieval(mistake, updated, log);
-        return next === mistake ? [] : [next];
-      });
-      if (deferred.length) await repo.saveMistakes(deferred);
+      const { card: updated, log, mistakes: deferred } = await saveCardReview(card, userId, grade, elapsedMs, confidence);
+      touchSessionClock(); // count only a saved retrieval decision
 
       setSnapshot((prev) => {
         if (!prev) return prev;
         const next: Snapshot = {
           ...prev,
-          cards: prev.cards.map((c) => (c.id === updated.id ? updated : c)),
+          cards: prev.cards.map((c) => (c.id === updated.id ? mergeCard(c, updated) : c)),
           reviewLogs: [...prev.reviewLogs, log],
           mistakes: prev.mistakes.map((mistake) => deferred.find((m) => m.id === mistake.id) ?? mistake),
         };
@@ -749,7 +791,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
         return next;
       });
     },
-    [userId, snapshot, bumpGamification, patch],
+    [userId, bumpGamification, patch],
   );
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
@@ -1126,8 +1168,86 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       />
     );
   }
+  if (bankUnavailable) {
+    return (
+      <BankUnavailableScreen
+        onRetry={() => {
+          setBankUnavailable(false);
+          bootstrapped.current = false;
+          setBootAttempt((attempt) => attempt + 1);
+        }}
+      />
+    );
+  }
+  // Fresh profile: onboarding renders here, at one fixed position, from the
+  // first frame until it completes. Before the store is ready it has no
+  // actions and holds a final click until they arrive; afterwards it gets the
+  // real ones. Returning students never take this branch.
+  if (freshProfile && (!value || value.needsOnboarding)) {
+    // Class management and sign-in settings do not require student onboarding.
+    // Learning routes keep the first-paint flow and durable completion gate.
+    if (pathname !== "/classes" && pathname !== "/settings") return (
+      <OnboardingFlow
+        actions={
+          value
+            ? {
+                regeneratePlan: value.regeneratePlan,
+                updateSettings: value.updateSettings,
+                upsertExamDate: value.upsertExamDate,
+                userId: value.userId,
+                recordFunnel: value.recordFunnel,
+              }
+            : null
+        }
+        onDone={completeOnboarding}
+      />
+    );
+  }
   if (!value) return <BootScreen />;
   return <StoreSubscriptionsProvider value={value}>{children}</StoreSubscriptionsProvider>;
+}
+
+function BankUnavailableScreen({ onRetry }: { onRetry: () => void }) {
+  return (
+    <main className="min-h-dvh grid place-items-center bg-bg" data-boot-error="content-bank-unavailable">
+      <div className="flex flex-col items-center gap-3 max-w-sm px-6 text-center">
+        <h1 className="text-base font-semibold text-ink">Revise needs a connection to finish setting up</h1>
+        <p className="text-sm text-ink2 leading-6">
+          The question bank has not been downloaded to this device yet. Your revision data here is safe. Connect to
+          the internet once, then try again; after that Revise works offline.
+        </p>
+        <button type="button" className="btn btn-primary mt-2" onClick={onRetry}>
+          Try again
+        </button>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * Resolves once the frame after the current one has been presented (two
+ * animation frames, then a task). A hidden tab produces no frames, so it
+ * resolves at once there, and a 1 s backstop covers any other environment
+ * without frames (tests), so boot never stalls on it. The backstop is long on
+ * purpose: on a throttled phone rendering the onboarding step alone can take
+ * several hundred milliseconds, and a short timer would fire before the frame.
+ */
+function afterNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame !== "function" || document.visibilityState === "hidden") {
+      resolve();
+      return;
+    }
+    const backstop = setTimeout(resolve, 1000);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setTimeout(() => {
+          clearTimeout(backstop);
+          resolve();
+        }, 0),
+      ),
+    );
+  });
 }
 
 function BootScreen({ error, onRetry }: { error?: string | null; onRetry?: () => void } = {}) {

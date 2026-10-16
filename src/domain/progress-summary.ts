@@ -11,13 +11,19 @@
 // ---------------------------------------------------------------------------
 
 import { buildMarksAtRisk } from "./marks-at-risk";
-import { masteryStages, STAGE_LABEL, type MasteryStage } from "./mastery-stage";
+import { masteryStages, stageLabel, type MasteryStage } from "./mastery-stage";
 import { buildMistakePatterns, type MistakePattern } from "./mistake-patterns";
 import { buildTopicLifecycles, type LifecycleStage } from "./proof-lifecycle";
 import type { ProofLedger } from "./proof-of-improvement";
 import type { Attempt, Id, Mistake, Question, Topic } from "./types";
 
-export interface StrongTopic { topicId: Id; title: string; stage: MasteryStage; label: string; reason: string }
+export interface StrongTopic {
+  topicId: Id; title: string; stage: MasteryStage; label: string; reason: string;
+  /** Reference-tier practice evidence: the label already says "in practice". */
+  referenceTier: boolean;
+  /** Marks lost on this topic that are not yet recovered (the topic can be strong overall and still have them). */
+  openMarks: number;
+}
 export interface LosingTopic { topicId: Id; title: string; marks: number }
 export interface ProvenTopic { topicId: Id; title: string; markPoints: number }
 
@@ -26,7 +32,19 @@ export interface ProgressSummary {
   coldStart: boolean;
   strong: StrongTopic[];
   stageCounts: Record<MasteryStage, number>;
-  losing: { totalMarks: number; topics: LosingTopic[]; patterns: MistakePattern[] };
+  /** How many of `stageCounts.secure` rest on reference-tier practice questions only. */
+  practiceOnlySecure: number;
+  losing: {
+    totalMarks: number; topics: LosingTopic[]; patterns: MistakePattern[];
+    /**
+     * Topics shown as strong or proven that still have unrecovered lost marks.
+     * Both are true at once, at different scopes: "Proven"/"Secure" is about
+     * the topic overall; a lost mark is one specific question not yet won back.
+     */
+    inStrongTopics: LosingTopic[];
+    /** One plain sentence explaining that scope whenever `inStrongTopics` is not empty; otherwise null. */
+    scopeNote: string | null;
+  };
   proven: { topics: ProvenTopic[]; declined: number; awaiting: number; markPoints: number };
   /** Where topics stand on proof: states shown to students, never a score. */
   lifecycle: {
@@ -64,17 +82,19 @@ export function buildProgressSummary(input: {
   });
   const stageCounts = Object.fromEntries(ORDER.map((stage) => [stage, 0])) as Record<MasteryStage, number>;
   for (const row of stages) stageCounts[row.stage] += 1;
-
-  const strong = stages
-    .filter((row) => row.stage === "secure" || row.stage === "proven")
-    .sort((a, b) => ORDER.indexOf(b.stage) - ORDER.indexOf(a.stage) || (b.evidence.accuracy ?? 0) - (a.evidence.accuracy ?? 0) || a.topicId.localeCompare(b.topicId))
-    .slice(0, 5)
-    .map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId, stage: row.stage, label: STAGE_LABEL[row.stage], reason: row.reasons[0] ?? "" }));
+  const practiceOnlySecure = stages.filter((row) => row.stage === "secure" && row.referenceTier).length;
 
   const risk = buildMarksAtRisk({
     mistakes: input.mistakes as Mistake[], attempts: input.attempts as Attempt[], questions: input.questions as Question[],
     ...(enrolled.size ? { subjectIds: [...enrolled] } : {}),
   });
+  const openMarks = new Map(risk.topics.filter((row) => row.marks > 0).map((row) => [row.topicId, row.marks] as const));
+
+  const strong = stages
+    .filter((row) => row.stage === "secure" || row.stage === "proven")
+    .sort((a, b) => ORDER.indexOf(b.stage) - ORDER.indexOf(a.stage) || (b.evidence.accuracy ?? 0) - (a.evidence.accuracy ?? 0) || a.topicId.localeCompare(b.topicId))
+    .slice(0, 5)
+    .map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId, stage: row.stage, label: stageLabel(row.stage, row.referenceTier), reason: row.reasons[0] ?? "", referenceTier: row.referenceTier, openMarks: openMarks.get(row.topicId) ?? 0 }));
   const patterns = buildMistakePatterns({ mistakes: input.mistakes, attempts: input.attempts, questions: input.questions })
     .filter((row) => !row.repaired && (row.recurring || row.openMarks > 0))
     .filter((row) => !enrolled.size || row.topics.some((id) => topics.some((topic) => topic.id === id)))
@@ -96,6 +116,22 @@ export function buildProgressSummary(input: {
   for (const row of lifecycles) lifecycleCounts[row.stage] += 1;
   const named = (rows: typeof lifecycles) => rows.map((row) => ({ topicId: row.topicId, title: title.get(row.topicId) ?? row.topicId }));
 
+  // A topic can be shown as strong/proven (whole-topic evidence) while
+  // specific lost marks on it are still open. Never hide either; say how they
+  // relate, so "Proven" next to "N marks lost" is not read as a contradiction.
+  const strongOrProven = new Map<Id, string>();
+  for (const row of strong) strongOrProven.set(row.topicId, row.label);
+  for (const row of provenTopics) if (!strongOrProven.has(row.topicId)) strongOrProven.set(row.topicId, "Improvement proven");
+  for (const row of lifecycles) if ((row.stage === "proven" || row.stage === "holding") && !strongOrProven.has(row.topicId)) strongOrProven.set(row.topicId, "Improvement proven");
+  const inStrongTopics = [...strongOrProven.keys()]
+    .filter((topicId) => (openMarks.get(topicId) ?? 0) > 0)
+    .map((topicId) => ({ topicId, title: title.get(topicId) ?? topicId, marks: openMarks.get(topicId) ?? 0 }))
+    .sort((a, b) => b.marks - a.marks || a.topicId.localeCompare(b.topicId));
+  const overlapMarks = inStrongTopics.reduce((sum, row) => sum + row.marks, 0);
+  const scopeNote = inStrongTopics.length
+    ? `${overlapMarks} of these marks ${overlapMarks === 1 ? "is" : "are"} in ${inStrongTopics.slice(0, 3).map((row) => row.title).join(", ")}, which ${inStrongTopics.length === 1 ? "shows" : "show"} as strong or proven. Both are true: that label is about the topic as a whole, while each lost mark is a specific question you have not yet got right again.`
+    : null;
+
   return {
     lifecycle: {
       counts: lifecycleCounts,
@@ -107,10 +143,13 @@ export function buildProgressSummary(input: {
     coldStart: stageCounts.practised + stageCounts.secure + stageCounts.proven + stageCounts.fading === 0,
     strong,
     stageCounts,
+    practiceOnlySecure,
     losing: {
       totalMarks: risk.totalMarks,
       topics: risk.topics.slice(0, 3).map((row) => ({ topicId: row.topicId, title: row.label, marks: row.marks })),
       patterns,
+      inStrongTopics,
+      scopeNote,
     },
     proven: {
       topics: provenTopics.slice(0, 5),

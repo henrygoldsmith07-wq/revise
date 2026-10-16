@@ -10,6 +10,10 @@ const TEACHER = "aaaaaaaa-1111-4111-8111-111111111111";
 const STUDENT = "bbbbbbbb-2222-4222-8222-222222222222";
 const TEACHER2 = "cccccccc-3333-4333-8333-333333333333";
 const H = (n: number) => `sha256:${String(n).repeat(64).slice(0, 64)}`;
+const CHECKS = {
+  question: true, marking: true, workedSolution: true,
+  capabilityMapping: true, specificationMapping: true, examRealism: true,
+};
 let db: PGlite;
 
 async function as(id: string | null) {
@@ -21,32 +25,47 @@ function event(seq: number, previousHash: string, hash: string, reviewerId = "te
   return {
     seq, previousHash, hash, questionId: "cnt:question:q1", subjectId: "wjec-alevel-physics",
     contentFingerprint: "wjec-review-v3:sha256:abc", decision: "approve", reviewerId,
-    reviewerRole: "teacher", reviewerQualification: "PGCE Physics", ...extra,
+    // Synthetic database fixtures only; these are not human content approvals.
+    reviewerRole: "teacher", reviewerQualification: "PGCE Physics", reviewedAt: "2026-01-07T10:00:00.000Z",
+    checks: { ...CHECKS }, comments: "", classification: {}, ...extra,
   };
 }
 
-async function insertEvent(e: ReturnType<typeof event>, userId: string) {
+async function withRollback(run: () => Promise<void>) {
+  await db.exec("begin");
+  try {
+    await run();
+  } finally {
+    await db.exec("rollback");
+  }
+}
+
+async function insertEvent(e: ReturnType<typeof event>, userId: string, payload: unknown = e) {
   return db.query(
     `insert into review_audit_events (seq, previous_hash, hash, question_id, subject_id, content_fingerprint, decision, reviewer_id, reviewer_user_id, event)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
-    [e.seq, e.previousHash, e.hash, e.questionId, e.subjectId, e.contentFingerprint, e.decision, e.reviewerId, userId, JSON.stringify(e)],
+    [e.seq, e.previousHash, e.hash, e.questionId, e.subjectId, e.contentFingerprint, e.decision, e.reviewerId, userId, JSON.stringify(payload)],
   );
 }
 
 beforeAll(async () => {
   db = new PGlite();
-  await db.exec(`create schema auth; create role authenticated; create role anon;
+  await db.exec(`create schema auth; create role authenticated; create role anon; create role service_role bypassrls;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
-    grant usage on schema auth, public to authenticated;
-    grant execute on function auth.uid() to authenticated;
+    grant usage on schema auth, public to authenticated, service_role;
+    grant execute on function auth.uid() to authenticated, service_role;
     insert into auth.users values ('${TEACHER}'),('${STUDENT}'),('${TEACHER2}');`);
   const schema = readFileSync("supabase/schema.sql", "utf8");
   await db.exec(schema);
   await db.exec(schema); // rerunnable
   await db.exec(readFileSync("supabase/migrations/20261007000200_reviewer_portal.sql", "utf8"));
   await db.exec(readFileSync("supabase/migrations/20261007000300_sync_push_batch.sql", "utf8"));
-  await db.exec(`grant select, insert, update, delete on all tables in schema public to authenticated;
+  const validation = readFileSync("supabase/migrations/20261014000200_reviewer_validation.sql", "utf8");
+  await db.exec(validation); // upgrades an existing portal guard
+  await db.exec(validation); // rerunnable
+  await db.exec(`grant select, insert on public.review_audit_events to service_role;
+    grant select, insert, update, delete on all tables in schema public to authenticated;
     revoke update, delete, truncate on public.review_audit_events from authenticated;
     revoke insert, update, delete, truncate on public.reviewer_roles from authenticated;`);
   // Granting is an operator action (no auth.uid()).
@@ -73,6 +92,138 @@ describe("reviewer roles", () => {
 });
 
 describe("review audit events", () => {
+  it("refuses a direct authenticated approval missing all six checks", async () => {
+    await as(TEACHER);
+    await db.exec("begin");
+    try {
+      const incomplete = event(1, "genesis", H(1));
+      delete (incomplete as Record<string, unknown>).checks;
+      await expect(insertEvent(incomplete, TEACHER)).rejects.toThrow(/checks/);
+    } finally {
+      await db.exec("rollback");
+    }
+  });
+
+  it.each(Object.keys(CHECKS).flatMap((check) => [false, null, "true", 1, undefined].map((value) => [check, value] as const)))(
+    "refuses direct approval with %s check set to %s", async (check, value) => {
+      await as(TEACHER);
+      await withRollback(async () => {
+        const checks = { ...CHECKS, [check]: value };
+        await expect(insertEvent(event(1, "genesis", H(1), "teacher-one", { checks }), TEACHER)).rejects.toThrow(/checks/);
+      });
+    },
+  );
+
+  it.each([null, [], "true", true].map((checks) => ({ checks })))("refuses a non-object checks payload: $checks", async ({ checks }) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      await expect(insertEvent(event(1, "genesis", H(1), "teacher-one", { checks }), TEACHER)).rejects.toThrow(/checks/);
+    });
+  });
+
+  it.each([null, [], "event", 42].map((payload) => ({ payload })))("refuses a non-object audit event: $payload", async ({ payload }) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      await expect(insertEvent(event(1, "genesis", H(1)), TEACHER, payload)).rejects.toThrow(/event object/);
+    });
+  });
+
+  it.each([
+    ["reviewerRole", "student"], ["reviewerRole", undefined], ["reviewerRole", 123],
+    ["reviewerQualification", " "], ["reviewerQualification", "\t\r\n"], ["reviewerQualification", null],
+    ["reviewerQualification", undefined], ["reviewerQualification", { name: "PGCE" }],
+    ["comments", undefined], ["comments", null], ["comments", ["approved"]],
+    ["reviewerId", " "], ["questionId", " "], ["subjectId", " "], ["contentFingerprint", " "],
+  ])("refuses invalid decision metadata %s=%s", async (field, value) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      const invalid = event(1, "genesis", H(1), "teacher-one", { [field as string]: value });
+      await expect(insertEvent(invalid, TEACHER)).rejects.toThrow(/review decision/);
+    });
+  });
+
+  it.each([
+    undefined, null, 123, "", "today", "infinity", "2026-01-07", "2026-01-07T10:00:00",
+    "2026-02-30T10:00:00Z", "2026-13-07T10:00:00Z", "2026-01-07T24:00:00Z",
+    "2026-01-07T10:00:60Z", "2026-01-07T10:00:00+24:00", "2026-01-07T10:00:00+00:60",
+  ])("refuses missing or malformed review date %s", async (reviewedAt) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      await expect(insertEvent(event(1, "genesis", H(1), "teacher-one", { reviewedAt }), TEACHER)).rejects.toThrow(/review date|reviewedAt/);
+    });
+  });
+
+  it("refuses a review date beyond the domain clock-skew allowance", async () => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      const reviewedAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      await expect(insertEvent(event(1, "genesis", H(1), "teacher-one", { reviewedAt }), TEACHER)).rejects.toThrow(/future/);
+    });
+  });
+
+  it.each([null, [], "confirmed", { transferConfirmed: "true" }, { dataAnalysisConfirmed: 1 }, { transferConfirmed: null }, { invented: true }].map((classification) => ({ classification })))(
+    "refuses malformed classification $classification", async ({ classification }) => {
+      await as(TEACHER);
+      await withRollback(async () => {
+        await expect(insertEvent(event(1, "genesis", H(1), "teacher-one", { classification }), TEACHER)).rejects.toThrow(/classification/);
+      });
+    },
+  );
+
+  it.each(["reject", "revise"].flatMap((decision) => [" ", "\t\r\n"].map((comments) => ({ decision, comments }))))("requires a nonblank comment for $decision: $comments", async ({ decision, comments }) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      await expect(insertEvent(event(1, "genesis", H(1), "teacher-one", { decision, comments }), TEACHER)).rejects.toThrow(/comment/);
+    });
+  });
+
+  it.each(["reject", "revise"])("accepts a commented %s with false checks", async (decision) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      const checks = Object.fromEntries(Object.keys(CHECKS).map((check) => [check, false]));
+      await insertEvent(event(1, "genesis", H(1), "teacher-one", { decision, checks, comments: "Synthetic revision reason." }), TEACHER);
+      expect((await db.query("select decision from review_audit_events")).rows).toEqual([{ decision }]);
+    });
+  });
+
+  it.each([
+    { reviewedAt: "2026-01-07T10:00:00+01:00", classification: undefined },
+    { reviewedAt: "2026-01-07T10:00:00.123Z", classification: { transferConfirmed: false, dataAnalysisConfirmed: true } },
+  ])("accepts full ISO dates and optional boolean classifications: %s", async (extra) => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      await insertEvent(event(1, "genesis", H(1), "teacher-one", extra), TEACHER);
+      expect((await db.query("select seq from review_audit_events")).rows).toEqual([{ seq: 1 }]);
+    });
+  });
+
+  it("preserves the domain's five-minute clock-skew allowance", async () => {
+    await as(TEACHER);
+    await withRollback(async () => {
+      const reviewedAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+      await insertEvent(event(1, "genesis", H(1), "teacher-one", { reviewedAt }), TEACHER);
+      expect((await db.query("select seq from review_audit_events")).rows).toEqual([{ seq: 1 }]);
+    });
+  });
+
+  it("preserves service-only granting and applies validation to operator inserts", async () => {
+    await as(null);
+    await db.exec("set role service_role");
+    await withRollback(async () => {
+      await db.query("select grant_reviewer_role($1, 'service-granted', 'examiner', 'Synthetic qualification', 'operator')", [STUDENT]);
+      await db.query("select revoke_reviewer_role($1)", [STUDENT]);
+      expect((await db.query("select has_table_privilege('service_role', 'review_audit_events', 'UPDATE, DELETE, TRUNCATE') as can_mutate")).rows).toEqual([{ can_mutate: false }]);
+      await insertEvent(event(1, "genesis", H(1), "operator", { reviewerRole: "subject-expert" }), TEACHER);
+      expect((await db.query("select seq from review_audit_events")).rows).toEqual([{ seq: 1 }]);
+      await expect(db.query("update review_audit_events set decision = 'reject' where seq = 1")).rejects.toThrow(/permission denied/);
+    });
+    await as(null);
+    await db.exec("set role service_role");
+    await withRollback(async () => {
+      await expect(insertEvent(event(1, "genesis", H(1), "operator", { checks: {} }), TEACHER)).rejects.toThrow(/checks/);
+    });
+  });
+
   it("accepts a reviewer's own decision and links the chain", async () => {
     await as(TEACHER);
     await insertEvent(event(1, "genesis", H(1)), TEACHER);

@@ -18,7 +18,7 @@
 // moves focus on its own.
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { misconceptionsForTopic } from "@/content";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
 import {
   checkSocraticReply,

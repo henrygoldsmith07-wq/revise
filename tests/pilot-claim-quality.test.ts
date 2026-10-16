@@ -5,7 +5,7 @@ import { recoveryClaim, productLearningClaimAllowed, BLOCKED_PROOF_COPY } from "
 import { productQualityReport } from "@/domain/product-quality";
 import { markingEvidenceReport } from "@/domain/marking-evidence";
 import { flagshipReadiness } from "@/domain/flagship-readiness";
-import { bank, attempt, mistake } from "./helpers-recovery";
+import { flagshipBank as bank, flagshipAttempt as attempt, flagshipMistake as mistake } from "./helpers-recovery";
 import { gateFor, SUBJECT } from "./helpers-review";
 import type { FunnelEvent } from "@/domain/funnel";
 

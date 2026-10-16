@@ -20,6 +20,8 @@ import { ProofCheckBanner } from "./ProofCheckBanner";
 import { useQuestionExecution, type QuestionDraft } from "@/state/question-execution";
 export type { QuestionDraft } from "@/state/question-execution";
 import { MarkedResult } from "./QuestionMarkedResult";
+import { ExamPaceTimer } from "./ExamPaceTimer";
+import type { PracticeStepMode } from "@/domain/practice-step-mode";
 const TIER_HINT_CTA: Record<HintTier, string> = {
   cue: "Reveal a small cue",
   prompt: "Reveal what to think about",
@@ -43,8 +45,20 @@ export function QuestionRunner({
   repairTeachingSeen = false,
   intervention,
   mission,
+  onConfidence,
+  inDiagnostic = false,
+  stepMode = null,
 }: {
+  /**
+   * The repair-plan step this question was opened for (/practice?guided=1,
+   * ?timed=1, ?unaided=1). Guided shows the hint steps before the answer
+   * box; timed shows an exam-pace clock. The page sets hintBudget to 0 for
+   * timed and unaided, so neither offers help.
+   */
+  stepMode?: PracticeStepMode | null;
   question: Question;
+  /** Answered inside a diagnostic check; see MarkedResult's `inDiagnostic`. */
+  inDiagnostic?: boolean;
   mode?: Attempt["mode"];
   paperId?: Id;
   paperSpecId?: Id;
@@ -63,8 +77,16 @@ export function QuestionRunner({
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
   mission?: Attempt["mission"];
+  /**
+   * Ask how sure the student is as part of submitting, before the mark is
+   * revealed. A confidence rating given after seeing the mark is a judgement
+   * of the mark, not of the answer, so calibration data must be captured
+   * here. When set, "Submit for marking" becomes two submit buttons.
+   */
+  onConfidence?: (confident: boolean) => void;
 }) {
-  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission });
+  const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit, submitError } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission, guided: stepMode === "guided" });
+  const guided = stepMode === "guided";
   const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || Boolean(farTransfer));
   return (
     <div className="space-y-4">
@@ -88,6 +110,13 @@ export function QuestionRunner({
 
         <TrustDetails question={question} />
 
+        {stepMode === "timed" ? <ExamPaceTimer marks={question.totalMarks} stopped={Boolean(result)} /> : null}
+        {stepMode === "unaided" && !result ? (
+          <p className="text-xs text-ink3 mb-3" data-testid="unaided-step-note">
+            Unaided: no hints on this one, so the mark counts as your own evidence.
+          </p>
+        ) : null}
+
         {farTransfer ? (
           <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mb-4 text-sm text-ink2">
             <p className="font-semibold text-ink">Does it hold in a new context?</p>
@@ -99,6 +128,24 @@ export function QuestionRunner({
         ) : null}
 
         <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>
+
+        {guided && !result ? (
+          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mt-4 space-y-2" data-testid="guided-steps" aria-live="polite">
+            <p className="text-sm font-semibold text-ink">Guided try: use these steps as you write</p>
+            {visibleHints.length ? (
+              <ol className="space-y-1.5 list-decimal pl-5">
+                {visibleHints.map((hint) => (
+                  <li key={hint.tier} className="text-sm text-ink2">{formatHint(hint)}</li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-ink2">This question has no step-by-step support yet; answer it as normal.</p>
+            )}
+            <p className="text-[11px] text-ink3">
+              Practice, not proof: a guided answer is marked as normal but counts at reduced weight. Only an unaided answer counts as evidence.
+            </p>
+          </div>
+        ) : null}
 
         {isMcq ? (
           <ul className="mt-4 space-y-1.5" role="radiogroup" aria-label="Choose one answer">
@@ -146,7 +193,9 @@ export function QuestionRunner({
                   <RichText className="text-sm leading-6 flex-1 min-w-0">{part.prompt}</RichText>
                   <span className="text-xs text-ink3 shrink-0 pt-0.5">[{part.marks}]</span>
                 </div>
-                <CommandWordCheck validation={validateCommandWord(question, part, answers[part.id] ?? "")} />
+                {/* A live check while writing. Once marked, the mark supersedes it:
+                    "Verb covered" beside a 0/2 read as a contradiction. */}
+                {result ? null : <CommandWordCheck validation={validateCommandWord(question, part, answers[part.id] ?? "")} />}
                 {result ? (
                   <div className="card card-2 p-3 text-sm text-ink2 whitespace-pre-wrap break-words">
                     {answers[part.id]?.trim() || "(no answer given)"}
@@ -195,7 +244,7 @@ export function QuestionRunner({
             </Button>
           </div>
         ) : null}
-        {hintsOpen && visibleHints.length ? (
+        {hintsOpen && visibleHints.length && !(guided && !result) ? (
           <div className="mt-2 space-y-2" aria-live="polite">
             {visibleHints.map((hint) => (
               <p key={hint.tier} className="card card-2 p-3 text-sm text-ink2">
@@ -209,7 +258,35 @@ export function QuestionRunner({
             ) : null}
           </div>
         ) : null}
-        {!result && !retestMistake?.resolved ? (
+        {!result && !retestMistake?.resolved && onConfidence ? (
+          <div className="mt-5 space-y-2" role="group" aria-labelledby={`confidence-${question.id}`}>
+            <p id={`confidence-${question.id}`} className="text-sm font-semibold text-ink">Before you see the mark: how sure are you?</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                className="w-full min-h-11"
+                disabled={marking || (isMcq ? choice === null : !Object.values(answers).some((a) => a.trim()))}
+                onClick={() => {
+                  onConfidence(false);
+                  void submit();
+                }}
+              >
+                {marking ? "Marking…" : "Not sure · submit"}
+              </Button>
+              <Button
+                variant="primary"
+                className="w-full min-h-11"
+                disabled={marking || (isMcq ? choice === null : !Object.values(answers).some((a) => a.trim()))}
+                onClick={() => {
+                  onConfidence(true);
+                  void submit();
+                }}
+              >
+                {marking ? "Marking…" : "Confident · submit"}
+              </Button>
+            </div>
+          </div>
+        ) : !result && !retestMistake?.resolved ? (
           <Button
             variant="primary"
             className="w-full min-h-11 mt-5"
@@ -218,6 +295,9 @@ export function QuestionRunner({
           >
             {marking ? "Marking…" : "Submit for marking"}
           </Button>
+        ) : null}
+        {submitError && !result && !marking ? (
+          <p className="mt-3 text-sm text-danger" role="alert">{submitError}</p>
         ) : null}
       </Panel>
 
@@ -228,7 +308,8 @@ export function QuestionRunner({
           awarded={awarded}
           answers={answers}
           attempt={result.lastAttempt}
-          improvableAnswers={mode === "practice" && !farTransfer && !retestMistake ? answers : undefined}
+          inDiagnostic={inDiagnostic}
+          improvableAnswers={mode === "practice" && !farTransfer && !retestMistake && !inDiagnostic ? answers : undefined}
         />
       ) : null}
     </div>

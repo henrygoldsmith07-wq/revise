@@ -11,7 +11,7 @@
 import { getTopic } from "./curriculum";
 import { FINAL_DAYS } from "./exam-countdown";
 import { INTERVENTION_MINUTES, type InterventionKind } from "./intervention-ranking";
-import { type MarkRecovery, type RecoveryTotals } from "./mark-recovery";
+import { PROOF_BARRIER_TEXT, type MarkRecovery, type ProofBarrier, type RecoveryTotals } from "./mark-recovery";
 import { buildMistakePatterns, ROOT_CAUSE_LABEL, rootCauseOf, type MistakePattern, type RootCause } from "./mistake-patterns";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import { evidenceLimits, limitsSentence, proofBlocked, MIN_PROVABLE_QUESTIONS, type EvidenceLimitNote, type TopicSupply } from "./supply";
@@ -66,6 +66,13 @@ export interface ExamMission {
   evidenceLimits: EvidenceLimitNote[];
   /** One honest sentence when proof is blocked, else null. */
   limitsSentence: string | null;
+  /**
+   * Set when none of the mission's lost marks can ever count towards proof
+   * (every loss carries a ProofBarrier). Proof is then impossible whatever the
+   * question supply, so the mission routes to practice with spaced Revisit
+   * checks instead of offering a proof step it can never complete.
+   */
+  proofBarrier?: ProofBarrier;
   /** When the delayed check can first count, if a success has happened. */
   proofDueAt?: string;
   completionCondition: string;
@@ -133,7 +140,15 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
   const unseenAvailable = supply.provable;
   const days = input.daysToExam;
   const proofFits = days === null || days > MIN_PROOF_DELAY_DAYS;
-  const limits = evidenceLimits({ supply, daysToExam: days, minProofDays: MIN_PROOF_DELAY_DAYS, trustedAttempts: recovery.evidence === "none" ? 0 : recovery.evidence === "thin" ? 2 : 3, delayedChecked: recovery.proven > 0 });
+  // Proof needs the loss itself to be trusted, not just new questions to answer. When no lost mark in
+  // the mission can count (each carries a barrier), name the most common reason by marks.
+  const items = input.recovery.items.filter((i) => mistakeIds.includes(i.mistakeId));
+  const barred = items.length > 0 && items.every((i) => i.proofBarrier);
+  const barrierMarks = new Map<ProofBarrier, number>();
+  if (barred) for (const i of items) barrierMarks.set(i.proofBarrier!, (barrierMarks.get(i.proofBarrier!) ?? 0) + i.marks);
+  const proofBarrier = [...barrierMarks.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+  const barrierText = proofBarrier ? PROOF_BARRIER_TEXT[proofBarrier] : null;
+  const limits = evidenceLimits({ supply, daysToExam: days, minProofDays: MIN_PROOF_DELAY_DAYS, trustedAttempts: recovery.evidence === "none" ? 0 : recovery.evidence === "thin" ? 2 : 3, delayedChecked: recovery.proven > 0, lossNotProvable: barrierText });
   const proofPossible = !proofBlocked(limits);
 
   const causes = scope.mistakes.map((m) => rootCauseOf(m));
@@ -148,13 +163,17 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
     ...(scope.cause && scope.cause !== "unclassified" ? [`${recurring ? "recurring " : ""}${ROOT_CAUSE_LABEL[scope.cause]}`] : []),
     ...(lost >= 4 && recallLost / lost <= 0.2 && recovery.evidence === "adequate" ? ["recall does not look like the problem"] : []),
     ...(recovery.evidence !== "adequate" ? ["evidence is still thin"] : []),
-    ...(!proofPossible ? [unseenAvailable < MIN_UNSEEN_FOR_PROOF ? (supply.practiceOnly > 0 && supply.provable === 0 ? "only unverified unseen questions remain, which cannot prove improvement" : "too few unseen questions to prove improvement") : "too close to the exam for a delayed check"] : []),
+    ...(barrierText ? [`cannot be proven: ${barrierText}`] : []),
+    ...(!proofPossible && !barrierText ? [unseenAvailable < MIN_UNSEEN_FOR_PROOF ? (supply.practiceOnly > 0 && supply.provable === 0 ? "only unverified unseen questions remain, which cannot prove improvement" : "too few unseen questions to prove improvement") : "too close to the exam for a delayed check"] : []),
     ...(recovery.proven === 0 && recovery.provisional === 0 ? ["no proof yet"] : []),
   ];
 
   const touched = recovery.targeted > 0;
   const succeeded = recovery.provisional + recovery.proven > 0;
-  const independentlyDone = recovery.awaitingProof + recovery.proven > 0;
+  // With a barrier, an unaided success on a different question (which starts spaced practice checks) is
+  // as far as the apply stage can go; without one, only awaiting-proof or proven counts.
+  const practisedUnaided = items.some((i) => i.practiceRevisit);
+  const independentlyDone = recovery.awaitingProof + recovery.proven > 0 || (Boolean(proofBarrier) && practisedUnaided);
   const finished = recovery.open === 0 && recovery.provisional === 0 && recovery.awaitingProof === 0 && recovery.proven > 0;
   const kind = repairKind(scope.cause, patterns);
   const final = days !== null && days <= FINAL_DAYS;
@@ -166,9 +185,17 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
   }
   add({ kind: "repair", title: `Repair: ${ROOT_CAUSE_LABEL[scope.cause ?? "unclassified"]}`, reason: "Fix the specific cause before more practice, so practice is not just repeating the error.", minutes: INTERVENTION_MINUTES[kind], dayOffset: 0, intervention: kind, done: touched });
   add({ kind: "practise", title: "Practise with support", reason: "Show the repair works on a question with the same demands.", minutes: INTERVENTION_MINUTES["supported-question"], dayOffset: 0, intervention: "supported-question", done: succeeded });
+  if (barrierText) {
+    // Practice route: the same unaided step, honestly labelled, then spaced checks. Never a proof step.
+    add({ kind: "apply", title: "Answer unaided on a different question (practice)", reason: `Shows whether the fix works on a question you have not seen. It cannot count as proof because ${barrierText}.`, minutes: INTERVENTION_MINUTES["independent-set"], dayOffset: 1, intervention: "independent-set", done: independentlyDone,
+      ...(supply.provable + supply.practiceOnly === 0 ? { blockedBy: "No unseen question is left on these topics to practise on." } : {}) });
+    add({ kind: "delayed-proof", title: "Spaced practice checks", reason: "Revise brings this back after a gap, doubling it each time the fix holds. Practice, not proof.", minutes: INTERVENTION_MINUTES["delayed-proof-retest"], dayOffset: Math.max(MIN_PROOF_DELAY_DAYS, 1), intervention: null, done: false,
+      blockedBy: `This cannot be proven because ${barrierText}.` });
+  } else {
   add({ kind: "apply", title: "Apply to unfamiliar questions", reason: "Success on a different question is what separates learning from memorising.", minutes: INTERVENTION_MINUTES["independent-set"], dayOffset: 1, intervention: "independent-set", done: independentlyDone,
     ...(unseenAvailable < MIN_UNSEEN_FOR_PROOF ? { blockedBy: "Fewer than two unseen questions are available on these topics." } : {}) });
-  if (proofFits) {
+  }
+  if (proofFits && !barrierText) {
     add({ kind: "delayed-proof", title: "Delayed check", reason: `Revise checks again at least ${MIN_PROOF_DELAY_DAYS} days later, on another new question.`, minutes: INTERVENTION_MINUTES["delayed-proof-retest"], dayOffset: Math.min(DELAYED_PROOF_DAY, Math.max(MIN_PROOF_DELAY_DAYS, (days ?? DELAYED_PROOF_DAY) - 1)), intervention: "delayed-proof-retest", done: finished,
       ...(unseenAvailable < MIN_UNSEEN_FOR_PROOF ? { blockedBy: "No independent unseen question is left to prove this on." } : {}) });
   }
@@ -183,13 +210,17 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
   else if (!touched && !succeeded && recovery.open > 0 && lost === recovery.open) status = "not-started";
   else status = "active";
   if (status !== "proven" && status !== "regressed" && !proofPossible && (current.kind === "apply" || current.kind === "delayed-proof" || status === "awaiting-proof")) status = "blocked";
+  // A loss that can never be proven is never "awaiting proof", whatever the supply.
+  if (barrierText && status === "awaiting-proof") status = "blocked";
   if (status === "regressed") {
     const repair = stages.find((s) => s.kind === "repair")!;
     repair.done = false;
   }
 
   const topics = topicIds.map(topicTitle);
-  const completionCondition = proofFits
+  const completionCondition = barrierText
+    ? `This mission cannot be proven because ${barrierText}. Revise tracks it as practice and brings it back for spaced checks.`
+    : proofFits
     ? `Independent success on a different question family at least ${MIN_PROOF_DELAY_DAYS} days after the first success.`
     : "The exam is too close for a delayed check, so this mission can improve marks but cannot be proven.";
 
@@ -212,6 +243,7 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
     proofPossible,
     evidenceLimits: limits,
     limitsSentence: limitsSentence(limits),
+    ...(proofBarrier ? { proofBarrier } : {}),
     ...(proofDueAt ? { proofDueAt } : {}),
     completionCondition,
     marksAtStake: Math.round((recovery.open + recovery.awaitingProof + recovery.provisional) * 10) / 10,
@@ -305,7 +337,8 @@ export function missionNextAction(mission: ExamMission): MissionNextAction {
     after: next ? `After this: ${next.title.charAt(0).toLowerCase()}${next.title.slice(1)} ${when(next.dayOffset)}.` : mission.status === "proven" ? "Proven. Nothing more needed here." : "Revise will check again when new evidence arrives.",
     proof: mission.completionCondition,
     stage: stage.kind,
-    blocked: Boolean(stage.blockedBy) || mission.status === "blocked",
+    // A barred mission's practice steps still run: only a stage that is itself blocked stops the student.
+    blocked: Boolean(stage.blockedBy) || (mission.status === "blocked" && !mission.proofBarrier),
     href: `/practice?mission=${encodeURIComponent(mission.id)}&stage=${encodeURIComponent(stage.kind)}`,
   };
 }

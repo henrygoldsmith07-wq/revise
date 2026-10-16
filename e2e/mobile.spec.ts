@@ -67,7 +67,10 @@ test.describe("mobile core loop — Pixel 7", () => {
     const tabs = [...primary, "Review", "Past papers", "Choose how to study", "Tutor", "Schedule", "Settings"];
     for (const tab of tabs) {
       if (!primary.includes(tab)) await mobileNav(page).locator("summary").tap();
-      await mobileNav(page).getByRole("link", { name: tab, exact: true }).tap();
+      // "Review" carries its due-card count in the Tools menu ("Review 128"),
+      // so match the label with an optional trailing count.
+      const name = new RegExp(`^${tab.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s*\\d+)?$`);
+      await mobileNav(page).getByRole("link", { name }).tap();
       await expect(page.locator("main#main")).toBeVisible({ timeout: 10_000 });
     }
 

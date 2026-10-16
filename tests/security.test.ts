@@ -16,6 +16,8 @@ describe("security — RLS + schema invariants", () => {
     | { kind: "definer-only" }
     // Granted by the service role only; the holder may read their own row.
     | { kind: "self-read"; policy: string }
+    // Collaboration data is read-only under scoped class predicates; RPCs write.
+    | { kind: "class-read"; policy: string; predicate: string }
     // Append-only audit history: reviewer insert + read, no update/delete.
     | { kind: "append-only"; insert: string; read: string }
     // Write-only: the learner may insert their own rows and read nothing back
@@ -47,6 +49,12 @@ describe("security — RLS + schema invariants", () => {
     // Opt-in pilot telemetry and shared disputes: write-only for the learner.
     product_events: { kind: "insert-only", policy: "product_events_insert" },
     marking_disputes: { kind: "insert-only", policy: "marking_disputes_insert" },
+    // Live classes: no direct client writes, peer roster or public join-code access.
+    teacher_classes: { kind: "class-read", policy: "class_owner_read", predicate: "public.is_class_teacher(id)" },
+    class_memberships: { kind: "class-read", policy: "class_members_read", predicate: "user_id = auth.uid() or public.is_class_teacher(class_id)" },
+    class_assignments: { kind: "class-read", policy: "class_assignments_read", predicate: "public.is_class_teacher(class_id) or public.is_active_class_member(class_id)" },
+    class_evidence: { kind: "class-read", policy: "class_evidence_read", predicate: "exists (select 1 from public.class_memberships m where m.class_id = class_evidence.class_id and m.user_id = class_evidence.user_id and m.status = 'active') and (public.is_class_teacher(class_id) or (user_id = auth.uid() and public.is_active_class_member(class_id)))" },
+    class_join_limits: { kind: "definer-only" },
   };
 
   const OWNER_CLAUSE = "using (user_id = auth.uid()) with check (user_id = auth.uid())";
@@ -100,6 +108,12 @@ describe("security — RLS + schema invariants", () => {
       expect(explicit.map((p) => p.name)).toEqual([expectation.policy]);
       expect(explicit[0]!.text).toContain("for select to authenticated using (user_id = auth.uid())");
       expect(sql).toContain(`revoke insert, update, delete, truncate on public.${table} from anon, authenticated`);
+    } else if (expectation.kind === "class-read") {
+      expect(looped).not.toContain(table);
+      expect(explicit.map((p) => p.name)).toEqual([expectation.policy]);
+      expect(explicit[0]!.text.replace(/\( /g, "(").replace(/ \)/g, ")")).toBe(`for select to authenticated using (${expectation.predicate})`);
+      const revoke = /revoke all on ([^;]+) from public, anon, authenticated;/.exec(sql.slice(sql.indexOf("alter table public.teacher_classes enable")));
+      expect(revoke?.[1]?.split(", ")).toContain(`public.${table}`);
     } else if (expectation.kind === "append-only") {
       expect(looped).not.toContain(table);
       expect(explicit.map((p) => p.name).sort()).toEqual([expectation.insert, expectation.read].sort());
@@ -158,7 +172,11 @@ describe("security — RLS + schema invariants", () => {
 
   it("batched sync RPC runs as the caller so table RLS still applies", () => {
     const sql = schema();
-    const fn = sql.slice(sql.indexOf("create or replace function public.sync_push_batch"));
+    const start = sql.indexOf("create or replace function public.sync_push_batch");
+    const end = sql.indexOf("\n$$;", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const fn = sql.slice(start, end + 4);
     expect(fn).toContain("security invoker");
     expect(fn).not.toMatch(/^\s*security definer/m);
     expect(fn).toContain("is distinct from uid::text");

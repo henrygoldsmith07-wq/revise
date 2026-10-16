@@ -44,16 +44,25 @@ export async function todayOrOnboarding(page: Page, timeoutMs = 60_000): Promise
  * profile. The funnel is the *only* thing rendered until it is done, so
  * every spec that needs a Today screen funnels through here.
  * Defaults to AQA and its first subject with an exam ~3 months out. Set
- * skipExamDates to exercise the date-later path.
+ * skipExamDates to exercise the date-later path. The quick-check choice is
+ * left on its default; the helper then returns to Today unless
+ * stayOnQuickCheck is set.
  */
 export async function completeOnboarding(
   page: Page,
-  opts: { board?: string; subjectNames?: string[]; examDate?: string; skipExamDates?: boolean } = {},
+  opts: { board?: string; subjectNames?: string[]; examDate?: string; skipExamDates?: boolean; stayOnQuickCheck?: boolean } = {},
 ): Promise<void> {
   const board = opts.board ?? "AQA";
-  // Phase 1 — exam board.
-  await page.getByRole("button", { name: new RegExp(board, "i") }).first().click();
-  await page.getByRole("button", { name: /Continue/i }).click();
+  // Phase 1 — exam board. The onboarding dialog can paint before React has
+  // attached its handlers, so a single click may land on inert markup and
+  // leave Continue disabled ("Step 1 of 5 · Board"). Click until the board
+  // reports aria-pressed, then move on.
+  const boardButton = page.getByRole("button", { name: new RegExp(board, "i") }).first();
+  await expect(async () => {
+    await boardButton.click();
+    await expect(boardButton).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await page.getByRole("button", { name: /^Continue$/i }).click();
   // Phase 2 — subjects of that board (multi-select). Subjects whose outline was
   // not checked against this board sit behind an unverified-preview disclosure;
   // most specs onboard on boards where every subject is one, so opt in first.
@@ -77,8 +86,25 @@ export async function completeOnboarding(
     for (let i = 0; i < count; i++) await inputs.nth(i).fill(date);
   }
 
-  await page.getByRole("button", { name: /Build my plan|Start revising|Finish|Continue/i }).click();
+  // Phases 4 and 5 — the quick-check choice (left on its recommended default,
+  // so Today still offers "Skip, just start revising") and the first-step
+  // summary, which ends in the final CTA. Click Continue until it appears.
+  const finalCta = page.getByRole("button", { name: /Start my quick check|Build my plan|Start revising|Finish/i });
+  for (let step = 0; step < 3 && !(await finalCta.isVisible().catch(() => false)); step++) {
+    await page.getByRole("button", { name: /^Continue$/i }).click();
+  }
+  await finalCta.click();
   await expect(page.locator("main#main")).toBeVisible({ timeout: 60_000 });
+  // "Start my quick check" takes the student straight to /diagnostic. Specs
+  // that need Today (with the check still pending, not skipped) return there;
+  // nothing has been answered, so no evidence is recorded by the detour.
+  if (!opts.stayOnQuickCheck) {
+    await page.waitForURL(/\/diagnostic\?subject=/, { timeout: 15_000 }).catch(() => undefined);
+    if (/\/diagnostic/.test(page.url())) {
+      await page.goto("/");
+      await expect(page.locator("main#main")).toBeVisible({ timeout: 60_000 });
+    }
+  }
 }
 
 /**

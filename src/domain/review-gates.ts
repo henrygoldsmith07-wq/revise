@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { isDataAnalysis } from "./supply-audit";
-import type { Id, Question } from "./types";
+import type { Id, Question, Topic } from "./types";
 
 export type GateCode =
   | "no-mark-scheme"
@@ -115,3 +115,31 @@ export function questionGateIssues(question: Question, context: GateContext): Ga
 }
 
 export const blockingGates = (issues: readonly GateIssue[]): GateIssue[] => issues.filter((issue) => issue.severity === "block");
+
+/** The gate context for a curriculum: known topics, spec points and each subject's current spec version (the most common one). */
+export function gateContextFromTopics(topics: readonly Topic[]): GateContext {
+  const versions = new Map<Id, Map<string, number>>();
+  for (const topic of topics) {
+    if (!topic.specVersion) continue;
+    const counts = versions.get(topic.subjectId) ?? new Map<string, number>();
+    counts.set(topic.specVersion, (counts.get(topic.specVersion) ?? 0) + 1);
+    versions.set(topic.subjectId, counts);
+  }
+  return {
+    topicIds: new Set(topics.map((topic) => topic.id)),
+    specPointIds: new Set(topics.flatMap((topic) => (topic.specPoints ?? []).map((point) => point.id))),
+    specVersionOf: (subjectId) => [...(versions.get(subjectId) ?? new Map<string, number>())].sort((a, b) => b[1] - a[1])[0]?.[0],
+  };
+}
+
+/**
+ * Could a human review ever make this question trusted? Not while it fails a
+ * blocking gate: the reviewer portal refuses approval until an author fixes
+ * it. Authored-ceiling metrics ("if every current question were approved")
+ * must therefore count only questions this returns true for — a question
+ * labelled transfer with no baseline link can never be approved as transfer,
+ * so it must not fill a statement's transfer slot.
+ */
+export function approvableByReview(question: Question, context: GateContext): boolean {
+  return blockingGates(questionGateIssues(question, context)).length === 0;
+}

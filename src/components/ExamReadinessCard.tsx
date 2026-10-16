@@ -87,6 +87,12 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
             {row.targetGrade ? ` · ${row.targetGrade} target` : " · inferred next boundary"}
             {row.examDays != null ? ` · ${examCountdown(row.examDays)}` : ""}
           </p>
+          {row.referenceTier ? (
+            <p className="text-[11px] text-ink3 mt-0.5" role="note">
+              Practice estimate: these questions are reference material, not checked against the exam board&apos;s
+              specification, so this subject cannot be marked exam-ready.
+            </p>
+          ) : null}
         </div>
         <div className="text-right shrink-0">
           <p className="text-xl font-semibold tabular-nums text-ink">{scoreLabel(row.score, row.confidence)}</p>

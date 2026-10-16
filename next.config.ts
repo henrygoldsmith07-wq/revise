@@ -47,6 +47,11 @@ const nextConfig: NextConfig = {
   // caching for /_next/static; overriding it here causes dev/build warnings and
   // can interfere with framework cache semantics. Only app-owned endpoints get
   // explicit cache policy below.
+  // Teachers look for /teacher; class management lives at /classes. A
+  // temporary redirect, so the path can become its own page later.
+  async redirects() {
+    return [{ source: "/teacher", destination: "/classes", permanent: false }];
+  },
   async headers() {
     return [
       {

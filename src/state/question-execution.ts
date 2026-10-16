@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { aiDiagnoseError, aiMark } from "@/lib/optional-ai";
 import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from "@/ai/mark-dlq";
-import { misconceptionsForTopic } from "@/content";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 
 import { getTopic } from "@/domain/curriculum";
 import { buildHintLadder, HINT_TIERS, hintEvidenceSource, type HintTier } from "@/domain/hints";
+import { guidedOpeningTiers } from "@/domain/practice-step-mode";
 import {
   completeDelayedFarTransfer,
   scheduleDelayedFarTransfer,
@@ -29,7 +30,7 @@ import { diagnoseAttemptErrors, isActionable } from "@/domain/error-diagnosis-pl
 import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
 import { MARK_POLICY_VERSION } from "@/ai/task-policy";
 import { canonicalJson, sha256Hex } from "@/domain/content-fingerprint";
-import { ERROR_CATEGORY_MEANING, isErrorCategory } from "@/domain/error-taxonomy";
+import { isErrorCategory } from "@/domain/error-taxonomy";
 import type { ErrorCategory } from "@/domain/error-taxonomy";
 import type { Attempt, AttemptWorkingEvidence, Id, InterventionAttemptContext, MarkedPart, Mistake, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
@@ -112,6 +113,7 @@ export function useQuestionExecution({
   repairTeachingSeen = false,
   intervention,
   mission,
+  guided = false,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -132,6 +134,12 @@ export function useQuestionExecution({
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
   mission?: Attempt["mission"];
+  /**
+   * A repair plan's "Guided application" step (?guided=1): the hint rungs
+   * below the worked solution start open, and are recorded on the attempt
+   * as used, so the answer is weighted as supported practice, never proof.
+   */
+  guided?: boolean;
 }) {
   const needsWjecHumanReview =
     requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question);
@@ -139,6 +147,9 @@ export function useQuestionExecution({
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
   const [choice, setChoice] = useState<number | null>(() => draft?.choice ?? null);
   const [marking, setMarking] = useState(false);
+  // Set when a submit fails outright, so the student is told and keeps their
+  // answer, instead of the button silently coming back as if never pressed.
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     attemptId: Id;
     /** The persisted attempt, so a learner can dispute a specific mark after it. */
@@ -159,6 +170,8 @@ export function useQuestionExecution({
     farTransfer?: Attempt["farTransfer"];
     /** Post-marking error diagnosis; never changes the marks above. */
     errorDiagnosis?: AttemptErrorDiagnosis;
+    /** The AI marker failed and this attempt is genuinely queued for an AI re-mark. */
+    aiRemarkQueued?: boolean;
     nextAction: { label: string; href: null; why: string };
   } | null>(null);
   // Stamped after mount: reading the clock during render makes the render
@@ -180,8 +193,10 @@ export function useQuestionExecution({
     () => HINT_TIERS.slice(0, Math.max(0, Math.min(HINT_TIERS.length, hintBudget ?? HINT_TIERS.length))),
     [hintBudget],
   );
-  const [usedTiers, setUsedTiers] = useState<HintTier[]>([]);
-  const [hintsOpen, setHintsOpen] = useState(false);
+  const [usedTiers, setUsedTiers] = useState<HintTier[]>(() =>
+    guided ? guidedOpeningTiers(ladder.map((hint) => hint.tier), allowedTiers) : [],
+  );
+  const [hintsOpen, setHintsOpen] = useState(() => guided && usedTiers.length > 0);
   const visibleHints = useMemo(() => ladder.filter((h) => usedTiers.includes(h.tier)), [ladder, usedTiers]);
   const upcoming = useMemo(
     () => ladder.filter((h) => allowedTiers.includes(h.tier)).find((h) => !usedTiers.includes(h.tier)) ?? null,
@@ -218,6 +233,7 @@ export function useQuestionExecution({
                 ? assessLowConfidenceMark({ markedBy: "ai", confidence: upgraded.markConfidence ?? null })
                 : undefined,
               assessment: undefined,
+              aiRemarkQueued: false,
               lastAttempt: upgraded,
             }
           : prev,
@@ -233,9 +249,12 @@ export function useQuestionExecution({
   useEffect(() => () => { if (funnelTimer.current) clearTimeout(funnelTimer.current); }, []);
   async function submit() {
     setMarking(true);
+    setSubmitError(null);
     try {
       const finished = await runSubmit();
       onFinished?.(finished);
+    } catch {
+      setSubmitError("That answer was not marked or saved. It is still here, so you can submit it again.");
     } finally {
       // Whatever marking or persistence does, the runner must never stay
       // stuck on "Marking…" with the submit button disabled.
@@ -384,9 +403,12 @@ export function useQuestionExecution({
     const nextAction: { label: string; href: null; why: string } =
       awarded < max
         ? {
-            label: "Micro-practice the missed point",
+            // Practice delivers no in-place micro-practice, so promise none:
+            // what really happens is that the missed points are saved as
+            // mistakes and come back for review.
+            label: "Repair the missed points",
             href: null,
-            why: `You dropped ${max - awarded} of ${max} marks here — two targeted items on exactly this point, then an unaided retry.`,
+            why: `You dropped ${max - awarded} of ${max} marks here. Each missed point is saved as a mistake and comes back for review until you can answer it unaided.`,
           }
         : supportUsed
           ? {
@@ -420,10 +442,9 @@ export function useQuestionExecution({
       if (isActionable(diagnosisHeadline)) {
         nextAction.label = diagnosisHeadline.intervention.action;
         nextAction.why = `${diagnosisHeadline.intervention.action} (${diagnosisHeadline.label}, ${diagnosisHeadline.awarded}/${diagnosisHeadline.max} — diagnosed as ${diagnosisHeadline.category}${diagnosisHeadline.provenance === "classifier-dev" ? "" : " on-device"}).`;
-      } else if (diagnosisHeadline.category !== "other") {
-        const meaning = ERROR_CATEGORY_MEANING[diagnosisHeadline.category];
-        nextAction.why = `${nextAction.why} One possibility is ${meaning.charAt(0).toLowerCase()}${meaning.replace(/\.$/, "").slice(1)} — but there is not enough evidence yet to say for sure.`;
       }
+      // A below-threshold read is shown once, by the marked result, as
+      // "Possible cause, not certain" — not appended here a second time.
     }
     // A rubric fallback grade (the AI never ran, or the provider failed) gets a
     // second chance: queue the persisted attempt for an AI re-grade. The drain
@@ -433,9 +454,11 @@ export function useQuestionExecution({
     // Only a cloud request that was actually attempted with the learner's
     // consent and then failed is queued; a mark that fell back because AI is
     // switched off is never queued for sending later.
-    if (markTier === "fallback" && retryable) {
-      void enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" });
-    }
+    // Awaited (a local IndexedDB write, never the network) so the result can
+    // say a re-mark is queued only when it really is.
+    const aiRemarkQueued = markTier === "fallback" && retryable
+      ? await enqueueDeadMark({ attempt: persistedAttempt, question, reason: note ?? "AI provider unavailable" })
+      : false;
     setResult({
       attemptId: persistedAttempt.id,
       lastAttempt: persistedAttempt,
@@ -453,6 +476,7 @@ export function useQuestionExecution({
       assessment,
       farTransfer: persistedAttempt.farTransfer,
       withheld,
+      aiRemarkQueued,
       nextAction,
     });
     // Refinement pass: classifier.dev may sharpen the error type on the parts
@@ -468,5 +492,5 @@ export function useQuestionExecution({
     return persistedAttempt;
   }
 
-  return { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, highestUsedTier, evidenceSource, ladder, submit };
+  return { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, highestUsedTier, evidenceSource, ladder, submit, submitError };
 }

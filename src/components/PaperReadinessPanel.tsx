@@ -23,7 +23,7 @@ function PaperCard({ row }: { row: PaperReadiness }) {
           <p className="text-xs text-ink3">{exam} · {pct(row.weight)} of the qualification</p>
         </div>
         <Pill tone={row.evidence === "solid" ? "success" : row.evidence === "none" ? "neutral" : "review"}>
-          {row.evidence === "none" ? "No evidence yet" : `${row.evidence[0]!.toUpperCase()}${row.evidence.slice(1)} evidence`}
+          {row.evidence === "none" ? "No evidence yet" : `${row.evidence[0]!.toUpperCase()}${row.evidence.slice(1)} ${row.referenceTier ? "practice evidence" : "evidence"}`}
         </Pill>
       </div>
       {!known ? (
@@ -31,16 +31,18 @@ function PaperCard({ row }: { row: PaperReadiness }) {
       ) : (
         <>
           <ul className="text-sm text-ink space-y-1">
-            <li>{pct(row.secureShare ?? 0)} of {plural(row.statements, "statement")} evidence-secure ({row.secure} secure, {row.weak} weak or thin, {row.missing} untouched)</li>
+            <li>{pct(row.secureShare ?? 0)} of {plural(row.statements, "statement")} {row.referenceTier ? "secure in practice" : "evidence-secure"} ({row.secure} secure, {row.weak} weak or thin, {row.missing} untouched)</li>
             <li>{row.marksAtRisk} marks at risk across {plural(row.unresolvedMistakes, "open mistake")}{row.recurringMistakes ? `, ${row.recurringMistakes} recurring` : ""}</li>
             <li>
               Recall {row.recall.accuracy === null ? "unknown" : pct(row.recall.accuracy)} · Application {row.application.accuracy === null ? "unknown" : pct(row.application.accuracy)} · Unfamiliar {row.transfer.accuracy === null ? "unknown" : pct(row.transfer.accuracy)}
             </li>
-            <li>{row.transferUnproven ? `${plural(row.transferUnproven, "statement")} still lack unfamiliar-context proof` : `${row.transferProven} proven on unfamiliar questions`}</li>
+            <li>{row.referenceTier
+              ? row.transferUnproven ? `${plural(row.transferUnproven, "statement")} not yet done well on unfamiliar practice questions` : `${row.transferProven} done well on unfamiliar practice questions (practice, not proof)`
+              : row.transferUnproven ? `${plural(row.transferUnproven, "statement")} still lack unfamiliar-context proof` : `${row.transferProven} proven on unfamiliar questions`}</li>
             <li>{row.paperAttempts ? `${plural(row.paperAttempts, "timed paper answer")} recorded` : "No timed paper evidence"}</li>
           </ul>
           <p className="text-xs text-ink3">
-            {strongest ? `Strongest: ${strongest}. ` : ""}{gap ? `Highest-value gap: ${gap}. ` : ""}Next proof: {row.nextProof.text}
+            {strongest ? `Strongest: ${strongest}. ` : ""}{gap ? `Highest-value gap: ${gap}. ` : ""}{row.referenceTier ? "Next step" : "Next proof"}: {row.nextProof.text}
           </p>
           {row.gapTopicId ? (
             <Link className="text-sm font-medium text-accent underline" href={`/practice?subject=${encodeURIComponent(row.subjectId)}&topic=${encodeURIComponent(row.gapTopicId)}`}>

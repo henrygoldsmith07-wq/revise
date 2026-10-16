@@ -23,7 +23,7 @@ import type { RevisionAction } from "./revision-engine";
 import type { Id } from "./types";
 
 export type TrajectoryPosition =
-  | { kind: "band"; low: number; high: number; grade: string; provisional: boolean; confidence: "low" | "moderate" | "high" }
+  | { kind: "band"; low: number; high: number; grade: string; provisional: boolean; confidence: "low" | "moderate" | "high"; referenceTier?: boolean }
   | { kind: "forming"; answers: number; needed: number }
   | { kind: "none" };
 
@@ -82,6 +82,7 @@ function positionOf(outlook: ExamOutlookRow | null | undefined): TrajectoryPosit
   return {
     kind: "band", low: outlook.low, high: outlook.high, grade: outlook.grade, provisional: outlook.provisional,
     confidence: confidenceWord(outlook.confidence, EVIDENCE_CONFIDENCE) ?? "low",
+    ...(outlook.referenceTier ? { referenceTier: true } : {}),
   };
 }
 
@@ -121,6 +122,8 @@ export function buildExamTrajectory(input: ExamTrajectoryInput): ExamTrajectory 
     heading = "No marked exam-style answers yet, so Revise cannot say where you are heading.";
   } else if (position.kind === "forming") {
     heading = `A likely score range appears after ${position.needed} more marked answer${position.needed === 1 ? "" : "s"}.`;
+  } else if (position.referenceTier) {
+    heading = `Practice estimate: ${position.low}–${position.high}% on reference questions that are not checked against the exam board's specification, so this is not an exam prediction.`;
   } else if (position.provisional || risk === "too-early") {
     heading = `Early estimate: ${position.low}–${position.high}%. The range narrows as you answer more questions without help.`;
   } else if (target && readiness && readiness.gapPercent !== null) {

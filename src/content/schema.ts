@@ -137,6 +137,15 @@ const learningPartSchema = z.object({
   }).optional(),
 }).passthrough();
 
+/** A "do not accept" line for one scheme point (MarkSchemeReject). */
+const markSchemeRejectSchema = z.object({
+  point: z.number().int().min(0),
+  phrases: z.array(nonEmpty).min(1).max(12),
+  except: z.array(nonEmpty).max(12).optional(),
+  scope: z.enum(["clause", "answer"]).optional(),
+  reason: nonEmpty,
+});
+
 export const contentQuestionPartSchema = z.object({
   id,
   label: z.string(),
@@ -151,7 +160,17 @@ export const contentQuestionPartSchema = z.object({
   capabilityIds: z.array(id).min(1).optional(),
   learning: learningPartSchema.optional(),
   calculationRules: z.array(calculationRuleSchema).optional(),
+  rejects: z.array(markSchemeRejectSchema).max(12).optional(),
 }).passthrough().superRefine((part, ctx) => {
+  for (const [index, rule] of (part.rejects ?? []).entries()) {
+    if (rule.point >= part.markScheme.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["rejects", index, "point"],
+        message: `reject rule points at scheme point ${rule.point}, but the scheme has ${part.markScheme.length}`,
+      });
+    }
+  }
   if (part.claimMap !== undefined) {
     if (part.claimMap.length !== part.markScheme.length) {
       ctx.addIssue({

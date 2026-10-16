@@ -1,3 +1,5 @@
+import { aiMarkerUnavailableMark } from "./offline-mark";
+
 /**
  * Route-level AI imports. Keeping the provider client behind these functions
  * means the normal revision route does not load OCR/LLM adapters just because
@@ -26,8 +28,15 @@ export async function aiGenerateQuestions(...args: Parameters<(typeof import("@/
 }
 
 export async function aiMark(...args: Parameters<(typeof import("@/ai/client"))["aiMark"]>) {
-  const { aiMark: run } = await import("@/ai/client");
-  return run(...args);
+  let client: typeof import("@/ai/client");
+  try {
+    client = await import("@/ai/client");
+  } catch {
+    // The chunk could not be fetched (offline, or a dropped connection): mark
+    // against the mark scheme on this device rather than failing silently.
+    return aiMarkerUnavailableMark(args[0], args[1]);
+  }
+  return client.aiMark(...args);
 }
 
 export async function aiExplain(...args: Parameters<(typeof import("@/ai/client"))["aiExplain"]>) {

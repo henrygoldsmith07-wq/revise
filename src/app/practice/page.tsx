@@ -13,6 +13,10 @@ import { rankQuestionsForExposure } from "@/domain/question-exposure";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
+import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
+import { adaptiveReturnHref } from "@/domain/study-navigation";
+import { chooseWorkedExample, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, parseCommandParam, parsePracticeStepMode, parseStepMinutes, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
+import { commandWordLabel } from "@/domain/command-word-validation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
 import { MissionSessionMode } from "@/components/MissionSessionMode";
@@ -33,6 +37,7 @@ import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
 import { MarksLedger } from "@/components/MarksLedger";
 import { PaperAutopsyView, PaperRepairMode, RecoverMarksMode } from "@/components/RecoveryModes";
 import { RichText } from "@/components/RichText";
+import { WorkedExamplePanel } from "@/components/WorkedExamplePanel";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 
 // Question practice. The queue is built from everything the student has: the
@@ -42,9 +47,22 @@ import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented 
 export default function PracticePage() {
   return (
     <Suspense fallback={null}>
-      <Practice />
+      <PracticeForRequest />
     </Suspense>
   );
+}
+
+/**
+ * A repair-plan step link is clicked from a marked practice answer on this
+ * same route, so Next keeps the page mounted and the held queue would still be
+ * the question just answered ("Question 1 of 1", already marked). Keying on
+ * the step (mode, topic, command) starts the step with its own queue; every
+ * other in-page navigation keeps the existing held-queue behaviour.
+ */
+function PracticeForRequest() {
+  const params = useSearchParams();
+  const step = parsePracticeStepMode(params);
+  return <Practice key={step ? `step:${step}:${params.get("topic") ?? ""}:${params.get("command") ?? ""}` : "practice"} />;
 }
 
 function Practice() {
@@ -65,10 +83,19 @@ function Practice() {
   // attempt stays unaided and mastery counts it at full weight.
   const adaptiveStep = params.get("adaptiveStep");
   const adaptiveHintBudget = adaptiveStep === "independent" || adaptiveStep === "transfer" ? 0 : undefined;
+  // Repair-plan steps arrive as ?guided=1 / ?timed=1 / ?unaided=1 (plus
+  // ?command= for a command-word check). They only ever add structure to the
+  // plain topic queue; retests, far-transfer checks, recall and adaptive
+  // rungs keep their own rules (see src/domain/practice-step-mode.ts).
+  const requestedStepMode = parsePracticeStepMode(params);
+  const commandParam = parseCommandParam(params.get("command"));
+  // ?minutes= is the plan step's stated length; the step's questions fit it
+  // at exam pace (90 s a mark) instead of a flat three.
+  const stepMinutes = parseStepMinutes(params.get("minutes"));
   // Steps opened from the adaptive runner carry ?from=adaptive&return=... so
   // marking here replans the runner's next step and hands the student back
   // to it — one tutor flow, not a redirect between pages.
-  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
+  const returnHref = params.get("from") === "adaptive" ? adaptiveReturnHref(params.get("return")) : null;
   const resumeRequested = params.get("resume") === "1";
   const savedCheckpoint =
     resumeRequested && store.revisionCheckpoint?.activity === "practice" ? store.revisionCheckpoint : null;
@@ -87,7 +114,13 @@ function Practice() {
   // (see src/data/content-ids.ts) — remap so they keep resolving to the
   // seeded bank instead of landing on an empty queue.
   const requestedQuestionParam = farTransferRetest?.candidateQuestionId ?? (questionParam ? remapContentIdString(questionParam) : questionParam);
-  const [subjectId, setSubjectId] = useState(subjectParam ?? farTransferRetest?.subjectId ?? subjects[0]?.id ?? "");
+  const [subjectId, setSubjectId] = useState(() => initialPracticeSubject({
+    enrolledSubjectIds: subjects.map((subject) => subject.id),
+    subjectParam,
+    questionSubjectId: store.questions.find((question) => question.id === requestedQuestionParam)?.subjectId,
+    topicSubjectId: getTopic(topicParam ?? "")?.subjectId,
+    retestSubjectId: farTransferRetest?.subjectId,
+  }));
   const [topicId, setTopicId] = useState(topicParam ?? farTransferRetest?.topicIds[0] ?? "");
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
@@ -157,7 +190,9 @@ function Practice() {
   const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
   const [sessionStartedAt, setSessionStartedAt] = useState(() => Date.now());
   const closing = useRef(false);
+  const completedPlanRef = useRef<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
 
   const masteryByTopic = useMemo(() => new Map(store.mastery.map((m) => [m.topicId, m])), [store.mastery]);
   const questionsById = useMemo(
@@ -169,6 +204,40 @@ function Practice() {
     [retestId, store.mistakes],
   );
   const retestQuestion = retestMistake?.questionId ? questionsById.get(retestMistake.questionId) : undefined;
+  const appliedStepMode = wrongOnly ? null : stepModeApplies({
+    mode: requestedStepMode,
+    retest: Boolean(retestId),
+    farTransfer: Boolean(farTransferRetest),
+    recall: mode === "recall",
+    adaptiveStep: Boolean(adaptiveStep),
+  });
+  // Exposure control keeps unseen questions ahead of secure repeats, while
+  // still allowing weak questions back into the queue when they need work.
+  const rankedPool = (subject: string, topic: string): Question[] => {
+    let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
+    if (subject) pool = pool.filter((q) => q.subjectId === subject);
+    if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
+    return rankQuestionsForExposure({
+      questions: pool,
+      attempts: store.attempts,
+      masteryByTopic: new Map([...masteryByTopic.entries()].map(([id, row]) => [id, row.mastery])),
+    });
+  };
+  // A worked-example step (?worked=1) shows one question worked through,
+  // chosen once and held (like the queue) so marking the fresh try never
+  // swaps the example. It never spends a question that could later prove the
+  // topic; when there is no such example, the step is the guided try instead
+  // and says so.
+  const [workedExample] = useState<WorkedExampleChoice | null>(() => {
+    if (appliedStepMode !== "worked" || !topicId) return null;
+    const held = new Set(savedCheckpoint?.queueIds ?? []);
+    const ranked = rankedPool(subjectId, topicId).filter((q) => !held.has(q.id));
+    const choice = chooseWorkedExample({ pool: ranked.filter((q) => q.kind !== "mcq"), attempts: store.attempts, questions: store.questions });
+    return choice && (held.size || freshAfterExample(ranked, choice.example).length) ? choice : null;
+  });
+  const workedUnavailable = appliedStepMode === "worked" && !workedExample;
+  const stepMode = workedUnavailable ? "guided" : appliedStepMode;
+  const timedCommand = stepMode === "timed" ? commandParam : null;
   const originalAttempt = retestMistake?.attemptId
     ? store.attempts.find((attempt) => attempt.id === retestMistake.attemptId)
     : undefined;
@@ -239,17 +308,16 @@ function Practice() {
     // Wrong-answer-only mode: the queue is exactly the questions behind lost
     // marks — no exposure ranking, no unseen questions mixed in.
     if (wrongOnly) return wrongQueueIds;
-    let pool = store.questions.filter((q) => store.settings.subjectIds.includes(q.subjectId));
-    if (subject) pool = pool.filter((q) => q.subjectId === subject);
-    if (topic) pool = pool.filter((q) => q.topicIds.includes(topic));
-    // Exposure control keeps unseen questions ahead of secure repeats, while
-    // still allowing weak questions back into the queue when they need work.
-    return rankQuestionsForExposure({
-      questions: pool,
-      attempts: store.attempts,
-      masteryByTopic: new Map([...masteryByTopic.entries()].map(([id, row]) => [id, row.mastery])),
-    })
-      .map((q) => q.id);
+    const ranked = rankedPool(subject, topic);
+    if (!stepMode) return ranked.map((q) => q.id);
+    // A worked step is the example plus one fresh try outside its family.
+    if (stepMode === "worked") {
+      return fitStepQueueToMinutes(freshAfterExample(ranked, workedExample?.example ?? null), stepMinutes, WORKED_STEP_TRIES).queue.map((q) => q.id);
+    }
+    // A command-word check puts questions using that verb first; it never
+    // removes the rest, so a topic without one still has a queue. The step
+    // fits its stated minutes at exam pace (at most three questions).
+    return fitStepQueueToMinutes(orderByCommand(ranked, timedCommand).ordered, stepMinutes).queue.map((q) => q.id);
   };
 
   const [index, setIndex] = useState(() => savedCheckpoint?.position ?? 0);
@@ -281,6 +349,19 @@ function Practice() {
 
   const current: Question | undefined = retestMistake ? retestQuestion : queue[index];
 
+  // The step's real length at exam pace, so a plan step never looks shorter
+  // (or longer) than the questions it holds.
+  const stepLength = useMemo(() => {
+    if (!stepMode || !queue.length) return null;
+    const seconds = queue.reduce((sum, q) => sum + examPaceTargetSeconds(q.totalMarks), 0);
+    const minutes = Math.max(1, Math.round(seconds / 60));
+    const count = `${queue.length} question${queue.length === 1 ? "" : "s"}`;
+    const over = stepMinutes !== null && seconds > stepMinutes * 60
+      ? `, longer than this ${stepMinutes}-minute step as no shorter question is available here`
+      : "";
+    return `${stepMode === "worked" ? `a worked example, then ${count} to try` : count}, about ${minutes} min at exam pace${over}`;
+  }, [queue, stepMinutes, stepMode]);
+
   const checkpointHref = useMemo(() => {
     const next = new URLSearchParams();
     if (subjectId) next.set("subject", subjectId);
@@ -288,10 +369,13 @@ function Practice() {
     if (mode === "recall") next.set("mode", mode);
     if (sessionId) next.set("session", sessionId);
     if (retestId) next.set("retest", retestId);
+    if (appliedStepMode) next.set(appliedStepMode, "1");
+    if (timedCommand) next.set("command", timedCommand);
+    if (appliedStepMode && stepMinutes) next.set("minutes", String(stepMinutes));
     next.set("resume", "1");
     const query = next.toString();
     return query ? `/practice?${query}` : "/practice?resume=1";
-  }, [mode, retestId, sessionId, subjectId, topicId]);
+  }, [appliedStepMode, mode, retestId, sessionId, stepMinutes, subjectId, timedCommand, topicId]);
 
   // Mission, recovery, paper-repair, weak-topic and quick modes run their own question sets; the generic
   // queue behind them must not save a resume point for questions the student never opened.
@@ -300,10 +384,6 @@ function Practice() {
     if (missionActive) return;
     if (closed || !current) {
       if (resumeRequested && !current) void clearRevisionCheckpoint();
-      return;
-    }
-    if (retestMistake?.resolved) {
-      void clearRevisionCheckpoint();
       return;
     }
     void saveRevisionCheckpoint({
@@ -324,26 +404,41 @@ function Practice() {
     setSessionElapsedMs(0);
     setSessionStartedAt(Date.now());
     closing.current = false;
+    completedPlanRef.current = null;
     setFinishing(false);
+    setFinishError(null);
   }
 
   async function finishSession() {
     if (!sessionAttempts.length || closing.current) return;
     closing.current = true;
     setFinishing(true);
-    setSessionElapsedMs(Date.now() - sessionStartedAt);
-    if (sessionId) await store.completeSession(sessionId);
-    setClosed(true);
+    setFinishError(null);
+    try {
+      if (sessionId && completedPlanRef.current !== sessionId) {
+        await store.completeSession(sessionId);
+        completedPlanRef.current = sessionId;
+      }
+      await clearRevisionCheckpoint();
+      setSessionElapsedMs(Date.now() - sessionStartedAt);
+      setClosed(true);
+    } catch {
+      setFinishError("Your answers are still recorded, but the session could not finish saving. Try again.");
+    } finally {
+      closing.current = false;
+      setFinishing(false);
+    }
   }
 
-  const sessionAwarded = sessionAttempts.reduce((sum, attempt) => sum + attempt.awarded, 0);
-  const sessionAvailable = sessionAttempts.reduce((sum, attempt) => sum + attempt.max, 0);
-  // Re-attempts of the same question signal fragility even when the score
-  // looks fine, so the closure's repair rule sees them.
-  const sessionRetries = sessionAttempts.length - new Set(sessionAttempts.map((attempt) => attempt.questionId)).size;
+  const summary = practiceSessionSummary(sessionAttempts, queue.map((question) => question.id));
+  const sessionAwarded = summary.awarded;
+  const sessionAvailable = summary.available;
+  // Re-attempts of the same question signal fragility even when the latest
+  // score looks fine, so retain them in the closure's repair rule.
+  const sessionRetries = summary.retryCount;
   const closure = buildPostSessionClosure({
     session: "practice",
-    attempted: sessionAttempts.length,
+    attempted: summary.attempted,
     total: queue.length,
     awarded: sessionAwarded,
     available: sessionAvailable,
@@ -355,7 +450,8 @@ function Practice() {
         ? { href: store.adaptiveSession.startHref, label: "Start next session", reason: store.adaptiveSession.reason }
         : undefined,
   });
-  const answered = queue.map((question) => sessionAttempts.some((attempt) => attempt.questionId === question.id));
+  const answered = summary.answered;
+  const latestCurrentAttempt = current ? summary.latestByQuestion.get(current.id) : undefined;
   const drafted = queue.map((question) => {
     const draft = questionDrafts[question.id];
     return Boolean(draft && (draft.choice !== null || Object.values(draft.answers).some((answer) => answer.trim())));
@@ -488,6 +584,14 @@ function Practice() {
               ? "Retest a mistake"
               : mode === "recall"
               ? "Active recall"
+              : stepMode === "worked"
+              ? "Worked example"
+              : stepMode === "guided"
+              ? "Guided application"
+              : stepMode === "timed"
+              ? timedCommand ? `Timed question: “${commandWordLabel(timedCommand)}”` : "Timed question"
+              : stepMode === "unaided"
+              ? "Unaided exam question"
               : "Exam questions"}
           </h1>
           <p className="text-sm text-ink3 mt-0.5">
@@ -497,9 +601,17 @@ function Practice() {
               ? "Apply the remediation, answer the original question again, and close the loop only when the missed point is secure."
               : mode === "recall"
               ? "Answer from memory with nothing in front of you, then get it marked."
+              : stepMode === "worked"
+              ? "See how one question earns its marks, then try a fresh one. Practice with support, marked as normal."
+              : stepMode === "guided"
+              ? "The steps are shown before you write. Practice with support, marked as normal."
+              : stepMode === "timed"
+              ? "Exam pace with a visible clock and no hints. Running over is shown, never penalised."
+              : stepMode === "unaided"
+              ? "No hints, so this mark counts as your own evidence."
               : "Answer as you would in the exam. Every dropped mark becomes a card."}
           </p>
-          {!wrongOnly && !retestMistake && !farTransferRetest ? (
+          {!wrongOnly && !retestMistake && !farTransferRetest && !stepMode ? (
             <nav aria-label="Other ways to practise" className="mt-1 flex flex-wrap gap-x-4 text-sm text-ink2">
               <Link href="/review" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Review cards{dueCount ? ` (${dueCount} due)` : ""}</Link>
               <Link href="/papers" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink">Past papers</Link>
@@ -507,7 +619,7 @@ function Practice() {
             </nav>
           ) : null}
         </div>
-        {subjects.length > 1 && !farTransferRetest ? (
+        {subjects.length > 1 && !farTransferRetest && !stepMode ? (
           <div className="w-full sm:w-auto max-w-full overflow-x-auto nice-scroll pb-1">
             <Segmented
               ariaLabel="Subject"
@@ -530,6 +642,15 @@ function Practice() {
         ) : null}
       </header>
 
+      {finishError ? (
+        <Panel className="border-danger">
+          <p role="alert" className="text-sm text-ink">{finishError}</p>
+          <Button size="sm" variant="primary" className="mt-3" disabled={finishing} onClick={() => void finishSession()}>
+            Retry finishing session
+          </Button>
+        </Panel>
+      ) : null}
+
       {farTransferRetest ? (
         <Panel className="border-accent bg-accentsoft">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -549,6 +670,24 @@ function Practice() {
         </Panel>
       ) : null}
 
+      {/* A repair-plan step is one focused question: the alternative entry
+          points (wrong answers, weak-topic exam, marks at risk, ledger,
+          quick sessions) would push it below the fold at 360px. */}
+      {stepMode ? (
+        <div className="space-y-1">
+          <p className="text-xs text-ink3" data-testid="step-length-note">
+            Opened from your repair plan{stepLength ? `: ${stepLength}` : ""}.{" "}
+            <Link href={topicId ? `/practice?topic=${encodeURIComponent(topicId)}` : "/practice"} className="underline underline-offset-4 hover:text-ink">
+              Practise normally instead
+            </Link>
+          </p>
+          {workedUnavailable ? (
+            <p className="text-xs text-ink2" data-testid="worked-unavailable-note">
+              No worked example can be shown here without using up a question that could later prove this topic, so this is the guided try instead.
+            </p>
+          ) : null}
+        </div>
+      ) : (<>
       {wrongOnly ? (
         wrongQueueIds.length ? (
           <Panel className="border-accent bg-accentsoft">
@@ -649,7 +788,9 @@ function Practice() {
       <MarksLedger />
 
       <QuickSessionPicker onSelect={setQuickMinutes} />
+      </>)}
 
+      {stepMode ? null : (
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
         <select
           value={topicId}
@@ -685,6 +826,7 @@ function Practice() {
           </span>
         ) : null}
       </div>
+      )}
 
       {note ? <p className="text-xs text-ink3">{note}</p> : null}
 
@@ -737,24 +879,36 @@ function Practice() {
         </Panel>
       ) : null}
 
+      {timedCommand && current && !questionUsesCommand(current, timedCommand) ? (
+        <p className="text-xs text-ink3" data-testid="command-fallback-note">
+          No “{commandWordLabel(timedCommand)}” question is available here yet, so this is a timed question on the same topic.
+        </p>
+      ) : null}
+
       {retestId && (!retestMistake || !retestQuestion) ? null : current ? (
         <>
+          {stepMode === "worked" && workedExample ? <WorkedExamplePanel choice={workedExample} /> : null}
           <QuestionNavigator
             currentIndex={index}
             total={queue.length}
             answered={answered}
             drafted={drafted}
-            onSelect={setIndex}
+            onSelect={(nextIndex) => { if (!finishing) setIndex(nextIndex); }}
             onPrevious={() => setIndex((i) => Math.max(0, i - 1))}
             onNext={() => {
               if (index >= queue.length - 1) void finishSession();
               else setIndex((i) => Math.min(queue.length - 1, i + 1));
             }}
-            previousDisabled={index === 0}
-            nextDisabled={index >= queue.length - 1 && !currentAnswered}
+            previousDisabled={finishing || index === 0}
+            nextDisabled={finishing || (index >= queue.length - 1 && !currentAnswered)}
             nextLabel={index >= queue.length - 1 ? "Finish session" : currentAnswered ? "Next question" : "Skip question"}
             controlsClassName="grid grid-cols-2 gap-2"
           />
+          {latestCurrentAttempt ? (
+            <p className="text-sm text-ink2" aria-live="polite">
+              Latest attempt: {latestCurrentAttempt.awarded}/{latestCurrentAttempt.max} marks. Earlier attempts stay in your session history.
+            </p>
+          ) : null}
           <QuestionRunner
             key={`${current.id}:${retestMistake?.id ?? "practice"}`}
             question={current}
@@ -762,14 +916,13 @@ function Practice() {
             retestMistake={retestMistake}
             repairTeachingSeen={Boolean(retestRemediation)}
             farTransfer={farTransferRetest}
-            hintBudget={adaptiveHintBudget}
+            hintBudget={adaptiveHintBudget ?? stepModeHintBudget(stepMode)}
+            stepMode={stepMode}
+            externalHintTier={stepModeSupportTier(stepMode)}
             draft={questionDrafts[current.id]}
             onDraftChange={(draft) => setQuestionDrafts((previous: Record<string, QuestionDraft>) => ({ ...previous, [current.id]: draft }))}
             onFinished={(attempt) => {
-              setSessionAttempts((previous) => [
-                ...previous.filter((existing) => existing.questionId !== attempt.questionId),
-                attempt,
-              ]);
+              setSessionAttempts((previous) => recordPracticeAttempt(previous, attempt));
               setQuestionDrafts((previous: Record<string, QuestionDraft>) => {
                 const next = { ...previous };
                 delete next[attempt.questionId];

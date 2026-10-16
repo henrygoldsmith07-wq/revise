@@ -80,7 +80,7 @@ describe("AI consent — device/server reconciliation", () => {
     expect(reconcileAiConsent({ pending: null, server: { enabled: false, updatedAt: at("2026-10-07T00:00:00Z") } }).local).toBe(false);
   });
 
-  it("pushes an offline change unless the server holds a newer decision", () => {
+  it("pushes an offline opt-out and discards an opt-in superseded by a newer server opt-out", () => {
     const offlineRevoke = reconcileAiConsent({
       pending: { enabled: false, at: "2026-10-07T12:00:00Z" },
       server: { enabled: true, updatedAt: "2026-10-07T09:00:00Z" },
@@ -92,6 +92,27 @@ describe("AI consent — device/server reconciliation", () => {
       server: { enabled: false, updatedAt: "2026-10-07T12:00:00Z" },
     });
     expect(supersededOptIn).toEqual({ local: false, push: null, clearPending: true });
+  });
+
+  it.each(["2000-01-01T00:00:00Z", "invalid", "2999-01-01T00:00:00Z"])(
+    "never lets server time override a pending opt-out recorded at %s",
+    (at) => {
+      expect(reconcileAiConsent({
+        pending: { enabled: false, at },
+        server: { enabled: true, updatedAt: "2026-10-07T12:00:00Z" },
+      })).toEqual({ local: false, push: false, clearPending: true });
+      expect(reconcileAiConsent({
+        pending: { enabled: false, at },
+        server: { enabled: false, updatedAt: "2026-10-07T12:00:00Z" },
+      })).toEqual({ local: false, push: null, clearPending: true });
+    },
+  );
+
+  it("keeps a pending opt-in conservative when its timestamp cannot be ordered", () => {
+    expect(reconcileAiConsent({
+      pending: { enabled: true, at: "invalid" },
+      server: { enabled: false, updatedAt: null },
+    })).toEqual({ local: false, push: null, clearPending: true });
   });
 
   it("resolves an unorderable conflict to off", () => {
@@ -139,7 +160,7 @@ describe("AI consent — wiring", () => {
     expect(consent).toMatch(/if \(!input\.enabled\) \{[\s\S]*clearDeadMarks\(\)/);
     const dlq = read("src/ai/mark-dlq.ts");
     expect(dlq).toMatch(/drainDeadMarks[\s\S]*if \(!\(await localAiConsentGranted\(\)\)\) \{\s*await clearDeadMarks\(\);/);
-    expect(dlq).toMatch(/enqueueDeadMark[\s\S]*if \(!\(await localAiConsentGranted\(\)\)\) return;/);
+    expect(dlq).toMatch(/enqueueDeadMark[\s\S]*if \(!\(await localAiConsentGranted\(\)\)\) return false;/);
   });
 
   it("Settings offers a real, labelled toggle that records the choice server-side", () => {

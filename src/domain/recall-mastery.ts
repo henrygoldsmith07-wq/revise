@@ -1,4 +1,4 @@
-import { isDue, retrievability, todayIso, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { isDueReview, retrievability, todayIso, MASTERED_STABILITY_DAYS } from "./scheduling";
 import type { Card, Id, IsoInstant, ReviewLog, Topic } from "./types";
 
 export type RecallEvidence = "unmeasured" | "emerging" | "reliable";
@@ -53,7 +53,8 @@ export function computeRecallMastery(input: RecallMasteryInput): RecallMasteryRo
       currentRetention: round01(currentRetention),
       trueRetention,
       cardsTotal: cards.length,
-      cardsDue: cards.filter((card) => isDue(card, today)).length,
+      // Owed reviews only: an installed, never-studied card is not "due" (isDueReview).
+      cardsDue: cards.filter((card) => isDueReview(card, today)).length,
       reviews: logs.length,
       recalled,
       lastReviewedAt: timestamps.at(-1) ?? null,

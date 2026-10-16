@@ -1,3 +1,4 @@
+import { isFlagship } from "./flagship";
 import type { GradePrediction } from "./grades";
 import type { Id, Subject } from "./types";
 
@@ -82,6 +83,11 @@ export interface ExamReadiness {
   /** How much evidence supports the score, separate from the score itself. */
   confidence: number;
   status: ExamReadinessStatus;
+  /**
+   * True for reference-tier subjects: practice evidence from questions not
+   * checked against the specification. Such a subject is never "ready".
+   */
+  referenceTier?: boolean;
   signals: ExamReadinessSignal[];
   blockers: ExamReadinessBlocker[];
   nextAction: { label: string; action: ReadinessAction };
@@ -232,7 +238,12 @@ export function buildExamReadiness(input: ExamReadinessInput): ExamReadiness {
     transferDue: input.transfer.due,
     confidence,
   });
-  const status = readinessStatus(score, confidence, blockers);
+  // Reference-tier subjects are cloned outlines whose questions are not
+  // checked against the exam board's specification. Their evidence is honest
+  // practice, but it cannot support an "exam ready" verdict: the strongest
+  // they can read is "nearly ready". Flagships are unchanged.
+  const measured = readinessStatus(score, confidence, blockers);
+  const status: ExamReadinessStatus = measured === "ready" && !isFlagship(subject.id) ? "nearly-ready" : measured;
   const nextAction = actionForBlocker(blockers[0]);
 
   return {
@@ -246,6 +257,7 @@ export function buildExamReadiness(input: ExamReadinessInput): ExamReadiness {
     score,
     confidence,
     status,
+    referenceTier: !isFlagship(subject.id),
     signals,
     blockers,
     nextAction,

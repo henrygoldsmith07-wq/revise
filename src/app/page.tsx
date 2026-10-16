@@ -19,6 +19,7 @@ import { useRevisionPlan } from "@/components/recovery-evidence";
 import { WeekLine } from "@/components/RecoverySummary";
 import { ExamDateNudge } from "@/components/ExamDateNudge";
 import { TodayOverview } from "@/components/TodayOverview";
+import { SundayPlan } from "@/components/SundayPlan";
 import { todayLocal } from "@/domain/local-date";
 
 // The roadmap derives lessons from the authored curriculum, which is a much
@@ -46,7 +47,7 @@ function SafeTodayRoadmap({ preferredSubjectId }: { preferredSubjectId?: string 
 // precedence so the student never loses their place.
 
 export default function TodayPage() {
-  const store = useStoreFields("adaptiveSession", "examDates", "experimentArm", "mastery", "proofLedger", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "attempts", "examDates", "experimentArm", "mastery", "proofLedger", "ready", "recordExperimentEvent", "recordFunnel", "refreshPhaseNotices", "reviewLogs", "revisionCheckpoint", "settings");
   const {
     settings,
     recordFunnel,
@@ -61,7 +62,9 @@ export default function TodayPage() {
   // The Next Best Action engine ranks missions, paper recovery, proof checks, reviews and the
   // adaptive session together; Today shows only its winner.
   const { plan, supplyNote, evidence } = useRevisionPlan();
-  const context = todayContext(evidence.daysToExam);
+  // "Chosen from your answers" is only true once there are answers to choose from.
+  const hasAnswers = store.attempts.length > 0 || reviewLogs.length > 0;
+  const context = todayContext(evidence.daysToExam, hasAnswers);
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -126,7 +129,7 @@ export default function TodayPage() {
       {revisionCheckpoint ? null : (
         <p className="text-sm text-ink3">
           Prefer to pick for yourself?{" "}
-          <Link href="/study" className="font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
+          <Link href="/study" className="inline-flex min-h-11 items-center font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
         </p>
       )}
       {revisionCheckpoint ? null : <WeekLine />}
@@ -136,6 +139,7 @@ export default function TodayPage() {
           Plan, pace and outlook
         </summary>
         <div className="mt-4 space-y-5">
+          <SundayPlan />
           <CommandCentreCard />
           <TodayOverview />
           <SafeTodayRoadmap preferredSubjectId={adaptiveSession?.subjectId ?? plan.top?.subjectId} />
@@ -155,8 +159,12 @@ export default function TodayPage() {
 // ---------------------------------------------------------------------------
 
 /** One line of context under the greeting: the nearest exam when there is one, never a made-up number. */
-function todayContext(daysToExam: number | null): string {
-  if (daysToExam === null) return "One session, chosen from your answers so far. Start it, and Revise adjusts as you go.";
+function todayContext(daysToExam: number | null, hasAnswers: boolean): string {
+  if (daysToExam === null) {
+    return hasAnswers
+      ? "One session, chosen from your answers so far. Start it, and Revise adjusts as you go."
+      : "One session to start with. Answer it, and Revise adjusts what comes next to how you did.";
+  }
   if (daysToExam === 0) return "Exam day. Keep it short and calm: one focused session.";
   return `Your next exam is in ${daysToExam} day${daysToExam === 1 ? "" : "s"}. This is the best use of your time right now.`;
 }
@@ -165,11 +173,13 @@ function TodayWelcome({ name, greeting, hasSession = true, context }: { name: st
   const salutation = greeting ? "Good " + greeting.toLowerCase() : "Welcome back";
   return (
     <header className="today-welcome">
-      <span className="relative z-10 text-xs font-bold uppercase tracking-[0.13em] text-ink2">Today</span>
-      <h1 className="relative z-10 mt-1 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+      {/* Narrow phones get a compact header (no eyebrow: the bottom nav already
+          says Today) so the session's Start button stays in the first viewport. */}
+      <span className="relative z-10 hidden text-xs font-bold uppercase tracking-[0.13em] text-ink2 sm:inline">Today</span>
+      <h1 className="relative z-10 text-xl font-semibold tracking-tight text-ink sm:mt-1 sm:text-3xl">
         {salutation}{name ? ", " + name : ""}
       </h1>
-      <p className="relative z-10 mt-2 max-w-xl text-sm leading-6 text-ink2 sm:text-base">
+      <p className="relative z-10 mt-1 max-w-xl text-sm leading-6 text-ink2 sm:mt-2 sm:text-base">
         {hasSession ? context ?? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
       </p>
     </header>
@@ -204,6 +214,10 @@ function EmptyToday({ name, greeting, pace, supplyNote }: { name: string; greeti
         </div>
         <p className="mt-3 text-xs text-ink3">Not a grade. Unreviewed questions are practice only — Revise says so rather than guessing.</p>
       </div>
+      <details className="card p-4 sm:p-5">
+        <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Sunday plan</summary>
+        <div className="mt-4"><SundayPlan /></div>
+      </details>
       <TodayOverview />
       <SafeTodayRoadmap />
       {pace ? <PaceForecastLine forecast={pace} /> : null}

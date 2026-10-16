@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { independentAttempt } from "./learning-evidence";
-import type { MarkRecovery, MistakeRecovery, RecoveryTotals } from "./mark-recovery";
+import { PROOF_BARRIER_TEXT, type MarkRecovery, type MistakeRecovery, type RecoveryTotals } from "./mark-recovery";
 import { buildMistakePatterns, ROOT_CAUSE_LABEL, rootCauseOf, type MistakePattern, type PatternIntervention, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Mistake, Question } from "./types";
 
@@ -117,7 +117,12 @@ export function buildPaperRecovery(input: PaperRecoveryInput): PaperRecovery | n
     stageReason = `${unproven.length || totals.open} important loss${unproven.length === 1 ? "" : "es"} still need a delayed check on a different question.`;
   } else if (any("provisional")) {
     stage = "equivalent-retest";
-    stageReason = "Early successes so far, but not yet on a different question answered independently.";
+    // When no loss on this paper can ever count towards proof, say so rather than implying a
+    // different question would prove it.
+    const barrier = paperItems.length && paperItems.every((i) => i.proofBarrier) ? paperItems[0]!.proofBarrier! : null;
+    stageReason = barrier
+      ? `Recovered in practice, but these marks cannot be proven because ${PROOF_BARRIER_TEXT[barrier]}.`
+      : "Early successes so far, but not yet on a different question answered independently.";
   } else if (any("targeted")) {
     stage = "repair";
     stageReason = "Repair has started; no successful answer yet.";

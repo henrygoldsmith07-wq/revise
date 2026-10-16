@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { physicsReasoningDepthQuestions } from "@/content/questions/physics-reasoning-depth";
 import { validateStructuredReasoning } from "@/content/structured-physics";
 import { physicsContentFingerprint } from "@/domain/physics-content-review";
+import type { Question } from "@/domain/types";
 
 const directory = "src/content/sources/physics-reasoning-depth/";
 const manifest = JSON.parse(readFileSync(directory + "manifest.json", "utf8")) as { files: string[] };
@@ -12,7 +13,16 @@ describe("structured flagship reasoning migration", () => {
   it("preserves the 540 exact IDs and original semantics/trust fingerprints", () => {
     const original = JSON.parse(readFileSync("tests/fixtures/physics-reasoning-depth-fingerprints.json", "utf8"));
     expect(physicsReasoningDepthQuestions).toHaveLength(540);
-    expect(Object.fromEntries(physicsReasoningDepthQuestions.map(question => [question.id, physicsContentFingerprint(question)]))).toEqual(original);
+    // Authored "do not accept" rules are part of the reviewed content, so they
+    // change a fingerprint. The only intended change is the rule itself: with
+    // the rules stripped, the fingerprint is the original one.
+    const withRules = physicsReasoningDepthQuestions.filter(question => question.parts.some(part => part.rejects?.length)).map(question => question.id);
+    expect(withRules).toEqual(["cnt:question:physics-depth-fields-sp-01-inverse-square-fallacy-3"]);
+    const stripped = (question: Question): Question => ({
+      ...question,
+      parts: question.parts.map((part) => Object.fromEntries(Object.entries(part).filter(([key]) => key !== "rejects")) as typeof part),
+    });
+    expect(Object.fromEntries(physicsReasoningDepthQuestions.map(question => [question.id, physicsContentFingerprint(stripped(question))]))).toEqual(original);
     expect(physicsReasoningDepthQuestions.every(question => question.verification === "unverified")).toBe(true);
   });
   it("rejects bad mapping, bad capability, duplicate IDs and fabricated verification", () => {

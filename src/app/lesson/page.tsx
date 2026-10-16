@@ -5,7 +5,8 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LessonMode } from "@/components/LessonMode";
 import { SubjectPicker } from "@/components/SubjectPicker";
-import { allSubjects, allTopics } from "@/domain/curriculum";
+import { allSubjects, allTopics, getTopic } from "@/domain/curriculum";
+import { adaptiveReturnHref, resolveLessonSubject } from "@/domain/study-navigation";
 import { useStoreFields } from "@/state/store";
 import { Pill } from "@/components/ui";
 
@@ -20,6 +21,12 @@ export default function LessonPage() {
 }
 
 function LessonBrowser() {
+  const params = useSearchParams();
+  // A new deep link must reset a prior manual selection, even on client navigation.
+  return <LessonBrowserForRequest key={`${params.get("subject") ?? ""}:${params.get("topic") ?? ""}`} />;
+}
+
+function LessonBrowserForRequest() {
   const store = useStoreFields("settings", "updateSettings");
   const params = useSearchParams();
   const subjects = useMemo(
@@ -36,16 +43,16 @@ function LessonBrowser() {
     [subjects],
   );
   const topicParam = params.get("topic");
-  const returnHref = params.get("from") === "adaptive" ? params.get("return") : null;
+  const returnHref = params.get("from") === "adaptive" ? adaptiveReturnHref(params.get("return")) : null;
 
-  // Land the student where they left off: an explicit ?subject= link wins,
-  // then the subject they last studied (synced through settings, so it
-  // follows them across devices), then the first enrolled subject. A
-  // remembered or linked subject that is no longer enrolled falls back.
-  const [subjectId, setSubjectId] = useState(() => {
-    const candidate = params.get("subject") ?? store.settings.lastLessonSubject ?? subjects[0]?.id ?? "";
-    return subjects.some((s) => s.id === candidate) ? candidate : subjects[0]?.id ?? "";
-  });
+  // Explicit subject, then the linked topic's subject, then the remembered path.
+  // A topic-only repair/practical link must not open another enrolled subject.
+  const [subjectId, setSubjectId] = useState(() => resolveLessonSubject({
+    enrolledSubjectIds: subjects.map((subject) => subject.id),
+    requestedSubject: params.get("subject"),
+    topicSubject: topicParam ? getTopic(topicParam)?.subjectId : null,
+    rememberedSubject: store.settings.lastLessonSubject,
+  }));
   const topics = useMemo(() => (subjectId ? allTopics([subjectId]) : []), [subjectId]);
   const initialTopicId = topicParam && topics.some((topic) => topic.id === topicParam) ? topicParam : undefined;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { RetestEvaluation } from "@/domain/mistakes";
 
@@ -15,16 +15,21 @@ import { markAssessmentLabel, type MarkConfidenceAssessment } from "@/domain/mar
 import { ERROR_CATEGORY_MEANING } from "@/domain/error-taxonomy";
 import { isActionable as isErrorDiagnosisActionable } from "@/domain/error-diagnosis-plan";
 import type { AttemptErrorDiagnosis } from "@/domain/error-diagnosis-plan";
+import { techniqueRepairForDiagnosis, techniqueShapeSuggestionForAnswer } from "@/domain/technique-repair";
 import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
 import { ProofCheckBanner } from "./ProofCheckBanner";
-import { InterventionPrescriptionPanel } from "./InterventionPrescriptionPanel";
+import { PracticeNextStep } from "./PracticeNextStep";
 import { RichText } from "./RichText";
 import { ButtonLink, Panel, Pill, ProgressBar, SourceBadge, cx } from "./ui";
-import { trustedAssessmentContent } from "@/domain/physics-content-review";
-import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
+import { learnerEvidenceTrusted } from "@/domain/content-trust";
+import { buildMarkRecovery, marksProvenByAttempt } from "@/domain/mark-recovery";
+import { officialPaperContextFromSettings } from "@/domain/official-papers";
+import { getTopic } from "@/domain/curriculum";
+import { useStoreFields } from "@/state/store";
 import { captureProductEvent } from "@/lib/product-telemetry";
+import { commentRestatesMarkedPoints, condenseMarkedFeedback } from "@/domain/marked-feedback-display";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 
 export function MarkedResult({
@@ -34,7 +39,18 @@ export function MarkedResult({
   improvableAnswers,
   answers,
   attempt,
+  inDiagnostic = false,
 }: {
+  /**
+   * Answered inside a diagnostic check. The repair plan is not offered here:
+   * its "Start" button would take the student out of the check after one
+   * question, and the check's own summary chooses the first step from all
+   * of its answers instead of one. Inside a check the result is also kept to
+   * the mark, what was missed, the model answer and the check's own next
+   * step: no guiding-question panel, fix list or "what this taught us"
+   * promise, because the check moves on to its next question instead.
+   */
+  inDiagnostic?: boolean;
   /** Submitted answers by part id, used for long-answer feedback. */
   answers?: Record<string, string>;
   /** The persisted attempt. Set when one exists, which is what makes a mark disputable. */
@@ -61,6 +77,8 @@ export function MarkedResult({
     farTransfer?: Attempt["farTransfer"];
     /** Post-marking error diagnosis; never changes the marks above. May be uncertain. */
     errorDiagnosis?: AttemptErrorDiagnosis;
+    /** The AI marker failed and this attempt is genuinely queued for an AI re-mark. */
+    aiRemarkQueued?: boolean;
     nextAction: { label: string; href: null; why: string };
   };
   awarded: number;
@@ -82,13 +100,52 @@ export function MarkedResult({
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
   const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
   const plan = result.remediation;
+  const marksLost = awarded < question.totalMarks;
+  const techniqueRepair = !inDiagnostic && awarded < question.totalMarks
+    ? techniqueRepairForDiagnosis(question, result.errorDiagnosis)
+    : null;
+  const techniqueShapeSuggestion = !inDiagnostic && !techniqueRepair && awarded < question.totalMarks
+    ? techniqueShapeSuggestionForAnswer({ question, marked: result.marked, answers: attempt?.answers ?? answers, copiedAnswer: result.copiedAnswer || attempt?.copiedAnswer })
+    : null;
   useEffect(() => {
     if (result.retest?.status === "resolved") {
       captureProductEvent("mistake.repaired", { count: 1 });
     }
     // Once per marked result.
   }, [result.retest?.status]);
-  const showSocratic = question.kind !== "mcq" && awarded < question.totalMarks && Boolean(answers);
+  const showSocratic = question.kind !== "mcq" && awarded < question.totalMarks && Boolean(answers) && !inDiagnostic;
+  // Submitting unmounts the Submit button, which drops keyboard and screen
+  // reader focus to the page body. Move it to the result heading instead, but
+  // only when focus really was lost, so nothing is taken from a control the
+  // student is using.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    if (!active || active === document.body) headingRef.current?.focus();
+  }, []);
+  const anyMissed = result.marked.some((m) => m.missedPoints.length > 0);
+  const feedbackText = useMemo(() => condenseMarkedFeedback(result.feedback, result.marked), [result.feedback, result.marked]);
+  // "Proven" is said only when the mark-recovery ledger says this exact
+  // attempt was the delayed proof of an earlier loss. Full marks alone is
+  // practice: it was previously shown as "now proven" for any unaided answer
+  // on content passing the permissive authoring predicate — reference-tier
+  // outlines included — with no delay, prior success or new-question check.
+  const store = useStoreFields("attempts", "mistakes", "questions", "settings");
+  const fullMarks = awarded >= question.totalMarks && question.totalMarks > 0;
+  const proved = useMemo(() => {
+    if (!fullMarks || !attempt) return null;
+    const recovery = buildMarkRecovery({
+      mistakes: store.mistakes, attempts: store.attempts, questions: store.questions, now: new Date(),
+      officialPaper: officialPaperContextFromSettings({
+        officialPaperTrust: store.settings.officialPaperTrust,
+        officialPaperTermsConfirmed: store.settings.officialPaperTermsConfirmed,
+      }),
+    });
+    const result = marksProvenByAttempt(recovery, attempt.id);
+    return result.marks > 0 ? result : null;
+  }, [fullMarks, attempt, store.mistakes, store.attempts, store.questions, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
+  const provedTopic = proved ? getTopic(proved.topicIds[0] ?? "")?.title : undefined;
+  const reviewedQuestion = learnerEvidenceTrusted(question);
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
     for (const part of plan.parts) {
@@ -104,8 +161,10 @@ export function MarkedResult({
     <Panel className="fade-in">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Examiner marking</p>
-          <p className="text-2xl font-semibold tabular-nums">
+          <h2 ref={headingRef} tabIndex={-1} className="text-[11px] uppercase tracking-wide text-ink3 font-semibold focus:outline-none">
+            Examiner marking<span className="sr-only">: {awarded} out of {question.totalMarks}</span>
+          </h2>
+          <p className="text-2xl font-semibold tabular-nums" aria-hidden="true">
             {awarded}
             <span className="text-ink3 text-lg">/{question.totalMarks}</span>
           </p>
@@ -155,6 +214,15 @@ export function MarkedResult({
           {result.copiedAnswer ? <Pill tone="review">Model answer matched — no independent credit</Pill> : null}
         </div>
       </div>
+      {result.source === "fallback" && result.aiRemarkQueued ? (
+        <div className="mb-3 rounded-[8px] border border-line bg-surface2 px-3 py-2.5 text-sm text-ink2" role="status">
+          <p className="font-semibold text-ink">AI marking did not respond</p>
+          <p className="text-xs mt-1">
+            This answer was marked against the mark scheme on your device instead. Revise will try the AI marker
+            again in the background while you are online and update this mark if it changes. You can carry on.
+          </p>
+        </div>
+      ) : null}
       {provisional ? (
         <div className="mb-3 rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Provisional mark</p>
@@ -178,10 +246,6 @@ export function MarkedResult({
         </p>
       ) : null}
       <ProgressBar value={pct} tone={pct >= 0.8 ? "success" : pct >= 0.5 ? "review" : "danger"} />
-
-      {/* Below full marks on a written answer: one guiding question before the
-          mark scheme. MCQs are excluded — marking already reveals the key. */}
-      {showSocratic ? <SocraticExaminerPanel question={question} marked={result.marked} answers={answers ?? {}} /> : null}
 
       {result.retest ? (
         <div
@@ -220,7 +284,10 @@ export function MarkedResult({
         </div>
       ) : null}
 
-      {result.remediation.headline ? (
+      {/* The headline is also the first entry of the fix list on written
+          answers, so the card is shown only where that list is not. */}
+      {/* Below full marks this card moves into "More help with this answer". */}
+      {result.remediation.headline && !inDiagnostic && !marksLost && (question.kind === "mcq" || !actions.length) ? (
         <div className="mt-4 card card-2 p-3 bg-surface2">
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone="review">Remediation</Pill>
@@ -248,7 +315,11 @@ export function MarkedResult({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-4">
+      <section className="mt-4" aria-labelledby={`marked-points-${question.id}`}>
+      <h3 id={`marked-points-${question.id}`} className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
+        {anyMissed ? "What you missed" : "What earned the marks"}
+      </h3>
+      <div className="mt-2 space-y-4">
         {result.marked.map((marked) => {
           const part = question.parts.find((p) => p.id === marked.partId);
           return (
@@ -256,22 +327,22 @@ export function MarkedResult({
               <p className="text-sm font-semibold text-ink">
                 {part?.label || "Answer"} — {marked.awarded}/{marked.max}
               </p>
-              {marked.creditedPoints.length ? (
-                <ul className="mt-1.5 space-y-1">
-                  {marked.creditedPoints.map((point, i) => (
-                    <li key={i} className="text-xs text-success flex gap-1.5">
-                      <CreditedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-px" />
-                      <span>{point}</span>
+              {marked.missedPoints.length ? (
+                <ul className="mt-1.5 space-y-1" aria-label="Missed">
+                  {marked.missedPoints.map((point, i) => (
+                    <li key={i} className="text-xs text-danger flex gap-1.5">
+                      <MissedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-px" />
+                      <span><span className="sr-only">Missed: </span>{point}</span>
                     </li>
                   ))}
                 </ul>
               ) : null}
-              {marked.missedPoints.length ? (
-                <ul className="mt-1.5 space-y-1">
-                  {marked.missedPoints.map((point, i) => (
-                    <li key={i} className="text-xs text-danger flex gap-1.5">
-                      <MissedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-px" />
-                      <span>{point}</span>
+              {marked.creditedPoints.length ? (
+                <ul className="mt-1.5 space-y-1" aria-label="Credited">
+                  {marked.creditedPoints.map((point, i) => (
+                    <li key={i} className="text-xs text-success flex gap-1.5">
+                      <CreditedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-px" />
+                      <span><span className="sr-only">Credited: </span>{point}</span>
                     </li>
                   ))}
                 </ul>
@@ -289,10 +360,10 @@ export function MarkedResult({
               {improvableAnswers && part && question.kind !== "mcq" && marked.awarded < marked.max ? (
                 <ImproveAnswer question={question} part={part} marked={marked} original={improvableAnswers[part.id] ?? ""} />
               ) : null}
-              {marked.comment ? <p className="text-xs text-ink3 mt-1.5">{marked.comment}</p> : null}
+              {marked.comment && !commentRestatesMarkedPoints(marked) ? <p className="text-xs text-ink3 mt-1.5">{marked.comment}</p> : null}
               {attempt ? <FlagThisMark attempt={attempt} part={marked} /> : null}
               {marked.evidence?.length ? (
-                <details className="mt-2" open={marked.missedPoints.length > 0}>
+                <details className="mt-2">
                   <summary className="text-xs text-ink2 cursor-pointer select-none">Evidence for each mark</summary>
                   <p className="text-[11px] text-ink3 mt-1.5">Matched locally against your answer and the mark scheme.</p>
                   <ul className="mt-2 space-y-2">
@@ -328,63 +399,50 @@ export function MarkedResult({
           );
         })}
       </div>
-
-      {question.kind !== "mcq" && actions.length ? (
-        <details className="mt-4 pt-4 border-t border-line" open={!showSocratic}>
-          <summary className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2 cursor-pointer select-none">How to fix it</summary>
-          <ul className="space-y-2.5">
-            {actions.map((action) => (
-              <li key={action.misconception} className="card card-2 p-3">
-                <div className="flex items-start gap-2">
-                  <MissedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-0.5 text-danger" />
-                  <p className="text-sm font-semibold text-ink">{action.misconception}</p>
-                </div>
-                {action.misconceptionEntry ? (
-                  <>
-                    <p className="text-xs text-ink3 mt-2">
-                      <span className="font-semibold">What it looks like: </span>
-                      {action.misconceptionEntry.example}
-                    </p>
-                    <p className="text-sm text-ink2 mt-1.5">{action.misconceptionEntry.explanation}</p>
-                    <div className="flex items-start gap-2 mt-1.5">
-                      <CreditedIcon size={ICON_SIZE.sm} aria-hidden className="shrink-0 mt-0.5 text-success" />
-                      <p className="text-sm text-ink2 flex-1">{action.misconceptionEntry.correction}</p>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-ink2 mt-1.5">{action.action}</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
+      </section>
 
       <div className="mt-4 pt-4 border-t border-line space-y-3">
-        <RichText className="text-sm">{result.feedback}</RichText>
-        <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
-          <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
-          <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
-          {uncertainCause ? (
-            <p className="text-xs text-ink2 mt-1.5">
-              <span className="font-medium text-ink">Possible cause, not certain: </span>
-              {uncertainCause}
-            </p>
-          ) : null}
-        </div>
-        {awarded < question.totalMarks ? (
-          <InterventionPrescriptionPanel topicId={question.topicIds[0] ?? question.subjectId} marksLost={question.totalMarks - awarded} />
-        ) : (
-          // Full marks is only "proven" when the answer can actually count as
-          // evidence: trusted content, answered unaided, outside recall mode.
-          // On an unreviewed or hinted question the same score is practice.
-          attempt && trustedAssessmentContent(question) &&
-          !attempt.hintTier && !attempt.repairTeachingSeen &&
-          !attempt.copiedAnswer && attempt.mode !== "recall"
+        <RichText className="text-sm">{feedbackText}</RichText>
+        {/* Outside a check, a lost mark gets ONE next step; the guiding question,
+            fix list, optional drill and the rest of the repair plan sit under
+            "More help with this answer". Inside a check the deferral line
+            below is the one next step. */}
+        {marksLost && !inDiagnostic ? (
+          <PracticeNextStep
+            question={question}
+            marked={result.marked}
+            answers={answers}
+            remediation={result.remediation}
+            actions={actions}
+            nextAction={result.nextAction}
+            uncertainCause={uncertainCause}
+            techniqueRepair={techniqueRepair}
+            techniqueShapeSuggestion={techniqueShapeSuggestion}
+            showSocratic={showSocratic}
+            showMistakesLogged={!result.retest}
+          />
+        ) : null}
+        {/* Full marks keeps its short "what this taught us" read (support used,
+            familiar question or bank it); a lost mark folds it into the next step. */}
+        {!inDiagnostic && !marksLost ? (
+          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
+            <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
+            <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
+          </div>
+        ) : null}
+        {awarded < question.totalMarks && inDiagnostic ? (
+          <p className="text-xs text-ink2" data-testid="diagnostic-repair-deferred">
+            Revise plans the repair for this when the check is finished, using all of your answers, not just this one.
+          </p>
+        ) : marksLost ? null : (
+          // Full marks is only "proven" when the recovery ledger says this
+          // attempt was the delayed proof of an earlier loss (marksProvenByAttempt).
+          // Otherwise the same score is practice, and says why.
+          proved
             ? (
               <ProofCheckBanner
-                topicTitle={question.topicIds[0]}
+                topicTitle={provedTopic}
                 href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
                 state="passed"
               />
@@ -392,8 +450,9 @@ export function MarkedResult({
               <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="What this answer establishes">
                 <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Full marks — practice, not proof</p>
                 <p className="text-sm text-ink2">
-                  Revise records this as a correct answer. It only becomes proof once the
-                  same skill is answered unaided on a different question, after a delay.
+                  {reviewedQuestion
+                    ? "Revise records this as a correct answer. It only becomes proof once the same skill is answered unaided on a different question, after a delay."
+                    : "Revise records this as a correct answer. This question has not been checked by a teacher yet, so it counts as practice; only answers on reviewed questions can prove a skill."}
                 </p>
                 <ButtonLink
                   href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
@@ -406,27 +465,6 @@ export function MarkedResult({
               </div>
             )
         )}
-        {/* Ask: what did this one attempt teach us? */}
-        {result.marked.some((m) => m.missedPoints.length) ? (
-          <div className="flex flex-wrap gap-1.5">
-            {result.marked.flatMap((m) => m.missedPoints).slice(0, 3).map((point, i) => {
-              const part = question.parts.find((p) => result.marked.some((mm) => mm.partId === p.id && mm.missedPoints.includes(point)));
-              const ao = part?.aos?.[0];
-              const difficulty = question.difficulty;
-              return (
-                <span key={i} className="inline-flex gap-1">
-                  {ao ? <Pill tone="danger">{ao}</Pill> : null}
-                  <Pill>Lvl {difficulty}</Pill>
-                </span>
-              );
-            })}
-          </div>
-        ) : null}
-        {!result.retest && awarded < question.totalMarks ? (
-          <p className="text-[11px] text-ink3">
-            The dropped marks have been logged as mistakes — with AO, command word and timing — and turned into cards that will reappear until you can answer them. See <span className="font-semibold">Progress</span> for expected marks per hour.
-          </p>
-        ) : null}
       </div>
     </Panel>
   );
