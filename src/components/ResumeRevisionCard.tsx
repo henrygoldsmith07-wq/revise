@@ -28,7 +28,8 @@ export function ResumeRevisionCard() {
   return (
     <Panel className="border-accent/40 bg-accentsoft/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        {/* min-w-56 (not min-w-0): at 360px the buttons wrap below the text instead of squeezing it to one word per line. */}
+        <div className="min-w-56 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone="accent">{mission ? "Mission in progress" : "Interrupted"}</Pill>
             <span className="text-xs text-ink3">{mission ? `Exam mission${mission.stage ? ` · ${mission.stage.replace(/-/g, " ")}` : ""}` : revisionActivityLabel(checkpoint.activity)}</span>
