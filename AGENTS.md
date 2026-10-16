@@ -118,6 +118,15 @@ background and do other work while it runs. On Windows, invoke npm through
   `tests/recovery-ui.test.ts`, `tests/proof-ui.test.ts`,
   `tests/onboarding-first-screen.test.ts`, `tests/perf.test.ts`). Read them before
   changing copy or adding a route.
+- **Repair-plan links carry a mode and `/practice` must honour it**
+  (twenty-third pass). `src/domain/intervention-engine.ts` builds
+  `guided=1`, `unaided=1` and `timed=1&command=…`; `src/domain/practice-step-mode.ts`
+  parses them. A new link parameter needs a consumer and a test, or the
+  plan promises something the page does not do. Still unhonoured:
+  `/lesson?worked=1`, `/practice?transfer=1`, `/adaptive-session?proof=1`.
+- **`replacePlan` is serialised** (`src/data/repository.ts`). Two concurrent
+  rebuilds used to union into overlapping blocks; keep plan writes going
+  through it.
 - **A new route under `src/app` must be added to `APP_SHELL` in `public/sw.js`**,
   or `tests/perf.test.ts` fails.
 - **Two pre-existing flake classes**, both evidenced on a clean baseline and both

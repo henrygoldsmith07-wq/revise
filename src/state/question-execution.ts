@@ -7,6 +7,7 @@ import { misconceptionsForTopic } from "@/content/misconceptions";
 
 import { getTopic } from "@/domain/curriculum";
 import { buildHintLadder, HINT_TIERS, hintEvidenceSource, type HintTier } from "@/domain/hints";
+import { guidedOpeningTiers } from "@/domain/practice-step-mode";
 import {
   completeDelayedFarTransfer,
   scheduleDelayedFarTransfer,
@@ -112,6 +113,7 @@ export function useQuestionExecution({
   repairTeachingSeen = false,
   intervention,
   mission,
+  guided = false,
 }: {
   question: Question;
   mode?: Attempt["mode"];
@@ -132,6 +134,12 @@ export function useQuestionExecution({
   repairTeachingSeen?: boolean;
   intervention?: InterventionAttemptContext;
   mission?: Attempt["mission"];
+  /**
+   * A repair plan's "Guided application" step (?guided=1): the hint rungs
+   * below the worked solution start open, and are recorded on the attempt
+   * as used, so the answer is weighted as supported practice, never proof.
+   */
+  guided?: boolean;
 }) {
   const needsWjecHumanReview =
     requiresWjecContentReview(question.subjectId) && !humanVerifiedWjecQuestion(question);
@@ -185,8 +193,10 @@ export function useQuestionExecution({
     () => HINT_TIERS.slice(0, Math.max(0, Math.min(HINT_TIERS.length, hintBudget ?? HINT_TIERS.length))),
     [hintBudget],
   );
-  const [usedTiers, setUsedTiers] = useState<HintTier[]>([]);
-  const [hintsOpen, setHintsOpen] = useState(false);
+  const [usedTiers, setUsedTiers] = useState<HintTier[]>(() =>
+    guided ? guidedOpeningTiers(ladder.map((hint) => hint.tier), allowedTiers) : [],
+  );
+  const [hintsOpen, setHintsOpen] = useState(() => guided && usedTiers.length > 0);
   const visibleHints = useMemo(() => ladder.filter((h) => usedTiers.includes(h.tier)), [ladder, usedTiers]);
   const upcoming = useMemo(
     () => ladder.filter((h) => allowedTiers.includes(h.tier)).find((h) => !usedTiers.includes(h.tier)) ?? null,
