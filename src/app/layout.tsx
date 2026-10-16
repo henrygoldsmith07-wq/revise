@@ -1,13 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/AppShell";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { PwaInstallProvider } from "@/components/PwaInstall";
-import { ShortcutProvider } from "@/components/shortcuts";
-import { AccountBoundary } from "@/state/account";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+import { RouteShell } from "@/components/RouteShell";
 
 /**
  * Canonical origin. Deliberately the same origin the app is served from; set
@@ -68,9 +63,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-GB" suppressHydrationWarning>
       <head>
+        <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
-      <body className={`${inter.variable} antialiased`}>
+      <body className="antialiased">
         {/* AccountBoundary resolves its profile in a client effect, so without
             JavaScript the app below never renders — only its "opening your
             profile" placeholder. This has to live outside that boundary to be
@@ -88,11 +84,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </noscript>
         <PwaInstallProvider>
-          <AccountBoundary>
-            <ShortcutProvider>
-              <AppShell>{children}</AppShell>
-            </ShortcutProvider>
-          </AccountBoundary>
+          {/* The student app runs inside AccountBoundary + AppShell; the
+              reviewer portal (/reviewer/**) renders on its own (RouteShell). */}
+          <RouteShell>{children}</RouteShell>
         </PwaInstallProvider>
         <ServiceWorker />
       </body>

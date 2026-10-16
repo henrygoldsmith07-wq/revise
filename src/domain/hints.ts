@@ -70,7 +70,8 @@ export function buildHintLadder(question: Question, topic?: { keyPoints: string[
   if (topic?.commonErrors?.length) {
     structure.push(`avoid the classic trap: ${topic.commonErrors[0]}`);
   }
-  hints.push({ tier: "scaffold", text: `Structure the answer: ${structure.join("; ")}.` });
+  // Authored common errors end with their own full stop; don't add a second.
+  hints.push({ tier: "scaffold", text: `Structure the answer: ${structure.join("; ").replace(/[.\s]+$/, "")}.` });
 
   if (keyPoint) {
     // The top tier is always reachable, but only after the lower tiers are
@@ -95,5 +96,7 @@ export function nextHint(ladder: Hint[], usedTiers: HintTier[]): Hint | null {
 
 /** Present the hint with its tier label for the UI. */
 export function formatHint(hint: Hint): string {
-  return `${TIER_LABELS[hint.tier]}: ${hint.text}`;
+  const label = TIER_LABELS[hint.tier];
+  // The prompt rung's text already opens "Think about:"; never print it twice.
+  return hint.text.startsWith(`${label}:`) ? hint.text : `${label}: ${hint.text}`;
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { diagnosticFinished, diagnosticReport, nextProbe, type ProbeRecord } from "@/domain/adaptive-diagnostic";
+import { diagnosticFinished, diagnosticReport, diagnosticStartBlocker, nextProbe, type ProbeRecord } from "@/domain/adaptive-diagnostic";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { diagnosticItems, probeFromAttempt } from "@/domain/diagnostic-items";
 import { QuickDiagnostic } from "@/components/QuickDiagnostic";
@@ -36,7 +36,12 @@ function Diagnostic() {
   const [subjectId, setSubjectId] = useState<string | null>(requested && subjectIds.includes(requested) ? requested : null);
   const [quick, setQuick] = useState(true);
   const [records, setRecords] = useState<ProbeRecord[]>([]);
+  // The attempt just marked, held on screen with its marked result until the
+  // student continues. Confidence is captured with the submit, before the
+  // mark is revealed (QuestionRunner `onConfidence`), so the calibration
+  // record is a judgement of the answer, not a reaction to the mark.
   const [pending, setPending] = useState<Attempt | null>(null);
+  const [confidence, setConfidence] = useState<boolean | null>(null);
   const active = subjectId ?? subjectIds[0] ?? null;
 
   const items = useMemo(() => (active ? diagnosticItems(active, store.questions) : []), [active, store.questions]);
@@ -46,15 +51,26 @@ function Diagnostic() {
   const input = { topicIds, items, records, seenItemIds: seen };
   const probe = !pending && active ? nextProbe(input) : null;
   const finished = !pending && (items.length === 0 || diagnosticFinished(input));
-  const question = probe ? store.questions.find((q) => q.id === probe.item.id) : undefined;
+  // Finished before a single question was asked: say why and route on,
+  // rather than showing an empty "No diagnostic answers yet" report.
+  const blocker = finished && !records.length ? diagnosticStartBlocker(input) : null;
+  // While an attempt is held, keep its question mounted so the runner keeps
+  // showing the marked result (same key, same position in the tree).
+  const questionId = pending ? pending.questionId : probe?.item.id;
+  const question = questionId ? store.questions.find((q) => q.id === questionId) : undefined;
   const report = useMemo(() => diagnosticReport(records, topicIds, items), [records, topicIds, items]);
   const titleOf = (id: string) => getTopic(id)?.title ?? id;
 
-  function confirm(confident: boolean) {
+  function advance() {
     if (!pending) return;
     const item = items.find((i) => i.id === pending.questionId);
-    if (item) setRecords((prev) => [...prev, probeFromAttempt(pending, item, confident)]);
+    // Confidence is always captured by the submit buttons; without it there
+    // is no honest calibration record, so no probe is recorded rather than
+    // inventing one.
+    if (item && confidence !== null) setRecords((prev) => [...prev, probeFromAttempt(pending, item, confidence)]);
     setPending(null);
+    setConfidence(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
@@ -63,7 +79,7 @@ function Diagnostic() {
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{quick ? "Optional · 5–10 minutes" : "Optional · 15–25 minutes"}</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Starting diagnostic</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered, so your answers count as unaided evidence.
+          A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered. Answers on teacher-reviewed questions count as unaided evidence; anything else is labelled practice, not proof.
         </p>
       </header>
 
@@ -87,13 +103,28 @@ function Diagnostic() {
       ) : quick && !records.length ? (
         <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} />
       ) : items.length === 0 ? (
-        <Panel><p className="text-sm text-ink3">There are no reviewed questions for this subject yet, so Revise will not run a diagnostic on unverified content.</p></Panel>
-      ) : pending ? (
+        // Not a dead end: the full diagnostic needs reviewed questions, but the
+        // quick check has a labelled practice tier and practice always works.
         <Panel className="space-y-3">
-          <p className="text-sm font-semibold text-ink">How sure were you of that answer?</p>
+          <p className="text-sm text-ink3">There are no reviewed questions for this subject yet, so Revise will not run the full diagnostic on unverified content.</p>
+          <p className="text-sm text-ink2">You can still find a starting point: the quick check uses authored questions, clearly labelled practice, not proof.</p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => confirm(false)}>Not sure / guessed</Button>
-            <Button variant="primary" onClick={() => confirm(true)}>Confident</Button>
+            <Button variant="primary" onClick={() => setQuick(true)}>Take the quick check instead</Button>
+            <ButtonLink href={`/practice?subject=${encodeURIComponent(active)}`} variant="secondary">Practise this subject</ButtonLink>
+          </div>
+        </Panel>
+      ) : blocker ? (
+        <Panel className="space-y-3">
+          <h2 className="text-base font-semibold text-ink">Nothing new for the full diagnostic to ask</h2>
+          <p className="text-sm text-ink3">
+            {blocker === "all-known"
+              ? "You already have solid evidence on every topic that has teacher-reviewed questions, so a diagnostic would not tell Revise anything new."
+              : "The full diagnostic only uses teacher-reviewed questions you have not answered before, and you have already answered every one for this subject. Your earlier answers already count."}
+          </p>
+          <p className="text-sm text-ink2">Today already uses those answers to choose your next step. Practice questions there are labelled practice, not proof.</p>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/" variant="primary">See your next step on Today</ButtonLink>
+            <ButtonLink href={`/practice?subject=${encodeURIComponent(active)}`} variant="secondary">Practise this subject</ButtonLink>
           </div>
         </Panel>
       ) : finished ? (
@@ -113,15 +144,27 @@ function Diagnostic() {
           <p className="text-xs text-ink3">These answers are saved as normal attempts, so Today and your readiness picture already use them.</p>
           <ButtonLink href="/" variant="primary">Back to Today</ButtonLink>
         </Panel>
-      ) : question && probe ? (
+      ) : question && (probe || pending) ? (
         <>
-          <p className="text-xs text-ink3">{records.length} answered · about {Math.round(report.minutes)} of 25 minutes · {probe.reason}</p>
+          <p className="text-xs text-ink3">{records.length} answered · about {Math.round(report.minutes)} of 25 minutes{probe ? ` · ${probe.reason}` : ""}</p>
           <QuestionRunner
             key={question.id}
             question={question}
             hintBudget={0}
+            inDiagnostic
+            onConfidence={setConfidence}
             onFinished={(attempt) => setPending(attempt)}
           />
+          {pending ? (
+            // Kept in reach on a phone: the marked result can be long, so the
+            // way on sits above the bottom navigation, not below the result.
+            <div className="sticky bottom-20 lg:bottom-4 z-10 card card-2 p-3 space-y-2 bg-surface">
+              <p className="text-sm text-ink2" role="status" aria-live="polite">
+                {pending.awarded}/{pending.max} on this one{confidence === true ? ", and you said you were confident" : confidence === false ? ", and you said you were not sure" : ""}. Read what you missed and the model answer, then carry on.
+              </p>
+              <Button variant="primary" className="w-full min-h-11" onClick={advance}>Continue</Button>
+            </div>
+          ) : null}
           <Link href="/" className="text-xs text-ink3 underline">Stop and go back to Today</Link>
         </>
       ) : null}

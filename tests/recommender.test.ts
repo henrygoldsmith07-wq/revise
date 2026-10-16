@@ -37,6 +37,9 @@ function dueCard(id: string, due: string, subjectId = "maths"): Card {
     ...createCard({ id, userId: "u", subjectId, topicId: "t1", front: "f", back: "b" }, NOW),
     due,
     state: 2,
+    // A card in Review state has been studied at least once; never-studied
+    // seeded cards are not owed reviews (isDueReview).
+    reps: 1,
   };
 }
 
@@ -80,6 +83,19 @@ describe("recommend", () => {
     });
     expect(result[0].activity).toBe("flashcards");
     expect(result[0].reason).toContain("overdue");
+  });
+
+  it("never counts installed-but-unstudied cards as due reviews (fresh profile)", () => {
+    const unstudied = Array.from({ length: 40 }, (_, i) => ({
+      ...createCard({ id: `n${i}`, userId: "u", subjectId: "maths", topicId: "t1", front: "f", back: "b" }, NOW),
+      due: "2025-05-28",
+    }));
+    const result = recommend({ ...base, cards: unstudied });
+    expect(result.some((r) => r.activity === "flashcards")).toBe(false);
+    // One studied, due card is owed a review, and only that one is counted.
+    const withOne = recommend({ ...base, cards: [...unstudied, dueCard("s1", "2025-05-28")] });
+    const flash = withOne.find((r) => r.activity === "flashcards");
+    expect(flash?.explanation?.count).toBe(1);
   });
 
   it("surfaces mistake repair once mistakes accumulate", () => {

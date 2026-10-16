@@ -33,6 +33,11 @@ export const EGRESS_LIMITS = {
   mistakeCategoryChars: 60,
   questionParts: 12,
   markSchemePoints: 20,
+  /** "Do not accept" rules per part, phrases per rule, and characters per phrase or reason. */
+  markSchemeRejects: 12,
+  rejectPhrases: 12,
+  rejectPhraseChars: 120,
+  rejectReasonChars: 300,
 } as const;
 
 /** Image types the OCR task may send; anything else is refused rather than sent unchecked. */
@@ -79,9 +84,32 @@ export function minimalMarkQuestion(question: unknown): Record<string, unknown> 
         prompt: text(p.prompt),
         marks: typeof p.marks === "number" ? p.marks : 0,
         markScheme: strings(p.markScheme).slice(0, EGRESS_LIMITS.markSchemePoints),
+        ...minimalRejects(p.rejects),
       };
     }),
   };
+}
+
+/**
+ * A part's authored "do not accept" lines, bounded, for the marking prompt.
+ * Only the point index, phrases and reason: `except` and `scope` are matcher
+ * details the model does not need. Omitted entirely when there are none, so
+ * a part without rules is sent exactly as before.
+ */
+function minimalRejects(value: unknown): { rejects?: Array<{ point: number; phrases: string[]; reason: string }> } {
+  if (!Array.isArray(value)) return {};
+  const rejects = value
+    .slice(0, EGRESS_LIMITS.markSchemeRejects)
+    .map((rule) => {
+      const r = record(rule);
+      return {
+        point: typeof r.point === "number" && Number.isInteger(r.point) && r.point >= 0 ? r.point : -1,
+        phrases: strings(r.phrases).slice(0, EGRESS_LIMITS.rejectPhrases).map((phrase) => phrase.slice(0, EGRESS_LIMITS.rejectPhraseChars)),
+        reason: text(r.reason).slice(0, EGRESS_LIMITS.rejectReasonChars),
+      };
+    })
+    .filter((rule) => rule.point >= 0 && rule.point < EGRESS_LIMITS.markSchemePoints && rule.phrases.length > 0);
+  return rejects.length ? { rejects } : {};
 }
 
 /** Mask every answer part; returns the masked map and the per-part results. */

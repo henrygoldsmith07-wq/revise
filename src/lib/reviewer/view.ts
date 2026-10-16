@@ -43,6 +43,12 @@ function topics() {
   return topicCache;
 }
 
+/** Curriculum topics and the gate context the review gates run against (built once per process). */
+export function reviewTopicContext(): { topics: readonly Topic[]; gate: GateContext } {
+  const { topics: list, gate } = topics();
+  return { topics: list, gate };
+}
+
 export function topicTitles(topicIds: readonly Id[]): string {
   const { byId } = topics();
   return topicIds.map((id) => byId.get(id)?.title ?? id).join(" · ");

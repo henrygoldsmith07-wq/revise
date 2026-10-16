@@ -14,6 +14,13 @@ Internal operations now include cross-subject reviewer campaigns, deterministic
 flagship readiness, blind human marking intake and learner-level pilot reports.
 Implementation and synthetic tests demonstrate behaviour, not learner benefit.
 
+Real teacher classes, generic exam-technique drills, WJEC science practical-skill
+paths and opt-in in-app Sunday plans are available. Diagnosed command-word losses
+can lead into a matching structure drill and back to relevant practice; the drill
+never awards marks, mastery or proof. [Product audit and scope](docs/product-audit-2026-10-14.md)
+and [competitor research](docs/competitive-research-2026-10.md) explain the priorities
+and remaining evidence gaps.
+
 ### Blocked by external evidence
 
 The flagship banks still require genuine qualified human reviews. Authored volume
@@ -68,7 +75,8 @@ when it changes what it can claim ("You improved here, but Revise does not yet
 have enough reviewed new questions to prove it.").
 
 Manual modes (Review, Study, Lessons, Practice, Past papers, Session) stay in
-Tools. The main navigation is **Today, Subjects, Readiness, Tools**.
+Tools. The main navigation is **Today, Learn, Practice, Progress, Library**, with
+manual and specialist tools kept secondary.
 
 Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
@@ -151,7 +159,11 @@ group): a server-rendered queue, one dense screen per question (stem, mark
 scheme, specification points, provenance) and keyboard decisions (`A` approve,
 `R` request changes). Decisions extend the same hash-chained audit log, and a
 question becomes trusted for students once two different reviewers approve the
-same content. Access is granted by the maintainer; see
+same content. Access is granted by the maintainer in one command
+(`npm run wjec:reviewer:grant`), and the first batch to send a teacher is
+`/reviewer/pairs?subject=physics`: the 14 Physics transfer questions with
+their 14 baselines, baseline first (`npm run wjec:review:pairs` shows the
+maintainer which question needs which reviewer); see
 [`docs/review-workflow.md`](docs/review-workflow.md) for the design, how to
 grant a teacher, and the developer-only CLI (`npm run wjec:review:priorities`,
 `npm run wjec:review:pull`, `npm run wjec:review:promote`,
@@ -353,7 +365,13 @@ statements), which are verified, and — per `SPEC_MANIFEST` — which unit/pape
 (duration, marks, weighting) each belongs to. The statement model now covers all
 **32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
 
-Runtime inventory: **475 topics, 3923 materialised seed questions, 2238 WJEC flagship questions**.
+Runtime inventory: **475 topics, 3995 materialised seed questions, 2310 WJEC flagship questions**.
+Recall-level coverage (a question whose demand is recall, which early
+diagnostics probe before application): every topic in all four WJEC
+flagships has at least one (Physics 19/19, Maths 23/23, Biology 25/25,
+Chemistry 23/23). 58 of the Maths, Biology and Chemistry recall items are the
+short probes in `src/content/questions/wjec-recall-probes.ts`. All of these
+are unreviewed authored practice until two teachers approve them.
 The static source audit currently sees 869 authoring/catalogue records before
 runtime expansion; CI treats the materialised bank above as the authoritative
 question inventory. Every topic carries `specPoints` and every seed question part

@@ -1,5 +1,7 @@
-@import "tailwindcss";
+/* Scan application source only, not tools, test artifacts or root configuration. */
+@import "tailwindcss" source("../");
 @import "./le-studio.css";
+@import "./fonts.css";
 @import "katex/dist/katex.min.css";
 
 /* KaTeX inherits the ink token so equations match body text in both themes. */
@@ -62,6 +64,12 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: linear-gradient(115deg, #d7f4f8 0%, #f0fbfc 54%, #fff1e4 100%);
+}
+@media (max-width: 639px) {
+  /* Compact on narrow phones: Today's Start button must clear the first viewport. */
+  .today-welcome {
+    padding: 1rem 1.15rem;
+  }
 }
 .today-welcome::before,
 .today-welcome::after {

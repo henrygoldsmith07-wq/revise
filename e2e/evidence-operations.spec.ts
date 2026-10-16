@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeOnboarding, todayOrOnboarding } from "./helpers";
+import { appQuestions } from "./review-fixture";
 import { verifyThroughWorkflow, wq, PROMPTS, SUBJECT } from "../tests/helpers-review";
-import type { Question } from "../src/domain/types";
 
 async function onboard(page: Page) {
   await page.goto("/");
@@ -12,11 +12,8 @@ async function onboard(page: Page) {
 // Only this browser receives these two-reviewer fixtures. Neither the repository
 // review log nor corpus is changed; this tests claim behaviour, not real efficacy.
 async function seedReviewChain(page: Page, proven: boolean) {
-  const base = await page.evaluate(async (subject): Promise<Question> => {
-    const db: IDBDatabase = await new Promise((resolve, reject) => { const r = indexedDB.open("revise"); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
-    const rows: Question[] = await new Promise(resolve => { const r = db.transaction("questions").objectStore("questions").getAll(); r.onsuccess = () => resolve(r.result); });
-    db.close(); return rows.find(q => q.subjectId === subject)!;
-  }, SUBJECT);
+  // Authored questions come from the bundle, not the profile's store (see review-fixture.ts).
+  const base = (await appQuestions(page)).find(q => q.subjectId === SUBJECT)!;
   const topic = base.topicIds[0]!;
   const slug = topic.replace(`${SUBJECT}.`, "");
   const bank = [0, 1, 2].map(i => ({ ...wq(`cnt:question:e2e-evidence-${i}`, slug, PROMPTS[i]!, { marks: 3 }), origin: "manual" as const }));

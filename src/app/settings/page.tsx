@@ -18,7 +18,7 @@ const ARM_LABELS: Record<string, string> = {
 import { useEffect, useState } from "react";
 import { aiStatus } from "@/lib/optional-ai";
 import { allSubjects, gradesFor, subjectLabel } from "@/domain/curriculum";
-import { seedQuestions } from "@/content";
+import { loadAuthoredQuestions } from "@/data/authored-questions";
 import {
   buildPortabilitySnapshot,
   deletionPreview,
@@ -1004,6 +1004,8 @@ function DataControls() {
           )}
           <Button className="mt-2" disabled={!markingFlags.length} onClick={() => {
             void (async () => {
+              // The bank is loaded on demand (and is already in memory once the store has booted).
+              const seedQuestions = await loadAuthoredQuestions();
               const anonId = crypto.randomUUID();
               const payload = exportMarkingFlags({
                 userId: store.userId,

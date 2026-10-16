@@ -13,8 +13,8 @@ test("onboarding → quick check → Today → repair → independent success �
   if ((await todayOrOnboarding(page)) === "onboarding") await completeOnboarding(page);
   const main = page.locator("main#main");
 
-  // Cold start: one clear action, visible without scrolling, and skippable.
-  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
+  // Cold start: one clear action ("Do this now", the current Today lead), visible without scrolling, and skippable.
+  await expect(main).toContainText("Do this now", { timeout: 30_000 });
   await expect(main).toContainText("Find where to start");
   const start = main.getByRole("link", { name: "Start quick check" });
   const box = await start.boundingBox();
@@ -23,7 +23,9 @@ test("onboarding → quick check → Today → repair → independent success �
   await expect(main.getByRole("link", { name: /^Start/ })).toHaveCount(1);
   await start.click();
 
-  // Quick check: exam answers that are wrong. Each answer is marked, then the next question appears.
+  // Quick check: exam answers that are wrong. Each answer is marked and stays on screen (score,
+  // what was missed, the model answer) until the student continues; only then does the next
+  // question appear (QuickDiagnostic keeps the marked result in reach since 7bf9158).
   await expect(page).toHaveURL(/\/diagnostic\?subject=/);
   const progress = page.getByText(/Question \d of \d/);
   await expect(progress).toBeVisible({ timeout: 30_000 });
@@ -32,12 +34,23 @@ test("onboarding → quick check → Today → repair → independent success �
   for (let n = 1; n <= total; n++) {
     await expect(page.getByText(new RegExp(`Question ${n} of ${total}`))).toBeVisible({ timeout: 60_000 });
     await answerOnScreen(page, false);
+    // Marked, not skipped: a wrong answer scores 0 and the result is announced before moving on.
+    await expect(page.getByRole("status").filter({ hasText: /^0\/\d+ on this one/ })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(new RegExp(`Question ${n} of ${total}`))).toBeVisible();
+    // Inside the check, no repair plan with its own Start button (it would leave the check after one
+    // answer); the summary plans from every answer instead.
+    await expect(main.getByTestId("diagnostic-repair-deferred")).toBeVisible();
+    await expect(main.getByLabel("Your repair plan")).toHaveCount(0);
+    await expect(main).not.toContainText("Watch for the classic error");
+    const next = page.getByRole("button", { name: n === total ? "See what I found" : "Next question" });
+    await next.scrollIntoViewIfNeeded();
+    await next.click();
   }
   await expect(main).toContainText("What I found", { timeout: 60_000 });
 
   // The check changed the recommendation: lost marks now lead, and the quick check is gone.
   await page.goto("/");
-  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
+  await expect(main).toContainText("Do this now", { timeout: 30_000 });
   await expect(main).not.toContainText("Find where to start");
   await expect(main).toContainText(/Recover \d+(\.\d)? marks?|marks/);
   await expect(main).toContainText(/Needs work|Improving/);
@@ -60,7 +73,7 @@ test("onboarding → quick check → Today → repair → independent success �
 
   // Today never calls this proven: nothing has been checked after a delay.
   await page.goto("/");
-  await expect(main).toContainText("Your highest-value session", { timeout: 30_000 });
+  await expect(main).toContainText("Do this now", { timeout: 30_000 });
   await expect(main).not.toContainText("Proven");
   await page.goto("/readiness");
   const panel = page.locator("section[aria-label='Marks recovered']");

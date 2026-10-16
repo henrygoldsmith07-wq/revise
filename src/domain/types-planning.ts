@@ -3,6 +3,8 @@
 // Part of the domain model (see ./types.ts barrel). Split by bounded
 // context for ownership; every name is re-exported from "@/domain/types".
 import type { Id, IsoDate, IsoInstant } from "./types-base";
+import type { SundayPlanSnapshot } from "./types-sunday-plan";
+import type { TechniqueDrillSubmission } from "./types-technique-drills";
 
 export interface PaperSimulation {
   paperSpecId: Id;
@@ -128,6 +130,12 @@ export interface UserSettings {
   aiConsentUpdatedAt?: string;
   /** Whether Pulse may read this account's study history. Off by default. */
   pulseEnabled: boolean;
+  /** Optional weekly in-app plan. Missing/false means off; never email or push. */
+  sundayPlanEnabled?: boolean;
+  /** The first local-data snapshot for this Sunday week; retained until the next. */
+  sundayPlanSnapshot?: SundayPlanSnapshot;
+  /** Most recent 30 generic structure submissions: shape signals only, never raw answers, marks or mastery. */
+  techniqueDrillHistory?: TechniqueDrillSubmission[];
   /**
    * Whether anonymised outcome events may be sent for an agreed learner pilot.
    * Off by default; switched on in Settings → Data with plain-language consent.

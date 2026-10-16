@@ -39,10 +39,19 @@ function pushUnique<T>(values: T[], value: T): void {
   if (!values.includes(value)) values.push(value);
 }
 
-function equationFragments(text: string): string[] {
-  return unique((text
+/**
+ * Every sentence-like segment (split on . ; ! ? and newlines) that contains a
+ * relation symbol (= ≈ ≤ ≥ → ⟶ ⇌ < >). This is exactly what the previous
+ * global match of "non-delimiters, a relation symbol, non-delimiters"
+ * returned, without its per-position backtracking, which was quadratic in
+ * segment length and ran for every authored question when the bank was
+ * built at boot. tests/content-boot-cost.test.ts pins the equivalence.
+ */
+export function equationFragments(text: string): string[] {
+  return unique(text
     .replace(/[−–—]/g, "-")
-    .match(/[^.;!?\n]*(?:=|≈|≤|≥|→|⟶|⇌|<|>)[^.;!?\n]*/g) ?? [])
+    .split(/[.;!?\n]/)
+    .filter((segment) => /[=≈≤≥→⟶⇌<>]/.test(segment))
     .map((value) => value.trim())
     .filter((value) => value.length > 2));
 }

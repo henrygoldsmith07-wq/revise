@@ -1,5 +1,1124 @@
 # Changelog
 
+## The "Worked example" step shows a worked example, and plan steps fit their stated minutes — 2026-10-16 (twenty-fourth pass)
+
+**"Worked example" opened the same lesson as "Targeted explanation".** On the
+application-gap path the plan reads explain → worked example → guided try →
+unaided question, but the worked step linked to `/lesson?topic=…&worked=1`
+and nothing read `worked=1`: at 360px it opened the topic's learning roadmap
+at a generic checkpoint orientation (probed on a production build), the page
+the explanation step had just opened.
+
+- The step now opens `/practice?topic=…&worked=1&minutes=7`: one real question
+  from the topic shown with its own authored model answer and mark-scheme
+  points, then one fresh question to try (outside the example's question
+  family). Nothing is generated.
+- The example never spends proof supply. A model answer shown is not an
+  attempt, so the example is a question the student has already answered
+  (lost marks first), or an unanswered one for which treating it as answered
+  would make no reviewed, still-unseen question in the subject count as seen
+  (`chooseWorkedExample`, reusing `unseenQuestion`). With neither, the page
+  says so and runs the guided try instead.
+- The try records the scaffold tier, so mastery weights it as viewed support;
+  it can never be independent evidence.
+
+**A plan step's three questions ignored its minutes.** An "Unaided exam
+question" step (10 minutes in the plan) held three 4-mark questions: 18
+minutes at the 90 s a mark baseline. Practice links now carry the step's
+`minutes=`, and the queue takes ranked questions that fit at exam pace (still
+at most three), passing over one that would overrun. When none fits, the first
+is offered and the page says it is longer than the step. Every step page
+states its real length ("1 question, about 6 min at exam pace").
+
+`transfer=1` (the "Unfamiliar-context question" kind) is not emitted by any
+plan; a test now fails if one starts emitting it before `/practice` reads it.
+
+**Two open tabs could still double the plan.** The twenty-third pass queued
+`replacePlan` within a tab, but two tabs (or a tab and the installed app) have
+separate queues over one IndexedDB; replanning in both at once kept both
+plans (reproduced in `tests/plan-replace-serial.test.ts` with two module
+instances: all four rows survived). Each replacement now also holds an
+origin-wide Web Lock (`revise:replace-plan`) where the browser has the API,
+so the later plan replaces the earlier one across tabs; without it,
+behaviour is the single-tab queue as before.
+
+## Repair-plan links do what their labels say, and Schedule shows one plan — 2026-10-15 (twenty-third pass)
+
+**"Guided application", "Unaided exam question" and "Timed question" all
+opened the same plain practice hub.** After #64 "Start: Guided application" is
+often the one next step after a lost mark, but `/practice` ignored `guided=1`
+and `timed=1` (and the unaided step had hints on offer). At 360px the student
+landed on "Exam questions" with the wrong-answers card, weak-topic exam, marks
+at risk, ledger and quick sessions above the question.
+
+- `src/domain/practice-step-mode.ts` (pure): parses `guided=1` / `timed=1` /
+  `unaided=1` and `command=`; a flag never overrides a retest, far-transfer
+  check, recall mode or adaptive rung. Timed and unaided allow no hints.
+- Guided: the question's own hint rungs below the worked solution (cue,
+  "think about", answer structure, all from `buildHintLadder`) are shown
+  before the answer box, and recorded on the attempt as used, so mastery
+  weights it as supported practice. Nothing new is authored.
+- Timed: `ExamPaceTimer` counts up against 90 s a mark (the baseline the
+  response-time calibration already uses), never auto-submits, and freezes
+  at marking. `command=` (from the plan's command-word check) puts questions
+  using that verb first and says so when the topic has none.
+- A step page is a short focused try: at most three questions
+  (`STEP_QUEUE_LIMIT`), with the hub cards, topic filter, subject switcher
+  and "other ways to practise" hidden and "Practise normally instead" to
+  leave. At 360×760 the question now starts at y≈380 (was below ~1,500 px
+  of hub cards and a 151-question navigator).
+- The plan's exam-style link now carries `unaided=1`.
+
+**A fresh student's Schedule showed two blocks at the same time.** Onboarding
+saves exam dates (which fires the dynamic replan) and then rebuilds the plan
+from a callback captured before those saves. Both `replacePlan` calls read the
+existing rows before either wrote, so neither removed the other's: a fresh
+four-flagship profile had 238 rows with 14 exact duplicates and two blocks at
+16:00 and 16:30 today (probed in IndexedDB on a production build).
+
+- `src/data/repository.ts`: plan replacements run one at a time, so the later
+  plan replaces the earlier one (a failed write does not block the next).
+- `src/state/planning.ts`: `regeneratePlan` reads the latest committed
+  snapshot, so onboarding's rebuild includes the exam dates it just saved.
+  Existing doubled plans clear on the next rebuild.
+- Schedule week headers read "Week of 12 Oct – 18 Oct" (was
+  "WEEK OF 12 OCT – 2026-10-18"), and Today's blocks say they are the
+  long-range plan and link to the Today screen's one recommendation, which
+  is chosen from the latest answers and can differ.
+- `/teacher` redirects (temporary) to `/classes` instead of a 404.
+
+## A lost practice mark gets one next step, and the repair plan stops calling a first mistake a repeat — 2026-10-15 (twenty-second pass)
+
+**After a wrong practice answer, five blocks competed to be the next step.**
+Walked as a fresh four-flagship student at 360px on a production build
+(`/practice?question=…`, deliberately wrong answers, real offline marking):
+the result stacked a guiding question (whose authored text repeats the missed
+points), "What you missed", "How to fix it", "What this taught us" (promising
+"two targeted items on exactly this point" that practice never delivers, then
+giving a below-threshold possible cause twice), the optional structure drill
+added in #61/#63, and a four-step repair plan with its own Start and Then
+buttons. The plan led with "Fix the misconception — the same wrong idea has
+cost marks more than once here" after the student's first wrong answer, while
+the guiding-question panel above said no known misconception matched.
+
+- `src/domain/practice-next-step.ts` + `src/components/PracticeNextStep.tsx`:
+  one "Your next step" card with one primary button. An actionable
+  (above-threshold) structure diagnosis of this answer opens its technique
+  drill; otherwise the repair plan's first step; otherwise no button. The
+  guiding question, fix list, heuristic shape drill (never primary), the rest
+  of the plan, objective pills and the mistake-log note are under "More help
+  with this answer". The guiding question mounts only when that is opened, so
+  an opted-in AI request is never made for a closed panel. Full-mark and
+  in-check results are unchanged.
+- `src/state/question-execution.ts`: the lost-mark default now says what
+  happens (missed points saved as mistakes that come back for review) instead
+  of promising micro-practice; the uncertain cause is no longer appended to
+  the action text (the result shows it once, marked "not certain").
+- `src/domain/learner-intelligence.ts`: `recurringMistakes` counts open
+  mistakes whose misconception (library entry, else tag; "other" excluded)
+  appears on at least two different questions. It counted every labelled
+  mistake, which is what made a first loss a "repeat".
+- At 360px the marked result went **2,165 → 906 px** (Physics explain,
+  0/3) and **2,054 → 1,087 px** (Maths show-that, 0/6). Measured on the
+  production build before and after both changes.
+- Tests: `tests/practice-next-step.test.ts`, `tests/recurring-mistakes.test.ts`,
+  `e2e/practice-next-step.spec.ts`; `e2e/repair-loop.spec.ts` opens "More help"
+  to reach the tentative drill.
+
+## Wrong-answer feedback lists what you missed once, and a check keeps to its own next step — 2026-10-14 (twenty-first pass)
+
+**A wrong answer got 1.8–2.4k px of marking that said the same thing about
+five times.** Walked as a fresh Biology student at 360px on a production
+build (quick check, deliberately wrong answers): each missed mark-scheme point
+appeared in the part list, the part comment ("No marks yet. The scheme wants:
+…"), the examiner summary ("The scheme still wants: …"), an open evidence
+list, a remediation card and the guiding-question panel. Inside the check it
+also promised "Micro-practice the missed point" (which the check never does),
+offered "Improve my answer", repeated an AO/level pill per missed point, and
+left the live "Verb covered" chip beside a 0/2.
+
+- `src/domain/marked-feedback-display.ts`: recognises the device marker's own
+  restatements by exact match with the text it generates
+  (`rubricPartComment`, `examinerSummaryParts` in `marking.ts`, output
+  unchanged), so they are dropped; AI or any other wording is shown as is.
+  The "no AI was involved" provenance line and any relevant common slip stay.
+- `QuestionMarkedResult.tsx`: one "What you missed" list (missed first, then
+  credited), evidence and model answer folded away, one objective pill per
+  objective, remediation card only where "How to fix it" is not shown. Inside
+  a check (`inDiagnostic`): no guiding-question panel, fix list, "What this
+  taught us" box, pills or mistake-log footnote; the deferral line and the
+  check's own Continue are the next step. The result heading is now an `h2`
+  that takes focus when submitting dropped it to the page body.
+- `QuestionRunner.tsx`: the live verb check hides once the answer is marked;
+  Improve my answer is not offered inside a check (still offered in practice).
+- Measured (scratch, same 3 questions, production builds): marked-result panel
+  1,797 / 2,367 / 1,813 px → 558 / 724 / 558 px; whole page 2,824 / 3,548 /
+  2,819 px → 1,585 / 1,790 / 1,506 px. Guards: `tests/marked-feedback-display.test.ts`,
+  `e2e/marked-feedback-compact.spec.ts`.
+
+## Marked feedback in the first check stops naming unrelated errors and pulling students out — 2026-10-13 (twentieth pass)
+
+**A wrong answer in the quick check got feedback that contradicted itself and
+a way out of the check.** Walked as a fresh Biology student at 360px on a
+production build: every device-marked answer appended "Watch for the classic
+error on this topic: <the topic's first common error>" — on the three-domains
+recall probe that was "Confusing species richness with diversity", directly
+below "No known misconception matches this answer". Each wrong answer also
+showed a full repair plan with its own "Start: Guided application" button
+after question 1 of 4, and the device footer printed literal underscores.
+
+- `src/domain/common-error-relevance.ts`: a topic common error is offered only
+  when it shares two specific words (not title words or generic verbs) with
+  the question's stem, prompts or mark scheme, worded "A common slip on this
+  topic", never as the student's error. Flagship bank: 2,310 questions all
+  got the note before; 863 now (scratch measurement, author-judged spot check:
+  mostly on-point, a few still loose).
+- `inDiagnostic` on `QuestionRunner`/`MarkedResult` (quick and full
+  diagnostic): no repair plan or Start button mid-check; one line says the
+  repair is planned from all answers when the check ends. Feedback per wrong
+  answer at 360px: 3,273–4,069 px → 2,819–3,548 px tall.
+- `DEVICE_MARK_FOOTER` uses `*…*`, which RichText renders as emphasis.
+
+## Staging RLS workflow names the missing secrets — 2026-10-13 (twentieth pass)
+
+The scheduled "Revise staging sync and RLS" run of 2026-10-13 failed because
+all seven `REVISE_STAGING_*` secrets are unset (not a code or RLS bug), but
+the runner printed a generic sentence. Preflight failures now name the unset
+secret *names* (never values) in an error annotation, the step summary and
+the artifact; driver/TLS errors still get a fixed sentence. The runbook says
+how to clear it.
+
+## A fresh profile's first taps no longer wait for the question bank — 2026-10-13 (nineteenth pass)
+
+**On a fresh profile the first taps in onboarding waited for the question
+bank.** Building `@/content` is ~1 s of main-thread JavaScript at 1× CPU and
+~3.6 s at 4×, and it ran while onboarding was on screen; the 4.3k seed cards
+were then installed in one ~0.3 s (1×) / ~1 s (4×) task. Measured on a
+production build at 360px, alternating against `main` (0033352): first tap
+1.41–1.81 s → 0.94–1.27 s at 1×, 4.68–5.45 s → 1.84–2.21 s at 4× (CDP
+throttling probably does not slow the worker, so the 4× gain is likely
+overstated); longest task after onboarding 449 ms → 119 ms.
+
+- `src/worker/content-bank.worker.ts` builds the bank for a fresh profile
+  once onboarding has painted and posts the plain-data questions back once.
+  Any worker error, 30 s of silence or missing `Worker` support falls back to
+  the main-thread import. Returning visits keep the main-thread import.
+- Modules that imported `@/content` themselves (Today's roadmap lessons, the
+  marked-answer panels, the revision sheet, question execution, the AI client)
+  read `@/content/misconceptions` or the loader instead, so nothing rebuilds the
+  bank on the main thread; the boundary test covers every student route.
+- `putMissing` does one read to find the missing rows (none on a returning
+  visit) and writes them in chunks of 500, handing the main thread back
+  between chunks; each chunk re-checks inside its write transaction. Wire
+  tombstone hashing is skipped when there are no tombstones.
+- Offline after onboarding: Turbopack bundles the worker's copy of the bank
+  chunks separately from the page's, so a profile onboarded while the worker
+  built the bank had only the worker's copy cached, and a later offline visit
+  (main-thread import) showed "needs a connection". CI's
+  `e2e/offline.spec.ts` caught it. A returning visit whose main-thread import
+  fails now tries the worker before reporting the bank unavailable; the spec
+  also waits for the warm load's bank before cutting the network.
+- Known cost: the first returning visit after onboarding reached Today in
+  1.40–1.47 s against 1.20–1.23 s on `main`, because the main thread has no V8
+  code cache for the bank chunk yet (the worker built it). Later visits are
+  cached again. No cheap fix was found: warming the cache means evaluating the
+  bank on the main thread (~0.55 s), which would bring back the long task on
+  Today that this pass removed.
+
+## A teacher's invite link opens the reviewer portal — 2026-10-13 (eighteenth pass)
+
+**The reviewer portal never reached a teacher on a fresh browser.** Every
+route, `/reviewer/**` included, rendered inside the student shell
+(`AccountBoundary` → `StoreProvider` → `AppShell`). A teacher opening
+`/reviewer/pairs?subject=physics` from their invite saw "Opening your
+revision profile…", then (signed in) "Use your local revision?", then the
+student onboarding ("Which exam board are you studying with?"), and their
+browser got a learner database in IndexedDB. The portal's server HTML was
+never shown, because the account boundary renders a placeholder until a
+client effect resolves. Reproduced on a production build of `main`: at
+360px and desktop the onboarding showed (0.5–1.3s) and the portal text
+never appeared in 8s.
+
+- `src/components/RouteShell.tsx`: the portal renders on its own (shortcut
+  registry only); every other route keeps the student shell unchanged. No
+  learner profile, IndexedDB or student sync runs for a teacher. Every
+  portal page and the decision API still re-check the session and the
+  reviewer grant on the server; RLS is unchanged.
+- `ReviewerSessionKeeper` starts the Supabase browser client on portal
+  pages, which refreshes the session cookie. The student shell used to do
+  this as a side effect; Server Components cannot write a refreshed cookie.
+- Sign-in links that fail now say why: expired or already used
+  (`error_code=otp_expired`), or opened in a different browser from the one
+  that asked (Supabase's PKCE verifier lives only there). Before, the
+  teacher landed silently on the same form.
+- A "Code from the email" box appears after the email is sent
+  (`verifyOtp`, type `email`); it works on any device once the Supabase
+  Magic Link template includes `{{ .Token }}` (maintainer step,
+  `docs/review-workflow.md` → *First teacher approvals*).
+- After Approve / Request changes the next page says what was recorded and
+  what happens next (one whitelisted word on the URL, display only); the
+  confirmation used to unmount with the bar. The review screen shows how
+  many decisions this reviewer has recorded and that each one saves
+  immediately, so short sessions are safe.
+- At phone width the decision bar is in the page flow instead of a fixed
+  177px bar that hid the end of the question and squeezed the comment box
+  to ~26px; checks and buttons get 44px targets. From `sm` up it is the
+  same fixed bar as before.
+- `e2e/reviewer-first-visit.spec.ts` (fresh 360px browser sees the portal
+  from server HTML, no `revise` IndexedDB, no onboarding; the student app
+  still onboards) and `tests/reviewer-teacher-journey.test.ts`.
+- Not changed: two independent approvals, the six checks, every domain rule
+  in `decisionProblems`, grants, RLS and the audit chain.
+
+## The first screen paints before the question bank loads — 2026-10-13 (seventeenth pass)
+
+**The whole authored question bank sat in the "/" shell chunk.** `@/content`
+was statically imported by the store, the repository, the authored-question
+reader and the search overlay, so a first visit downloaded, parsed and
+evaluated ~2.2 MB of minified questions before React could paint anything:
+about a second on a normal CPU, over three at 4× throttling.
+
+- `src/data/authored-questions.ts` loads the bank on demand
+  (`loadAuthoredQuestions()`): one request per page, retried once, and a
+  failure is forgotten so a later call can try again. Snapshot reads and
+  portable restore resolve it before opening an IndexedDB transaction.
+  Misconceptions and seed cards are imported from their own small modules.
+- A fresh profile's boot waits for the commit that shows onboarding and one
+  painted frame before it starts the snapshot (and so the bank), so the first
+  step reaches the screen first. Returning students are unaffected.
+- If the bank chunk cannot be downloaded (offline before the service worker
+  cached it), the student sees "Revise needs a connection to finish setting
+  up", with a working Try again, instead of the storage-recovery screen and
+  its "Reset this device" button. Covered by
+  `e2e/content-bank-unavailable.spec.ts`.
+- `tests/shell-content-boundary.test.ts` walks the real import graph
+  (esbuild metafile) and fails, printing the chain, if the "/" route ever
+  reaches `@/content` statically again.
+- `perf:budget` route "/": 5,131,397 → 2,969,938 bytes raw, 1,353,778 →
+  733,372 gzip; budget lowered from 5.4 MB / 1.42 MB to 3.06 MB / 760 kB.
+- Measured on production builds of `main` and this branch, alternating runs,
+  360px mobile emulation, the pass-14/15 scripts plus a DOM-insertion mark
+  (Playwright's own visibility probe cannot run while the bank evaluates, so
+  it reads late on this branch; a compositor screencast at 4× confirmed the
+  step on screen at ~1.0–1.4s against ~3.2–3.5s on `main`). Onboarding in the
+  page: 0.92–1.00s → 0.34–0.39s (normal CPU), 3.31–3.32s → 0.96–0.97s (4×).
+  Unchanged within noise: the earliest a tap registers (1.42–1.52s →
+  1.41–1.49s; 4.67–5.08s → 4.62–4.78s), Today after a scripted
+  as-fast-as-possible onboarding (3.60–3.95s → 3.13–3.92s; 7.35–7.86s →
+  7.72–7.74s) and a returning visit (1.11–1.42s → 1.16–1.46s; 3.17–3.98s →
+  3.51–3.65s). With a human-paced last step the final tap reaches Today in
+  0.24–0.25s → 0.20–0.23s (normal) and 0.95–1.05s → 0.57–0.64s (4×), two
+  runs each. The "~1s after the last tap" from earlier passes only exists
+  when a script taps faster than the bank can install.
+
+## Correct answers in a student's own words get the marks — 2026-10-12 (sixteenth pass)
+
+**The offline marker under-credited correct paraphrases.** It reads keyword
+coverage against the scheme's own wording, so "goes up" for "rises", "four
+times smaller" for "one quarter", "zero or negative" for "≤ 0" or
+"inversely proportional to the square of the distance" for "∝ 1/r²" earned
+nothing. The reported inverse-square answer scored 0/3.
+
+- Equivalent wording (`PHRASE_EQUIVALENTS`, `src/domain/marking-language.ts`):
+  a curated list rewrites phrases that mean the same thing in every A-level
+  context to one form, on both scheme point and answer, for coverage only.
+  Opposites, ambiguous words ("fall", "left", "leaves", "double", "by a
+  quarter") and mark-earning terms ("diffuses into") are never merged.
+- "Zero or negative" / "less than or equal to" are read as `≤` by every check,
+  so the relation veto rejects "zero or positive" for a `≤ 0` point.
+- An opposite claim in the new wording ("goes down" for an increase, "four
+  times bigger" for a quarter) is vetoed in very short answers and in the
+  labelled case a point is about ("In A, …" is judged on the sentences about A).
+- Two silent zero-credit bugs: the scaffolding guard read a sentence's last
+  word with its full stop ("genus." never matched the point "Genus"), and a
+  point written only in notation ("P(A ∩ B) = P(A)P(B|A)") could not be
+  credited even verbatim.
+- Measured on a new paraphrase set of real flagship questions
+  (`tests/fixtures/marking-paraphrase-set.ts`; every answer and examiner mark
+  is author judgement, not a moderated mark): 50 design paraphrases
+  under-credited 11 → 4 (103 → 111 of 115 marks); 13 held-out paraphrases
+  written after the change 3 → 2 (26 → 27 of 29); 11 wrong answers in the new
+  wording over-credited 4 → 2 (15 → 13 marks where an examiner gives 10).
+  Whole flagship bank (3,170 parts): no verbatim model answer loses a mark
+  (8,103 → 8,106); rubric-only model answers 71.96% → 72.27%; a same-topic
+  wrong-answer probe 1,497 → 1,496 marks. The contradiction regression set
+  still has no over-credited answer.
+- Not fixed: answers that need comprehension rather than wording ("closer
+  together" for "the gap gets smaller", "cosmological component" for "the
+  expansion of the universe", number words against digits).
+
+## Today about 3 seconds sooner on a first visit, no over-credited contradictions left, and a real "/" budget — 2026-10-12 (fifteenth pass)
+
+**After onboarding a fresh profile still waited 4.6–4.9s (normal CPU) for
+Today**, while ~4k authored questions (~15 MB) were copied into IndexedDB. A
+CPU profile of that window was 76% idle: the main thread was waiting on the
+writes. Those copies were also never refreshed (`putMissing` never
+overwrites), so a device that installed the bank kept that version, including
+any mark scheme fixed later.
+
+- Authored questions are served from the shipped bundle
+  (`src/data/authored-questions.ts`). They carry no learner state and never
+  sync; the `questions` store keeps private questions (AI, imported papers)
+  and retired rows. Only seed cards, which hold FSRS state, still install.
+- Local and wire tombstones still hide an authored id. Nothing on disk is
+  rewritten or dropped: an old device's copies stay where they are, unread,
+  and the current authored version supersedes them. Portable restore treats
+  authored ids as present and never writes an export's older copy.
+- Same snapshot: on a fresh profile the served questions deep-equal what the
+  old install-then-read path produced, in the same key order
+  (`tests/authored-questions.test.ts`).
+- Measured on production builds of `main` and this branch, same scripts as
+  pass 14, 360px mobile emulation, alternating runs: Today visible after
+  navigation 6.94/7.19s → 3.62/3.99s (normal CPU) and 11.85/11.40s →
+  7.57/8.39s (4× CPU); last onboarding tap → Today 4.60/4.90s → 1.28/1.81s
+  and 5.84/3.96s → 1.10/0.92s; quick-check path to the diagnostic
+  7.18/7.41s → 4.00/4.14s. Onboarding-visible and returning-visit times did
+  not change measurably. Numbers and method are in PR #53.
+
+**The last two contradictions in the marker regression set were
+over-credited (2 answers, 3 marks)**, both Physics. Authored "do not accept"
+rules now cover the inverse-square fallacy item (in the reasoning-depth JSON;
+`1/r` is rejected unless the answer states `1/r²`, `1/r^2` or "inverse
+square") and the thermal-storage log (all eight Physics specs). The set now
+has none; no model answer trips a rule; held-out correct answers lose no
+mark. The reasoning-depth fingerprint guard proves the rules are the only
+change to that item.
+
+**`perf:budget` reported the `/` route as 0.55 MB** because it counted only
+the root files. It now also measures the route's layout and page entry
+chunks from the client reference manifest: 5.12 MB raw / 1.35 MB gzip,
+budgeted at 5.4 MB / 1.42 MB. The content bank is still in the shell chunk.
+
+## A cold start in about a second, and Start in the first viewport — 2026-10-12 (fourteenth pass)
+
+**After the thirteenth pass a fresh 360px profile still waited 2.6–2.8s
+(normal CPU) and 10.4–10.8s (4× CPU throttle) before onboarding appeared,
+and returning visits waited the same.** A CPU profile of the boot showed the
+main thread busy, not waiting: the content bank is built when the content
+module first evaluates, the app shell imports it statically, and most of that
+build was spent in authoring helpers rather than in the content itself.
+
+- `hasPhrase` (`src/content/questions/wjec-quality-authoring.ts`)
+  re-normalised the same prompt and compiled a fresh `RegExp` for every
+  candidate phrase. It now normalises each prompt once and compiles each
+  pattern once; the matching rules are unchanged.
+- `provenanceFor` scanned every operation word even when a carried reasoning
+  token made the result unused; it now scans only when it is needed.
+- `equationFragments` (`src/domain/subject-assessment-semantic.ts`) used a
+  global pattern whose backtracking was quadratic in sentence length; it now
+  splits on the same delimiters, with identical results.
+- Same output: the sha256 of the serialised authored questions, seeded cards
+  and misconceptions is unchanged. `tests/content-boot-cost.test.ts` checks
+  the new `equationFragments` against the old pattern on every authored text
+  plus 2,000 generated strings, and the cached matcher against stale state.
+- Measured on production builds of `main` and this branch, same script, 360px
+  mobile emulation: bank build in Node 2.6–2.7s → 0.8s; onboarding visible
+  2.6–2.8s → 1.0–1.3s at normal CPU and 10.4–10.8s → 3.4–4.7s at 4× CPU;
+  a returning visit's main view 2.7s → 1.2–1.3s (normal) and 9.2s → 3.6s (4×).
+  Numbers and method are in PR #52.
+- The bank is still in the shell's 3.6 MB chunk and is still installed into
+  IndexedDB after onboarding (about 4.7s before Today on a first visit).
+  Moving it off the boot path is the next step, not done here.
+
+**Today's Start button was below the fold on a 360 × 760 phone** (it ended
+at y=876; the fixed bottom nav starts at y=694), behind a tall greeting card
+and four lines of reasons.
+
+- `AdaptiveSessionHero` puts Start straight under the subject, topic and exam
+  line, as `BestNextStep` already did. The provisional note, lifecycle, "In
+  this session" and "How" lines follow it, unchanged and still visible.
+- `TodayWelcome` is compact below the `sm` breakpoint (no "Today" eyebrow,
+  which the bottom nav already shows; smaller heading and padding).
+- Start now ends at y=483 (y=462 at 360 × 640). A new check in
+  `e2e/narrow-360.spec.ts` fails on `main` ("Start ends at y=876, fold at
+  694") and passes here.
+
+## A first visit opens in about 3 seconds, and "due" means owed everywhere — 2026-10-12 (thirteenth pass)
+
+**A brand-new profile on a 360px phone profile waited 8.8–9.0s (normal CPU)
+and ~19s (4× CPU throttle) behind "Loading your revision data…" before the
+first onboarding step appeared.** A CPU profile showed the main thread idle
+for most of that time: it was waiting on IndexedDB while the content bank
+(~4.6k cards and questions) installed, and `putAll` made two tombstone reads
+per row on top of each write.
+
+- Onboarding no longer waits for the bank. `StoreProvider` reads the one
+  `onboardedAt` row in parallel with boot and renders the onboarding flow
+  for a never-onboarded profile from the first frame; the store actions
+  arrive when the snapshot is ready, and a final click before then is held
+  ("Finishing setting up your subjects…") rather than dropped. Nothing is
+  saved early; returning students still wait for the full snapshot.
+- `putMissing` (`src/data/db.ts`) installs the bank in one transaction that
+  reads existing ids and tombstone keys itself, so existing rows are never
+  overwritten and deleted content is never resurrected, with two key-range
+  scans instead of ~9k per-row reads. The legacy content-id check on every
+  boot reads keys rather than whole rows.
+- Measured with the same script before and after (production build, 360px
+  mobile emulation): onboarding visible 8.8–9.0s → 2.9s at normal CPU and
+  19.0s → 8.9–10.0s at 4× CPU. Numbers and method are in PR #51.
+- The twelfth pass stopped Today counting installed, never-studied cards as
+  owed reviews; the rest of the app still did. The recommender
+  (`RecommendationCard`, `RevisionTwinCard`, `CountdownPhaseBanner`),
+  `store.dueCards` (the nav badge and Practice's "Review cards (N due)") and
+  per-topic `cardsDue` (Library pills, knowledge map, topic status) now use
+  `isDueReview` too. `/review` still introduces new cards itself.
+- Today's subtitle said "chosen from your answers so far" to a student with
+  no answers; it now says so only once there are answers.
+- Tests: `tests/seed-boot.test.ts`, plus recommender and mastery tests whose
+  fixtures had studied cards (`reps > 0`) still in the New state.
+
+## A first visit no longer opens on a fake card backlog — 2026-10-12 (twelfth pass)
+
+**A phone walk-through of a brand-new profile (375 × 812 and 360 × 800)
+that skipped the quick check landed on "Complete your Mathematics reviews —
+194 cards due; the later they are done, the more you forget", marked "This
+is backed by solid recent evidence."** None of it was true. The 194 were
+the seeded deck, which is installed due on day one and had never been
+studied; Today counted them as owed reviews, and because every topic had
+seeded cards it also treated every topic as already started, so the
+"learn an unstarted topic" candidates never reached the engine.
+
+- `isDueReview` and `studiedCardTopicIds` (`src/domain/scheduling.ts`): an
+  owed review is a card studied at least once whose interval has run out;
+  a topic counts as started only when one of its cards has been studied.
+  This is the line `subject-allocation.ts` and the daily queue already drew.
+- The adaptive session planner (`scoreTopic`, `src/domain/adaptive-scoring.ts`)
+  used the same count, so the session it built opened with "3 due
+  retrievals" and "9 cards are due for review" on a topic never studied; it
+  now counts owed reviews only.
+- Today's plan (`useRevisionPlan`, `src/components/recovery-evidence.ts`)
+  uses both. Re-walked on the rebuilt app, the same first visit now opens on
+  a marked session in Mathematics · Algebra and functions, labelled
+  "Provisional: you have no marked answers on this topic yet, so it was
+  chosen from how much of the specification this topic covers."
+  Cards still appear in their own review queue; nothing was deleted.
+- Removed a design note that had leaked into the last onboarding step ("you
+  will leave thinking that, not that you configured a dashboard").
+- Tests: `tests/first-visit-recommendation.test.ts`, and a 360px Playwright
+  check that a skip-path first visit is offered a marked session, not "cards
+  due".
+
+## Mark schemes can say "do not accept" — 2026-10-12 (twelfth pass)
+
+**Sixteen wrong answers in the regression set still earned offline marks
+because no general check can see them**: swapped Type I/II definitions keep
+every word of both points, "antipodal cells" is a wrong structure rather than
+an opposite word, and "Percentage uncertainty = measured value ÷ uncertainty"
+keeps every word of the right formula. WJEC mark schemes handle these with
+"do not accept" notes beside a point; the bank now can too.
+
+- `QuestionPart.rejects` (optional, backward compatible): per-point
+  `MarkSchemeReject` rules with phrases, an optional `except` list, an
+  optional whole-answer `scope` (for orderings) and a learner-facing reason.
+  Validated by `defineQuestion` and `contentQuestionPartSchema`.
+- `src/domain/marking-reject.ts` applies them. A phrase must appear in one
+  clause, in order ("…" skips up to six words; a word of four or more letters
+  covers its longer forms). A negated phrase ("not osmosis", "rather than",
+  "fail to reject") is a contrast and never vetoes. Rules only remove credit:
+  the offline marker drops the point and says "the mark scheme does not
+  accept “…” for this point" with the reason; on an AI mark the point is
+  contested, so the mark is provisional.
+- The AI marking prompt gets each rule as a "Do not accept" note under its
+  point (bounded in egress, schema-checked server-side; the student answer
+  stays in its untrusted fence). The semantic-cache and DLQ scheme hash
+  include the rules only when a part has some, so other parts' cached marks
+  are unaffected.
+- Rules authored for the 15 recall probes behind the regression set's known
+  gaps. Regression set: over-credited contradictions 18 answers (23 marks) →
+  **2 (3 marks)**, both Physics items that have no rules yet. Held-out
+  answers written for this pass (20 correct, 12 wrong, worded differently):
+  no correct answer loses a mark to a rule; wrong answers over-credited 7 →
+  0. No model answer in the bank trips a rule. Marks are hand-judged, not
+  moderated.
+- Not changed: proof predicates, review gates, verification status (every
+  probe is still unverified), the general contradiction checks.
+
+## Fewer wrong answers earn offline marks — 2026-10-11 (eleventh pass)
+
+**Writing a plainly wrong answer for each of the 40 new recall probes showed
+the offline marker still crediting 19 of them.** "H₀: ρ = 1 and H₁: ρ < 0"
+scored 2/2 for "H₀: ρ = 0, H₁: ρ > 0"; "dm/dt = km, so m = Ae^(kt)" 2/2 for
+exponential decay; "Al₂O₃ is basic only. P₄O₁₀ is basic" 2/2 for
+"amphoteric … acidic".
+
+- A digit that belongs to a name is no longer numeric evidence on its own.
+  A scheme point whose only digits are subscripts or formula digits (H₀,
+  Al₂O₃, H₃N⁺CH₂COO⁻, V₁) used to be credited by any shared digit in the
+  answer; now that only counts when one of those names is in the answer
+  (`pointStatesNumber`, `namedDigitsPresent` in `src/domain/marking.ts`).
+  Powers (v², ½kx²) still count as stated numbers, because formula points
+  in the bank rely on them.
+- New contradiction checks in `src/domain/marking-contradiction.ts`, each
+  only removing credit: an equation identical to the scheme's apart from
+  its + and − signs ("dm/dt = km", "xₙ + f(xₙ)/f′(xₙ)"); a population
+  parameter set to a different value ("ρ = 1" for "ρ = 0"; ρ, μ, σ, λ only,
+  since unknowns such as x take several values in working); a different
+  numeric ratio ("1 : 1" for "3 : 1"); a different whole-number count of the
+  same thing ("38 ATP" for "2 ATP", never a unit); Greek letters inside
+  relations, so "ρ < 0" is read as the flip of "ρ > 0"; and opposite pairs
+  rational/irrational, full/partial, same/different and acidic/basic/
+  amphoteric, plus shortens/lengthens. A different stated value now
+  overrides the symbolic layer, which called "M : M+2 = 1 : 1" equivalent
+  to "3 : 1" through a shared fragment.
+- Regression set `tests/fixtures/marking-contradiction-set.ts` grows to 164
+  answers (67 model, 19 paraphrased-correct, 78 contradictory). Before:
+  24 contradictory answers over-credited (35 marks). After: 18 (23 marks),
+  every one a documented `knownGap` (swapped definitions, wrong structures
+  that are not opposites, quantifiers). No contradictory answer is
+  under-credited and all 19 paraphrases keep full marks.
+- Whole bank, every authored model answer submitted verbatim: no part loses
+  a mark. See the PR for the paraphrase-proxy measurement and the three
+  parts whose proxy credit came only from unrelated digits.
+- Not changed: proof predicates, review gates, the anti-recitation cap, the
+  Physics reversal guards and the structured-notation path (√2, ±, ≤).
+
+## Every flagship topic has a recall question — 2026-10-11 (eleventh pass)
+
+**A recall gap and an application gap looked the same in 40 topics.** Early
+diagnostics probe recall first and escalate to application
+(`diagnostic-intake.ts`). Before this pass 12 of 23 Maths, 14 of 25 Biology
+and 14 of 23 Chemistry topics had no recall-level question, so those topics
+could only be probed at application level.
+
+- 40 new recall probes in `src/content/questions/wjec-recall-probes.ts`, one
+  for every remaining topic (Maths 12, Biology 14, Chemistry 14), using the
+  ninth-pass pattern: two-mark definitions or standard results mapped to one
+  capability node and its spec point, with a visible model answer. Examples:
+  Type I/II errors, Newton–Raphson, F ≤ μR, double fertilisation, Taq
+  polymerase, ΔG = ΔH − TΔS, the silver nitrate halide test.
+- Original practice content, not board questions: every item is
+  `unverified`, has no reviewer and is not proof-eligible until two
+  independent teachers approve it in the reviewer portal.
+- Recall coverage is now 23/23, 25/25 and 23/23 topics (Physics was already
+  19/19). Authoring backlog refreshed: "core if every approvable question
+  were approved" moves from 12/87 to 16/87 (Maths), 10/114 to 11/114
+  (Biology) and 14/108 to 17/108 (Chemistry); none of it is approved.
+- Writing them exposed a marker weakness: hand-written wrong answers to 17
+  of the 40 still earned marks offline (see the next entry).
+
+## The offline marker stops crediting answers that contradict the scheme — 2026-10-11 (tenth pass)
+
+**Short wrong answers were scoring full marks.** With no AI provider (or
+offline), the rubric marker credits a scheme point when enough of its words
+appear in the answer. Half of "Pulmonary vein" is "pulmonary", so
+"Pulmonary artery, right atrium" scored 2/2; "b² + 4ac" passed for
+"b² − 4ac", "< 0" for "> 0", "centre (−3, 2), radius 25" for "(3, −2), radius
+5", and "both alleles are not expressed" for "both alleles are expressed".
+
+- New pure module `src/domain/marking-contradiction.ts`. Per scheme point it
+  checks for an opposite term next to the point's subject (artery/vein,
+  left/right, atrium/ventricle, oxidised/reduced, anode/cathode,
+  endo/exothermic, nucleophilic/electrophilic, donor/acceptor, α/β cells,
+  insulin/glucagon and ~30 more groups), a negation of one of the point's
+  own words, a flipped sign in an expression, a flipped inequality, a
+  different coordinate or named value (radius, roots, gradient …) where the
+  scheme's value appears nowhere, and a different chemical formula (NH₂⁻ for
+  NH₃). It only fires when the scheme's own term or value is absent, so a
+  contrast ("the vein, not the artery") is left alone. It only ever removes
+  credit.
+- `markPart` applies it as a veto after the existing polarity check; the
+  authored-model-answer shortcut no longer passes an answer that contradicts
+  a point (its term-order canonicalisation made "1 − 2cos²θ" look like
+  "2cos²θ − 1"). The symbolic layer's "equivalent" stays decisive only for a
+  point that is a bare expression: on prose points it extracted a fragment
+  and called "b² + 4ac" equivalent to "Discriminant = b² − 4ac".
+- Scope, chosen from false-positive measurements on every model answer in
+  the bank: wording checks (opposite terms, negation) run on answers of up
+  to 40 words, whole-answer only up to 15; Physics parts, which have their
+  own reversal guards and long multi-claim answers, get the general veto
+  only for answers of up to 15 words. A negation inside a conditional
+  sentence ("If substrate runs out, the rate need not double") is a
+  qualification, not a reversal, and the verbatim model answer always keeps
+  the authored-answer shortcut.
+- Evidence now says why: "Not awarded: your answer says “artery” where the
+  mark scheme needs “vein”." A credited point whose answer hedges between the
+  right term and its opposite ("the pulmonary vein or the pulmonary artery")
+  is flagged `contested`, and the deterministic assessment then labels the
+  whole mark provisional instead of presenting it as firm. The AI path's
+  `answer-evidence` check fails softly on the same flag, so an AI mark that
+  credits a contradicted point is shown as provisional, never as "checked".
+- `pointCoverage` no longer misses a short scheme term because the answer's
+  last word carries a full stop ("E(X) = np." scored 0 for "E(X) = np"). The
+  anti-recitation cap still reads `tokenise` exactly as before, so it is not
+  loosened.
+- Regression set `tests/fixtures/marking-contradiction-set.ts`: 27 real bank
+  questions, 74 answers (27 model, 9 paraphrased-correct, 38 contradictory)
+  with hand-judged examiner marks (not human-moderated). Before: 30 of 38
+  contradictory answers over-credited (35 marks), 8/9 paraphrases at full
+  marks. After: 5 over-credited (7 marks), all documented known gaps; 9/9
+  paraphrases at full marks; no contradictory answer under-credited. On
+  every model answer in the bank the veto fires on 1 of 13,288 scheme points.
+- Not changed: copied-mark-scheme detection (`textOverload`), the
+  anti-recitation cap, proof predicates and review gates. The veto can only
+  lower a rubric mark.
+
+## Readiness explains "Proven" next to unrecovered marks — 2026-10-11 (tenth pass)
+
+Both signals were right but scoped differently: "Proven"/"Secure" (and an
+"improved on new questions" claim) describe a topic as a whole, while "N
+marks lost and not yet recovered" counts specific questions not yet won back.
+`buildProgressSummary` now reports `losing.inStrongTopics` and a one-line
+`scopeNote` when they overlap, and each strong topic row carries its
+`openMarks`. The Progress summary shows "N lost marks here still to win back"
+beside the badge and the scope sentence under the lost-marks total. No stage,
+proof rule or total changed.
+
+## Missions stop promising proof the lost marks can never give — 2026-10-11 (ninth pass)
+
+**"Awaiting proof" was a dead end.** A mission decided whether proof was
+possible only from question supply. But proof of recovery also needs the
+*loss itself* to be trusted evidence (`trustedAssessmentMistake`): a WJEC
+paper-mode loss needs a verified past paper and human-reviewed marking
+(`authenticPaperEvidence`), and any flagship loss needs a teacher-reviewed
+source question and a reliable mark. When that failed, an unaided success on
+a different reviewed question stayed "provisional" forever, yet the mission
+still read "Awaiting proof" and offered the apply step again.
+
+- `mark-recovery.ts`: each review-gated loss that fails the gate now carries a
+  `proofBarrier` (`loss-unverified-paper`, `loss-unreviewed-question`,
+  `loss-untrusted-mark`, `loss-unlinked`) with plain wording. It is computed
+  only after `trustedAssessmentMistake` has already said no: no state, total
+  or predicate changes.
+- `buildMission`: when every loss in a mission is barred, proof is reported
+  impossible whatever the supply (new evidence limit `loss-not-provable`,
+  named first), the mission is never "awaiting proof", the apply step becomes
+  "Answer unaided on a different question (practice)" (and runs on unreviewed
+  unseen questions rather than emptying), and the delayed check becomes
+  "Spaced practice checks", blocked with the reason. Today then routes to the
+  existing spaced practice Revisit ("Check it held: …") with the barrier as
+  the evidence limit, instead of blaming question supply.
+- The same supply-only reasoning was fixed on the mission card (no more
+  dead-end with no button: "Practise it (not proof)"), Today's "Evidence
+  limit", Progress's improvement story ("on the way … waiting for that check"
+  no longer counts barred marks), and the paper autopsy stage reason. A
+  blocked mission with marks recovered in practice now reads "Improving", as
+  each lost mark already did.
+- `e2e/paper-recovery-journey.spec.ts` now asserts this honest state instead
+  of a proof step it could never reach, and still fakes no reviewed paper.
+- Test fixtures in `tests/revision-engine.test.ts` now include the marked
+  attempts their losses link to; without them those losses could never have
+  been proven under the existing gate.
+
+**Recall-level probes where there were none.** Early diagnostics probe recall
+first and escalate to application (`diagnostic-intake.ts`), but most WJEC
+Maths, Biology and Chemistry topics had no recall-level question (by primary
+topic: 18 of 23, 20 of 25 and 20 of 23), so a recall gap and an application
+gap looked the same. `src/content/questions/wjec-recall-probes.ts` adds 18
+original, spec-mapped recall questions (one or two AO1 marks each) on the six
+highest reviewer-priority topics without one in each subject (Maths: algebra,
+integration, trigonometry, coordinate geometry, distributions, kinematics;
+Biology: nucleic acids, homeostasis, transport in animals, ecosystems, gas
+exchange, inheritance; Chemistry: bonding, acids and bases, kinetics,
+energetics, redox, hydrocarbons). All are `unverified` with no reviewer and
+pass the review gates, so they are approvable, never trusted, until two
+teachers approve them. Topics still without one: 12 of 23, 14 of 25, 14 of
+23. Authoring backlog refreshed (`wjec:authoring:refresh`).
+
+## Teachers can find, judge and finish the transfer pairs — 2026-10-11 (eighth pass)
+
+**The questions that most need two teachers were invisible to them.** A
+transfer question can only help prove improvement once it and its baseline
+are each approved by two different reviewers. In the portal's
+capability-first queue the 14 linked Physics transfer items sat at about
+positions 1,371–1,384 of 1,643 "Ready for you" rows (the table renders 200)
+and their baselines anywhere from 123 to 1,273, and the review screen asked a
+teacher to tick "Genuine transfer" without showing the baseline.
+
+- `/reviewer/pairs?subject=<slug>`: every linked (baseline, transfer) pair in
+  a subject, baseline first, with pairs usable for proof, questions verified,
+  approvals recorded (of 56 for Physics) and who still has to act on each
+  question ("needs 1 more reviewer, not teacher-a"). Linked from the queue.
+- Opened from the batch, Next/Skip stay in batch order and skip anything the
+  reviewer already approved or that waits for an author edit
+  (`nextInBatch`); the review screen shows the linked baseline (prompt, mark
+  scheme, worked answer) beside a transfer question, and the transfer items
+  built on a baseline beside the baseline.
+- The queue table now says when it shows only the first 200 rows.
+- `src/lib/reviewer/batches.ts` is ordering and context only: states come from
+  `reviewStateOf`; no rule, gate or trust predicate changes.
+
+**Smaller fixes.** Touch targets on Today at 360px: "Skip, just start
+revising", "Choose how to study", "Change subjects", "View my plan", "Set up
+my plan", "View full roadmap" and "Continue roadmap" are now at least 44px
+tall (`min-h-11`; `e2e/narrow-360.spec.ts` passes), and the review screen
+no longer tells a teacher that approving one half of a transfer pair "unlocks
+nothing new": it says the pair counts only once the other half is verified
+too. E2E specs updated to the current Today lead ("Do this now"), the Tools
+menu's "Review <count>" label, a settings toggle that waits for hydration, and
+proof journeys re-based on fixture-reviewed WJEC Biology content (approvals
+written only inside the test's own browser profile), the quick check's
+"Next question" step (a marked answer stays on screen until the student
+continues), and the proof stage's "Start proof check" CTA.
+
+**Known: a paper's lost marks cannot reach delayed proof without an attested
+past paper.** `e2e/paper-recovery-journey.spec.ts` now runs through repair and
+the unaided step on fixture-reviewed content, then stops where the trust rule
+says it must: WJEC paper-mode mistakes count only through
+`authenticPaperEvidence` (verified past-paper provenance plus a human-reviewed
+marking attestation). The mission still labels that state "Awaiting proof" and
+offers the apply step again; that wording gap is recorded, not fixed here.
+
+**Onboarding offline sent the student back to step 1.** `finish()` called
+`onDone()` (which writes the "onboarded" marker) without waiting, then
+`router.push('/diagnostic?…')`. Online that is a client-side transition and
+the write finished anyway; offline the RSC fetch fails, Next falls back to a
+full browser navigation and the in-flight write was lost, so the reloaded app
+showed "Step 1 of 5 · Board" again. `finish()` now awaits the marker before
+navigating (`AppShell` passes `completeOnboarding` itself). Found by
+`e2e/offline.spec.ts` "offline banner appears when offline", which reproduced
+it deterministically and now passes.
+
+**A teacher following the sign-in link landed on the sign-in form again.**
+The gate is server-rendered before the browser finishes the magic-link
+exchange, and the link always returned to `/reviewer`. `ReviewerSignIn` now
+re-renders the server page once a session exists (the server still checks the
+grant), and the link returns to the portal page that was opened
+(`reviewerReturnPath`, portal paths only), so a shared batch link survives
+sign-in. Needs `https://<site>/reviewer/**` in Supabase's redirect allow-list.
+
+**Granting a teacher took the Supabase dashboard plus hand-written SQL.**
+`npm run wjec:reviewer:grant` (maintainer, service role in their own shell)
+finds or invites the auth account and calls `grant_reviewer_role` /
+`revoke_reviewer_role`, after validating the `reviewer_roles` constraints,
+refusing a label that reuses the email and the obvious self-grant.
+`npm run wjec:review:pairs` shows the maintainer, who holds no reviewer
+grant, which question needs which reviewer (committed log, plus verified
+portal events when the service role is set). No migration.
+
+## Full diagnostic no longer dead-ends without recall questions — 2026-10-11 (seventh pass)
+
+**The full diagnostic could finish before asking anything.** It opened each
+topic only with a trusted recall-level question. While only a handful of
+questions are teacher-reviewed, none of them may be recall-level (the e2e
+fixture's 24 trusted WJEC Maths questions are all application or harder), so
+the student chose "Full", saw "No diagnostic answers yet, so nothing can be
+said." and had nowhere to go.
+
+- `nextProbe` falls back to the lowest-demand trusted item for a topic when
+  the wanted depth has none (`fallbackDepths`): an opening or recall check
+  widens upwards; any other want steps down, but never to a depth the topic
+  has already answered correctly. The probe's reason says plainly that no
+  reviewed recall question exists yet. The record keeps the item's real depth,
+  and a miss is no longer described as "Recall is fine" when recall was never
+  tested. Untrusted items are still never used.
+- `diagnosticStartBlocker` names why a diagnostic cannot ask its first
+  question (`no-reviewed`, `all-seen`, `all-known`); the page explains it and
+  routes to Today or practice instead of showing an empty report.
+- No trust gate, proof predicate or review rule changes.
+  `tests/adaptive-diagnostic.test.ts` (6 new cases),
+  `tests/full-diagnostic-trusted-start.test.ts` (the 24-trusted Maths fixture).
+
+**Five circular motion/SHM transfer items were only rearrangements.** sp-01,
+sp-03, sp-04, sp-05 and sp-06 in `physics-transfer-linked.ts` passed the
+Physics novelty check only as inverse problems on their baseline's own
+relations (`rearrangementOnly`). Each now continues into a physical relation
+its baseline never uses, as one worked chain: sp-01 carries ω and r into the
+centripetal force on a stone in the tread (F = mω²r); sp-03 uses the largest
+logged acceleration for the amplitude and maximum speed (a_max = ω²A,
+v_max = ωA); sp-04 uses the glider's mass for k = mω² and the oscillation
+energy (½mv_max², checked as ½kA²); sp-05 finds the loaded chair's maximum
+speed by energy conservation (checked against ωA); sp-06 predicts the period
+from the k it found (T = 2π√(m/k)). Every new number is recomputed in
+`tests/physics-transfer-linked.test.ts`, which now also asserts that none of
+the fourteen linked items is `rearrangementOnly`. All stay `generated`,
+`unverified`, reviewer null. Physics stays 14/108 (same statements).
+
+**Submitting offline could silently do nothing.** The AI client is a separate
+chunk loaded on first use. If a student's first marked answer of the session
+happened offline, the import rejected, the submit promise rejected with no
+handler, and the button came back as if never pressed.
+`src/lib/optional-ai.ts` now marks against the mark scheme on this device
+when the chunk cannot load (`aiMarkerUnavailableMark` in
+`src/lib/offline-mark.ts`, the same deterministic marker and labelling as the
+existing rubric fallback, which now shares its code; nothing is sent, nothing
+queued). Any other submit failure now shows "That answer was not marked or
+saved. It is still here, so you can submit it again." (`role="alert"`)
+instead of nothing. `tests/offline-marking-fallback.test.ts`.
+
+**Browser checks brought up to date.** `e2e/marked-feedback-visible.spec.ts`
+now rates due retrieval cards and writes the explain-the-gap recall before
+revealing, so it reaches the marked step; `e2e/wjec-trusted-journey.spec.ts`
+asserts Today's current "Do this now" card and that its cold-start step names
+the reviewed questions it rests on. Every trust assertion is unchanged.
+
+## Spaced revisits for the returning student; Physics-aware novelty; full-diagnostic feedback — 2026-10-11 (sixth pass)
+
+**A returning flagship student got the same Today action for ever.** Every
+flagship question is still unreviewed, so a lost mark recovered on another
+question stays `provisional` (`unverifiedOnly`) and its mission is blocked on
+proof supply. The engine answered that by sending the student straight back
+to supported practice on the topic they had just fixed ("Recover 3 marks …"),
+an hour later, the next day and a fortnight later. Nothing was spaced, the
+Revisit step of the loop never happened, and repeating the practice could
+never change the state.
+
+- `mark-recovery` now derives a practice revisit schedule for those items
+  (`practiceRevisit`, `practiceRevisitFor`): first check 3 days after the
+  first unaided success on a different question; each unaided check on yet
+  another question that holds doubles the gap (capped at 30 days); a check
+  that loses marks stops the schedule, because that loss opens its own repair.
+  Hinted attempts, early attempts and repeats of the same question never count.
+- The engine waits ("Waiting for the delay to pass: … from <date>", shown on
+  Today under the next step) and then offers **"Check it held: <topic>"**,
+  labelled practice, not proof, ranked below open losses of the same stake.
+- No proof state, total, predicate or trust gate changes; reviewed content is
+  unaffected. `tests/practice-revisit.test.ts` (9 cases).
+
+**Physics transfer novelty compares physics.** The generic comparison reads
+reasoning from Maths/Biology/Chemistry vocabulary, so on Physics it matched
+chance words ("enzyme-mechanism" on an SHM energy answer, "stoichiometric" on
+a rotor ride). For WJEC A-level Physics only, the subject audit now uses
+`comparePhysicsTransfer` (`src/domain/physics-transfer-novelty.ts`): the
+physical relations each worked solution uses (bound to the step that shows
+them), the unknowns each prompt's instruction clauses ask for, and a context
+change. It fails closed when it recognises no relation or unknown, and
+rejects number swaps and renamed copies that solve the same relations for
+the same unknowns. Other subjects keep the graph comparison unchanged.
+
+- All 13 existing linked Physics transfers pass; 5 of them only as inverse
+  problems on the baseline's own relations (`rearrangementOnly`: circular
+  motion/SHM sp-01, sp-03, sp-04, sp-05, sp-06), reported as weaker transfer.
+- The electric circuits sp-04 draft withheld in the fifth pass (fixed 40 W
+  from a battery with internal resistance; a quadratic, chosen on efficiency)
+  is authored in full and passes: Physics authored ceiling 13/108 → 14/108,
+  all unreviewed and `source: "generated"`.
+
+**The full diagnostic shows the mark, and asks confidence first.** It used to
+unmount the marked result and ask "How sure were you of that answer?" in its
+place. Confidence is now captured with the submit, before the reveal
+(`QuestionRunner` `onConfidence`: "Not sure · submit" / "Confident · submit"),
+so each calibration record is a judgement of the answer rather than a
+reaction to the mark; the marked result stays mounted until "Continue".
+`tests/full-diagnostic-feedback.test.ts`.
+
+**Browser check for held feedback.** `e2e/marked-feedback-visible.spec.ts`
+drives the adaptive session and the full diagnostic and asserts the result is
+still visible after the replan, until Continue. The fixture-review helper the
+trusted journey used is shared as `e2e/review-fixture.ts`. `completeOnboarding`
+now walks the five-step onboarding: it re-clicks the board until it reports
+`aria-pressed` (the dialog can paint before hydration, which left the run on
+"Step 1 of 5 · Board"), steps through the quick-check and first-step phases,
+and returns to Today after "Start my quick check" redirects to `/diagnostic`.
+**Not yet green locally:** with that fix all three specs get past onboarding,
+then fail on spec drift — the adaptive-session walker does not rate retrieval
+cards; the trusted journey still expects the old "Your highest-value session"
+heading; and the fixture's trusted WJEC Maths items contain no recall-depth
+question, so the full diagnostic (which opens each topic with a recall probe)
+finishes with no questions.
+
+## Marked answers stay on screen; Physics baseline integrity; two more Physics transfer items — 2026-10-10 (fifth pass)
+
+**A student never saw feedback in the two main flows.** `useQuestionExecution`
+calls `onFinished` the moment marking completes. The quick diagnostic (a new
+student's first marked questions) advanced to the next probe in that same
+render, and the adaptive session (Today's "Start session") recorded the step
+and replanned, swapping the step panel out. Either way the marked result —
+the mark, the points missed, the model answer, "How to fix it" — unmounted
+before it could be read. README promised "lost marks appear immediately".
+
+- `QuickDiagnostic` holds the marked attempt until the student taps
+  "Next question" / "See what I found" (sticky above the phone nav, mark
+  announced via `role="status"`).
+- The adaptive session holds a marked step (`heldStep`) on screen until
+  "Continue"; the record and the replan still happen at once, the completion
+  screen waits, and a retest that resolves its mistake no longer remounts the
+  question.
+- Tests: `tests/quick-diagnostic-feedback.test.ts`,
+  `tests/adaptive-session-feedback.test.ts` (source-level; there is no React
+  test renderer in the repo). The WJEC trusted-journey e2e now asserts the
+  mark is visible before continuing; it was not executed here (no Playwright
+  browsers in the sandbox).
+
+**Physics baseline integrity.** `validateBaselineIntegrity` rejected 9 of 11
+Physics transfer baselines because its step families only knew
+Maths/Biology/Chemistry vocabulary. For Physics only it now also accepts
+`physicsWorkingNodes`: a supplied quantity with a unit, a substitution into a
+relation (a number in standard form alone does not count) and a result with
+its unit, each bound to a real span. `deriveVerifiedGraph` and every novelty
+comparison are unchanged; other subjects' verdicts are unchanged (pinned by
+test). Physics transfer parts with an explicit baseline link now go through
+the transfer block of `auditFlagshipSubject`; all pass. The spring-period
+baseline's model answer now shows its working.
+
+**Reference-tier learning actions are practice-only.** `selectLearningAction`
+labelled any item passing the permissive `trustedAssessmentContent` as
+`trusted-assessment`; the label now requires `learnerEvidenceTrusted`, and
+reference items (still available, including transfer/retention practice) are
+`practice-only`.
+
+**Two more linked Physics transfer items** (electric circuits sp-02: divider
+worked backwards plus meter loading; electromagnetic induction sp-01: field
+from search-coil charge). Physics authored ceiling 11/108 → 13/108, all
+unreviewed. A drafted circuits sp-04 item was withheld: the novelty heuristic
+rated it not novel because Physics derived graphs are nearly empty.
+
+## Reference-tier mastery says "practice"; nine more linked Physics transfer items — 2026-10-10 (fourth pass)
+
+**A reference-tier topic could still show "Proven".** `masteryStage`
+(Progress → "What am I strong at?" and the topic counts under it) judged
+evidence with `trustedAssessmentAttempt`, which is permissive for subjects
+with no review gate. A correct, unaided, delayed answer on an unreviewed
+reference question therefore produced a green **Proven** pill, the claim
+#40 removed from the proof ledger but which survived in this layer.
+
+- Reference topics now top out at Secure, labelled **"Secure in practice"**
+  (`stageLabel`), with a next step that says why the topic cannot be proven
+  there; the topic-count line notes how many "secure" topics rest on
+  reference practice only (`practiceOnlySecure`).
+- The specification map (`/readiness/spec`) carries `referenceTier`: the
+  eyebrow reads "Practice layer", the reference disclaimer is shown, and
+  "Secure" / "Secure but stale" become "Secure in practice" (`specStatusLabel`).
+- Paper readiness flags `referenceTier`: "secure in practice", "done well on
+  unfamiliar practice questions (practice, not proof)", "Next step" instead of
+  "Next proof", and "Practise it on an unfamiliar-context question" instead
+  of "Prove it…".
+- Flagship behaviour and every proof predicate are unchanged.
+  `tests/reference-tier-mastery-wording.test.ts` (7 cases, all fail on the
+  previous code). `mastery-stage` and `progress-summary` fixtures use a
+  non-flagship id, so their "proven"/"Secure" expectations moved to a reviewed
+  flagship fixture or to the practice label.
+
+**Nine more Physics transfer items with a real baseline.** Capacitance
+sp-01..03 and circular motion/SHM sp-01..06, the statements
+`wjec:authoring:plan -- physics` ranked next, in
+`src/content/questions/physics-transfer-linked.ts`. Each links to an existing
+application/calculation part of the same capability and passes the
+structural-novelty comparison on independently derived graphs (the stricter
+check that withheld the sp-02 draft last pass); tests recompute every worked
+number. `source: "generated"`, `verification: "unverified"`, no reviewer.
+Physics authored ceiling 2/108 → 11/108. The deeper `validateBaselineIntegrity`
+check still rejects 9 of the 11 baselines (the verified-graph derivation finds
+no evidence/conclusion nodes in most Physics model answers); it is not applied
+to Physics and was not changed.
+
+## Practice estimates say so; first linked Physics transfer items; honest AI re-mark notice — 2026-10-10 (third pass)
+
+**Reference-tier subjects no longer read as exam-ready or as an exam
+prediction.** Their questions pass the permissive `trustedAssessmentContent`
+(no review gate), which is right for practice but was flowing into claims:
+
+- `buildExamReadiness` could mark a reference subject **Ready** (and
+  `readinessStopFor` would then cut its practice short). It now caps them at
+  `nearly-ready` and sets `referenceTier`; the readiness card says why.
+- `outlookRows` could give a reference subject a non-provisional band, so
+  Today said "Estimate: you're most likely to score 60–80% in …" with no
+  qualifier. Reference rows are now always provisional and flagged
+  `referenceTier`; Today, the Progress trajectory heading and the knowledge
+  map's exam node call it a **practice estimate, not an exam prediction**.
+- `predictGrade` names the weakness in `uncertaintySources` for reference
+  subjects (shown under "What makes this estimate uncertain?").
+- `isProofCapable` used the permissive predicate; it now uses
+  `learnerEvidenceTrusted`, matching `provenanceTier`.
+- Left as practice-tier on purpose (labelled already, no proof/readiness
+  claim): supply, mock generation, diagnostics, knowledge-graph
+  covered/shaky statuses, calculation/response-time calibration.
+- Flagship behaviour is unchanged. `tests/reference-tier-claims.test.ts`
+  (6 of 7 cases fail on the previous code).
+
+**First Physics transfer items with a real baseline.** Two new transfer
+questions for the top-ranked authoring briefs (alternating currents sp-01,
+rms from a logged peak voltage and metered energy; sp-03, minimum
+transmission voltage and turns ratio from a loss limit), each linked to an
+existing application/calculation part of the same capability with recomputed
+setup fingerprints. `source: "generated"`, `verification: "unverified"`, no
+reviewer. Physics authored ceiling 0/108 → 2/108. A drafted sp-02 item was
+withheld because the structural-novelty comparison (not yet applied to
+Physics) rated it too close to its baseline. No gate was relaxed and the
+234 unlinked items were not touched.
+
+**AI marking failure is explained.** When the AI marker fails and the attempt
+is genuinely queued for a re-mark (consent given, cloud tried), the marked
+result now says so and that the mark may update; `enqueueDeadMark` resolves
+`true` only when the item was written.
+
+## "Proven" means the same thing everywhere — 2026-10-10 (second pass)
+
+**Four places could tell a student something was proven, or provable, when
+the proof rules say it was not.** The proof ledger already required
+`learnerEvidenceTrusted` (flagship + human review); the layers around it did
+not.
+
+- **Reference-tier proof steps.** `mission-session` (apply / transfer /
+  delayed-proof picks) and `unseenSupplyByTopic` used the permissive
+  `trustedAssessmentContent`, so a reference-tier subject could be served
+  "Delayed check — this is what proves the marks are back" from unreviewed
+  outline content. Both now use `learnerEvidenceTrusted`. The
+  `revision-engine.test.ts` fixtures moved onto the four flagship ids with a
+  reviewed bank (same intent) — the blocker recorded by the last two passes.
+- **Reference-tier "Proven" marks.** `mark-recovery` reached `proven` on the
+  same permissive predicate, feeding "Proven on trusted unseen" (MarksLedger)
+  and "Proven improvement" (ExamCommandCentre). The answering question must
+  now clear `learnerEvidenceTrusted` (or the separately verified official-paper
+  tier); reference-tier marks stay provisional and say why. Proof-lifecycle
+  test fixtures use new reviewed-flagship helpers in `tests/helpers-recovery.ts`.
+- **"Proof check · passed" after any full-marks answer.** The marked result
+  showed "<topic id> is now proven on a new question" for any unaided full
+  marks on permissively-trusted content — first answers, no delay, no earlier
+  loss. It now shows only when `marksProvenByAttempt` says this attempt was the
+  delayed proof of an earlier loss, and uses the topic title.
+- **Authored ceiling.** `wjec:authoring:*` counted gate-blocked questions as
+  if they could be approved. None of the 234 Physics questions labelled
+  "transfer" has a baseline link, so the reviewer portal refuses all of them,
+  yet they filled every Physics statement's transfer slot: the backlog said
+  108/108. Counting only `approvableByReview` questions it is 0/108 (Maths
+  9→8, Biology 12→9, Chemistry 13→12 statements). The backlog
+  (`part-level-depth-v2-approvable`) pins gate-blocked counts per subject, and
+  `--check` names any rise in a blocking gate. No links were invented and no
+  content was relabelled: choosing a baseline is an authoring judgement, and
+  relabelling 234 items would rewrite authored design to make a number move.
+
+**Today no longer goes blank while unseen questions remain.** The flaky
+property `never headlines an action it cannot perform` (seed 1002749685) was a
+real gap: a learner who had started every topic, lost no marks and had
+nothing due got an empty Today and a note blaming review supply, with unseen
+questions still in the bank. `rankRevisionActions` now falls back to "Keep
+practising <topic>" when nothing else ranks and there is no adaptive plan; it
+skips topics with unproven losses so practice never spends the questions a
+delayed check needs, and it claims no proof.
+
+Nothing loosened: no gate, threshold, review rule or proof predicate was
+relaxed; every change above tightens a claim to match the existing rules.
+
+## Reviewer minutes go where students gain most — 2026-10-10
+
+**The biggest bottleneck is human review (0 reviewed flagship questions), and
+the portal was spending it in alphabetical order.** "Ready for you" sorted by
+question id, so a teacher's first reviews went to whatever id sorted first —
+often a reskin of a question already queued, or one of the 234 Physics
+questions that fail a blocking content gate. The domain already had a
+capability-first plan (`buildReviewPriorities`), but only the CLI used it.
+
+- **Queue and Next/Skip are capability-first.** `src/lib/reviewer/priority.ts`
+  runs the plan against the verified combined chain, with trust read exactly
+  as a student device reads it (effective ledger →
+  `applyHumanVerificationLedger`). `buildReviewQueue` takes the index and
+  orders ranked reviews first, then no-gain reviews, then gate-blocked ones.
+  Without an index the old order is unchanged. Memoised per subject on the
+  chain tail: ~1.2 s cold for Physics, ~0 warm, recomputed after any decision.
+- **Reviewers see why.** Each row has a "Why review it" column in the
+  domain's own words; the review screen has a "Why this question" note; the
+  subject panel shows topics where proof can begin, quick-check readiness, the
+  fastest route (approvals and estimated minutes) to the next provable topic,
+  and gate-blocked counts by reason. On today's bank that route is 4 approvals
+  (two questions × two reviewers) in every flagship.
+- **What the plan shows about the bank** (computed, not changed): of 1,629
+  Physics questions only 57 reviews are needed to reach every unlock the plan
+  values; 234 are gate-blocked, all "labelled transfer but has no baseline
+  link". Maths/Biology/Chemistry: 62/64/61 ranked reviews, 8/11/12 blocked.
+- **Diagnostic never dead-ends.** With no reviewed questions, "Full" on
+  `/diagnostic` said Revise would not run and offered nothing else; the empty
+  quick check said "Practice is still available" without a link. Both now
+  offer the labelled practice-tier quick check and/or practice for that
+  subject. The header no longer says every answer "counts as unaided
+  evidence": only answers on teacher-reviewed questions do.
+
+Nothing about trust, proof predicates, review rules or gates changed; this is
+ordering and copy. Not attempted again: the supply-layer consistency for
+reference subjects (`mission-session` still uses `trustedAssessmentContent`
+for `verifiedOnly`); switching it to `learnerEvidenceTrusted` fails
+`revision-engine.test.ts > builds a delayed check…` because the fixtures use a
+non-flagship subject id, exactly as the earlier attempt recorded.
+
 ## Reviewer checks now have evidence on screen — 2026-10-10
 
 **A reviewer could not verify two of the six approvals they were attesting

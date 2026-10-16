@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { topicsFor, unitsFor } from "./curriculum";
+import { isFlagship } from "./flagship";
 import { independentAttempt, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Id, Question, SpecPoint, Topic, Unit } from "./types";
 
@@ -59,6 +60,12 @@ export interface SpecUnitEvidence {
 
 export interface SpecificationMap {
   subjectId: Id;
+  /**
+   * Not one of the four WJEC flagships: the statements are adapted from a WJEC
+   * outline and the questions are unreviewed, so "secure" here means secure in
+   * practice and the map is a practice map, not proof.
+   */
+  referenceTier: boolean;
   units: SpecUnitEvidence[];
   rollup: SpecRollup;
   /** Topic with the most statements that lack real evidence, for the next action. */
@@ -248,6 +255,7 @@ export function buildSpecificationMap(input: SpecificationMapInput): Specificati
 
   return {
     subjectId: input.subjectId,
+    referenceTier: !isFlagship(input.subjectId),
     units: unitRows,
     rollup: mergeRollups(unitRows.map((unit) => unit.rollup)),
     thinnestTopic: lacking ?? null,
@@ -262,3 +270,14 @@ export const STATUS_LABELS: Record<SpecStatus, string> = {
   secure: "Secure",
   stale: "Secure but stale",
 };
+
+/** Reference-tier wording: the same thresholds, but practice evidence, never proof. */
+export const REFERENCE_STATUS_LABELS: Partial<Record<SpecStatus, string>> = {
+  secure: "Secure in practice",
+  stale: "Secure in practice but stale",
+};
+
+/** Student-facing status label, qualified for reference-tier subjects. */
+export function specStatusLabel(status: SpecStatus, referenceTier: boolean): string {
+  return (referenceTier ? REFERENCE_STATUS_LABELS[status] : undefined) ?? STATUS_LABELS[status];
+}

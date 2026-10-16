@@ -203,6 +203,22 @@ export function isDue(card: Card, on: IsoDate = todayIso()): boolean {
   return isAvailable(card, on) && card.due <= on;
 }
 
+/**
+ * A review that is owed: a card the learner has studied at least once whose
+ * interval has run out. A never-studied card (FSRS state New) is due by
+ * construction the day it is created, but nothing has been learned yet, so
+ * there is nothing to forget: it is new material, not an overdue review.
+ * This is the line subject-allocation.ts and the daily queue already draw.
+ */
+export function isDueReview(card: Card, on: IsoDate = todayIso()): boolean {
+  return card.state !== State.New && card.reps > 0 && isDue(card, on);
+}
+
+/** Topics where the learner has studied at least one card (not merely had cards installed). */
+export function studiedCardTopicIds(cards: ReadonlyArray<Pick<Card, "topicId" | "reps" | "state">>): Set<Id> {
+  return new Set(cards.filter((c) => c.reps > 0 || c.state !== State.New).map((c) => c.topicId));
+}
+
 /** Suspended cards never surface; buried ones come back the next day. */
 export function isAvailable(card: Card, on: IsoDate = todayIso()): boolean {
   if (card.suspended) return false;

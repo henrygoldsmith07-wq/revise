@@ -1,10 +1,10 @@
 import {
   applyHumanVerificationLedger,
-  humanVerificationLedgerKey,
   parseHumanVerificationLedger,
   type HumanVerificationLedgerFile,
 } from "@/domain/human-verification-ledger";
-import type { Question } from "@/domain/types";
+import { canonicalJson } from "@/domain/content-fingerprint";
+import type { HumanVerificationRecord, Question } from "@/domain/types";
 import { readReviseMeta, writeReviseMeta } from "./storage-namespace";
 
 // ---------------------------------------------------------------------------
@@ -33,17 +33,44 @@ export async function readRuntimeReviewLedger(): Promise<HumanVerificationLedger
 /** Apply runtime approvals to bank (seed) questions only; learner-authored questions are never touched. */
 const isBankQuestion = (question: Question): boolean => (question as { userId?: unknown }).userId === undefined;
 
+// Runtime attestations are overlays, not a new baseline. Keep their provenance
+// outside the plain-data question so withdrawals also work on an in-memory
+// snapshot. Keying the review record handles shallow question copies/edits too.
+const runtimeBaselines = new WeakMap<HumanVerificationRecord, Question>();
+const runtimeReviewFields = ["humanVerification", "verification", "reviewer", "lastChecked"] as const;
+
+function withoutRuntimeApproval(question: Question): Question {
+  const baseline = question.humanVerification && runtimeBaselines.get(question.humanVerification);
+  if (!baseline) return question;
+  const restored = { ...question };
+  for (const field of runtimeReviewFields) {
+    delete restored[field];
+    if (Object.prototype.hasOwnProperty.call(baseline, field)) {
+      Object.assign(restored, { [field]: baseline[field] });
+    }
+  }
+  return restored;
+}
+
 export function applyRuntimeReviewLedger(questions: Question[], ledger: HumanVerificationLedgerFile | null): Question[] {
-  if (!ledger?.entries.length) return questions;
-  const bank = questions.filter(isBankQuestion);
+  const baseline = questions.map((question) => isBankQuestion(question) ? withoutRuntimeApproval(question) : question);
+  if (!ledger?.entries.length) return baseline;
+  const bank = baseline.filter(isBankQuestion);
   const applied = applyHumanVerificationLedger(bank, ledger);
-  if (!applied.appliedKeys.length) return questions;
+  applied.questions.forEach((question, index) => {
+    const original = bank[index]!;
+    if (question !== original && question.humanVerification) {
+      runtimeBaselines.set(question.humanVerification, original);
+    }
+  });
   const byId = new Map(applied.questions.map((question) => [question.id, question] as const));
-  return questions.map((question) => (isBankQuestion(question) ? byId.get(question.id) ?? question : question));
+  return baseline.map((question) => (isBankQuestion(question) ? byId.get(question.id) ?? question : question));
 }
 
 function ledgerSignature(file: HumanVerificationLedgerFile): string {
-  return file.entries.map((entry) => `${humanVerificationLedgerKey(entry.questionId, entry.contentFingerprint)}@${entry.review.reviewedAt ?? ""}`).sort().join("|");
+  // All approval metadata affects trust, not just fingerprint/date. Normalise
+  // entry/key order without discarding status, checks, identity or notes.
+  return canonicalJson(file.entries.map((entry) => canonicalJson(entry)).sort());
 }
 
 /**

@@ -22,7 +22,7 @@ export const LOCAL_ERASE_EXPLANATION =
   "Erase local data wipes everything stored in this browser. It does not delete your account or anything already synced to it — sign in again and synced history comes back.";
 
 export const ACCOUNT_DELETION_EXPLANATION =
-  "Delete account permanently deletes your Revise account and everything synced to it: cards, answers, marks, mistakes, plans, exam dates, settings, deletion records, AI consent and AI usage counters. It cannot be undone. Export a portable snapshot first if you want a copy.";
+  "Delete account permanently deletes your Revise account and everything synced to it: cards, answers, marks, mistakes, plans, exam dates, settings, deletion records, AI consent, AI usage counters, class memberships and shared class evidence. If you are a class teacher, your classes, assignments and their shared records are also deleted. It cannot be undone. Export a portable snapshot first if you want a copy.";
 
 export type DeletionRequestCheck =
   | { ok: true }

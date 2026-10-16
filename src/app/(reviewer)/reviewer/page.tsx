@@ -1,16 +1,85 @@
 import Link from "next/link";
+import { DecisionNotice } from "@/components/reviewer/DecisionNotice";
 import { ReviewerGate } from "@/components/reviewer/ReviewerGate";
 import { buildReviewQueue, REQUIRED_INDEPENDENT_APPROVALS, type ReviewQueueItem } from "@/lib/reviewer/runtime-ledger";
-import { getReviewerContext, loadCombinedLog, reviewBank } from "@/lib/reviewer/server";
+import { REQUIRED_TRUSTED_DISTINCT } from "@/domain/review-priority";
+import { buildTransferBatch, type TransferBatchView } from "@/lib/reviewer/batches";
+import { unlockLabel, type ReviewPriorityIndex } from "@/lib/reviewer/priority";
+import { getReviewerContext, getReviewPriority, loadCombinedLog, reviewBank } from "@/lib/reviewer/server";
 import { REVIEW_SUBJECTS, shortId, subjectFromSlug, topicTitles } from "@/lib/reviewer/view";
 
 // Review queue. A Server Component: the queue is computed on the server from
 // the bundled bank and the verified audit chain (domain reviewStateOf), so the
 // browser receives HTML only and none of the bank or the domain code.
+// "Ready for you" is ordered capability-first (src/lib/reviewer/priority.ts):
+// the review that unlocks most for students leads, reskins and no-gain reviews
+// follow, and questions failing a blocking authoring gate sit last.
 
 export const dynamic = "force-dynamic";
 
+const QUEUE_ROWS = 200;
+
 const reviewHref = (item: ReviewQueueItem, slug: string) => `/reviewer/review/${encodeURIComponent(item.questionId)}?subject=${slug}`;
+
+/** Why this review matters, in the domain's own words. Never a promise beyond what the plan computes. */
+function whyText(item: ReviewQueueItem): string {
+  if (item.blocked) return "Needs an author fix first (fails a content gate)";
+  if (item.unlocks.length) return item.unlocks.map(unlockLabel).join("; ");
+  return "Nothing new yet (a sibling or reskin covers it)";
+}
+
+/** Where review effort stands for students in this subject, from the same plan the CLI campaign uses. */
+function SubjectProgress({ priority, slug }: { priority: ReviewPriorityIndex; slug: string }) {
+  const summary = priority.summary;
+  if (!summary) return null;
+  const path = priority.fastestProof;
+  return (
+    <section aria-labelledby="impact-title" className="card p-3 text-xs text-ink2 space-y-1">
+      <h2 id="impact-title" className="text-sm font-semibold text-ink">What your reviews unlock for students</h2>
+      <p>
+        Topics with enough verified questions for proof to begin: <span className="font-semibold text-ink tabular-nums">{summary.topicsWithProof} of {summary.topics}</span>
+        {" "}(with a third for the delayed check: <span className="tabular-nums">{summary.delayedProofTopics}</span>).
+        {" "}Until a topic has {REQUIRED_TRUSTED_DISTINCT} distinct questions each approved by {REQUIRED_INDEPENDENT_APPROVALS} different reviewers, nothing a student does there can count as proof.
+      </p>
+      <p>
+        Topics ready for the quick check: <span className="font-semibold text-ink tabular-nums">{summary.coldStartTopics} of {summary.coldStartTarget}</span> needed.
+      </p>
+      {path ? (
+        <p>
+          Fastest route to the next topic where proof can begin: <span className="text-ink">{topicTitles([path.topicId])}</span> needs{" "}
+          <span className="font-semibold text-ink tabular-nums">{path.approvals}</span> more approval{path.approvals === 1 ? "" : "s"} across {path.questionIds.length} question{path.questionIds.length === 1 ? "" : "s"}
+          {" "}(about {path.minutes} reviewer minutes, a planning estimate).{" "}
+          <Link href={`/reviewer/review/${encodeURIComponent(path.questionIds[0]!)}?subject=${slug}`} className="underline underline-offset-2 text-ink">Review {shortId(path.questionIds[0]!)}</Link>
+        </p>
+      ) : summary.topicsNeedingNewAuthoring ? (
+        <p>Every remaining topic needs newly authored questions before review alone can make it provable.</p>
+      ) : null}
+      {priority.blocked.size ? (
+        <p>
+          <span className="font-semibold text-ink tabular-nums">{priority.blocked.size}</span> question{priority.blocked.size === 1 ? "" : "s"} fail a content gate and need an author fix before review is worth your time (listed last):{" "}
+          {priority.blockedReasons.slice(0, 3).map((reason) => `${reason.label} (${reason.count})`).join("; ")}.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/** The transfer-pair batch, which the capability-first list scatters across hundreds of rows. */
+function TransferPairsCallout({ batch, slug }: { batch: TransferBatchView; slug: string }) {
+  if (!batch.pairs.length) return null;
+  return (
+    <section aria-labelledby="pairs-callout-title" className="card p-3 text-xs text-ink2 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 id="pairs-callout-title" className="text-sm font-semibold text-ink">Transfer pairs: {batch.pairs.length} baseline + transfer pair{batch.pairs.length === 1 ? "" : "s"}</h2>
+        <p>
+          <span className="tabular-nums">{batch.readyPairs}</span> usable for proof · <span className="tabular-nums">{batch.approvalsRecorded} of {batch.approvalsNeeded}</span> approvals recorded · <span className="tabular-nums">{batch.actionable}</span> ready for you.
+          {" "}Reviewed together, with each baseline shown beside its transfer question.
+        </p>
+      </div>
+      <Link href={`/reviewer/pairs?subject=${slug}`} className="btn btn-secondary text-xs px-2.5 py-1.5">Review transfer pairs</Link>
+    </section>
+  );
+}
 
 function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[]; slug: string; caption: string; empty: string }) {
   return (
@@ -27,10 +96,11 @@ function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[];
               <th scope="col" className="px-3 py-1.5 font-medium">Topic</th>
               <th scope="col" className="px-3 py-1.5 font-medium">Marks</th>
               <th scope="col" className="px-3 py-1.5 font-medium">Status</th>
+              <th scope="col" className="px-3 py-1.5 font-medium">Why review it</th>
             </tr>
           </thead>
           <tbody>
-            {items.slice(0, 200).map((item) => (
+            {items.slice(0, QUEUE_ROWS).map((item) => (
               <tr key={item.questionId} className="border-t border-line align-top">
                 <td className="px-3 py-1.5">
                   <Link href={reviewHref(item, slug)} className="font-medium text-ink underline-offset-2 hover:underline focus-visible:underline">{shortId(item.questionId)}</Link>
@@ -43,19 +113,27 @@ function QueueTable({ items, slug, caption, empty }: { items: ReviewQueueItem[];
                     : item.stage === "checked" ? `Checked · ${item.approvalsNeeded} more approval`
                     : item.needsReReview ? "Edited · needs re-review" : "Unverified"}
                 </td>
+                <td className="px-3 py-1.5 text-ink2">
+                  {item.priorityRank !== null ? <span className="tabular-nums text-ink3">#{item.priorityRank} · </span> : null}
+                  {whyText(item)}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
+      {items.length > QUEUE_ROWS ? (
+        <p className="px-3 py-2 border-t border-line text-[11px] text-ink3">Showing the first {QUEUE_ROWS} of {items.length}. “Start reviewing” and Next follow the full order, so nothing beyond this list is skipped.</p>
+      ) : null}
     </section>
   );
 }
 
-export default async function ReviewerQueuePage({ searchParams }: { searchParams: Promise<{ subject?: string }> }) {
+export default async function ReviewerQueuePage({ searchParams }: { searchParams: Promise<{ subject?: string; recorded?: string }> }) {
   const context = await getReviewerContext();
   if (context.status !== "ok") return <ReviewerGate status={context.status} email={"email" in context ? context.email : null} />;
-  const subject = subjectFromSlug((await searchParams).subject);
+  const search = await searchParams;
+  const subject = subjectFromSlug(search.subject);
   const combined = await loadCombinedLog(context.supabase);
   if (combined.issues.length) {
     return (
@@ -65,8 +143,10 @@ export default async function ReviewerQueuePage({ searchParams }: { searchParams
       </main>
     );
   }
-  const queue = buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId);
+  const priority = getReviewPriority(combined, subject.subjectId);
+  const queue = buildReviewQueue(reviewBank, combined.log, context.grant.reviewerLabel, subject.subjectId, priority);
   const first = queue.ready[0];
+  const pairs = buildTransferBatch(reviewBank, combined.log.events, subject.subjectId, context.grant.reviewerLabel);
 
   return (
     <main aria-labelledby="queue-title" className="space-y-3">
@@ -81,6 +161,8 @@ export default async function ReviewerQueuePage({ searchParams }: { searchParams
           <Link href={reviewHref(first, subject.slug)} className="btn btn-primary text-sm">Start reviewing</Link>
         ) : null}
       </header>
+
+      <DecisionNotice recorded={search.recorded} />
 
       <nav aria-label="Subject" className="flex flex-wrap gap-1.5">
         {REVIEW_SUBJECTS.map((entry) => (
@@ -109,7 +191,10 @@ export default async function ReviewerQueuePage({ searchParams }: { searchParams
         ))}
       </dl>
 
-      <QueueTable items={queue.ready} slug={subject.slug} caption="Ready for you" empty="Nothing waiting in this subject." />
+      <SubjectProgress priority={priority} slug={subject.slug} />
+      <TransferPairsCallout batch={pairs} slug={subject.slug} />
+
+      <QueueTable items={queue.ready} slug={subject.slug} caption="Ready for you (highest student impact first)" empty="Nothing waiting in this subject." />
       <QueueTable items={queue.changesRequested} slug={subject.slug} caption="Changes requested (waiting for an author edit)" empty="No open change requests." />
       <QueueTable items={queue.awaitingOtherReviewer} slug={subject.slug} caption="You approved — waiting on a second reviewer" empty="None." />
     </main>

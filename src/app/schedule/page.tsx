@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { countdownGuidance } from "@/domain/exam-countdown";
+import { plannedSessionHref } from "@/domain/study-navigation";
 import { buildIcsCalendar } from "@/domain/calendar-export";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { formatTime } from "@/domain/planner";
@@ -13,7 +14,7 @@ import { Button, EmptyState, Pill, SectionHeading } from "@/components/ui";
 
 // The personalised schedule: the planner's output over the whole remaining
 // run-up to each exam. Everything here is derived state — the planner rebuilds
-// it whenever availability, exam dates, targets or evidence change, and Review
+// it whenever availability, exam dates or targets change, and Review
 // and Practice tick blocks off as they are finished. This page only reads and
 // groups that plan; the one mutation is an explicit rebuild.
 
@@ -40,24 +41,14 @@ function dayDiff(a: string, b: string): number {
     (new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / 86_400_000,
   );
 }
+/** "12 Oct" — one format for both ends of a week header. */
+function dayMonth(key: string): string {
+  const d = new Date(`${key}T00:00:00Z`);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
 function humanDate(key: string): string {
   const d = new Date(`${key}T00:00:00Z`);
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
-}
-
-/** Where a planned block actually runs, so starting it ticks it off on finish. */
-function hrefForSession(session: PlannedSession): string {
-  const base: Record<ActivityKind, string> = {
-    learn: `/lesson?subject=${session.subjectId}`,
-    flashcards: "/review",
-    recall: `/practice?mode=recall${session.topicId ? `&topic=${encodeURIComponent(session.topicId)}` : ""}`,
-    practice: `/practice?topic=${encodeURIComponent(session.topicId ?? session.subjectId)}`,
-    paper: "/papers",
-    mistakes: "/review?mode=mistakes",
-  };
-  const href = base[session.activity];
-  const marksDone = session.activity === "flashcards" || session.activity === "recall" || session.activity === "practice";
-  return marksDone ? `${href}${href.includes("?") ? "&" : "?"}session=${session.id}` : href;
 }
 
 export default function SchedulePage() {
@@ -128,7 +119,7 @@ export default function SchedulePage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Schedule</h1>
           <p className="text-sm text-ink3 mt-0.5">
-            The whole run-up to each exam, rebuilt automatically as dates, availability and evidence change.
+            Your exam run-up adapts to dates, availability and targets. Rebuild to include your latest answers.
           </p>
         </div>
         <div className="flex gap-2">
@@ -272,11 +263,10 @@ function CalendarDays({
     <div className="space-y-6">
       {[...weeks.entries()].map(([monday, week]) => {
         const sunday = addDays(monday, 6);
-        const d = new Date(`${monday}T00:00:00Z`);
         return (
           <section key={monday} aria-label={`Week of ${humanDate(monday)}`}>
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-1.5">
-              Week of {d.getUTCDate()} {MONTHS[d.getUTCMonth()]} – {sunday}
+              Week of {dayMonth(monday)} – {dayMonth(sunday)}
             </p>
             <div className="space-y-2">
               {week.days.map((key) => (
@@ -312,6 +302,17 @@ function DayCard({ date, sessions, exams, today }: { date: string; sessions: Pla
           );
         })}
       </div>
+      {isToday && sessions.some((session) => session.status === "pending") ? (
+        // Two different "today"s used to sit side by side: Today's one
+        // recommended session (chosen from the latest answers) and these
+        // planned blocks (the long-range plan). Say which is which, and point
+        // to the one recommendation, rather than let them silently disagree.
+        <p className="px-4 pb-1.5 text-[11px] text-ink3 leading-snug" data-testid="schedule-today-note">
+          These blocks are your long-range plan. Your{" "}
+          <Link href="/" className="underline underline-offset-4 text-ink2 hover:text-ink">Today screen</Link>{" "}
+          picks the single best next step from your latest answers, so it can differ. Start there.
+        </p>
+      ) : null}
       <ul className="divide-y divide-line">
         {sessions.map((session) => {
           const topic = session.topicId ? getTopic(session.topicId) : undefined;
@@ -342,7 +343,7 @@ function DayCard({ date, sessions, exams, today }: { date: string; sessions: Pla
           return (
             <li key={session.id}>
               {session.status === "pending" ? (
-                <Link href={hrefForSession(session)} className="block hover:bg-surface2 transition-colors">
+                <Link href={plannedSessionHref(session)} className="block hover:bg-surface2 transition-colors">
                   {content}
                 </Link>
               ) : (

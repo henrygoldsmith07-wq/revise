@@ -17,6 +17,7 @@ import {
   validateBaselineIntegrity,
   verifyTransferFingerprints,
 } from "./transfer-trust";
+import { comparePhysicsTransfer, physicsNoveltyDetail } from "./physics-transfer-novelty";
 export { answerLeakageDetail, capabilityNotRequiredReason, classifyNumericalClaims, compareTransferStructures, promptAnswerClaims, transferNoveltyClasses } from "./subject-assessment-semantic";
 export { fingerprintSetup, isDistinctReasoningRoute, isSupersetRoute, reasoningGraphForPart } from "./reasoning-graph";
 export type { NumericalClaimClassification, NumericalClaimRole, TransferNoveltyClass } from "./subject-assessment-semantic";
@@ -342,13 +343,23 @@ export function auditFlagshipSubject(input: {
   // baseline, synoptic needs two mapped capabilities, and Route A/B need
   // materially different reasoning graphs. No layer is bypassed for generated
   // substantive content; only explicit `scaffold` cells keep a bypass.
-  if (input.subjectId !== "wjec-alevel-physics") {
+  //
+  // Physics keeps its legacy depth contract, so the stored-graph and Route
+  // A/B checks below stay off for it. Its transfer items that carry an
+  // explicit baseline link (src/content/questions/physics-transfer-linked.ts)
+  // do enter the transfer block: baseline integrity (with Physics step
+  // recognisers), recomputed fingerprints and structural novelty, exactly as
+  // for the other flagships. Physics parts labelled "transfer" with no link
+  // stay governed by the review gate (`transfer-label-without-transfer`).
+  const physicsSubject = input.subjectId === "wjec-alevel-physics";
+  {
     const allParts = subjectQuestions.flatMap((question) => question.parts.map((part) => ({ question, part })));
     const partById = new Map(allParts.map(({ question, part }) => [`${question.id}:${part.id}`, { question, part }]));
     // Stored reasoning graphs are authored hints: every substantive depth
     // cell's stored nodes must be demonstrable in its current task and
     // worked solution. Stale metadata invalidates the cell outright.
     for (const { question, part } of allParts) {
+      if (physicsSubject) break;
       if (part.learning?.quality !== "substantive") continue;
       if (!(part.learning?.familyId ?? "").includes("-depth:")) continue;
       if (invalidParts.has(`${question.id}:${part.id}`)) continue;
@@ -360,6 +371,7 @@ export function auditFlagshipSubject(input: {
     for (const { question, part } of allParts) {
       if (part.learning?.demand !== "transfer") continue;
       if (part.learning?.quality === "scaffold") continue;
+      if (physicsSubject && !part.learning?.transferLink?.baselinePartId?.trim()) continue;
       if (invalidParts.has(`${question.id}:${part.id}`)) continue;
       const capability = part.capabilityIds?.length === 1 ? part.capabilityIds[0] : undefined;
       const specPoint = part.specPointIds?.length === 1 ? part.specPointIds[0] : undefined;
@@ -387,7 +399,7 @@ export function auditFlagshipSubject(input: {
           continue;
         }
         let baselineBroken = false;
-        for (const detail of validateBaselineIntegrity(part, baselineEntry[1].part)) {
+        for (const detail of validateBaselineIntegrity(part, baselineEntry[1].part, input.subjectId)) {
           addIssue(subjectIssues, question, part, "invalid-transfer-baseline", "error", detail);
           baselineBroken = true;
         }
@@ -415,6 +427,20 @@ export function auditFlagshipSubject(input: {
           invalidParts.add(`${question.id}:${part.id}`);
         }
         if (invalidParts.has(`${question.id}:${part.id}`)) continue;
+        // Physics shows its reasoning as relations and substitutions, which
+        // the word-based reasoning graphs cannot see (they matched chance
+        // words such as "enzyme" on oscillation answers). For Physics the
+        // verdict compares the physical relations used, the unknowns asked
+        // for and the context instead, and fails closed when it cannot
+        // recognise them. Every other subject keeps the graph comparison.
+        if (physicsSubject) {
+          const physics = comparePhysicsTransfer(baselineEntry![1].part, part);
+          if (!physics.isNovel) {
+            addIssue(subjectIssues, question, part, "transfer-not-novel", "error", physicsNoveltyDetail(physics));
+            invalidParts.add(`${question.id}:${part.id}`);
+          }
+          continue;
+        }
         const comparison = compareTransferReasoningGraphs(
           fingerprintSetup(baselineEntry![1].part.prompt),
           fingerprintSetup(part.prompt, part.modelAnswer),
@@ -465,6 +491,7 @@ export function auditFlagshipSubject(input: {
     // prose, substitute-vs-recompute) collapse.
     const routeGroups = new Map<string, Array<{ question: (typeof allParts)[number]["question"]; part: (typeof allParts)[number]["part"] }>>();
     for (const entry of allParts) {
+      if (physicsSubject) break;
       const { question, part } = entry;
       if (part.learning?.quality !== "substantive") continue;
       // Route A/B diversity is a depth-pack contract (two authored variants per

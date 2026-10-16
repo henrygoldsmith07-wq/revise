@@ -1,6 +1,5 @@
-import { seedQuestionsForTopic } from "@/content";
 import { getTopic } from "@/domain/curriculum";
-import { markQuestion } from "@/domain/marking";
+import { deviceRubricMark } from "@/lib/offline-mark";
 import { mistakePatterns } from "@/domain/mistakes";
 import { makeCloze } from "@/content/seed-cards";
 import type { Mistake, Question, Topic } from "@/domain/types";
@@ -161,16 +160,7 @@ export function socraticExaminerFallback(examiner: SocraticExaminerPayload): Soc
 }
 
 export function markFallback(question: Question, answers: Record<string, string>): MarkResponse {
-  const result = markQuestion(question, answers);
-  const topic = getTopic(question.topicIds[0] ?? "");
-  const errorNote = topic?.commonErrors.length
-    ? ` Watch for the classic error on this topic: ${topic.commonErrors[0]}`
-    : "";
-  return {
-    marked: result.marked,
-    feedback: `${result.feedback}${errorNote}\n\n_Marked against the mark scheme on this device — no AI was involved._`,
-    confidence: 1,
-  };
+  return deviceRubricMark(question, answers);
 }
 
 export function generateCardsFallback(topicId: string, count: number): GeneratedCard[] {
@@ -196,9 +186,11 @@ export function generateCardsFallback(topicId: string, count: number): Generated
  * authored bank that the student has not seen recently" — which is what a
  * revision guide does anyway.
  */
-export function generateQuestionsFallback(topicId: string, count: number): GeneratedQuestion[] {
-  const bank = seedQuestionsForTopic(topicId);
-  return bank.slice(0, count).map((q) => ({
+export function generateQuestionsFallback(topicId: string, count: number, bank: readonly Question[]): GeneratedQuestion[] {
+  // The caller passes the authored bank: importing `@/content` here would put
+  // the whole bank behind every marked answer in the browser (this module loads
+  // with the AI client), building it a second time on the main thread.
+  return bank.filter((q) => q.topicIds.includes(topicId)).slice(0, count).map((q) => ({
     stem: q.stem,
     kind: q.kind,
     options: q.options,

@@ -17,6 +17,9 @@ const bundle = await build({
         flagshipTrustReadiness as readiness,
         buildFlagshipReviewPlan as plan
       } from "./src/domain/flagship-trust";
+      export { approvalThroughputReport, loadRuntimeRowsFromPostgres } from "./src/lib/reviewer/review-throughput";
+      export { default as committedAuditLog } from "./src/content/reviews/wjec-review-audit-log.json";
+      export { default as committedLedger } from "./src/content/reviews/wjec-human-verification.json";
     `,
     resolveDir: process.cwd(),
     loader: "ts",
@@ -80,16 +83,44 @@ const prerequisiteTrust = Object.fromEntries(data.flagships.map((flagship) => {
   }
   return [flagship.subjectId, { total, approved, rejected, pending: total - approved - rejected, missingRationale }];
 }));
-const now = Date.now();
-const reviewVelocity = Object.fromEntries(data.flagships.map((flagship) => {
-  const approved = data.questions.filter((question) =>
-    question.subjectId === flagship.subjectId && question.humanVerification?.status === "approved");
-  const recent = (days) => approved.filter((question) => {
-    const at = Date.parse(question.humanVerification?.reviewedAt ?? "");
-    return Number.isFinite(at) && at >= now - days * 86_400_000;
-  }).length;
-  return [flagship.subjectId, { approved7d: recent(7), approved30d: recent(30) }];
-}));
+// Approval throughput reads the runtime review log (reviewer-portal
+// decisions in public.review_audit_events) when TEST_DATABASE_URL is set, the
+// same gate as the real-Postgres test suites, and the committed ledger
+// otherwise. Measurement only; see src/lib/reviewer/review-throughput.ts.
+async function readRuntimeRows() {
+  const connectionString = process.env.TEST_DATABASE_URL;
+  if (!connectionString) return { rows: null, unavailableReason: "runtime-not-configured" };
+  let client;
+  try {
+    const { default: pg } = await import("pg");
+    client = new pg.Client({ connectionString });
+    await client.connect();
+    const rows = await data.loadRuntimeRowsFromPostgres((sql, params) => client.query(sql, params));
+    return { rows };
+  } catch (error) {
+    console.error(`Runtime review log unavailable (${error?.code ?? error?.message ?? "unknown error"}); approval throughput falls back to the committed ledger.`);
+    return { rows: null, unavailableReason: "runtime-unavailable" };
+  } finally {
+    await client?.end().catch(() => {});
+  }
+}
+const throughput = data.approvalThroughputReport({
+  questions: data.questions,
+  subjectIds: data.flagships.map((flagship) => flagship.subjectId),
+  nowMs: Date.now(),
+  committedAuditLog: data.committedAuditLog,
+  committedLedger: data.committedLedger,
+  ...(await readRuntimeRows()),
+});
+const reviewVelocity = throughput.bySubject;
+const reviewVelocitySource = throughput.source;
+const throughputSourceLine = reviewVelocitySource.kind === "runtime"
+  ? `Approval throughput source: runtime review log (committed chain + ${reviewVelocitySource.runtimeEvents} portal event(s), chain verified).`
+  : reviewVelocitySource.reason === "runtime-chain-failed"
+    ? `Approval throughput source: committed ledger; the runtime review chain FAILED verification (${reviewVelocitySource.issues?.length ?? 0} issue(s)) and was not counted.`
+    : reviewVelocitySource.reason === "runtime-unavailable"
+      ? "Approval throughput source: committed ledger; the runtime review log could not be read."
+      : "Approval throughput source: committed ledger only; portal approvals not yet pulled are not counted (set TEST_DATABASE_URL to read the runtime log).";
 const json = process.argv.includes("--json");
 const check = process.argv.includes("--check");
 const trustBlockers = [...ledgerBlockers, ...prerequisiteLedgerBlockers, ...releaseSetBlockers];
@@ -102,6 +133,7 @@ if (json) {
     releaseSet: { blockers: releaseSetBlockers },
     prerequisites: { bySubject: prerequisiteTrust, blockers: prerequisiteLedgerBlockers },
     reviewVelocity,
+    reviewVelocitySource,
     authoringCeilings,
   }, null, 2));
 } else {
@@ -149,6 +181,7 @@ if (json) {
   console.log("Authored ceiling = release/core depth if every currently eligible bank question were approved; it separates authoring blockers from review blockers.");
   console.log(`Historical/stale ledger attestations: ${staleApprovals}; question-ledger blockers: ${ledgerBlockers.length}; prerequisite-ledger blockers: ${prerequisiteLedgerBlockers.length}; release-set blockers: ${releaseSetBlockers.length}.`);
   console.log("Draft/authored question volume is intentionally excluded.");
+  console.log(throughputSourceLine);
 }
 
 if (check) {

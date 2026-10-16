@@ -37,20 +37,94 @@ approvals stay in the log as history and never apply to the new content.
 | `public.review_audit_events` (Supabase) | The **runtime continuation of the same audit log**, written by the reviewer portal. Same event objects, same hash, chained onto the committed tail. Insert-only. |
 | `public.reviewer_roles` (Supabase) | Who may review, with the role and qualification stamped on their decisions. Granted only by the service role. |
 
+## First teacher approvals: the maintainer's runbook
+
+Nothing can be Proven until two different teachers approve the same
+questions. These are the only steps that need the maintainer; each one is
+something the code cannot do for you. In order:
+
+1. **Redirect allow-list (once).** Supabase dashboard → Authentication → URL
+   Configuration → Redirect URLs → add `https://revise-gray.vercel.app/reviewer/**`.
+   Without it the sign-in link returns the teacher to the Site URL (the
+   student app), not the portal.
+2. **A code in the sign-in email (once, recommended).** Supabase dashboard →
+   Authentication → Email Templates → *Magic Link*: keep the link and add the
+   code, for example
+
+   ```html
+   <h2>Sign in to the Revise reviewer portal</h2>
+   <p><a href="{{ .ConfirmationURL }}">Sign in</a> (open it in the browser where you asked for it)</p>
+   <p>Or type this code on the sign-in page: <strong>{{ .Token }}</strong></p>
+   ```
+
+   The link only works in the browser that requested it (Supabase's PKCE
+   flow keeps its verifier there), so a teacher who reads school email on a
+   phone and reviews on a laptop is otherwise stuck. The portal shows a
+   "Code from the email" box after it sends the email; the code works on any
+   device. Without the template change the box is harmless and the link
+   still works in the same browser. This template is shared with the student
+   app's sign-in email, which does not ask for the code; the extra line is
+   all students see.
+3. **Grant two teachers** (different people; one approval is only
+   *checked*). Use pseudonymous labels, never an email address:
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
+     --email teacher@school.org --label teacher-a --role teacher \
+     --qualification "PGCE Physics; N years teaching WJEC A-level" \
+     --granted-by henry --invite --site https://revise-gray.vercel.app
+   ```
+
+   Add `--dry-run` first if unsure. The command prints `sendThisLink`.
+4. **Send each teacher the printed link** (`/reviewer/pairs?subject=physics`),
+   with a line such as: "Open this on the computer you will review on. Sign in
+   with your school email (no password). Each question has six checks; tick
+   all six to approve, or write what needs changing. Every decision saves
+   immediately, so ten minutes at a time is fine."
+5. **Watch progress without a grant:**
+   `NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:review:pairs -- physics`.
+   A pair counts for transfer proof only when both halves have two
+   approvals from different reviewers. Students' devices pick up verified
+   questions the next time they are online (`GET /api/review-ledger`).
+
+What a teacher meets, so you can tell them: the link opens the portal itself
+(since the eighteenth pass it no longer renders inside the student app, so
+there is no student onboarding and no learner profile on their device); a
+sign-in box for their school email; then the batch list with "Start this
+batch". After each Approve or Request changes the next question opens with a
+line saying what was recorded and what happens next.
+
 ## Reviewer portal (the canonical path)
 
 Teachers review in the browser at `/reviewer`. Nobody outside the development
 team needs a terminal, JSON or an HTML pack any more.
 
 1. **Access.** The maintainer grants access (below). The teacher signs in with
-   the email one-time link at `/reviewer`; the portal never creates accounts
-   and cannot grant itself access.
+   the email one-time link at `/reviewer`, or with the code from the same
+   email when the template carries one (runbook above); the portal never
+   creates accounts and cannot grant itself access. The portal renders
+   outside the student shell (`src/components/RouteShell.tsx`): no account
+   boundary, IndexedDB or onboarding runs for a teacher, and a small client
+   (`ReviewerSessionKeeper`) keeps the session cookie refreshed. A link that
+   fails says why (expired or used, or opened in another browser).
 2. **Queue** (`/reviewer?subject=physics`, also maths / biology / chemistry).
    A Server Component computes it on the server from the bundled bank and the
-   verified audit chain with `reviewStateOf`: questions one approval from
-   verified first, then unverified ones. Questions sent back for changes and
-   questions you already approved are listed separately, because you cannot act
-   on them.
+   verified audit chain with `reviewStateOf`. "Ready for you" is ordered
+   **capability-first** by the same plan as `wjec:review:priorities`
+   (`src/lib/reviewer/priority.ts` → `buildReviewPriorities`, see
+   *Prioritisation* below): the review that unlocks most for students leads
+   (finishing a half-reviewed question counts as cheaper), then reviews that
+   unlock nothing new (a reskin sibling or an already-covered topic), then
+   questions that fail a blocking content gate. Each row says why it is worth
+   reviewing; a panel shows topics where proof can begin, quick-check
+   readiness, the fastest route to the next provable topic, and gate-blocked
+   counts by reason. Trust is read exactly as students read it (effective
+   ledger applied with `applyHumanVerificationLedger`). The plan is memoised
+   per subject on the audit-chain tail (about 1.2 s cold for Physics). It only
+   orders the list: nothing is hidden and no rule changes. Questions sent back
+   for changes and questions you already approved are listed separately,
+   because you cannot act on them. Next/Skip on the review screen follow the
+   same order, and the screen says why that question matters.
 3. **Review screen.** Stem and options, each part beside its mark scheme and
    worked answer, mapped specification points with board refs, provenance,
    content-gate warnings, reskin siblings, the history on this exact content
@@ -97,6 +171,12 @@ portal **continues the existing hash chain** in `public.review_audit_events`:
   the service role), a trigger that serialises appends and refuses a row that
   does not continue the current tail, and a binding that a signed-in reviewer
   can only record as themselves with their granted role and qualification.
+  The additive `supabase/migrations/20261014000200_reviewer_validation.sql`
+  also validates approval structure (all six checks, identity and date) on direct
+  inserts; the consumer revalidates every approval, not just the final reviewer.
+  Apply it through the operator release process before relying on this database
+  guard in a deployed environment. It was executed locally in PostgreSQL/PGlite,
+  not applied to live Supabase by this change.
 
 ### How decisions reach students
 
@@ -108,13 +188,40 @@ every snapshot load with `applyHumanVerificationLedger`, which re-checks the
 exact content fingerprint and the trust contract. The applied result is never
 written back to question rows. A verified question therefore joins the
 `provable` supply on the next fetch (within seconds of opening the app, then
-every 10 minutes), without a new build.
+every 10 minutes), without a new build. Each refresh restores the pristine
+approval baseline before applying the new runtime ledger, so an empty or partial
+withdrawal removes the previous overlay instead of leaving stale trust in the
+open learner session. Legitimate bundled approvals are preserved. Offline clients
+retain their last good ledger; withdrawal is not instant on disconnected devices.
 
 ### Granting and revoking a teacher
 
+One command, run by the maintainer with the service role key in their own
+shell (never committed):
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
+  --email teacher@school.org --label teacher-jsmith --role teacher \
+  --qualification "PGCE Physics; 8 years teaching WJEC A-level" \
+  --granted-by henry --invite --site https://revise-gray.vercel.app [--dry-run]
+
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- --email teacher@school.org --revoke
+```
+
+`scripts/grant-reviewer.mjs` finds the teacher's Supabase Auth account by
+email (with `--invite`, it sends Supabase's own invite email when there is
+none, landing on `/reviewer/pairs?subject=physics`), then calls
+`public.grant_reviewer_role` (or `revoke_reviewer_role`). It validates the
+same constraints as `public.reviewer_roles` first, refuses a label that reuses
+the email address, and refuses the obvious self-grant (the person granting is
+the maintainer who authored the questions; that is a guard against a mistake,
+not an identity proof). It prints the link to send the teacher.
+
+The manual route still works and is what the command does:
+
 1. The teacher needs a Supabase Auth account: invite them from the Supabase
    dashboard (Authentication → Users → Invite) or have them sign in once in the
-   app.
+   app. The portal's sign-in never creates an account (`shouldCreateUser: false`).
 2. In the Supabase SQL editor (runs as the database owner):
 
    ```sql
@@ -132,6 +239,37 @@ every 10 minutes), without a new build.
    Neither function can be called by a signed-in user.
 3. Reviewer ids are what students and the committed ledger see; use a stable
    pseudonym, not an email address.
+4. **Supabase redirect allow-list.** The portal's sign-in link (and the
+   invite) return the teacher to the portal page they opened, such as
+   `/reviewer/pairs?subject=physics`. Supabase only honours redirect URLs in
+   Authentication → URL Configuration; add `https://<site>/reviewer/**`
+   there, or Supabase falls back to the Site URL (the student app).
+   The link must be opened in the same browser that requested it (PKCE).
+
+### Transfer pairs: the first batch to send a teacher
+
+A transfer question can help prove a student improved only when it **and the
+baseline it is linked to** are each verified by two different reviewers. In
+the capability-first queue those questions are scattered (on the shipped
+Physics bank the 14 linked transfer items sat near position 1,370 of about
+1,640 rows, behind a list that renders 200), so `/reviewer/pairs?subject=physics`
+lists every linked (baseline, transfer) pair in one place, baseline first,
+with who still has to act on each ("needs 1 more reviewer, not teacher-a").
+Opened from there, the review screen keeps Next/Skip inside the batch, skips
+anything the reviewer already approved or that waits for an author edit, and
+shows the linked baseline (prompt, mark scheme, worked answer) beside a
+transfer question so "Genuine transfer" is judged with the baseline in view.
+It is ordering and context only (`src/lib/reviewer/batches.ts`): every state
+comes from `reviewStateOf`, every decision goes through the same route and
+domain rules.
+
+The maintainer, who authored the questions and so holds no reviewer grant,
+sees the same status from the command line:
+
+```bash
+npm run wjec:review:pairs                     # committed log only
+NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:review:pairs -- physics   # + portal decisions (read-only, chain verified)
+```
 
 ### Exporting back to the repository (developers)
 

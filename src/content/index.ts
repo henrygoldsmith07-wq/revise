@@ -35,6 +35,7 @@ import { physicsStatementCoverageQuestions } from "./questions/physics-statement
 import { physicsReasoningDepthQuestions } from "./questions/physics-reasoning-depth";
 import { wjecAlevelExpansionQuestions } from "./questions/wjec-alevel-expansion";
 import { wjecRepairDepthQuestions } from "./questions/wjec-repair-depth";
+import { wjecRecallProbeQuestions } from "./questions/wjec-recall-probes";
 import { wjecPhysicsDeepQuestions } from "./questions/wjec-physics-deep";
 import { wjecPhysicsQualityExpansionQuestions } from "./questions/wjec-physics-quality-expansion";
 import {
@@ -44,6 +45,7 @@ import {
 import { physicsMotionGraphQuestions } from "./questions/physics-motion-graphs";
 import { physicsDepth50MechanicsQuestions } from "./questions/physics-depth-50-mechanics";
 import { physicsDepth50CircuitsFieldsQuestions } from "./questions/physics-depth-50-circuits-fields";
+import { physicsTransferLinkedQuestions } from "./questions/physics-transfer-linked";
 import { physicsDepth50AppliedQuestions } from "./questions/physics-depth-50-applied";
 import { physicsDepth50OrbitsQuestions } from "./questions/physics-depth-50-orbits";
 import { physicsDepthNearCompleteCoreQuestions } from "./questions/physics-depth-near-complete-core";
@@ -59,7 +61,7 @@ import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
 import { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts } from "./questions/wjec-flagship-depth";
-import { seedMisconceptions } from "./misconceptions";
+import { misconceptionsForTopic, seedMisconceptions } from "./misconceptions";
 import humanVerificationLedger from "./reviews/wjec-human-verification.json";
 import wjecReleaseSet from "./reviews/wjec-release-set.json";
 import { applyHumanVerificationLedger } from "@/domain/human-verification-ledger";
@@ -112,6 +114,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...physicsDepthCompletionCircuitsMechanicsQuestions,
   ...physicsDepthCompletionFieldsThermalNuclearQuestions,
   ...physicsDepthCompletionPracticalQuestions,
+  ...physicsTransferLinkedQuestions,
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
@@ -128,6 +131,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
   ...wjecRepairDepthQuestions,
+  ...wjecRecallProbeQuestions,
   // Keep the generated Physics depth pack after the curated bank so a fresh
   // learner sees reviewed authored items first. Coverage and adaptive
   // selection are keyed by ids, not array position.
@@ -182,9 +186,7 @@ export function misconceptionsForSubject(subjectId: Id): Misconception[] {
   return seedMisconceptions.filter((m) => m.subjectId === subjectId);
 }
 
-export function misconceptionsForTopic(topicId: Id): Misconception[] {
-  return seedMisconceptions.filter((m) => m.topicIds.includes(topicId));
-}
+export { misconceptionsForTopic };
 
 export function misconceptionById(id: Id): Misconception | undefined {
   return seedMisconceptions.find((m) => m.id === id);

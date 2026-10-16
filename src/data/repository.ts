@@ -1,9 +1,11 @@
 import { syncWireIdValue } from "./sync-contract";
-import { seedCards, seedQuestions } from "@/content";
+import { seedCards } from "@/content/seed-cards";
+import { loadQuestionRows, preloadAuthoredQuestions } from "./authored-questions";
 import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
 import { allTopics } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
+import { buildSundayPlan, retainedSundayPlan, type SundayPlanSnapshot } from "@/domain/sunday-plan";
 import type {
   Attempt,
   Card,
@@ -25,7 +27,7 @@ import {
 import { validatePersistedStores, type PersistenceIssue } from "./persistence-schema";
 import { StorageRecoveryError } from "./storage-recovery";
 import { isRevisionTwinState, type RevisionTwinState } from "@/domain/revision-twin";
-import { COLLECTION_STORES, activeDatabaseProfile, getAll, getDb, putAll, putOne, streamAttempts, streamReviewLogs } from "./db";
+import { COLLECTION_STORES, activeDatabaseProfile, getDb, putAll, putMissing, putOne, streamAttempts, streamReviewLogs } from "./db";
 import { deleteReplicaRows } from "./sync-deletions";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import type { CollectionStore } from "./db";
@@ -131,6 +133,7 @@ export function defaultSettings(userId: Id): UserSettings {
     aiEnabled: false,
     // Pulse never reads this account's study history until it is switched on.
     pulseEnabled: false,
+    sundayPlanEnabled: false,
     // Pilot telemetry never leaves the device until it is switched on.
     pilotTelemetry: false,
     // Official-paper matching stays off until the owner confirms the terms.
@@ -172,19 +175,11 @@ const SEED_VERSION = 2;
 export async function ensureSeeded(userId: Id): Promise<void> {
   await migrateContentIds();
   const installed = await readReviseMeta<number>("seedVersion");
-  const existing = await getAll<Card>("cards");
-  const known = new Set(existing.map((c) => c.id));
-
-  const wanted = seedCards(allTopics(), userId);
-  const deleted = new Set((await (await getDb()).getAll("meta")).filter(row => (row.key.startsWith("revise.deleted.v1:") || row.key.startsWith("revise.deletedWire.v1:"))).map(row => row.key));
-  const missing = wanted.filter((c) => !known.has(c.id) && !deleted.has(tombstoneKey("cards", c.id)) && !deleted.has(wireTombstoneKey("cards", syncWireIdValue(userId, c.id))));
-  if (missing.length) await putAll("cards", missing);
-
-  const existingQuestions = await getAll<Question>("questions");
-  const knownQuestions = new Set(existingQuestions.map((q) => q.id));
-  const missingQuestions = seedQuestions.filter((q) => !knownQuestions.has(q.id) && !deleted.has(tombstoneKey("questions", q.id)) && !deleted.has(wireTombstoneKey("questions", syncWireIdValue(userId, q.id))));
-  if (missingQuestions.length) await putAll("questions", missingQuestions);
-
+  // putMissing skips ids already installed and ids the learner deleted (local
+  // or wire tombstone), reading both inside its own write transaction.
+  // Authored questions are not copied: the bundle serves them (see
+  // ./authored-questions), so only cards, which carry FSRS state, install.
+  await putMissing("cards", seedCards(allTopics(), userId), userId);
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
 }
 
@@ -194,6 +189,8 @@ export const HISTORY_FIRST_PAGE = 500;
 export const HISTORY_CHUNK = 500;
 
 export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number }): Promise<Snapshot> {
+  // The authored bank is a separate chunk; start fetching it while the cards install.
+  preloadAuthoredQuestions();
   await ensureSeeded(userId);
   const db = await getDb();
   const historyLimit = opts?.historyLimit ?? HISTORY_FIRST_PAGE;
@@ -201,11 +198,14 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
   // Keyed by store name rather than destructured positionally: COLLECTION_STORES
   // is ordered for sync replay, and tying the read order to it silently swaps
   // collections the moment that order changes.
-  const rows = Object.fromEntries(
-    await Promise.all(
-      COLLECTION_STORES.map(async (store) => [store, await db.getAll(store)] as const),
-    ),
-  ) as Record<CollectionStore, unknown[]>;
+  // Questions are the exception: current authored questions come from the
+  // bundle and only private/retired rows are read from the store.
+  const [questionRows, rows] = await Promise.all([
+    loadQuestionRows(userId),
+    Promise.all(
+      COLLECTION_STORES.filter((store) => store !== "questions").map(async (store) => [store, await db.getAll(store)] as const),
+    ).then((entries) => Object.fromEntries(entries) as Record<Exclude<CollectionStore, "questions">, unknown[]>),
+  ]);
 
   // The two append-only history logs are the ones that grow without bound, so
   // only their most recent `historyLimit` rows load synchronously — IndexedDB
@@ -226,6 +226,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
         accessibility: { ...fallback.accessibility, ...stored.accessibility },
         labMode: stored.labMode === true,
         pulseEnabled: stored.pulseEnabled === true,
+        sundayPlanEnabled: stored.sundayPlanEnabled === true,
         pilotTelemetry: stored.pilotTelemetry === true,
         officialPaperTrust: stored.officialPaperTrust === true,
         officialPaperTermsConfirmed: stored.officialPaperTermsConfirmed === true,
@@ -247,7 +248,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
   const issues = validatePersistedStores({
     cards: rows.cards,
     reviewLogs: rows.reviewLogs,
-    questions: rows.questions,
+    questions: questionRows.stored,
     attempts: rows.attempts,
     mistakes: rows.mistakes,
     papers: rows.papers,
@@ -271,7 +272,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
 
   const runtimeLedger = await readRuntimeReviewLedger();
   const scoped = <T>(store: CollectionStore): T[] =>
-    rows[store].filter((value) => {
+    (store === "questions" ? questionRows.questions : rows[store]).filter((value) => {
       if (store === "questions") {
         const owner = value && typeof value === "object" ? (value as { userId?: unknown }).userId : undefined;
         return owner === undefined || owner === userId;
@@ -505,7 +506,39 @@ export async function savePlan(sessions: PlannedSession[]): Promise<void> {
   for (const s of sessions) await enqueue("plannedSessions", "upsert", s);
 }
 
-export async function replacePlan(userId: Id, sessions: PlannedSession[]): Promise<void> {
+// Plan replacements run one at a time. Onboarding saves exam dates (which
+// fires the dynamic replan) and then rebuilds the plan itself; run together,
+// each read "existing" before the other had written, neither deleted the
+// other's rows, and a fresh student's Schedule showed two blocks at 16:00
+// (twenty-third pass). Serialised, the later plan replaces the earlier one.
+//
+// That queue only covers one tab. Two open tabs (or a tab and an installed
+// PWA window) share one IndexedDB, and each replan read "existing" before the
+// other wrote, so both plans survived (twenty-fourth pass). Where the Web
+// Locks API exists, every replacement also holds one origin-wide lock, so the
+// later plan replaces the earlier one across tabs too. Without it (very old
+// browsers) behaviour is the single-tab queue, as before.
+let planWrites: Promise<void> = Promise.resolve();
+
+export const PLAN_REPLACE_LOCK = "revise:replace-plan";
+
+type PlanLockManager = { request<T>(name: string, callback: () => Promise<T>): Promise<T> };
+
+function planLocks(): PlanLockManager | null {
+  const locks = (globalThis as { navigator?: { locks?: PlanLockManager } }).navigator?.locks;
+  return locks && typeof locks.request === "function" ? locks : null;
+}
+
+export function replacePlan(userId: Id, sessions: PlannedSession[]): Promise<void> {
+  const locks = planLocks();
+  const run = planWrites.then(() =>
+    locks ? locks.request(PLAN_REPLACE_LOCK, () => replacePlanNow(userId, sessions)) : replacePlanNow(userId, sessions),
+  );
+  planWrites = run.catch(() => undefined);
+  return run;
+}
+
+async function replacePlanNow(userId: Id, sessions: PlannedSession[]): Promise<void> {
   const db = await getDb();
   const existing = (await db.getAll("plannedSessions")) as PlannedSession[];
   const keep = new Set(sessions.map((s) => s.id));
@@ -528,8 +561,65 @@ export async function deleteExamDate(id: Id, ownerId?: Id): Promise<void> {
 
 export async function saveSettings(settings: UserSettings): Promise<void> {
   const db = await getDb();
-  await db.put("settings", settings);
-  await enqueue("settings", "upsert", settings);
+  const tx = db.transaction("settings", "readwrite");
+  const stored = await tx.store.get(settings.userId) as UserSettings | undefined;
+  // A stale view saving another setting must not discard or rewrite a weekly
+  // snapshot. The first snapshot wins, including concurrent tabs.
+  const existing = stored?.sundayPlanSnapshot;
+  const incoming = settings.sundayPlanSnapshot;
+  const next = existing && (!incoming || existing.weekStart >= incoming.weekStart)
+    ? { ...settings, sundayPlanSnapshot: existing }
+    : settings;
+  await tx.store.put(next);
+  await tx.done;
+  await enqueue("settings", "upsert", next);
+}
+
+/** Reads complete persisted local history, not the store's partial boot window.
+ * A preview never writes. Recurring capture is opt-in and atomic per week. */
+export async function loadSundayPlan(userId: Id, now: Date, timeZone: string, preview = false): Promise<SundayPlanSnapshot | null> {
+  const db = await getDb();
+  const initial = await db.get("settings", userId) as UserSettings | undefined;
+  if (!initial || (!preview && initial.sundayPlanEnabled !== true)) return null;
+  if (!preview) {
+    const retained = retainedSundayPlan(initial.sundayPlanSnapshot, now, timeZone);
+    if (retained) return retained;
+  }
+  const tx = db.transaction(["settings", "attempts", "reviewLogs", "cards", "examDates"], "readonly");
+  const [settings, attempts, reviewLogs, cards, examDates] = await Promise.all([
+    tx.objectStore("settings").get(userId) as Promise<UserSettings | undefined>,
+    tx.objectStore("attempts").getAll() as Promise<Attempt[]>,
+    tx.objectStore("reviewLogs").getAll() as Promise<ReviewLog[]>,
+    tx.objectStore("cards").getAll() as Promise<Card[]>,
+    tx.objectStore("examDates").getAll() as Promise<ExamDate[]>,
+  ]);
+  await tx.done;
+  if (!settings || (!preview && settings.sundayPlanEnabled !== true)) return null;
+  if (!preview) {
+    const retained = retainedSundayPlan(settings.sundayPlanSnapshot, now, timeZone);
+    if (retained) return retained;
+  }
+  const snapshot = buildSundayPlan({
+    now, timeZone, subjectIds: settings.subjectIds,
+    subjectTopicIds: allTopics(settings.subjectIds).map((topic) => topic.id),
+    attempts: attempts.filter((row) => row.userId === userId),
+    reviewLogs: reviewLogs.filter((row) => row.userId === userId),
+    cards: cards.filter((row) => row.userId === userId),
+    examDates: examDates.filter((row) => row.userId === userId),
+  });
+  if (preview) return snapshot;
+  const write = db.transaction("settings", "readwrite");
+  const latest = await write.store.get(userId) as UserSettings | undefined;
+  if (!latest || latest.sundayPlanEnabled !== true) { await write.done; return null; }
+  const retained = retainedSundayPlan(latest.sundayPlanSnapshot, now, timeZone);
+  if (retained) { await write.done; return retained; }
+  const next: UserSettings = { ...latest, sundayPlanSnapshot: snapshot, updatedAt: now.toISOString() };
+  await write.store.put(next);
+  await write.done;
+  // Same IndexedDB-first/outbox path as every other settings update. No send
+  // to a notification service; configured account sync may replicate settings.
+  await enqueue("settings", "upsert", next);
+  return snapshot;
 }
 
 export async function saveStreak(streak: StreakState): Promise<void> {

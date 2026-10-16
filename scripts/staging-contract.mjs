@@ -12,16 +12,45 @@ export const CONTINUITY_COLUMNS = {
 export const DELETION_TABLES = ["cards","review_logs","questions","attempts","mistakes","papers","planned_sessions","exam_dates"];
 export const SINGLETON_TABLES = ["user_settings", "streaks", "lesson_progress"];
 
+/**
+ * A preflight failure whose message was written here and names only secret
+ * *names* or a fixed rule, never a value, so the runner may print it as is.
+ */
+export class StagingPreflightError extends Error {}
+
+function parseUrl(value, label) {
+  // `new URL` failures can echo the input in some runtimes; never surface it.
+  try { return new URL(value); } catch { throw new StagingPreflightError(`[infrastructure] ${label} is not a valid URL.`); }
+}
+
 export function stagingConfiguration(env) {
   const missing = REQUIRED_STAGING_SECRETS.filter((key) => !env[key]?.trim());
-  if (missing.length) throw new Error(`[infrastructure] Missing GitHub secrets: ${missing.join(", ")}`);
-  const url = new URL(env.REVISE_STAGING_SUPABASE_URL);
-  if (url.protocol !== "https:") throw new Error("[infrastructure] Staging Supabase URL must use HTTPS.");
-  const database = new URL(env.REVISE_STAGING_DATABASE_URL);
-  if (!["postgres:", "postgresql:"].includes(database.protocol)) throw new Error("[infrastructure] Staging database URL must be PostgreSQL.");
-  if (env.REVISE_STAGING_USER_A_EMAIL.trim().toLowerCase() === env.REVISE_STAGING_USER_B_EMAIL.trim().toLowerCase()) {
-    throw new Error("[infrastructure] Two independent staging users are required.");
+  if (missing.length) {
+    const which = missing.length === REQUIRED_STAGING_SECRETS.length ? "all seven are unset" : `${missing.length} of 7 unset`;
+    throw new StagingPreflightError(`[infrastructure] Missing GitHub secrets (${which}): ${missing.join(", ")}`);
   }
+  const url = parseUrl(env.REVISE_STAGING_SUPABASE_URL, "REVISE_STAGING_SUPABASE_URL");
+  if (url.protocol !== "https:") throw new StagingPreflightError("[infrastructure] Staging Supabase URL must use HTTPS.");
+  const database = parseUrl(env.REVISE_STAGING_DATABASE_URL, "REVISE_STAGING_DATABASE_URL");
+  if (!["postgres:", "postgresql:"].includes(database.protocol)) throw new StagingPreflightError("[infrastructure] Staging database URL must be PostgreSQL.");
+  if (env.REVISE_STAGING_USER_A_EMAIL.trim().toLowerCase() === env.REVISE_STAGING_USER_B_EMAIL.trim().toLowerCase()) {
+    throw new StagingPreflightError("[infrastructure] Two independent staging users are required.");
+  }
+}
+
+export const STAGING_RUNBOOK = "docs/operations-runbook.md (Required staging verification)";
+
+/**
+ * What the runner may print and upload for a failure. Preflight messages are
+ * ours and value-free, so they pass through (this is what tells the owner
+ * *which* secret is missing); any other infrastructure error (a pg/TLS/network
+ * error that can contain a connection string or server detail) is replaced by
+ * a fixed sentence. Later stages report the contract's own drift messages.
+ */
+export function stagingFailureMessage(stage, error) {
+  if (stage !== "infrastructure") return error?.message ?? String(error);
+  if (error instanceof StagingPreflightError) return `${error.message.replace(/^\[infrastructure\] /, "")}. See ${STAGING_RUNBOOK}.`;
+  return `Could not reach the staging database (secrets are present). Check the TLS database connection string, and that the database accepts connections from GitHub-hosted runners. See ${STAGING_RUNBOOK}.`;
 }
 
 /** Pure deployed-catalog checks, used by the runner and local unit tests. */

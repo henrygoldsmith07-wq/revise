@@ -36,7 +36,7 @@ describe("marks recovery surfaces", () => {
 
   it("offers answer improvement only on ordinary practice, never on evidence-bearing modes", () => {
     const runner = read("src/components/QuestionRunner.tsx");
-    expect(runner).toContain('improvableAnswers={mode === "practice" && !farTransfer && !retestMistake ? answers : undefined}');
+    expect(runner).toContain('improvableAnswers={mode === "practice" && !farTransfer && !retestMistake && !inDiagnostic ? answers : undefined}');
     const marked = read("src/components/QuestionMarkedResult.tsx");
     expect(marked).toContain("improvableAnswers && part");
     expect(marked).toContain('question.kind !== "mcq"');

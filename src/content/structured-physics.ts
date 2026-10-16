@@ -12,7 +12,13 @@ export const physicsDepthPartSchema = z.object({
   family: text, context: text, move: text, prompt: text, answer: text,
   marks: z.number().int().positive(), scheme: z.array(text).min(1),
   aos: z.array(z.enum(["AO1", "AO2", "AO3"])).min(1).optional(),
-}).strict().refine((row) => row.scheme.length === row.marks, "Each mark needs a scheme point.");
+  // Authored "do not accept" lines (MarkSchemeReject); defineQuestion checks each point index.
+  rejects: z.array(z.object({
+    point: z.number().int().nonnegative(), phrases: z.array(text).min(1), except: z.array(text).min(1).optional(),
+    scope: z.enum(["clause", "answer"]).optional(), reason: text,
+  }).strict()).min(1).max(12).optional(),
+}).strict().refine((row) => row.scheme.length === row.marks, "Each mark needs a scheme point.")
+  .refine((row) => (row.rejects ?? []).every((rule) => rule.point < row.scheme.length), "A reject rule must guard an existing scheme point.");
 export const physicsDepthSourceSchema = z.object({
   topic: text, point: z.number().int().positive(), parts: z.array(physicsDepthPartSchema).min(1),
 }).strict();

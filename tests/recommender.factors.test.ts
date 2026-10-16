@@ -61,6 +61,9 @@ function dueCard(id: string, due: string, topicId = "chem.electrolysis"): Card {
     ...createCard({ id, userId: "u", subjectId: "chem", topicId, front: "f", back: "b" }, NOW),
     due,
     state: 2,
+    // A card in Review state has been studied at least once; never-studied
+    // seeded cards are not owed reviews (isDueReview).
+    reps: 1,
   };
 }
 

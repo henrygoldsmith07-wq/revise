@@ -71,24 +71,43 @@ const nonBlank = (value: unknown): value is string => typeof value === "string" 
 
 export interface ReviewProblem { questionId: Id; detail: string }
 
-/** Rules every decision must pass before it can enter the log. */
-export function decisionProblems(input: ReviewDecisionInput, question: Question | undefined, priorApprovers: readonly string[], nowMs = Date.now()): string[] {
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Intrinsic rules shared by append validation and persisted-log consumption. */
+function decisionRecordProblems(input: ReviewDecisionInput, nowMs: number): string[] {
   const out: string[] = [];
-  if (!question) return ["the question is not in the current bank"];
-  if (!requiresWjecContentReview(question.subjectId)) out.push("the subject is not review-gated");
+  if (!nonBlank(input.questionId) || !nonBlank(input.contentFingerprint)) out.push("missing question id or content fingerprint");
   if (!["approve", "reject", "revise"].includes(input.decision)) out.push("decision must be approve, reject or revise");
   if (!nonBlank(input.reviewerId)) out.push("missing reviewer id");
   if (!input.reviewerRole || !WJEC_REVIEWER_ROLES.includes(input.reviewerRole)) out.push("missing or unknown reviewer role");
   if (!nonBlank(input.reviewerQualification)) out.push("missing reviewer qualification");
   if (!validHumanReviewInstant(input.reviewedAt, nowMs)) out.push("review date is missing, malformed or in the future");
-  if (input.contentFingerprint !== physicsContentFingerprint(question)) out.push("the question or its marking changed since this review (stale fingerprint)");
+  if (typeof input.comments !== "string") out.push("comments must be text");
+  if (input.classification !== undefined && (!isObject(input.classification) ||
+      ["transferConfirmed", "dataAnalysisConfirmed"].some((key) =>
+        input.classification?.[key as keyof ReviewClassification] !== undefined &&
+        typeof input.classification[key as keyof ReviewClassification] !== "boolean"))) {
+    out.push("classification confirmations must be booleans");
+  }
   if (input.decision === "approve") {
     if (REQUIRED_HUMAN_CHECKS.some((check) => input.checks?.[check] !== true)) out.push("an approval needs all six checks ticked");
+  } else if (!nonBlank(input.comments)) out.push("a rejection or revision request needs a comment");
+  return out;
+}
+
+/** Rules every decision must pass before it can enter the log or count as an approval. */
+export function decisionProblems(input: ReviewDecisionInput, question: Question | undefined, priorApprovers: readonly string[], nowMs = Date.now()): string[] {
+  if (!question) return ["the question is not in the current bank"];
+  const out = decisionRecordProblems(input, nowMs);
+  if (!requiresWjecContentReview(question.subjectId)) out.push("the subject is not review-gated");
+  if (input.contentFingerprint !== physicsContentFingerprint(question)) out.push("the question or its marking changed since this review (stale fingerprint)");
+  if (input.decision === "approve") {
     if (priorApprovers.includes(input.reviewerId)) out.push("this reviewer already approved this exact content; a different reviewer must confirm it");
     if (["retired", "rejected", "needs_changes"].includes(question.validation?.stage ?? "")) out.push("the question is in a blocked validation stage");
     if (input.classification?.transferConfirmed && !hasActualTransfer(question)) out.push("transfer confirmed, but the question has no structural transfer link");
     if (input.classification?.dataAnalysisConfirmed && !(isDataAnalysis(question) && hasDataRepresentation(question))) out.push("data analysis confirmed, but the question has no authored data representation");
-  } else if (!nonBlank(input.comments)) out.push("a rejection or revision request needs a comment");
+  }
   return out;
 }
 
@@ -111,15 +130,18 @@ export interface QuestionReviewState {
 }
 
 /** Events on the current fingerprint, after the latest reject/revise, in order. */
-export function reviewStateOf(question: Question, events: readonly ReviewAuditEvent[]): QuestionReviewState {
+export function reviewStateOf(question: Question, events: readonly ReviewAuditEvent[], nowMs = Date.now()): QuestionReviewState {
   const fingerprint = physicsContentFingerprint(question);
-  const mine = events.filter((e) => e.questionId === question.id);
+  const mine = events.filter((e) => e?.questionId === question.id);
   const current = mine.filter((e) => e.contentFingerprint === fingerprint).sort((a, b) => a.seq - b.seq);
   let lastBlock = -1;
   current.forEach((e, i) => { if (e.decision !== "approve") lastBlock = i; });
   const open = lastBlock >= 0 ? current[lastBlock]! : null;
   const chain: ReviewAuditEvent[] = [];
-  for (const e of current.slice(lastBlock + 1)) if (e.decision === "approve" && !chain.some((c) => c.reviewerId === e.reviewerId)) chain.push(e);
+  for (const e of current.slice(lastBlock + 1)) {
+    if (e.decision === "approve" && e.subjectId === question.subjectId &&
+        decisionProblems(e, question, chain.map((c) => c.reviewerId), nowMs).length === 0) chain.push(e);
+  }
   const stage: ReviewStage = chain.length >= REQUIRED_INDEPENDENT_APPROVALS ? "verified" : chain.length > 0 ? "checked" : "unverified";
   const last = current.at(-1) ?? null;
   return {
@@ -131,8 +153,8 @@ export function reviewStateOf(question: Question, events: readonly ReviewAuditEv
   };
 }
 
-export const approversOnCurrentContent = (question: Question, events: readonly ReviewAuditEvent[]): string[] =>
-  reviewStateOf(question, events).approvers;
+export const approversOnCurrentContent = (question: Question, events: readonly ReviewAuditEvent[], nowMs = Date.now()): string[] =>
+  reviewStateOf(question, events, nowMs).approvers;
 
 // --- append -----------------------------------------------------------------------
 
@@ -145,7 +167,7 @@ export function appendReviewDecisions(log: ReviewAuditLog, decisions: readonly R
   let events = [...log.events];
   for (const input of decisions) {
     const question = byId.get(input.questionId);
-    const prior = question ? approversOnCurrentContent(question, events) : [];
+    const prior = question ? approversOnCurrentContent(question, events, nowMs) : [];
     const detail = decisionProblems(input, question, prior, nowMs);
     if (detail.length) { problems.push(...detail.map((d) => ({ questionId: input.questionId, detail: d }))); continue; }
     const previousHash = events.at(-1)?.hash ?? GENESIS_HASH;
@@ -158,31 +180,31 @@ export function appendReviewDecisions(log: ReviewAuditLog, decisions: readonly R
 
 // --- log integrity -----------------------------------------------------------------
 
-export function auditLogIssues(log: unknown): string[] {
+export function auditLogIssues(log: unknown, nowMs = Date.now()): string[] {
   const issues: string[] = [];
   if (typeof log !== "object" || log === null || (log as ReviewAuditLog).formatVersion !== REVIEW_AUDIT_LOG_VERSION || !Array.isArray((log as ReviewAuditLog).events)) {
     return ["audit log must be a version-1 object with an events array"];
   }
   let previous = GENESIS_HASH;
+  const approvers = new Map<string, Set<string>>();
   (log as ReviewAuditLog).events.forEach((event, i) => {
-    const where = `event ${i + 1} (${event?.questionId})`;
+    if (!isObject(event)) { issues.push(`event ${i + 1}: event must be an object`); return; }
+    const where = `event ${i + 1} (${event.questionId})`;
     if (event.seq !== i + 1) issues.push(`${where}: sequence number ${event.seq} is out of order`);
     if (event.previousHash !== previous) issues.push(`${where}: chain is broken (history was edited or removed)`);
     const { hash, ...rest } = event;
     if (hash !== eventHash(rest)) issues.push(`${where}: content does not match its hash (the record was edited)`);
-    if (!nonBlank(event.reviewerId) || !event.reviewerRole || !nonBlank(event.reviewerQualification) || !validHumanReviewInstant(event.reviewedAt)) issues.push(`${where}: missing reviewer identity, qualification or date`);
+    issues.push(...decisionRecordProblems(event, nowMs).map((problem) => `${where}: ${problem}`));
+    if (!requiresWjecContentReview(event.subjectId)) issues.push(`${where}: the subject is not review-gated`);
     previous = hash;
-  });
-  // Transition rule: a reviewer cannot approve the same exact content twice without a rejection between.
-  const approvers = new Map<string, Set<string>>();
-  for (const event of (log as ReviewAuditLog).events) {
+    // A reviewer cannot approve the same exact content twice without a block between.
     const key = `${event.questionId}::${event.contentFingerprint}`;
-    if (event.decision !== "approve") { approvers.delete(key); continue; }
+    if (event.decision !== "approve") { approvers.delete(key); return; }
     const seen = approvers.get(key) ?? new Set<string>();
-    if (seen.has(event.reviewerId)) issues.push(`event ${event.seq} (${event.questionId}): ${event.reviewerId} approved the same content twice`);
+    if (seen.has(event.reviewerId)) issues.push(`${where}: ${event.reviewerId} approved the same content twice`);
     seen.add(event.reviewerId);
     approvers.set(key, seen);
-  }
+  });
   return issues;
 }
 

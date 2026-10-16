@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
 import { isFlagship } from "@/domain/flagship";
 import { todayIso } from "@/domain/scheduling";
 import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
-import { useStoreFields } from "@/state/store";
+import { useStoreFields } from "@/state/store-context";
+import type { StoreValue } from "@/state/store";
 import { Button, Field, Panel, Pill, ProgressBar, cx } from "./ui";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
@@ -35,8 +36,23 @@ interface SubjectRow {
   subjects: { id: Id; name: string; detail: string }[];
 }
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
-  const store = useStoreFields("regeneratePlan", "updateSettings", "upsertExamDate", "userId", "recordFunnel");
+/** The store actions the final step needs. `null` while the content bank is still installing. */
+export type OnboardingActions = Pick<StoreValue, "regeneratePlan" | "updateSettings" | "upsertExamDate" | "userId" | "recordFunnel">;
+
+/** Onboarding inside a ready store (AppShell's path). */
+export function Onboarding({ onDone }: { onDone: () => void | Promise<void> }) {
+  const actions = useStoreFields("regeneratePlan", "updateSettings", "upsertExamDate", "userId", "recordFunnel");
+  return <OnboardingFlow actions={actions} onDone={onDone} />;
+}
+
+/**
+ * The onboarding flow itself. It does not need the store until the final
+ * step, so a fresh profile is shown it straight away while the content bank
+ * installs in the background (StoreProvider renders it before the snapshot
+ * is ready). If the student reaches "Start" before the bank is in, the click
+ * is held and runs the moment the store is ready; nothing is saved early.
+ */
+export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions | null; onDone: () => void | Promise<void> }) {
   const [phase, setPhase] = useState(0);
   const [boardId, setBoardId] = useState<Id | null>(null);
   const [subjectIds, setSubjectIds] = useState<Id[]>([]);
@@ -44,6 +60,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [diagnosticChoice, setDiagnosticChoice] = useState<"quick" | "skip">("quick");
   const [showReference, setShowReference] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The student pressed the final button before the store was ready.
+  const [finishQueued, setFinishQueued] = useState(false);
   const router = useRouter();
 
   const boards = useMemo(() => availableBoards(), []);
@@ -119,8 +137,16 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     setExamDates({});
   }
 
-  async function finish() {
+  function requestFinish() {
     if (!boardId) return;
+    setSaving(true);
+    if (actions) void finish(actions);
+    else setFinishQueued(true);
+  }
+
+  async function finish(store: OnboardingActions) {
+    if (!boardId) return;
+    setFinishQueued(false);
     setSaving(true);
     const availability: Availability[] = STEADY_MINUTES.map((minutes, weekday) => ({ weekday, minutes }));
 
@@ -153,7 +179,18 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     } else {
       void store.recordFunnel("diagnostic_skipped", subjectIds[0] ?? "none");
     }
-    onDone();
+    // Wait for the "onboarded" marker to land in IndexedDB before leaving.
+    // Online, router.push is a client-side transition and a fire-and-forget
+    // write finished anyway; offline, the RSC fetch for /diagnostic fails and
+    // Next falls back to a full browser navigation, which dropped the
+    // in-flight write, so the student landed back on step 1 of onboarding
+    // (e2e/offline.spec.ts "offline banner appears when offline").
+    try {
+      await onDone();
+    } catch {
+      // Settings, exam dates and the plan are already saved; if only the
+      // marker failed, onboarding reappears on the next load, as before.
+    }
     // Honour the "Start my quick check" commit. The final step promises
     // "Revise will start with a quick check", so take them straight to it
     // (with autoStart) instead of dropping them on Today, where the check
@@ -164,6 +201,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       router.push(`/diagnostic?subject=${encodeURIComponent(subjectIds[0]!)}`);
     }
   }
+
+  useEffect(() => {
+    if (!finishQueued || !actions) return;
+    void finish(actions);
+    // finish reads this render's choices; it runs once when the store arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishQueued, actions]);
 
   return (
     <div className="min-h-dvh bg-bg flex items-center justify-center p-4">
@@ -448,9 +492,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 <li>Mistakes turn into targeted repair, then an unseen proof check.</li>
               </ol>
             </div>
-            <p className="text-xs text-ink3">
-              Revise already understands where to look first — you will leave thinking that, not that you configured a dashboard.
-            </p>
           </Panel>
         ) : null}
 
@@ -475,9 +516,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               variant="primary"
               className="flex-1 min-h-[3rem]"
               disabled={saving || !canContinue}
-              onClick={() => void finish()}
+              onClick={requestFinish}
             >
-              {saving
+              {finishQueued
+                ? "Finishing setting up your subjects…"
+                : saving
                 ? "Building your plan…"
                 : diagnosticChoice === "quick"
                   ? "Start my quick check"

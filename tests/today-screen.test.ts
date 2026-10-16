@@ -30,6 +30,18 @@ describe("Today screen — one dominant next action (decision engine)", () => {
     expect(source).toContain("Why this session?");
   });
 
+  it("puts Start directly under what and where, before the reasons (first viewport at 360px)", () => {
+    // Fourteenth pass: Start sat under the provisional note, the lifecycle and
+    // "In this session" lines, at y≈876 on a 360 x 760 phone. The reasons stay,
+    // always visible, just after the button (e2e/narrow-360.spec.ts measures it).
+    const source = hero();
+    const start = source.indexOf("Start session");
+    expect(start).toBeGreaterThan(source.indexOf("No exam date set"));
+    expect(start).toBeLessThan(source.indexOf("brief.provisional ?"));
+    expect(start).toBeLessThan(source.indexOf("In this session:"));
+    expect(start).toBeLessThan(source.indexOf("How:"));
+  });
+
   it("the session never shows spec-point scale or an after-this queue", () => {
     const source = page();
     expect(source).not.toContain("After this:");

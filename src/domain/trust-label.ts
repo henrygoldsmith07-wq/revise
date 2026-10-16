@@ -9,7 +9,7 @@
 // backwards-compatible learner summary.
 // ---------------------------------------------------------------------------
 
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted, trustedAssessmentContent } from "./content-trust";
 import { isFlagship } from "./flagship";
 import { officialPaperQuestionEligible, type OfficialPaperManifest } from "./official-papers";
 import { MIN_PROVABLE_QUESTIONS } from "./supply";
@@ -63,9 +63,14 @@ export function provenanceTier(question: Question): ProvenanceTier {
 export const provenanceLabel = (question: Question): string =>
   PROVENANCE_LABEL[provenanceTier(question)];
 
-/** Trusted + unseen questions can carry proof; everything else is practice only. */
+/**
+ * Trusted + unseen questions can carry proof; everything else is practice only.
+ * Uses learner-evidence trust, so reference-tier content (which passes the
+ * permissive trustedAssessmentContent) is never proof-capable — matching
+ * provenanceTier, which never labels it "proof-capable".
+ */
 export function isProofCapable(question: Question, seenQuestionIds: ReadonlySet<Id>): boolean {
-  return trustedAssessmentContent(question) && !seenQuestionIds.has(question.id);
+  return learnerEvidenceTrusted(question) && !seenQuestionIds.has(question.id);
 }
 
 /**
