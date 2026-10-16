@@ -245,10 +245,6 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
   const where = names.length ? ` across ${names.slice(0, 3).join(", ")}${names.length > 3 ? " and more" : ""}` : "";
   const cause = mission.cause && mission.cause !== "unclassified" ? ROOT_CAUSE_LABEL[mission.cause] : null;
   const shown = Math.round(marks * 10) / 10;
-  const title = regressed ? `Recover ${shown} marks you lost again: ${mission.title}`
-    : stage.kind === "delayed-proof" ? `Prove it: ${mission.title}`
-    : mission.origin === "paper" ? mission.title
-    : `${shown > 0 ? `Recover ${shown} marks: ` : ""}${mission.title}`;
   const share = STAGE_SHARE[stage.kind];
   // The time shown must be the time the session takes, so it comes from the questions it will run.
   const session = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, stage.kind);
@@ -257,6 +253,7 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
   // teacher-reviewed flagship questions (a step's `verified` is
   // learnerEvidenceTrusted on every question it holds).
   const proofEligible = session.steps.some((s) => s.kind === "delayed-proof" && s.verified);
+  const title = missionActionTitle(mission, { shown, regressed, delayed: stage.kind === "delayed-proof", proofEligible });
   return {
     id: `action:${mission.id}:${stage.kind}`,
     type, title, subjectId: mission.subjectId, topicIds: mission.topicIds, specPoints: [],
@@ -363,6 +360,26 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
     route: { href: proofHref(row.subjectId, row.topicId), label: "Start the check" },
   };
   return { draft, blockedBy };
+}
+
+/**
+ * A mission action's headline, composed from the mission's parts so no verb is
+ * said twice. A generic mission is titled "Recover Motion marks"; prefixing
+ * that with "Recover 3 marks: " read "Recover 3 marks: Recover Motion marks"
+ * on Today, so a mission with a `recoverFocus` names the topic directly.
+ * A delayed check says "Prove it" only when it would run on teacher-reviewed
+ * questions; otherwise it is a check that the fix held, recorded as practice.
+ */
+export function missionActionTitle(
+  mission: Pick<ExamMission, "title" | "origin" | "recoverFocus">,
+  opts: { shown: number; regressed: boolean; delayed: boolean; proofEligible: boolean },
+): string {
+  const focus = mission.recoverFocus;
+  if (opts.regressed) return focus ? `Recover ${opts.shown} marks you lost again in ${focus}` : `Recover ${opts.shown} marks you lost again: ${mission.title}`;
+  if (opts.delayed) return `${opts.proofEligible ? "Prove it" : "Check it held"}: ${focus ?? mission.title}`;
+  if (mission.origin === "paper") return mission.title;
+  if (opts.shown <= 0) return mission.title;
+  return focus ? `Recover ${opts.shown} marks in ${focus}` : `Recover ${opts.shown} marks: ${mission.title}`;
 }
 
 function practiceRevisitDraft(mission: ExamMission, input: EngineInput, revisit: { dueAt: string; heldChecks: number; firstSuccessAt?: string }): Draft {
@@ -677,7 +694,7 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
   actions = actions.filter((a) => {
     const gate = a.topicIds.map((t) => gates.get(t)).find(Boolean);
     if (!gate || !["learn-untouched", "weak-topic", "adaptive-session"].includes(a.type)) return true;
-    const reason = `Recover the marks you lost again first: ${gate.title}`;
+    const reason = `Do this first: ${gate.title}`;
     deferred.push({ action: { ...a, blockedBy: reason }, reason });
     return false;
   });

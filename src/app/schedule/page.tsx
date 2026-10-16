@@ -13,6 +13,7 @@ import { useStoreFields, useSubjects } from "@/state/store";
 import { Button, ButtonLink, EmptyState, Pill, SectionHeading } from "@/components/ui";
 import { useRevisionPlan } from "@/components/recovery-evidence";
 import { todayPick, type TodayPick } from "@/domain/today-pick";
+import { checkpointHasProgress } from "@/domain/revision-checkpoint";
 
 // The personalised schedule: the planner's output over the whole remaining
 // run-up to each exam. Everything here is derived state — the planner rebuilds
@@ -54,12 +55,13 @@ function humanDate(key: string): string {
 }
 
 export default function SchedulePage() {
-  const store = useStoreFields("adaptiveSession", "examDates", "planChangelog", "plannedSessions", "regeneratePlan", "revisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "attempts", "examDates", "planChangelog", "plannedSessions", "regeneratePlan", "reviewLogs", "revisionCheckpoint", "settings");
   // Today's one recommendation, read from the same ranked plan and the same
   // choice Today makes (todayPick), so Schedule's "Today" names the same next
   // step instead of only warning that the two can differ.
   const { plan } = useRevisionPlan();
-  const pick: TodayLead | null = store.revisionCheckpoint
+  // Today offers the resume card only for a run with progress in it, so Schedule asks the same question.
+  const pick: TodayLead | null = store.revisionCheckpoint && checkpointHasProgress(store.revisionCheckpoint, { attempts: store.attempts, reviewLogs: store.reviewLogs })
     ? { kind: "resume" }
     : (() => { const p = todayPick(plan.top, store.adaptiveSession); return p ? { kind: "pick", pick: p } : null; })();
   const subjects = useSubjects();

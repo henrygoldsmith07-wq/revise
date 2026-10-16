@@ -124,6 +124,11 @@ background and do other work while it runs. On Windows, invoke npm through
   parses them. A new link parameter needs a consumer and a test, or the
   plan promises something the page does not do. Still unhonoured:
   `/lesson?worked=1`, `/practice?transfer=1`, `/adaptive-session?proof=1`.
+- **A saved checkpoint is not an interrupted run** (twenty-sixth pass). Pages
+  save a resume point as soon as a question shows; anything that offers to
+  resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
+  titles that prefix "Recover N marks" compose through `missionActionTitle`,
+  never by concatenating `mission.title`.
 - **`replacePlan` is serialised** (`src/data/repository.ts`). Two concurrent
   rebuilds used to union into overlapping blocks; keep plan writes going
   through it.
