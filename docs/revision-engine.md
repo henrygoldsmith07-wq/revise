@@ -336,6 +336,17 @@ step "practice, not proof" or "counts as evidence", so help is never
 mistaken for proof. The same modules drive the Library topic sheet; the mark
 result is now the primary place a learner meets them.
 
+Each practice step link carries its mode and its stated minutes
+(`/practice?topic=…&guided=1&minutes=8`), read by
+`src/domain/practice-step-mode.ts`: guided shows the question's own hint
+rungs first; unaided and timed allow no hints (timed adds an exam-pace clock);
+worked shows one question with its authored model answer and mark-scheme
+points, then one fresh question outside its family, recorded as viewed
+support. The worked example is a question the student has already answered,
+or one that could never be served as unseen proof, so showing it spends no
+proof supply. A step's questions fit its minutes at 90 s a mark (at most
+three) and the page states the real length.
+
 ## Exam technique vs knowledge separation
 
 `src/domain/retention-analytics.ts`, `src/domain/assessment.ts` and
