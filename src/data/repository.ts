@@ -511,10 +511,29 @@ export async function savePlan(sessions: PlannedSession[]): Promise<void> {
 // each read "existing" before the other had written, neither deleted the
 // other's rows, and a fresh student's Schedule showed two blocks at 16:00
 // (twenty-third pass). Serialised, the later plan replaces the earlier one.
+//
+// That queue only covers one tab. Two open tabs (or a tab and an installed
+// PWA window) share one IndexedDB, and each replan read "existing" before the
+// other wrote, so both plans survived (twenty-fourth pass). Where the Web
+// Locks API exists, every replacement also holds one origin-wide lock, so the
+// later plan replaces the earlier one across tabs too. Without it (very old
+// browsers) behaviour is the single-tab queue, as before.
 let planWrites: Promise<void> = Promise.resolve();
 
+export const PLAN_REPLACE_LOCK = "revise:replace-plan";
+
+type PlanLockManager = { request<T>(name: string, callback: () => Promise<T>): Promise<T> };
+
+function planLocks(): PlanLockManager | null {
+  const locks = (globalThis as { navigator?: { locks?: PlanLockManager } }).navigator?.locks;
+  return locks && typeof locks.request === "function" ? locks : null;
+}
+
 export function replacePlan(userId: Id, sessions: PlannedSession[]): Promise<void> {
-  const run = planWrites.then(() => replacePlanNow(userId, sessions));
+  const locks = planLocks();
+  const run = planWrites.then(() =>
+    locks ? locks.request(PLAN_REPLACE_LOCK, () => replacePlanNow(userId, sessions)) : replacePlanNow(userId, sessions),
+  );
   planWrites = run.catch(() => undefined);
   return run;
 }

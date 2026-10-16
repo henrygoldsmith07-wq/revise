@@ -5,6 +5,9 @@
 //   guided=1   "Guided application"      the question with its steps shown first
 //   timed=1    "Timed question"          exam pace, no hints, a visible clock
 //   unaided=1  "Unaided exam question"   no hints, so the answer is evidence
+//   worked=1   "Worked example"          one question worked through first,
+//                                         then a fresh one to try (supported)
+//   minutes=N  the step's stated minutes; the queue fits them at exam pace
 // Before the twenty-third pass /practice read none of them, so a step labelled
 // "Guided" or "Timed" opened the same plain question as every other link.
 //
@@ -12,10 +15,12 @@
 // ---------------------------------------------------------------------------
 
 import { commandOf } from "./assessment";
+import { learnerEvidenceTrusted } from "./content-trust";
 import type { HintTier } from "./hint-tiers";
-import type { CommandWord, Question } from "./types";
+import { questionFamilies, unseenQuestion } from "./learning-evidence";
+import type { Attempt, CommandWord, Question } from "./types";
 
-export type PracticeStepMode = "guided" | "timed" | "unaided";
+export type PracticeStepMode = "guided" | "timed" | "unaided" | "worked";
 
 /**
  * Exam-time baseline: 90 seconds a mark. The response-time calibration and
@@ -33,6 +38,7 @@ export function parsePracticeStepMode(params: { get(name: string): string | null
   if (params.get("timed") === "1") return "timed";
   if (params.get("unaided") === "1") return "unaided";
   if (params.get("guided") === "1") return "guided";
+  if (params.get("worked") === "1") return "worked";
   return null;
 }
 
@@ -66,12 +72,150 @@ export function limitStepQueue<T>(ids: readonly T[], mode: PracticeStepMode | nu
 }
 
 /**
+ * A worked-example step is one example and one fresh try (an example-problem
+ * pair); the next plan step is the guided try, so more would repeat it.
+ */
+export const WORKED_STEP_TRIES = 1;
+
+/** The plan step's stated minutes (?minutes=), a whole number from 1 to 60. */
+export function parseStepMinutes(value: string | null): number | null {
+  if (!value || !/^\d{1,2}$/.test(value.trim())) return null;
+  const minutes = Number(value.trim());
+  return minutes >= 1 && minutes <= 60 ? minutes : null;
+}
+
+/**
+ * Fit a step's queue to its stated minutes at exam pace (90 s a mark, the
+ * same baseline as the timed clock), keeping the ranked order and never more
+ * than `limit` questions. A question that would overrun the step is passed
+ * over for a later one that fits; when none fits, the first question is still
+ * offered (a step always has something to do) and `overrun` says so, so the
+ * page can show its real length instead of pretending it fits.
+ *
+ * Without minutes the old count cap applies unchanged.
+ */
+export function fitStepQueueToMinutes<T extends Pick<Question, "totalMarks">>(
+  questions: readonly T[],
+  minutes: number | null,
+  limit: number = STEP_QUEUE_LIMIT,
+): { queue: T[]; seconds: number; overrun: boolean } {
+  const cap = Math.max(1, limit);
+  if (minutes === null) {
+    const queue = questions.slice(0, cap);
+    return { queue, seconds: queue.reduce((sum, q) => sum + examPaceTargetSeconds(q.totalMarks), 0), overrun: false };
+  }
+  const budget = minutes * 60;
+  const queue: T[] = [];
+  let seconds = 0;
+  for (const question of questions) {
+    if (queue.length >= cap) break;
+    const cost = examPaceTargetSeconds(question.totalMarks);
+    if (seconds + cost > budget) continue;
+    queue.push(question);
+    seconds += cost;
+  }
+  if (queue.length || !questions.length) return { queue, seconds, overrun: false };
+  const first = questions[0]!;
+  return { queue: [first], seconds: examPaceTargetSeconds(first.totalMarks), overrun: true };
+}
+
+/** A question can be shown worked through only when every part has a model answer. */
+export function hasWorkedSolution(question: Pick<Question, "parts">): boolean {
+  return question.parts.length > 0 && question.parts.every((part) => part.modelAnswer.trim().length > 0);
+}
+
+export type WorkedExampleChoice = {
+  example: Question;
+  /**
+   * "your-answer": the student has already answered it (so seeing its worked
+   * solution spends nothing); "practice-only": never answered, but neither it
+   * nor anything it would make "seen" could ever count as proof.
+   */
+  basis: "your-answer" | "practice-only";
+};
+
+/**
+ * Choose the question to show worked through, without spending proof supply.
+ *
+ * Proof needs a reviewed question the student has never seen, judged by
+ * `unseenQuestion` (same question, same family or a shallow reskin). Showing a
+ * model answer is not recorded as an attempt, so an example must never be a
+ * question that could later be served as "unseen" proof, or something that
+ * would hide such a question's answer. In order:
+ *   1. a question in the step's pool the student has already answered,
+ *      most recent lost marks first, then most recent;
+ *   2. an unanswered question for which treating it as answered would make
+ *      no reviewed, still-unseen question in the subject count as seen.
+ * Otherwise null: the page says so and offers the guided try instead.
+ */
+export function chooseWorkedExample(input: {
+  pool: readonly Question[];
+  attempts: readonly Attempt[];
+  questions: readonly Question[];
+  /** How many unanswered candidates to test (each test walks the reviewed pool). */
+  maxCandidates?: number;
+}): WorkedExampleChoice | null {
+  const { pool, attempts, questions } = input;
+  const withSolution = pool.filter(hasWorkedSolution);
+  if (!withSolution.length) return null;
+  const poolIds = new Set(withSolution.map((q) => q.id));
+  const latest = new Map<string, Attempt>();
+  for (const attempt of attempts) {
+    if (!poolIds.has(attempt.questionId)) continue;
+    const seen = latest.get(attempt.questionId);
+    if (!seen || attempt.createdAt > seen.createdAt) latest.set(attempt.questionId, attempt);
+  }
+  if (latest.size) {
+    const answered = [...latest.values()].sort((a, b) => {
+      const lostA = a.awarded < a.max ? 1 : 0;
+      const lostB = b.awarded < b.max ? 1 : 0;
+      return lostB - lostA || b.createdAt.localeCompare(a.createdAt);
+    });
+    const example = withSolution.find((q) => q.id === answered[0]!.questionId);
+    if (example) return { example, basis: "your-answer" };
+  }
+  const subjects = new Set(withSolution.map((q) => q.subjectId));
+  // Reviewed questions that could still serve as unseen proof today.
+  const provable = questions.filter((q) => subjects.has(q.subjectId) && learnerEvidenceTrusted(q) && unseenQuestion(q, attempts, questions));
+  const unanswered = withSolution.filter((q) => !latest.has(q.id)).slice(0, input.maxCandidates ?? 6);
+  for (const candidate of unanswered) {
+    if (learnerEvidenceTrusted(candidate)) continue;
+    const asIfAnswered = [...attempts, { questionId: candidate.id } as Attempt];
+    const spends = provable.some((q) => q.subjectId === candidate.subjectId && !unseenQuestion(q, asIfAnswered, questions));
+    if (!spends) return { example: candidate, basis: "practice-only" };
+  }
+  return null;
+}
+
+/**
+ * The fresh tries after a worked example: the rest of the ranked pool minus
+ * the example and anything in its family, so the try is not the same
+ * question with new numbers.
+ */
+export function freshAfterExample<T extends Question>(ranked: readonly T[], example: Question | null): T[] {
+  if (!example) return [...ranked];
+  const families = new Set(questionFamilies(example));
+  return ranked.filter((q) => q.id !== example.id && !questionFamilies(q).some((family) => families.has(family)));
+}
+
+/**
  * Hint tiers the page allows. Timed and unaided allow none, so the attempt
  * stays independent evidence. Guided keeps the full ladder (the worked
  * solution stays behind its own button). `undefined` means "page default".
  */
 export function stepModeHintBudget(mode: PracticeStepMode | null): number | undefined {
   return mode === "timed" || mode === "unaided" ? 0 : undefined;
+}
+
+/**
+ * The support a worked-example try records. The student studied a different
+ * question's full solution first, the same kind of help as reading repair
+ * teaching, so the try carries the scaffold tier: weighted as viewed support
+ * by mastery and never independent evidence. Every other mode records only
+ * the hints actually opened.
+ */
+export function stepModeSupportTier(mode: PracticeStepMode | null): HintTier | null {
+  return mode === "worked" ? "scaffold" : null;
 }
 
 /**

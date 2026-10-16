@@ -25,9 +25,11 @@ test("repair-plan practice links honour guided, unaided and timed at 360px", asy
   // Clicked, not typed: the step opens on the same route, which used to keep
   // the just-answered question as the "guided" one.
   const guidedLink = nextStep.getByRole("link", { name: /Guided application/ });
-  await expect(guidedLink).toHaveAttribute("href", `/practice?topic=${encodeURIComponent(TOPIC)}&guided=1`);
+  await expect(guidedLink).toHaveAttribute("href", `/practice?topic=${encodeURIComponent(TOPIC)}&guided=1&minutes=8`);
   await guidedLink.click();
-  await expect(page.getByText("0/3 answered")).toBeVisible({ timeout: 30_000 });
+  // An 8-minute step at 90 s a mark: one 4-mark question (6 min), not three (18 min).
+  await expect(page.getByText(/^0\/\d answered$/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("step-length-note")).toContainText(/about \d+ min at exam pace/);
 
   // Guided: the steps are on screen before the answer box, and the page is
   // the one question, not the practice hub.
@@ -67,4 +69,33 @@ test("repair-plan practice links honour guided, unaided and timed at 360px", asy
     await page.getByRole("button", { name: /^(Not sure · submit|Submit for marking)$/ }).click();
     await expect(timer).toContainText("Time taken", { timeout: 30_000 });
   }
+});
+
+test("the worked-example step shows a worked solution first, then a fresh question, at 360px", async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.setViewportSize({ width: 360, height: 760 });
+  await page.goto("/");
+  if (await todayOrOnboarding(page) === "onboarding") {
+    await completeOnboarding(page, { board: "WJEC", subjectNames: ["Physics"], skipExamDates: true });
+  }
+  await page.goto(`/practice?topic=${encodeURIComponent(TOPIC)}&worked=1&minutes=7`);
+  await expect(page.getByRole("heading", { level: 1, name: "Worked example" })).toBeVisible({ timeout: 30_000 });
+  const example = page.getByTestId("worked-example");
+  await expect(example).toBeVisible();
+  // The question's own authored model answer and mark-scheme points.
+  await expect(example).toContainText("Model answer");
+  await expect(example).toContainText("Marks are given for");
+  await expect(example).toContainText("Practice, not proof");
+  await expect(page.getByTestId("step-length-note")).toContainText("a worked example, then 1 question to try");
+  await expect(page.getByText("0/1 answered")).toBeVisible();
+  // Example first, then the try, and no hub cards.
+  const exampleBox = await example.boundingBox();
+  const answerBox = await page.locator("textarea, [role=radiogroup]").first().boundingBox();
+  expect(exampleBox && answerBox && exampleBox.y < answerBox.y).toBeTruthy();
+  await expect(page.getByText("Do only questions I got wrong")).toHaveCount(0);
+  await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 360);
+  await example.screenshot({ path: "artifacts/worked-example-360.png" });
+  // It collapses so the try is reachable on a phone.
+  await example.locator("summary").click();
+  await expect(example.getByText("Model answer")).toBeHidden();
 });

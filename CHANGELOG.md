@@ -1,5 +1,47 @@
 # Changelog
 
+## The "Worked example" step shows a worked example, and plan steps fit their stated minutes — 2026-10-16 (twenty-fourth pass)
+
+**"Worked example" opened the same lesson as "Targeted explanation".** On the
+application-gap path the plan reads explain → worked example → guided try →
+unaided question, but the worked step linked to `/lesson?topic=…&worked=1`
+and nothing read `worked=1`: at 360px it opened the topic's learning roadmap
+at a generic checkpoint orientation (probed on a production build), the page
+the explanation step had just opened.
+
+- The step now opens `/practice?topic=…&worked=1&minutes=7`: one real question
+  from the topic shown with its own authored model answer and mark-scheme
+  points, then one fresh question to try (outside the example's question
+  family). Nothing is generated.
+- The example never spends proof supply. A model answer shown is not an
+  attempt, so the example is a question the student has already answered
+  (lost marks first), or an unanswered one for which treating it as answered
+  would make no reviewed, still-unseen question in the subject count as seen
+  (`chooseWorkedExample`, reusing `unseenQuestion`). With neither, the page
+  says so and runs the guided try instead.
+- The try records the scaffold tier, so mastery weights it as viewed support;
+  it can never be independent evidence.
+
+**A plan step's three questions ignored its minutes.** An "Unaided exam
+question" step (10 minutes in the plan) held three 4-mark questions: 18
+minutes at the 90 s a mark baseline. Practice links now carry the step's
+`minutes=`, and the queue takes ranked questions that fit at exam pace (still
+at most three), passing over one that would overrun. When none fits, the first
+is offered and the page says it is longer than the step. Every step page
+states its real length ("1 question, about 6 min at exam pace").
+
+`transfer=1` (the "Unfamiliar-context question" kind) is not emitted by any
+plan; a test now fails if one starts emitting it before `/practice` reads it.
+
+**Two open tabs could still double the plan.** The twenty-third pass queued
+`replacePlan` within a tab, but two tabs (or a tab and the installed app) have
+separate queues over one IndexedDB; replanning in both at once kept both
+plans (reproduced in `tests/plan-replace-serial.test.ts` with two module
+instances: all four rows survived). Each replacement now also holds an
+origin-wide Web Lock (`revise:replace-plan`) where the browser has the API,
+so the later plan replaces the earlier one across tabs; without it,
+behaviour is the single-tab queue as before.
+
 ## Repair-plan links do what their labels say, and Schedule shows one plan — 2026-10-15 (twenty-third pass)
 
 **"Guided application", "Unaided exam question" and "Timed question" all

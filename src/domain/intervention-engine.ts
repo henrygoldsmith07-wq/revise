@@ -74,24 +74,36 @@ export const INTERVENTION_STEP_LABEL: Record<InterventionStepKind, string> = {
  * honours it (src/domain/practice-step-mode.ts): guided=1 opens the question
  * with its steps shown, unaided=1 and timed=1 remove hints, timed=1 adds an
  * exam-pace clock and command= puts questions using that verb first.
+ * worked=1 shows one question worked through, then a fresh one to try (it
+ * opened the topic's lesson before, the same page as "Targeted explanation").
+ * minutes= is the step's stated minutes, so the step's questions fit them at
+ * exam pace instead of a flat three.
  */
-function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | null): string {
+function practiceHref(topicId: Id, flag: string, minutes: number | undefined, extra = ""): string {
+  return `/practice?topic=${encodeURIComponent(topicId)}&${flag}=1${extra}${minutes ? `&minutes=${minutes}` : ""}`;
+}
+
+function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | null, minutes?: number): string {
   switch (kind) {
     case "retrieve":
       return `/review?topic=${encodeURIComponent(topicId)}`;
     case "explain":
       return `/lesson?topic=${encodeURIComponent(topicId)}`;
     case "worked-example":
-      return `/lesson?topic=${encodeURIComponent(topicId)}&worked=1`;
+      return practiceHref(topicId, "worked", minutes);
     case "misconception-repair":
       return `/tutor?topic=${encodeURIComponent(topicId)}`;
     case "guided-question":
-      return `/practice?topic=${encodeURIComponent(topicId)}&guided=1`;
+      return practiceHref(topicId, "guided", minutes);
     case "exam-style-question":
-      return `/practice?topic=${encodeURIComponent(topicId)}&unaided=1`;
+      return practiceHref(topicId, "unaided", minutes);
     case "timed-question":
-      return `/practice?topic=${encodeURIComponent(topicId)}&timed=1${command ? `&command=${encodeURIComponent(command)}` : ""}`;
+      return practiceHref(topicId, "timed", minutes, command ? `&command=${encodeURIComponent(command)}` : "");
     case "far-transfer-question":
+      // Never prescribed: prescribeIntervention emits no far-transfer step,
+      // and /practice does not read transfer=1. The real unfamiliar-context
+      // check is the delayed far-transfer retest (/practice?retest=…).
+      // tests/practice-step-mode.test.ts fails if a plan starts emitting it.
       return `/practice?topic=${encodeURIComponent(topicId)}&transfer=1`;
     case "delayed-proof":
       return `/adaptive-session?topic=${encodeURIComponent(topicId)}&start=1&proof=1`;
@@ -181,7 +193,7 @@ export function prescribeIntervention(
       minutes: 7,
       countsAsProof: false,
       why: "One fully worked application shows how the fact turns into marks.",
-      href: topicHref(topic.topicId, "worked-example"),
+      href: topicHref(topic.topicId, "worked-example", null, 7),
     });
     steps.push({
       kind: "guided-question",
@@ -189,7 +201,7 @@ export function prescribeIntervention(
       minutes: 8,
       countsAsProof: false,
       why: "A guided question with help available — practice, not proof.",
-      href: topicHref(topic.topicId, "guided-question"),
+      href: topicHref(topic.topicId, "guided-question", null, 8),
     });
     steps.push({
       kind: "exam-style-question",
@@ -197,7 +209,7 @@ export function prescribeIntervention(
       minutes: 10,
       countsAsProof: true,
       why: "An unseen exam question with no hints. This is the first answer that counts as evidence.",
-      href: topicHref(topic.topicId, "exam-style-question"),
+      href: topicHref(topic.topicId, "exam-style-question", null, 10),
     });
     reasons.push("recall is strong but application is weaker");
   } else if (appWeak) {
@@ -207,7 +219,7 @@ export function prescribeIntervention(
       minutes: 8,
       countsAsProof: false,
       why: "Support first, so the method is practised correctly before it is tested.",
-      href: topicHref(topic.topicId, "guided-question"),
+      href: topicHref(topic.topicId, "guided-question", null, 8),
     });
     steps.push({
       kind: "exam-style-question",
@@ -215,7 +227,7 @@ export function prescribeIntervention(
       minutes: 10,
       countsAsProof: true,
       why: "An unseen question with no hints checks whether the repair holds.",
-      href: topicHref(topic.topicId, "exam-style-question"),
+      href: topicHref(topic.topicId, "exam-style-question", null, 10),
     });
     if (!recallWeak && topic.recurringMistakes === 0) reasons.push("application is weaker than recall");
   }
@@ -227,7 +239,7 @@ export function prescribeIntervention(
       minutes: 8,
       countsAsProof: true,
       why: `“${topic.commandWeakness}” questions cost the most here, so one timed answer checks the technique under pressure.`,
-      href: topicHref(topic.topicId, "timed-question", topic.commandWeakness),
+      href: topicHref(topic.topicId, "timed-question", topic.commandWeakness, 8),
     });
     reasons.push(`“${topic.commandWeakness}” questions cost marks`);
   }
