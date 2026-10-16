@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { markMcq, markPart, markQuestion, pointCoverage, tokenise } from "@/domain/marking";
+import { seedQuestions } from "@/content";
 import { classifyMistake, mistakePatterns, mistakesFromAttempt, shouldResolve } from "@/domain/mistakes";
 import { createCard } from "@/domain/scheduling";
 import type { Attempt, Question, QuestionPart } from "@/domain/types";
@@ -289,5 +290,22 @@ describe("mistake enrichment — assessment depth", () => {
     expect(typeof draft.mistake.command).toBe("string");
     expect(typeof draft.mistake.misconception).toBe("string");
     expect(typeof draft.mistake.timing).toBe("string");
+  });
+});
+
+describe("relationship points that use both directions", () => {
+  const part = seedQuestions.flatMap((q) => q.parts).find((p) => p.prompt.startsWith("A transformer has 500 primary turns"))!;
+  const point = "For fixed power a higher voltage means lower current and lower I²R cable loss";
+  const credits = (answer: string) => markPart(part, answer).creditedPoints.includes(point);
+
+  it("credits a correct paraphrase that only uses one direction word", () => {
+    expect(credits("Vs = 240 × 50/500 = 24 V. A step-up transformer raises the voltage so the current is lower for the same power, reducing I^2R heating losses in the cables.")).toBe(true);
+    expect(credits("Vs = 24 V. Stepping up the voltage means a lower current for the same power, so less I²R power is lost in the cables.")).toBe(true);
+  });
+
+  it("still refuses a direction word attached to the wrong quantity", () => {
+    expect(credits("Vs = 24 V. A lower voltage gives a lower current and lower I^2R loss.")).toBe(false);
+    expect(credits("Vs = 24 V. Transmit at lower voltage so there is less loss.")).toBe(false);
+    expect(credits("Vs = 24 V. Higher current means lower losses.")).toBe(false);
   });
 });

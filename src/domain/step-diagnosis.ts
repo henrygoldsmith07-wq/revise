@@ -121,8 +121,13 @@ function unitOf(text: string): string | null {
 function unitMismatchOnly(student: string, expected: string): boolean {
   const su = unitOf(student);
   const eu = unitOf(expected);
-  if (!su && !eu) return false;
-  return (su ?? "") !== (eu ?? "");
+  // Only a step that states a value with a unit can show a unit error, and
+  // only when the magnitude agrees: otherwise the steps are simply different
+  // (a relation such as "Vs/Vp = Ns/Np" against "Vs = 24 V" is not a unit slip).
+  if (!eu) return false;
+  if ((su ?? "") === eu) return false;
+  const expectedValue = numbers(expected).at(-1);
+  return expectedValue !== undefined && numbers(student).some((v) => Math.abs(v - expectedValue) <= Math.abs(expectedValue) * 1e-9);
 }
 
 function looksLikeRearrangementFlip(student: string, expected: string): boolean {
