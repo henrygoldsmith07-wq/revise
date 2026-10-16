@@ -17,7 +17,7 @@
 // establish why marks were lost.
 
 import type { InterventionStep } from "./intervention-engine";
-import { INTERVENTION_STEP_LABEL } from "./intervention-engine";
+import { interventionStepLabel } from "./intervention-engine";
 import type { TechniqueRepair } from "./technique-repair";
 
 export type PracticeNextStep =
@@ -75,7 +75,7 @@ export function choosePracticeNextStep(input: {
       title: prescription.headline,
       why: `${first.why}${first.countsAsProof ? "" : " (practice, not proof)"}`,
       note: `Chosen for ${prescription.topicTitle} from your recall, application, mistakes and proof evidence.`,
-      cta: `Start: ${INTERVENTION_STEP_LABEL[first.kind]}`,
+      cta: `Start: ${interventionStepLabel(first)}`,
       href: first.href,
       stepKind: first.kind,
     };

@@ -12,7 +12,8 @@
 import { useMemo } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { buildLearnerIntelligence, describeTopicIntelligence } from "@/domain/learner-intelligence";
-import { prescribeIntervention, INTERVENTION_STEP_LABEL } from "@/domain/intervention-engine";
+import { prescribeIntervention, interventionStepLabel } from "@/domain/intervention-engine";
+import { reviewedQuestionCount } from "@/domain/content-trust";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink } from "./ui";
 import { captureProductEvent } from "@/lib/product-telemetry";
@@ -47,7 +48,7 @@ export function useInterventionPrescription(topicId: string | undefined) {
     });
     const row = intel.subjects.flatMap((s) => s.topics).find((t) => t.topicId === topicId);
     if (!row) return null;
-    const prescription = prescribeIntervention(row, topic.title);
+    const prescription = prescribeIntervention(row, topic.title, { reviewedQuestions: reviewedQuestionCount(store.questions, topicId) });
     return { row, prescription, topicTitle: topic.title, intelligenceLine: describeTopicIntelligence(row, topic.title) };
   }, [
     topicId,
@@ -58,6 +59,7 @@ export function useInterventionPrescription(topicId: string | undefined) {
     store.mistakes,
     store.proofLedger,
     store.examDates,
+    store.questions,
   ]);
 }
 
@@ -87,7 +89,7 @@ export function InterventionPrescriptionPanel({ topicId, marksLost }: { topicId:
               {i + 1}
             </span>
             <span className="min-w-0">
-              <span className="font-medium text-ink">{INTERVENTION_STEP_LABEL[step.kind]}</span>
+              <span className="font-medium text-ink">{interventionStepLabel(step)}</span>
               {" — "}
               {step.why}
               {step.countsAsProof ? "" : " (practice, not proof)"}
@@ -102,11 +104,11 @@ export function InterventionPrescriptionPanel({ topicId, marksLost }: { topicId:
           variant="primary"
           onClick={() => captureProductEvent("intervention.started", { kind: first.kind })}
         >
-          Start: {INTERVENTION_STEP_LABEL[first.kind]}
+          Start: {interventionStepLabel(first)}
         </ButtonLink>
         {steps[1] ? (
           <ButtonLink href={steps[1].href} size="sm" variant="ghost">
-            Then: {INTERVENTION_STEP_LABEL[steps[1].kind]} →
+            Then: {interventionStepLabel(steps[1])} →
           </ButtonLink>
         ) : null}
       </div>

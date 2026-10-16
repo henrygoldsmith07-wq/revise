@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { choosePracticeNextStep } from "@/domain/practice-next-step";
-import { INTERVENTION_STEP_LABEL } from "@/domain/intervention-engine";
+import { interventionStepLabel } from "@/domain/intervention-engine";
 import type { RemediationAction, RemediationPlan } from "@/domain/remediation";
 import type { TechniqueRepair, TechniqueShapeSuggestion } from "@/domain/technique-repair";
 import type { MarkedPart, Question } from "@/domain/types";
@@ -177,7 +177,7 @@ export function PracticeNextStep({
               <ol className="mt-1.5 space-y-1.5" aria-label="Repair steps">
                 {otherPlanSteps.map((item) => (
                   <li key={item.kind} className="text-xs text-ink2">
-                    <Link href={item.href} className="font-medium text-ink underline inline-flex min-h-11 items-center">{INTERVENTION_STEP_LABEL[item.kind]}</Link>
+                    <Link href={item.href} className="font-medium text-ink underline inline-flex min-h-11 items-center">{interventionStepLabel(item)}</Link>
                     {" — "}
                     {item.why}
                     {item.countsAsProof ? "" : " (practice, not proof)"}
