@@ -16,6 +16,7 @@ import { officialPaperContextFromSettings } from "@/domain/official-papers";
 import { buildMistakePatterns, type MistakePattern } from "@/domain/mistake-patterns";
 import { daysToNearestExam, rankRevisionActions, type RevisionPlan } from "@/domain/revision-engine";
 import { isDue } from "@/domain/scheduling";
+import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { reviewedSupplyNote, unseenSupplyByTopic, type TopicSupply } from "@/domain/supply";
 import { topicShares } from "@/domain/topic-weight";
 import { useStoreFields } from "@/state/store";
@@ -33,10 +34,16 @@ export interface RecoveryEvidence {
   effectiveness: EffectivenessEvidence;
   /** Outcome-based ranking weight; 1 until this learner has reliable evidence. */
   repairWeight: (kind: InterventionKind) => number;
+  /**
+   * The existing proof ledger, derived from attempts rather than stored. Proof
+   * actions on Today read the store's own ledger, so a completed check is
+   * reflected immediately without a second evidence store.
+   */
+  proof: ProofLedger;
 }
 
 export function useRecoveryEvidence(): RecoveryEvidence {
-  const store = useStoreFields("attempts", "examDates", "interventionOutcomes", "mistakes", "questions", "settings");
+  const store = useStoreFields("attempts", "examDates", "interventionOutcomes", "mistakes", "proofLedger", "questions", "settings");
   return useMemo(() => {
     const subjects = new Set(store.settings.subjectIds);
     const mistakes = store.mistakes.filter((m) => subjects.has(m.subjectId));
@@ -52,6 +59,9 @@ export function useRecoveryEvidence(): RecoveryEvidence {
       }),
     });
     const patterns = buildMistakePatterns({ mistakes, attempts: store.attempts, questions: store.questions });
+    // The store's ledger, not a second build: review logs feed the proof delay
+    // clock, so rebuilding it here would drift from every other proof surface.
+    const proof = store.proofLedger;
     const supplyByTopic = unseenSupplyByTopic(new Set(mistakes.map((m) => m.topicId)), store.questions, store.attempts);
     const unseenByTopic = Object.fromEntries(Object.entries(supplyByTopic).map(([t, s]) => [t, s.provable]));
     const days = [...subjects].map((id) => daysToNearestExam(store.examDates, id, now)).filter((d): d is number => d !== null).sort((a, b) => a - b)[0] ?? null;
@@ -60,10 +70,10 @@ export function useRecoveryEvidence(): RecoveryEvidence {
       chains: missionChains({ attempts: store.attempts, mistakes: store.mistakes, questions: store.questions }),
     };
     return {
-      mistakes, recovery, patterns, unseenByTopic, supplyByTopic, daysToExam: days, topicTitle: (id: string) => getTopic(id)?.title ?? id, effectiveness,
+      mistakes, recovery, patterns, unseenByTopic, supplyByTopic, proof, daysToExam: days, topicTitle: (id: string) => getTopic(id)?.title ?? id, effectiveness,
       repairWeight: (kind: InterventionKind) => estimateEffectiveness(effectiveness, { kind }).weight,
     };
-  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.questions, store.settings.subjectIds, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
+  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.proofLedger, store.questions, store.settings.subjectIds, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
 }
 
 /** The single ranked plan Today, the command centre, the diagnostic and mission routes all read. */
@@ -109,6 +119,7 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
       now, subjectIds, subjectName: (id) => getSubject(id)?.name ?? id, topicTitle: evidence.topicTitle,
       mistakes: evidence.mistakes, attempts: store.attempts, questions: store.questions, recovery: evidence.recovery, examDates: store.examDates,
       adaptive: store.adaptiveSession, supplyByTopic: evidence.supplyByTopic, effectiveness: evidence.effectiveness, topicWeight, papers, untouched,
+      proof: evidence.proof,
       dueReviews: [...due].map(([subjectId, v]) => ({ subjectId, ...v })),
       paperTitles: Object.fromEntries(store.papers.map((p) => [p.id, p.title])),
       availableMinutes: store.settings.sessionLengthMinutes,

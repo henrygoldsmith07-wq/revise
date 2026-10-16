@@ -9,7 +9,7 @@
 // say so when the supply is not there.
 // ---------------------------------------------------------------------------
 
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted } from "./content-trust";
 import type { ExamMission, MissionStageKind } from "./exam-mission";
 import { isTransferQuestion, partLearningMetadata, questionFamilies, unseenQuestion } from "./learning-evidence";
 import type { RootCause } from "./mistake-patterns";
@@ -17,6 +17,65 @@ import type { MissionCheckpointState, RevisionCheckpointInput } from "./revision
 import type { Attempt, Id, MissionAttemptContext, Mistake, Question } from "./types";
 
 export type MissionStepKind = MissionAttemptContext["stage"];
+
+export interface ProofCandidateOptions {
+  /** Hard cap on how many questions to return. */
+  max: number;
+  /** Only questions a human has reviewed can count as evidence of improvement. */
+  verifiedOnly: boolean;
+  /** Restrict to unfamiliar-context questions, so transfer can be tested. */
+  transferOnly?: boolean;
+  /** Questions already used elsewhere in this run (e.g. re-sit source questions). */
+  excludeQuestionIds?: Iterable<Id>;
+  /** Families already sat in this run, so a near-identical question cannot stand in for a new one. */
+  excludeFamilies?: Iterable<string>;
+  /** Bias for ordering, e.g. how well a question matches a target root cause. */
+  fit?: (question: Question) => number;
+}
+
+/**
+ * The questions that may act as independent evidence on a topic: genuinely
+ * unseen (new family, not a shallow reskin of something already sat), reviewed
+ * when the stage claims proof, spread across the topic's siblings so one set
+ * cannot quietly become the only evidence for everything.
+ *
+ * Mission proof stages and the standalone proof check both call this, so
+ * eligibility cannot drift between them.
+ */
+export function selectProofCandidates(
+  questions: readonly Question[],
+  attempts: readonly Attempt[],
+  topicIds: readonly Id[],
+  options: ProofCandidateOptions,
+): Question[] {
+  const excluded = new Set(options.excludeQuestionIds ?? []);
+  const pool = questions.filter((q) => !excluded.has(q.id) && q.topicIds.some((t) => topicIds.includes(t)) && unseenQuestion(q, attempts, questions));
+  const fit = options.fit ?? (() => 0);
+  // `learnerEvidenceTrusted`, not `trustedAssessmentContent`: the latter is
+  // deliberately permissive for subjects with no review gate, so it would treat
+  // an unreviewed reference-tier question as human-reviewed proof supply. Every
+  // question here is shown to the learner as "counts as evidence", so the
+  // flagship-and-reviewed predicate is the only honest one.
+  const cand = pool
+    .filter((q) => (!options.verifiedOnly || learnerEvidenceTrusted(q)) && (!options.transferOnly || isTransferQuestion(q)))
+    .sort((a, b) => fit(b) - fit(a) || Number(learnerEvidenceTrusted(b)) - Number(learnerEvidenceTrusted(a)) || a.id.localeCompare(b.id));
+  const out: Question[] = [];
+  const usedFamilies = new Set<string>(options.excludeFamilies ?? []);
+  const used = new Set<Id>();
+  const topicCount = new Map<Id, number>();
+  while (out.length < options.max) {
+    // Take the least-used topic's best remaining question.
+    const next = cand
+      .filter((q) => !used.has(q.id) && !questionFamilies(q).some((f) => usedFamilies.has(f)))
+      .sort((a, b) => Math.min(...a.topicIds.map((t) => topicCount.get(t) ?? 0)) - Math.min(...b.topicIds.map((t) => topicCount.get(t) ?? 0)))[0];
+    if (!next) break;
+    out.push(next);
+    next.topicIds.forEach((t) => topicCount.set(t, (topicCount.get(t) ?? 0) + 1));
+    questionFamilies(next).forEach((f) => usedFamilies.add(f));
+    used.add(next.id);
+  }
+  return out;
+}
 
 export interface MissionSessionStep {
   id: string;
@@ -87,8 +146,6 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     .sort((a, b) => b.marksLost - a.marksLost || a.id.localeCompare(b.id));
   const sourceFamilies = new Set(sources.flatMap((m) => questionFamilies(byId.get(m.questionId!)!)));
   const sourceIds = new Set(sources.map((m) => m.questionId!));
-  const usedFamilies = new Set<string>(sourceFamilies);
-  const used = new Set<Id>();
   const interventionOf = (kind: MissionStageKind) => mission.stages.find((s) => s.kind === kind)?.intervention ?? null;
   const ctx = (kind: MissionStepKind): MissionAttemptContext => ({
     missionId: mission.id, stage: kind, intervention: kind === "transfer" ? "transfer-set" : kind === "apply" ? "independent-set" : interventionOf(kind === "delayed-proof" ? "delayed-proof" : kind as MissionStageKind),
@@ -96,25 +153,23 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
   });
 
   const topics = mission.topicIds;
-  const pool = input.questions.filter((q) => !sourceIds.has(q.id) && q.topicIds.some((t) => topics.includes(t)) && unseenQuestion(q, input.attempts, input.questions));
+  // A mission draws several rungs from one pool, so keep them apart.
+  const used = new Set<Id>(sourceIds);
+  const usedFamilies = new Set<string>(sourceFamilies);
   const unseenPick = ({ max, verifiedOnly, transferOnly }: Pick): Question[] => {
-    const cand = pool
-      .filter((q) => !used.has(q.id) && (!verifiedOnly || trustedAssessmentContent(q)) && (!transferOnly || isTransferQuestion(q)))
-      .sort((a, b) => causeFit(b, mission.cause) - causeFit(a, mission.cause) || Number(trustedAssessmentContent(b)) - Number(trustedAssessmentContent(a)) || a.id.localeCompare(b.id));
-    const out: Question[] = [];
-    const topicCount = new Map<Id, number>();
-    while (out.length < max) {
-      // Spread across the mission's topics: take the least-used topic's best remaining question.
-      const next = cand
-        .filter((q) => !out.includes(q) && !questionFamilies(q).some((f) => usedFamilies.has(f)))
-        .sort((a, b) => Math.min(...a.topicIds.map((t) => topicCount.get(t) ?? 0)) - Math.min(...b.topicIds.map((t) => topicCount.get(t) ?? 0)))[0];
-      if (!next) break;
-      out.push(next);
-      next.topicIds.forEach((t) => topicCount.set(t, (topicCount.get(t) ?? 0) + 1));
-      questionFamilies(next).forEach((f) => usedFamilies.add(f));
-      used.add(next.id);
+    const picked = selectProofCandidates(input.questions, input.attempts, topics, {
+      max,
+      verifiedOnly,
+      transferOnly,
+      excludeQuestionIds: used,
+      excludeFamilies: usedFamilies,
+      fit: (q) => causeFit(q, mission.cause),
+    });
+    for (const q of picked) {
+      used.add(q.id);
+      questionFamilies(q).forEach((f) => usedFamilies.add(f));
     }
-    return out;
+    return picked;
   };
   const resits = (max: number): Question[] => {
     const seenTopics = new Set<Id>();
@@ -133,7 +188,7 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     if (!qs.length) return;
     steps.push({
       id: `${mission.id}:${kind}`, kind, title, why, questionIds: qs.map((q) => q.id), hintBudget,
-      minutes: round1(qs.reduce((s, q) => s + minutesFor(q), 0)), verified: qs.every(trustedAssessmentContent), context: ctx(kind),
+      minutes: round1(qs.reduce((s, q) => s + minutesFor(q), 0)), verified: qs.every(learnerEvidenceTrusted), context: ctx(kind),
     });
   };
 
@@ -202,6 +257,57 @@ export function missionCheckpoint(session: MissionSession, route: { stage: strin
       contextFor: Object.fromEntries(session.questionIds.flatMap((id) => (session.contextFor[id] ? [[id, session.contextFor[id]!]] : []))),
     },
   };
+}
+
+/** Questions a standalone proof check runs: two, reviewed, unseen, no hints. */
+export const PROOF_CHECK_QUESTIONS = 2;
+
+export interface ProofCheck {
+  topicId: Id;
+  questionIds: Id[];
+  minutes: number;
+  /** Every question is human-reviewed, so the answer can count as evidence. */
+  verified: boolean;
+  /** Set when there is not enough reviewed unseen supply, and why. */
+  limit: string | null;
+  /** Always 0: a proof check is by definition unaided. */
+  hintBudget: 0;
+}
+
+/**
+ * A delayed proof check for a topic that has a baseline but no follow-up yet.
+ *
+ * It runs the same questions, at the same support level, as a mission's
+ * delayed-proof stage — reviewed, unseen, no hints — so an answer from here
+ * feeds exactly the same proof ledger. If there is not enough reviewed unseen
+ * supply the check says so instead of quietly running something that cannot
+ * count.
+ */
+export function buildProofCheck(input: {
+  topicId: Id;
+  questions: readonly Question[];
+  attempts: readonly Attempt[];
+}): ProofCheck {
+  const picked = selectProofCandidates(input.questions, input.attempts, [input.topicId], {
+    max: PROOF_CHECK_QUESTIONS,
+    verifiedOnly: true,
+  });
+  const ids = picked.map((q) => q.id);
+  return {
+    topicId: input.topicId,
+    questionIds: ids,
+    minutes: round1(picked.reduce((sum, q) => sum + minutesFor(q), 0)),
+    verified: picked.length > 0 && picked.every(learnerEvidenceTrusted),
+    limit: ids.length
+      ? null
+      : "Revise does not have enough reviewed new questions for this topic to test the improvement yet. Keep revising it, and the proof will open as soon as there is reviewed supply.",
+    hintBudget: 0,
+  };
+}
+
+/** The route that runs a standalone proof check on a topic. */
+export function proofHref(subjectId: Id, topicId: Id): string {
+  return `/practice?proof=${encodeURIComponent(topicId)}&subject=${encodeURIComponent(subjectId)}`;
 }
 
 /**

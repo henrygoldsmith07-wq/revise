@@ -30,12 +30,14 @@ import { buildExamMissions, buildPaperMission, missionNextAction, type ExamMissi
 import type { InterventionKind } from "./intervention-ranking";
 import { missionLearnerState, type LearnerState } from "./learner-state";
 import type { MarkRecovery } from "./mark-recovery";
-import { buildMissionSession, missionHref } from "./mission-session";
+import { buildMissionSession, buildProofCheck, missionHref, proofHref } from "./mission-session";
 import { ROOT_CAUSE_LABEL } from "./mistake-patterns";
 import { timeBoxPlan, type TimeBox, type TimeBoxPlan } from "./pre-exam-plan";
 import type { TopicSupply } from "./supply";
 import type { Attempt, ExamDate, Id, Mistake, Question } from "./types";
 import { BLOCKED_PROOF_COPY } from "./proof-copy";
+import { MIN_PROOF_DELAY_DAYS, type ProofLedger, type TopicProof } from "./proof-of-improvement";
+import { needsBaselineBeforeProof, proofFacts, proofOutcomeFor } from "./proof-action";
 
 export type ActionType =
   | "proof-check" | "regression-recovery" | "mission" | "paper-repair" | "recurring-error" | "exam-urgent"
@@ -115,6 +117,12 @@ export interface EngineInput {
    * At least one action always survives, so a short session never empties Today.
    */
   availableMinutes?: number;
+  /**
+   * The existing proof ledger. Passed in rather than recomputed here so the
+   * engine cannot drift from the rules in proof-of-improvement.ts: eligibility,
+   * baseline windows and the proven/declined arithmetic stay in one place.
+   */
+  proof?: ProofLedger | null;
 }
 
 export interface DeferredAction { action: RevisionAction; reason: string }
@@ -133,6 +141,8 @@ export const SCORE_MODEL = "score = √(expected marks × marks per minute × 20
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 const round = (n: number, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
 const DAY = 86_400_000;
+/** Fallback minute estimate for a proof check; buildProofCheck supplies the real one. */
+const PROOF_MINUTES = 6;
 
 /** Whole days from `now`'s date to the subject's nearest future exam; null with none. Independent of list order. */
 export function daysToNearestExam(exams: readonly ExamDate[], subjectId: Id, now: Date): number | null {
@@ -236,6 +246,79 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     route: { href: missionHref(mission.id, stage.kind), label: "Start session" },
     mission: { id: mission.id, stage: stage.kind },
   };
+}
+
+/**
+ * A delayed proof check the ledger says is due, on a topic no mission covers.
+ *
+ * This is the same `proof-check` type a mission's `delayed-proof` stage emits,
+ * so it ranks alongside everything else instead of becoming a second queue. It
+ * exists because the ledger computes `proofDue` from attempts alone, while
+ * missions are built from mistakes: a student whose marks were never lost as a
+ * mistake could be due a check that nothing would ever offer them.
+ */
+function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { draft: Draft; blockedBy: string | null } {
+  const label = input.topicTitle?.(row.topicId) ?? row.topicId;
+  // The same selector a mission's delayed-proof stage uses, so the action can
+  // only ever promise a check it is actually able to run.
+  const check = buildProofCheck({ topicId: row.topicId, questions: input.questions, attempts: input.attempts });
+  // A check cannot produce a comparison without a baseline, and cannot count at
+  // all with no reviewed unseen supply. Both say so on the action rather than
+  // silently offering a check that cannot move the ledger.
+  const blockedBy = needsBaselineBeforeProof(row)
+    ? "Not enough independent answers yet to compare a check against."
+    : check.questionIds.length ? null : check.limit ?? BLOCKED_PROOF_COPY;
+  const days = daysToNearestExam(input.examDates, row.subjectId, input.now);
+  const share = input.topicWeight?.(row.topicId)?.share ?? row.share;
+  const outcome = proofOutcomeFor(row, { now: input.now });
+  const eff = estimate("delayed-proof-retest", null);
+  const gained = row.after && row.before ? Math.round((row.after.rate - row.before.rate) * 100) : 0;
+  const marks = round(Math.abs(gained) * share * 1.0, 2);
+
+  const draft: Draft = {
+    id: `action:proof:${row.topicId}`,
+    type: "proof-check",
+    title: `Prove ${label}`,
+    subjectId: row.subjectId,
+    topicIds: [row.topicId],
+    specPoints: [],
+    minutes: check.minutes || PROOF_MINUTES,
+    marksRecoverable: marks || null,
+    examWeight: share,
+    daysToExam: days,
+    // Proof is unusually strong evidence when it exists and unusually weak when
+    // it does not; this is the strength of what we know, not of what will happen.
+    evidenceStrength: 0.7,
+    confidence: row.illusory ? 0.8 : 0.65,
+    expectedLearningGain: 0.6,
+    expectedMarks: marks,
+    proofStatus: row.illusory ? "needs-work" : "improving",
+    requiredFirst: false,
+    effectiveness: eff,
+    mistakeIds: [],
+    explanation: {
+      why: row.illusory
+        ? `You answer ${label} well on questions you have seen, but not on new ones. Revise cannot count that as proof.`
+        : `You revised ${label} at least ${MIN_PROOF_DELAY_DAYS} days ago. Revise now needs to check whether it held.`,
+      whyNow: `Enough time has passed that a check on a new question would count as evidence.`,
+      whyBefore: "",
+      stake: row.after
+        ? `About ${Math.round(share * 100)}% of the exam, and the difference between calling this improved and calling it unproven.`
+        : `About ${Math.round(share * 100)}% of the exam.`,
+      // The last entry is the limits line. Missions append the same way, so the
+      // UI already has one place to render "what this will not prove".
+      evidence: [
+        `${check.questionIds.length} new question${check.questionIds.length === 1 ? "" : "s"} you have not seen, with no hints available`,
+        `reviewed by a human, so a correct answer counts as evidence`,
+        `before: ${row.before?.questions ?? 0} independent answers at ${Math.round((row.before?.rate ?? 0) * 100)}%`,
+        outcome.limits,
+      ],
+      after: `Revise marks it against the scheme, then says whether the skill held.`,
+      proves: `That ${label} survived on a question you had not seen, without hints.`,
+    },
+    route: { href: proofHref(row.subjectId, row.topicId), label: "Start the check" },
+  };
+  return { draft, blockedBy };
 }
 
 function adaptiveDraft(plan: AdaptiveSessionPlan, input: EngineInput, estimate: Estimate): Draft {
@@ -383,6 +466,21 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
       const parked = missionDraft(mission, scoped, estimate, true);
       if (!("skip" in parked)) deferred.push({ action: { ...finalise(parked, scoped), blockedBy: d.skip }, reason: d.skip });
     } else drafts.push(d);
+  }
+
+  // A mission's `delayed-proof` stage and this draft are the same work, so the
+  // exclusion is what stops one check being planned twice.
+  if (input.proof) {
+    const missionTopics = missions.flatMap((m) => m.topicIds);
+    const facts = proofFacts(input.proof, missionTopics);
+    for (const row of facts.dueTopics) {
+      if (!enrolled.has(row.subjectId)) continue;
+      const { draft, blockedBy } = proofDraft(row, scoped, estimate);
+      // Deferred with its reason rather than dropped: a proof the learner
+      // cannot see is a proof they assume the app has forgotten.
+      if (blockedBy) deferred.push({ action: { ...finalise(draft, scoped), blockedBy }, reason: blockedBy });
+      else drafts.push(draft);
+    }
   }
   if (input.adaptive && enrolled.has(input.adaptive.subjectId)) {
     const d = adaptiveDraft(input.adaptive, scoped, estimate);

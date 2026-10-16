@@ -26,6 +26,7 @@ import { wrongAnswerQueue } from "@/domain/wrong-answers";
 import { reviewedWjecTopicEdges } from "@/content/capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
+import { ProofCheckMode } from "@/components/ProofCheckMode";
 import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
 import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionMode";
 import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
@@ -91,6 +92,8 @@ function Practice() {
   const quickParam = params.get("quick");
   const [quickMinutes, setQuickMinutes] = useState<QuickSessionMinutes | null>(() => parseQuickSessionMinutes(quickParam));
   const [weakExam, setWeakExam] = useState(() => params.get("weak") === "1");
+  // Proof-check mode (?proof=<topicId>): the delayed check Today offers.
+  const [proofTopicId, setProofTopicId] = useState(() => params.get("proof"));
   // Wrong-answer-only mode (?wrong=1): do only the questions behind lost marks.
   const wrongParam = params.get("wrong") === "1";
   const [wrongOnly, setWrongOnly] = useState(wrongParam);
@@ -292,7 +295,7 @@ function Practice() {
 
   // Mission, recovery, paper-repair, weak-topic and quick modes run their own question sets; the generic
   // queue behind them must not save a resume point for questions the student never opened.
-  const missionActive = Boolean(params.get("mission")) || recover || Boolean(autopsyRun) || weakExam || quickMinutes !== null;
+  const missionActive = Boolean(params.get("mission")) || recover || Boolean(autopsyRun) || weakExam || quickMinutes !== null || Boolean(proofTopicId);
   useEffect(() => {
     if (missionActive) return;
     if (closed || !current) {
@@ -443,6 +446,11 @@ function Practice() {
   const missionParam = params.get("mission");
   if (missionParam) {
     return <MissionSessionMode key={`${missionParam}:${params.get("stage") ?? ""}`} missionId={missionParam} stage={params.get("stage")} onExit={() => router.push("/")} />;
+  }
+
+  if (proofTopicId) {
+    const exitProof = () => { setProofTopicId(null); router.push("/"); };
+    return <ProofCheckMode key={proofTopicId} topicId={proofTopicId} onExit={exitProof} />;
   }
 
   if (weakExam) {
