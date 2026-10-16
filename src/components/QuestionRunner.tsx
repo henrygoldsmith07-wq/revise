@@ -1,6 +1,7 @@
 "use client";
 
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
+import { stemRepeatsOnlyPart } from "@/domain/question-display";
 import { getSubject } from "@/domain/curriculum";
 import { learnerEvidenceTrusted } from "@/domain/content-trust";
 import { formatHint, nextHint, type HintTier } from "@/domain/hints";
@@ -134,7 +135,7 @@ export function QuestionRunner({
           </div>
         ) : null}
 
-        <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>
+        {stemRepeatsOnlyPart(question) ? null : <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>}
 
         {guided && !result ? (
           <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mt-4 space-y-2" data-testid="guided-steps" aria-live="polite">

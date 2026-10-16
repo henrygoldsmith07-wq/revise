@@ -333,6 +333,21 @@ function objectiveForPoint(text: string): string {
   return `Explain that ${lower}.`;
 }
 
+const STARTS_WITH_COMMAND_WORD = new RegExp(`^(?:${COMMAND_WORDS.map((word) => word.replace(" ", "\\s+")).join("|")})\\b`, "i");
+
+/** First-person success statement for a spec point ("I can resolve a vector…"). */
+function takeawayForPoint(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+  if (!clean) return "I can explain the idea clearly and use it in context.";
+  const lower = clean.charAt(0).toLowerCase() + clean.slice(1);
+  const ableTo = lower.match(/^be able to\s+(.*)$/i);
+  if (ableTo) return `I can ${ableTo[1]}.`;
+  // Spec statements are verb phrases ("resolve a vector…", "define rate…");
+  // a capitalised start is usually a named idea ("Hardy Weinberg equilibrium").
+  if (/^[a-z]/.test(clean) || STARTS_WITH_COMMAND_WORD.test(clean)) return `I can ${lower}.`;
+  return `I can explain ${clean}.`;
+}
+
 function estimateLessonMinutes(topic: Topic): number {
   const core = Math.max(1, authoredKeyPoints(topic).length);
   const support = Math.min(4, topic.commonErrors.length) + Math.min(3, misconceptionsForTopic(topic.id).length);
@@ -966,11 +981,10 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
           objective: objectiveForPoint(specPoint.text),
           explanationSteps: [
-            `Start with the requirement in plain English: ${specPoint.text}`,
-            `Link it to the wider topic: ${topic.title}.`,
+            `Where it sits: one part of ${topic.title}.`,
             "You will finish by retrieving the idea, applying it and saying the point back without looking.",
           ],
-          takeaway: `I can explain ${specPoint.text.toLowerCase()}.`,
+          takeaway: takeawayForPoint(specPoint.text),
           examLink,
         },
         {

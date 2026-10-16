@@ -160,7 +160,7 @@ function Diagnostic() {
             // way on sits above the bottom navigation, not below the result.
             <div className="sticky bottom-20 lg:bottom-4 z-10 card card-2 p-3 space-y-2 bg-surface">
               <p className="text-sm text-ink2" role="status" aria-live="polite">
-                {pending.awarded}/{pending.max} on this one{confidence === true ? ", and you said you were confident" : confidence === false ? ", and you said you were not sure" : ""}. Read what you missed and the model answer, then carry on.
+                {pending.awarded}/{pending.max} on this one{confidence === true ? ", and you said you were confident" : confidence === false ? ", and you said you were not sure" : ""}. {pending.awarded >= pending.max ? "Compare with the model answer if you like, then carry on." : "Read what you missed and the model answer, then carry on."}
               </p>
               <Button variant="primary" className="w-full min-h-11" onClick={advance}>Continue</Button>
             </div>

@@ -132,7 +132,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
         // on sits above the bottom navigation instead of at the end of it.
         <div className="sticky bottom-20 lg:bottom-4 z-10 card card-2 p-3 space-y-2 bg-surface">
           <p className="text-sm text-ink2" role="status" aria-live="polite">
-            {reviewing.awarded}/{reviewing.max} on this one. Read what you missed and the model answer, then carry on.
+            {reviewing.awarded}/{reviewing.max} on this one. {reviewing.awarded >= reviewing.max ? "Compare with the model answer if you like, then carry on." : "Read what you missed and the model answer, then carry on."}
           </p>
           <Button variant="primary" className="w-full min-h-11" onClick={advance}>
             {index + 1 >= selection.items.length ? "See what I found" : "Next question"}
