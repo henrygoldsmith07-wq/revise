@@ -251,7 +251,12 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
     : `${shown > 0 ? `Recover ${shown} marks: ` : ""}${mission.title}`;
   const share = STAGE_SHARE[stage.kind];
   // The time shown must be the time the session takes, so it comes from the questions it will run.
-  const sessionMinutes = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, stage.kind).minutes;
+  const session = buildMissionSession(mission, { questions: input.questions, attempts: input.attempts, mistakes: input.mistakes }, stage.kind);
+  const sessionMinutes = session.minutes;
+  // "Counts as proof" only when the delayed check would actually run on
+  // teacher-reviewed flagship questions (a step's `verified` is
+  // learnerEvidenceTrusted on every question it holds).
+  const proofEligible = session.steps.some((s) => s.kind === "delayed-proof" && s.verified);
   return {
     id: `action:${mission.id}:${stage.kind}`,
     type, title, subjectId: mission.subjectId, topicIds: mission.topicIds, specPoints: [],
@@ -266,7 +271,9 @@ function missionDraft(mission: ExamMission, input: EngineInput, estimate: Estima
         ? (mission.proofBarrier ? `You improved on this topic. It cannot count as proof because ${PROOF_BARRIER_TEXT[mission.proofBarrier]}, so keep it in practice.` : BLOCKED_PROOF_COPY)
         : `${lost} mark${lost === 1 ? "" : "s"} were lost${where}${cause ? `, mainly through ${cause}` : ""}. ${stage.reason}`,
       whyNow: regressed ? "Marks you had recovered were lost again, so they are the most likely to cost you in the exam."
-        : stage.kind === "delayed-proof" ? "Enough time has passed that a check on a different question now counts as proof."
+        : stage.kind === "delayed-proof" ? (proofEligible
+          ? "Enough time has passed that a check on a different question now counts as proof."
+          : "Enough time has passed for a check on a different question. Until its questions are teacher-reviewed it is practice, not proof.")
         : mission.status === "not-started" ? "These marks are open and nothing has been done about them yet."
         : "The previous stage is done, so this is the next thing the evidence needs.",
       whyBefore: "", stake: regressed ? `${shown} marks you had recovered are lost again.` : stage.kind === "delayed-proof" ? `${shown} marks only count as recovered once they hold on a new question.` : shown > 0 ? `${shown} mark${shown === 1 ? "" : "s"} you lost are still open.` : "Nothing is at stake yet; this builds the evidence.",
@@ -306,6 +313,9 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
   const eff = estimate("delayed-proof-retest", null);
   const gained = row.after && row.before ? Math.round((row.after.rate - row.before.rate) * 100) : 0;
   const marks = round(Math.abs(gained) * share * 1.0, 2);
+  // Evidence wording follows trust: only a check made entirely of
+  // teacher-reviewed flagship questions may say an answer counts.
+  const eligible = check.verified && check.questionIds.length > 0;
 
   const draft: Draft = {
     id: `action:proof:${row.topicId}`,
@@ -332,7 +342,9 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
       why: row.illusory
         ? `You answer ${label} well on questions you have seen, but not on new ones. Revise cannot count that as proof.`
         : `You revised ${label} at least ${MIN_PROOF_DELAY_DAYS} days ago. Revise now needs to check whether it held.`,
-      whyNow: `Enough time has passed that a check on a new question would count as evidence.`,
+      whyNow: eligible
+        ? `Enough time has passed that a check on a new question would count as evidence.`
+        : `Enough time has passed for a check, but there is no teacher-reviewed new question on ${label} yet, so a check could not count as evidence.`,
       whyBefore: "",
       stake: row.after
         ? `About ${Math.round(share * 100)}% of the exam, and the difference between calling this improved and calling it unproven.`
@@ -341,12 +353,12 @@ function proofDraft(row: TopicProof, input: EngineInput, estimate: Estimate): { 
       // UI already has one place to render "what this will not prove".
       evidence: [
         `${check.questionIds.length} new question${check.questionIds.length === 1 ? "" : "s"} you have not seen, with no hints available`,
-        `reviewed by a human, so a correct answer counts as evidence`,
+        eligible ? `reviewed by teachers, so a correct answer counts as evidence` : `no teacher-reviewed question is available, so nothing here can count as evidence yet`,
         `before: ${row.before?.questions ?? 0} independent answers at ${Math.round((row.before?.rate ?? 0) * 100)}%`,
         outcome.limits,
       ],
       after: `Revise marks it against the scheme, then says whether the skill held.`,
-      proves: `That ${label} survived on a question you had not seen, without hints.`,
+      proves: eligible ? `That ${label} survived on a question you had not seen, without hints.` : "Nothing yet: without teacher-reviewed questions this cannot count as proof.",
     },
     route: { href: proofHref(row.subjectId, row.topicId), label: "Start the check" },
   };

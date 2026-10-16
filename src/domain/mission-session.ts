@@ -134,6 +134,9 @@ export function causeFit(q: Question, cause: RootCause | null): number {
   }
 }
 
+/** Only a non-empty set of teacher-reviewed flagship questions may be described as evidence or proof. */
+const proofEligible = (qs: readonly Question[]): boolean => qs.length > 0 && qs.every(learnerEvidenceTrusted);
+
 const minutesFor = (q: Question) => Math.max(0.5, q.learning?.expectedMinutes ?? q.totalMarks * 0.75);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -205,12 +208,22 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     // Any unseen question works for an unaided practice check; it is labelled practice, not proof.
     add("apply", "Unaided practice", "Different question families, no hints, so you can see whether the fix works on its own. Practice, not proof.", unseenPick({ max: 2, verifiedOnly: false }), 0);
   } else if (stage === "apply") {
-    add("apply", "Independent application", "Different question families, no hints, so success counts as independent evidence.", unseenPick({ max: 2, verifiedOnly: true }), 0);
+    // The evidence claim is made only when every question in the step is
+    // teacher-reviewed flagship content (learnerEvidenceTrusted). Reviewed-only
+    // selection already guarantees that today; the wording checks it again so
+    // a future change to the selection cannot leave the claim behind.
+    const applied = unseenPick({ max: 2, verifiedOnly: true });
+    add("apply", "Independent application", proofEligible(applied)
+      ? "Different question families, no hints, so success counts as independent evidence."
+      : "Different question families, no hints. Practice, not proof: these questions are not teacher-reviewed yet.", applied, 0);
     add("transfer", "Unfamiliar context", "The same skill in a context you have not seen.", unseenPick({ max: 1, verifiedOnly: true, transferOnly: true }), 0);
   } else if (stage === "delayed-proof" && mission.proofBarrier) {
     // No proof check can run on a loss that cannot count; the limit below says why.
   } else if (stage === "delayed-proof") {
-    add("delayed-proof", "Delayed check", "A separate question, later, answered independently. This is what proves the marks are back.", unseenPick({ max: 2, verifiedOnly: true }), 0);
+    const delayed = unseenPick({ max: 2, verifiedOnly: true });
+    add("delayed-proof", "Delayed check", proofEligible(delayed)
+      ? "A separate question, later, answered independently. This is what proves the marks are back."
+      : "A separate question, later, answered independently. Practice, not proof: these questions are not teacher-reviewed yet.", delayed, 0);
   }
   if (proofStage && mission.proofBarrier) {
     // With steps, the intro's completion condition already says why this is practice.
@@ -317,6 +330,87 @@ export function buildProofCheck(input: {
 /** The route that runs a standalone proof check on a topic. */
 export function proofHref(subjectId: Id, topicId: Id): string {
   return `/practice?proof=${encodeURIComponent(topicId)}&subject=${encodeURIComponent(subjectId)}`;
+}
+
+/**
+ * A proof check saves its run in the checkpoint's existing step state
+ * (`MissionCheckpointState`: start instant, exact questions, hint budget), so a
+ * refresh resumes the same run. The schema is unchanged: the run id is
+ * `proof:<topicId>` and the stage is `proof-check`, neither of which any
+ * mission route carries, so mission resume (`restoreMissionSession`,
+ * `missionContinuation`) never mistakes it for a mission step.
+ */
+export const PROOF_CHECK_STAGE = "proof-check";
+export const proofCheckRunId = (topicId: Id): string => `proof:${topicId}`;
+
+export function proofCheckCheckpoint(check: ProofCheck, input: { title: string; subjectId: Id }, startedAt: string, position: number): RevisionCheckpointInput {
+  return {
+    activity: "practice",
+    title: input.title,
+    href: proofHref(input.subjectId, check.topicId),
+    topicId: check.topicId,
+    position,
+    total: check.questionIds.length,
+    queueIds: [...check.questionIds],
+    mission: {
+      missionId: proofCheckRunId(check.topicId),
+      stage: PROOF_CHECK_STAGE,
+      startedAt,
+      questionIds: [...check.questionIds],
+      hintBudgetFor: Object.fromEntries(check.questionIds.map((id) => [id, check.hintBudget])),
+      contextFor: {},
+    },
+  };
+}
+
+export interface RestoredProofCheck {
+  check: ProofCheck;
+  /** When the saved run began: the only safe cut-off for "answered in this run". */
+  startedAt: string;
+  resume: { index: number; attempts: Attempt[] };
+}
+
+/**
+ * The saved proof check, exactly as it was: same questions in the same order,
+ * same (zero) hint budget, and the answers already given in this run.
+ *
+ * Rebuilding instead would be wrong twice over: the selector excludes questions
+ * the learner has now answered (so the set changes under them), and the
+ * checkpoint's `updatedAt` moves on every save (so it cannot date the run).
+ *
+ * Null, so the caller builds a fresh check, when the checkpoint is not this
+ * topic's proof run, a question has left the bank, a question is no longer
+ * teacher-reviewed (trust is re-checked, never inherited from the save), or
+ * the saved run allowed hints.
+ */
+export function restoreProofCheck(
+  saved: RevisionCheckpointInput | null | undefined,
+  input: { topicId: Id; subjectId: Id; questions: readonly Question[]; attempts: readonly Attempt[] },
+): RestoredProofCheck | null {
+  const run = saved?.mission;
+  if (!saved || !run || saved.activity !== "practice") return null;
+  if (saved.href !== proofHref(input.subjectId, input.topicId)) return null;
+  if (run.missionId !== proofCheckRunId(input.topicId) || run.stage !== PROOF_CHECK_STAGE) return null;
+  const ids = run.questionIds;
+  if (!ids.length || new Set(ids).size !== ids.length) return null;
+  const byId = new Map(input.questions.map((q) => [q.id, q] as const));
+  const questions = ids.map((id) => byId.get(id));
+  if (!questions.every((q): q is Question => q !== undefined && learnerEvidenceTrusted(q) && q.topicIds.includes(input.topicId))) return null;
+  if (!ids.every((id) => run.hintBudgetFor[id] === 0)) return null;
+  const inRun = new Set(ids);
+  const done = input.attempts.filter((a) => a.createdAt >= run.startedAt && inRun.has(a.questionId));
+  return {
+    check: {
+      topicId: input.topicId,
+      questionIds: [...ids],
+      minutes: round1(questions.reduce((sum, q) => sum + minutesFor(q), 0)),
+      verified: true,
+      limit: null,
+      hintBudget: 0,
+    },
+    startedAt: run.startedAt,
+    resume: { index: missionResumePosition(ids, done, run.startedAt), attempts: done },
+  };
 }
 
 /**
