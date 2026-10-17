@@ -28,6 +28,14 @@ where it is code.
   not know the content to a pacing drill. Only a slow part now counts, labelled
   "spending too long on some parts"; genuine rushing on a mostly-earned part
   is still diagnosed by `mistake-classification`.
+- **Keyword tags presented as learner behaviour.** `classifyMistake` reads the
+  question's own words, so "A book rests on a table" made a third-law loss
+  "misreading the question" (and paper recovery counted it as careless). The
+  `interpretation` category now maps to a new `data-interpretation` cause
+  ("using the graph, table or data given"), and "table" needs to mean a data
+  table. The units tag matched any "J"/"kJ" value and "per unit", so missed
+  energy values and the definition of capacitance were filed as unit errors;
+  it now needs the point to talk about units.
 - **Marking.** `polarityConflict` treated any "lower" without "higher" as
   reversed reasoning, even for a point stating a relationship in both
   directions ("a higher voltage means lower current and lower I²R loss").

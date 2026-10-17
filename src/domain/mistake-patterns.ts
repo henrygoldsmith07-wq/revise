@@ -24,6 +24,7 @@ export type RootCause =
   | "command-word-error"
   | "poor-application"
   | "misread-question"
+  | "data-interpretation"
   | "timing"
   | "prerequisite-weakness"
   | "unclassified";
@@ -40,6 +41,7 @@ export const ROOT_CAUSE_LABEL: Record<RootCause, string> = {
   "command-word-error": "not doing what the command word asks",
   "poor-application": "knowing the idea but not applying it to the question",
   "misread-question": "misreading the question",
+  "data-interpretation": "using the graph, table or data given",
   timing: "spending too long on some parts",
   "prerequisite-weakness": "a weak prerequisite",
   unclassified: "causes not yet classified",
@@ -59,6 +61,7 @@ const INTERVENTION_FOR: Record<RootCause, PatternIntervention> = {
   "command-word-error": "technique-intervention",
   "poor-application": "independent-set",
   "misread-question": "technique-intervention",
+  "data-interpretation": "independent-set",
   timing: "timed-sprint",
   "prerequisite-weakness": "prerequisite-repair",
   unclassified: "independent-set",
@@ -114,7 +117,10 @@ export function rootCauseOf(mistake: Mistake, opts: { prerequisiteWeakTopics?: R
     case "recall": return "missing-knowledge";
     case "method": return "wrong-method";
     case "arithmetic": return "arithmetic-slip";
-    case "interpretation": return "misread-question";
+    // "interpretation" comes from the question's own words (graph, data,
+    // table, …) in classifyMistake, not from anything the learner did, so it
+    // names the skill the marks were on rather than claiming a misreading.
+    case "interpretation": return "data-interpretation";
     case "communication": return mistake.command && EVALUATIVE.has(mistake.command) ? "poor-evaluation" : "insufficient-explanation";
     // A fast answer that lost marks is not evidence of time pressure: with no
     // other signal it is far more often a gap the learner skipped past. It

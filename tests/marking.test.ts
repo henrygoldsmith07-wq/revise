@@ -221,6 +221,22 @@ describe("mistake capture", () => {
     expect(classifyMistake("Something else entirely", [])).toBe("unclassified");
   });
 
+  it("reads a data table as interpretation, but not a piece of furniture", () => {
+    expect(classifyMistake("Use the data in the table below", [])).toBe("interpretation");
+    expect(classifyMistake("The results table shows the count rate", [])).toBe("interpretation");
+    expect(classifyMistake("A book rests on a table. Which pair of forces is a third-law pair?", [])).toBe("unclassified");
+  });
+
+  it("tags a unit mistake only when the missed point is about units", () => {
+    const tagFor = (missed: string) => {
+      const a: Attempt = { ...attempt, marked: [{ ...attempt.marked[0]!, missedPoints: [missed] }] };
+      return mistakesFromAttempt(a, question(), () => "m", new Date("2025-06-01T09:00:00Z"))[0]!.mistake.misconception;
+    };
+    expect(tagFor("Correct SI unit: the farad")).toBe("units");
+    expect(tagFor("C = Q/V (charge stored per unit potential difference)")).not.toBe("units");
+    expect(tagFor("Final stored energy = 0.0169 J")).not.toBe("units");
+  });
+
   it("only resolves a mistake once its card is genuinely secure", () => {
     const base = createCard(
       { id: "c1", userId: "u", subjectId: "chem", topicId: "chem.kinetics", front: "f", back: "b" },

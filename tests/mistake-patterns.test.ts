@@ -27,6 +27,8 @@ describe("root causes", () => {
     expect(rootCauseOf(mk("a", { category: "unclassified", timing: "slow" }))).toBe("timing");
     // Answering fast and losing marks is not time pressure.
     expect(rootCauseOf(mk("a", { category: "unclassified", timing: "rushed" }))).toBe("unclassified");
+    // A question about a graph or data names the skill, not a misreading.
+    expect(rootCauseOf(mk("a", { category: "interpretation" }))).toBe("data-interpretation");
     expect(rootCauseOf(mk("a", { category: "recall" }), { prerequisiteWeakTopics: new Set(["t1"]) })).toBe("prerequisite-weakness");
   });
 });
