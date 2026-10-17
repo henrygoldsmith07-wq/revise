@@ -1,5 +1,27 @@
 # Changelog
 
+## Taught lessons, same-skill repair, resumable quick check, nonce CSP — 2026-10-17 (twenty-seventh pass)
+
+- **Lessons teach.** All 108 WJEC A-level Physics checkpoints have authored
+  teaching (`src/content/teaching`): explanation, worked example, a check on
+  the physics, an exam-style task with a model answer, and the trap for that
+  point. The generated version restated the spec sentence, offered "I can
+  explain …" as a model answer, asked which spec sentence the checkpoint was,
+  and paired traps and misconceptions to checkpoints by array index. Other
+  subjects' checkpoints are labelled "Outline only".
+- **Repair practises the skill, not the memory.** The repair stage took the
+  questions answered minutes earlier. It now takes an unseen question from a
+  different family on the lost part's spec point or capability, preferring
+  one that exercises the diagnosed cause (`causeFit` gains a case for
+  `data-interpretation`), and re-sits the original only when none exists.
+- **The quick check survives a reload.** Its questions and recorded attempts
+  are saved per subject (`quickDiagnosticRuns`), so "Question 3 of 5" stays
+  question 3 of 5 instead of drawing a fresh set.
+- **No inline scripts.** Pages get a per-request nonce CSP from
+  `src/proxy.ts`; script-src no longer allows `'unsafe-inline'`. Every page
+  now renders per request. Verified on a production build (nonces on every
+  script, an injected `onerror` refused) and by the full Playwright suite.
+
 ## Fixes from using it as a new student: sync, marking, diagnosis, content and copy — 2026-10-17 (twenty-sixth pass)
 
 A production build was driven on a phone-sized screen as a new WJEC Physics
