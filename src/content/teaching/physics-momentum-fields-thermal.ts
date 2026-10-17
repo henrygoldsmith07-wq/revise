@@ -617,7 +617,7 @@ export const physicsMomentumFieldsThermalTeaching: TeachingBySpecPoint = {
     explain: [
       "**Internal energy** is the sum of the randomly distributed kinetic and potential energies of all the particles in a body.",
       "Heating raises the **kinetic** part, which we detect as a rise in temperature. During a change of state, the energy supplied increases the **potential** part (breaking bonds), so the temperature stays constant.",
-      "Internal energy can be increased by heating or by doing work on the system (first law: ΔU = Q + W, with W the work done on it).",
+      "Internal energy can be increased by heating or by doing work on the system. WJEC writes the first law as ΔU = Q − W, where Q is the heat supplied to the system and W is the work done **by** it, so work done on the system makes W negative.",
     ],
     worked: {
       prompt: "Ice at 0 °C is heated and melts into water at 0 °C. What happens to the internal energy, the kinetic energy and the potential energy of its molecules?",
