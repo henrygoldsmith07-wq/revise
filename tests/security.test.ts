@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { buildContentSecurityPolicy, createNonce } from "@/lib/csp";
 
 const schema = () => readFileSync(join(process.cwd(), "supabase/schema.sql"), "utf8").replace(/\r\n/g, "\n");
 
@@ -332,7 +333,28 @@ describe("security — browser response headers", () => {
     ]) {
       expect(config).toContain(header);
     }
-    expect(config).toContain("frame-ancestors 'none'");
-    expect(config).toContain("object-src 'none'");
+    // API responses: a strict no-document policy.
+    expect(config).toContain("default-src 'none'; frame-ancestors 'none'");
+  });
+
+  it("gives every page a per-request nonce CSP with no inline-script allowance", () => {
+    const policy = buildContentSecurityPolicy({ nonce: "abc123==", isDev: false });
+    const scriptSrc = policy.split("; ").find((d) => d.startsWith("script-src "))!;
+    expect(scriptSrc).toContain("'nonce-abc123=='");
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("object-src 'none'");
+    expect(buildContentSecurityPolicy({ nonce: "x", isDev: true })).toContain("'unsafe-eval'");
+    const a = createNonce();
+    expect(a).toMatch(/^[A-Za-z0-9+/]{22}==$/);
+    expect(createNonce()).not.toBe(a);
+    // The proxy sets it; next.config must not add a second, nonce-less page CSP.
+    const proxy = readFileSync(join(process.cwd(), "src/proxy.ts"), "utf8");
+    expect(proxy).toContain("buildContentSecurityPolicy");
+    expect(proxy).toContain('requestHeaders.set("x-nonce", nonce)');
+    expect(readFileSync(join(process.cwd(), "next.config.ts"), "utf8")).not.toContain("'unsafe-inline'");
+    expect(readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8")).toContain("<script nonce={nonce}");
   });
 });

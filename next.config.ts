@@ -7,23 +7,11 @@ import type { NextConfig } from "next";
 const basePath = process.env.APP_BASE_PATH ?? "";
 const isDev = process.env.NODE_ENV === "development";
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "form-action 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:" + (isDev ? " 'unsafe-eval'" : ""),
-  "connect-src 'self' https: wss:",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-].join("; ");
-
+// Pages get a per-request nonce CSP from src/proxy.ts, with no allowance for
+// inline scripts. It must not also be set here: browsers enforce every CSP header,
+// and a nonce-less one would block Next's own nonced inline scripts. API
+// responses are never documents and get the strict policy below.
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -67,7 +55,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/api/:path*",
-        headers: [{ key: "Cache-Control", value: "no-store" }],
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
+          { key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" },
+        ],
       },
     ];
   },
