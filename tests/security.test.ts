@@ -354,7 +354,14 @@ describe("security — browser response headers", () => {
     const proxy = readFileSync(join(process.cwd(), "src/proxy.ts"), "utf8");
     expect(proxy).toContain("buildContentSecurityPolicy");
     expect(proxy).toContain('requestHeaders.set("x-nonce", nonce)');
-    expect(readFileSync(join(process.cwd(), "next.config.ts"), "utf8")).not.toContain("'unsafe-inline'");
+    const config = readFileSync(join(process.cwd(), "next.config.ts"), "utf8");
+    // No script-src in next.config may allow inline script: the only CSP it
+    // sets on non-API paths is the static file policy for extension-ending
+    // paths, which the proxy never runs on.
+    for (const scriptSrc of config.match(/script-src[^"]*/g) ?? []) expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(config).toContain("staticFileContentSecurityPolicy");
+    expect(config).toContain('source: "/:path((?!api(?:/|$)|_next/).*\\\\.[a-zA-Z0-9]+)"');
+    expect(proxy).toContain('source: "/((?!api(?:/|$)|_next/static|_next/image|.*\\\\.[a-zA-Z0-9]+$).*)"');
     expect(readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8")).toContain("<script nonce={nonce}");
   });
 });

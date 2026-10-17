@@ -24,9 +24,16 @@ describe("resumeQuickDiagnostic", () => {
     expect(resumed?.done.map((d) => d.id)).toEqual(["a1", "a2"]);
   });
 
-  it("starts afresh for another subject, a finished run, a missing question or an attempt that no longer matches", () => {
+  it("resumes a run whose last answer was marked but not yet moved past straight to the report", () => {
+    // The attempt is saved when it is marked, so a reload on the last
+    // question's feedback must neither re-ask it nor start a fresh check.
+    const resumed = resumeQuickDiagnostic(run({ doneAttemptIds: ["a1", "a2", "a3"] }), "s", bank, [a("a1", "q1"), a("a2", "q2"), a("a3", "q3")]);
+    expect(resumed?.done.map((d) => d.id)).toEqual(["a1", "a2", "a3"]);
+  });
+
+  it("starts afresh for another subject, an overfull run, a missing question or an attempt that no longer matches", () => {
     expect(resumeQuickDiagnostic(run(), "other", bank, [a("a1", "q1"), a("a2", "q2")])).toBeNull();
-    expect(resumeQuickDiagnostic(run({ doneAttemptIds: ["a1", "a2", "a3"] }), "s", bank, [a("a1", "q1"), a("a2", "q2"), a("a3", "q3")])).toBeNull();
+    expect(resumeQuickDiagnostic(run({ doneAttemptIds: ["a1", "a2", "a3", "a4"] }), "s", bank, [a("a1", "q1"), a("a2", "q2"), a("a3", "q3"), a("a4", "q1")])).toBeNull();
     expect(resumeQuickDiagnostic(run(), "s", [q("q1"), q("q2")], [a("a1", "q1"), a("a2", "q2")])).toBeNull();
     expect(resumeQuickDiagnostic(run(), "s", bank, [a("a1", "q1")])).toBeNull();
     expect(resumeQuickDiagnostic(run(), "s", bank, [a("a1", "q1"), a("a2", "q3")])).toBeNull();

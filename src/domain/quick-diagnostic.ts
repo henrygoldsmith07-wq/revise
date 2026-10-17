@@ -249,8 +249,8 @@ export interface QuickDiagnosticRun extends QuickSelection {
 /**
  * The saved run and its answered attempts when it can be resumed: same
  * subject, every question still in the bank, and every recorded attempt
- * still present and on its item's question. A finished or inconsistent run
- * returns null and a new check starts.
+ * still present and on its item's question. An inconsistent run returns null
+ * and a new check starts; a completed run is cleared once its report shows.
  */
 export function resumeQuickDiagnostic(
   saved: unknown,
@@ -263,7 +263,9 @@ export function resumeQuickDiagnostic(
   if (run.version !== 1 || run.subjectId !== subjectId || !Array.isArray(run.items) || !run.items.length || !Array.isArray(run.doneAttemptIds)) return null;
   const questionIds = new Set(questions.map((q) => q.id));
   if (!run.items.every((item) => item && questionIds.has(item.questionId))) return null;
-  if (run.doneAttemptIds.length >= run.items.length) return null;
+  // Every item answered but the report not yet shown (a reload on the last
+  // question's feedback) resumes straight to the report.
+  if (run.doneAttemptIds.length > run.items.length) return null;
   const byId = new Map(attempts.map((a) => [a.id, a]));
   const done: Attempt[] = [];
   for (const [index, id] of run.doneAttemptIds.entries()) {

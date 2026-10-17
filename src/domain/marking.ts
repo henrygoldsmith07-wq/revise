@@ -228,13 +228,13 @@ function polarityConflict(point: string, answer: string): boolean {
     // A point that uses both directions ("a higher voltage means lower
     // current") is a relationship, so one direction word in the answer says
     // nothing by itself: "the current is lower" is right. It is reversed only
-    // when it is attached to what the point gives the other direction
-    // ("lower voltage").
+    // when it is attached to what the point gives the other direction:
+    // "lower voltage", or "the current is higher".
     if (p.includes(x) && p.includes(y)) {
       return [[x, y], [y, x]].some(([said, other]) => {
-        const reversed = wordsAfter(p, other!);
-        const kept = wordsAfter(p, said!);
-        return [...wordsAfter(a, said!)].some((word) => reversed.has(word) && !kept.has(word));
+        const reversed = directionTargets(p, other!);
+        const kept = directionTargets(p, said!);
+        return [...directionTargets(a, said!)].some((word) => reversed.has(word) && !kept.has(word));
       });
     }
     return (p.includes(x) && a.includes(y) && !a.includes(x)) ||
@@ -242,11 +242,30 @@ function polarityConflict(point: string, answer: string): boolean {
   });
 }
 
-/** The word right after each word that starts with `stem` ("lower current" → "current"). */
-function wordsAfter(text: string, stem: string): Set<string> {
+/** Words that link a quantity to its direction, never the quantity itself. */
+const DIRECTION_LINK_WORDS = new Set([
+  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "becomes", "become", "gets", "get", "getting",
+  "will", "would", "and", "or", "so", "than", "for", "much", "even", "far", "very", "means", "mean", "gives", "give",
+  "makes", "make", "to", "of", "in", "with", "at", "by", "its", "their", "this", "that", "it",
+]);
+const COPULAS = new Set(["is", "are", "was", "were", "be", "been", "becomes", "become", "gets", "get", "getting"]);
+
+/**
+ * The quantity each word starting with `stem` is attached to: the word right
+ * after it ("lower current" → "current") or, in predicate form, the word
+ * before it or before its verb ("the current is higher", "makes the current
+ * higher" → "current").
+ */
+function directionTargets(text: string, stem: string): Set<string> {
   const out = new Set<string>();
   const words = text.split(/[^a-z0-9²³]+/).filter(Boolean);
-  for (let i = 0; i < words.length - 1; i++) if (words[i]!.startsWith(stem)) out.add(words[i + 1]!);
+  const quantity = (word: string | undefined) => word !== undefined && !DIRECTION_LINK_WORDS.has(word) && !word.startsWith(stem);
+  for (let i = 0; i < words.length; i++) {
+    if (!words[i]!.startsWith(stem)) continue;
+    if (quantity(words[i + 1])) out.add(words[i + 1]!);
+    const before = COPULAS.has(words[i - 1] ?? "") ? words[i - 2] : words[i - 1];
+    if (quantity(before)) out.add(before!);
+  }
   return out;
 }
 

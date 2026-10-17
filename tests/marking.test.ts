@@ -324,4 +324,12 @@ describe("relationship points that use both directions", () => {
     expect(credits("Vs = 24 V. Transmit at lower voltage so there is less loss.")).toBe(false);
     expect(credits("Vs = 24 V. Higher current means lower losses.")).toBe(false);
   });
+
+  it("refuses the reversed direction stated as a predicate (\"the current is higher\")", () => {
+    expect(credits("Vs = 24 V. The current is higher for the same power, reducing I²R cable loss.")).toBe(false);
+    expect(credits("Vs = 24 V. The voltage is raised so the current is higher, so the I²R cable loss is lower.")).toBe(false);
+    expect(credits("Vs = 24 V. Stepping up makes the current higher and the I^2R loss in the cables lower for the same power.")).toBe(false);
+    // The right direction in predicate form still earns the point.
+    expect(credits("Vs = 24 V. With a higher voltage the current is lower for the same power, so less I²R power is lost in the cables.")).toBe(true);
+  });
 });
