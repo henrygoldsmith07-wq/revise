@@ -69,6 +69,13 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
+    // The marked attempt is saved as done the moment it is marked, not when
+    // the learner moves on: a reload while reading the feedback must resume
+    // after this question, never re-ask it with the model answer already seen.
+    if (reviewing && selection) void saveRun({ ...selection, doneAttemptIds: [...done, reviewing].map((a) => a.id) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewing]);
+  useEffect(() => {
     // Saved only once the learner starts, so opening the page never pins a set.
     if (started && selection && selection.items.length && done.length === 0) void saveRun(selection);
     // eslint-disable-next-line react-hooks/exhaustive-deps
