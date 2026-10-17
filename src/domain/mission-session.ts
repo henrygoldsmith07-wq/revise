@@ -186,6 +186,42 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     return out;
   };
 
+  // Repair works on the skill, not the memory of one question: re-sitting the
+  // question answered minutes ago mostly tests recall of its mark scheme. For
+  // each lost mark (highest first) take an unseen question from a different
+  // family that shares the lost part's spec point or capability; only when
+  // the bank has none does the original come back.
+  const repairSet = (max: number): { questions: Question[]; resat: number } => {
+    const out: Question[] = [];
+    let resat = 0;
+    for (const m of sources) {
+      if (out.length >= max) break;
+      const source = byId.get(m.questionId!)!;
+      const lostPart = source.parts.find((p) => p.id === m.partId);
+      const skills = new Set<string>([
+        ...(m.capabilityIds ?? []),
+        ...(lostPart ? [lostPart] : source.parts).flatMap((p) => [...(p.specPointIds ?? []), ...(p.capabilityIds ?? [])]),
+      ]);
+      const overlap = (q: Question) => q.parts.reduce((n, p) => n + [...(p.specPointIds ?? []), ...(p.capabilityIds ?? [])].filter((id) => skills.has(id)).length, 0);
+      const [sibling] = selectProofCandidates(input.questions, input.attempts, [m.topicId], {
+        max: 1,
+        verifiedOnly: false,
+        excludeQuestionIds: used,
+        excludeFamilies: usedFamilies,
+        fit: (q) => overlap(q) * 10 + causeFit(q, mission.cause),
+      });
+      if (sibling && (skills.size === 0 || overlap(sibling) > 0)) {
+        out.push(sibling);
+        used.add(sibling.id);
+        questionFamilies(sibling).forEach((f) => usedFamilies.add(f));
+      } else if (!out.includes(source)) {
+        out.push(source);
+        resat++;
+      }
+    }
+    return { questions: out, resat };
+  };
+
   const steps: MissionSessionStep[] = [];
   const add = (kind: MissionStepKind, title: string, why: string, qs: Question[], hintBudget: number | undefined) => {
     if (!qs.length) return;
@@ -200,7 +236,13 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
   if (stage === "diagnose") {
     add("diagnose", "Find the exact error", "Re-sit the questions where marks were lost, across topics, with working shown, so the error can be classified precisely.", resits(2), undefined);
   } else if (stage === "repair") {
-    add("repair", "Repair it", "Re-sit the highest-loss questions with help available, so the fix is applied to the exact place it went wrong.", resits(3), undefined);
+    const repair = repairSet(3);
+    const why = repair.resat === 0
+      ? "A different question on each skill you lost marks on, with help available, so the fix is practised rather than remembered from a few minutes ago."
+      : repair.resat === repair.questions.length
+        ? "Re-sit the questions where marks were lost, with help available: Revise has no other question on these skills yet."
+        : "A different question on each skill you lost marks on, with help available. Where Revise has no other question on that skill yet, you re-sit the original.";
+    add("repair", "Repair it", why, repair.questions, undefined);
   } else if (stage === "practise") {
     add("practise", "Supported practice", "New questions that exercise the same weakness, with limited help.", unseenPick({ max: 3, verifiedOnly: false }), undefined);
   } else if (stage === "apply" && mission.proofBarrier) {
