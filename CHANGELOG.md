@@ -1,5 +1,31 @@
 # Changelog
 
+## Lessons say they are not yet teacher-reviewed; a lost mark leads to the lesson for that point — 2026-10-17 (twenty-eighth pass)
+
+- **Review state on lessons.** The 108 authored WJEC Physics lessons
+  (`src/content/teaching`) were shown with no review state, while every
+  question carries one. Each taught lesson now has
+  `teachingReview: "not-teacher-reviewed"`; the lesson page says "Not yet
+  teacher-reviewed. Revise wrote this lesson and no teacher has checked it
+  yet…", and the roadmap card and Today's roadmap card carry the same label.
+  The content is unchanged and fully visible. Today's card also shows
+  "Outline only" for outline lessons, which only the roadmap did before.
+- **A lost mark reaches the lesson that teaches it.** Nothing after a marked
+  answer linked to a lesson, and the repair plan's "Targeted explanation"
+  step opened the topic's *first* checkpoint whichever point the marks were
+  lost on (a Young modulus loss opened "define stress, strain…"). The
+  marked result now finds the lost part's taught spec point
+  (`relearnCheckpointFor`) and links `/lesson?…&checkpoint=<id>`, which the
+  lesson page honours: under "More help with this answer", as the plan's
+  explanation step, or as the one next step when there is no other. Every
+  such link says the lesson is not yet teacher-reviewed and is practice, not
+  proof. The one-primary-action rule is unchanged.
+- **Study copy without accounts.** Settings told a learner on a build with no
+  account server that "only anonymous counts ever leave" the device "unless
+  Pulse sync is on"; nothing about the study leaves at all there, and the
+  wording now says so. The `pilotTelemetry` setting's doc comment called the
+  events "anonymised"; they are pseudonymous and stored against the account.
+
 ## Taught lessons, same-skill repair, resumable quick check, nonce CSP — 2026-10-17 (twenty-seventh pass)
 
 - **Lessons teach.** All 108 WJEC A-level Physics checkpoints have authored

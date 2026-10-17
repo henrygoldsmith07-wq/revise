@@ -607,7 +607,7 @@ function Account() {
             <div className="space-y-2">
               <p className="text-sm text-ink2">
                 You are in the <strong className="text-ink">{ARM_LABELS[store.experimentArm.arm] ?? store.experimentArm.arm}</strong> arm.
-                {" " }Everything stays on this device; only anonymous counts ever leave it (and nothing leaves unless Pulse sync is on).
+                {" " }Your arm and the study&apos;s results are kept on this device only. This version of Revise runs without accounts, so they are not sent anywhere.
               </p>
               <Button variant="secondary" size="sm" onClick={() => void store.leaveExperiment()}>Leave study</Button>
             </div>

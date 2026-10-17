@@ -78,6 +78,13 @@ export interface Lesson {
    * outline rather than present it as teaching.
    */
   outline?: boolean;
+  /**
+   * Set on every lesson taught from src/content/teaching. That teaching is
+   * written by Revise and no teacher has reviewed it (there is no review
+   * path for lessons yet), so the lesson page and roadmap say so. Nothing
+   * may set another value until a real review is recorded.
+   */
+  teachingReview?: "not-teacher-reviewed";
   /** Deterministic id: `lesson:<topicId>` — re-derivation is idempotent. */
 }
 
@@ -88,6 +95,8 @@ export interface RoadmapLesson extends Lesson {
   /** One-based position within the parent topic's checkpoints. */
   checkpointIndex: number;
   checkpointTotal: number;
+  /** The specification point this checkpoint teaches; absent for a topic with none. */
+  specPointId?: Id;
 }
 
 export interface RoadmapLessonEntry {
@@ -1129,6 +1138,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           focus: specPoint.text,
           checkpointIndex,
           checkpointTotal: specPoints.length,
+          specPointId: specPoint.id,
           outline: true,
         },
       };
@@ -1246,7 +1256,19 @@ function authoredCheckpointLesson(input: {
     focus: specPoint.text,
     checkpointIndex,
     checkpointTotal,
+    specPointId: specPoint.id,
+    teachingReview: "not-teacher-reviewed",
   };
+}
+
+/** The roadmap entry a deep link opens: the named checkpoint, else the topic's first, else none (-1). */
+export function roadmapLessonIndex(lessons: readonly RoadmapLessonEntry[], topicId?: string, checkpointId?: string): number {
+  if (!topicId) return -1;
+  if (checkpointId) {
+    const exact = lessons.findIndex((entry) => entry.topic.id === topicId && entry.lesson.specPointId === checkpointId);
+    if (exact >= 0) return exact;
+  }
+  return lessons.findIndex((entry) => entry.topic.id === topicId);
 }
 
 /** A suggested learning order: curriculum order (units/topics are ordered). */

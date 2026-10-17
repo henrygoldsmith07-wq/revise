@@ -6,7 +6,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { choosePracticeNextStep } from "@/domain/practice-next-step";
+import { choosePracticeNextStep, relearnCheckpointFor, RELEARN_NOTE, withRelearnHref } from "@/domain/practice-next-step";
+import { getTopic } from "@/domain/curriculum";
+import { TAUGHT_SPEC_POINT_IDS } from "@/content/teaching/taught-spec-points";
 import { interventionStepLabel } from "@/domain/intervention-engine";
 import type { RemediationAction, RemediationPlan } from "@/domain/remediation";
 import type { TechniqueRepair, TechniqueShapeSuggestion } from "@/domain/technique-repair";
@@ -16,6 +18,8 @@ import { useInterventionPrescription } from "./InterventionPrescriptionPanel";
 import { SocraticExaminerPanel } from "./SocraticExaminerPanel";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 import { ButtonLink, Pill } from "./ui";
+
+const TAUGHT = new Set(TAUGHT_SPEC_POINT_IDS);
 
 export function PracticeNextStep({
   question,
@@ -44,12 +48,17 @@ export function PracticeNextStep({
   showMistakesLogged: boolean;
 }) {
   const prescribed = useInterventionPrescription(question.topicIds[0] ?? question.subjectId);
-  const plan = prescribed ? prescribed.prescription.steps.slice(0, 4) : [];
+  // The lesson that teaches the point this answer lost, when one is written.
+  const relearn = relearnCheckpointFor({ question, marked, taught: TAUGHT, topicFor: getTopic });
+  const plan = prescribed ? prescribed.prescription.steps.slice(0, 4).map((item) => withRelearnHref(item, relearn)) : [];
   const step = choosePracticeNextStep({
     techniqueRepair,
     prescription: prescribed ? { headline: prescribed.prescription.headline, topicTitle: prescribed.topicTitle, firstStep: plan[0] } : null,
     fallback: nextAction,
+    relearn,
   });
+  // Already the primary button, or already the plan's explanation link: not offered twice.
+  const relearnElsewhere = Boolean(relearn) && step.href !== relearn?.href && !plan.some((item) => item.href === relearn?.href);
   // The guiding-question panel may call the opted-in AI as soon as it
   // mounts, so it is mounted only once the student opens "More help".
   const [moreOpen, setMoreOpen] = useState(false);
@@ -77,8 +86,8 @@ export function PracticeNextStep({
         <p className="text-sm font-semibold text-ink mt-0.5">{step.title}</p>
         <p className="text-xs text-ink2 mt-0.5">{step.why}</p>
         {step.note ? <p className="text-[11px] text-ink3 mt-1">{step.note}</p> : null}
-        {step.kind === "technique" ? (
-          <div data-testid="technique-repair">
+        {step.kind === "technique" || step.kind === "relearn" ? (
+          <div data-testid={step.kind === "technique" ? "technique-repair" : "relearn-lesson"}>
             <ButtonLink href={step.href} size="sm" variant="primary" className="mt-2">{step.cta}</ButtonLink>
           </div>
         ) : step.kind === "prescription" ? (
@@ -103,6 +112,17 @@ export function PracticeNextStep({
           More help with this answer
         </summary>
         <div className="space-y-4 px-3 pb-3">
+          {relearn && relearnElsewhere ? (
+            <div data-testid="relearn-lesson-more">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Re-learn the idea</p>
+              <p className="text-xs text-ink2 mt-1">
+                The lesson for {relearn.ref} ({relearn.topicTitle}) teaches this point with a worked example. {RELEARN_NOTE}
+              </p>
+              <Link href={relearn.href} className="font-medium text-sm text-ink underline inline-flex min-h-11 items-center">
+                Open the lesson for {relearn.ref}
+              </Link>
+            </div>
+          ) : null}
           {answerShowed || uncertainCause ? (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this answer showed</p>
@@ -181,6 +201,7 @@ export function PracticeNextStep({
                     {" — "}
                     {item.why}
                     {item.countsAsProof ? "" : " (practice, not proof)"}
+                    {item.href === relearn?.href ? ` Opens the lesson for ${relearn.ref}; ${RELEARN_NOTE.charAt(0).toLowerCase()}${RELEARN_NOTE.slice(1)}` : ""}
                   </li>
                 ))}
               </ol>
