@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMissionSession,
   buildProofCheck,
+  missionContinuation,
   PROOF_CHECK_STAGE,
   proofCheckCheckpoint,
   proofCheckRunId,
@@ -120,7 +121,9 @@ describe("a proof check survives a refresh", () => {
   });
 
   it("is never mistaken for a mission step by mission resume", () => {
-    const { checkpoint, ids } = savedAfterFirstAnswer();
+    const { checkpoint, ids, attempts } = savedAfterFirstAnswer();
+    // Today's "Continue mission" card (PR #68) must not offer a proof check as a mission.
+    expect(missionContinuation(checkpoint, attempts)).toBeNull();
     const fakeMission = buildMissionSessionStub(ids);
     expect(restoreMissionSession(fakeMission, checkpoint.mission, { missionId: fakeMission.missionId, stage: "delayed-proof" }, () => true)).toBeNull();
   });
