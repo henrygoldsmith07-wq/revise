@@ -92,7 +92,11 @@ describe("metadata honesty", () => {
   it("uses a deploy-time origin rather than a request header for canonicals", () => {
     // A Host-derived canonical can be pointed at a spoofed origin.
     expect(layout).toContain("NEXT_PUBLIC_SITE_URL");
-    expect(layout).not.toMatch(/headers\(\)/);
+    // The layout reads request headers only for the CSP nonce (src/proxy.ts),
+    // never the host, so canonicals cannot follow a spoofed Host header.
+    const headerReads = [...layout.matchAll(/\(await headers\(\)\)\.get\(["']([^"']+)["']\)/g)].map((m) => m[1]);
+    expect(headerReads).toEqual(["x-nonce"]);
+    expect(layout).not.toMatch(/get\(["'](?:host|x-forwarded-host)["']\)/i);
   });
 });
 

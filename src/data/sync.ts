@@ -609,11 +609,11 @@ async function pullEntity(
     }
     failed += rowFailures;
     if (rowFailures > 0) {
-      // Pin this entity's cursor: successfully merged pages stay merged
-      // (keyed puts are idempotent), and the retry re-fetches from the last
-      // fully-processed page instead of skipping the unreadable rows.
+      // Pin this entity's persisted cursor so the next pull retries the
+      // unreadable rows, but keep paging: stopping here starved every row
+      // past this page (a second device with its own E2EE key made that the
+      // normal case). Merges are keyed puts, so the re-fetch is idempotent.
       entityOk = false;
-      break;
     }
     const last = fresh[fresh.length - 1]!;
     cursor = { updatedAt: String(last.updated_at ?? ""), id: String(last[cursorColumn] ?? "") };
@@ -644,7 +644,7 @@ function mergeForEntity(
 ): unknown {
   const local = existing as Record<string, unknown> | undefined;
   const remote = incoming as Record<string, unknown>;
-  if (!local) return remote;
+  if (!local) return entity === "settings" ? withDeviceE2ee(remote, undefined) : remote;
 
   switch (entity) {
     case "cards":
@@ -671,9 +671,23 @@ function mergeForEntity(
         lastActiveDate: (a.lastActiveDate ?? "") >= (b.lastActiveDate ?? "") ? a.lastActiveDate : b.lastActiveDate,
       } satisfies StreakState;
     }
+    case "settings": {
+      // E2EE is per device (each device holds its own key unless one is
+      // imported), so another device's settings row must never switch it on
+      // or off here. Whole-row LWW used to turn encryption off silently
+      // whenever a device without it saved any setting.
+      return isNewer(remote, local) ? withDeviceE2ee(remote, local.e2eeEnabled) : local;
+    }
     default:
       return isNewer(remote, local) ? remote : local;
   }
+}
+
+/** A pulled settings row with this device's own E2EE choice in place of the sender's. */
+function withDeviceE2ee(remote: Record<string, unknown>, deviceValue: unknown): Record<string, unknown> {
+  const { e2eeEnabled: _sender, ...rest } = remote;
+  void _sender;
+  return deviceValue === undefined ? rest : { ...rest, e2eeEnabled: deviceValue };
 }
 
 /**

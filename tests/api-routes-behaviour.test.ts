@@ -185,6 +185,14 @@ describe("Pulse history route behaviour", () => {
     expect((await pulseGet(new Request("https://x/api/pulse/history"))).status).toBe(403);
   });
 
+  it("says sync encryption is the reason, not that Pulse is off, when settings are E2EE", async () => {
+    authUser = { id: USER };
+    db.user_settings = [{ id: "s", updated_at: "2026-01-01T00:00:00.000Z", user_id: USER, data: { v: 1, alg: "AES-GCM", iv: "aXY=", ct: "Y3Q=", fp: "00" } }];
+    const res = await pulseGet(new Request("https://x/api/pulse/history?limit=10"));
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("e2ee");
+  });
+
   it("returns an empty page with hasMore false when consented but no rows", async () => {
     authUser = { id: USER };
     db.user_settings = [{ id: "s", updated_at: "2026-01-01T00:00:00.000Z", user_id: USER, data: { pulseEnabled: true } }];

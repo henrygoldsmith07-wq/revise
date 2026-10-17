@@ -15,6 +15,7 @@
 
 import type { Id, Topic } from "@/domain/types";
 import { misconceptionsForTopic } from "@/content/misconceptions";
+import { teachingFor, type CheckpointTeaching } from "@/content/teaching";
 
 export interface LessonStep {
   id: Id;
@@ -71,6 +72,12 @@ export interface Lesson {
   learningObjectives?: string[];
   /** Honest, bounded estimate for a complete guided pass. */
   estimatedMinutes?: number;
+  /**
+   * True when no teaching has been written for this checkpoint: the steps are
+   * assembled from the specification wording, so the page must say it is an
+   * outline rather than present it as teaching.
+   */
+  outline?: boolean;
   /** Deterministic id: `lesson:<topicId>` — re-derivation is idempotent. */
 }
 
@@ -331,6 +338,21 @@ function objectiveForPoint(text: string): string {
     return `Be able to ${lower}.`;
   }
   return `Explain that ${lower}.`;
+}
+
+const STARTS_WITH_COMMAND_WORD = new RegExp(`^(?:${COMMAND_WORDS.map((word) => word.replace(" ", "\\s+")).join("|")})\\b`, "i");
+
+/** First-person success statement for a spec point ("I can resolve a vector…"). */
+function takeawayForPoint(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
+  if (!clean) return "I can explain the idea clearly and use it in context.";
+  const lower = clean.charAt(0).toLowerCase() + clean.slice(1);
+  const ableTo = lower.match(/^be able to\s+(.*)$/i);
+  if (ableTo) return `I can ${ableTo[1]}.`;
+  // Spec statements are verb phrases ("resolve a vector…", "define rate…");
+  // a capitalised start is usually a named idea ("Hardy Weinberg equilibrium").
+  if (/^[a-z]/.test(clean) || STARTS_WITH_COMMAND_WORD.test(clean)) return `I can ${lower}.`;
+  return `I can explain ${clean}.`;
 }
 
 function estimateLessonMinutes(topic: Topic): number {
@@ -945,6 +967,13 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
       const checkpointIndex = index + 1;
       const lessonId = `${base.id}:checkpoint:${specPoint.id}`;
       const focusTitle = pointTitle(specPoint.text, `Checkpoint ${checkpointIndex}`);
+      const teaching = teachingFor(specPoint.id);
+      if (teaching) {
+        return {
+          topic,
+          lesson: authoredCheckpointLesson({ topic, specPoint, teaching, lessonId, focusTitle, checkpointIndex, checkpointTotal: specPoints.length }),
+        };
+      }
       // Specification points and key points are authored independently; an
       // array-index join silently teaches the wrong fact when one list is
       // reordered or has a different granularity. Only borrow a supporting
@@ -966,11 +995,10 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
           objective: objectiveForPoint(specPoint.text),
           explanationSteps: [
-            `Start with the requirement in plain English: ${specPoint.text}`,
-            `Link it to the wider topic: ${topic.title}.`,
+            `Where it sits: one part of ${topic.title}.`,
             "You will finish by retrieving the idea, applying it and saying the point back without looking.",
           ],
-          takeaway: `I can explain ${specPoint.text.toLowerCase()}.`,
+          takeaway: takeawayForPoint(specPoint.text),
           examLink,
         },
         {
@@ -1101,10 +1129,124 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           focus: specPoint.text,
           checkpointIndex,
           checkpointTotal: specPoints.length,
+          outline: true,
         },
       };
     });
   });
+}
+
+/**
+ * A checkpoint taught from authored content (src/content/teaching): the
+ * explanation, a worked example, a check on the physics itself, an exam-style
+ * task with a real model answer, and the trap that belongs to this point.
+ */
+function authoredCheckpointLesson(input: {
+  topic: Topic;
+  specPoint: { id: string; text: string; ref?: string };
+  teaching: CheckpointTeaching;
+  lessonId: string;
+  focusTitle: string;
+  checkpointIndex: number;
+  checkpointTotal: number;
+}): RoadmapLesson {
+  const { topic, specPoint, teaching, lessonId, focusTitle, checkpointIndex, checkpointTotal } = input;
+  const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
+  const objective = objectiveForPoint(specPoint.text);
+  const steps: LessonStep[] = [
+    {
+      id: `${lessonId}:overview`,
+      kind: "overview",
+      title: "Know the target",
+      body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
+      objective,
+      explanationSteps: [
+        `Where it sits: one part of ${topic.title}.`,
+        "You will learn the idea, follow a worked example, check yourself, then write an exam answer.",
+      ],
+      takeaway: takeawayForPoint(specPoint.text),
+      examLink,
+    },
+    {
+      id: `${lessonId}:core`,
+      kind: "core",
+      title: focusTitle,
+      body: teaching.explain[0]!,
+      objective,
+      explanationSteps: teaching.explain.slice(1),
+      explanationMode: "concept",
+      application: {
+        prompt: `Without looking back, explain this in two or three sentences: ${specPoint.text}.`,
+        modelAnswer: teaching.explain.slice(0, 2).join("\n\n"),
+        successCriteria: ["Uses the key terms precisely", "States the relationship or condition, not just a definition"],
+      },
+      takeaway: teaching.explain[0]!,
+      examLink,
+      check: teaching.check,
+    },
+    {
+      id: `${lessonId}:worked`,
+      kind: "core",
+      title: "Worked example",
+      body: teaching.worked.prompt,
+      objective: "Follow each step, then cover it and try to reproduce the method.",
+      explanationSteps: teaching.worked.steps,
+      explanationMode: "process",
+      application: {
+        prompt: `Cover the steps and solve it yourself: ${teaching.worked.prompt}`,
+        modelAnswer: [...teaching.worked.steps, `Answer: ${teaching.worked.answer}`].join("\n"),
+        successCriteria: ["Follows the same method, step by step", `Reaches the answer: ${teaching.worked.answer}`],
+      },
+      takeaway: `Answer: ${teaching.worked.answer}`,
+    },
+    {
+      id: `${lessonId}:apply`,
+      kind: "core",
+      title: "Use it in an exam answer",
+      body: teaching.apply.prompt,
+      objective: "Write your own answer before revealing the model answer, then mark it against the checklist.",
+      explanationSteps: [],
+      application: {
+        prompt: teaching.apply.prompt,
+        modelAnswer: teaching.apply.modelAnswer,
+        successCriteria: teaching.apply.successCriteria,
+      },
+      examTechnique: examTechniqueFor(teaching.apply.prompt),
+      takeaway: teaching.apply.successCriteria.join("; "),
+    },
+  ];
+  if (teaching.trap) {
+    const options = shuffleStable([teaching.trap.right, teaching.trap.wrong], specPoint.id, 4000 + checkpointIndex);
+    steps.push({
+      id: `${lessonId}:trap`,
+      kind: "trap",
+      title: "Avoid a common exam trap",
+      body: `Common trap: ${teaching.trap.wrong}`,
+      objective: "Spot the error before it costs marks.",
+      explanationSteps: [`The error: ${teaching.trap.wrong}`, `Instead: ${teaching.trap.right}`],
+      takeaway: teaching.trap.right,
+      check: {
+        question: "Which of these is the correct approach?",
+        options,
+        correctIndex: options.indexOf(teaching.trap.right),
+        explanation: `${teaching.trap.right} The other option is the trap.`,
+      },
+    });
+  }
+  const minutes = Math.max(8, Math.min(15, 3 + teaching.explain.length + teaching.worked.steps.length + (teaching.trap ? 1 : 0)));
+  return {
+    id: lessonId,
+    topicId: topic.id,
+    subjectId: topic.subjectId,
+    title: focusTitle,
+    intro: `Checkpoint ${checkpointIndex} of ${checkpointTotal}. ${buildLessonIntro(topic, [objective], minutes)}`,
+    steps,
+    learningObjectives: [objective],
+    estimatedMinutes: minutes,
+    focus: specPoint.text,
+    checkpointIndex,
+    checkpointTotal,
+  };
 }
 
 /** A suggested learning order: curriculum order (units/topics are ordered). */

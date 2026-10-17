@@ -60,6 +60,15 @@ describe("diagnoseStep", () => {
     expect(d.kind).toBe("rounding-error");
   });
 
+  it("never calls a different step a unit error", () => {
+    // A relation with no stated value is not the student's valued line with a wrong unit.
+    expect(diagnoseStep("Vs = Vp x Ns/Np = 240 x 50/500 = 24 V.", "Vₛ/Vₚ = Nₛ/Nₚ,").kind).not.toBe("unit-error");
+    // A different magnitude is not a unit slip either.
+    expect(diagnoseStep("P = 12 W", "P = 48 kW").kind).not.toBe("unit-error");
+    // Same magnitude, missing unit, still is.
+    expect(diagnoseStep("KE = 240", "KE = 240 J").kind).toBe("unit-error");
+  });
+
   it("detects a unit mismatch", () => {
     const d = diagnoseStep("KE = 240 kJ", "KE = 240 J");
     expect(d.kind).toBe("unit-error");

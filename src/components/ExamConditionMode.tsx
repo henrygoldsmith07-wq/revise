@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { stemRepeatsOnlyPart } from "@/domain/question-display";
 import { aiMark } from "@/lib/optional-ai";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import {
@@ -410,7 +411,7 @@ function ExamQuestion({
         {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
       </div>
 
-      <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>
+      {stemRepeatsOnlyPart(question) ? null : <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>}
 
       {isMcq ? (
         <ul className="mt-4 space-y-1.5" role="radiogroup" aria-label="Choose one answer">

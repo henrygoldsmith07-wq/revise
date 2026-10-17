@@ -272,8 +272,41 @@ describe("mission sessions", () => {
     const apply = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "apply");
     expect(apply.steps.length).toBeGreaterThan(0);
     expect(apply.steps.every((st) => st.hintBudget === 0 && st.verified)).toBe(true);
+    // Repair practises the skill on a different question per lost mark, not
+    // the one answered minutes ago.
     const repair = buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "repair");
-    expect(repair.questionIds.sort()).toEqual(["p-c-0", "p-f-0"]);
+    expect(repair.questionIds).toHaveLength(2);
+    expect(repair.questionIds).not.toContain("p-c-0");
+    expect(repair.questionIds).not.toContain("p-f-0");
+    expect(new Set(repair.questionIds.map((id) => questions.find((x) => x.id === id)!.topicIds[0]))).toEqual(new Set(["circuits", "fields"]));
+    expect(repair.steps[0]!.hintBudget).toBeUndefined();
+    expect(repair.steps[0]!.why).toMatch(/different question on each skill/);
+  });
+
+  it("repair prefers a question on the lost spec point, and re-sits the original only when none exists", () => {
+    const onPoint = (question: Question, point: string): Question => ({ ...question, parts: question.parts.map((p) => ({ ...p, specPointIds: [point] })) });
+    const ms = [m("u1", PHY, "circuits", "src", { marksLost: 3 })];
+    const questions = [
+      onPoint(q("src", PHY, "circuits"), "sp-02"),
+      onPoint(q("other-point", PHY, "circuits"), "sp-05"),
+      onPoint(q("same-point", PHY, "circuits"), "sp-02"),
+    ];
+    const recovery = buildMarkRecovery({ mistakes: ms, attempts: [], questions, now: NOW });
+    const mis = buildExamMissions({ mistakes: ms, recovery, daysToExam: 30, unseenByTopic: {} })[0]!;
+    expect(buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "repair").questionIds).toEqual(["same-point"]);
+
+    // Within the spec point, a question that exercises the diagnosed cause wins.
+    const dataMs = [m("d1", PHY, "circuits", "src", { marksLost: 3, category: "interpretation", workingErrorKind: undefined })];
+    const withGraph = [...questions, onPoint(q("graph", PHY, "circuits", { stem: "A student plots ln V against t from the data." }), "sp-02")];
+    const dataRecovery = buildMarkRecovery({ mistakes: dataMs, attempts: [], questions: withGraph, now: NOW });
+    const dataMission = buildExamMissions({ mistakes: dataMs, recovery: dataRecovery, daysToExam: 30, unseenByTopic: {} })[0]!;
+    expect(dataMission.cause).toBe("data-interpretation");
+    expect(buildMissionSession(dataMission, { questions: withGraph, attempts: [], mistakes: dataMs }, "repair").questionIds).toEqual(["graph"]);
+
+    const only = [questions[0]!, questions[1]!];
+    const fallback = buildMissionSession(mis, { questions: only, attempts: [], mistakes: ms }, "repair");
+    expect(fallback.questionIds).toEqual(["src"]);
+    expect(fallback.steps[0]!.why).toMatch(/no other question on these skills yet/);
   });
 
   it("reports the limit instead of inventing a proof stage when no verified unseen question exists", () => {

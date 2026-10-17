@@ -19,7 +19,7 @@ describe("quick diagnostic feedback", () => {
   });
 
   it("advances only from an explicit control, and only then records the attempt as done", () => {
-    expect(quick).toMatch(/const advance = \(\) => \{\n\s+if \(!reviewing\) return;\n\s+setDone\(\(prev\) => \[\.\.\.prev, reviewing\]\);\n\s+setReviewing\(null\);/);
+    expect(quick).toMatch(/const advance = \(\) => \{\n\s+if \(!reviewing\) return;\n\s+const next = \[\.\.\.done, reviewing\];\n\s+setDone\(next\);\n[^\n]*saveRun[^\n]*\n\s+setReviewing\(null\);/);
     expect(quick).toContain('onClick={advance}');
     expect(quick).toContain('"See what I found" : "Next question"');
   });

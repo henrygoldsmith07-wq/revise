@@ -319,6 +319,13 @@ export function LessonMode({
         </div>
         <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label="Lesson progress" />
 
+        {lesson.outline ? (
+          <p className="rounded-[8px] border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
+            Outline only: Revise has not written teaching for this checkpoint yet, so these steps are built from the
+            specification wording. Use it as a checklist, and learn the idea from your notes or textbook.
+          </p>
+        ) : null}
+
         {stepIdx === 0 && lesson.learningObjectives?.length ? (
           <Panel className="space-y-3 border-accent/30 bg-accentsoft/20">
             <div className="flex items-start justify-between gap-3">
@@ -758,6 +765,7 @@ export function LessonMode({
                                       {current ? "Up next" : done ? "Complete" : `Lesson ${lessonNumber + 1}`}
                                     </p>
                                     {current ? <Pill tone="accent">Recommended next</Pill> : null}
+                                    {entry.lesson.outline ? <Pill>Outline only</Pill> : null}
                                   </div>
                                   <h4 className="mt-1 text-sm font-bold text-ink">{entry.lesson.title}</h4>
                                   <p className="mt-0.5 line-clamp-2 text-xs text-ink2">

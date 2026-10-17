@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pulseHistoryAllowed, pulseEnabledValue } from "@/data/pulse-consent";
+import { pulseHistoryAllowed, pulseEnabledValue, pulseSettingsEncrypted } from "@/data/pulse-consent";
 
 describe("Revise Pulse consent", () => {
   it("is off when the user has no settings row at all", () => {
@@ -23,5 +23,13 @@ describe("Revise Pulse consent", () => {
   it("never trusts a truthy-looking but non-boolean value", () => {
     expect(pulseHistoryAllowed({ pulseEnabled: 1 })).toBe(false);
     expect(pulseHistoryAllowed({ pulseEnabled: "true" })).toBe(false);
+  });
+
+  it("recognises an end-to-end encrypted settings row, which can never grant access", () => {
+    const blob = { v: 1, alg: "AES-GCM", iv: "aXY=", ct: "Y3Q=", fp: "00" };
+    expect(pulseSettingsEncrypted(blob)).toBe(true);
+    expect(pulseHistoryAllowed(blob)).toBe(false);
+    expect(pulseSettingsEncrypted({ pulseEnabled: true })).toBe(false);
+    expect(pulseSettingsEncrypted(null)).toBe(false);
   });
 });

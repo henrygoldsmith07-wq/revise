@@ -211,6 +211,22 @@ describe("paginated pull", () => {
     expect(await entityCursor("cards")).toEqual({ updatedAt: ts(11), id: "card-bad" });
   });
 
+  it("keeps paging past an unreadable row instead of starving every later page", async () => {
+    // A second device with its own E2EE key makes unreadable rows routine; a
+    // pinned cursor must not stop this pull at the first page.
+    const bad: Row = {
+      id: "card-bad",
+      user_id: USER,
+      updated_at: ts(0),
+      data: { v: 1, alg: "AES-GCM", iv: "bogus", ct: "bogus", fp: "bogus" },
+    };
+    const rows = [bad, ...Array.from({ length: SYNC_PULL_PAGE_SIZE * 2 + 1 }, (_, i) => remoteCard(`card-${String(i).padStart(5, "0")}`, ts(i + 1)))];
+    const result = await sync(USER, { client: pagedClient({ tables: { cards: rows } }).client, online: true });
+    expect(result.failed).toBe(1);
+    expect(await cardCount()).toBe(SYNC_PULL_PAGE_SIZE * 2 + 1);
+    expect(await entityCursor("cards")).toBeUndefined();
+  });
+
   it("records the exact final-row cursor for a small page", async () => {
     const rows = [remoteCard("b", ts(2)), remoteCard("a", ts(1)), remoteCard("c", ts(2))];
     const result = await sync(USER, { client: pagedClient({ tables: { cards: rows } }).client, online: true });
@@ -242,5 +258,22 @@ describe("paginated pull", () => {
     expect(retry.failed).toBe(0);
     expect(await entityCursor("attempts")).toEqual({ updatedAt: ts(2), id: "attempt-2" });
     expect(await readReviseUserMeta<string>("lastPullAt", USER)).toBe(ts(5));
+  });
+});
+
+describe("settings pull", () => {
+  it("never lets another device's settings row switch this device's E2EE on or off", async () => {
+    const db = await getDb();
+    await db.put("settings", { userId: USER, e2eeEnabled: true, updatedAt: ts(1) } as never);
+    const remote: Row = { user_id: USER, updated_at: ts(5), data: { userId: USER, theme: "dark", updatedAt: ts(5) } };
+    await sync(USER, { client: pagedClient({ tables: { user_settings: [remote] } }).client, online: true });
+    const after = (await db.get("settings", USER)) as { e2eeEnabled?: boolean; theme?: string } | undefined;
+    expect(after?.theme).toBe("dark");
+    expect(after?.e2eeEnabled).toBe(true);
+
+    await db.put("settings", { userId: USER, updatedAt: ts(6) } as never);
+    const encryptingSender: Row = { user_id: USER, updated_at: ts(9), data: { userId: USER, e2eeEnabled: true, updatedAt: ts(9) } };
+    await sync(USER, { client: pagedClient({ tables: { user_settings: [encryptingSender] } }).client, online: true });
+    expect(((await db.get("settings", USER)) as { e2eeEnabled?: boolean }).e2eeEnabled).toBeUndefined();
   });
 });

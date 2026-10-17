@@ -56,7 +56,8 @@ Pilot outcome reporting is separate from collecting answers for human marking.
 Pulse privacy is unchanged.
 
 Server-side pilot telemetry is a separate, equally opt-in channel: Settings →
-Data → "Pilot telemetry" (default off) sends anonymous outcome counts to
+Data → "Pilot telemetry" (default off) sends outcome counts (stored against
+the account, so pseudonymous rather than anonymous) to
 `POST /api/pilot/events` (see `src/app/api/pilot/events/route.ts`), stored in
 the insert-only `product_events` table (migration
 `supabase/migrations/20261009000100_pilot_telemetry.sql`; no client read

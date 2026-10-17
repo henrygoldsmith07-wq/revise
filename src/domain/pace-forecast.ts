@@ -140,7 +140,9 @@ export function forecastUntouched(input: PaceForecastInput): PaceForecast | null
 
   let sentence: string;
   if (activeDays === 0) {
-    sentence = `No reviews in the last ${REVIEW_PACE_WINDOW_DAYS} days — at this pace, all ${untouchedNow} untouched ${
+    // Only flashcard reviews feed this pace; question practice does not, so
+    // the sentence names reviews rather than implying no study at all.
+    sentence = `No flashcard reviews in the last ${REVIEW_PACE_WINDOW_DAYS} days — at that pace, all ${untouchedNow} untouched ${
       untouchedNow === 1 ? "topic" : "topics"
     } stay untouched before the ${target} on ${dateLabel}.`;
   } else if (projectedUntouched > 0) {

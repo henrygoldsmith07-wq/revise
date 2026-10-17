@@ -224,11 +224,30 @@ const ANTONYM_STEMS: Array<[string, string]> = [
 function polarityConflict(point: string, answer: string): boolean {
   const p = point.toLowerCase();
   const a = answer.toLowerCase();
-  return ANTONYM_STEMS.some(
-    ([x, y]) =>
-      (p.includes(x) && a.includes(y) && !a.includes(x)) ||
-      (p.includes(y) && a.includes(x) && !a.includes(y)),
-  );
+  return ANTONYM_STEMS.some(([x, y]) => {
+    // A point that uses both directions ("a higher voltage means lower
+    // current") is a relationship, so one direction word in the answer says
+    // nothing by itself: "the current is lower" is right. It is reversed only
+    // when it is attached to what the point gives the other direction
+    // ("lower voltage").
+    if (p.includes(x) && p.includes(y)) {
+      return [[x, y], [y, x]].some(([said, other]) => {
+        const reversed = wordsAfter(p, other!);
+        const kept = wordsAfter(p, said!);
+        return [...wordsAfter(a, said!)].some((word) => reversed.has(word) && !kept.has(word));
+      });
+    }
+    return (p.includes(x) && a.includes(y) && !a.includes(x)) ||
+      (p.includes(y) && a.includes(x) && !a.includes(y));
+  });
+}
+
+/** The word right after each word that starts with `stem` ("lower current" → "current"). */
+function wordsAfter(text: string, stem: string): Set<string> {
+  const out = new Set<string>();
+  const words = text.split(/[^a-z0-9²³]+/).filter(Boolean);
+  for (let i = 0; i < words.length - 1; i++) if (words[i]!.startsWith(stem)) out.add(words[i + 1]!);
+  return out;
 }
 
 /**
