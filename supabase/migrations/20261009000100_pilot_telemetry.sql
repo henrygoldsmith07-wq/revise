@@ -5,7 +5,7 @@
 -- appended to supabase/schema.sql, so re-running schema.sql on a fresh
 -- project is equivalent; running both is harmless.
 --
--- 1. public.product_events — opt-in, anonymous pilot telemetry. One row per
+-- 1. public.product_events — opt-in pilot telemetry (pseudonymous, keyed by user_id). One row per
 --    outcome event (diagnostic completion, recommendation start, recovered
 --    marks, delayed-proof completion, time from first loss to proof, proof
 --    blocked by supply). Insert-only for signed-in learners; NO select/update/
@@ -26,7 +26,8 @@ create table if not exists public.product_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   -- Rotating pseudonym minted on device (rotated daily); joins a learner's
-  -- events within a rotation window without ever carrying the account id.
+  -- events within a rotation window. The row also carries user_id (RLS and
+  -- deletion cascade), so the data is pseudonymous, not anonymous.
   anon_id text not null check (anon_id ~ '^[0-9a-fA-F-]{8,64}$'),
   event text not null check (event in (
     'diagnostic.completed',

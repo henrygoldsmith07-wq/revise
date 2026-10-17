@@ -6,7 +6,7 @@ import { sameOriginRequest } from "@/domain/account-deletion";
 import { rateLimit } from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
-// Pilot telemetry intake. Opt-in, anonymous, insert-only.
+// Pilot telemetry intake. Opt-in, insert-only, stored against the account.
 //
 // The client sends outcome events only after the learner switches pilot
 // telemetry on in Settings → Data (off by default;_revise pilotTelemetry_).

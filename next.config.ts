@@ -7,7 +7,21 @@ import type { NextConfig } from "next";
 const basePath = process.env.APP_BASE_PATH ?? "";
 const isDev = process.env.NODE_ENV === "development";
 
-const contentSecurityPolicy = [
+// Pages get a per-request nonce CSP from src/proxy.ts, with no allowance for
+// inline scripts. It must not also be set here: browsers enforce every CSP header,
+// and a nonce-less one would block Next's own nonced inline scripts. API
+// responses are never documents and get the strict policy below.
+//
+// The proxy skips paths that end in a file extension: public files (the
+// diagrams, sw.js, domain-worker.js, the PDF worker) and any page URL whose
+// last segment contains a dot, which today is only a 404 such as /x.y (no
+// question id in the bank ends in ".ext"). Those responses carry no nonce, so
+// they get this static policy instead of none: no inline script at all, so a
+// file opened as a document cannot run injected script, and workers keep the
+// same-origin, blob: and wasm allowances they had before the nonce proxy. A
+// nonce-less page at such a path renders but does not hydrate. The two
+// sources are disjoint: a path either ends in an extension or the proxy runs.
+const staticFileContentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
@@ -16,14 +30,13 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:" + (isDev ? " 'unsafe-eval'" : ""),
+  "script-src 'self' 'wasm-unsafe-eval' blob:" + (isDev ? " 'unsafe-eval'" : ""),
   "connect-src 'self' https: wss:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
 ].join("; ");
 
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -59,6 +72,12 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
+        // Exactly the paths src/proxy.ts does not match (extension-ending,
+        // outside /api and /_next): see staticFileContentSecurityPolicy above.
+        source: "/:path((?!api(?:/|$)|_next/).*\\.[a-zA-Z0-9]+)",
+        headers: [{ key: "Content-Security-Policy", value: staticFileContentSecurityPolicy }],
+      },
+      {
         source: "/sw.js",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
@@ -67,7 +86,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/api/:path*",
-        headers: [{ key: "Cache-Control", value: "no-store" }],
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
+          { key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" },
+        ],
       },
     ];
   },

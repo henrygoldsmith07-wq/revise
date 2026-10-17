@@ -137,7 +137,9 @@ export interface UserSettings {
   /** Most recent 30 generic structure submissions: shape signals only, never raw answers, marks or mastery. */
   techniqueDrillHistory?: TechniqueDrillSubmission[];
   /**
-   * Whether anonymised outcome events may be sent for an agreed learner pilot.
+   * Whether pseudonymous outcome events may be sent for an agreed learner pilot.
+   * Not anonymous: the server stores each event against the account (user_id)
+   * alongside a rotating pseudonym (src/lib/pilot-telemetry.ts).
    * Off by default; switched on in Settings → Data with plain-language consent.
    * Counts and coarse days only — never answers, marks detail or free text.
    * Revoking stops the next send immediately.

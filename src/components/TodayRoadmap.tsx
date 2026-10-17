@@ -121,6 +121,8 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
                   {nextEntry.topic.title} · checkpoint {nextEntry.lesson.checkpointIndex} of {nextEntry.lesson.checkpointTotal}
                 </p>
                 <p className="mt-1 line-clamp-2 text-xs text-ink3">{nextEntry.lesson.focus}</p>
+                {nextEntry.lesson.outline ? <p className="mt-1 text-[11px] text-ink3">Outline only</p> : null}
+                {nextEntry.lesson.teachingReview === "not-teacher-reviewed" ? <p className="mt-1 text-[11px] text-ink3">Not yet teacher-reviewed</p> : null}
               </div>
               <ButtonLink href={nextHref} variant="primary" size="sm" className="shrink-0 min-h-11">
                 {roadmapComplete ? "Review roadmap" : "Continue roadmap"} →

@@ -3,7 +3,7 @@
 // Bridges the recovery ledger to opt-in pilot telemetry. Renders nothing.
 //
 // Watches proven recovery: when the ledger's proven total grows, records
-// anonymised outcome events (marks recovered, proof completed, minutes from
+// pseudonymous outcome events (marks recovered, proof completed, minutes from
 // first loss to proof). A device-side watermark means each proven mark is
 // reported once. Nothing is queued unless pilot telemetry consent is on, and
 // sending happens only in flushPilotEvents (Settings toggle, online return).

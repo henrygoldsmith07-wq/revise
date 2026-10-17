@@ -100,7 +100,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
         ) : null}
         <p className="mt-3 max-w-2xl text-sm text-ink2">{focus.why}</p>
         {strength ? <p className="mt-1 max-w-2xl text-xs text-ink3">{strength}</p> : null}
-        <p className="mt-1 max-w-2xl text-sm text-ink2"><span className="font-medium text-ink">Then:</span> {focus.after}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink2"><span className="font-medium text-ink">Then:</span> {focus.after.replace(/^After this: /, "")}</p>
         <details className="mt-4 max-w-2xl">
           <summary className="cursor-pointer select-none text-sm font-medium text-ink2 min-h-11 inline-flex items-center">Why this?</summary>
           <dl className="mt-2 space-y-2 text-sm leading-6 text-ink2" aria-label="Why this recommendation">

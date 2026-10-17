@@ -17,7 +17,8 @@ export type MistakeCategory = Mistake["category"];
 const CATEGORY_HINTS: { category: MistakeCategory; patterns: RegExp[] }[] = [
   { category: "arithmetic", patterns: [/\bsig(?:nificant)? ?fig/i, /\bunit(s)?\b/i, /\brounding\b/i, /\bcalculat/i] },
   { category: "method", patterns: [/\bmethod\b/i, /\bderiv/i, /\bshow that\b/i, /\bequation\b/i, /\bsubstitut/i] },
-  { category: "interpretation", patterns: [/\bgraph\b/i, /\bdata\b/i, /\btable\b/i, /\bconclude\b/i, /\bevaluat/i] },
+  // "table" only as a data table: "a book rests on a table" is not data.
+  { category: "interpretation", patterns: [/\bgraph\b/i, /\bdata\b/i, /\b(?:data|results?|this|the following) table\b|\btable (?:of|shows|below|above)\b/i, /\bconclude\b/i, /\bevaluat/i] },
   { category: "communication", patterns: [/\bexplain\b/i, /\bdescribe\b/i, /\bstate\b/i, /\bcompare\b/i] },
   { category: "recall", patterns: [/\bdefin/i, /\bname\b/i, /\bidentify\b/i, /\brecall\b/i] },
 ];
@@ -49,7 +50,9 @@ function detectCommandWord(prompt: string): import("./types").CommandWord {
   return w as import("./types").CommandWord;
 }
 const MISCONCEPTION_RE: Array<{ tag: import("./types").MisconceptionTag; re: RegExp }> = [
-  { tag: "units", re: /unit|kJ|J\b|m s-1|mol dm/i },
+  // Only a point that talks about units. A bare "J" or "kJ" is any energy
+  // value and "per unit" is a definition, so neither tags a unit error.
+  { tag: "units", re: /\b(?<!per\s)units?\b/i },
   { tag: "significant-figures", re: /sig fig|significant|decimal/i },
   { tag: "graph-reading", re: /graph|gradient|intercept|area under/i },
   { tag: "method-skipped", re: /method|working|step/i },

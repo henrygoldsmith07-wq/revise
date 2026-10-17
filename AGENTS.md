@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Notes for agents working in this repository. Everything here was checked against
-the code on 2026-10-04; if a command below stops existing, update this file in the
+the code on 2026-10-17; if a command below stops existing, update this file in the
 same commit.
 
 ## The one command that matters
@@ -124,7 +124,7 @@ background and do other work while it runs. On Windows, invoke npm through
   parses them. A new link parameter needs a consumer and a test, or the
   plan promises something the page does not do. Still unhonoured:
   `/lesson?worked=1`, `/practice?transfer=1`, `/adaptive-session?proof=1`.
-- **A saved checkpoint is not an interrupted run** (twenty-sixth pass). Pages
+- **A saved checkpoint is not an interrupted run** (twenty-ninth pass). Pages
   save a resume point as soon as a question shows; anything that offers to
   resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
   titles that prefix "Recover N marks" compose through `missionActionTitle`,
@@ -134,6 +134,35 @@ background and do other work while it runs. On Windows, invoke npm through
   through it.
 - **A new route under `src/app` must be added to `APP_SHELL` in `public/sw.js`**,
   or `tests/perf.test.ts` fails.
+- **Pages use a per-request nonce CSP** (twenty-seventh pass). `src/proxy.ts`
+  sets it from `buildContentSecurityPolicy` (`src/lib/csp.ts`); script-src has
+  no `'unsafe-inline'`, because the E2EE key lives in this origin's IndexedDB.
+  The root layout reads `headers()` for the nonce, so every page renders per
+  request. An inline `<script>` needs `nonce={nonce}`; never add a page CSP in
+  `next.config.ts` (browsers enforce every CSP header, and a nonce-less one
+  blocks Next's own scripts). `tests/security.test.ts` pins this.
+- **Lesson teaching is authored per spec point** in `src/content/teaching`
+  (all 108 WJEC Physics checkpoints). A checkpoint without an entry is built
+  from its spec wording and flagged `outline: true`, which the lesson page and
+  roadmap card label "Outline only". Teaching is unreviewed authored content:
+  it never makes a question, mark or proof claim. Check worked-example
+  arithmetic before adding one (`tests/lesson-teaching.test.ts` checks shape,
+  not physics).
+  Every taught lesson carries `teachingReview: "not-teacher-reviewed"`, and
+  the lesson page, roadmap card and Today roadmap card say "Not yet
+  teacher-reviewed"; there is no review path for lessons, so never set any
+  other value (twenty-eighth pass). A lost mark links to the checkpoint that
+  teaches the lost part's spec point (`relearnCheckpointFor` in
+  `src/domain/practice-next-step.ts`, `/lesson?…&checkpoint=<spec point id>`),
+  and the repair plan's "Targeted explanation" step opens that checkpoint
+  rather than the topic's first. The practice screen knows which points are
+  taught from `src/content/teaching/taught-spec-points.ts`, not the teaching
+  itself: add an id there with each new entry
+  (`tests/lesson-relearn.test.ts` fails otherwise).
+- **Repair does not re-sit the question just answered** (twenty-seventh pass):
+  `buildMissionSession`'s repair stage takes an unseen question from another
+  family sharing the lost part's spec point or capability, ranked by
+  `causeFit`, and re-sits the original only when none exists (and says so).
 - **Two pre-existing flake classes**, both evidenced on a clean baseline and both
   left documented rather than hidden: Vitest worker RPC timeouts on a loaded
   machine (`vitest.config.mts`), and wall-clock compile assertions

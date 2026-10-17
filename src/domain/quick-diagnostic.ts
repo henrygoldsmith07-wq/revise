@@ -228,3 +228,50 @@ export function quickDiagnosticReport(input: { probes: readonly QuickProbe[]; to
     lines: { found, next },
   };
 }
+
+// --- resumable run ----------------------------------------------------------
+
+/**
+ * One quick-check run as chosen at its start. Persisted so a reload (or a
+ * phone discarding the tab) resumes the same questions: the pool excludes
+ * answered questions, so re-selecting picked a fresh set and the counter
+ * restarted at "Question 1 of 5" however many had been answered.
+ */
+export interface QuickDiagnosticRun extends QuickSelection {
+  version: 1;
+  subjectId: Id;
+  topicIds: Id[];
+  practiceTier: boolean;
+  /** Attempts recorded for items[0..n), in order. */
+  doneAttemptIds: Id[];
+}
+
+/**
+ * The saved run and its answered attempts when it can be resumed: same
+ * subject, every question still in the bank, and every recorded attempt
+ * still present and on its item's question. An inconsistent run returns null
+ * and a new check starts; a completed run is cleared once its report shows.
+ */
+export function resumeQuickDiagnostic(
+  saved: unknown,
+  subjectId: Id,
+  questions: readonly Question[],
+  attempts: readonly Attempt[],
+): { run: QuickDiagnosticRun; done: Attempt[] } | null {
+  if (!saved || typeof saved !== "object") return null;
+  const run = saved as Partial<QuickDiagnosticRun>;
+  if (run.version !== 1 || run.subjectId !== subjectId || !Array.isArray(run.items) || !run.items.length || !Array.isArray(run.doneAttemptIds)) return null;
+  const questionIds = new Set(questions.map((q) => q.id));
+  if (!run.items.every((item) => item && questionIds.has(item.questionId))) return null;
+  // Every item answered but the report not yet shown (a reload on the last
+  // question's feedback) resumes straight to the report.
+  if (run.doneAttemptIds.length > run.items.length) return null;
+  const byId = new Map(attempts.map((a) => [a.id, a]));
+  const done: Attempt[] = [];
+  for (const [index, id] of run.doneAttemptIds.entries()) {
+    const attempt = byId.get(id);
+    if (!attempt || attempt.questionId !== run.items[index]!.questionId) return null;
+    done.push(attempt);
+  }
+  return { run: run as QuickDiagnosticRun, done };
+}

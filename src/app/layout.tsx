@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { PwaInstallProvider } from "@/components/PwaInstall";
@@ -56,7 +57,11 @@ export const viewport: Viewport = {
 // once the store has loaded.
 const THEME_BOOTSTRAP = `(function(){try{var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var s=localStorage.getItem('revise.theme');if(s==='dark'||(s!=='light'&&d)){document.documentElement.classList.add('dark');document.documentElement.dataset.theme='dark';}}catch(e){}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Set by src/proxy.ts: the per-request CSP nonce for this inline script.
+  // Reading request headers also opts every page into the dynamic rendering
+  // a nonce needs.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   // Locale is read from localStorage on the client (AppShell hydrates it);
   // the html lang stays en-GB for the SSR shell. A future step can make this
   // dynamic via a cookie + middleware when i18n leaves scaffolding.
@@ -64,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-GB" suppressHydrationWarning>
       <head>
         <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body className="antialiased">
         {/* AccountBoundary resolves its profile in a client effect, so without

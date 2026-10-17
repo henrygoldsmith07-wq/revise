@@ -1,19 +1,23 @@
 "use client";
 
+import { useMemo } from "react";
+import { missionContinuation } from "@/domain/mission-session";
 import { revisionActivityLabel } from "@/domain/revision-checkpoint";
 import { useStoreFields } from "@/state/store";
 import { Button, ButtonLink, Panel, Pill, ProgressBar } from "@/components/ui";
 import { captureProductEvent } from "@/lib/product-telemetry";
 
 export function ResumeRevisionCard() {
-  const store = useStoreFields("clearRevisionCheckpoint", "revisionCheckpoint");
+  const store = useStoreFields("attempts", "clearRevisionCheckpoint", "revisionCheckpoint");
   const checkpoint = store.revisionCheckpoint;
+  // A mission step saved mid-way reopens the same questions and support at its first unanswered one.
+  const mission = useMemo(() => missionContinuation(checkpoint, store.attempts), [checkpoint, store.attempts]);
 
   if (!checkpoint) return null;
 
-  const next = Math.min(checkpoint.total, checkpoint.position + 1);
-  const progress = checkpoint.total ? checkpoint.position / checkpoint.total : 0;
-  const progressLabel = checkpoint.activity === "review"
+  const next = mission ? mission.position + 1 : Math.min(checkpoint.total, checkpoint.position + 1);
+  const progress = mission ? mission.position / mission.total : checkpoint.total ? checkpoint.position / checkpoint.total : 0;
+  const progressLabel = mission ? `${mission.position} of ${mission.total} answered` : checkpoint.activity === "review"
     ? `${checkpoint.position} of ${checkpoint.total} reviewed`
     : checkpoint.activity === "adaptive"
       // Adaptive positions count whole steps (a step can hold several cards),
@@ -24,15 +28,18 @@ export function ResumeRevisionCard() {
   return (
     <Panel className="border-accent/40 bg-accentsoft/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        {/* min-w-56 (not min-w-0): at 360px the buttons wrap below the text instead of squeezing it to one word per line. */}
+        <div className="min-w-56 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Pill tone="accent">Interrupted</Pill>
-            <span className="text-xs text-ink3">{revisionActivityLabel(checkpoint.activity)}</span>
+            <Pill tone="accent">{mission ? "Mission in progress" : "Interrupted"}</Pill>
+            <span className="text-xs text-ink3">{mission ? `Exam mission${mission.stage ? ` · ${mission.stage.replace(/-/g, " ")}` : ""}` : revisionActivityLabel(checkpoint.activity)}</span>
           </div>
-          <h2 className="text-sm font-semibold text-ink mt-2">Resume interrupted revision</h2>
+          <h2 className="text-sm font-semibold text-ink mt-2">{mission ? "Continue mission" : "Resume interrupted revision"}</h2>
           <p className="text-sm text-ink2 mt-0.5 truncate">{checkpoint.title}</p>
           <p className="text-[11px] text-ink3 mt-1">
-            {checkpoint.total
+            {mission
+              ? `Same questions and hints, from question ${next} of ${mission.total}`
+              : checkpoint.total
               ? `Continue at ${checkpoint.activity === "adaptive" ? "step " : ""}${next} of ${checkpoint.total}`
               : "Continue where you stopped"} · last active {lastActive(checkpoint.updatedAt)}
           </p>
@@ -43,7 +50,7 @@ export function ResumeRevisionCard() {
             size="sm"
             onClick={() => captureProductEvent("session.returned", { kind: checkpoint.activity })}
           >
-            Resume
+            {mission ? "Continue mission" : "Resume"}
           </ButtonLink>
           <Button
             size="sm"
@@ -57,7 +64,7 @@ export function ResumeRevisionCard() {
           </Button>
         </div>
       </div>
-      {checkpoint.total ? <ProgressBar value={progress} label={progressLabel} /> : null}
+      {mission || checkpoint.total ? <ProgressBar value={progress} label={progressLabel} /> : null}
     </Panel>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { buildRoadmapLessons } from "@/content/lessons";
+import { buildRoadmapLessons, roadmapLessonIndex } from "@/content/lessons";
 import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import type { RoadmapLessonEntry } from "@/content/lessons";
@@ -48,16 +48,19 @@ export function LessonMode({
   topics,
   onExit,
   initialTopicId,
+  initialCheckpointId,
 }: {
   topics: Topic[];
   onExit: () => void;
   /** Optional deep link used by mock preparation to open a tested topic. */
   initialTopicId?: string;
+  /** Spec point id within `initialTopicId`: opens that checkpoint instead of the topic's first. */
+  initialCheckpointId?: string;
 }) {
   const lessons = useMemo<LessonEntry[]>(() => buildRoadmapLessons(topics), [topics]);
   const initialLessonIdx = useMemo(
-    () => (initialTopicId ? lessons.findIndex((entry) => entry.topic.id === initialTopicId) : -1),
-    [initialTopicId, lessons],
+    () => roadmapLessonIndex(lessons, initialTopicId, initialCheckpointId),
+    [initialCheckpointId, initialTopicId, lessons],
   );
 
   const store = useStoreFields("completeLesson", "lessonProgress", "settings");
@@ -318,6 +321,18 @@ export function LessonMode({
           </Button>
         </div>
         <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label="Lesson progress" />
+
+        {lesson.outline ? (
+          <p className="rounded-[8px] border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
+            Outline only: Revise has not written teaching for this checkpoint yet, so these steps are built from the
+            specification wording. Use it as a checklist, and learn the idea from your notes or textbook.
+          </p>
+        ) : lesson.teachingReview === "not-teacher-reviewed" ? (
+          <p className="rounded-[8px] border border-line bg-surface2 px-3 py-2 text-xs text-ink2" role="note" data-testid="lesson-review-state">
+            <span className="font-semibold text-ink">Not yet teacher-reviewed.</span> Revise wrote this lesson and no teacher
+            has checked it yet. If anything disagrees with your notes or textbook, go with those. Finishing it is practice, not proof.
+          </p>
+        ) : null}
 
         {stepIdx === 0 && lesson.learningObjectives?.length ? (
           <Panel className="space-y-3 border-accent/30 bg-accentsoft/20">
@@ -758,6 +773,8 @@ export function LessonMode({
                                       {current ? "Up next" : done ? "Complete" : `Lesson ${lessonNumber + 1}`}
                                     </p>
                                     {current ? <Pill tone="accent">Recommended next</Pill> : null}
+                                    {entry.lesson.outline ? <Pill>Outline only</Pill> : null}
+                                    {entry.lesson.teachingReview === "not-teacher-reviewed" ? <Pill>Not yet teacher-reviewed</Pill> : null}
                                   </div>
                                   <h4 className="mt-1 text-sm font-bold text-ink">{entry.lesson.title}</h4>
                                   <p className="mt-0.5 line-clamp-2 text-xs text-ink2">

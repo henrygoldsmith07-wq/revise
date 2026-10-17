@@ -175,7 +175,7 @@ describe("forecastUntouched — honest pace projection", () => {
     });
     expect(fc!.activeDays).toBe(0);
     expect(fc!.topicsPerDay).toBe(0);
-    expect(fc!.sentence).toContain("No reviews in the last 7 days");
+    expect(fc!.sentence).toContain("No flashcard reviews in the last 7 days");
     expect(fc!.sentence).toContain("stay untouched");
     expect(fc!.sentence).not.toContain("%");
   });

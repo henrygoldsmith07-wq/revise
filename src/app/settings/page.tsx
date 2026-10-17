@@ -447,6 +447,7 @@ export default function SettingsPage() {
                 When on, Pulse can connect to this account and correlate your reviews and attempts with outcomes
                 like mood or study accuracy. Turning it off revokes access immediately — Pulse is refused at the
                 source until it is switched back on.
+                {settings.e2eeEnabled ? " Sync encryption is on, so the server cannot read your history and Pulse cannot connect until you turn encryption off." : ""}
               </p>
             </div>
             <Button
@@ -606,7 +607,7 @@ function Account() {
             <div className="space-y-2">
               <p className="text-sm text-ink2">
                 You are in the <strong className="text-ink">{ARM_LABELS[store.experimentArm.arm] ?? store.experimentArm.arm}</strong> arm.
-                {" " }Everything stays on this device; only anonymous counts ever leave it (and nothing leaves unless Pulse sync is on).
+                {" " }Your arm and the study&apos;s results are kept on this device only. This version of Revise runs without accounts, so they are not sent anywhere.
               </p>
               <Button variant="secondary" size="sm" onClick={() => void store.leaveExperiment()}>Leave study</Button>
             </div>
@@ -909,11 +910,12 @@ function PilotTelemetryToggle() {
   return (
     <div className="mt-2 space-y-2">
       <p className="text-sm text-ink2">
-        For an agreed learner pilot. When on, Revise sends anonymous outcome counts — diagnostic
+        For an agreed learner pilot. When on, Revise sends outcome counts — diagnostic
         completions, started recommendations, recovered marks, completed proofs, time from first
-        loss to proof, and proof blocked by supply. Each event carries a rotating random ID (fresh
-        daily), a subject name and numbers only: no answers, no marks detail, no free text. Signed-in
-        learners only; nothing is readable back by any device.
+        loss to proof, and proof blocked by supply. Each event carries a subject name and numbers
+        only: no answers, no marks detail, no free text. It is not anonymous: events are stored
+        against your account so the pilot team can follow one learner over time, and deleting your
+        account deletes them. Signed-in learners only; nothing is readable back by any device.
         {pending > 0 ? ` ${pending} event${pending === 1 ? "" : "s"} waiting on this device.` : ""}
       </p>
       <div className="flex items-center gap-2">
@@ -979,7 +981,7 @@ function DataControls() {
           }}>Export pilot evidence</Button>
         </details>
         <details>
-          <summary className="cursor-pointer text-sm font-medium text-ink2">Pilot telemetry (anonymous outcome events)</summary>
+          <summary className="cursor-pointer text-sm font-medium text-ink2">Pilot telemetry (outcome events, linked to your account)</summary>
           <PilotTelemetryToggle />
         </details>
         <details>

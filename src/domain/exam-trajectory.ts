@@ -119,7 +119,7 @@ export function buildExamTrajectory(input: ExamTrajectoryInput): ExamTrajectory 
 
   let heading: string;
   if (position.kind === "none") {
-    heading = "No marked exam-style answers yet, so Revise cannot say where you are heading.";
+    heading = "No marked answers on checked questions yet (practice on unchecked questions does not count), so Revise cannot say where you are heading.";
   } else if (position.kind === "forming") {
     heading = `A likely score range appears after ${position.needed} more marked answer${position.needed === 1 ? "" : "s"}.`;
   } else if (position.referenceTier) {

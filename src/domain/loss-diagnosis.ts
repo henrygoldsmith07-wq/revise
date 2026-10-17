@@ -30,6 +30,7 @@ const HAPPENED: Partial<Record<RootCause, string>> = {
   "command-word-error": "The answer did not do what the command word asked.",
   "poor-application": "The idea was known but not applied to this situation.",
   "misread-question": "The question was read differently from how it was asked.",
+  "data-interpretation": "The marks were on reading or using the graph, table or data given.",
   timing: "Time ran short on this part.",
   "prerequisite-weakness": "An earlier topic this builds on is not secure yet.",
 };
