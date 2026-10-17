@@ -21,7 +21,8 @@ export const config = {
   matcher: [
     {
       // Pages only: not API routes, build assets or files served from /public.
-      source: "/((?!api|_next/static|_next/image|.*\\.[a-zA-Z0-9]+$).*)",
+      // Paths skipped here get a static CSP from next.config.ts instead.
+      source: "/((?!api(?:/|$)|_next/static|_next/image|.*\\.[a-zA-Z0-9]+$).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },
