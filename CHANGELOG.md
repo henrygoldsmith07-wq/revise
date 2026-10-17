@@ -1,5 +1,52 @@
 # Changelog
 
+## Fixes from using it as a new student: sync, marking, diagnosis, content and copy — 2026-10-17 (twenty-sixth pass)
+
+A production build was driven on a phone-sized screen as a new WJEC Physics
+student (onboarding, quick check, the recommended repair, Progress, a
+lesson). Each item below was reproduced first, and has a regression test
+where it is code.
+
+- **Sync.** One undecryptable row (routine once two devices each hold their
+  own E2EE key) stopped the pull at that page, so nothing past the next 500
+  rows of that entity ever arrived. The cursor still stays pinned for the
+  retry, but the pull keeps paging. Settings merged whole-row LWW, so a
+  settings save on a device without encryption switched it off on one that
+  had it; `e2eeEnabled` is now kept per device on pull.
+- **Pulse with E2EE.** The server cannot read encrypted `user_settings`, so
+  `/api/pulse/history` answered "turned off" when it was on. It now returns
+  409 `code: "e2ee"`, and Settings explains the conflict.
+- **Privacy wording.** Pilot telemetry was called "anonymous" in Settings,
+  the data-rights summary, docs and comments, but every `product_events` row
+  carries `user_id`. It now says the events are linked to the account.
+- **Content.** The 470 μF capacitor question asked for the final common p.d.
+  and stored energy without ever giving the charging voltage (its scheme
+  assumed 12 V); the stem now states 12.0 V. Part (d) said "final charge"
+  where it meant the charge at the start of discharge.
+- **Diagnosis.** `rootCauseOf` filed any unclassified loss on a fast answer
+  as "running short of time", so an untimed diagnostic sent a learner who did
+  not know the content to a pacing drill. Only a slow part now counts, labelled
+  "spending too long on some parts"; genuine rushing on a mostly-earned part
+  is still diagnosed by `mistake-classification`.
+- **Marking.** `polarityConflict` treated any "lower" without "higher" as
+  reversed reasoning, even for a point stating a relationship in both
+  directions ("a higher voltage means lower current and lower I²R loss").
+  For such points it now checks what each direction word is attached to, so
+  "lower voltage" and "higher current" are still refused. Paraphrase sets are
+  unchanged (design 111/115, held-out 27/29, wrong-set over-credit as before).
+  The working check reported "unit error" whenever a valued line was aligned
+  with a model step that states no value; it now needs a unit and the same
+  magnitude, as its definition says.
+- **Copy.** Lesson overviews read "I can explain distinguish scalars from
+  vectors…" (now "I can distinguish…"); a single-part question whose prompt
+  repeats its stem printed it twice; Today read "Then: After this:"; full
+  marks still said "Read what you missed"; the forecast and pace sentences now
+  name what they count (answers on checked questions; flashcard reviews).
+
+Still open, and not closable in code: no flagship question has a human
+review, most generated lessons restate the spec point rather than teach it,
+and a repair re-sits the questions just answered.
+
 ## Evidence wording matches what is recorded; Schedule's Today leads with Today's recommendation — 2026-10-16 (twenty-fifth pass)
 
 **Unaided and timed steps promised evidence on questions labelled "practice
