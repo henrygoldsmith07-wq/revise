@@ -33,6 +33,8 @@ export const REVISE_META_KEYS = {
   aiConsentPending: "revise.aiConsentPending.v1",
   /** Last verified human-verification ledger fetched from /api/review-ledger (reviewer portal approvals). */
   runtimeReviewLedger: "revise.runtimeReviewLedger.v1",
+  /** Unfinished quick-diagnostic runs by subject, so a reload resumes the same questions. */
+  quickDiagnosticRuns: "revise.quickDiagnosticRuns.v1",
 } as const;
 
 // New keys have no legacy spelling; lookups fall back gracefully.

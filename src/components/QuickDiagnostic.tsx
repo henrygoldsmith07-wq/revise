@@ -6,7 +6,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { rootCauseOf } from "@/domain/mistake-patterns";
-import { quickDiagnosticPool, quickDiagnosticReport, selectQuickDiagnostic, type QuickProbe } from "@/domain/quick-diagnostic";
+import { quickDiagnosticPool, quickDiagnosticReport, resumeQuickDiagnostic, selectQuickDiagnostic, type QuickDiagnosticRun, type QuickProbe } from "@/domain/quick-diagnostic";
+import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { QuestionRunner } from "./QuestionRunner";
 import { ButtonLink, Button, Panel } from "./ui";
 import { useStoreFields } from "@/state/store";
@@ -27,53 +28,87 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
   const [reviewing, setReviewing] = useState<Attempt | null>(null);
   const advance = () => {
     if (!reviewing) return;
-    setDone((prev) => [...prev, reviewing]);
+    const next = [...done, reviewing];
+    setDone(next);
+    if (selection) void saveRun({ ...selection, doneAttemptIds: next.map((a) => a.id) });
     setReviewing(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const [selection] = useState(() => {
-    const pool = quickDiagnosticPool(store.questions, store.attempts, subjectId);
-    const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
-    const trusted = selectQuickDiagnostic({ questions: pool, topicIds });
-    if (trusted.items.length) return { ...trusted, topicIds, practiceTier: false as const };
-    // No trusted supply (the normal flagship state until human review lands):
-    // offer an authored practice-tier check, labelled as practice, not proof.
-    const practice = selectQuickDiagnostic({ questions: pool, topicIds, practiceTier: true });
-    return { ...practice, topicIds, practiceTier: true as const };
-  });
+  // The run is chosen once and saved, so a reload resumes the same questions
+  // at the same position instead of drawing a fresh set from the unseen pool.
+  const [selection, setSelection] = useState<QuickDiagnosticRun | null>(null);
+  const saveRun = async (run: QuickDiagnosticRun | null) => {
+    const runs = (await readReviseUserMeta<Record<string, QuickDiagnosticRun>>("quickDiagnosticRuns", store.userId)) ?? {};
+    if (run) runs[subjectId] = run;
+    else delete runs[subjectId];
+    await writeReviseUserMeta("quickDiagnosticRuns", store.userId, runs);
+  };
   useEffect(() => {
-    if (started && selection.items.length) void store.recordFunnel("diagnostic_started", subjectId);
+    let cancelled = false;
+    void (async () => {
+      const runs = await readReviseUserMeta<Record<string, unknown>>("quickDiagnosticRuns", store.userId).catch(() => undefined);
+      if (cancelled) return;
+      const resumed = resumeQuickDiagnostic(runs?.[subjectId], subjectId, store.questions, store.attempts);
+      if (resumed) {
+        setDone(resumed.done);
+        setStarted(true);
+        setSelection(resumed.run);
+        return;
+      }
+      const pool = quickDiagnosticPool(store.questions, store.attempts, subjectId);
+      const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
+      const trusted = selectQuickDiagnostic({ questions: pool, topicIds });
+      // No trusted supply (the normal flagship state until human review lands):
+      // offer an authored practice-tier check, labelled as practice, not proof.
+      const practiceTier = !trusted.items.length;
+      const chosen = practiceTier ? selectQuickDiagnostic({ questions: pool, topicIds, practiceTier: true }) : trusted;
+      setSelection({ ...chosen, version: 1, subjectId, topicIds, practiceTier, doneAttemptIds: [] });
+    })();
+    return () => { cancelled = true; };
+    // Chosen once per mount, like the synchronous initialiser it replaces.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    // Saved only once the learner starts, so opening the page never pins a set.
+    if (started && selection && selection.items.length && done.length === 0) void saveRun(selection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, selection]);
+  useEffect(() => {
+    if (started && selection?.items.length && done.length === 0) void store.recordFunnel("diagnostic_started", subjectId);
     // Once per mount: `started` flips true at most once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [started]);
+  }, [started, selection]);
   const title = (id: string) => getTopic(id)?.title ?? id;
   const index = done.length;
-  const item = selection.items[index];
+  const items = useMemo(() => selection?.items ?? [], [selection]);
+  const item = items[index];
   const question = item ? store.questions.find((q) => q.id === item.questionId) : undefined;
 
   const report = useMemo(() => {
-    if (index < selection.items.length) return null;
+    if (!selection || index < items.length) return null;
     const probes: QuickProbe[] = done.map((attempt, i) => {
-      const it = selection.items[i]!;
+      const it = items[i]!;
       const cause = store.mistakes.find((m) => m.attemptId === attempt.id);
       return { topicId: it.topicId, dimension: it.dimension, awarded: attempt.awarded, max: attempt.max, ...(cause ? { cause: rootCauseOf(cause) } : {}) };
     });
-    return quickDiagnosticReport({ probes, topicIds: [...new Set(selection.items.map((i) => i.topicId))], topicTitle: title });
-  }, [done, index, selection.items, store.mistakes]);
+    return quickDiagnosticReport({ probes, topicIds: [...new Set(items.map((i) => i.topicId))], topicTitle: title });
+  }, [done, index, items, selection, store.mistakes]);
 
   const finished = Boolean(report);
   useEffect(() => {
     if (finished) {
+      void saveRun(null);
       void store.recordFunnel("diagnostic_completed", subjectId);
-      captureProductEvent("diagnostic.completed", { subject: subjectId, count: selection.items.length });
+      captureProductEvent("diagnostic.completed", { subject: subjectId, count: items.length });
       if (store.settings.pilotTelemetry === true && store.userId) {
-        recordPilotEvent(store.userId, { event: "diagnostic.completed", subjectId, count: selection.items.length });
+        recordPilotEvent(store.userId, { event: "diagnostic.completed", subjectId, count: items.length });
         void flushPilotEvents(store.userId);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
+  if (!selection) return null;
   if (!selection.items.length) {
     return (
       <Panel className="space-y-3">
