@@ -23,7 +23,7 @@ export default function LessonPage() {
 function LessonBrowser() {
   const params = useSearchParams();
   // A new deep link must reset a prior manual selection, even on client navigation.
-  return <LessonBrowserForRequest key={`${params.get("subject") ?? ""}:${params.get("topic") ?? ""}`} />;
+  return <LessonBrowserForRequest key={`${params.get("subject") ?? ""}:${params.get("topic") ?? ""}:${params.get("checkpoint") ?? ""}`} />;
 }
 
 function LessonBrowserForRequest() {
@@ -55,6 +55,10 @@ function LessonBrowserForRequest() {
   }));
   const topics = useMemo(() => (subjectId ? allTopics([subjectId]) : []), [subjectId]);
   const initialTopicId = topicParam && topics.some((topic) => topic.id === topicParam) ? topicParam : undefined;
+  // A marked answer links to the checkpoint that teaches the point it lost
+  // (`checkpoint=<spec point id>`); LessonMode falls back to the topic's
+  // first checkpoint when the id is not one of the topic's.
+  const initialCheckpointId = initialTopicId ? params.get("checkpoint") ?? undefined : undefined;
 
   const changeSubject = (value: string) => {
     setSubjectId(value);
@@ -112,9 +116,10 @@ function LessonBrowserForRequest() {
             </p>
           ) : null}
           <LessonMode
-            key={`${subjectId}:${initialTopicId ?? ""}`}
+            key={`${subjectId}:${initialTopicId ?? ""}:${initialCheckpointId ?? ""}`}
             topics={topics}
             initialTopicId={initialTopicId}
+            initialCheckpointId={initialCheckpointId}
             onExit={() => setSubjectId("")}
           />
         </>

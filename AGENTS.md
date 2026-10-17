@@ -143,6 +143,17 @@ background and do other work while it runs. On Windows, invoke npm through
   it never makes a question, mark or proof claim. Check worked-example
   arithmetic before adding one (`tests/lesson-teaching.test.ts` checks shape,
   not physics).
+  Every taught lesson carries `teachingReview: "not-teacher-reviewed"`, and
+  the lesson page, roadmap card and Today roadmap card say "Not yet
+  teacher-reviewed"; there is no review path for lessons, so never set any
+  other value (twenty-eighth pass). A lost mark links to the checkpoint that
+  teaches the lost part's spec point (`relearnCheckpointFor` in
+  `src/domain/practice-next-step.ts`, `/lesson?…&checkpoint=<spec point id>`),
+  and the repair plan's "Targeted explanation" step opens that checkpoint
+  rather than the topic's first. The practice screen knows which points are
+  taught from `src/content/teaching/taught-spec-points.ts`, not the teaching
+  itself: add an id there with each new entry
+  (`tests/lesson-relearn.test.ts` fails otherwise).
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by
