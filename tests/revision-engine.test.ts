@@ -295,6 +295,14 @@ describe("mission sessions", () => {
     const mis = buildExamMissions({ mistakes: ms, recovery, daysToExam: 30, unseenByTopic: {} })[0]!;
     expect(buildMissionSession(mis, { questions, attempts: [], mistakes: ms }, "repair").questionIds).toEqual(["same-point"]);
 
+    // Within the spec point, a question that exercises the diagnosed cause wins.
+    const dataMs = [m("d1", PHY, "circuits", "src", { marksLost: 3, category: "interpretation", workingErrorKind: undefined })];
+    const withGraph = [...questions, onPoint(q("graph", PHY, "circuits", { stem: "A student plots ln V against t from the data." }), "sp-02")];
+    const dataRecovery = buildMarkRecovery({ mistakes: dataMs, attempts: [], questions: withGraph, now: NOW });
+    const dataMission = buildExamMissions({ mistakes: dataMs, recovery: dataRecovery, daysToExam: 30, unseenByTopic: {} })[0]!;
+    expect(dataMission.cause).toBe("data-interpretation");
+    expect(buildMissionSession(dataMission, { questions: withGraph, attempts: [], mistakes: dataMs }, "repair").questionIds).toEqual(["graph"]);
+
     const only = [questions[0]!, questions[1]!];
     const fallback = buildMissionSession(mis, { questions: only, attempts: [], mistakes: ms }, "repair");
     expect(fallback.questionIds).toEqual(["src"]);

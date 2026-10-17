@@ -113,6 +113,7 @@ export interface MissionSessionInput {
 }
 
 const COMMAND = /^\s*(evaluate|assess|discuss|justify|compare|suggest|explain)\b/i;
+const DATA_WORDS = /\b(?:graph|plot(?:s|ted)?|gradient|data|results|readings|measure(?:s|d|ments)?)\b/i;
 
 function demandOf(q: Question): string | undefined {
   return q.learning?.demand ?? q.parts.map((p) => partLearningMetadata(q, p)?.demand).find(Boolean);
@@ -130,6 +131,7 @@ export function causeFit(q: Question, cause: RootCause | null): number {
     case "poor-application": case "wrong-method": return demand === "application" || demand === "calculation" ? 2 : 0;
     case "missing-knowledge": return demand === "recall" || q.kind === "short" || q.kind === "mcq" ? 2 : 0;
     case "misunderstood-concept": return demand === "misconception" || demand === "explanation" ? 2 : 0;
+    case "data-interpretation": return DATA_WORDS.test(`${q.stem} ${q.parts.map((p) => p.prompt).join(" ")}`) ? 2 : 0;
     default: return 0;
   }
 }
