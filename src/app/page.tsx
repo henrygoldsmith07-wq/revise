@@ -17,6 +17,7 @@ import { BestNextStep } from "@/components/BestNextStep";
 import { CommandCentreCard } from "@/components/CommandCentreCard";
 import { useRevisionPlan } from "@/components/recovery-evidence";
 import { todayPick } from "@/domain/today-pick";
+import { checkpointHasProgress } from "@/domain/revision-checkpoint";
 import { WeekLine } from "@/components/RecoverySummary";
 import { ExamDateNudge } from "@/components/ExamDateNudge";
 import { TodayOverview } from "@/components/TodayOverview";
@@ -66,6 +67,13 @@ export default function TodayPage() {
   // "Chosen from your answers" is only true once there are answers to choose from.
   const hasAnswers = store.attempts.length > 0 || reviewLogs.length > 0;
   const context = todayContext(evidence.daysToExam, hasAnswers);
+  // A checkpoint is saved as soon as a step's first question shows; Today only
+  // offers to resume (and steps its recommendation aside) once there is
+  // progress in it to resume.
+  const resume = useMemo(
+    () => (revisionCheckpoint ? checkpointHasProgress(revisionCheckpoint, { attempts: store.attempts, reviewLogs }) : false),
+    [revisionCheckpoint, store.attempts, reviewLogs],
+  );
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -116,7 +124,7 @@ export default function TodayPage() {
       <TodayWelcome name={settings.displayName} greeting={greetingLabel} context={context} />
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
-      {revisionCheckpoint ? (
+      {resume ? (
         <ResumeRevisionCard />
       ) : (
         <div className="today-focus card p-5 sm:p-7">
@@ -127,14 +135,14 @@ export default function TodayPage() {
           )}
         </div>
       )}
-      {revisionCheckpoint ? null : (
+      {resume ? null : (
         <p className="text-sm text-ink3">
           Prefer to pick for yourself?{" "}
           <Link href="/study" className="inline-flex min-h-11 items-center font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
         </p>
       )}
-      {revisionCheckpoint ? null : <WeekLine />}
-      {revisionCheckpoint ? null : <ExamDateNudge />}
+      {resume ? null : <WeekLine />}
+      {resume ? null : <ExamDateNudge />}
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
           Plan, pace and outlook
