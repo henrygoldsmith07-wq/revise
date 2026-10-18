@@ -451,6 +451,19 @@ export function proofHref(subjectId: Id, topicId: Id): string {
 }
 
 /**
+ * The standalone proof check for the topic a mission's delayed-proof step is
+ * testing (its first question's first topic), or null when the session has no
+ * delayed-proof question. Before the thirtieth pass MissionSessionMode put the
+ * question id in `topic=` of a dead /adaptive-session link (proof=1, a flag nothing reads).
+ */
+export function missionProofHref(session: Pick<MissionSession, "steps">, questions: readonly Question[]): string | null {
+  const id = session.steps.find((s) => s.kind === "delayed-proof")?.questionIds[0];
+  const question = id ? questions.find((q) => q.id === id) : undefined;
+  const topicId = question?.topicIds[0];
+  return question && topicId ? proofHref(question.subjectId, topicId) : null;
+}
+
+/**
  * A proof check saves its run in the checkpoint's existing step state
  * (`MissionCheckpointState`: start instant, exact questions, hint budget), so a
  * refresh resumes the same run. The schema is unchanged: the run id is
