@@ -31,6 +31,16 @@ export interface ProofCandidateOptions {
   excludeFamilies?: Iterable<string>;
   /** Bias for ordering, e.g. how well a question matches a target root cause. */
   fit?: (question: Question) => number;
+  /** A question must pass this to be picked at all (e.g. shares the lost mark's spec point). */
+  require?: (question: Question) => boolean;
+  /**
+   * For a supported (non-proof) step: fill every slot an unreviewed question
+   * can fill first, and spend a teacher-reviewed one only when nothing else
+   * fits. Every reviewed question a repair or practice step serves becomes
+   * "seen", and a seen question can never be the unaided or delayed proof the
+   * topic needs (`unseenQuestion`). Ignored with `verifiedOnly`.
+   */
+  reserveReviewed?: boolean;
 }
 
 /**
@@ -49,7 +59,8 @@ export function selectProofCandidates(
   options: ProofCandidateOptions,
 ): Question[] {
   const excluded = new Set(options.excludeQuestionIds ?? []);
-  const pool = questions.filter((q) => !excluded.has(q.id) && q.topicIds.some((t) => topicIds.includes(t)) && unseenQuestion(q, attempts, questions));
+  const require = options.require ?? (() => true);
+  const pool = questions.filter((q) => !excluded.has(q.id) && q.topicIds.some((t) => topicIds.includes(t)) && require(q) && unseenQuestion(q, attempts, questions));
   const fit = options.fit ?? (() => 0);
   // `learnerEvidenceTrusted`, not `trustedAssessmentContent`: the latter is
   // deliberately permissive for subjects with no review gate, so it would treat
@@ -63,18 +74,37 @@ export function selectProofCandidates(
   const usedFamilies = new Set<string>(options.excludeFamilies ?? []);
   const used = new Set<Id>();
   const topicCount = new Map<Id, number>();
-  while (out.length < options.max) {
-    // Take the least-used topic's best remaining question.
-    const next = cand
-      .filter((q) => !used.has(q.id) && !questionFamilies(q).some((f) => usedFamilies.has(f)))
-      .sort((a, b) => Math.min(...a.topicIds.map((t) => topicCount.get(t) ?? 0)) - Math.min(...b.topicIds.map((t) => topicCount.get(t) ?? 0)))[0];
-    if (!next) break;
-    out.push(next);
-    next.topicIds.forEach((t) => topicCount.set(t, (topicCount.get(t) ?? 0) + 1));
-    questionFamilies(next).forEach((f) => usedFamilies.add(f));
-    used.add(next.id);
+  const fill = (tier: readonly Question[]) => {
+    while (out.length < options.max) {
+      // Take the least-used topic's best remaining question.
+      const next = tier
+        .filter((q) => !used.has(q.id) && !questionFamilies(q).some((f) => usedFamilies.has(f)))
+        .sort((a, b) => Math.min(...a.topicIds.map((t) => topicCount.get(t) ?? 0)) - Math.min(...b.topicIds.map((t) => topicCount.get(t) ?? 0)))[0];
+      if (!next) break;
+      out.push(next);
+      next.topicIds.forEach((t) => topicCount.set(t, (topicCount.get(t) ?? 0) + 1));
+      questionFamilies(next).forEach((f) => usedFamilies.add(f));
+      used.add(next.id);
+    }
+  };
+  if (options.reserveReviewed && !options.verifiedOnly) {
+    // Unreviewed first; reviewed only for the slots nothing else can fill.
+    fill(cand.filter((q) => !learnerEvidenceTrusted(q)));
+    fill(cand.filter(learnerEvidenceTrusted));
+  } else {
+    fill(cand);
   }
   return out;
+}
+
+/**
+ * How many questions in a supported (non-proof) step are teacher-reviewed
+ * flagship questions. Each one is proof supply spent on practice: once seen it
+ * cannot be the topic's unaided or delayed proof. Non-zero only when
+ * `reserveReviewed` found no unreviewed alternative.
+ */
+export function reviewedSpentOnPractice(qs: readonly Question[]): number {
+  return qs.filter(learnerEvidenceTrusted).length;
 }
 
 export interface MissionSessionStep {
@@ -88,6 +118,12 @@ export interface MissionSessionStep {
   minutes: number;
   /** Every question in the step is human-verified. */
   verified: boolean;
+  /**
+   * Teacher-reviewed questions a supported step had to use because no
+   * unreviewed question fitted; each is proof supply spent on practice.
+   * Absent on proof steps and when none were spent.
+   */
+  reviewedSpent?: number;
   context: MissionAttemptContext;
 }
 
@@ -142,7 +178,7 @@ const proofEligible = (qs: readonly Question[]): boolean => qs.length > 0 && qs.
 const minutesFor = (q: Question) => Math.max(0.5, q.learning?.expectedMinutes ?? q.totalMarks * 0.75);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-interface Pick { max: number; verifiedOnly: boolean; transferOnly?: boolean }
+interface Pick { max: number; verifiedOnly: boolean; transferOnly?: boolean; reserveReviewed?: boolean }
 
 export function buildMissionSession(mission: ExamMission, input: MissionSessionInput, stageOverride?: MissionStageKind): MissionSession {
   const stage = stageOverride ?? mission.current.kind;
@@ -161,11 +197,12 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
   // A mission draws several rungs from one pool, so keep them apart.
   const used = new Set<Id>(sourceIds);
   const usedFamilies = new Set<string>(sourceFamilies);
-  const unseenPick = ({ max, verifiedOnly, transferOnly }: Pick): Question[] => {
+  const unseenPick = ({ max, verifiedOnly, transferOnly, reserveReviewed }: Pick): Question[] => {
     const picked = selectProofCandidates(input.questions, input.attempts, topics, {
       max,
       verifiedOnly,
       transferOnly,
+      reserveReviewed,
       excludeQuestionIds: used,
       excludeFamilies: usedFamilies,
       fit: (q) => causeFit(q, mission.cause),
@@ -193,8 +230,9 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
   // each lost mark (highest first) take an unseen question from a different
   // family that shares the lost part's spec point or capability; only when
   // the bank has none does the original come back.
-  const repairSet = (max: number): { questions: Question[]; resat: number } => {
+  const repairSet = (max: number): { questions: Question[]; resat: number; fresh: Question[] } => {
     const out: Question[] = [];
+    const fresh: Question[] = [];
     let resat = 0;
     for (const m of sources) {
       if (out.length >= max) break;
@@ -205,15 +243,20 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
         ...(lostPart ? [lostPart] : source.parts).flatMap((p) => [...(p.specPointIds ?? []), ...(p.capabilityIds ?? [])]),
       ]);
       const overlap = (q: Question) => q.parts.reduce((n, p) => n + [...(p.specPointIds ?? []), ...(p.capabilityIds ?? [])].filter((id) => skills.has(id)).length, 0);
+      // A sibling must share the lost skill. Teacher-reviewed siblings are
+      // kept for the proof check while an unreviewed one shares it too.
       const [sibling] = selectProofCandidates(input.questions, input.attempts, [m.topicId], {
         max: 1,
         verifiedOnly: false,
+        reserveReviewed: true,
         excludeQuestionIds: used,
         excludeFamilies: usedFamilies,
         fit: (q) => overlap(q) * 10 + causeFit(q, mission.cause),
+        require: skills.size === 0 ? undefined : (q) => overlap(q) > 0,
       });
-      if (sibling && (skills.size === 0 || overlap(sibling) > 0)) {
+      if (sibling) {
         out.push(sibling);
+        fresh.push(sibling);
         used.add(sibling.id);
         questionFamilies(sibling).forEach((f) => usedFamilies.add(f));
       } else if (!out.includes(source)) {
@@ -221,15 +264,21 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
         resat++;
       }
     }
-    return { questions: out, resat };
+    return { questions: out, resat, fresh };
   };
 
   const steps: MissionSessionStep[] = [];
-  const add = (kind: MissionStepKind, title: string, why: string, qs: Question[], hintBudget: number | undefined) => {
+  const add = (kind: MissionStepKind, title: string, why: string, qs: Question[], hintBudget: number | undefined, freshPicks: readonly Question[] = []) => {
     if (!qs.length) return;
+    // A supported step that had to use reviewed questions says so: they will
+    // not be available later as fresh proof for this topic.
+    const spent = reviewedSpentOnPractice(freshPicks);
     steps.push({
-      id: `${mission.id}:${kind}`, kind, title, why, questionIds: qs.map((q) => q.id), hintBudget,
+      id: `${mission.id}:${kind}`, kind, title,
+      why: spent ? `${why} Revise has no unreviewed question left for this, so ${spent === 1 ? "a teacher-reviewed question is" : `${spent} teacher-reviewed questions are`} used here; once seen, ${spent === 1 ? "it" : "they"} cannot be your proof check.` : why,
+      questionIds: qs.map((q) => q.id), hintBudget,
       minutes: round1(qs.reduce((s, q) => s + minutesFor(q), 0)), verified: qs.every(learnerEvidenceTrusted), context: ctx(kind),
+      ...(spent ? { reviewedSpent: spent } : {}),
     });
   };
 
@@ -244,13 +293,16 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
       : repair.resat === repair.questions.length
         ? "Re-sit the questions where marks were lost, with help available: Revise has no other question on these skills yet."
         : "A different question on each skill you lost marks on, with help available. Where Revise has no other question on that skill yet, you re-sit the original.";
-    add("repair", "Repair it", why, repair.questions, undefined);
+    // Only a newly picked sibling is spent supply; a re-sat original was already seen.
+    add("repair", "Repair it", why, repair.questions, undefined, repair.fresh);
   } else if (stage === "practise") {
-    add("practise", "Supported practice", "New questions that exercise the same weakness, with limited help.", unseenPick({ max: 3, verifiedOnly: false }), undefined);
+    const practised = unseenPick({ max: 3, verifiedOnly: false, reserveReviewed: true });
+    add("practise", "Supported practice", "New questions that exercise the same weakness, with limited help.", practised, undefined, practised);
   } else if (stage === "apply" && mission.proofBarrier) {
     // The lost marks can never count as proof, so reviewed-only selection would only empty the step.
     // Any unseen question works for an unaided practice check; it is labelled practice, not proof.
-    add("apply", "Unaided practice", "Different question families, no hints, so you can see whether the fix works on its own. Practice, not proof.", unseenPick({ max: 2, verifiedOnly: false }), 0);
+    const tried = unseenPick({ max: 2, verifiedOnly: false, reserveReviewed: true });
+    add("apply", "Unaided practice", "Different question families, no hints, so you can see whether the fix works on its own. Practice, not proof.", tried, 0, tried);
   } else if (stage === "apply") {
     // The evidence claim is made only when every question in the step is
     // teacher-reviewed flagship content (learnerEvidenceTrusted). Reviewed-only
