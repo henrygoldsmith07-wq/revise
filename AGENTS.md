@@ -161,6 +161,17 @@ background and do other work while it runs. On Windows, invoke npm through
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by
   `causeFit`, and re-sits the original only when none exists (and says so).
+- **Supported steps keep reviewed questions for proof** (thirtieth pass).
+  Anything that serves questions with help or as practice (mission repair,
+  practise, proof-barred apply; guided/worked plan steps) passes
+  `reserveReviewed` to `selectProofCandidates` or orders with
+  `deferProofSupply`: a reviewed question it serves becomes "seen" and can
+  never be the topic's proof. Spend one only when nothing else fits, and say
+  so (`reviewedSpent`).
+- **A Physics spec tag is a lesson link.** `tests/physics-spec-tags.test.ts`
+  checks every WJEC Physics tag is a real point in the question's topic and
+  pins the audited massive-authentic tags. Never retag a question to fill a
+  depth cell; `tests/subject-assessment-audit.test.ts` lists the honest gaps.
 - **Two pre-existing flake classes**, both evidenced on a clean baseline and both
   left documented rather than hidden: Vitest worker RPC timeouts on a loaded
   machine (`vitest.config.mts`), and wall-clock compile assertions
