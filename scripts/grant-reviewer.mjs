@@ -9,6 +9,10 @@
 //
 //   ... npm run wjec:reviewer:grant -- --email teacher@school.org --revoke
 //
+// A reviewer's --label is permanent: re-granting (e.g. after a revoke, or to
+// update the qualification) must use the same label, and the database refuses
+// a different one, because independent approvals are counted by it.
+//
 // It does exactly what docs/review-workflow.md describes by hand:
 //   1. finds the teacher's Supabase Auth account by email, or with --invite
 //      sends Supabase's own invite email (redirecting to the portal);
@@ -18,7 +22,7 @@
 // account, and never weakens the two-independent-reviewer rule. The service
 // role key stays in the maintainer's shell; nothing is written to the repo.
 import { createClient } from "@supabase/supabase-js";
-import { grantProblems, parseGrantArgs, reviewerLink } from "./lib/reviewer-grant.mjs";
+import { grantFailureHint, grantProblems, parseGrantArgs, reviewerLink } from "./lib/reviewer-grant.mjs";
 
 let args;
 try {
@@ -91,8 +95,7 @@ if (!args.dryRun) {
     p_granted_by: args.grantedBy,
   });
   if (error) {
-    const hint = /reviewer_label/.test(error.message) ? " (that pseudonym is already used by another reviewer)" : "";
-    console.error(`grant_reviewer_role failed (${error.message})${hint}`);
+    console.error(`grant_reviewer_role failed (${error.message})${grantFailureHint(error.message)}`);
     process.exit(1);
   }
 }

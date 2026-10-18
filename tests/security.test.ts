@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { buildContentSecurityPolicy, createNonce } from "@/lib/csp";
+import { REVIEW_AUDIT_EVENT_COLUMNS } from "@/lib/reviewer/runtime-ledger";
 
 const schema = () => readFileSync(join(process.cwd(), "supabase/schema.sql"), "utf8").replace(/\r\n/g, "\n");
 
@@ -47,6 +48,8 @@ describe("security — RLS + schema invariants", () => {
     // Reviewer portal.
     reviewer_roles: { kind: "self-read", policy: "reviewer_roles_self_read" },
     review_audit_events: { kind: "append-only", insert: "review_audit_events_reviewer_insert", read: "review_audit_events_reviewer_read" },
+    // The committed log's tail the first runtime event must continue; service role only.
+    review_audit_anchor: { kind: "definer-only" },
     // Opt-in pilot telemetry and shared disputes: write-only for the learner.
     product_events: { kind: "insert-only", policy: "product_events_insert" },
     marking_disputes: { kind: "insert-only", policy: "marking_disputes_insert" },
@@ -143,6 +146,8 @@ describe("security — RLS + schema invariants", () => {
       // Attestations are audit history and deliberately outlive the reviewer's
       // account (reviewer_user_id, no foreign key; never exposed publicly).
       if (table === "review_audit_events") continue;
+      // One row holding the committed log's tail; no user data.
+      if (table === "review_audit_anchor") continue;
       const start = sql.indexOf(`create table if not exists public.${table} (`);
       const block = sql.slice(start, sql.indexOf(");", start));
       expect(block, `${table}: user_id must reference auth.users with cascade`).toMatch(/user_id uuid[^,]*references auth\.users ?\(id\) on delete cascade/);
@@ -157,6 +162,7 @@ describe("security — RLS + schema invariants", () => {
     for (const fn of [
       "purge_account_server_data(uuid)", "account_residual_rows(uuid)", "purge_expired_server_data()",
       "grant_reviewer_role(uuid, text, text, text, text)", "revoke_reviewer_role(uuid)",
+      "set_review_audit_anchor(integer, text)",
     ]) {
       expect(sql).toContain(`revoke all on function public.${fn} from public, anon, authenticated;`);
       expect(sql).toContain(`grant execute on function public.${fn} to service_role`);
@@ -169,6 +175,39 @@ describe("security — RLS + schema invariants", () => {
     expect(sql).toContain("raise exception 'review_audit_events is append-only'");
     expect(sql).toMatch(/create or replace function public\.is_active_reviewer\(\)[\s\S]*?security definer[\s\S]*?where user_id = auth\.uid\(\) and revoked_at is null/);
     expect(sql).not.toContain("grant execute on function public.grant_reviewer_role(uuid, text, text, text, text) to authenticated");
+  });
+
+  it("the review audit guard verifies the domain hash, the anchor and repeat approvals", () => {
+    const sql = schema();
+    // The LAST definition of each function is the one a fresh schema.sql leaves installed.
+    const last = (name: string) => {
+      const start = sql.lastIndexOf(`create or replace function public.${name}(`);
+      expect(start, `${name} missing`).toBeGreaterThanOrEqual(0);
+      return sql.slice(start, sql.indexOf("\n$$;", start));
+    };
+    const guard = last("review_audit_events_guard");
+    expect(guard).toContain("if public.review_audit_event_hash(new.event) is distinct from new.hash then");
+    expect(guard).toContain("select tail_seq, tail_hash into anchor from public.review_audit_anchor where id;");
+    expect(guard).toContain("and (a.reviewer_id = new.reviewer_id or a.reviewer_user_id = new.reviewer_user_id)");
+    expect(guard).toContain("perform pg_advisory_xact_lock(hashtext('public.review_audit_events'));");
+    expect(last("review_audit_event_hash")).toContain("encode(sha256(convert_to(public.review_audit_canonical_json(p_event - 'hash'), 'UTF8')), 'hex')");
+    // Re-granting never relabels: independence is counted by pseudonym.
+    const grant = last("grant_reviewer_role");
+    expect(grant).toContain("raise exception 'reviewer pseudonym cannot change");
+    expect(grant.slice(grant.indexOf("on conflict (user_id) do update"))).not.toContain("reviewer_label =");
+    expect(last("set_review_audit_anchor")).toContain("its anchor can no longer move");
+    expect(sql).toContain("revoke all on public.review_audit_anchor from public, anon, authenticated;");
+  });
+
+  it("reviewers can read every review_audit_events column except reviewer_user_id", () => {
+    const sql = schema();
+    const start = sql.lastIndexOf("revoke select on public.review_audit_events from authenticated;");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const grant = /grant select \(([^)]*)\)\s+on public\.review_audit_events to authenticated;/.exec(sql.slice(start));
+    const columns = grant?.[1]?.split(",").map((c) => c.trim()) ?? [];
+    expect(columns).not.toContain("reviewer_user_id");
+    // Everything the portal reads (src/lib/reviewer/runtime-ledger.ts) stays readable.
+    for (const column of REVIEW_AUDIT_EVENT_COLUMNS) expect(columns).toContain(column);
   });
 
   it("batched sync RPC runs as the caller so table RLS still applies", () => {

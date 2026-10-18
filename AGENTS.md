@@ -201,6 +201,16 @@ The transfer-pair batch (`/reviewer/pairs`, `src/lib/reviewer/batches.ts`)
 is ordering and context only, like the priority plan: never use it to skip a
 check or count a pair as proven before both halves are verified.
 
+The database re-runs `auditLogIssues` on every insert into
+`review_audit_events` (direct PostgREST inserts by a reviewer included):
+it recomputes `eventHash` in SQL (`review_audit_event_hash`), anchors the
+first runtime row to the committed tail (`review_audit_anchor`) and refuses a
+repeat approval by pseudonym or account. Change the event shape, the
+canonical JSON or `REVIEWED_WJEC_SUBJECT_IDS` and that SQL must change in a
+new migration too (`tests/reviewer-sql.test.ts` compares them). A reviewer's
+label never changes once granted (`grant_reviewer_role` refuses), because
+independence is counted by it.
+
 `docs/review-workflow.md` covers all of it.
 
 ## Current honest position

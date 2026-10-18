@@ -137,7 +137,8 @@ label, role, qualification, date, six checks and comment, plus the reviewer's
 auth user id (`reviewer_user_id`, no foreign key) so RLS can bind a decision to
 its author. Audit rows are append-only and are kept after the reviewer's account
 is deleted, because they are the attestation trail behind trusted content; the
-user id is never served to students. `/api/review-ledger` publishes only the
+user id is never served to students, and other reviewers cannot select it
+either (column-level grants; only the service role reads it). `/api/review-ledger` publishes only the
 fields the committed ledger already publishes (label, role, qualification,
 date, checks), never comments, account ids or rejected decisions.
 

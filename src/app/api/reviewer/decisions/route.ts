@@ -19,7 +19,8 @@ import { appendRuntimeEvent, getReviewerContext, loadCombinedLog, reviewBank } f
 //      with the domain's auditLogIssues; the next event is built by the
 //      domain's appendReviewDecisions (422 with the domain's reasons).
 //   6. Inserted with the caller's session: RLS + the append trigger check the
-//      grant binding and chain continuity again (409 if someone appended first).
+//      grant binding, chain continuity, the recomputed hash and repeat
+//      approvals again (409 if someone appended first).
 // The service role is never used here.
 // ---------------------------------------------------------------------------
 

@@ -9,7 +9,7 @@ import { buildTransferBatch, linkedPartFor, needsLabel, nextInBatch, transferPai
 import { reviewerReturnPath } from "@/lib/reviewer/return-path";
 import { decision, NOW, PROMPTS, SUBJECT, wq } from "./helpers-review";
 // @ts-expect-error plain .mjs helper without types
-import { grantProblems, parseGrantArgs, reviewerLink } from "../scripts/lib/reviewer-grant.mjs";
+import { grantFailureHint, grantProblems, parseGrantArgs, reviewerLink } from "../scripts/lib/reviewer-grant.mjs";
 
 // The transfer-pair batch is ordering and context only: states come from the
 // domain's reviewStateOf, nobody is offered a question they already approved,
@@ -132,6 +132,13 @@ describe("maintainer grant command (validation only)", () => {
     expect(grantProblems({ ...ok, label: "j.smith-physics" }).join()).toMatch(/pseudonym/);
     expect(grantProblems({ ...ok, label: "henry" }).join()).toMatch(/cannot grant reviewer access to themselves/);
     expect(grantProblems({ ...ok, email: "henry@example.org", label: "reviewer-h" }).join()).toMatch(/themselves/);
+  });
+
+  it("explains a refused relabel and a taken pseudonym", () => {
+    expect(grantFailureHint("reviewer pseudonym cannot change: this account is already reviewer teacher-one, and independent approvals are counted by pseudonym"))
+      .toMatch(/re-run with --label teacher-one/);
+    expect(grantFailureHint('duplicate key value violates unique constraint "reviewer_roles_reviewer_label_key"')).toMatch(/already used by another reviewer/);
+    expect(grantFailureHint("network down")).toBe("");
   });
 
   it("rejects unknown flags and prints the batch link", () => {
