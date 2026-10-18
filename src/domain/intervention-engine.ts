@@ -83,7 +83,19 @@ function practiceHref(topicId: Id, flag: string, minutes: number | undefined, ex
   return `/practice?topic=${encodeURIComponent(topicId)}&${flag}=1${extra}${minutes ? `&minutes=${minutes}` : ""}`;
 }
 
-function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | null, minutes?: number): string {
+/**
+ * The standalone proof check (`ProofCheckMode` on /practice?proof=…): the
+ * same reviewed, unseen, no-hint questions as a mission's delayed-proof
+ * stage. Same shape as `proofHref` in mission-session (not imported, to keep
+ * this module's imports minimal; tests/proof-links.test.ts pins them equal).
+ * Until the thirtieth pass this step linked to /adaptive-session with a proof=1 flag,
+ * a flag the page ignored, so it ran an ordinary adaptive session.
+ */
+function proofCheckHref(topicId: Id, subjectId?: Id): string {
+  return `/practice?proof=${encodeURIComponent(topicId)}${subjectId ? `&subject=${encodeURIComponent(subjectId)}` : ""}`;
+}
+
+function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | null, minutes?: number, subjectId?: Id): string {
   switch (kind) {
     case "retrieve":
       return `/review?topic=${encodeURIComponent(topicId)}`;
@@ -106,7 +118,7 @@ function topicHref(topicId: Id, kind: InterventionStepKind, command?: string | n
       // tests/practice-step-mode.test.ts fails if a plan starts emitting it.
       return `/practice?topic=${encodeURIComponent(topicId)}&transfer=1`;
     case "delayed-proof":
-      return `/adaptive-session?topic=${encodeURIComponent(topicId)}&start=1&proof=1`;
+      return proofCheckHref(topicId, subjectId);
     case "revisit":
       return `/review?topic=${encodeURIComponent(topicId)}`;
   }
@@ -308,7 +320,7 @@ function prescribeFromEvidence(
       minutes: 8,
       countsAsProof: true,
       why: "This question is new and you have no hints, so on a teacher-reviewed question your answer counts as evidence.",
-      href: topicHref(topic.topicId, "delayed-proof"),
+      href: topicHref(topic.topicId, "delayed-proof", null, undefined, topic.subjectId),
     });
   }
 
