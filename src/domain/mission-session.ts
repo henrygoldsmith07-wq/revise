@@ -456,7 +456,7 @@ export function proofHref(subjectId: Id, topicId: Id): string {
  * delayed-proof question. Before the thirtieth pass MissionSessionMode put the
  * question id in `topic=` of a dead /adaptive-session link (proof=1, a flag nothing reads).
  */
-export function missionProofHref(session: Pick<MissionSession, "steps">, questions: readonly Question[]): string | null {
+export function missionProofHref(session: { steps: readonly MissionSessionStep[] }, questions: readonly Question[]): string | null {
   const id = session.steps.find((s) => s.kind === "delayed-proof")?.questionIds[0];
   const question = id ? questions.find((q) => q.id === id) : undefined;
   const topicId = question?.topicIds[0];
