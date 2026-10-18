@@ -24,8 +24,11 @@ test.use({
 
 async function fits(page: Page, where: string) {
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), { message: `${where} scrolled sideways at 360px` })
-    .toBe(true);
+    // Against 360, not window.innerWidth: with isMobile the browser zooms out
+    // to fit wide content, so innerWidth grows with the overflow (373 on the
+    // old readiness detail) and the comparison would always pass.
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth), { message: `${where} scrolled sideways at 360px` })
+    .toBeLessThanOrEqual(361);
 }
 
 /** Answer the current question without really trying (first option, or "I am not sure.") and submit. */
@@ -103,6 +106,14 @@ test("fresh WJEC Physics student: quick check → repair → lesson → plan →
   await page.goto("/readiness#proof");
   await expect(main.getByText("Proof of improvement").first()).toBeVisible({ timeout: 30_000 });
   await fits(page, "the proof section");
+
+  // The readiness detail used to reach 373px: its two-column grids let the
+  // "Recurring misconceptions" and "How sure Revise is" panels keep their
+  // min-content width (thirty-first pass).
+  await page.goto("/readiness");
+  await main.getByText("Detailed readiness and evidence").first().click();
+  await expect(main.getByText("Remembering it versus using it").first()).toBeVisible({ timeout: 30_000 });
+  await fits(page, "the readiness detail");
 
   expect(thirdParty, "a student with AI off reached huggingface.co").toEqual([]);
   expect(cspViolations(), "CSP violations other than Zod's eval probe").toEqual([]);
