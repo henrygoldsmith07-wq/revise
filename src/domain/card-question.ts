@@ -23,13 +23,14 @@ export function cardPointIds(card: Card): Id[] {
   return card.specPointIds ?? [];
 }
 
-/** Authored questions in the card's topic that test at least one of the
- *  card's spec points. Exact intersection only. */
+/** Authored (never machine-generated) questions in the card's topic that
+ *  test at least one of the card's spec points. Exact intersection only. */
 export function questionsTestingCardPoint(card: Card, questions: Question[]): Question[] {
   const points = new Set(cardPointIds(card));
   if (points.size === 0) return [];
   return questions.filter(
     (question) =>
+      question.origin !== "ai" && question.source !== "generated" &&
       question.topicIds.includes(card.topicId) &&
       (question.specPointIds ?? []).some((id) => points.has(id)),
   );

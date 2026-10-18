@@ -86,6 +86,24 @@ export function GenerateMockPanel({ subjectId, onStart }: { subjectId: string; o
 
   const topics = preview?.topics ?? [];
 
+  // Mocks draw only on trusted questions. When none qualify, the controls
+  // would only tweak an empty paper, so say why instead.
+  if (!preview || !preview.questionIds.length) {
+    return (
+      <Panel className="space-y-2">
+        <SectionHeading
+          title="Generate a bespoke mock"
+          hint="Builds a fresh paper from the question bank, aimed at the topics measured evidence says are costing you marks."
+        />
+        <p className="text-sm text-ink2" role="status">
+          {bankCount
+            ? `Not available for this subject yet. A mock is built only from questions a teacher has reviewed, and none of the ${bankCount} questions here has been reviewed. Practise them from the Practice tab in the meantime.`
+            : "Not available for this subject yet: it has no questions to build a mock from."}
+        </p>
+      </Panel>
+    );
+  }
+
   return (
     <Panel className="space-y-3">
       <SectionHeading

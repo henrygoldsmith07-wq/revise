@@ -168,7 +168,7 @@ export default function SettingsPage() {
         <SectionHeading title="Subjects" hint="Only these are planned, recommended and predicted." />
         <Panel>
           {[
-            { title: "Flagship depth", list: allSubjects().filter((s) => s.contentTier === "flagship") },
+            { title: "Spec-checked", list: allSubjects().filter((s) => s.contentTier === "flagship") },
             { title: "Reference (not spec-checked)", list: allSubjects().filter((s) => s.contentTier !== "flagship") },
           ].map((group) => (
             <div key={group.title} className="mb-4 last:mb-0">

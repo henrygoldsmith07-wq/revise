@@ -473,7 +473,7 @@ export function generateMockPaper(input: MockGeneratorInput): GeneratedMock {
     );
   }
   if (untrustedCount > 0) {
-    notes.push(`${untrustedCount} question${untrustedCount === 1 ? "" : "s"} in this subject is not trusted content yet and was left out.`);
+    notes.push(`${untrustedCount} question${untrustedCount === 1 ? " in this subject is" : "s in this subject are"} not trusted content yet and ${untrustedCount === 1 ? "was" : "were"} left out.`);
   }
   if (![...evidence.values()].some((row) => row.evidence !== "none")) {
     notes.push("No measured evidence exists for this subject yet — the paper covers the syllabus evenly to establish a baseline.");
