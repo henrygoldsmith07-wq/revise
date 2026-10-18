@@ -9,7 +9,8 @@ import {
   type OfficialPaperManifest,
   type OfficialPaperConfirmation,
 } from "@/domain/official-papers";
-import type { Attempt, Question } from "@/domain/types";
+import type { Attempt, Question, QuestionPart } from "@/domain/types";
+import { trustedAssessmentAttempt } from "@/domain/learning-evidence";
 
 // ---------------------------------------------------------------------------
 // Official-paper trust tier — synthetic fixtures, NOT human evidence. Asserts
@@ -41,6 +42,16 @@ const confirmation: OfficialPaperConfirmation = {
   questionRef: "Q3(a)",
 };
 
+const UPLOADED_PART: QuestionPart = {
+  id: "p1",
+  label: "(a)",
+  prompt: "State the principle.",
+  marks: 2,
+  markScheme: ["Total momentum before equals total momentum after", "in a closed system"],
+  modelAnswer: "Momentum is conserved in a closed system.",
+  markSchemeSource: "uploaded-scheme",
+};
+
 function question(over: Partial<Question> = {}): Question {
   return {
     id: "q1",
@@ -48,7 +59,7 @@ function question(over: Partial<Question> = {}): Question {
     topicIds: ["t1"],
     kind: "short",
     stem: "State the principle.",
-    parts: [],
+    parts: [UPLOADED_PART],
     totalMarks: 2,
     calculatorAllowed: true,
     difficulty: 2,
@@ -130,5 +141,41 @@ describe("official-paper eligibility", () => {
       question: question({ subjectId: "wjec-alevel-maths", officialPaper: confirmation }),
       attempt: a, history: [a], manifest: MANIFEST, enabled: true,
     })).toBe(false);
+  });
+});
+
+describe("official-paper trust needs the paper's own mark scheme", () => {
+  const a = attempt({ mode: "paper" });
+  const context = { enabled: true, manifest: MANIFEST };
+
+  it("refuses a confirmed question whose scheme the model wrote, even though the learner ticked it", () => {
+    const written = question({ officialPaper: confirmation, parts: [{ ...UPLOADED_PART, markSchemeSource: "model-written" }] });
+    expect(officialPaperQuestionEligible(written, MANIFEST, true)).toBe(false);
+    expect(officialPaperProofEligible({ question: written, attempt: a, history: [a], manifest: MANIFEST, enabled: true })).toBe(false);
+    expect(trustedAssessmentAttempt(a, written, [a], [written], context)).toBe(false);
+  });
+
+  it("fails closed when the source was never recorded, when any one part is model-written, or with no parts", () => {
+    const legacy = question({ officialPaper: confirmation, parts: [{ ...UPLOADED_PART, markSchemeSource: undefined }] });
+    const mixed = question({
+      officialPaper: confirmation,
+      parts: [UPLOADED_PART, { ...UPLOADED_PART, id: "p2", markSchemeSource: "model-written" }],
+    });
+    const empty = question({ officialPaper: confirmation, parts: [] });
+    for (const q of [legacy, mixed, empty]) {
+      expect(officialPaperQuestionEligible(q, MANIFEST, true)).toBe(false);
+      expect(trustedAssessmentAttempt(a, q, [a], [q], context)).toBe(false);
+    }
+  });
+
+  it("still accepts a confirmed question whose every part came from the uploaded scheme", () => {
+    const uploaded = question({ officialPaper: confirmation });
+    expect(officialPaperQuestionEligible(uploaded, MANIFEST, true)).toBe(true);
+    expect(officialPaperProofEligible({ question: uploaded, attempt: a, history: [a], manifest: MANIFEST, enabled: true })).toBe(true);
+    // The override itself is unchanged, so the refusals above are the scheme gate's doing.
+    const practice = attempt();
+    expect(trustedAssessmentAttempt(practice, uploaded, [practice], [uploaded], context)).toBe(true);
+    const writtenToo = question({ officialPaper: confirmation, parts: [{ ...UPLOADED_PART, markSchemeSource: "model-written" }] });
+    expect(trustedAssessmentAttempt(practice, writtenToo, [practice], [writtenToo], context)).toBe(false);
   });
 });

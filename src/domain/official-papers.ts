@@ -19,6 +19,9 @@
 //     rule, checked against attempt history).
 //   · All other proof rules still apply on top: independent, unseen, delayed.
 //     Help still never counts as proof.
+//   · It needs the paper's own mark scheme: a question with any part whose
+//     scheme the model wrote (or whose source was never recorded) is not
+//     eligible, however it was confirmed (paper-extraction.ts).
 //
 // With an empty manifest every lookup misses, so the whole path is inert
 // until real digests are verified from WJEC's site and committed. Never
@@ -28,6 +31,7 @@
 
 import type { Attempt, Id, Question } from "./types";
 import { validAttestationInstant } from "./trust-attestation";
+import { markSchemeFromUpload } from "./paper-extraction";
 import bundledManifest from "@/content/official-papers/manifest.json";
 
 /** Distinct tier label. Kept separate from TrustTier on purpose. */
@@ -118,20 +122,28 @@ export function findOfficialPaperMatch(
   return manifest.papers.find((p) => p.sha256 === clean) ?? null;
 }
 
-/** A stored per-question confirmation is valid only against the manifest. */
+/**
+ * A stored per-question confirmation is valid only against the manifest, and
+ * only for a question whose every part's mark scheme came from the learner's
+ * uploaded scheme. The learner confirms the question against the paper; a
+ * scheme the model wrote is not on the paper, so it can never borrow that
+ * confirmation (fails closed, including for rows saved before the source was
+ * recorded).
+ */
 export function officialPaperConfirmationValid(
-  question: Pick<Question, "officialPaper">,
+  question: Pick<Question, "officialPaper" | "parts">,
   manifest: OfficialPaperManifest,
 ): boolean {
   const c = question.officialPaper;
   if (!c || !c.questionRef.trim() || !validAttestationInstant(c.confirmedAt)) return false;
+  if (!markSchemeFromUpload(question)) return false;
   const entry = manifest.papers.find((p) => p.id === c.manifestId);
   return Boolean(entry && entry.sha256 === c.digest.trim().toLowerCase() && WJEC_HTTPS.test(entry.sourceUrl));
 }
 
 /** Question-level eligibility (no attempt needed): a valid confirmation. */
 export function officialPaperQuestionEligible(
-  question: Pick<Question, "officialPaper"> | undefined,
+  question: Pick<Question, "officialPaper" | "parts"> | undefined,
   manifest: OfficialPaperManifest,
   enabled: boolean,
 ): boolean {

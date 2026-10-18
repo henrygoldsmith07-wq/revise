@@ -287,7 +287,17 @@ export interface QuestionPart {
    * (src/domain/marking-reject.ts). Rules only ever remove credit.
    */
   rejects?: MarkSchemeReject[];
+  /**
+   * Extracted past-paper parts only: whether `markScheme` was taken from the
+   * learner's uploaded mark scheme or written by the model. Absent on
+   * authored questions and on extractions saved before it was recorded;
+   * absence is treated as "model-written" (src/domain/paper-extraction.ts).
+   */
+  markSchemeSource?: MarkSchemeSource;
 }
+
+/** Where an extracted part's mark scheme came from. */
+export type MarkSchemeSource = "uploaded-scheme" | "model-written";
 
 /** One "do not accept" line for one mark-scheme point. */
 export interface MarkSchemeReject {

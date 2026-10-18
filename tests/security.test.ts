@@ -268,7 +268,7 @@ describe("security — API route guards", () => {
     const post = route.slice(route.indexOf("export async function POST"));
     const consent = post.indexOf("auth.consent.allowed");
     expect(consent).toBeGreaterThan(-1);
-    expect(consent).toBeLessThan(post.indexOf("request.text()"));
+    expect(consent).toBeLessThan(post.indexOf("readBoundedText(request"));
     expect(consent).toBeLessThan(post.indexOf("enforceAiRateLimit"));
     expect(consent).toBeLessThan(post.indexOf("dispatch("));
     expect(route).toContain('.from("ai_consent")');

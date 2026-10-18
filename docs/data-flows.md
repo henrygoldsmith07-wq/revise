@@ -68,7 +68,7 @@ until the staging suite has passed against a migrated database.
   disk, unread.
 
 The last two are device-local by design and never synced. `aiCache` holds
-previously AI-graded answers plus the embedding used to find them; `aiDlq`
+previously AI-graded answers, keyed by an answer hash; `aiDlq`
 holds marks awaiting an AI re-grade. Both hold learner answers in plaintext on
 the device. `clearAll()` wipes all fifteen.
 
@@ -152,13 +152,18 @@ offline fallback, so losing the network mid-session degrades to the same result
 as having no provider configured.
 
 Four tiers decide who grades an answer (`src/ai/marking-resilience.ts`):
-device-local semantic cache → on-device model (`localAiMarking`, off by
+device-local answer cache → on-device model (`localAiMarking`, off by
 default) → cloud AI → deterministic rubric fallback. When the rubric fallback
 answers, the attempt is queued in `aiDlq` and retried later.
 
 What the tiers mean for data:
 
 - Cache, local-model and rubric tiers make **no network call**. Nothing leaves.
+  The cache is an exact answer-hash lookup in IndexedDB; there is no embedding
+  model and nothing is fetched from huggingface.co on the marking path. The
+  one download is opt-in: turning on on-device marking (`localAiMarking`)
+  makes WebLLM fetch its model weights once from the host in its prebuilt
+  model list (Hugging Face). That request carries no learner text.
 - The cloud tier sends the question plus `maskPii`-masked answers.
   `aiMark` sets the "details withheld" disclosure only for this tier, which is
   an honest signal.
@@ -172,7 +177,10 @@ What the tiers mean for data:
   question prompt, the mark-scheme point and the student answer (each truncated
   to 500/300/800 characters). Those arrive already masked, because
   `aiDiagnoseError` masks before posting to the AI route. `CLASSIFIER_DISABLED=1`
-  forces the deterministic local classifier instead.
+  forces the deterministic local classifier instead. Because the classifier
+  needs no key, the route counts it as a provider: a production deploy without
+  Supabase auth answers 503 rather than relaying to it in local mode, unless
+  it is disabled.
 
 ### Pulse
 

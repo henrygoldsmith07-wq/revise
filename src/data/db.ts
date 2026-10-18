@@ -28,7 +28,7 @@ import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 // in a school with blocked wifi, or with no account at all.
 //
 // Two local-only stores (never synced) support the AI-marking resilience
-// layer: `aiCache` (semantic cache of previously AI-graded answers) and
+// layer: `aiCache` (exact-answer cache of previously AI-graded answers) and
 // `aiDlq` (dead-letter queue of marks awaiting an AI re-grade). They are
 // device-local by design: a cached grade is only valid for the same student,
 // and the DLQ replays against the *local* attempt records.
@@ -45,13 +45,13 @@ import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 export const DB_NAME = "revise";
 export const DB_VERSION = PERSISTED_SCHEMA_VERSION;
 
-/** A cached AI mark: the graded result plus the embedding used to find it. */
+/** A cached AI mark: the graded result, keyed by question, part and answer hash. */
 export interface AiCacheEntry {
   /** questionId:partId:answerHash — exact-match tier. */
   key: string;
   /** questionId:partId prefix lets one query fetch a whole question's entries. */
   scope: string;
-  /** L2-normalised embedding of "answer \u0000 mark-scheme points". Null on legacy pre-embedding entries. */
+  /** Always null: the embedding tier was removed. Kept so stored rows keep their shape. */
   embedding: number[] | null;
   /** The AI grade being cached. */
   marked: Attempt["marked"][number];

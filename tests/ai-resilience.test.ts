@@ -1,34 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { cosineSimilarity, fnv1a, answerKey, scopeKey, CACHE_THRESHOLD } from "@/ai/semantic-cache";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fnv1a, answerKey, scopeKey } from "@/ai/semantic-cache";
 import { dlqBackoffMs, dlqNextAttemptAt, DLQ_BASE_DELAY_MS, DLQ_MAX_DELAY_MS, DLQ_MAX_ATTEMPTS, AI_DLQ_RESOLVED_EVENT } from "@/ai/mark-dlq";
 import type { MarkTier } from "@/ai/marking-resilience";
 
 // ---------------------------------------------------------------------------
 // AI marking resilience: supply-chain fallbacks for grading.
 //
-// The semantic cache and the dead-letter queue are the two levers that keep
+// The answer cache and the dead-letter queue are the two levers that keep
 // marking working when the free-tier provider is rate-limiting or down. The
 // pure math below is unit-tested directly; the IDB-backed flows follow the
 // repo's structural-contract pattern (see performance-optimization.test.ts)
 // because the vitest environment is plain node without IndexedDB.
 // ---------------------------------------------------------------------------
 
-describe("semantic cache math", () => {
-  it("cosine similarity: identical vectors are 1, orthogonal are 0", () => {
-    expect(cosineSimilarity([1, 0, 2], [2, 0, 4])).toBeCloseTo(1, 10);
-    expect(cosineSimilarity([1, 0], [0, 1])).toBe(0);
-    expect(cosineSimilarity([0, 0], [1, 1])).toBe(0); // zero vector guards div-by-zero
-  });
-
-  it("cosine similarity orders candidates by angle, not magnitude", () => {
-    const query = [1, 1, 0];
-    const near = [0.9, 1, 0.1];
-    const far = [0.1, 0.2, 1];
-    expect(cosineSimilarity(query, near)).toBeGreaterThan(cosineSimilarity(query, far));
-  });
-
+describe("answer cache keys", () => {
   it("FNV-1a is deterministic and sensitive to content", () => {
     expect(fnv1a("the mitochondria is the powerhouse")).toBe(fnv1a("the mitochondria is the powerhouse"));
     expect(fnv1a("a")).not.toBe(fnv1a("b"));
@@ -43,10 +30,32 @@ describe("semantic cache math", () => {
     expect(scopeKey("q1", "p1")).toBe(scopeKey("q1", "p1"));
     expect(scopeKey("q1", "p1")).not.toBe(scopeKey("q1", "p2"));
   });
+});
 
-  it("the semantic threshold is strict enough to avoid wrong-but-similar grades", () => {
-    expect(CACHE_THRESHOLD).toBeGreaterThanOrEqual(0.9);
-    expect(CACHE_THRESHOLD).toBeLessThanOrEqual(0.99);
+describe("no third-party model download on the marking path", () => {
+  const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
+
+  // The removed embedding tier fetched a MiniLM model from huggingface.co on
+  // the first written answer, with AI off and no consent check. Nothing on
+  // the marking path may load a model from a third party.
+  it("the answer cache and the resilience chain import no embedder or transformers runtime", () => {
+    for (const file of ["src/ai/semantic-cache.ts", "src/ai/marking-resilience.ts", "src/ai/client.ts"]) {
+      const src = read(file);
+      expect(src, file).not.toContain("@huggingface/transformers");
+      expect(src, file).not.toMatch(/pipeline\(|getEmbedder|feature-extraction/);
+    }
+  });
+
+  it("no source file imports @huggingface/transformers and it is not a dependency", () => {
+    const pkg = JSON.parse(read("package.json")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect(pkg.dependencies?.["@huggingface/transformers"]).toBeUndefined();
+    expect(pkg.devDependencies?.["@huggingface/transformers"]).toBeUndefined();
+    const walk = (dir: string): string[] =>
+      readdirSync(resolve(__dirname, "..", dir), { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory() ? walk(join(dir, entry.name)) : /\.(ts|tsx|js|mjs)$/.test(entry.name) ? [join(dir, entry.name)] : [],
+      );
+    const importers = walk("src").filter((file) => read(file).includes("@huggingface/transformers"));
+    expect(importers).toEqual([]);
   });
 });
 

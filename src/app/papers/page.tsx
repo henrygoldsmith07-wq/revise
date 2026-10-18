@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { aiExtractQuestions, aiOcr } from "@/lib/optional-ai";
 import { imageForAi } from "@/lib/file-data";
 import { gateGeneratedQuestions } from "@/domain/generated-question-quality";
+import { checkExtractionInput, markSchemeFromUpload, markSchemeSourceFor } from "@/domain/paper-extraction";
 import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { tokenise } from "@/domain/marking";
@@ -432,20 +433,32 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
 
   async function extract() {
     if (!text.trim() || !subjectId) return;
+    // Too long for one request: say so plainly and send nothing, rather than
+    // spending quota on a request the server would refuse or cut.
+    const inputCheck = checkExtractionInput(text, markScheme);
+    if (!inputCheck.ok) {
+      setStatus(inputCheck.message);
+      return;
+    }
     setBusy("extract");
     setStatus(null);
 
     try {
-      const combined = markScheme.trim() ? `${text}\n\n--- MARK SCHEME ---\n${markScheme}` : text;
-      const result = await aiExtractQuestions(subjectId, combined);
+      // Paper and mark scheme go as separate fields, so a long paper can
+      // never push the uploaded scheme out of what the model reads.
+      const result = await aiExtractQuestions(subjectId, text, markScheme);
 
     if (!result.data.questions.length) {
       setStatus(
-        result.note
-          ? `Extraction needs an AI provider — ${result.note}. The paper is saved, so you can extract it later.`
-          : "No questions could be extracted from that text.",
+        result.tooLong
+          ? result.note ?? null
+          : result.note
+            ? `Extraction needs an AI provider — ${result.note}. The paper is saved, so you can extract it later.`
+            : "No questions could be extracted from that text.",
       );
     }
+    // A model answer that had to cut the input says so; never drop that silently.
+    const cutNotice = result.source === "ai" && result.note ? ` Note: ${result.note}.` : "";
 
     const paperId = crypto.randomUUID();
     const extracted: Question[] = result.data.questions.map((generated, index) => ({
@@ -463,6 +476,8 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
         marks: part.marks,
         markScheme: part.markScheme,
         modelAnswer: part.modelAnswer,
+        // The model's claim checked against the uploaded scheme; fails closed.
+        markSchemeSource: markSchemeSourceFor(part.markScheme, part.markSchemeSource, markScheme),
       })),
       totalMarks: generated.parts.reduce((a, p) => a + p.marks, 0),
       calculatorAllowed: true,
@@ -503,12 +518,12 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
       setPendingPaperId(paperId);
       setConfirmPage(1);
       setStatus(
-        `That file matches ${match.entry.title}. Confirm each question against the paper before saving — only confirmed questions can count toward proof for you.`,
+        `That file matches ${match.entry.title}. Confirm each question against the paper before saving — only confirmed questions whose mark scheme came from your upload can count toward proof for you.${cutNotice}`,
       );
       return;
     }
 
-    await saveExtracted({ paperId, questions, rejected: gated.rejected.length, match: null });
+    await saveExtracted({ paperId, questions, rejected: gated.rejected.length, match: null, notice: cutNotice });
 
     } catch {
       setStatus("Extraction failed — the paper is still saved as text, so try again.");
@@ -522,6 +537,7 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
     questions: Question[];
     rejected: number;
     match: { entry: OfficialPaperManifestEntry; digest: string } | null;
+    notice?: string;
   }) {
     const { questions } = input;
     const confirmedAt = new Date().toISOString();
@@ -529,6 +545,9 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
       ? questions.map((question, index) => {
           const row = pendingConfirm?.[index];
           if (!row?.confirmed || !row.ref.trim()) return question;
+          // A model-written scheme is not on the paper: the tick confirms the
+          // question, never a scheme the model wrote, so it stays practice-only.
+          if (!markSchemeFromUpload(question)) return question;
           return {
             ...question,
             officialPaper: {
@@ -559,12 +578,17 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
 
     if (withConfirmations.length) {
       const confirmed = withConfirmations.filter((q) => q.officialPaper).length;
+      const modelWritten = withConfirmations.filter((q) => !markSchemeFromUpload(q)).length;
       setStatus(
         `Extracted ${withConfirmations.length} questions worth ${paper.totalMarks} marks, mapped to topics${
           input.rejected ? ` (${input.rejected} failed the quality checks and ${input.rejected === 1 ? "was" : "were"} left out)` : ""
         }. Extracted questions are not checked by a person — compare them with the original paper.${
+          modelWritten
+            ? ` ${modelWritten} ${modelWritten === 1 ? "has a mark scheme" : "have mark schemes"} written by the AI rather than taken from your uploaded mark scheme — check ${modelWritten === 1 ? "it" : "them"} against the real one${input.match ? "; these can never count toward proof" : ""}.`
+            : ""
+        }${
           input.match ? (confirmed ? ` ${confirmed} confirmed against ${input.match.entry.title}; only those can count toward proof for you.` : " None confirmed, so all stay practice-only.") : ""
-        }`,
+        }${input.notice ?? ""}`,
       );
       setText("");
       setMarkScheme("");
@@ -689,6 +713,11 @@ function UploadPaper({ subjectId }: { subjectId: string }) {
                     ))}
                   </ul>
                 </details>
+                {!markSchemeFromUpload(row.question) ? (
+                  <p className="mt-1 text-xs text-ink3">
+                    Mark scheme written by the AI, not taken from your uploaded mark scheme — this question stays practice-only even if ticked.
+                  </p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <label className="flex items-center gap-2 text-xs text-ink2">
                     <input

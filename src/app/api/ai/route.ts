@@ -15,6 +15,8 @@ import { enforceAiRateLimit, RateLimiterUnavailableError, type QuotaRpcCaller } 
 import { captureServerTelemetry, errorClass } from "@/lib/observability";
 import { AI_CONSENT_HEADER, decideAiConsent, type AiConsentDecision } from "@/domain/ai-consent";
 import { prepareAiEgress } from "@/ai/egress";
+import { classifierConfigured } from "@/ai/error-classifier";
+import { readBoundedText } from "@/lib/bounded-body";
 
 // The single AI entry point. Keys never leave this process; the browser only
 // ever sees a task name and a validated payload going out, and an envelope
@@ -46,6 +48,13 @@ type AiAuth =
 function providerCredentialsPresent(): boolean {
   // Mirrors src/ai/provider.ts selection without importing keys: any provider
   // env means a deployment intends to call a model.
+  //
+  // classifier.dev is a third-party recipient too, and it needs no key: it is
+  // on unless CLASSIFIER_DISABLED=1. Counting it here means production
+  // without Supabase auth fails closed instead of relaying learner text to it
+  // in local mode, where consent is only a browser header and the rate-limit
+  // key comes from x-forwarded-for.
+  if (classifierConfigured()) return true;
   if (process.env.ANTHROPIC_API_KEY) return true;
   if (process.env.AI_PROVIDER === "none") return false;
   if (process.env.OPENAI_COMPATIBLE_BASE_URL && process.env.OPENAI_COMPATIBLE_MODEL) return true;
@@ -67,7 +76,10 @@ async function requireAiUser(request: Request): Promise<AiAuth> {
     if (isProduction() && providerCredentialsPresent()) {
       return {
         error: NextResponse.json(
-          { error: "AI authentication is not configured. Set Supabase auth before enabling AI providers." },
+          {
+            error:
+              "AI authentication is not configured. Set Supabase auth before enabling AI providers or the error classifier (CLASSIFIER_DISABLED=1 turns it off).",
+          },
           { status: 503 },
         ),
       };
@@ -133,15 +145,16 @@ export async function POST(request: Request) {
   }
   const rateKey = resolveRateLimitKey(request, auth.userId);
 
-  let raw: string;
-  try {
-    raw = await request.text();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  // Bounded read: a declared Content-Length over the cap is refused before a
+  // byte is read, and a missing or lying one cannot make the route buffer
+  // more than MAX_BODY_CHARS (src/lib/bounded-body.ts).
+  const read = await readBoundedText(request, MAX_BODY_CHARS);
+  if (!read.ok) {
+    return read.reason === "too-large"
+      ? NextResponse.json({ error: "Request body is too large." }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
-  if (raw.length > MAX_BODY_CHARS) {
-    return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
-  }
+  const raw = read.text;
 
   let body: { task?: string; payload?: unknown };
   try {
@@ -280,8 +293,8 @@ async function dispatch(task: AiTask, payload: unknown) {
       return tasks.ocr(p.image, p.mediaType, p.hint);
     }
     case "extract-questions": {
-      const p = payload as { subjectId: string; text: string };
-      return tasks.extractQuestions(p.subjectId, p.text);
+      const p = payload as { subjectId: string; text: string; markScheme?: string };
+      return tasks.extractQuestions(p.subjectId, p.text, p.markScheme);
     }
     case "diagnose-error": {
       const p = payload as { prompt: string; point: string; answer: string; awarded: number; maxMarks: number; command?: string | null };

@@ -301,7 +301,7 @@ export function prepareAiEgress(task: AiTask, payload: unknown): EgressResult {
             : {}),
         },
         withheld: maskSummaryMany([
-          ...history.filter((e) => e.role === "user").map((e) => maskPii(e.content)),
+          ...history.map((e) => maskPii(e.content)),
           ...(answer ? [answer] : []),
         ]),
       };
@@ -339,7 +339,7 @@ export function prepareAiEgress(task: AiTask, payload: unknown): EgressResult {
           },
         },
         withheld: maskSummaryMany([
-          ...history.filter((e) => e.role === "user").map((e) => maskPii(e.content)),
+          ...history.map((e) => maskPii(e.content)),
           ...points,
         ]),
       };
@@ -375,7 +375,21 @@ export function prepareAiEgress(task: AiTask, payload: unknown): EgressResult {
         withheld: maskSummaryMany(descriptions),
       };
     }
-    case "extract-questions":
+    case "extract-questions": {
+      // Paper and uploaded mark scheme travel as separate fields so the
+      // scheme can never be cut off the end of a long paper.
+      const body = text(p.text);
+      const scheme = optionalText(p.markScheme);
+      return {
+        ok: true,
+        payload: {
+          subjectId: text(p.subjectId),
+          text: maskStudentText(body),
+          ...(scheme ? { markScheme: maskStudentText(scheme) } : {}),
+        },
+        withheld: maskSummaryMany([maskPii(body), ...(scheme ? [maskPii(scheme)] : [])]),
+      };
+    }
     case "route-spec": {
       const body = text(p.text);
       return {

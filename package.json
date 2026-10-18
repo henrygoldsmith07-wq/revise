@@ -68,7 +68,6 @@
     "marking:evidence:report": "node scripts/marking-evidence.mjs report"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
     "@mlc-ai/web-llm": "^0.2.84",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",

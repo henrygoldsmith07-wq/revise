@@ -17,6 +17,7 @@ import { sendAiTask } from "./transport";
 import { assessMarkConfidence } from "@/domain/marking-confidence";
 import { AI_CONSENT_REQUIRED_MESSAGE } from "@/domain/ai-consent";
 import { getTopic } from "@/domain/curriculum";
+import { checkExtractionInput } from "@/domain/paper-extraction";
 import { localClassifyError } from "@/domain/error-local-classifier";
 import { ERROR_TAXONOMY_VERSION } from "@/domain/error-taxonomy";
 import { rubricConfidence, withMarkEvidence } from "@/domain/marking";
@@ -153,7 +154,7 @@ export function aiTutor(input: {
 }
 
 export async function aiMark(question: Question, answers: Record<string, string>, opts?: { useLocalModel?: boolean }) {
-  // Resilience chain: semantic cache → local model (when enabled + loaded) →
+  // Resilience chain: answer cache → local model (when enabled + loaded) →
   // cloud AI → rubric fallback. The tier records which link actually graded;
   // the DLQ enqueue happens in the caller once the real attempt is persisted.
   // Student answers are PII-masked before anything leaves the device (here for
@@ -257,10 +258,25 @@ export function aiRouteSpec(subjectId: string, text: string) {
   return call("route-spec", { subjectId, text: maskStudentText(text) }, syncFallback);
 }
 
-export function aiExtractQuestions(subjectId: string, text: string) {
-  return call<{ questions: GeneratedQuestion[] }>("extract-questions", { subjectId, text }, () => ({
-    questions: [],
-  }));
+/**
+ * Extract questions from an uploaded paper. The paper and the uploaded mark
+ * scheme go as separate fields, and input over EXTRACTION_LIMITS is refused
+ * here, before any request: the server would reject or cut it, and a cut
+ * could silently drop the mark scheme.
+ */
+export async function aiExtractQuestions(
+  subjectId: string,
+  text: string,
+  markScheme = "",
+): Promise<AiEnvelope<{ questions: GeneratedQuestion[] }> & { tooLong?: true }> {
+  const check = checkExtractionInput(text, markScheme);
+  if (!check.ok) return { data: { questions: [] }, source: "fallback", note: check.message, tooLong: true };
+  const scheme = markScheme.trim();
+  return call<{ questions: GeneratedQuestion[] }>(
+    "extract-questions",
+    { subjectId, text: text.trim(), ...(scheme ? { markScheme: scheme } : {}) },
+    () => ({ questions: [] }),
+  );
 }
 
 /** Generate cards from the student's own notes. Needs a model: nothing local
