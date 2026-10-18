@@ -153,7 +153,10 @@ const physics: ExpansionItem[] = [
     options: [
       "The weight of the book, and the upward normal force of the table on the book",
       "The normal force of the book on the table, and the normal force of the table on the book",
-      "The weight of the book, and the gravitational pull of the book on the Earth",
+      // Was "the weight of the book, and the gravitational pull of the book on
+      // the Earth", which is also a third-law pair, so a correct pick was
+      // marked wrong (thirty-first pass). This is the classic confusion instead.
+      "The weight of the book, and the downward push of the book on the table",
       "The normal force of the table on the book, and the weight of the table",
     ],
     correctIndex: 1,
