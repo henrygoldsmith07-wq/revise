@@ -30,6 +30,10 @@ The combined counts include the earlier quality packs for each subject. They are
 
 The dashboard must be read with the trust state and repair queue. A row can be substantively complete while still having unresolved subject warnings and zero approved questions. Draft rows can support practice, but no unreviewed question can establish trusted mastery, transfer, delayed retention or calibration evidence. `repairQueue` is intentionally visible only to authoring/reporting code; the student surface remains the single next action.
 
+## Removed from the learner bank (2026-10-18)
+
+A product review found the Maths/Biology/Chemistry pack unusable as practice: every part repeats the stem, tasks read as stitched brief fragments ("Apply track water removal or addition at each bond to the supplied setup…"), mark schemes carry unrelated filler sentences, and students saw internal spec ids. Because the adaptive engine only selects questions with learning metadata, these made up about 40% of the Today pool in those subjects. `wjecFlagshipDepthQuestions` is no longer part of `seedQuestions`; it stays exported for the authoring audits above. Rewrite items by hand before returning any of them to the bank.
+
 ## Review path
 
 Use the existing WJEC review packet workflow for the generated questions. It already preserves the content fingerprint, reviewer qualification, six checks and edit invalidation for all four WJEC flagships:

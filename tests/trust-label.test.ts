@@ -75,3 +75,14 @@ describe("trustNoteFor", () => {
     expect(trustNoteFor(question("wjec-alevel-maths"), "proof")).toContain("cannot prove improvement");
   });
 });
+
+describe("provenanceLabel", () => {
+  it("never calls a machine-generated draft authored", async () => {
+    const { provenanceLabel, GENERATED_DRAFT_LABEL, PROVENANCE_LABEL } = await import("@/domain/trust-label");
+    const { seedQuestions } = await import("@/content");
+    const generated = seedQuestions.find((q) => q.subjectId === "wjec-alevel-physics" && q.source === "generated" && q.verification === "unverified")!;
+    const authored = seedQuestions.find((q) => q.subjectId === "wjec-alevel-physics" && q.source === "authored" && q.verification === "unverified")!;
+    expect(provenanceLabel(generated)).toBe(GENERATED_DRAFT_LABEL);
+    expect(provenanceLabel(authored)).toBe(PROVENANCE_LABEL.authored);
+  });
+});

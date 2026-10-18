@@ -118,7 +118,10 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecChemistryQualityQuestions,
-  ...wjecFlagshipDepthQuestions,
+  // The Maths/Biology/Chemistry depth pack (wjecFlagshipDepthQuestions) is
+  // deliberately not in the learner bank: its parts are stitched from brief
+  // fragments (repeated stems, filler mark-scheme sentences, internal ids)
+  // and read as nonsense. It stays exported for the authoring audits only.
   ...biologyAqaQuestions,
   ...biologyAqaExtraQuestions,
   ...chemistryAqaQuestions,

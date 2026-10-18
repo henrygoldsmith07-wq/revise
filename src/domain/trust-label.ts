@@ -60,8 +60,14 @@ export function provenanceTier(question: Question): ProvenanceTier {
   return "authored";
 }
 
-export const provenanceLabel = (question: Question): string =>
-  PROVENANCE_LABEL[provenanceTier(question)];
+/** Machine-generated drafts share the "authored" tier but must not claim a human wrote them. */
+export const GENERATED_DRAFT_LABEL = "Generated · awaiting review";
+
+export const provenanceLabel = (question: Question): string => {
+  const tier = provenanceTier(question);
+  if (tier === "authored" && (question.origin === "ai" || question.source === "generated")) return GENERATED_DRAFT_LABEL;
+  return PROVENANCE_LABEL[tier];
+};
 
 /**
  * Trusted + unseen questions can carry proof; everything else is practice only.

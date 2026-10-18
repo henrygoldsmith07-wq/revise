@@ -22,32 +22,66 @@
   "subjects": {
     "wjec-alevel-maths": [
       {
-        "specPointId": "wjec-alevel-maths.algebra.sp-03",
+        "specPointId": "wjec-alevel-maths.algebra.sp-01",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 6,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-02",
         "topicId": "wjec-alevel-maths.algebra",
         "currentQuestionCount": 2,
         "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "missingCategories": [
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.algebra.sp-03",
+        "topicId": "wjec-alevel-maths.algebra",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.algebra.sp-04",
         "topicId": "wjec-alevel-maths.algebra",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.algebra.sp-05",
         "topicId": "wjec-alevel-maths.algebra",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.algebra.sp-06",
         "topicId": "wjec-alevel-maths.algebra",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.conditional-probability.sp-01",
@@ -130,16 +164,23 @@
       {
         "specPointId": "wjec-alevel-maths.coordinate-geometry.sp-02",
         "topicId": "wjec-alevel-maths.coordinate-geometry",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.coordinate-geometry.sp-03",
         "topicId": "wjec-alevel-maths.coordinate-geometry",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.correlation-tests.sp-01",
@@ -211,18 +252,33 @@
         ]
       },
       {
+        "specPointId": "wjec-alevel-maths.differentiation.sp-01",
+        "topicId": "wjec-alevel-maths.differentiation",
+        "currentQuestionCount": 6,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
         "specPointId": "wjec-alevel-maths.differentiation.sp-02",
         "topicId": "wjec-alevel-maths.differentiation",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.differentiation.sp-03",
         "topicId": "wjec-alevel-maths.differentiation",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.distributions.sp-02",
@@ -257,9 +313,22 @@
       {
         "specPointId": "wjec-alevel-maths.exponentials.sp-02",
         "topicId": "wjec-alevel-maths.exponentials",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.exponentials.sp-03",
+        "topicId": "wjec-alevel-maths.exponentials",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.exponentials.sp-04",
@@ -353,16 +422,23 @@
       {
         "specPointId": "wjec-alevel-maths.integration.sp-02",
         "topicId": "wjec-alevel-maths.integration",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.integration.sp-03",
         "topicId": "wjec-alevel-maths.integration",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-maths.integration.sp-04",
@@ -591,15 +667,6 @@
         ]
       },
       {
-        "specPointId": "wjec-alevel-maths.sequences.sp-01",
-        "topicId": "wjec-alevel-maths.sequences",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "recall"
-        ]
-      },
-      {
         "specPointId": "wjec-alevel-maths.sequences.sp-02",
         "topicId": "wjec-alevel-maths.sequences",
         "currentQuestionCount": 2,
@@ -620,19 +687,10 @@
         ]
       },
       {
-        "specPointId": "wjec-alevel-maths.statistical-sampling.sp-01",
+        "specPointId": "wjec-alevel-maths.statistical-sampling.sp-02",
         "topicId": "wjec-alevel-maths.statistical-sampling",
         "currentQuestionCount": 3,
         "independentQuestionDeficit": 1,
-        "missingCategories": [
-          "recall"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-maths.statistical-sampling.sp-02",
-        "topicId": "wjec-alevel-maths.statistical-sampling",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
         "missingCategories": [
           "application"
         ]
@@ -644,6 +702,24 @@
         "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.trigonometry.sp-01",
+        "topicId": "wjec-alevel-maths.trigonometry",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.trigonometry.sp-02",
+        "topicId": "wjec-alevel-maths.trigonometry",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
           "transfer"
         ]
       },
@@ -744,53 +820,95 @@
         ]
       },
       {
-        "specPointId": "wjec-alevel-biology.biological-molecules.sp-04",
+        "specPointId": "wjec-alevel-biology.biological-molecules.sp-02",
         "topicId": "wjec-alevel-biology.biological-molecules",
         "currentQuestionCount": 2,
         "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "missingCategories": [
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biological-molecules.sp-03",
+        "topicId": "wjec-alevel-biology.biological-molecules",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.biological-molecules.sp-04",
+        "topicId": "wjec-alevel-biology.biological-molecules",
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.biological-molecules.sp-05",
         "topicId": "wjec-alevel-biology.biological-molecules",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.biological-molecules.sp-06",
         "topicId": "wjec-alevel-biology.biological-molecules",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.cell-structure.sp-02",
         "topicId": "wjec-alevel-biology.cell-structure",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.cell-structure.sp-03",
         "topicId": "wjec-alevel-biology.cell-structure",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.cell-structure.sp-04",
         "topicId": "wjec-alevel-biology.cell-structure",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.cell-structure.sp-05",
         "topicId": "wjec-alevel-biology.cell-structure",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "application"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.ecosystems.sp-01",
@@ -1131,9 +1249,12 @@
       {
         "specPointId": "wjec-alevel-biology.membranes-transport.sp-02",
         "topicId": "wjec-alevel-biology.membranes-transport",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.membranes-transport.sp-03",
@@ -1147,16 +1268,24 @@
       {
         "specPointId": "wjec-alevel-biology.membranes-transport.sp-04",
         "topicId": "wjec-alevel-biology.membranes-transport",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.membranes-transport.sp-05",
         "topicId": "wjec-alevel-biology.membranes-transport",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.microbiology.sp-01",
@@ -1317,16 +1446,22 @@
       {
         "specPointId": "wjec-alevel-biology.nucleic-acids.sp-02",
         "topicId": "wjec-alevel-biology.nucleic-acids",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.nucleic-acids.sp-03",
         "topicId": "wjec-alevel-biology.nucleic-acids",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-biology.nucleic-acids.sp-04",
@@ -1401,8 +1536,8 @@
       {
         "specPointId": "wjec-alevel-biology.photosynthesis.sp-02",
         "topicId": "wjec-alevel-biology.photosynthesis",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "application",
           "transfer"
@@ -1411,10 +1546,9 @@
       {
         "specPointId": "wjec-alevel-biology.photosynthesis.sp-03",
         "topicId": "wjec-alevel-biology.photosynthesis",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "recall",
           "transfer"
         ]
       },
@@ -1820,51 +1954,86 @@
       {
         "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-02",
         "topicId": "wjec-alevel-chemistry.atomic-structure",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-03",
         "topicId": "wjec-alevel-chemistry.atomic-structure",
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-04",
+        "topicId": "wjec-alevel-chemistry.atomic-structure",
         "currentQuestionCount": 2,
         "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "missingCategories": [
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-05",
         "topicId": "wjec-alevel-chemistry.atomic-structure",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.bonding.sp-02",
         "topicId": "wjec-alevel-chemistry.bonding",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.bonding.sp-03",
         "topicId": "wjec-alevel-chemistry.bonding",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.bonding.sp-04",
         "topicId": "wjec-alevel-chemistry.bonding",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.bonding.sp-05",
         "topicId": "wjec-alevel-chemistry.bonding",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.carbonyls-acids.sp-02",
@@ -2028,6 +2197,16 @@
         ]
       },
       {
+        "specPointId": "wjec-alevel-chemistry.equilibria.sp-02",
+        "topicId": "wjec-alevel-chemistry.equilibria",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
         "specPointId": "wjec-alevel-chemistry.equilibria.sp-03",
         "topicId": "wjec-alevel-chemistry.equilibria",
         "currentQuestionCount": 9,
@@ -2099,11 +2278,23 @@
         ]
       },
       {
+        "specPointId": "wjec-alevel-chemistry.kinetics.sp-01",
+        "topicId": "wjec-alevel-chemistry.kinetics",
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
         "specPointId": "wjec-alevel-chemistry.kinetics.sp-02",
         "topicId": "wjec-alevel-chemistry.kinetics",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
-        "missingCategories": []
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.kinetics.sp-03",
@@ -2137,25 +2328,56 @@
         ]
       },
       {
+        "specPointId": "wjec-alevel-chemistry.moles.sp-01",
+        "topicId": "wjec-alevel-chemistry.moles",
+        "currentQuestionCount": 6,
+        "independentQuestionDeficit": 0,
+        "missingCategories": [
+          "recall"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.moles.sp-02",
+        "topicId": "wjec-alevel-chemistry.moles",
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": [
+          "recall",
+          "transfer"
+        ]
+      },
+      {
         "specPointId": "wjec-alevel-chemistry.moles.sp-03",
         "topicId": "wjec-alevel-chemistry.moles",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.moles.sp-04",
         "topicId": "wjec-alevel-chemistry.moles",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.moles.sp-05",
         "topicId": "wjec-alevel-chemistry.moles",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": []
+        "currentQuestionCount": 0,
+        "independentQuestionDeficit": 4,
+        "missingCategories": [
+          "recall",
+          "application",
+          "transfer"
+        ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.organic-basics.sp-01",
