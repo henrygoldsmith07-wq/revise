@@ -36,8 +36,15 @@
   items were wrongly filling; quantum.sp-02 gains the photodiode item and
   is now complete). No question is approved, so no attestation is
   invalidated. `wjec-authoring-backlog.json` is refreshed.
+- **Readiness fits 360px; counts read as English.** The readiness detail's
+  two-column grids kept their children at min-content width (373px on a
+  360px phone); `grid-cols-1` and `min-w-0` let them shrink. Students now see
+  "1 mark", "1 open mark" and "No timed answers yet" (`src/domain/plural.ts`,
+  `tests/count-labels.test.ts`).
 - **`e2e/fresh-student-360.spec.ts`** walks onboarding → quick check →
-  repair → lesson → Schedule → proof at 360px and fails on sideways scroll,
+  repair → lesson → Schedule → proof → readiness detail at 360px and fails
+  on sideways scroll (`scrollWidth` against 360, not `innerWidth`, which grows
+  with the overflow on a zoomed-out mobile page),
   any huggingface.co request, or "Explain that define". Run locally with
   `npm run test:e2e -- e2e/fresh-student-360.spec.ts` (the standard config
   reuses a server already on `PORT`).
