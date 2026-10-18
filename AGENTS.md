@@ -127,6 +127,11 @@ background and do other work while it runs. On Windows, invoke npm through
   `proofHref` (`/practice?proof=<topic>&subject=…`, ProofCheckMode); the
   old `/adaptive-session?…&proof=1` was never read and is gone (thirtieth
   pass, `tests/proof-links.test.ts`).
+- **A saved checkpoint is not an interrupted run** (twenty-ninth pass). Pages
+  save a resume point as soon as a question shows; anything that offers to
+  resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
+  titles that prefix "Recover N marks" compose through `missionActionTitle`,
+  never by concatenating `mission.title`.
 - **`replacePlan` is serialised** (`src/data/repository.ts`). Two concurrent
   rebuilds used to union into overlapping blocks; keep plan writes going
   through it.

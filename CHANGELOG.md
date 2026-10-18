@@ -43,9 +43,43 @@
   tags were filling seven demand cells), and the audit now flags three
   genuine duplicates the wrong tags had hidden. No question is approved, so
   no review attestation is invalidated (the content fingerprint includes
-  part spec tags). `wjec-authoring-backlog.json` is stale by 23 question
-  counts and must be refreshed (`npm run wjec:authoring:refresh`); it is
-  left alone here because open PR #75 also changes it.
+  part spec tags). `wjec-authoring-backlog.json` is refreshed for the 23
+  question counts the retags change (`npm run wjec:authoring:refresh`).
+
+## Today's headline says "Recover" once; opening a step no longer leaves a phantom "Resume interrupted revision" — 2026-10-17 (twenty-ninth pass)
+
+**Today's headline read "Recover 3 marks: Recover Motion marks".** A generic
+mission is titled "Recover <topic> marks" (`exam-mission.ts`) and the ranked
+action prefixed that with its own "Recover N marks: ". The regressed form
+doubled it the same way, and a deferred action's reason tripled it ("Recover
+the marks you lost again first: Recover 4 marks you lost again: Recover …").
+
+- A generic mission now carries `recoverFocus` (its topic), and
+  `missionActionTitle` (`src/domain/revision-engine.ts`) composes the
+  headline from the mission's parts: "Recover 3 marks in Motion",
+  "Recover 3 marks you lost again in Motion". Pattern and paper missions keep
+  their verb-led titles ("Recover 3 marks: Eliminate unit-conversion errors in
+  Motion"). The gate reason is "Do this first: <title>".
+- A delayed-check headline says "Prove it: …" only when the check would run on
+  teacher-reviewed questions (the same `proofEligible` the action's
+  `countsAsProof` already used); otherwise "Check it held: …". No predicate,
+  gate or ranking changed.
+
+**Opening a repair step and going back replaced Today's recommendation with
+"Resume interrupted revision".** Every revision page saves a resume point as
+soon as its first question is on screen, and Today showed the resume card
+(hiding the recommendation, week line and exam-date nudge) for any saved
+checkpoint, including one with nothing answered.
+
+- `checkpointHasProgress` (`src/domain/revision-checkpoint.ts`): a run counts
+  once the student has moved past its first item, or has answered or reviewed
+  something from it since it began (its own question/card ids; for an adaptive
+  run, its pinned topic). Checkpoints now carry `startedAt`, kept across saves
+  of the same run; older ones fall back to their last save.
+- Today and Schedule ask that question before offering the resume card. The
+  checkpoint itself is still written and still used by the page to restore the
+  same questions on refresh, so mission and proof-check restores are
+  unchanged.
 
 ## Lessons say they are not yet teacher-reviewed; a lost mark leads to the lesson for that point — 2026-10-17 (twenty-eighth pass)
 
