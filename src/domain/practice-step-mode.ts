@@ -119,6 +119,31 @@ export function fitStepQueueToMinutes<T extends Pick<Question, "totalMarks">>(
   return { queue: [first], seconds: examPaceTargetSeconds(first.totalMarks), overrun: true };
 }
 
+/**
+ * Supported plan steps (guided, worked) are practice, not proof. Move the
+ * questions that are still proof supply (teacher-reviewed flagship content the
+ * student has not seen, by `unseenQuestion`) behind everything else, keeping
+ * the ranked order within each group, so a step spends one only when nothing
+ * else is left. A question served here becomes "seen" and could never be the
+ * topic's unaided or delayed proof. Timed and unaided steps are unchanged:
+ * they are no-hint and may be evidence themselves. `deferred` is how many were
+ * moved, so the page can say when the step still had to use one.
+ */
+export function deferProofSupply<T extends Question>(
+  ranked: readonly T[],
+  mode: PracticeStepMode | null,
+  attempts: readonly Attempt[],
+  questions: readonly Question[],
+): { ordered: T[]; deferred: number } {
+  if (mode !== "guided" && mode !== "worked") return { ordered: [...ranked], deferred: 0 };
+  const keep: T[] = [];
+  const reserve: T[] = [];
+  // learnerEvidenceTrusted first: it is cheap and false for every flagship
+  // question today, so unseenQuestion runs only on reviewed questions.
+  for (const q of ranked) (learnerEvidenceTrusted(q) && unseenQuestion(q, attempts, questions) ? reserve : keep).push(q);
+  return { ordered: [...keep, ...reserve], deferred: reserve.length };
+}
+
 /** A question can be shown worked through only when every part has a model answer. */
 export function hasWorkedSolution(question: Pick<Question, "parts">): boolean {
   return question.parts.length > 0 && question.parts.every((part) => part.modelAnswer.trim().length > 0);

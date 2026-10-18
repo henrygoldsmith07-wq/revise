@@ -441,9 +441,10 @@ export function MarkedResult({
           // Otherwise the same score is practice, and says why.
           proved
             ? (
+              // The "passed" banner renders no link; href is required by the type only.
               <ProofCheckBanner
                 topicTitle={provedTopic}
-                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1`}
                 state="passed"
               />
             ) : (
@@ -454,11 +455,14 @@ export function MarkedResult({
                     ? "Revise records this as a correct answer. It only becomes proof once the same skill is answered unaided on a different question, after a delay."
                     : "Revise records this as a correct answer. This question has not been checked by a teacher yet, so it counts as practice; only answers on reviewed questions can prove a skill."}
                 </p>
+                {/* An ordinary adaptive session: practice, as the copy above says.
+                    It used to carry &proof=1, which nothing reads, and log a
+                    proof attempt that never happened. */}
                 <ButtonLink
-                  href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                  href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1`}
                   size="sm"
                   variant="secondary"
-                  onClick={() => captureProductEvent("proof.attempted", { kind: "delayed-proof" })}
+                  onClick={() => captureProductEvent("recommendation.accepted", { kind: "unseen-practice" })}
                 >
                   Try an unseen question
                 </ButtonLink>

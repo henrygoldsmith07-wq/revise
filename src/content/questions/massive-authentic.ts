@@ -627,6 +627,12 @@ const maths: ExpansionItem[] = [
   },
 ];
 
+// The `point` of each Physics part is its spec point within the topic, and a
+// lost mark links to the lesson for that point. Audited one by one against the
+// curriculum statement and its authored teaching in the thirtieth pass (15 of
+// 24 were retagged; tests/physics-spec-tags.test.ts pins the mapping). The
+// aqa-alevel-physics topic tree is a clone of the WJEC one, so the same number
+// is right for both.
 const physics: ExpansionItem[] = [
   {
     slug: "physics-projectile-components",
@@ -634,14 +640,14 @@ const physics: ExpansionItem[] = [
     stem: "A ball is projected horizontally at 12 m s⁻¹ from a platform 5.0 m above level ground. Take g = 9.8 m s⁻².",
     difficulty: 3,
     kind: "calculation",
-    parts: [part("Calculate the time to hit the ground and the horizontal range.", 4, ["5.0 = ½gt²", "t = 1.01 s", "Horizontal speed remains 12 m s⁻¹", "Range = 12×1.01 = 12.1 m"], "Vertically, 5.0 = 4.9t², so t = 1.01 s. Horizontal motion is uniform, giving range = 12 × 1.01 = 12.1 m.", "resolve projectile motion into independent components", 2, ["AO2"])],
+    parts: [part("Calculate the time to hit the ground and the horizontal range.", 4, ["5.0 = ½gt²", "t = 1.01 s", "Horizontal speed remains 12 m s⁻¹", "Range = 12×1.01 = 12.1 m"], "Vertically, 5.0 = 4.9t², so t = 1.01 s. Horizontal motion is uniform, giving range = 12 × 1.01 = 12.1 m.", "resolve projectile motion into independent components", 6, ["AO2"])],
   },
   {
     slug: "physics-terminal-speed",
     topic: "kinematics-dynamics",
     stem: "A falling object reaches terminal speed.",
     difficulty: 3,
-    parts: [part("Explain why its acceleration becomes zero.", 3, ["Drag increases with speed", "At terminal speed drag equals weight", "Resultant force is zero, so acceleration is zero"], "As the object speeds up, drag increases. At terminal speed drag equals the object's weight, so the resultant force and therefore acceleration are zero.", "explain terminal speed using resultant force", 1, ["AO2"])],
+    parts: [part("Explain why its acceleration becomes zero.", 3, ["Drag increases with speed", "At terminal speed drag equals weight", "Resultant force is zero, so acceleration is zero"], "As the object speeds up, drag increases. At terminal speed drag equals the object's weight, so the resultant force and therefore acceleration are zero.", "explain terminal speed using resultant force", 7, ["AO2"])],
   },
   {
     slug: "physics-efficiency",
@@ -649,7 +655,7 @@ const physics: ExpansionItem[] = [
     stem: "A motor takes in 600 J of electrical energy each second and delivers 420 J of useful mechanical energy each second.",
     difficulty: 2,
     kind: "calculation",
-    parts: [part("Calculate the motor's efficiency and its wasted power.", 3, ["Useful power = 420 W and input power = 600 W", "Efficiency = 420/600 = 0.70 or 70%", "Wasted power = 600 − 420 = 180 W"], "Efficiency = 420/600 = 0.70 = 70%. The wasted power is 600 − 420 = 180 W.", "calculate efficiency and wasted power", 1, ["AO2"])],
+    parts: [part("Calculate the motor's efficiency and its wasted power.", 3, ["Useful power = 420 W and input power = 600 W", "Efficiency = 420/600 = 0.70 or 70%", "Wasted power = 600 − 420 = 180 W"], "Efficiency = 420/600 = 0.70 = 70%. The wasted power is 600 − 420 = 180 W.", "calculate efficiency and wasted power", 3, ["AO2"])],
   },
   {
     slug: "physics-stress-strain",
@@ -657,14 +663,14 @@ const physics: ExpansionItem[] = [
     stem: "A wire of original length 2.00 m and cross-sectional area 1.5 × 10⁻⁶ m² extends by 1.2 mm under a force of 90 N.",
     difficulty: 3,
     kind: "calculation",
-    parts: [part("Calculate the Young modulus of the wire.", 3, ["Stress = F/A = 6.0 × 10⁷ Pa", "Strain = extension/original length = 0.0012/2.00 = 6.0 × 10⁻⁴", "E = stress/strain = 1.0 × 10¹¹ Pa"], "Stress = 90/(1.5 × 10⁻⁶) = 6.0 × 10⁷ Pa. Strain = 0.0012/2.00 = 6.0 × 10⁻⁴. Young modulus = 1.0 × 10¹¹ Pa.", "calculate Young modulus from stress and strain", 2, ["AO2"])],
+    parts: [part("Calculate the Young modulus of the wire.", 3, ["Stress = F/A = 6.0 × 10⁷ Pa", "Strain = extension/original length = 0.0012/2.00 = 6.0 × 10⁻⁴", "E = stress/strain = 1.0 × 10¹¹ Pa"], "Stress = 90/(1.5 × 10⁻⁶) = 6.0 × 10⁷ Pa. Strain = 0.0012/2.00 = 6.0 × 10⁻⁴. Young modulus = 1.0 × 10¹¹ Pa.", "calculate Young modulus from stress and strain", 1, ["AO2"])],
   },
   {
     slug: "physics-standing-wave",
     topic: "waves",
     stem: "A string fixed at both ends has length 0.80 m and vibrates in its third harmonic at 180 Hz.",
     difficulty: 3,
-    parts: [part("Calculate the wave speed on the string.", 3, ["Third harmonic has three half-wavelengths in the length", "0.80 = 3λ/2, so λ = 0.533 m", "v = fλ = 96 m s⁻¹"], "For the third harmonic, L = 3λ/2, so λ = 2(0.80)/3 = 0.533 m. The wave speed is v = 180 × 0.533 = 96 m s⁻¹.", "relate harmonic mode, wavelength and wave speed", 2, ["AO2"])],
+    parts: [part("Calculate the wave speed on the string.", 3, ["Third harmonic has three half-wavelengths in the length", "0.80 = 3λ/2, so λ = 0.533 m", "v = fλ = 96 m s⁻¹"], "For the third harmonic, L = 3λ/2, so λ = 2(0.80)/3 = 0.533 m. The wave speed is v = 180 × 0.533 = 96 m s⁻¹.", "relate harmonic mode, wavelength and wave speed", 3, ["AO2"])],
   },
   {
     slug: "physics-photoelectric-work-function",
@@ -672,7 +678,7 @@ const physics: ExpansionItem[] = [
     stem: "Light of frequency 8.0 × 10¹⁴ Hz ejects photoelectrons from a metal with maximum kinetic energy 1.2 × 10⁻¹⁹ J. Use h = 6.63 × 10⁻³⁴ J s.",
     difficulty: 4,
     kind: "calculation",
-    parts: [part("Calculate the work function of the metal.", 3, ["Photon energy E = hf = 5.304 × 10⁻¹⁹ J", "hf = work function + maximum kinetic energy", "φ = 4.10 × 10⁻¹⁹ J"], "hf = 6.63 × 10⁻³⁴ × 8.0 × 10¹⁴ = 5.304 × 10⁻¹⁹ J. Therefore φ = 5.304 × 10⁻¹⁹ − 1.2 × 10⁻¹⁹ = 4.10 × 10⁻¹⁹ J.", "apply the photoelectric equation to find a work function", 2, ["AO2"])],
+    parts: [part("Calculate the work function of the metal.", 3, ["Photon energy E = hf = 5.304 × 10⁻¹⁹ J", "hf = work function + maximum kinetic energy", "φ = 4.10 × 10⁻¹⁹ J"], "hf = 6.63 × 10⁻³⁴ × 8.0 × 10¹⁴ = 5.304 × 10⁻¹⁹ J. Therefore φ = 5.304 × 10⁻¹⁹ − 1.2 × 10⁻¹⁹ = 4.10 × 10⁻¹⁹ J.", "apply the photoelectric equation to find a work function", 1, ["AO2"])],
   },
   {
     slug: "physics-electric-resistivity",
@@ -687,14 +693,14 @@ const physics: ExpansionItem[] = [
     topic: "electric-circuits",
     stem: "A cell has emf 1.50 V and internal resistance 0.80 Ω. It supplies a current of 0.50 A.",
     difficulty: 3,
-    parts: [part("Calculate the terminal potential difference.", 2, ["Lost volts = Ir = 0.50×0.80 = 0.40 V", "Terminal p.d. = ε − Ir = 1.10 V"], "The lost volts are Ir = 0.50 × 0.80 = 0.40 V. Terminal p.d. = 1.50 − 0.40 = 1.10 V.", "calculate terminal p.d. allowing for internal resistance", 1, ["AO2"])],
+    parts: [part("Calculate the terminal potential difference.", 2, ["Lost volts = Ir = 0.50×0.80 = 0.40 V", "Terminal p.d. = ε − Ir = 1.10 V"], "The lost volts are Ir = 0.50 × 0.80 = 0.40 V. Terminal p.d. = 1.50 − 0.40 = 1.10 V.", "calculate terminal p.d. allowing for internal resistance", 2, ["AO2"])],
   },
   {
     slug: "physics-momentum-explosion",
     topic: "momentum",
     stem: "A 2.0 kg trolley at rest explodes into a 1.2 kg part moving east at 5.0 m s⁻¹ and a second part.",
     difficulty: 3,
-    parts: [part("Find the velocity of the second part.", 3, ["Initial momentum is zero", "1.2×5.0 + 0.8v = 0", "v = −7.5 m s⁻¹, so 7.5 m s⁻¹ west"], "Conservation of momentum gives 0 = (1.2 × 5.0) + 0.8v. Thus v = −7.5 m s⁻¹, or 7.5 m s⁻¹ west.", "apply conservation of momentum to an explosion", 1, ["AO2"])],
+    parts: [part("Find the velocity of the second part.", 3, ["Initial momentum is zero", "1.2×5.0 + 0.8v = 0", "v = −7.5 m s⁻¹, so 7.5 m s⁻¹ west"], "Conservation of momentum gives 0 = (1.2 × 5.0) + 0.8v. Thus v = −7.5 m s⁻¹, or 7.5 m s⁻¹ west.", "apply conservation of momentum to an explosion", 2, ["AO2"])],
   },
   {
     slug: "physics-shm-condition",
@@ -708,7 +714,7 @@ const physics: ExpansionItem[] = [
     topic: "circular-shm",
     stem: "A driven oscillator is tested with different driving frequencies, first with light damping and then with heavy damping.",
     difficulty: 3,
-    parts: [part("Compare the two amplitude–frequency graphs.", 3, ["Both have a maximum near the natural frequency", "Heavy damping reduces the maximum amplitude", "Heavy damping broadens the response and shifts the peak slightly lower"], "Both responses peak near the natural frequency. Heavy damping gives a lower, broader peak, with the maximum usually shifted to a slightly lower frequency.", "explain damping effects on a resonance curve", 2, ["AO2"])],
+    parts: [part("Compare the two amplitude–frequency graphs.", 3, ["Both have a maximum near the natural frequency", "Heavy damping reduces the maximum amplitude", "Heavy damping broadens the response and shifts the peak slightly lower"], "Both responses peak near the natural frequency. Heavy damping gives a lower, broader peak, with the maximum usually shifted to a slightly lower frequency.", "explain damping effects on a resonance curve", 7, ["AO2"])],
   },
   {
     slug: "physics-orbital-speed",
@@ -724,7 +730,7 @@ const physics: ExpansionItem[] = [
     stem: "A coil of 200 turns has flux linkage that changes from 0.040 Wb turns to 0.010 Wb turns in 0.015 s.",
     difficulty: 3,
     kind: "calculation",
-    parts: [part("Calculate the magnitude of the induced emf.", 2, ["Change in flux linkage = 0.030 Wb turns", "emf = Δ(NΦ)/Δt = 0.030/0.015 = 2.0 V"], "The magnitude of the change in flux linkage is 0.030 Wb turns, so emf = 0.030/0.015 = 2.0 V.", "calculate induced emf from a change in flux linkage", 2, ["AO2"])],
+    parts: [part("Calculate the magnitude of the induced emf.", 2, ["Change in flux linkage = 0.030 Wb turns", "emf = Δ(NΦ)/Δt = 0.030/0.015 = 2.0 V"], "The magnitude of the change in flux linkage is 0.030 Wb turns, so emf = 0.030/0.015 = 2.0 V.", "calculate induced emf from a change in flux linkage", 8, ["AO2"])],
   },
   {
     slug: "physics-ideal-gas",
@@ -732,7 +738,7 @@ const physics: ExpansionItem[] = [
     stem: "A sealed gas has pressure 1.2 × 10⁵ Pa, volume 0.020 m³ and temperature 300 K. Use R = 8.31 J mol⁻¹ K⁻¹.",
     difficulty: 3,
     kind: "calculation",
-    parts: [part("Calculate the amount of gas.", 2, ["Use pV = nRT", "n = pV/RT = (1.2×10⁵×0.020)/(8.31×300) = 0.963 mol"], "n = pV/RT = (1.2 × 10⁵ × 0.020)/(8.31 × 300) = 0.963 mol.", "use the ideal gas equation", 1, ["AO2"])],
+    parts: [part("Calculate the amount of gas.", 2, ["Use pV = nRT", "n = pV/RT = (1.2×10⁵×0.020)/(8.31×300) = 0.963 mol"], "n = pV/RT = (1.2 × 10⁵ × 0.020)/(8.31 × 300) = 0.963 mol.", "use the ideal gas equation", 3, ["AO2"])],
   },
   {
     slug: "physics-specific-heat",
@@ -748,7 +754,7 @@ const physics: ExpansionItem[] = [
     stem: "A radioactive source has an initial activity of 640 kBq and a half-life of 6.0 hours.",
     difficulty: 2,
     kind: "calculation",
-    parts: [part("Find its activity after 18 hours.", 2, ["18 hours is three half-lives", "Activity = 640/2³ = 80 kBq"], "18 hours is three half-lives, so activity = 640 × (1/2)³ = 80 kBq.", "apply repeated half-life reduction", 2, ["AO2"])],
+    parts: [part("Find its activity after 18 hours.", 2, ["18 hours is three half-lives", "Activity = 640/2³ = 80 kBq"], "18 hours is three half-lives, so activity = 640 × (1/2)³ = 80 kBq.", "apply repeated half-life reduction", 3, ["AO2"])],
   },
   {
     slug: "physics-binding-energy",
@@ -762,14 +768,14 @@ const physics: ExpansionItem[] = [
     topic: "nuclear",
     stem: "In beta-minus decay a neutron changes into a proton.",
     difficulty: 3,
-    parts: [part("State the other particles emitted and explain how charge is conserved.", 3, ["An electron and an electron antineutrino are emitted", "Neutron charge 0 becomes proton charge +1 and electron charge −1", "The antineutrino has zero charge"], "A neutron changes into a proton and emits an electron and an electron antineutrino. The final charges are +1 and −1, giving zero overall, while the antineutrino is neutral.", "apply charge and lepton-number conservation to beta-minus decay", 2, ["AO2"])],
+    parts: [part("State the other particles emitted and explain how charge is conserved.", 3, ["An electron and an electron antineutrino are emitted", "Neutron charge 0 becomes proton charge +1 and electron charge −1", "The antineutrino has zero charge"], "A neutron changes into a proton and emits an electron and an electron antineutrino. The final charges are +1 and −1, giving zero overall, while the antineutrino is neutral.", "apply charge and lepton-number conservation to beta-minus decay", 7, ["AO2"])],
   },
   {
     slug: "physics-polarisation",
     topic: "waves",
     stem: "A beam of light passes through a polarising filter and an analyser.",
     difficulty: 3,
-    parts: [part("Explain why the observation of polarisation shows that light is a transverse wave.", 3, ["Polarisation restricts oscillations to one direction", "Only transverse oscillations can be restricted in this way", "Longitudinal waves oscillate parallel to propagation and cannot be polarised"], "Polarisation selects one direction of oscillation perpendicular to the direction of travel. This is possible for transverse waves but not longitudinal waves, whose oscillations are parallel to their direction of travel.", "use polarisation as evidence that light is transverse", 3, ["AO2"])],
+    parts: [part("Explain why the observation of polarisation shows that light is a transverse wave.", 3, ["Polarisation restricts oscillations to one direction", "Only transverse oscillations can be restricted in this way", "Longitudinal waves oscillate parallel to propagation and cannot be polarised"], "Polarisation selects one direction of oscillation perpendicular to the direction of travel. This is possible for transverse waves but not longitudinal waves, whose oscillations are parallel to their direction of travel.", "use polarisation as evidence that light is transverse", 5, ["AO2"])],
   },
   {
     slug: "physics-de-broglie",
@@ -777,7 +783,7 @@ const physics: ExpansionItem[] = [
     kind: "calculation",
     stem: "An electron travels at 2.0 × 10⁶ m s⁻¹. Its mass is 9.11 × 10⁻³¹ kg and h = 6.63 × 10⁻³⁴ J s.",
     difficulty: 3,
-    parts: [part("Calculate its de Broglie wavelength.", 2, ["Momentum p = mv = 1.822 × 10⁻²⁴ kg m s⁻¹", "λ = h/p = 3.64 × 10⁻¹⁰ m"], "p = mv = 9.11 × 10⁻³¹ × 2.0 × 10⁶ = 1.822 × 10⁻²⁴ kg m s⁻¹. λ = h/p = 3.64 × 10⁻¹⁰ m.", "calculate a matter-wave wavelength using de Broglie's relation", 1, ["AO2"])],
+    parts: [part("Calculate its de Broglie wavelength.", 2, ["Momentum p = mv = 1.822 × 10⁻²⁴ kg m s⁻¹", "λ = h/p = 3.64 × 10⁻¹⁰ m"], "p = mv = 9.11 × 10⁻³¹ × 2.0 × 10⁶ = 1.822 × 10⁻²⁴ kg m s⁻¹. λ = h/p = 3.64 × 10⁻¹⁰ m.", "calculate a matter-wave wavelength using de Broglie's relation", 4, ["AO2"])],
   },
   {
     slug: "more-alevel-physics-filament-lamp",

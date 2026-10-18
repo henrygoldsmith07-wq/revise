@@ -5,7 +5,7 @@
 // the mission, stage, method, target cause and source mistakes.
 
 import { useCallback, useState } from "react";
-import { stageForRoute, buildMissionSession, missionCheckpoint, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
+import { stageForRoute, buildMissionSession, missionCheckpoint, missionProofHref, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
 import { collectMissions } from "@/domain/revision-engine";
 import { useStoreFields } from "@/state/store";
 import { QuestionSetSession } from "./QuestionSetSession";
@@ -58,6 +58,8 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
     onExit();
   }, [clearRevisionCheckpoint, onExit, session?.stage]);
 
+  // The topic the delayed check tests, for the banner (it used to pass a question id as topic=).
+  const proofLink = session ? missionProofHref(session, store.questions) : null;
   return (
     <QuestionSetSession
       title={session?.title ?? "Exam mission"}
@@ -74,11 +76,8 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
       contextFor={session?.contextFor}
       intro={session ? (
         <>
-          {session.stage === "delayed-proof" ? (
-            <ProofCheckBanner
-              href={`/adaptive-session?topic=${encodeURIComponent(session.questionIds[0] ?? "")}&start=1&proof=1`}
-              state="due"
-            />
+          {session.stage === "delayed-proof" && proofLink ? (
+            <ProofCheckBanner href={proofLink} state="due" />
           ) : null}
           {session.intro.map((line) => <p key={line}>{line}</p>)}
           {session.steps.map((step) => (

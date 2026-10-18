@@ -123,7 +123,10 @@ background and do other work while it runs. On Windows, invoke npm through
   `guided=1`, `unaided=1` and `timed=1&command=…`; `src/domain/practice-step-mode.ts`
   parses them. A new link parameter needs a consumer and a test, or the
   plan promises something the page does not do. Still unhonoured:
-  `/lesson?worked=1`, `/practice?transfer=1`, `/adaptive-session?proof=1`.
+  `/lesson?worked=1`, `/practice?transfer=1`. A proof check link is
+  `proofHref` (`/practice?proof=<topic>&subject=…`, ProofCheckMode); the
+  old `/adaptive-session?…&proof=1` was never read and is gone (thirtieth
+  pass, `tests/proof-links.test.ts`).
 - **A saved checkpoint is not an interrupted run** (twenty-ninth pass). Pages
   save a resume point as soon as a question shows; anything that offers to
   resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
@@ -163,6 +166,17 @@ background and do other work while it runs. On Windows, invoke npm through
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by
   `causeFit`, and re-sits the original only when none exists (and says so).
+- **Supported steps keep reviewed questions for proof** (thirtieth pass).
+  Anything that serves questions with help or as practice (mission repair,
+  practise, proof-barred apply; guided/worked plan steps) passes
+  `reserveReviewed` to `selectProofCandidates` or orders with
+  `deferProofSupply`: a reviewed question it serves becomes "seen" and can
+  never be the topic's proof. Spend one only when nothing else fits, and say
+  so (`reviewedSpent`).
+- **A Physics spec tag is a lesson link.** `tests/physics-spec-tags.test.ts`
+  checks every WJEC Physics tag is a real point in the question's topic and
+  pins the audited massive-authentic tags. Never retag a question to fill a
+  depth cell; `tests/subject-assessment-audit.test.ts` lists the honest gaps.
 - **Two pre-existing flake classes**, both evidenced on a clean baseline and both
   left documented rather than hidden: Vitest worker RPC timeouts on a loaded
   machine (`vitest.config.mts`), and wall-clock compile assertions

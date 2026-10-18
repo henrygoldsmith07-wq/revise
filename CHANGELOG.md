@@ -1,5 +1,51 @@
 # Changelog
 
+## Repair keeps reviewed questions for proof; proof links reach the proof check; Physics tags point at the right lesson — 2026-10-18 (thirtieth pass)
+
+- **Repair and supported practice no longer spend proof supply.**
+  `selectProofCandidates` broke fit ties in favour of teacher-reviewed
+  questions even for non-proof steps, so once approvals exist a mission's
+  repair, supported practice or proof-barred unaided practice would have
+  served exactly the reviewed questions the topic's unaided/delayed proof
+  needs (a served question is "seen" and `unseenQuestion` then bars it from
+  proof). The new `reserveReviewed` option fills from unreviewed questions
+  first and spends a reviewed one only when nothing else fits; the step then
+  says so (`reviewedSpent`, plus a sentence in its "why"). Repair siblings
+  must still share the lost skill (`require`). Guided and worked plan steps on
+  `/practice` do the same through `deferProofSupply`; timed and unaided steps
+  are unchanged. Proof stages still take reviewed questions only. Every
+  flagship has 0 approved questions today, so nothing changes for learners
+  yet; `tests/proof-supply-reserve.test.ts` uses fixture approvals.
+- **Proof-check links open the proof check.** The repair plan's "Proof check"
+  step and the marked-answer panel linked to `/adaptive-session?…&proof=1`;
+  that page never read `proof`, so the "Proof check" was an ordinary
+  supported adaptive session. The plan step now links `proofHref`
+  (`/practice?proof=<topic>&subject=…`, ProofCheckMode). The marked-answer
+  "Try an unseen question" button keeps its adaptive session (its copy says
+  practice) without the dead flag, and no longer logs a `proof.attempted`
+  event for a proof that never ran.
+- **Mission proof banner.** MissionSessionMode passed the first question id as
+  `topic=` in the same dead link. It now uses `missionProofHref` (the
+  delayed-proof step's topic). The "due" banner renders no link at all, so
+  this was never visible; the href is now correct if it ever is.
+- **Physics spec-point tags.** The 24 WJEC Physics items in
+  `massive-authentic.ts` were checked one by one against the curriculum
+  statement and the authored teaching for each point; 15 were tagged to the
+  wrong point (e.g. a Young modulus calculation on 1.5(b) Hooke's law, a
+  half-life question on 4.3(b) nuclear radius) and are retagged; 2 are left
+  for teacher review. The offsets vary (−1 to +6), so there was no
+  systematic off-by-one. The same items feed `aqa-alevel-physics`, whose
+  topic tree is a clone of the WJEC one, so one number is right for both.
+  `tests/physics-spec-tags.test.ts` pins the audit and checks every WJEC
+  Physics tag in the bank is a real point in the question's own topic (all
+  3,654 are). Consequences, reported rather than hidden: the internal depth
+  report drops from 108/108 to 102/108 deep-complete statements (the wrong
+  tags were filling seven demand cells), and the audit now flags three
+  genuine duplicates the wrong tags had hidden. No question is approved, so
+  no review attestation is invalidated (the content fingerprint includes
+  part spec tags). `wjec-authoring-backlog.json` is refreshed for the 23
+  question counts the retags change (`npm run wjec:authoring:refresh`).
+
 ## Today's headline says "Recover" once; opening a step no longer leaves a phantom "Resume interrupted revision" — 2026-10-17 (twenty-ninth pass)
 
 **Today's headline read "Recover 3 marks: Recover Motion marks".** A generic
