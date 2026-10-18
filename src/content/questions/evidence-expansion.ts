@@ -17,6 +17,7 @@ interface ExpansionPart {
   scheme: string[];
   answer: string;
   claim: string;
+  /** Spec-point number within the topic (sp-NN); defaults to 1 (see thirty-first pass). */
   point?: number;
   aos?: AoCode[];
 }
@@ -118,7 +119,7 @@ const physics: ExpansionItem[] = [
     calculator: true,
     stem: "A communications satellite is moved from a low circular orbit (400 km) to a higher circular orbit (36 000 km). Use ideas about gravitational fields and energy to explain what must be done to raise the orbit, and evaluate the claim that 'a higher orbit means the satellite travels faster'.",
     parts: [
-      part(
+      { ...part(
         "Explain why the satellite's speed in a stable circular orbit depends only on the orbital radius.",
         3,
         [
@@ -129,8 +130,8 @@ const physics: ExpansionItem[] = [
         "Setting gravitational force equal to the required centripetal force gives GMm/r² = mv²/r, so v = √(GM/r); the speed depends only on the radius and decreases as the orbit grows larger.",
         "Circular motion in a gravitational field links force, field strength and orbital speed.",
         ["AO1", "AO2"],
-      ),
-      part(
+      ), point: 4 },
+      { ...part(
         "Evaluate the claim that a higher orbit means the satellite travels faster.",
         3,
         [
@@ -141,7 +142,7 @@ const physics: ExpansionItem[] = [
         "The claim is incorrect: v = √(GM/r) shows orbital speed falls as radius rises. Raising the orbit does require net energy input because the total energy becomes less negative, but that energy goes into potential energy, not extra speed.",
         "Energy considerations in gravitational fields; evaluating claims quantitatively.",
         ["AO2", "AO3"],
-      ),
+      ), point: 4 },
     ],
   },
   {
@@ -160,7 +161,7 @@ const physics: ExpansionItem[] = [
       "The normal force of the table on the book, and the weight of the table",
     ],
     correctIndex: 1,
-    parts: [part("Select the correct third-law pairing.", 1, ["Third-law pairs act on different bodies and are of the same type"], "Third-law pairs act on different bodies, are equal in magnitude, opposite in direction, and of the same type of force.", "Newton's third law identifies force pairs.", ["AO1"])],
+    parts: [{ ...part("Select the correct third-law pairing.", 1, ["Third-law pairs act on different bodies and are of the same type"], "Third-law pairs act on different bodies, are equal in magnitude, opposite in direction, and of the same type of force.", "Newton's third law identifies force pairs.", ["AO1"]), point: 4 }],
   },
   {
     slug: "projectile-data-interpretation",
@@ -169,9 +170,9 @@ const physics: ExpansionItem[] = [
     calculator: true,
     stem: "In a laboratory, a ball is launched horizontally at 4.0 m/s from a bench of height 0.80 m. Calculate the time of flight, the horizontal range, and explain why the horizontal velocity can be treated as constant.",
     parts: [
-      part("Calculate the time of flight.", 2, ["Vertical motion: s = ½gt² so t = √(2s/g)", "t = √(2×0.80/9.8) ≈ 0.40 s"], "Vertically: 0.80 = ½(9.8)t² so t = √(0.163) ≈ 0.40 s.", "Projectile motion separates into independent components.", ["AO2"]),
-      part("Calculate the horizontal range.", 2, ["Range = horizontal speed × time", "range = 4.0 × 0.40 ≈ 1.6 m"], "Range = 4.0 × 0.40 = 1.6 m.", "Range follows from uniform horizontal velocity and flight time.", ["AO2"]),
-      part("Explain why the horizontal velocity stays constant.", 1, ["No horizontal resultant force acts once launched (air resistance neglected)"], "With air resistance neglected there is no horizontal resultant force, and by Newton's first law the horizontal velocity remains constant.", "Newton's laws applied to projectile motion.", ["AO1", "AO2"]),
+      { ...part("Calculate the time of flight.", 2, ["Vertical motion: s = ½gt² so t = √(2s/g)", "t = √(2×0.80/9.8) ≈ 0.40 s"], "Vertically: 0.80 = ½(9.8)t² so t = √(0.163) ≈ 0.40 s.", "Projectile motion separates into independent components.", ["AO2"]), point: 6 },
+      { ...part("Calculate the horizontal range.", 2, ["Range = horizontal speed × time", "range = 4.0 × 0.40 ≈ 1.6 m"], "Range = 4.0 × 0.40 = 1.6 m.", "Range follows from uniform horizontal velocity and flight time.", ["AO2"]), point: 6 },
+      { ...part("Explain why the horizontal velocity stays constant.", 1, ["No horizontal resultant force acts once launched (air resistance neglected)"], "With air resistance neglected there is no horizontal resultant force, and by Newton's first law the horizontal velocity remains constant.", "Newton's laws applied to projectile motion.", ["AO1", "AO2"]), point: 6 },
     ],
   },
 ];

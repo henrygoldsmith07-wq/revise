@@ -29,6 +29,12 @@ type SourceItem = {
   correctIndex?: number;
   difficulty?: 1 | 2 | 3 | 4 | 5;
   calculator?: boolean;
+  /**
+   * Spec-point number within the topic (sp-NN). Defaults to 1. Every item was
+   * tagged sp-01 until the thirty-first pass, whatever it tested; Physics items
+   * now name their point (see tests/physics-spec-tags.test.ts).
+   */
+  point?: number;
 };
 
 function part(
@@ -65,7 +71,7 @@ function buildQuestions(subjectId: string, items: SourceItem[]): Question[] {
         scheme: current.scheme,
         answer: current.answer,
         aos: current.aos,
-        specPointIds: [subjectId + "." + item.topic + ".sp-01"],
+        specPointIds: [`${subjectId}.${item.topic}.sp-${String(item.point ?? 1).padStart(2, "0")}`],
         learningClaims: [current.claim],
         rejects: current.rejects,
       })),
@@ -441,6 +447,7 @@ const maths: SourceItem[] = [
 const physics: SourceItem[] = [
   {
     slug: "cyclist-field-note",
+    point: 4,
     topic: "kinematics-dynamics",
     stem: "Source extract: A cycling field note says a 75 kg rider and bicycle accelerate from 3.0 to 9.0 m s⁻¹ in 12 s against an average resistance of 25 N.",
     kind: "calculation",
@@ -449,6 +456,7 @@ const physics: SourceItem[] = [
   },
   {
     slug: "tidal-generator-report",
+    point: 3,
     topic: "energy-power",
     stem: "Source extract: A tidal-generator report says a turbine receives 45 kJ of kinetic energy every 20 s. The generator stage converts 70% of the turbine's mechanical output to electricity, and the turbine itself converts 45% of the incoming kinetic energy to mechanical output.",
     kind: "calculation",
@@ -473,6 +481,7 @@ const physics: SourceItem[] = [
   },
   {
     slug: "photodiode-brief",
+    point: 2,
     topic: "quantum",
     stem: "Source extract: A photodiode brief says photons of frequency 7.0 × 10¹⁴ Hz eject electrons from a surface, while photons of 4.0 × 10¹⁴ Hz do not. Take h = 6.63 × 10⁻³⁴ J s.",
     kind: "extended",
@@ -491,6 +500,7 @@ const physics: SourceItem[] = [
   },
   {
     slug: "crash-test-report",
+    point: 4,
     topic: "momentum",
     stem: "Source extract: A crash-test report says an occupant's momentum changes by 1200 kg m s⁻¹. Safety rules require the average restraint force to stay below 3000 N.",
     kind: "calculation",
@@ -499,6 +509,7 @@ const physics: SourceItem[] = [
   },
   {
     slug: "centrifuge-log",
+    point: 2,
     topic: "circular-shm",
     stem: "Source extract: A centrifuge log records a rotor radius of 0.20 m. A sample must experience 200 m s⁻² at the rotor edge.",
     kind: "calculation",
@@ -507,6 +518,7 @@ const physics: SourceItem[] = [
   },
   {
     slug: "planetary-mission-report",
+    point: 4,
     topic: "fields",
     stem: "Source extract: A planetary-mission report tracks a probe climbing from twice to four times the planet's radius, measured from the planet's centre.",
     kind: "calculation",
@@ -531,6 +543,7 @@ const physics: SourceItem[] = [
   },
   {
     slug: "radiotherapy-record",
+    point: 3,
     topic: "nuclear",
     stem: "Source extract: A radiotherapy record gives a tracer half-life of 8.0 hours and an initial activity of 480 MBq. Imaging requires at least 60 MBq.",
     kind: "calculation",

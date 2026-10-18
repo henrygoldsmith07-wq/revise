@@ -23,6 +23,12 @@ type ContextItem = {
   correctIndex?: number;
   difficulty?: 1 | 2 | 3 | 4 | 5;
   calculator?: boolean;
+  /**
+   * Spec-point number within the topic (sp-NN). Defaults to 1. Every item was
+   * tagged sp-01 until the thirty-first pass, whatever it tested; Physics items
+   * now name their point (see tests/physics-spec-tags.test.ts).
+   */
+  point?: number;
 };
 
 function part(
@@ -59,7 +65,7 @@ function buildQuestions(subjectId: string, items: ContextItem[]): Question[] {
         scheme: current.scheme,
         answer: current.answer,
         aos: current.aos,
-        specPointIds: [subjectId + "." + item.topic + ".sp-01"],
+        specPointIds: [`${subjectId}.${item.topic}.sp-${String(item.point ?? 1).padStart(2, "0")}`],
         learningClaims: [current.claim],
       })),
     })),
@@ -450,6 +456,7 @@ const maths: ContextItem[] = [
 const physics: ContextItem[] = [
   {
     slug: "hovercraft-launch",
+    point: 4,
     topic: "kinematics-dynamics",
     stem: "Unfamiliar context: A hovercraft of mass 800 kg accelerates from rest to 12 m s⁻¹ in 15 s while the average resistive force is 400 N.",
     kind: "calculation",
@@ -458,6 +465,7 @@ const physics: ContextItem[] = [
   },
   {
     slug: "wave-buoy",
+    point: 3,
     topic: "energy-power",
     stem: "Unfamiliar context: A wave-energy buoy transfers 18 kJ to its generator every 12 s, but only 65% becomes useful electrical output.",
     kind: "calculation",
@@ -497,6 +505,7 @@ const physics: ContextItem[] = [
   },
   {
     slug: "airbag-collision",
+    point: 4,
     topic: "momentum",
     stem: "Unfamiliar context: An airbag increases the time taken for a passenger's momentum to fall from 900 kg m s⁻¹ to zero from 0.10 s to 0.40 s.",
     kind: "calculation",
@@ -505,6 +514,7 @@ const physics: ContextItem[] = [
   },
   {
     slug: "space-station-rotation",
+    point: 2,
     topic: "circular-shm",
     stem: "Unfamiliar context: A rotating space station has radius 50 m and completes one rotation every 20 s. A loose tool at the rim moves in a circle.",
     kind: "calculation",
@@ -513,6 +523,7 @@ const physics: ContextItem[] = [
   },
   {
     slug: "lunar-transfer",
+    point: 3,
     topic: "fields",
     stem: "Unfamiliar context: A probe moves farther from a moon. Its gravitational potential changes from −2.0 × 10⁷ to −1.2 × 10⁷ J kg⁻¹.",
     difficulty: 2,
@@ -527,6 +538,7 @@ const physics: ContextItem[] = [
   },
   {
     slug: "medical-tracer",
+    point: 3,
     topic: "nuclear",
     stem: "Unfamiliar context: A medical tracer has an initial activity of 640 MBq and a half-life of 6 hours. A scan is planned 18 hours after injection.",
     kind: "calculation",
