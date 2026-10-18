@@ -54,7 +54,10 @@ export default function ReadinessPage() {
 
       <ExamCommandCentre />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Grid children default to min-width: auto, so one long word or wide
+          table pushed the readiness detail to 373px on a 360px phone
+          (thirty-first pass); grid-cols-1 and min-w-0 let them shrink. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <ImprovementStory />
         <InterventionMemoryPanel />
       </div>
@@ -87,12 +90,12 @@ export default function ReadinessPage() {
           <p className="text-sm text-ink3 max-w-3xl">
             Remembering a fact is not the same as using it for marks, so the two are measured separately. These panels show which one is holding you back.
           </p>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             <RecallMasteryCard />
             <ApplicationMasteryCard />
           </div>
           <MarksLostByCause />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             <RecurringMisconceptions />
             <MasteryUncertaintyCard />
           </div>

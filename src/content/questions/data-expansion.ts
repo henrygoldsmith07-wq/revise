@@ -23,6 +23,12 @@ type DataItem = {
   correctIndex?: number;
   difficulty?: 1 | 2 | 3 | 4 | 5;
   calculator?: boolean;
+  /**
+   * Spec-point number within the topic (sp-NN). Defaults to 1. Every item was
+   * tagged sp-01 until the thirty-first pass, whatever it tested; Physics items
+   * now name their point (see tests/physics-spec-tags.test.ts).
+   */
+  point?: number;
 };
 
 function part(
@@ -59,7 +65,7 @@ function buildQuestions(subjectId: string, items: DataItem[]): Question[] {
         scheme: current.scheme,
         answer: current.answer,
         aos: current.aos,
-        specPointIds: [`${subjectId}.${item.topic}.sp-01`],
+        specPointIds: [`${subjectId}.${item.topic}.sp-${String(item.point ?? 1).padStart(2, "0")}`],
         learningClaims: [current.claim],
       })),
     })),
@@ -425,6 +431,7 @@ const maths: DataItem[] = [
 const physics: DataItem[] = [
   {
     slug: "velocity-time-table",
+    point: 2,
     topic: "kinematics-dynamics",
     stem: "Data: A trolley has velocities 2, 5, 8 and 11 m s⁻¹ at times 0, 1, 2 and 3 s.",
     kind: "calculation",
@@ -433,6 +440,7 @@ const physics: DataItem[] = [
   },
   {
     slug: "power-efficiency-data",
+    point: 3,
     topic: "energy-power",
     stem: "Data: A lift receives 18 kJ of energy each second and increases the gravitational potential energy of its load by 13.5 kJ each second.",
     kind: "calculation",
@@ -467,6 +475,7 @@ const physics: DataItem[] = [
   },
   {
     slug: "iv-data",
+    point: 5,
     topic: "electric-circuits",
     stem: "Data: A component has currents 0.10, 0.20 and 0.30 A at p.d.s 2.0, 4.0 and 5.4 V respectively.",
     difficulty: 2,
@@ -474,6 +483,7 @@ const physics: DataItem[] = [
   },
   {
     slug: "collision-data",
+    point: 2,
     topic: "momentum",
     stem: "Data: A 0.40 kg trolley moving at 3.0 m s⁻¹ collides with a stationary 0.60 kg trolley. They move together afterwards.",
     kind: "calculation",
@@ -496,6 +506,7 @@ const physics: DataItem[] = [
   },
   {
     slug: "gas-pressure-data",
+    point: 3,
     topic: "thermal",
     stem: "Data: A fixed mass of gas has pressure 100, 110 and 120 kPa at temperatures 300, 330 and 360 K respectively.",
     kind: "calculation",
@@ -504,6 +515,7 @@ const physics: DataItem[] = [
   },
   {
     slug: "half-life-count-data",
+    point: 3,
     topic: "nuclear",
     stem: "Data: Background count rate is 20 counts min⁻¹. The measured sample count rates are 820, 420, 220 and 120 counts min⁻¹ at 0, 6, 12 and 18 minutes.",
     kind: "calculation",

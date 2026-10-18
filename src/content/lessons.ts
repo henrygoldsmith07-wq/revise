@@ -164,7 +164,7 @@ export function buildLesson(topic: Topic): Lesson | null {
       kind: "core",
       title: pointTitle(point, `Key idea ${i + 1}`),
       body: point,
-      objective: objectiveForPoint(point),
+      objective: objectiveForPoint(point, false),
       explanationSteps: pointExplanation.steps,
       explanationMode: pointExplanation.mode,
       application: buildApplication(topic, point, pointExplanation, undefined, "understand"),
@@ -332,18 +332,24 @@ const COMMAND_WORDS = [
  */
 function buildLearningObjectives(topic: Topic): string[] {
   const requirements = [
-    ...(topic.specPoints ?? []).map((point) => point.text),
-    ...authoredKeyPoints(topic),
+    ...(topic.specPoints ?? []).map((point) => objectiveForPoint(point.text, true)),
+    ...authoredKeyPoints(topic).map((point) => objectiveForPoint(point, false)),
   ];
-  return uniqueStrings(requirements.map(objectiveForPoint)).slice(0, 5);
+  return uniqueStrings(requirements).slice(0, 5);
 }
 
-function objectiveForPoint(text: string): string {
+function objectiveForPoint(text: string, specStatement: boolean): string {
   const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
   if (!clean) return "Explain the idea clearly and use it in context.";
   const lower = clean.charAt(0).toLowerCase() + clean.slice(1);
   if (/^be able to\b/i.test(clean)) return `${clean}.`;
-  if (COMMAND_WORDS.some((word) => new RegExp(`^${word.replace(" ", "\\s+")}\\b`, "i").test(clean))) {
+  // Spec statements are verb phrases ("define capacitance…", "recall…",
+  // "analyse…"); the command-word list missed most of those verbs, so 143 of
+  // 450 WJEC objectives read "Explain that define …" (thirty-first pass).
+  // A spec statement with a lower-case start is a verb phrase, as in
+  // takeawayForPoint. Authored key points are sentences ("suvat applies…",
+  // "sin²θ + cos²θ = 1…"), so only the command-word test applies to them.
+  if ((specStatement && /^[a-z]/.test(clean)) || STARTS_WITH_COMMAND_WORD.test(clean)) {
     return `Be able to ${lower}.`;
   }
   return `Explain that ${lower}.`;
@@ -1002,7 +1008,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           kind: "overview",
           title: "Know the target",
           body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
-          objective: objectiveForPoint(specPoint.text),
+          objective: objectiveForPoint(specPoint.text, true),
           explanationSteps: [
             `Where it sits: one part of ${topic.title}.`,
             "You will finish by retrieving the idea, applying it and saying the point back without looking.",
@@ -1015,7 +1021,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           kind: "core",
           title: focusTitle,
           body: sourceBody ? `${specPoint.text}\n\nConnect it to this core idea: ${sourceBody}` : specPoint.text,
-          objective: objectiveForPoint(specPoint.text),
+          objective: objectiveForPoint(specPoint.text, true),
           explanationSteps: [
             `Translate the checkpoint into a sentence you would use in an answer: ${specPoint.text}`,
             ...(sourceExplanation.length ? sourceExplanation.slice(0, 3) : checkpointExplanation.steps.slice(0, 3)),
@@ -1129,11 +1135,11 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           title: focusTitle,
           intro: `Checkpoint ${checkpointIndex} of ${specPoints.length}. ${buildLessonIntro(
             topic,
-            [objectiveForPoint(specPoint.text)],
+            [objectiveForPoint(specPoint.text, true)],
             estimateCheckpointMinutes(topic, Boolean(misconception), Boolean(trap)),
           )}`,
           steps,
-          learningObjectives: [objectiveForPoint(specPoint.text)],
+          learningObjectives: [objectiveForPoint(specPoint.text, true)],
           estimatedMinutes: estimateCheckpointMinutes(topic, Boolean(misconception), Boolean(trap)),
           focus: specPoint.text,
           checkpointIndex,
@@ -1162,7 +1168,7 @@ function authoredCheckpointLesson(input: {
 }): RoadmapLesson {
   const { topic, specPoint, teaching, lessonId, focusTitle, checkpointIndex, checkpointTotal } = input;
   const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
-  const objective = objectiveForPoint(specPoint.text);
+  const objective = objectiveForPoint(specPoint.text, true);
   const steps: LessonStep[] = [
     {
       id: `${lessonId}:overview`,

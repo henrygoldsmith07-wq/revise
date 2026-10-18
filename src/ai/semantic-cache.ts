@@ -183,16 +183,21 @@ export async function lookupCachedMark(
   else if (exact) return { hit: { marked: exact.marked, confidence: exact.confidence, via: "exact" }, embedding: null };
 
   // Tier 2: cosine similarity against this part's cached answers.
+  // The model (~23MB from huggingface.co) is fetched only when there is an
+  // embedded, current entry to compare against. Without one the tier cannot
+  // hit, and loading it anyway sent every student's browser to a third party
+  // on their first marked answer, AI consent or not (thirty-first pass).
   let embedding: number[] | null = null;
   try {
-    const embedder = await getEmbedder();
+    const scope = (await db.getAllFromIndex("aiCache", "byScope", scopeKey(questionId, partId)))
+      .filter((entry) => entry.embedding && fresh(entry) && current(entry));
+    const embedder = scope.length ? await getEmbedder() : null;
     if (embedder) {
       const vector = (await embedder([embedText(answer, markScheme)]))[0];
       embedding = vector;
-      const scope = await db.getAllFromIndex("aiCache", "byScope", scopeKey(questionId, partId));
       let best: { entry: AiCacheEntry; sim: number } | null = null;
       for (const entry of scope) {
-        if (!entry.embedding || !fresh(entry) || !current(entry)) continue;
+        if (!entry.embedding) continue;
         const sim = cosineSimilarity(vector, entry.embedding);
         if (sim >= CACHE_THRESHOLD && (!best || sim > best.sim)) best = { entry, sim };
       }

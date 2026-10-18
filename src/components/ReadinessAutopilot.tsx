@@ -14,6 +14,7 @@ import { buildMarksIntelligence } from "@/domain/readiness-intelligence";
 import { todayLocal } from "@/domain/local-date";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill } from "./ui";
+import { marksLabel } from "@/domain/plural";
 
 export function ReadinessAutopilot() {
   const store = useStoreFields(
@@ -77,7 +78,7 @@ export function ReadinessAutopilot() {
               ? "Not enough evidence yet"
               : intel.totalMarks === 0
                 ? "No open lost marks"
-                : `${intel.totalMarks} marks currently at risk`}
+                : `${marksLabel(intel.totalMarks)} currently at risk`}
           </h2>
           <p className="mt-1 text-sm text-ink2 max-w-2xl" role="status">
             {intel.headline}
@@ -107,7 +108,7 @@ export function ReadinessAutopilot() {
               <p className="text-xs font-semibold text-ink">
                 {c.label}{" "}
                 <span className="font-normal text-ink3">
-                  · {c.marks > 0 ? `${c.marks} marks` : "clear"}
+                  · {c.marks > 0 ? marksLabel(c.marks) : "clear"}
                 </span>
               </p>
               <p className="mt-0.5 text-xs text-ink2">{c.detail}</p>
@@ -131,7 +132,7 @@ export function ReadinessAutopilot() {
                   <p className="text-sm font-medium text-ink">
                     {o.title}{" "}
                     <span className="text-xs font-normal text-ink3">
-                      {getSubject(o.subjectId)?.name} · {o.marks} marks
+                      {getSubject(o.subjectId)?.name} · {marksLabel(o.marks)}
                     </span>
                   </p>
                   <p className="text-xs text-ink2">{o.reason}</p>

@@ -18,6 +18,7 @@
 
 import type { ApplicationMasteryRow } from "./application-mastery";
 import type { RecallMasteryRow } from "./recall-mastery";
+import { countLabel, marksLabel } from "./plural";
 import type { Attempt, Id, Mistake, Question } from "./types";
 import { buildMarksAtRisk } from "./marks-at-risk";
 
@@ -206,7 +207,7 @@ export function buildMarksIntelligence(
       detail:
         thin.topics === 0
           ? "Open topics have checked answers behind them."
-          : `${thin.topics} topic${thin.topics === 1 ? "" : "s"} have open marks but too few checked answers to judge.`,
+          : `${thin.topics} topic${thin.topics === 1 ? " has" : "s have"} open marks but too few checked answers to judge.`,
       action: { label: "Gather evidence", href: "/diagnostic" },
     },
     {
@@ -239,7 +240,9 @@ export function buildMarksIntelligence(
       detail:
         timed >= 3
           ? `${timed} timed answers give a real pace signal.`
-          : `Only ${timed} timed answer${timed === 1 ? "" : "s"} so far — pace under pressure is unproven.`,
+          : timed === 0
+            ? "No timed answers yet — pace under pressure is unproven."
+            : `Only ${countLabel(timed, "timed answer")} so far — pace under pressure is unproven.`,
       action: { label: "Timed practice", href: "/papers" },
     },
   ];
@@ -251,10 +254,10 @@ export function buildMarksIntelligence(
     marks: t.marks,
     reason:
       appWeak.has(t.topicId) && recallWeak.has(t.topicId)
-        ? `${t.marks} open marks; both recall and application are weak.`
+        ? `${marksLabel(t.marks, "open")}; both recall and application are weak.`
         : appWeak.has(t.topicId)
-          ? `${t.marks} open marks; application is weaker than recall.`
-          : `${t.marks} open marks; the biggest recoverable stake.`,
+          ? `${marksLabel(t.marks, "open")}; application is weaker than recall.`
+          : `${marksLabel(t.marks, "open")}; the biggest recoverable stake.`,
     href: `/practice?topic=${encodeURIComponent(t.topicId)}`,
   }));
 
