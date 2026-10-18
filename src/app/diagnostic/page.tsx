@@ -77,7 +77,7 @@ function Diagnostic() {
     <div className="space-y-6">
       <header>
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{quick ? "Optional · 5–10 minutes" : "Optional · 15–25 minutes"}</p>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">Starting diagnostic</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">{quick ? "Quick check" : "Full diagnostic"}</h1>
         <p className="text-sm text-ink3 mt-1 max-w-3xl">
           A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered. Answers on teacher-reviewed questions count as unaided evidence; anything else is labelled practice, not proof.
         </p>

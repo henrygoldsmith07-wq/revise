@@ -101,6 +101,16 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
     return quickDiagnosticReport({ probes, topicIds: [...new Set(items.map((i) => i.topicId))], topicTitle: title });
   }, [done, index, items, selection, store.mistakes]);
 
+  // The next step must follow from this check: the plan's best action in the
+  // subject just checked, preferring a topic this check found weak. The
+  // global top action could be another subject entirely.
+  const next = useMemo(() => {
+    if (!report) return null;
+    const weak = new Set(done.flatMap((attempt, i) => (attempt.max > 0 && attempt.awarded / attempt.max < 0.6 ? [items[i]!.topicId] : [])));
+    const inSubject = plan.actions.filter((action) => action.subjectId === subjectId);
+    return inSubject.find((action) => action.topicIds.some((id) => weak.has(id))) ?? inSubject[0] ?? null;
+  }, [report, done, items, plan.actions, subjectId]);
+
   const finished = Boolean(report);
   useEffect(() => {
     if (finished) {
@@ -149,16 +159,16 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
         <ul className="text-sm text-ink space-y-1">{report.lines.found.map((l) => <li key={l}>{l}</li>)}</ul>
         <div>
           <p className="text-sm font-semibold text-ink">Best next step</p>
-          {plan.top ? (
+          {next ? (
             <>
-              <p className="text-sm text-ink2">{plan.top.title} · {Math.ceil(plan.top.minutes)} min</p>
-              <p className="text-xs text-ink3 mt-1">{plan.top.explanation.why}</p>
+              <p className="text-sm text-ink2">{next.title} · {Math.ceil(next.minutes)} min</p>
+              <p className="text-xs text-ink3 mt-1">{next.explanation.why}</p>
             </>
           ) : <p className="text-sm text-ink2">{report.lines.next}</p>}
         </div>
         <p className="text-xs text-ink3">{report.caveat}</p>
-        <ButtonLink href={plan.top?.route.href ?? "/"} variant="primary">{plan.top ? "Start session" : "Back to Today"}</ButtonLink>
-        {plan.top ? <ButtonLink href="/" variant="secondary">Back to Today</ButtonLink> : null}
+        <ButtonLink href={next?.route.href ?? "/"} variant="primary">{next ? "Start session" : "Back to Today"}</ButtonLink>
+        {next ? <ButtonLink href="/" variant="secondary">Back to Today</ButtonLink> : null}
       </Panel>
     );
   }

@@ -489,7 +489,11 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
               <ol className="mt-1.5 space-y-1 text-xs text-ink2 list-decimal pl-4">
                 <li>{diagnosticChoice === "quick" ? "Answer a few short questions with no hints." : "Open Today and start the recommended step."}</li>
                 <li>See what Revise found and why it chose the next action.</li>
-                <li>Mistakes turn into targeted repair, then an unseen proof check.</li>
+                <li>
+                  {flagshipChosen.length
+                    ? "Mistakes turn into targeted repair, then an unseen proof check."
+                    : "Mistakes turn into targeted repair, then a fresh practice question on the same skill."}
+                </li>
               </ol>
             </div>
           </Panel>

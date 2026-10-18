@@ -122,7 +122,7 @@ export default function ReadinessPage() {
           </div>
           <div className="flex flex-wrap gap-2 max-w-full sm:shrink-0">
             <ButtonLink href="/twin" size="sm" variant="primary">Open Digital Twin</ButtonLink>
-            <ButtonLink href="/diagnostic" size="sm">Starting diagnostic</ButtonLink>
+            <ButtonLink href="/diagnostic" size="sm">Take a quick check</ButtonLink>
             {weakestSubject ? <ButtonLink href={`/practice?subject=${encodeURIComponent(weakestSubject.id)}`} size="sm">Practise {weakestSubject.name}</ButtonLink> : null}
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function ReadinessPage() {
       <nav aria-label="Specialist views" className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink3">
         <Link href="/schedule" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Plan the run-up to your exams →</Link>
         <Link href="/twin" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">How your plan was chosen →</Link>
-        <Link href="/diagnostic" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Starting diagnostic →</Link>
+        <Link href="/diagnostic" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Take a quick check →</Link>
         <Link href="/readiness/spec" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Evidence for every specification statement →</Link>
         <Link href="/readiness/trusted-coverage" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Which content has been checked →</Link>
       </nav>

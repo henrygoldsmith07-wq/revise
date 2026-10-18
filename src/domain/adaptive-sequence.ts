@@ -1,4 +1,5 @@
 import { fitToBudget } from "./adaptive-budget";
+import { isFlagship } from "./flagship";
 import { capabilityState, type CapabilityProfile } from "./capability-mastery";
 
 import { type LearningAction } from "./learning-action";
@@ -301,7 +302,12 @@ export function reasonFor(candidate: AdaptiveTopicCandidate, topicTitle: string)
   if (evidence.overdueCount) reasons.push(`${evidence.overdueCount} overdue retrieval${evidence.overdueCount === 1 ? "" : "s"}`);
   else if (evidence.dueCount) reasons.push(`${evidence.dueCount} FSRS retrieval${evidence.dueCount === 1 ? "" : "s"} due`);
   if (evidence.openMistakes) reasons.push(`${evidence.openMistakes} open misconception${evidence.openMistakes === 1 ? "" : "s"}`);
-  if (evidence.mastery < 0.55) reasons.push(`${Math.round(evidence.mastery * 100)}% proven mastery`);
+  // Reference-tier subjects can never prove mastery, so "0% proven" there
+  // reads as a verdict on the learner rather than on the question supply.
+  if (evidence.mastery < 0.55) {
+    reasons.push(!isFlagship(candidate.subjectId) ? "practice only, nothing here can be proven"
+      : evidence.mastery <= 0 ? "nothing proven yet" : `${Math.round(evidence.mastery * 100)}% proven mastery`);
+  }
   if (evidence.daysToExam != null && evidence.daysToExam <= 30) reasons.push(`exam in ${Math.max(0, evidence.daysToExam)} days`);
   if (evidence.focusState === "unknown") reasons.push(`first ${evidence.focus} evidence`);
   if (!reasons.length) reasons.push("the best balance of recall, application and exam readiness");
