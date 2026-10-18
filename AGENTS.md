@@ -177,6 +177,17 @@ background and do other work while it runs. On Windows, invoke npm through
   checks every WJEC Physics tag is a real point in the question's topic and
   pins the audited massive-authentic tags. Never retag a question to fill a
   depth cell; `tests/subject-assessment-audit.test.ts` lists the honest gaps.
+- **Question builders take a spec point; never default to sp-01** (thirty-first
+  pass). The data, unfamiliar-context, authentic-source and evidence builders
+  used to tag every part sp-01 of its topic. Pass the point the part actually
+  tests, checked against the curriculum statement. `node
+  scripts/audit-physics-spec-tags.mjs` ranks likely mis-tags by keyword
+  agreement; it is triage, not accuracy, and every retag is a human decision
+  pinned in `tests/physics-spec-tags.test.ts`.
+- **Nothing on the marking path may reach a third party without AI consent**
+  (thirty-first pass). The semantic cache loads its embedding model only when
+  an embedded entry exists (`tests/semantic-cache-egress.test.ts`);
+  `e2e/fresh-student-360.spec.ts` fails on any huggingface.co request.
 - **Two pre-existing flake classes**, both evidenced on a clean baseline and both
   left documented rather than hidden: Vitest worker RPC timeouts on a loaded
   machine (`vitest.config.mts`), and wall-clock compile assertions

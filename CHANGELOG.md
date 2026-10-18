@@ -1,5 +1,53 @@
 # Changelog
 
+## 360px fresh-student walkthrough: no huggingface.co fetch, correct third-law MCQ, readable lesson objectives; Physics tags beyond massive-authentic — 2026-10-18 (thirty-first pass)
+
+- **No third-party model download on a student's first marked answer.** A
+  fresh Year 12 Physics walkthrough at 360px (AI never enabled) saw the
+  browser request `huggingface.co/Xenova/all-MiniLM-L6-v2` on the first
+  marked diagnostic answer. `lookupCachedMark` loaded the embedding model
+  before checking whether any embedded entry existed; nothing stores an
+  embedding today, so the tier could never hit. The model now loads only when
+  a fresh, current, embedded entry exists for the part
+  (`tests/semantic-cache-egress.test.ts`). Open PR #75 removes the embedding
+  tier outright; whichever lands second should take #75's version.
+- **Third-law MCQ.** One distractor was itself a correct Newton's third law
+  pair, so a right answer could be marked wrong. Replaced
+  (`tests/third-law-mcq.test.ts`).
+- **Lesson objectives read "Be able to define …"**, not "Explain that define
+  …" (`tests/lesson-objectives-grammar.test.ts`).
+- **Physics spec-point tags beyond massive-authentic.** The data-expansion,
+  unfamiliar-context, authentic-source and evidence-expansion builders
+  hard-coded (or defaulted to) sp-01 of the topic. They now take a `point`.
+  `scripts/audit-physics-spec-tags.mjs` ranks likely mis-tags by keyword
+  agreement (a triage tool, not an accuracy measure: agreement went from
+  1,136/1,720 to 1,149/1,720 parts, strong suspects from 155 to 139); each
+  retag was checked by hand against the curriculum statement. 26 parts on 23
+  question templates are retagged in every Physics variant, including the
+  banked-curve centripetal question moved from SHM (sp-04) to centripetal
+  motion (sp-02); 8 parts are left for teacher review with their old tags.
+  All pinned in `tests/physics-spec-tags.test.ts`, which also checks every
+  Physics variant's tags are real points in the question's own topic; the one
+  exception, `aqa-gcse-physics-practical-resistance` tagged to a nonexistent
+  sp-08, is allowlisted for its owner. Consequence, reported rather than
+  hidden: the internal Physics depth report drops from 102/108 to 99/108
+  (kinematics-dynamics.sp-01, energy-power.sp-01, fields.sp-01 and
+  thermal.sp-01 lose cells that projectile, efficiency, orbit and ideal-gas
+  items were wrongly filling; quantum.sp-02 gains the photodiode item and
+  is now complete). No question is approved, so no attestation is
+  invalidated. `wjec-authoring-backlog.json` is refreshed.
+- **`e2e/fresh-student-360.spec.ts`** walks onboarding → quick check →
+  repair → lesson → Schedule → proof at 360px and fails on sideways scroll,
+  any huggingface.co request, or "Explain that define". Run locally with
+  `npm run test:e2e -- e2e/fresh-student-360.spec.ts` (the standard config
+  reuses a server already on `PORT`).
+- **Found, not fixed** (see the PR): Zod v4's `new Function` probe raises a
+  CSP eval report (`z.config({ jitless: true })`); no Year 12/AS awareness;
+  centripetal calculation marked 1/2 for omitting "towards the centre";
+  WJEC spec code shown as A200QS; lesson link hidden in collapsed "More
+  help"; a false "unit error" note on a full-mark part; and copy
+  inconsistencies on Today, mission, results, readiness and Schedule.
+
 ## Repair keeps reviewed questions for proof; proof links reach the proof check; Physics tags point at the right lesson — 2026-10-18 (thirtieth pass)
 
 - **Repair and supported practice no longer spend proof supply.**
