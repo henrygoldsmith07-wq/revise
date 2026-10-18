@@ -7,7 +7,7 @@
 // recommendations only to offer twin choices; writes go through the
 // repository. Nothing here mutates cards, attempts, or the plan.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildAdaptiveSession } from "@/domain/adaptive-session";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import type { ApplicationMasteryRow } from "@/domain/application-mastery";
@@ -88,6 +88,8 @@ export function useRevisionSessions(input: {
   const [revisionCheckpoint, setRevisionCheckpoint] = useState<RevisionCheckpoint | null>(null);
   const [revisionTwin, setRevisionTwin] = useState<RevisionTwinState | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // The latest checkpoint, read when the next save of the same run carries its startedAt forward.
+  const checkpointRef = useRef<RevisionCheckpoint | null>(null);
 
   // Self-loading on mount (in parallel with the snapshot load).
   useEffect(() => {
@@ -98,6 +100,7 @@ export function useRevisionSessions(input: {
         repo.loadRevisionTwin(userId),
       ]);
       if (cancelled) return;
+      checkpointRef.current = checkpoint ?? null;
       setRevisionCheckpoint(checkpoint ?? null);
       setRevisionTwin(twin ?? createRevisionTwinState(userId));
       setLoaded(true);
@@ -108,12 +111,14 @@ export function useRevisionSessions(input: {
   }, [userId]);
 
   const saveRevisionCheckpoint = useCallback(async (checkpointInput: RevisionCheckpointInput) => {
-    const checkpoint = createRevisionCheckpoint(userId, checkpointInput);
+    const checkpoint = createRevisionCheckpoint(userId, checkpointInput, undefined, checkpointRef.current);
+    checkpointRef.current = checkpoint;
     await repo.saveRevisionCheckpoint(checkpoint);
     setRevisionCheckpoint(checkpoint);
   }, [userId]);
 
   const clearRevisionCheckpoint = useCallback(async () => {
+    checkpointRef.current = null;
     await repo.clearRevisionCheckpoint(userId);
     setRevisionCheckpoint(null);
   }, [userId]);

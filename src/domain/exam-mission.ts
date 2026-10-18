@@ -47,6 +47,13 @@ export interface MissionStage {
 export interface ExamMission {
   id: string;
   title: string;
+  /**
+   * What a "Recover marks" mission is about (its first topic), set only when
+   * `title` is the generic "Recover … marks" form. Anything that prefixes the
+   * title with its own "Recover N marks" composes from this instead, so a
+   * recommendation never reads "Recover 3 marks: Recover Motion marks".
+   */
+  recoverFocus?: string;
   origin: MissionOrigin;
   subjectId: Id;
   topicIds: Id[];
@@ -112,6 +119,12 @@ function titleFor(origin: MissionOrigin, cause: RootCause | null, topics: string
   if (origin === "pattern" && cause === "poor-evaluation") return `Fix weak evaluation answers${where}`;
   if (origin === "pattern" && cause) return `Fix ${ROOT_CAUSE_LABEL[cause]}${where}`;
   return `Recover ${topics[0] ?? "these"} marks`;
+}
+
+/** The topic a generic "Recover … marks" title names; null when titleFor wrote another form. */
+function recoverFocusFor(origin: MissionOrigin, cause: RootCause | null, topics: string[]): string | null {
+  if (origin === "paper" || (origin === "pattern" && cause)) return null;
+  return topics[0] ?? null;
 }
 
 function repairKind(cause: RootCause | null, patterns: readonly MistakePattern[]): InterventionKind {
@@ -224,10 +237,12 @@ export function buildMission(scope: Scope, input: MissionInput): ExamMission {
     ? `Independent success on a different question family at least ${MIN_PROOF_DELAY_DAYS} days after the first success.`
     : "The exam is too close for a delayed check, so this mission can improve marks but cannot be proven.";
 
+  const recoverFocus = recoverFocusFor(scope.origin, scope.cause, topics);
   const proofDueAt = input.recovery.items.filter((i) => mistakeIds.includes(i.mistakeId) && i.proofDueAt).map((i) => i.proofDueAt!).sort()[0];
   return {
     id: `mission:${scope.origin}:${scope.key}`,
     title: titleFor(scope.origin, scope.cause, topics, scope.paperId ? input.paperTitles?.[scope.paperId] : undefined),
+    ...(recoverFocus ? { recoverFocus } : {}),
     origin: scope.origin,
     subjectId: scope.mistakes[0]?.subjectId ?? input.subjectId ?? "",
     topicIds,
