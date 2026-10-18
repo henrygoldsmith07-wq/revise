@@ -58,7 +58,24 @@ describe("WJEC flagship depth pack", () => {
       "wjec-alevel-physics", "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry",
     ]);
     expect(dashboard.subjects[0]!.statements).toBe(108);
-    expect(dashboard.subjects[0]!.deepComplete).toBe(108);
+    // 102, not 108 (thirtieth pass). The old 108 counted massive-authentic
+    // items tagged to the wrong spec point (a terminal-speed question on
+    // scalars/vectors, a half-life question on nuclear radius, ...). With
+    // those retagged, these statements each have one family, not two
+    // distinct ones, for the listed demand. Author a real second family to
+    // close a gap and remove it here; never retag a question back to fill one.
+    expect(dashboard.subjects[0]!.deepComplete).toBe(102);
+    const physics = auditFlagshipSubject({ subjectId: "wjec-alevel-physics", topics: wjecFlagshipCurricula.find((c) => c.subject.id === "wjec-alevel-physics")!.topics, questions: seedQuestions, nodes: wjecCapabilities });
+    const gaps = physics.capabilityCoverage.filter((row) => !row.complete)
+      .map((row) => `${row.specPointId.replace("wjec-alevel-physics.", "")}: ${row.demands.filter((d) => !(d.complete && d.distinct)).map((d) => d.demand).join("+")}`);
+    expect(gaps.sort()).toEqual([
+      "circular-shm.sp-02: explanation",
+      "electric-circuits.sp-01: calculation",
+      "fields.sp-02: calculation",
+      "nuclear.sp-02: explanation+calculation",
+      "quantum.sp-02: calculation",
+      "waves.sp-03: explanation",
+    ]);
     expect(dashboard.balancedAtTwenty).toBe(true);
   }, 60_000);
 });
