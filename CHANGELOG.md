@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-fifth pass
+
+- When a lost mark has a written lesson but the main next step is something else (technique drill or repair plan), the lesson link is now shown under that step instead of hidden inside the collapsed "More help with this answer". Marks and proof rules unchanged. Playwright spec updated; not run this pass.
+
 ## 2026-10-19 — thirty-fourth pass
 
 - The centripetal force 'Calculate' question (WJEC and AQA copies) withheld a mark for not saying 'towards centre' without asking for direction; the prompt now asks 'and state its direction'. Marking logic unchanged.
