@@ -338,7 +338,7 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
     minutes: round1(steps.reduce((s, x) => s + x.minutes, 0)),
     intro: [
       mission.evidence[0] ?? "",
-      mission.cause ? `Every question targets ${mission.cause.replace(/-/g, " ")}, across ${topics.length} topic${topics.length === 1 ? "" : "s"}.` : "",
+      mission.cause ? `Questions are chosen to target ${mission.cause.replace(/-/g, " ")}, across ${topics.length} topic${topics.length === 1 ? "" : "s"}.` : "",
       mission.completionCondition,
     ].filter(Boolean),
     limit, hintBudgetFor, contextFor,
