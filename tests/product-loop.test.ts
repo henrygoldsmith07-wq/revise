@@ -117,7 +117,7 @@ describe("intervention chains and memory", () => {
 });
 
 describe("trust indicator keeps provenance honest", () => {
-  const physics = { id: "wjec-alevel-physics", name: "Physics", specCode: "A200QS", contentTier: "flagship" as const };
+  const physics = { id: "wjec-alevel-physics", name: "Physics", specCode: "1420QS", contentTier: "flagship" as const };
   const topic = { id: "motion", specRef: "Unit 1.2", specPoints: [{ id: "sp-1", ref: "Unit 1.2(a)", text: "", aos: [] }] };
   const q = (overrides: Partial<Question> = {}) => question("q1", "motion", { subjectId: "wjec-alevel-physics", specPointIds: ["sp-1"], ...overrides });
 
@@ -126,7 +126,7 @@ describe("trust indicator keeps provenance honest", () => {
     expect(t.tier).toBe("unverified");
     expect(t.status).toBe("Not yet checked by a person");
     expect(t.lastReviewed).toBeNull();
-    expect(t.specification).toEqual({ title: "WJEC A Level Physics", code: "A200QS", refs: ["Unit 1.2(a)"], matched: true });
+    expect(t.specification).toEqual({ title: "WJEC A Level Physics", code: "1420QS", refs: ["Unit 1.2(a)"], matched: true });
   });
 
   it("labels AI-generated content and never matches a reference subject to a specification", () => {
