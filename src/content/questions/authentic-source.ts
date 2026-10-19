@@ -1,6 +1,5 @@
 import type { AoCode, Question, QuestionKind, QuestionPart } from "@/domain/types";
 import { defineQuestions } from "./authoring";
-import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /**
  * Original source-stimulus material written in the style of field notes,
@@ -257,13 +256,13 @@ const chemistry: SourceItem[] = [
     kind: "mcq",
     difficulty: 3,
     options: [
-      "The third element starts a new period and has an electron in a higher shell",
+      "The third element's outer electron is in a p sub-shell, higher in energy than the second element's outer s electron",
       "The third element is a noble gas with a complete outer shell",
       "The second element has more electron shells than the third",
       "The drop proves the third element has a larger nuclear charge",
     ],
     correctIndex: 0,
-    parts: [part("Select the explanation for the drop and justify it.", 2, ["The drop suggests the third element begins a new period", "Its outer electron is in a shell farther from the nucleus and is easier to remove"], "The third element may begin a new period. Its outer electron occupies a new shell farther from the nucleus, so less energy is needed to remove it.", "interpret an ionisation-energy anomaly in an original archive extract", ["AO2"])],
+    parts: [part("Select the explanation for the drop and justify it.", 2, ["The third element's outer electron is in a p sub-shell rather than an s sub-shell", "The p electron is higher in energy and partly shielded by the filled s sub-shell, so it is easier to remove"], "The four elements are in the same period. The third element's outer electron is in a p sub-shell, which is higher in energy than the second element's outer s sub-shell and partly shielded by it, so less energy is needed to remove it.", "interpret an ionisation-energy anomaly in an original archive extract", ["AO2"])],
   },
   {
     slug: "pigment-conservator",
@@ -354,7 +353,7 @@ const maths: SourceItem[] = [
     stem: "Source extract: A navigation log says a survey boat travels 7.0 km and then 5.0 km with an included angle of 112° between the legs.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Calculate the boat's displacement from its starting point.", 3, ["Use the cosine rule", "d² = 7² + 5² − 2(7)(5)cos112°", "d ≈ 9.36 km"], "The displacement is given by d² = 7² + 5² − 2(7)(5)cos112°, so d ≈ 9.36 km.", "apply the cosine rule to an original navigation log")],
+    parts: [part("Calculate the boat's displacement from its starting point.", 3, ["Use the cosine rule", "d² = 7² + 5² − 2(7)(5)cos112°", "d ≈ 10.0 km"], "The displacement is given by d² = 7² + 5² − 2(7)(5)cos112°. Because cos112° is negative, d² = 74 + 26.2 = 100.2, so d ≈ 10.0 km.", "apply the cosine rule to an original navigation log")],
   },
   {
     slug: "virus-growth-report",
@@ -362,7 +361,7 @@ const maths: SourceItem[] = [
     stem: "Source extract: A public-health report models the number of infected plants as N(t) = 40(1.28)^t, where t is measured in days.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Estimate the number infected after 8 days and explain the meaning of 1.28.", 2, ["N(8) = 40(1.28)^8 ≈ 353", "1.28 is the daily multiplication factor, equivalent to 28% growth per day"], "After 8 days, N(8) = 40(1.28)^8 ≈ 353 plants. The factor 1.28 means the number is multiplied by 1.28 each day, a 28% daily increase.", "interpret an exponential model in an original epidemiological report")],
+    parts: [part("Estimate the number infected after 8 days and explain the meaning of 1.28.", 2, ["N(8) = 40(1.28)^8 ≈ 288", "1.28 is the daily multiplication factor, equivalent to 28% growth per day"], "After 8 days, N(8) = 40(1.28)^8 ≈ 288 plants. The factor 1.28 means the number is multiplied by 1.28 each day, a 28% daily increase.", "interpret an exponential model in an original epidemiological report")],
   },
   {
     slug: "solar-panel-optimisation",
@@ -563,5 +562,4 @@ export const authenticSourceQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
-  ...wjecAlevelCoverageQuestions({ id: "source", prefix: "Source extract:", reviewer: "authored/authentic-source-review", kind: "structured" }),
 ];

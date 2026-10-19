@@ -86,7 +86,7 @@
       {
         "specPointId": "wjec-alevel-maths.conditional-probability.sp-01",
         "topicId": "wjec-alevel-maths.conditional-probability",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 12,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -125,8 +125,8 @@
       {
         "specPointId": "wjec-alevel-maths.continuous-distributions.sp-01",
         "topicId": "wjec-alevel-maths.continuous-distributions",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -185,8 +185,8 @@
       {
         "specPointId": "wjec-alevel-maths.correlation-tests.sp-01",
         "topicId": "wjec-alevel-maths.correlation-tests",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -218,6 +218,15 @@
         "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.differential-equations-context.sp-01",
+        "topicId": "wjec-alevel-maths.differential-equations-context",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
           "application"
         ]
       },
@@ -383,8 +392,8 @@
       {
         "specPointId": "wjec-alevel-maths.inference-errors.sp-01",
         "topicId": "wjec-alevel-maths.inference-errors",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -484,10 +493,11 @@
       {
         "specPointId": "wjec-alevel-maths.modelling-assumptions.sp-01",
         "topicId": "wjec-alevel-maths.modelling-assumptions",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall"
+          "recall",
+          "application"
         ]
       },
       {
@@ -522,8 +532,8 @@
       {
         "specPointId": "wjec-alevel-maths.moments-statics.sp-01",
         "topicId": "wjec-alevel-maths.moments-statics",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -585,6 +595,15 @@
           "recall",
           "application",
           "transfer"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-maths.poisson-uniform.sp-01",
+        "topicId": "wjec-alevel-maths.poisson-uniform",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "application"
         ]
       },
       {
@@ -1033,8 +1052,8 @@
       {
         "specPointId": "wjec-alevel-biology.genetic-applications.sp-01",
         "topicId": "wjec-alevel-biology.genetic-applications",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -1171,8 +1190,8 @@
       {
         "specPointId": "wjec-alevel-biology.human-impact.sp-01",
         "topicId": "wjec-alevel-biology.human-impact",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1210,8 +1229,8 @@
       {
         "specPointId": "wjec-alevel-biology.immunity-disease.sp-01",
         "topicId": "wjec-alevel-biology.immunity-disease",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1290,8 +1309,8 @@
       {
         "specPointId": "wjec-alevel-biology.microbiology.sp-01",
         "topicId": "wjec-alevel-biology.microbiology",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -1329,8 +1348,8 @@
       {
         "specPointId": "wjec-alevel-biology.musculoskeletal.sp-01",
         "topicId": "wjec-alevel-biology.musculoskeletal",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -1368,8 +1387,8 @@
       {
         "specPointId": "wjec-alevel-biology.nervous-coordination.sp-01",
         "topicId": "wjec-alevel-biology.nervous-coordination",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -1407,8 +1426,8 @@
       {
         "specPointId": "wjec-alevel-biology.neurobiology-behaviour.sp-01",
         "topicId": "wjec-alevel-biology.neurobiology-behaviour",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1488,8 +1507,8 @@
       {
         "specPointId": "wjec-alevel-biology.nutrition.sp-01",
         "topicId": "wjec-alevel-biology.nutrition",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -1575,8 +1594,8 @@
       {
         "specPointId": "wjec-alevel-biology.plant-reproduction.sp-01",
         "topicId": "wjec-alevel-biology.plant-reproduction",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1608,6 +1627,15 @@
         "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
+          "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-biology.practical-skills.sp-01",
+        "topicId": "wjec-alevel-biology.practical-skills",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
           "application"
         ]
       },
@@ -1695,8 +1723,8 @@
       {
         "specPointId": "wjec-alevel-biology.sexual-reproduction.sp-01",
         "topicId": "wjec-alevel-biology.sexual-reproduction",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1863,8 +1891,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.amino-acids-proteins.sp-01",
         "topicId": "wjec-alevel-chemistry.amino-acids-proteins",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -2080,8 +2108,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-01",
         "topicId": "wjec-alevel-chemistry.electrochemical-cells",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -2160,8 +2188,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.entropy-feasibility.sp-01",
         "topicId": "wjec-alevel-chemistry.entropy-feasibility",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2432,8 +2460,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.organic-mechanisms.sp-01",
         "topicId": "wjec-alevel-chemistry.organic-mechanisms",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "transfer"
         ]
@@ -2471,10 +2499,11 @@
       {
         "specPointId": "wjec-alevel-chemistry.organic-synthesis.sp-01",
         "topicId": "wjec-alevel-chemistry.organic-synthesis",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall"
+          "recall",
+          "application"
         ]
       },
       {
@@ -2509,8 +2538,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.p-block.sp-01",
         "topicId": "wjec-alevel-chemistry.p-block",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2590,10 +2619,11 @@
       {
         "specPointId": "wjec-alevel-chemistry.practical-analysis.sp-01",
         "topicId": "wjec-alevel-chemistry.practical-analysis",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall"
+          "recall",
+          "application"
         ]
       },
       {
@@ -2709,9 +2739,10 @@
       {
         "specPointId": "wjec-alevel-chemistry.stereoisomerism.sp-01",
         "topicId": "wjec-alevel-chemistry.stereoisomerism",
-        "currentQuestionCount": 4,
-        "independentQuestionDeficit": 0,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
+          "application",
           "transfer"
         ]
       },

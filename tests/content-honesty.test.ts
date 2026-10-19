@@ -4,7 +4,7 @@ import { seedQuestions } from "@/content";
 import { allSubjects, topicsFor } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS, isFlagship } from "@/domain/flagship";
 import { defaultSettings } from "@/data/repository";
-import { REFERENCE_DISCLAIMER } from "@/domain/curriculum/honesty";
+import { GCSE_REFERENCE_DISCLAIMER, REFERENCE_DISCLAIMER } from "@/domain/curriculum/honesty";
 
 describe("content honesty — flagship vs reference", () => {
   it("marks exactly the four WJEC A-level flagships as flagship", () => {
@@ -16,7 +16,7 @@ describe("content honesty — flagship vs reference", () => {
         expect(subject.contentDisclaimer).toBeUndefined();
       } else {
         expect(subject.contentTier).toBe("reference");
-        expect(subject.contentDisclaimer).toBe(REFERENCE_DISCLAIMER);
+        expect(subject.contentDisclaimer).toBe(subject.id.includes("-gcse-") ? GCSE_REFERENCE_DISCLAIMER : REFERENCE_DISCLAIMER);
       }
     }
   });

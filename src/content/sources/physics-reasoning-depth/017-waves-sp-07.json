@@ -105,14 +105,14 @@
       "family": "physics-depth:interferometer-measure",
       "context": "physics-depth:interferometer-measure:mirror-shift",
       "move": "transfer interference counting to measuring a tiny displacement",
-      "prompt": "In a Michelson-type setup, moving one mirror by 0.12 μm shifts the pattern from one bright fringe to the next-but-one (two fringes). Calculate the wavelength of the light, explaining the factor of two.",
+      "prompt": "In a Michelson-type setup, moving one mirror by 0.60 μm shifts the pattern from one bright fringe to the next-but-one (two fringes). Calculate the wavelength of the light, explaining the factor of two.",
       "marks": 3,
       "scheme": [
         "A mirror displacement d changes the round-trip path by 2d",
-        "Two fringe shifts = two half-wavelength changes: 2d = 2×(λ/2)",
-        "λ = 2d/2 = d = 0.12 μm — wait: two fringes mean 2d = 2λ, so λ = d = 0.12 μm; check: 2d = 0.24 μm = 2λ gives λ = 0.12 μm (120 nm, ultraviolet)"
+        "Each fringe shift is a path change of one wavelength, so two fringes mean 2d = 2λ",
+        "λ = d = 0.60 μm (600 nm, orange light)"
       ],
-      "answer": "Moving a mirror by d lengthens the round trip by 2d. Two full fringe shifts mean 2d = 2λ, so λ = d = 0.12 μm (120 nm — an ultraviolet line). The factor of two is the round trip: the mirror counts twice."
+      "answer": "Moving a mirror by d lengthens the round trip by 2d. Each fringe shift is one wavelength of path change, so two fringe shifts mean 2d = 2λ and λ = d = 0.60 μm (600 nm, orange light). The factor of two is the round trip: the mirror displacement counts twice."
     },
     {
       "demand": "calculation",

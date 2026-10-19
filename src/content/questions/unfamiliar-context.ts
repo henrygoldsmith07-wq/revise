@@ -1,6 +1,5 @@
 import type { AoCode, Question, QuestionKind } from "@/domain/types";
 import { defineQuestions } from "./authoring";
-import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /** Original transfer questions that place familiar ideas in unfamiliar settings. */
 
@@ -262,17 +261,17 @@ const chemistry: ContextItem[] = [
   {
     slug: "unknown-period",
     topic: "periodicity",
-    stem: "Unfamiliar context: The first ionisation energies of four unknown elements are 496, 738, 578 and 1012 kJ mol⁻¹. The values include a drop between the second and third entries.",
+    stem: "Unfamiliar context: The first ionisation energies of four consecutive elements are 496, 738, 578 and 786 kJ mol⁻¹. The values include a drop between the second and third entries.",
     kind: "mcq",
     difficulty: 3,
     options: [
-      "The first two elements are likely in the same period with the third starting a new period",
+      "The third element's outer electron is in a p sub-shell, higher in energy than the second element's outer s electron",
       "The third element must be a noble gas",
       "The drop proves the third element has fewer electron shells than the second",
       "All four elements must be in the same group",
     ],
     correctIndex: 0,
-    parts: [part("Select the interpretation that best explains the unusually low third value.", 2, ["A large drop can indicate the start of a new period", "The electron removed from the third element is in a shell farther from the nucleus"], "The third element may start a new period. Its outer electron is in a new shell farther from the nucleus and is easier to remove.", "interpret an unfamiliar ionisation-energy pattern using electron structure", ["AO2"])],
+    parts: [part("Select the interpretation that best explains the unusually low third value.", 2, ["The third element's outer electron is in a p sub-shell rather than an s sub-shell", "The p electron is higher in energy and partly shielded by the filled s sub-shell, so less energy is needed to remove it"], "All four are in the same period. The third element's outer electron is in a p sub-shell, which is higher in energy than the second element's outer s sub-shell and partly shielded by it, so less energy is needed to remove it.", "interpret an unfamiliar ionisation-energy pattern using electron structure", ["AO2"])],
   },
   {
     slug: "transition-catalyst",
@@ -355,7 +354,7 @@ const maths: ContextItem[] = [
     topic: "sequences",
     stem: "Unfamiliar context: The vertical clearances between successive platforms in a spiral staircase are 2.4, 3.1, 4.0, 5.1 and 6.4 cm.",
     difficulty: 3,
-    parts: [part("Suggest a formula for the nth clearance and use it to estimate the sixth clearance.", 3, ["The second differences are approximately constant at 0.2", "A quadratic model is aₙ = 0.1n² + 0.4n + 1.9", "The sixth clearance is approximately 8.5 cm"], "The values are consistent with a quadratic model aₙ = 0.1n² + 0.4n + 1.9. This gives a sixth clearance of about 8.5 cm.", "fit and extrapolate a quadratic sequence in an unfamiliar design context")],
+    parts: [part("Suggest a formula for the nth clearance and use it to estimate the sixth clearance.", 3, ["The second differences are constant at 0.2", "A quadratic model is aₙ = 0.1n² + 0.4n + 1.9", "The sixth clearance is approximately 7.9 cm"], "The second differences are constant at 0.2, giving the quadratic model aₙ = 0.1n² + 0.4n + 1.9. This gives a sixth clearance of 3.6 + 2.4 + 1.9 = 7.9 cm.", "fit and extrapolate a quadratic sequence in an unfamiliar design context")],
   },
   {
     slug: "robot-arm",
@@ -363,7 +362,7 @@ const maths: ContextItem[] = [
     stem: "Unfamiliar context: A robot arm has two links of lengths 0.80 m and 0.55 m. The angle between them is 68° when it reaches a sample.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Calculate the distance from the joint to the sample.", 3, ["Use the cosine rule", "d² = 0.80² + 0.55² − 2(0.80)(0.55)cos68°", "d ≈ 0.84 m"], "Using the cosine rule, d² = 0.80² + 0.55² − 2(0.80)(0.55)cos68°, so d ≈ 0.84 m.", "apply the cosine rule to a non-standard engineering context")],
+    parts: [part("Calculate the distance from the joint to the sample.", 3, ["Use the cosine rule", "d² = 0.80² + 0.55² − 2(0.80)(0.55)cos68°", "d ≈ 0.78 m"], "Using the cosine rule, d² = 0.80² + 0.55² − 2(0.80)(0.55)cos68° = 0.613, so d ≈ 0.78 m.", "apply the cosine rule to a non-standard engineering context")],
   },
   {
     slug: "fungal-spread",
@@ -371,7 +370,7 @@ const maths: ContextItem[] = [
     stem: "Unfamiliar context: A fungus colony on a tree trunk has area 12 cm² and grows by a factor of 1.35 each week while conditions remain suitable.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Model the area after t weeks and estimate when it first exceeds 100 cm².", 3, ["A(t) = 12(1.35)^t", "Solve 12(1.35)^t > 100 using logarithms", "t > log(100/12)/log(1.35) ≈ 6.4, so it first exceeds 100 cm² in week 7"], "The model is A(t) = 12(1.35)^t. The threshold is reached when t > 6.4, so the area first exceeds 100 cm² during week 7.", "apply exponential modelling and logarithms to a biological spread")],
+    parts: [part("Model the area after t weeks and estimate when it first exceeds 100 cm².", 3, ["A(t) = 12(1.35)^t", "Solve 12(1.35)^t > 100 using logarithms", "t > log(100/12)/log(1.35) ≈ 7.07, so it first exceeds 100 cm² after 8 weeks"], "The model is A(t) = 12(1.35)^t. Solving 12(1.35)^t > 100 gives t > 7.07; A(7) ≈ 98 cm² and A(8) ≈ 132 cm², so the area first exceeds 100 cm² after 8 weeks.", "apply exponential modelling and logarithms to a biological spread")],
   },
   {
     slug: "drone-path",
@@ -559,5 +558,4 @@ export const unfamiliarContextQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
-  ...wjecAlevelCoverageQuestions({ id: "transfer", prefix: "Unfamiliar context:", reviewer: "authored/unfamiliar-context-review", kind: "extended" }),
 ];

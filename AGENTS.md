@@ -237,7 +237,7 @@ Until the seventh pass five circular motion/SHM items passed only as inverse
 problems on the baseline's own relations (`rearrangementOnly`); each now
 continues into a relation its baseline never uses (a test asserts none of the
 fourteen is `rearrangementOnly`). Do not reword an item to pass the check. Mathematics, Biology and Chemistry still
-have 75, 105 and 96 statements to write
+have 77, 106 and 96 statements to write
 (`src/content/reviews/wjec-authoring-backlog.json`).
 Earlier notes saying Physics was "authored to all 108" counted gate-blocked
 questions. Do not invent baseline links to close that: author real transfer

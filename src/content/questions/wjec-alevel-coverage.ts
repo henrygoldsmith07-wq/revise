@@ -17,6 +17,13 @@ type CoverageFamily = {
 };
 
 /**
+ * NOT IN THE LEARNER BANK (2026-10-18). Every item this produced failed its
+ * own offline marker: the prompt ("Use the … evidence to explain the first
+ * examinable requirement") gave no evidence, the stem was the topic summary,
+ * and the scheme was the spec wording plus a generic "links the idea to the
+ * context" point, yet each was stamped verification "checked". Kept only so
+ * the pattern is documented; do not spread it back into a question file.
+ *
  * The four flagship packs have a deliberately broad set of generated-style
  * question families. When a new WJEC topic is added, it must receive one
  * member of each family too; otherwise topic-level practice silently falls

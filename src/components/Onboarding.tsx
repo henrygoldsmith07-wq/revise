@@ -341,8 +341,10 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                       </p>
                     </div>
                     <p className="mb-2 text-xs text-ink3">
-                      These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
-                      specification. Use them to navigate, not as a specification guarantee.
+                      {row.level === "GCSE"
+                        ? "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE. Only the practice questions were written for GCSE, and none has been checked against the specification."
+                        : <>These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
+                      specification. Use them to navigate, not as a specification guarantee.</>}
                     </p>
                     <SubjectPicker
                       options={row.subjects}
