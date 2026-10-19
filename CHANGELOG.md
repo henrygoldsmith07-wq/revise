@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-19 — forty-first pass
+
+- Flashcards: 1,071 of the 1,900 key-point seed cards printed their whole answer on the front ("<topic> — state and explain: <the answer>"). Fronts are now recall cues that keep the subject and hide the claim ("A tangent to a circle is …"); every card now hides at least 20% of its answer, and 90%+ hide at least 40%. Common-error cards paired each error with whichever key point shared its index; they now name a correct approach only when it is about the same thing, otherwise none. Cards already on a device are upgraded on read only when their stored face is exactly the old generator's output, so edits and FSRS history are untouched. Guarded by tests/seed-card-prompts.test.ts.
+- Past papers: a question-level map of all 16 WJEC A level Physics written papers, Summer 2022–2025 (122 questions), onto the topic tree, with marks and AO splits read from each official mark scheme's grid and links to the board's PDFs. No WJEC text is stored; the topic mapping is authored and unreviewed. The Papers page shows how often and for how many marks each topic has come up, and names two examined areas the topic tree has no topic for (moments and equilibrium; radiation from stars), each in every Unit 1 paper. Display-only: it feeds no mastery, proof or ranking. Guarded by tests/past-paper-coverage.test.ts.
+
 ## 2026-10-19 — fortieth pass
 
 - Schedule: a pending block today whose time slot has already passed now says "Time passed, still to do" rather than looking upcoming. Guarded by tests/schedule-page.test.ts (source-level; not rendered).
