@@ -46,7 +46,7 @@ describe("a11y scaffolding", () => {
   });
   it("modal surfaces use the shared modal primitive and expose a close path", async () => {
     const modal = readFileSync(join(process.cwd(), "src/components/Modal.tsx"), "utf8");
-    const shortcuts = readFileSync(join(process.cwd(), "src/components/shortcuts.tsx"), "utf8");
+    const shortcuts = readFileSync(join(process.cwd(), "src/components/ShortcutHelp.tsx"), "utf8");
     const customStudy = readFileSync(join(process.cwd(), "src/components/CustomStudyDialog.tsx"), "utf8");
     const search = readFileSync(join(process.cwd(), "src/components/SearchOverlay.tsx"), "utf8");
     // Base UI's dialog owns Escape, focus trapping and return, inertness and
