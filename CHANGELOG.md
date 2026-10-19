@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-19 — forty-first pass
+
+- Search, keyboard shortcuts and custom study now open through one shared `Modal` built on Base UI's dialog (`@base-ui/react`), replacing three hand-rolled overlays and `useFocusTrap`. The page behind a modal is now inert to screen readers and no longer scrolls, the modal is portalled above every stacking context, and focus still returns to the opener. Guarded by tests/a11y.test.ts (source-level) and e2e/modal.spec.ts (Chromium, run this pass).
+- Added `.mcp.json` registering the Col component-search MCP server (`https://usecol.com/api/mcp`) for Claude Code sessions in this repo.
+
 ## 2026-10-19 — fortieth pass
 
 - Schedule: a pending block today whose time slot has already passed now says "Time passed, still to do" rather than looking upcoming. Guarded by tests/schedule-page.test.ts (source-level; not rendered).

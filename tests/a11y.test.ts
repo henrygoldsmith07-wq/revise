@@ -29,7 +29,7 @@ describe("a11y scaffolding", () => {
   }, 15_000);
   it("SearchOverlay: combobox/listbox/option a11y contract", async () => {
     const src = readFileSync(join(process.cwd(), "src/components/SearchOverlay.tsx"), "utf8");
-    expect(src).toContain('role="dialog"');
+    expect(src).toContain("<Modal");
     expect(src).toContain('role="combobox"');
     expect(src).toContain('aria-expanded=');
     expect(src).toContain('role="listbox"');
@@ -44,17 +44,23 @@ describe("a11y scaffolding", () => {
     expect(src).toContain("aria-pressed");
     expect(src).not.toContain('role="tablist"');
   });
-  it("modal surfaces use the shared focus trap and expose a close path", async () => {
-    const trap = readFileSync(join(process.cwd(), "src/components/useFocusTrap.ts"), "utf8");
+  it("modal surfaces use the shared modal primitive and expose a close path", async () => {
+    const modal = readFileSync(join(process.cwd(), "src/components/Modal.tsx"), "utf8");
     const shortcuts = readFileSync(join(process.cwd(), "src/components/shortcuts.tsx"), "utf8");
     const customStudy = readFileSync(join(process.cwd(), "src/components/CustomStudyDialog.tsx"), "utf8");
     const search = readFileSync(join(process.cwd(), "src/components/SearchOverlay.tsx"), "utf8");
-    expect(trap).toContain('event.key === "Escape"');
-    expect(trap).toContain("previouslyFocused?.focus()");
-    expect(shortcuts).toContain("useFocusTrap");
-    expect(shortcuts).toContain('onClick={onClose}');
-    expect(customStudy).toContain("useFocusTrap");
-    expect(search).toContain("useFocusTrap");
+    // Base UI's dialog owns Escape, focus trapping and return, inertness and
+    // scroll lock; every dismissal reaches the caller through onOpenChange.
+    expect(modal).toContain('from "@base-ui/react/dialog"');
+    expect(modal).toContain("if (!open) onClose()");
+    expect(modal).not.toContain("modal={false}");
+    for (const src of [shortcuts, customStudy, search]) {
+      expect(src).toContain("<Modal onClose={onClose}");
+      expect(src).toContain("onClick={onClose}");
+      expect(src).not.toContain('role="dialog"');
+    }
+    expect(search).toContain('label="Search"');
+    expect(search).toContain("initialFocus={inputRef}");
   });
   it("AnswerInput: textarea has label + status is a live region", async () => {
     const src = readFileSync(join(process.cwd(), "src/components/AnswerInput.tsx"), "utf8");
