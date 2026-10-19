@@ -1,9 +1,14 @@
 # Changelog
 
-## 2026-10-19 — forty-first pass
+## 2026-10-19 — forty-second pass
 
 - Flashcards: 1,071 of the 1,900 key-point seed cards printed their whole answer on the front ("<topic> — state and explain: <the answer>"). Fronts are now recall cues that keep the subject and hide the claim ("A tangent to a circle is …"); every card now hides at least 20% of its answer, and 90%+ hide at least 40%. Common-error cards paired each error with whichever key point shared its index; they now name a correct approach only when it is about the same thing, otherwise none. Cards already on a device are upgraded on read only when their stored face is exactly the old generator's output, so edits and FSRS history are untouched. Guarded by tests/seed-card-prompts.test.ts.
 - Past papers: a question-level map of all 16 WJEC A level Physics written papers, Summer 2022–2025 (122 questions), onto the topic tree, with marks and AO splits read from each official mark scheme's grid and links to the board's PDFs. No WJEC text is stored; the topic mapping is authored and unreviewed. The Papers page shows how often and for how many marks each topic has come up, and names two examined areas the topic tree has no topic for (moments and equilibrium; radiation from stars), each in every Unit 1 paper. Display-only: it feeds no mastery, proof or ranking. Guarded by tests/past-paper-coverage.test.ts.
+
+## 2026-10-19 — forty-first pass
+
+- Search, keyboard shortcuts and custom study now open through one shared `Modal` built on Base UI's dialog (`@base-ui/react`), replacing three hand-rolled overlays and `useFocusTrap`. The page behind a modal is now inert to screen readers and no longer scrolls, the modal is portalled above every stacking context, and focus still returns to the opener. Search and the shortcut sheet are now loaded on demand and preloaded once the page is idle, so Base UI stays out of the `/` bundle (742,573 B gzip against the 760,000 B budget) and both still open offline. Guarded by tests/a11y.test.ts (source-level) and e2e/modal.spec.ts (Chromium, run this pass, including an offline reload).
+- Added `.mcp.json` registering the Col component-search MCP server (`https://usecol.com/api/mcp`) for Claude Code sessions in this repo.
 
 ## 2026-10-19 — fortieth pass
 
