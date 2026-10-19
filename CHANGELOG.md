@@ -1,8 +1,12 @@
 # Changelog
 
-## 2026-10-19 — thirty-ninth pass
+## 2026-10-19 — fortieth pass
 
 - Schedule: a pending block today whose time slot has already passed now says "Time passed, still to do" rather than looking upcoming. Guarded by tests/schedule-page.test.ts (source-level; not rendered).
+
+## 2026-10-19 — thirty-ninth pass
+
+- Diagnostic results screen now reads "Your diagnostic result" instead of staying on "Starting diagnostic". Guarded by tests/diagnostic-result-heading.test.ts (source-level; not rendered).
 
 ## 2026-10-19 — thirty-eighth pass
 
