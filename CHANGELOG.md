@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-ninth pass
+
+- Schedule: a pending block today whose time slot has already passed now says "Time passed, still to do" rather than looking upcoming. Guarded by tests/schedule-page.test.ts (source-level; not rendered).
+
 ## 2026-10-19 — thirty-eighth pass
 
 - Readiness no longer offers "Starting diagnostic" (button and link) once the student has answered any question. Guarded by tests/starting-diagnostic-offer.test.ts (source-level; not rendered, Playwright not run).

@@ -299,6 +299,7 @@ function CalendarDays({
 
 function DayCard({ date, sessions, exams, today, lead }: { date: string; sessions: PlannedSession[]; exams: ExamDate[]; today: string; lead: TodayLead | null }) {
   const isToday = date === today;
+  const nowMinute = new Date().getHours() * 60 + new Date().getMinutes();
   const pickTopics = new Set(lead?.kind === "pick" ? lead.pick.topicIds : []);
   return (
     <article className="card" aria-label={`${humanDate(date)}${isToday ? " (today)" : ""}`}>
@@ -348,6 +349,8 @@ function DayCard({ date, sessions, exams, today, lead }: { date: string; session
                 <span className="text-[11px] text-ink3 shrink-0">Missed</span>
               ) : session.status === "skipped" ? (
                 <span className="text-[11px] text-ink3 shrink-0">Skipped</span>
+              ) : isToday && session.status === "pending" && session.startMinute + session.minutes <= nowMinute ? (
+                <span data-testid="schedule-block-time-passed" className="text-[11px] text-ink3 shrink-0">Time passed, still to do</span>
               ) : null}
             </div>
           );
