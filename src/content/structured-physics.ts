@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { depthQuestions } from "./questions/physics-depth-50-common";
 import { pipelineQuestion } from "./pipeline";
 import { allTopics } from "@/domain/curriculum";

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { compareStamps } from "./lamport";
 import { canonicalJson, sha256Hex } from "./content-fingerprint";
 

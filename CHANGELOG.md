@@ -1,5 +1,13 @@
 # Changelog
 
+## Thirty-second pass: no Zod eval probe under the CSP — 2026-10-19
+
+Zod v4 probes `new Function("")` on first schema build, which the nonce CSP reported
+as a `script-src` violation on every page load. All schemas now import `z` from
+`src/lib/zod.ts`, which sets `z.config({ jitless: true })` first;
+`tests/zod-jitless.test.ts` fails if any source imports `zod` directly. Not verified
+in a live browser's CSP report console.
+
 ## 360px fresh-student walkthrough: no huggingface.co fetch, correct third-law MCQ, readable lesson objectives; Physics tags beyond massive-authentic — 2026-10-18 (thirty-first pass)
 
 - **No third-party model download on a student's first marked answer.** A
