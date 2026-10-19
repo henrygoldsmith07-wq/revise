@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
+import { DatabaseNotice } from "@/components/DatabaseNotice";
 import { ShortcutProvider } from "@/components/shortcuts";
 import { isReviewerPath } from "@/lib/reviewer/return-path";
 import { AccountBoundary } from "@/state/account";
@@ -29,10 +30,13 @@ export function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   if (isReviewerPath(pathname)) return <ShortcutProvider>{children}</ShortcutProvider>;
   return (
-    <AccountBoundary>
-      <ShortcutProvider>
-        <AppShell>{children}</AppShell>
-      </ShortcutProvider>
-    </AccountBoundary>
+    <>
+      <DatabaseNotice />
+      <AccountBoundary>
+        <ShortcutProvider>
+          <AppShell>{children}</AppShell>
+        </ShortcutProvider>
+      </AccountBoundary>
+    </>
   );
 }

@@ -34,6 +34,13 @@ export interface PortableRestoreValidation {
 }
 
 export interface PortableRestoreResult {
+  /**
+   * Deletion markers in the file that were not applied because the file
+   * belongs to another account. Applying them would delete this account's
+   * rows that share an id (curriculum and seed cards keep their ids across
+   * accounts) on every device, so they are dropped and the summary says so.
+   */
+  droppedDeletions: number;
   restored: {
     cards: number;
     reviewLogs: number;
@@ -355,15 +362,24 @@ export async function restorePortableSnapshot(
     "readwrite",
   );
 
+  // A file exported by another account carries that account's deletions.
+  // Ids that are not account-scoped UUIDs (curriculum/seed cards) are kept by
+  // remapPortableRecordIds, so applying the markers here would delete the
+  // current account's own copies everywhere. Only the owner's own file may
+  // carry terminal intent into this account.
+  const foreignFile = snapshot.userId !== targetUserId;
+  const droppedDeletions = foreignFile
+    ? (snapshot.deletions ?? []).length + (snapshot.learnerHistoryDeletions ?? []).length
+    : 0;
+
   try {
     const meta = tx.objectStore("meta");
     // Imported terminal markers and existing device markers both suppress IDs.
-    for (const raw of snapshot.deletions ?? []) {
-      if (raw.wireOnly && snapshot.userId !== targetUserId) continue; // wire hashes belong to the source account
+    for (const raw of foreignFile ? [] : snapshot.deletions ?? []) {
       const marker = {...validateTombstone(raw,snapshot.userId),userId:targetUserId};
       await meta.put({key:marker.wireOnly ? wireTombstoneKey(marker.entity,marker.id) : tombstoneKey(marker.entity,marker.id),value:marker});
     }
-    for (const raw of snapshot.learnerHistoryDeletions ?? []) {
+    for (const raw of foreignFile ? [] : snapshot.learnerHistoryDeletions ?? []) {
       const marker = {...validateHistoryRecord(raw,snapshot.userId),userId:targetUserId};
       await meta.put({key:historyStorageKey(marker.id),value:marker});
     }
@@ -495,6 +511,7 @@ export async function restorePortableSnapshot(
   }
 
   return {
+    droppedDeletions,
     restored: {
       cards: rows.cards.length,
       reviewLogs: rows.reviewLogs.length,

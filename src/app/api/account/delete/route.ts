@@ -23,8 +23,12 @@ import { errorClass } from "@/lib/observability";
 //      every synced table, sync_writes, learner_records and sync_tombstones.
 //   6. account_residual_rows verifies nothing is left for that id in any
 //      public table with a user_id column, in ai_rate_quota by key, or in
-//      auth.users. Any residue is a 500 naming the tables (never their data).
-//   7. The session cookies are cleared.
+//      auth.users. Residue after the auth user is gone is a 202 with
+//      `code: "deleted_with_residue"`, `deleted: true` and the table names
+//      (never their data): the account no longer exists, so the client must
+//      still clear this device and sign out rather than treat it as a
+//      failure, and the residue is logged here for operator follow-up.
+//   7. The session cookies are cleared (in both outcomes of step 6).
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -100,13 +104,17 @@ export async function POST(request: Request) {
     const residual = await admin.rpc("account_residual_rows", { p_user_id: userId });
     const remaining = residual.error ? [{ scope: "unverified", remaining: 1 }] : residualScopes(residual.data);
     if (remaining.length) {
+      // Operators follow this log line up (docs/operations-runbook.md).
       console.error("[account] deletion left residual rows", { scopes: remaining.map((row) => row.scope) });
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
       return NextResponse.json(
         {
-          error: "Your account was deleted, but some server data could not be confirmed as removed. Contact support.",
+          deleted: true,
+          code: "deleted_with_residue",
+          error: "Your account was deleted, but some server data could not yet be confirmed as removed. That has been logged for follow-up.",
           residual: remaining.map((row) => row.scope),
         },
-        { status: 500 },
+        { status: 202, headers: { "cache-control": "no-store" } },
       );
     }
   } catch (error) {

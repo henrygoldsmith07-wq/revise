@@ -25,8 +25,17 @@
 //     way, and disabling later loses nothing.
 //
 // Honest scope: this protects the `data` column against a *storage* breach.
-// The server still sees row metadata (user_id, updated_at) and the index
-// columns (due, date) the sync design already lifts out of the payload.
+// The server still sees row metadata (user_id, updated_at) and the plaintext
+// index columns the sync design lifts out of the payload (src/data/sync.ts
+// toRow): `subject_id` and `topic_id` on every collection row (which subjects
+// and topics a learner studies, and how much), plus learner-record headers
+// (kind, lamport, device_id, deleted, frozen_fingerprint). `due` and `date`
+// are sent as null while encryption is on. The wire format is unchanged by
+// this note; it only says what is and is not covered.
+//
+// Decrypting never creates a key: a device that never switched E2EE on, or
+// lost its key, counts another device's encrypted row as unreadable instead
+// of minting a key it never needed (`existingEncryptionKey`).
 // ---------------------------------------------------------------------------
 
 const KEY_META_KEY = "revise.e2ee.key.v1";
@@ -134,6 +143,29 @@ export function encryptionKey(): Promise<CryptoKey> {
   return memoized;
 }
 
+/** The stored key, or null when this device has none. Never generates one. */
+export async function existingEncryptionKey(): Promise<CryptoKey | null> {
+  if (memoized) return memoized;
+  const jwk = await readStoredJwk();
+  if (!jwk) return null;
+  const key = await crypto.subtle.importKey("jwk", jwk, { name: ALG }, true, ["encrypt", "decrypt"]);
+  memoized ??= Promise.resolve(key);
+  return memoized;
+}
+
+/** Test-only: forget the memoised key so a test can model a fresh device. */
+export function resetEncryptionKeyCacheForTests(): void {
+  memoized = null;
+}
+
+/** Thrown when a row is encrypted but this device holds no key at all. */
+export class MissingEncryptionKeyError extends Error {
+  constructor() {
+    super("This device has no encryption key for an encrypted row.");
+    this.name = "MissingEncryptionKeyError";
+  }
+}
+
 /** SHA-256 key fingerprint, hex — enough to detect a mismatch, useless to attack. */
 export async function keyFingerprint(key?: CryptoKey): Promise<string> {
   const k = key ?? (await getOrCreateEncryptionKey());
@@ -161,9 +193,14 @@ export async function encryptPayload(payload: unknown, key?: CryptoKey): Promise
   };
 }
 
-/** Decrypt a blob produced by encryptPayload. Corrupted rows throw. */
+/**
+ * Decrypt a blob produced by encryptPayload. Corrupted rows throw, and so does
+ * a device with no key (MissingEncryptionKeyError): pulling someone else's
+ * ciphertext must never generate and store a key here.
+ */
 export async function decryptPayload<T = unknown>(blob: EncryptedPayload, key?: CryptoKey): Promise<T> {
-  const k = key ?? (await encryptionKey());
+  const k = key ?? (await existingEncryptionKey());
+  if (!k) throw new MissingEncryptionKeyError();
   const plaintext = await crypto.subtle.decrypt(
     { name: ALG, iv: base64ToBuf(blob.iv) },
     k,

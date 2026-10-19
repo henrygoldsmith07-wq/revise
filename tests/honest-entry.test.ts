@@ -63,10 +63,11 @@ describe("no-JS entry point", () => {
     // route that is not precached would fail the build gate instead.
     expect(sw).toContain('"/welcome"');
     // The offline shell must not change shape underneath existing users, so
-    // the cache version is pinned. Bump it deliberately (and here) whenever
-    // the shell list changes, so a stale cache is invalidated rather than
-    // silently leaving new routes unavailable offline.
-    expect(sw).toContain('const CACHE_VERSION = "revise-v8"');
+    // the cache base is pinned; each deploy's build id (sw.js?v=…) completes
+    // the cache name, so activating a new build deletes the old caches
+    // (tests/sw-offline.test.ts runs that).
+    expect(sw).toContain('const CACHE_BASE = "revise-v8"');
+    expect(sw).toContain("const CACHE_VERSION = `${CACHE_BASE}-${BUILD_ID}`");
     expect(read("public/manifest.webmanifest")).toContain('"start_url": "/"');
     expect(read("public/manifest.webmanifest")).toContain('"scope": "/"');
   });

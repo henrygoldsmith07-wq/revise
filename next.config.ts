@@ -44,7 +44,17 @@ const securityHeaders = [
   ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]),
 ];
 
+// Stamped into the client at build time and passed to the service worker as
+// /sw.js?v=<id> (src/components/ServiceWorker.tsx), so each deploy gets its own
+// cache name and the worker's activate step deletes the previous build's.
+// A commit sha when the host provides one, else the build's start time.
+const buildId =
+  process.env.REVISE_BUILD_ID ??
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ??
+  new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   // Set by the one-origin shell (apps/ecosystem-shell) to serve this app under
   // a path prefix. Unset means "serve at the root", which is exactly how this
   // app deploys on its own today, so leaving the variable alone changes nothing.

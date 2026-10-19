@@ -8,7 +8,10 @@ export function ServiceWorker() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     if (process.env.NODE_ENV !== "production") return;
-    const register = () => navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    // The build id names the worker's cache (public/sw.js), so each deploy
+    // installs a fresh worker whose activate step deletes older caches.
+    const build = encodeURIComponent(process.env.NEXT_PUBLIC_BUILD_ID ?? "dev");
+    const register = () => navigator.serviceWorker.register(`/sw.js?v=${build}`).catch(() => undefined);
     if (document.readyState === "complete") register();
     else window.addEventListener("load", register, { once: true });
   }, []);

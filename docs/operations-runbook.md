@@ -198,3 +198,11 @@ learners, whose old implicit `aiEnabled: true` is not treated as consent) and
 must switch it on in Settings → AI. Before the migration is applied, `/api/ai`
 answers 503 (consent cannot be read) for signed-in users. Without the
 service-role key, account deletion answers 503 and deletes nothing.
+
+If `account_residual_rows` still finds rows after the auth user is deleted,
+the route answers 202 with `code: "deleted_with_residue"` and the table names;
+the client clears that device and signs out, and tells the learner the residue
+is being followed up. That promise is kept here: each server log line
+`[account] deletion left residual rows` (it lists table names only) needs an
+operator to inspect those tables for the deleted id, remove what remains with
+the service role, and re-run `account_residual_rows` until it returns nothing.

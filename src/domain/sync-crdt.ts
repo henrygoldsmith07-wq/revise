@@ -76,6 +76,16 @@ export function mergeCardLogs(local: CardGradeEvent[] | undefined, remote: CardG
 }
 
 /**
+ * True when `merged` holds a grade event that `other`'s log lacks — i.e. the
+ * replica behind `other` (the server copy, on pull) would lose a review if
+ * nobody wrote the merged card back to it.
+ */
+export function logHasEventsMissingFrom(merged: CardGradeEvent[] | undefined, other: CardGradeEvent[] | undefined): boolean {
+  const known = new Set((other ?? []).map((e) => `${e.deviceId}:${e.lamport}`));
+  return (merged ?? []).some((e) => !known.has(`${e.deviceId}:${e.lamport}`));
+}
+
+/**
  * Deterministically pick the replay base from a merged log: the base attached
  * to the earliest-stamped event that carries one. Every replica evaluates the
  * same choice over the same merged log, so they all replay from the same

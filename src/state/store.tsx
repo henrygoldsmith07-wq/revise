@@ -105,6 +105,7 @@ import { policyTaskFor,
 import { StorageRecovery } from "@/components/StorageRecovery";
 import { OnboardingFlow } from "@/components/Onboarding";
 import { estimateStorageQuota } from "@/data/storage-quota";
+import { requestPersistentStorage } from "@/data/storage-persistence";
 import type { StorageQuota } from "@/data/storage-quota";
 import type {
   RevisionCheckpoint,
@@ -415,6 +416,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     await repo.markOnboarded(userId);
     setNeedsOnboarding(false);
     void recordFunnel("onboarding_completed").catch(() => undefined);
+    // The learner has chosen to keep revision data here. Ask the browser not
+    // to evict it (best-effort storage is the default); Settings shows the
+    // outcome. Never awaited: a prompt or refusal must not hold onboarding.
+    void requestPersistentStorage().catch(() => undefined);
   }, [userId, recordFunnel]);
 
   const patch = useCallback((updater: (prev: Snapshot) => Snapshot) => {

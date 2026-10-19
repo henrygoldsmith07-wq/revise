@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   ACCOUNT_DELETION_CONFIRMATION,
   checkDeletionRequest,
@@ -151,12 +153,25 @@ describe("account deletion — route behaviour", () => {
     expect(JSON.stringify(calls)).not.toContain("someone-else");
   });
 
-  it("reports residue honestly instead of claiming success", async () => {
+  it("reports residue honestly instead of claiming a clean deletion, with a distinct code the client acts on", async () => {
     residual = [{ scope: "cards", remaining: 3 }];
     const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
-    expect(res.status).toBe(500);
-    const body = (await res.json()) as { residual: string[] };
+    // The auth user is gone, so this is not a failure to retry: a 202 with
+    // its own code, telling the client to clear the device and sign out.
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as { residual: string[]; deleted: boolean; code: string };
     expect(body.residual).toEqual(["cards"]);
+    expect(body.deleted).toBe(true);
+    expect(body.code).toBe("deleted_with_residue");
+    expect(signedOut).toBe(true);
+  });
+
+  it("clears local data and signs out on the client when residue was found", () => {
+    const settings = readFileSync(join(process.cwd(), "src/app/settings/page.tsx"), "utf8");
+    const remove = settings.slice(settings.indexOf("async function remove()"), settings.indexOf("return (", settings.indexOf("async function remove()")));
+    expect(remove).toContain('"deleted_with_residue"');
+    expect(remove.indexOf("await clearAll()")).toBeGreaterThan(remove.indexOf('"deleted_with_residue"'));
+    expect(remove).toContain("auth.signOut()");
   });
 
   it("does not claim deletion when the auth user could not be deleted", async () => {

@@ -1,10 +1,11 @@
 import type { Card, Id, LessonProgress, OutboxItem, SyncEntity, StreakState } from "@/domain/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
+import { logHasEventsMissingFrom, mergeCard, mergeLessonProgress } from "@/domain/sync-crdt";
+import { classifySyncError, nextSyncBackoff, syncBackoffActive, type SyncBackoffState, type SyncErrorLike, type SyncFailureClass } from "@/domain/sync-retry";
 import { decryptPayload, encryptPayload, isEncryptedPayload } from "./e2ee";
 import { remapContentIds } from "./content-ids";
 import { SYNC_TABLES, syncPrimaryKey, syncWireId, syncWireIdValue } from "./sync-contract";
-import { pullContinuity, ContinuityPullError } from "./sync-continuity";
+import { pullContinuityDetailed, ContinuityPullError } from "./sync-continuity";
 import { repairQuestionOutboxOwners } from "./question-ownership";
 import { deletionIsKnown, sendReplicaDeletion } from "./sync-deletions";
 import { migrateLearnerHistory } from "./learner-history";
@@ -12,7 +13,7 @@ import { historyFrozenFingerprint, validateHistoryRecord } from "@/domain/learne
 import { isDeletableEntity, tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import { getDb } from "./db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
-import { readReviseUserMeta, writeReviseUserMeta } from "./storage-namespace";
+import { deleteReviseUserMeta, readReviseUserMeta, writeReviseUserMeta } from "./storage-namespace";
 import { getDeviceIdentity, nextLamport, observeRemoteLamport } from "./device";
 import { captureTelemetry, errorClass } from "@/lib/observability";
 
@@ -56,6 +57,11 @@ export async function enqueue(entity: SyncEntity, op: OutboxItem["op"], payload:
   // With no backend there is nothing to drain into, so queuing would only
   // grow unbounded on a device that is working perfectly well.
   if (!isSupabaseConfigured) return;
+  await queueOutboxItem(entity, op, payload, ownerId);
+}
+
+/** The queue write itself. Sync calls it directly: it runs only against a backend. */
+async function queueOutboxItem(entity: SyncEntity, op: OutboxItem["op"], payload: unknown, ownerId?: Id): Promise<void> {
   const db = await getDb();
   const [deviceId, lamport] = await Promise.all([getDeviceIdentity().then((d) => d.deviceId), nextLamport()]);
   const payloadOwner = payloadRecord(payload)?.userId;
@@ -84,12 +90,14 @@ export async function outboxSize(userId?: Id): Promise<number> {
   return userId ? items.filter((item) => isOwnedBy(item, userId)).length : items.length;
 }
 
-export type SyncSkip = "unconfigured" | "offline" | "signed-out" | "account-mismatch" | "owner-unknown";
+export type SyncSkip = "unconfigured" | "offline" | "signed-out" | "account-mismatch" | "owner-unknown" | "busy";
 
 export interface SyncResult {
   pushed: number;
   pulled: number;
   failed: number;
+  /** Queued items held back by a push backoff after a transient failure. */
+  deferred?: number;
   skipped?: SyncSkip;
 }
 
@@ -97,6 +105,19 @@ export interface SyncOptions {
   /** Test seam and service-worker injection; foreground code uses the browser client. */
   client?: SupabaseClient;
   online?: boolean;
+}
+
+/** Name of the cross-tab Web Lock that serialises sync passes. */
+export const SYNC_LOCK_NAME = "revise-sync";
+
+interface WebLocks {
+  request<T>(name: string, options: { ifAvailable: boolean }, callback: (lock: unknown) => Promise<T>): Promise<T>;
+}
+
+function webLocks(): WebLocks | null {
+  if (typeof navigator === "undefined") return null;
+  const locks = (navigator as Navigator & { locks?: WebLocks }).locks;
+  return locks && typeof locks.request === "function" ? locks : null;
 }
 
 /** Confirm that the active Supabase session still belongs to this queue. */
@@ -171,8 +192,26 @@ export async function failedOutboxRecoveryItem(id: Id, userId: Id): Promise<Outb
   return item;
 }
 
-/** Push the outbox, then pull anything newer from the server. */
+/**
+ * Push the outbox, then pull anything newer from the server.
+ *
+ * One pass at a time per origin: two tabs draining the same outbox used to
+ * send every row twice, and a tab whose request failed could write a stale
+ * copy of an item back after the other tab had delivered and deleted it. The
+ * pass runs under a Web Lock (`ifAvailable`, so a second tab skips with
+ * `skipped: "busy"` instead of queuing behind it). Browsers without Web Locks
+ * keep the per-tab guard in sync-engine.ts; failure writes re-read the item
+ * inside their transaction, so a delivered item is never revived either way.
+ */
 export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncResult> {
+  const locks = webLocks();
+  if (!locks) return syncPass(userId, options);
+  const result = await locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock) =>
+    lock ? syncPass(userId, options) : null);
+  return result ?? { pushed: 0, pulled: 0, failed: 0, skipped: "busy" };
+}
+
+async function syncPass(userId: Id, options: SyncOptions): Promise<SyncResult> {
   const startedAt = Date.now();
   const finish = (result: SyncResult): SyncResult => {
     captureTelemetry(result.failed > 0 ? "sync.failure" : "sync.completed", {
@@ -198,10 +237,15 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
     // Mandatory v2 schema: never drain an offline stale upsert before learning
     // which ids another device intentionally deleted.
     let continuityPulled = 0;
+    // Learner records another device encrypted with its own key: counted as
+    // failures, never a reason to stop this device pushing its own work.
+    let undecryptable = 0;
     try {
-      continuityPulled += await pullContinuity(supabase, userId, "sync_tombstones");
+      continuityPulled += (await pullContinuityDetailed(supabase, userId, "sync_tombstones")).pulled;
       await migrateLearnerHistory(userId);
-      continuityPulled += await pullContinuity(supabase, userId, "learner_records");
+      const history = await pullContinuityDetailed(supabase, userId, "learner_records");
+      continuityPulled += history.pulled;
+      undecryptable += history.undecryptable;
     } catch (error) {
       if (error instanceof ContinuityPullError) continuityPulled += error.applied;
       const changed = await authIdentity(supabase, userId);
@@ -209,16 +253,20 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
       return finish({ pushed: 0, pulled: continuityPulled, failed: 1 });
     }
     const pushed = await drainOutbox(userId, supabase);
-    if (pushed.skipped) return finish({ pushed: pushed.pushed, pulled: 0, failed: pushed.failed, skipped: pushed.skipped });
+    const deferred = pushed.deferred ? { deferred: pushed.deferred } : {};
+    if (pushed.skipped) return finish({ pushed: pushed.pushed, pulled: 0, failed: pushed.failed + undecryptable, ...deferred, skipped: pushed.skipped });
     const pulled = await pull(userId, supabase);
     try {
-      continuityPulled += await pullContinuity(supabase, userId, "learner_records");
-      continuityPulled += await pullContinuity(supabase, userId, "sync_tombstones");
+      const history = await pullContinuityDetailed(supabase, userId, "learner_records");
+      continuityPulled += history.pulled;
+      // The same unreadable rows are fetched again here: count each once.
+      undecryptable = Math.max(undecryptable, history.undecryptable);
+      continuityPulled += (await pullContinuityDetailed(supabase, userId, "sync_tombstones")).pulled;
     } catch (error) {
       if (error instanceof ContinuityPullError) continuityPulled += error.applied;
       pulled.failed++;
     }
-    return finish({ pushed: pushed.pushed, pulled: pulled.pulled + continuityPulled, failed: pushed.failed + pulled.failed, ...(pulled.skipped ? { skipped: pulled.skipped } : {}) });
+    return finish({ pushed: pushed.pushed, pulled: pulled.pulled + continuityPulled, failed: pushed.failed + pulled.failed + undecryptable, ...deferred, ...(pulled.skipped ? { skipped: pulled.skipped } : {}) });
   } catch (error) {
     captureTelemetry("sync.failure", {
       status: "failed",
@@ -229,7 +277,90 @@ export async function sync(userId: Id, options: SyncOptions = {}): Promise<SyncR
   }
 }
 
-async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ pushed: number; failed: number; skipped?: SyncSkip }> {
+/** Most extra requests one drain may spend isolating poison rows. */
+const BISECT_REQUEST_BUDGET = 64;
+
+type SendOutcome =
+  | { kind: "ok" }
+  | { kind: "skipped"; skipped: SyncSkip }
+  | { kind: "missing-rpc" }
+  | { kind: SyncFailureClass; error: SyncErrorLike };
+
+interface DrainStop {
+  /** The pass must end: the account changed, or the network/server is failing. */
+  skipped?: SyncSkip;
+  transient?: SyncErrorLike;
+  missingRpc?: boolean;
+}
+
+/**
+ * Send `batch`; when the server rejects it for its content, split it in half
+ * and retry each half, down to single rows, so one poison row cannot park the
+ * 49 (or 199) rows sharing its request. Only rows that still fail alone spend
+ * their retry budget. A transient failure stops the whole drain at once: the
+ * rows are fine, the server or network is not.
+ */
+async function deliverBisecting<T>(
+  batch: T[],
+  send: (part: T[]) => Promise<SendOutcome>,
+  onPermanent: (part: T[], error: SyncErrorLike) => Promise<void>,
+  onTransient: (part: T[], error: SyncErrorLike) => Promise<void>,
+  budget: { remaining: number },
+): Promise<DrainStop | null> {
+  if (!batch.length) return null;
+  const outcome = await send(batch);
+  if (outcome.kind === "ok") return null;
+  if (outcome.kind === "skipped") return { skipped: outcome.skipped };
+  if (outcome.kind === "missing-rpc") return { missingRpc: true };
+  if (outcome.kind === "transient") {
+    await onTransient(batch, outcome.error);
+    return { transient: outcome.error };
+  }
+  if (batch.length === 1 || budget.remaining < 2) {
+    await onPermanent(batch, outcome.error);
+    return null;
+  }
+  budget.remaining -= 2;
+  const middle = Math.ceil(batch.length / 2);
+  const left = await deliverBisecting(batch.slice(0, middle), send, onPermanent, onTransient, budget);
+  if (left) return left;
+  return deliverBisecting(batch.slice(middle), send, onPermanent, onTransient, budget);
+}
+
+/** A request that threw (fetch rejected, aborted) is a transport failure. */
+function thrownAsError(error: unknown): SyncErrorLike {
+  return {
+    message: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    name: error instanceof Error ? error.name : undefined,
+  };
+}
+
+function responseError(response: { error?: unknown; status?: unknown } | null | undefined): SyncErrorLike | null {
+  const error = (response?.error ?? null) as SyncErrorLike | null;
+  if (!error) return null;
+  const status = typeof response?.status === "number" ? response.status : error.status;
+  return { ...error, ...(typeof status === "number" ? { status } : {}) };
+}
+
+/**
+ * Record a failed delivery. Each entry is re-read inside the transaction: an
+ * entry another tab (or a retry) already delivered and deleted stays deleted,
+ * and an attempt count is never lost to a stale copy. Transient failures keep
+ * the error for diagnosis without spending the retry budget.
+ */
+async function recordDeliveryFailure(entries: OutboxItem[], message: string, countAttempt: boolean): Promise<void> {
+  if (!entries.length) return;
+  const db = await getDb();
+  const tx = db.transaction("outbox", "readwrite");
+  for (const entry of entries) {
+    const current = (await tx.store.get(entry.id)) as OutboxItem | undefined;
+    if (!current) continue;
+    await tx.store.put({ ...current, attempts: current.attempts + (countAttempt ? 1 : 0), lastError: message });
+  }
+  await tx.done;
+}
+
+async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ pushed: number; failed: number; deferred?: number; skipped?: SyncSkip }> {
   const db = await getDb();
   // One settings read per drain, not per row.
   const e2ee = await e2eeEnabledFor(userId);
@@ -239,6 +370,26 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
     (ownerFor(item) === userId && payloadRecord(item.payload)?.userId !== undefined && payloadRecord(item.payload)?.userId !== userId));
   let pushed = 0;
   let failed = 0;
+
+  // A transient failure (outage, timeout, 5xx) set a persisted backoff: wait
+  // it out instead of retrying every few seconds. Nothing is counted against
+  // the items; they are simply not sent yet.
+  const backoff = await readReviseUserMeta<SyncBackoffState>("outboxBackoff", userId).catch(() => undefined);
+  if (syncBackoffActive(backoff, new Date())) {
+    const deferred = items.filter((item) => item.attempts < MAX_OUTBOX_ATTEMPTS).length;
+    if (deferred > 0) return { pushed, failed, deferred, ...(hasUnknownOwner ? { skipped: "owner-unknown" as const } : {}) };
+  }
+  let transientError: SyncErrorLike | null = null;
+  const budget = { remaining: BISECT_REQUEST_BUDGET };
+  const finishDrain = async (skipped?: SyncSkip): Promise<{ pushed: number; failed: number; skipped?: SyncSkip }> => {
+    if (transientError) {
+      await writeReviseUserMeta("outboxBackoff", userId, nextSyncBackoff(backoff, new Date(), transientError.message));
+    } else if (backoff && !skipped) {
+      await deleteReviseUserMeta("outboxBackoff", userId);
+    }
+    const reported = skipped ?? (hasUnknownOwner ? "owner-unknown" as const : undefined);
+    return { pushed, failed, ...(reported ? { skipped: reported } : {}) };
+  };
 
   // Batch by entity so a 200-card session is one request, not 200.
   // Items past the attempt cap are skipped (kept, never silently dropped)
@@ -264,10 +415,14 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
   // Falls back to the per-table upserts below when the RPC is not installed.
   let remainingUpserts = upserts;
   if (typeof (supabase as Partial<SupabaseClient>).rpc === "function" && !batchRpcUnavailable) {
-    const batched = await drainUpsertsBatched(userId, supabase, items, upserts, e2ee);
+    const batched = await drainUpsertsBatched(userId, supabase, items, upserts, e2ee, budget);
     pushed += batched.pushed;
     failed += batched.failed;
-    if (batched.skipped) return { pushed, failed, skipped: batched.skipped };
+    if (batched.skipped) return finishDrain(batched.skipped);
+    if (batched.transient) {
+      transientError = batched.transient;
+      return finishDrain();
+    }
     remainingUpserts = batched.remaining;
   }
 
@@ -276,36 +431,66 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
     // request bounded so a very large offline session cannot monopolise the
     // connection, and so a mid-drain failure leaves a durable remainder.
     const collapsed = collapseOutboxItems(list);
+    const coveredBy = (part: OutboxItem[]) => {
+      const ids = new Set(part.map((item) => item.id));
+      const rowIds = new Set(part.map((item) => rowId(item.payload)));
+      return items.filter((item) => item.entity === entity && (ids.has(item.id) || rowIds.has(rowId(item.payload))));
+    };
     for (const batch of chunks(collapsed, 50)) {
-      const identity = await authIdentity(supabase, userId);
-      if (identity !== "ok") return { pushed, failed, skipped: identity };
-      const byId = new Map(batch.map((item) => [rowId(item.payload), item]));
-      const rows = await Promise.all([...byId.values()].map((i) => toRow(entity, i.payload, userId, { e2ee })));
-      const { error } = await supabase.from(TABLES[entity]).upsert(rows, { onConflict: pkFor(entity) });
-      const batchIds = new Set(batch.map((item) => item.id));
-      const originalEntries = items.filter((item) => item.entity === entity && (batchIds.has(item.id) || batch.some((latest) => rowId(latest.payload) === rowId(item.payload))));
-      if (error) {
-        failed += originalEntries.length;
-        for (const item of originalEntries) {
-          await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
-        }
-        continue;
+      const stop = await deliverBisecting(
+        batch,
+        async (part) => {
+          const identity = await authIdentity(supabase, userId);
+          if (identity !== "ok") return { kind: "skipped", skipped: identity };
+          const byId = new Map(part.map((item) => [rowId(item.payload), item]));
+          let error: SyncErrorLike | null;
+          let rows: Record<string, unknown>[];
+          try {
+            rows = await Promise.all([...byId.values()].map((i) => toRow(entity, i.payload, userId, { e2ee })));
+          } catch (caught) {
+            return { kind: "permanent", error: thrownAsError(caught) };
+          }
+          try {
+            error = responseError(await supabase.from(TABLES[entity]).upsert(rows, { onConflict: pkFor(entity) }));
+          } catch (caught) {
+            error = thrownAsError(caught);
+            return { kind: "transient", error };
+          }
+          if (error) return { kind: classifySyncError(error), error };
+          try {
+            await claimIdempotencyKeys(supabase, userId, part.flatMap((i) => i.idempotencyKey ? [i.idempotencyKey] : []));
+          } catch {
+            /* the ledger is best-effort; delivery remains durable */
+          }
+          const stillOwned = await authIdentity(supabase, userId);
+          if (stillOwned !== "ok") return { kind: "skipped", skipped: stillOwned };
+          pushed += rows.length;
+          for (const item of coveredBy(part)) await db.delete("outbox", item.id);
+          return { kind: "ok" };
+        },
+        async (part, error) => {
+          const covered = coveredBy(part);
+          failed += covered.length;
+          await recordDeliveryFailure(covered, error.message ?? "Sync failed.", true);
+        },
+        async (part, error) => {
+          const covered = coveredBy(part);
+          failed += covered.length;
+          await recordDeliveryFailure(covered, error.message ?? "Sync failed.", false);
+        },
+        budget,
+      );
+      if (stop?.skipped) return finishDrain(stop.skipped);
+      if (stop?.transient) {
+        transientError = stop.transient;
+        return finishDrain();
       }
-      try {
-        await claimIdempotencyKeys(supabase, userId, batch.flatMap((i) => i.idempotencyKey ? [i.idempotencyKey] : []));
-      } catch {
-        /* the ledger is best-effort; delivery remains durable */
-      }
-      const stillOwned = await authIdentity(supabase, userId);
-      if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned };
-      pushed += rows.length;
-      for (const item of originalEntries) await db.delete("outbox", item.id);
     }
   }
 
   for (const [entity, list] of deletes) {
     const identity = await authIdentity(supabase, userId);
-    if (identity !== "ok") return { pushed, failed, skipped: identity };
+    if (identity !== "ok") return finishDrain(identity);
     const localIds = [...new Set(list.map((i) => rowId(i.payload)))].filter(Boolean);
     if (!localIds.length) {
       for (const item of list) await db.delete("outbox", item.id);
@@ -313,29 +498,38 @@ async function drainOutbox(userId: Id, supabase: SupabaseClient): Promise<{ push
     }
     const originalEntries = items.filter(item => item.entity === entity && localIds.includes(rowId(item.payload)));
     if (!isDeletableEntity(entity)) throw new Error("Unsupported replica deletion.");
-    let error: { message: string } | null = null;
+    let error: SyncErrorLike | null = null;
+    let failureClass: SyncFailureClass = "permanent";
     for (const id of localIds) {
       const currentIdentity = await authIdentity(supabase, userId);
-      if (currentIdentity !== "ok") return { pushed, failed, skipped: currentIdentity };
-      const result = await sendReplicaDeletion(supabase, entity, id, userId);
-      if (result.error) { error = result.error; break; }
+      if (currentIdentity !== "ok") return finishDrain(currentIdentity);
+      try {
+        const result = await sendReplicaDeletion(supabase, entity, id, userId);
+        if (result.error) { error = result.error; failureClass = classifySyncError(result.error); break; }
+      } catch (caught) {
+        error = thrownAsError(caught);
+        failureClass = "transient";
+        break;
+      }
     }
     if (error) {
       failed += originalEntries.length;
-      // Mirror the upsert path: record the failure so it is diagnosable and
-      // the attempt counter can eventually retire the item.
-      for (const item of originalEntries) {
-        await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
+      // Mirror the upsert path: record the failure so it is diagnosable; only
+      // a permanent failure spends the attempt counter that retires an item.
+      await recordDeliveryFailure(originalEntries, error.message ?? "Sync failed.", failureClass === "permanent");
+      if (failureClass === "transient") {
+        transientError = error;
+        return finishDrain();
       }
       continue;
     }
     const stillOwned = await authIdentity(supabase, userId);
-    if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned };
+    if (stillOwned !== "ok") return finishDrain(stillOwned);
     pushed += localIds.length;
     for (const item of originalEntries) await db.delete("outbox", item.id);
   }
 
-  return { pushed, failed, ...(hasUnknownOwner ? { skipped: "owner-unknown" as const } : {}) };
+  return finishDrain();
 }
 
 /** Most rows one `sync_push_batch` call may carry (the server caps at 500). */
@@ -358,12 +552,14 @@ function missingRpc(error: { message?: string; code?: string } | null): boolean 
 
 /**
  * Drain upserts through `sync_push_batch`: rows for several entities in one
- * request and one transaction. Outbox semantics are unchanged: entries are
- * deleted only after the server accepted the whole chunk, a failed chunk
- * increments every covered entry's attempt counter, and ownership is checked
- * before and after each request. Row shape and ids come from `toRow`, so wire
- * ids stay deterministic and conflict resolution stays server-side
- * (`on conflict (pk) do update` plus the updated_at guard triggers).
+ * request and one transaction. Entries are deleted only after the server
+ * accepted the request that carried them, and ownership is checked before
+ * and after each request. A request the server rejects for its content is
+ * bisected until the rejecting row(s) are isolated; only those spend their
+ * retry budget. A transient failure stops the drain without spending any.
+ * Row shape and ids come from `toRow`, so wire ids stay deterministic and
+ * conflict resolution stays server-side (`on conflict (pk) do update` plus
+ * the updated_at guard triggers).
  */
 async function drainUpsertsBatched(
   userId: Id,
@@ -371,7 +567,8 @@ async function drainUpsertsBatched(
   items: OutboxItem[],
   upserts: Map<SyncEntity, OutboxItem[]>,
   e2ee: boolean,
-): Promise<{ pushed: number; failed: number; skipped?: SyncSkip; remaining: Map<SyncEntity, OutboxItem[]> }> {
+  budget: { remaining: number },
+): Promise<{ pushed: number; failed: number; skipped?: SyncSkip; transient?: SyncErrorLike; remaining: Map<SyncEntity, OutboxItem[]> }> {
   const db = await getDb();
   let pushed = 0;
   let failed = 0;
@@ -385,31 +582,59 @@ async function drainUpsertsBatched(
     }
     return rest;
   };
+  const coveredBy = (part: OutboxItem[]) => items.filter((item) => item.op === "upsert" && part.some((latest) =>
+    latest.entity === item.entity && (latest.id === item.id || rowId(latest.payload) === rowId(item.payload))));
   for (const batch of chunks(queue, SYNC_BATCH_MAX_ROWS)) {
-    const identity = await authIdentity(supabase, userId);
-    if (identity !== "ok") return { pushed, failed, skipped: identity, remaining: new Map() };
-    const rows = await Promise.all(batch.map(async (item) => ({
-      table: TABLES[item.entity],
-      row: await toRow(item.entity, item.payload, userId, { e2ee }),
-    })));
-    const keys = batch.flatMap((item) => item.idempotencyKey && UUID_RE.test(item.idempotencyKey) ? [item.idempotencyKey] : []);
-    const { error } = await supabase.rpc("sync_push_batch", { p_rows: rows, p_idempotency_keys: keys });
-    if (missingRpc(error)) {
+    let first = true;
+    const stop = await deliverBisecting(
+      batch,
+      async (part) => {
+        const identity = await authIdentity(supabase, userId);
+        if (identity !== "ok") return { kind: "skipped", skipped: identity };
+        let rows: { table: string; row: Record<string, unknown> }[];
+        try {
+          rows = await Promise.all(part.map(async (item) => ({
+            table: TABLES[item.entity],
+            row: await toRow(item.entity, item.payload, userId, { e2ee }),
+          })));
+        } catch (caught) {
+          return { kind: "permanent", error: thrownAsError(caught) };
+        }
+        const keys = part.flatMap((item) => item.idempotencyKey && UUID_RE.test(item.idempotencyKey) ? [item.idempotencyKey] : []);
+        let error: SyncErrorLike | null;
+        try {
+          error = responseError(await supabase.rpc("sync_push_batch", { p_rows: rows, p_idempotency_keys: keys }));
+        } catch (caught) {
+          return { kind: "transient", error: thrownAsError(caught) };
+        }
+        if (first && missingRpc(error)) return { kind: "missing-rpc" };
+        first = false;
+        if (error) return { kind: classifySyncError(error), error };
+        const stillOwned = await authIdentity(supabase, userId);
+        if (stillOwned !== "ok") return { kind: "skipped", skipped: stillOwned };
+        pushed += rows.length;
+        for (const item of coveredBy(part)) await db.delete("outbox", item.id);
+        return { kind: "ok" };
+      },
+      async (part, error) => {
+        const covered = coveredBy(part);
+        failed += covered.length;
+        await recordDeliveryFailure(covered, error.message ?? "Sync failed.", true);
+      },
+      async (part, error) => {
+        const covered = coveredBy(part);
+        failed += covered.length;
+        await recordDeliveryFailure(covered, error.message ?? "Sync failed.", false);
+      },
+      budget,
+    );
+    if (stop?.missingRpc) {
       batchRpcUnavailable = true;
       return { pushed, failed, remaining: remainingAfter() };
     }
-    const covered = items.filter((item) => item.op === "upsert" && batch.some((latest) =>
-      latest.entity === item.entity && (latest.id === item.id || rowId(latest.payload) === rowId(item.payload))));
     for (const item of batch) done.add(item.id);
-    if (error) {
-      failed += covered.length;
-      for (const item of covered) await db.put("outbox", { ...item, attempts: item.attempts + 1, lastError: error.message });
-      continue;
-    }
-    const stillOwned = await authIdentity(supabase, userId);
-    if (stillOwned !== "ok") return { pushed, failed, skipped: stillOwned, remaining: new Map() };
-    pushed += rows.length;
-    for (const item of covered) await db.delete("outbox", item.id);
+    if (stop?.skipped) return { pushed, failed, skipped: stop.skipped, remaining: new Map() };
+    if (stop?.transient) return { pushed, failed, transient: stop.transient, remaining: new Map() };
   }
   return { pushed, failed, remaining: remainingAfter() };
 }
@@ -591,12 +816,21 @@ async function pullEntity(
         if (Number.isFinite(remoteLamport)) await observeRemoteLamport(remoteLamport);
       }
       const store = STORE_FOR[entity];
+      // Cards whose merged op log holds reviews the server copy lacks. The
+      // server keeps the newer-timestamp row and drops an older update, so a
+      // grade made offline here (pushed earlier, with an older timestamp) only
+      // survives on this device unless the merged card is written back.
+      const pushBack: Card[] = [];
       const tx = db.transaction([store, "meta"], "readwrite");
       try {
         for (const incoming of incomingRows) {
           if (isDeletableEntity(entity) && (await tx.objectStore("meta").get(tombstoneKey(entity, String(incoming.id))) || await tx.objectStore("meta").get(wireTombstoneKey(entity, syncWireIdValue(userId, String(incoming.id)))))) continue;
           const existing = await tx.objectStore(store).get(keyFor(entity, incoming));
-          const merged = mergeForEntity(entity, existing as never, incoming as never);
+          let merged = mergeForEntity(entity, existing as never, incoming as never);
+          if (entity === "cards" && existing && merged && logHasEventsMissingFrom((merged as Card).log, (incoming as unknown as Card).log)) {
+            merged = { ...(merged as Card), updatedAt: newerThan(String(incoming.updatedAt ?? "")) };
+            pushBack.push(merged as Card);
+          }
           if (merged) await tx.objectStore(store).put(merged as never);
         }
         await tx.done;
@@ -605,6 +839,10 @@ async function pullEntity(
         await tx.done.catch(() => undefined);
         return { pulled, failed: failed + 1, maxObservedUpdatedAt };
       }
+      // After the merge commits (never inside its transaction): queue each
+      // merged card with a timestamp newer than the server's, so the server
+      // accepts it and the other device pulls the union.
+      for (const card of pushBack) await queueOutboxItem("cards", "upsert", card, userId);
       pulled += incomingRows.length;
     }
     failed += rowFailures;
@@ -786,11 +1024,11 @@ function chunks<T>(items: T[], size: number): T[][] {
  * migrations off the critical path: a new domain field needs no migration.
  *
  * With E2EE on (user settings), `data` carries an AES-GCM blob instead of the
- * domain object — the server stores ciphertext it cannot read. The lifted
- * index columns (due, date) stay plaintext by design: they are bookkeeping
- * fields with no student content, and dropping them would cost the scheduler
- * query. `due`/`date` may also be omitted at rest when encryption is on, so
- * both shapes are read on pull.
+ * domain object — the server stores ciphertext it cannot read. `due` and
+ * `date` are sent as null while encryption is on (both shapes are read on
+ * pull). `subject_id` and `topic_id` are NOT encrypted: they stay plaintext
+ * on every row even with E2EE on, so the server can see which subjects and
+ * topics a learner studies and how much (docs/data-flows.md says so too).
  */
 async function toRow(entity: SyncEntity, payload: unknown, userId: Id, opts?: { e2ee?: boolean }): Promise<Record<string, unknown>> {
   const row = payload as Record<string, unknown>;
@@ -851,6 +1089,13 @@ async function fromRow(entity: SyncEntity, row: Record<string, unknown>): Promis
   const data = (raw ?? {}) as Record<string, unknown>;
   if (data.userId !== undefined && data.userId !== row.user_id) throw new Error("Mixed-owner sync payload.");
   return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: row.updated_at } : {}) });
+}
+
+/** An ISO instant strictly after `serverUpdatedAt` and no earlier than now. */
+function newerThan(serverUpdatedAt: string): string {
+  const server = Date.parse(serverUpdatedAt);
+  const now = Date.now();
+  return new Date(Number.isFinite(server) ? Math.max(now, server + 1) : now).toISOString();
 }
 
 function isNewer(incoming: Record<string, unknown>, existing: unknown): boolean {

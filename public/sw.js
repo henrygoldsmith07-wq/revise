@@ -1,10 +1,22 @@
 // Service worker: app-shell precache + stale-while-revalidate for navigations.
 //
 // Revision *data* lives in IndexedDB and is never cached here — the worker's
-// only job is making sure the app itself loads with no network. Bump
-// CACHE_VERSION to invalidate previously cached shells.
+// only job is making sure the app itself loads with no network.
+//
+// Cache versioning: src/components/ServiceWorker.tsx registers this script as
+// /sw.js?v=<build id> (NEXT_PUBLIC_BUILD_ID, stamped by next.config.ts at
+// build time). A new deploy changes the script URL, so the browser installs
+// this worker again, its cache gets a new name, and `activate` deletes every
+// older cache — including the hashed /_next chunks earlier builds left behind,
+// which used to pile up for ever under one constant name. Bump CACHE_BASE only
+// to invalidate shells within one build id (never needed in production).
+//
+// Route chunks are not precached from the build manifest: the shells below
+// are, and each page's chunks are cached the first time they load online.
 
-const CACHE_VERSION = "revise-v8";
+const CACHE_BASE = "revise-v8";
+const BUILD_ID = new URL(self.location.href).searchParams.get("v") || "dev";
+const CACHE_VERSION = `${CACHE_BASE}-${BUILD_ID}`;
 // Precaches every App Router shell so the whole app loads offline.
 // Keep this in sync with src/app/**/page.tsx — tests/perf.test.ts walks the
 // tree (not just top-level directories) and fails when a route is missing.
@@ -86,7 +98,16 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
+        // Offline: the exact URL if it was cached, else the precached shell
+        // for the same route — deep links such as /practice?guided=1 or
+        // /lesson?checkpoint=… carry a query the precache never saw, and
+        // the page reads it client-side — and only then the home shell.
+        .catch(() =>
+          caches
+            .match(request)
+            .then((cached) => cached || caches.match(request, { ignoreSearch: true }))
+            .then((cached) => cached || caches.match("/")),
+        ),
     );
     return;
   }

@@ -9,7 +9,8 @@
 //
 // What causes synchronisation: syncNow() drain+pull when online + signed in.
 // Module-scoped syncInFlight/hydrationEpoch are coordination state for
-// background work, never render input.
+// background work, never render input. syncInFlight guards this tab; sync()
+// itself takes the cross-tab "revise-sync" Web Lock where the browser has one.
 
 import { useCallback, useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
@@ -94,9 +95,16 @@ export function useSyncEngine(input: {
     setSyncStatus((s) => ({ ...s, syncing: true }));
     try {
       const result = await sync(userId);
+      if (result.skipped === "busy") {
+        // Another tab holds the cross-tab sync lock and is syncing this same
+        // profile; it delivers the shared outbox. Nothing to report here.
+        setSyncStatus((s) => ({ ...s, syncing: false }));
+        return;
+      }
       const [pending, failedItems] = await Promise.all([outboxSize(userId), failedOutboxItems(userId)]);
+      const waiting = result.failed > 0 || (result.deferred ?? 0) > 0;
       const error =
-        result.failed > 0
+        waiting
           ? "Some changes are still waiting to sync. We’ll keep trying."
           : result.skipped === "signed-out"
             ? "Sign in to sync across devices. Your data is still saved here."
@@ -108,7 +116,7 @@ export function useSyncEngine(input: {
         syncing: false,
         pending,
         failed: failedItems.length,
-        lastSyncedAt: result.skipped || result.failed > 0 ? s.lastSyncedAt : new Date().toISOString(),
+        lastSyncedAt: result.skipped || waiting ? s.lastSyncedAt : new Date().toISOString(),
         lastSyncError: error,
       }));
       if (result.pulled > 0) {

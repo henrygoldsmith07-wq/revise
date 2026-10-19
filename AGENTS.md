@@ -40,8 +40,12 @@ background and do other work while it runs. On Windows, invoke npm through
   `PERSISTED_SCHEMA_VERSION` in `src/data/persistence-schema.ts`, add a named
   entry to `PERSISTED_MIGRATIONS`, add the store to `PERSISTED_STORES`, and guard
   `createObjectStore` with `objectStoreNames.contains(...)` in `src/data/db.ts`.
-  Rename nothing and drop nothing — a downgrade must still read old rows. Any
-  store that reaches the server needs a migration before a client ships.
+  Rename nothing and drop nothing, so old rows stay readable by every later
+  build. An *older* build cannot open a newer database at all (IndexedDB
+  VersionError); that is shown as "this tab is running an older version —
+  reload" (`src/data/db-notice.ts`), and an old tab closes its connection on
+  `versionchange` so the new one can upgrade. Any store that reaches the
+  server needs a migration before a client ships.
 - **Treat a brief's claims as hypotheses.** Check the code first; if a claim is
   wrong, say so and skip it rather than implementing to the brief.
 
@@ -124,6 +128,20 @@ background and do other work while it runs. On Windows, invoke npm through
   parses them. A new link parameter needs a consumer and a test, or the
   plan promises something the page does not do. Still unhonoured:
   `/lesson?worked=1`, `/practice?transfer=1`, `/adaptive-session?proof=1`.
+- **Outbox failures are classified** (`src/domain/sync-retry.ts`). Only a
+  permanent (content) rejection spends an item's `MAX_OUTBOX_ATTEMPTS`
+  budget; a transient one (network, timeout, 5xx, 429, expired JWT) records
+  `lastError`, sets a persisted push backoff (`outboxBackoff` meta, 15 s
+  doubling to 15 min) and stops the drain. A rejected batch is bisected so
+  only the poison row(s) are counted. `sync()` runs under the cross-tab
+  `revise-sync` Web Lock (`skipped: "busy"` in the losing tab), and a card
+  whose merged op log holds reviews the server copy lacks is re-queued on
+  pull with a newer `updatedAt` (the server drops older card updates).
+  `tests/sync-delivery-resilience.test.ts` covers all of it.
+- **The service worker's cache is named per build** (`public/sw.js` reads
+  `?v=` from its own URL; `ServiceWorker.tsx` registers
+  `/sw.js?v=${NEXT_PUBLIC_BUILD_ID}`, set in `next.config.ts`). Keep
+  `CACHE_BASE` pinned; activate deletes every other cache.
 - **`replacePlan` is serialised** (`src/data/repository.ts`). Two concurrent
   rebuilds used to union into overlapping blocks; keep plan writes going
   through it.

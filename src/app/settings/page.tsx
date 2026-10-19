@@ -30,6 +30,7 @@ import {
 } from "@/domain/portability";
 import { clearAll } from "@/data/db";
 import { restorePortableSnapshot } from "@/data/portable-restore";
+import { STORAGE_PERSISTENCE_COPY, readStoragePersistence, requestPersistentStorage, type StoragePersistenceState } from "@/data/storage-persistence";
 import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import {
@@ -706,8 +707,13 @@ function DeleteAccount() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ confirm: typed }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string; deleted?: boolean };
-      if (!res.ok || !body.deleted) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string; deleted?: boolean; code?: string };
+      // The account itself is gone but the server could not confirm every row
+      // was removed. Not a failure to retry: the account no longer exists, so
+      // this device must still let go of it, and the user is told the residue
+      // is being followed up rather than that everything is clean.
+      const residue = body.deleted === true && body.code === "deleted_with_residue";
+      if (!residue && (!res.ok || !body.deleted)) {
         setMessage(body.error ?? "Your account could not be deleted. Nothing on this device was changed.");
         return;
       }
@@ -715,8 +721,12 @@ function DeleteAccount() {
       // then drop the browser session.
       await clearAll().catch(() => undefined);
       await getSupabase()?.auth.signOut().catch(() => undefined);
-      setMessage("Your account and its synced data have been deleted.");
-      window.setTimeout(() => location.replace("/"), 800);
+      setMessage(
+        residue
+          ? "Your account has been deleted and this device's copy cleared. Some server data could not yet be confirmed as removed; that has been logged for follow-up."
+          : "Your account and its synced data have been deleted.",
+      );
+      window.setTimeout(() => location.replace("/"), residue ? 4000 : 800);
     } catch {
       setMessage("Your account could not be deleted because the server could not be reached. Nothing was changed.");
     } finally {
@@ -928,6 +938,44 @@ function PilotTelemetryToggle() {
   );
 }
 
+/** Whether the browser has agreed to keep this device's copy (navigator.storage.persist). */
+function StoragePersistenceRow() {
+  const [state, setState] = useState<StoragePersistenceState | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void readStoragePersistence().then((next) => { if (live) setState(next); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  if (!state) return null;
+  const copy = STORAGE_PERSISTENCE_COPY[state];
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-2" data-storage-persistence={state}>
+      <div>
+        <p className="text-sm font-medium text-ink2">
+          Storage on this device: <span className="text-ink">{copy.label}</span>
+        </p>
+        <p className="text-[11px] text-ink3">{copy.explanation}</p>
+      </div>
+      {state === "best-effort" ? (
+        <Button
+          variant="secondary"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void requestPersistentStorage()
+              .then(setState)
+              .catch(() => undefined)
+              .finally(() => setBusy(false));
+          }}
+        >
+          Ask the browser to keep it
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function DataControls() {
   const store = usePageStore();
   const filename = portabilityFilename(store.userId);
@@ -965,6 +1013,7 @@ function DataControls() {
     <section>
       <SectionHeading title="Data" hint="Portable, private, and yours to delete." />
       <Panel className="space-y-3">
+        <StoragePersistenceRow />
         <details>
           <summary className="cursor-pointer text-sm font-medium text-ink2">Pilot evidence export</summary>
           <p className="mt-2 text-sm text-ink2">For an agreed learner pilot. This saves a private local file with activity dates, marks and progress under a random ID. Answers, feedback and account details are excluded. Choose whether to share the file with your pilot organiser.</p>
@@ -1098,10 +1147,13 @@ function DataControls() {
                   setRestoreMessage("Validating snapshot and restoring…");
                   void restorePortableSnapshot(pendingRestore, store.userId)
                     .then((result) => {
+                      const dropped = result.droppedDeletions
+                        ? ` ${result.droppedDeletions} deletion record${result.droppedDeletions === 1 ? " was" : "s were"} not applied because this file belongs to another account.`
+                        : "";
                       setRestoreMessage(
-                        `Restored ${result.restored.cards} cards, ${result.restored.reviewLogs} reviews and ${result.restored.attempts} attempts. Reloading…`,
+                        `Restored ${result.restored.cards} cards, ${result.restored.reviewLogs} reviews and ${result.restored.attempts} attempts.${dropped} Reloading…`,
                       );
-                      window.setTimeout(() => location.reload(), 300);
+                      window.setTimeout(() => location.reload(), dropped ? 3000 : 300);
                     })
                     .catch((error: unknown) => {
                       setRestoreMessage(error instanceof Error ? error.message : "Restore failed. No partial restore was committed.");

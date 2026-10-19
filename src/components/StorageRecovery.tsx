@@ -74,6 +74,27 @@ export function StorageRecovery({ error, onRetry }: { error: unknown; onRetry: (
     }
   }
 
+  if (kind === "outdated") {
+    // Not damage and not a failed upgrade: another tab already runs a newer
+    // build. Repair and reset would be the wrong advice; a reload fixes it.
+    return (
+      <main className="min-h-dvh bg-bg p-4 sm:p-8 grid place-items-center" data-boot-error={storageFailureMessage(error)}>
+        <Panel className="w-full max-w-xl space-y-4">
+          <div className="flex items-center gap-2">
+            <Pill tone="neutral">Revise was updated</Pill>
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-ink">Reload to continue</h1>
+            <p className="text-sm text-ink2 mt-2 leading-6">{storageFailureMessage(error)}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => window.location.reload()}>Reload</Button>
+          </div>
+        </Panel>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-dvh bg-bg p-4 sm:p-8 grid place-items-center" data-boot-error={storageFailureMessage(error)}>
       <Panel className="w-full max-w-xl space-y-4 border-danger/40">
