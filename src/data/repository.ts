@@ -1,5 +1,5 @@
 import { syncWireIdValue } from "./sync-contract";
-import { seedCards } from "@/content/seed-cards";
+import { seedCards, upgradeSeedCardFaces } from "@/content/seed-cards";
 import { loadQuestionRows, preloadAuthoredQuestions } from "./authored-questions";
 import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
 import { allTopics } from "@/domain/curriculum";
@@ -172,15 +172,17 @@ const SEED_VERSION = 2;
  * a pre-namespace device reseeds against already-remapped rows and never
  * reintroduces a legacy id. Idempotent and effectively free when it has run.
  */
-export async function ensureSeeded(userId: Id): Promise<void> {
+export async function ensureSeeded(userId: Id): Promise<Card[]> {
   await migrateContentIds();
   const installed = await readReviseMeta<number>("seedVersion");
   // putMissing skips ids already installed and ids the learner deleted (local
   // or wire tombstone), reading both inside its own write transaction.
   // Authored questions are not copied: the bundle serves them (see
   // ./authored-questions), so only cards, which carry FSRS state, install.
-  await putMissing("cards", seedCards(allTopics(), userId), userId);
+  const seeded = seedCards(allTopics(), userId);
+  await putMissing("cards", seeded, userId);
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
+  return seeded;
 }
 
 /** How many history rows load synchronously at boot before the rest streams in. */
@@ -191,7 +193,7 @@ export const HISTORY_CHUNK = 500;
 export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number }): Promise<Snapshot> {
   // The authored bank is a separate chunk; start fetching it while the cards install.
   preloadAuthoredQuestions();
-  await ensureSeeded(userId);
+  const seeded = await ensureSeeded(userId);
   const db = await getDb();
   const historyLimit = opts?.historyLimit ?? HISTORY_FIRST_PAGE;
 
@@ -281,7 +283,8 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
     }) as T[];
 
   return {
-    cards: scoped<Card>("cards"),
+    // Cards installed by an older generator get its fixed faces (see upgradeSeedCardFaces).
+    cards: upgradeSeedCardFaces(scoped<Card>("cards"), seeded, allTopics()),
     reviewLogs: reviewLogs.filter((row) => row.userId === userId),
     // Retired template rows stay on disk for export/history recovery, but can
     // no longer be selected or contribute to live learning evidence.

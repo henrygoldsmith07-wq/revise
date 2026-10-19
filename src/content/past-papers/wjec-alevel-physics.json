@@ -1,0 +1,2064 @@
+{
+  "$comment": "Question-level map of WJEC A level Physics (1420QS) written papers onto this app's topic tree. Question numbers, marks and assessment-objective splits are read from each official mark scheme's summary grid; topics are an authored, unreviewed classification of what each question assesses. No WJEC question or mark-scheme text is stored: follow the links for the papers themselves. notInTopicTree names content the paper examines that the app has no topic for.",
+  "formatVersion": 1,
+  "subjectId": "wjec-alevel-physics",
+  "board": "WJEC",
+  "specification": "1420QS",
+  "retrievedAt": "2026-10-19",
+  "classification": "authored-unreviewed",
+  "papers": [
+    {
+      "id": "wjec-physics-1420U30-1-2022-summer",
+      "unit": 3,
+      "level": "A2",
+      "unitTitle": "Oscillations and Nuclei",
+      "componentCode": "1420U30-1",
+      "year": 2022,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S22/s22-1420U30-1-ms.pdf",
+      "markSchemeSha256": "d8a4d11205a8633b4158685e048c32a1af4efe3af11ac1c5ba35f9533a3b784a",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 13,
+          "ao": [
+            4,
+            6,
+            3
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 14,
+          "ao": [
+            9,
+            5,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 19,
+          "ao": [
+            10,
+            9,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 13,
+          "ao": [
+            4,
+            6,
+            3
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm",
+            "wjec-alevel-physics.orbits-universe"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 21,
+          "ao": [
+            0,
+            14,
+            7
+          ],
+          "mathsMarks": 17,
+          "practicalMarks": 21,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 20,
+          "ao": [
+            3,
+            5,
+            12
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U40-1-2022-summer",
+      "unit": 4,
+      "level": "A2",
+      "unitTitle": "Fields and Options",
+      "componentCode": "1420U40-1",
+      "year": 2022,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S22/s22-1420U40-1-ms.pdf",
+      "markSchemeSha256": "3a194bc9fa1f9ff4d75b3ad5a8e491554123ad06613e40dc4dc7d0d10ebe7347",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 8,
+          "ao": [
+            2,
+            3,
+            3
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 9,
+          "ao": [
+            9,
+            0,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 14,
+          "ao": [
+            3,
+            7,
+            4
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 13,
+          "ao": [
+            1,
+            8,
+            4
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.capacitance"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 22,
+          "ao": [
+            8,
+            9,
+            5
+          ],
+          "mathsMarks": 12,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.orbits-universe"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 14,
+          "ao": [
+            1,
+            9,
+            4
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 11,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U10-1-2022-summer",
+      "unit": 1,
+      "level": "AS",
+      "unitTitle": "Motion, Energy and Matter",
+      "componentCode": "2420U10-1",
+      "year": 2022,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S22/s22-2420U10-1-ms.pdf",
+      "markSchemeSha256": "c7e35ca3482c77000133a4410053deb07b6a864927891091007361c681894656",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 9,
+          "ao": [
+            2,
+            7,
+            0
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Moments, centre of gravity and equilibrium"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 10,
+          "ao": [
+            3,
+            7,
+            0
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.materials",
+            "wjec-alevel-physics.energy-power"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 17,
+          "ao": [
+            5,
+            6,
+            6
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics",
+            "wjec-alevel-physics.momentum"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 14,
+          "ao": [
+            4,
+            5,
+            5
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 14,
+          "topicIds": [
+            "wjec-alevel-physics.materials",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 9,
+          "ao": [
+            6,
+            3,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 12,
+          "ao": [
+            5,
+            4,
+            3
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 9,
+          "ao": [
+            3,
+            4,
+            2
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Radiation from stars: black body, Wien, Stefan and inverse-square intensity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U20-1-2022-summer",
+      "unit": 2,
+      "level": "AS",
+      "unitTitle": "Electricity and Light",
+      "componentCode": "2420U20-1",
+      "year": 2022,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S22/s22-2420U20-1-ms.pdf",
+      "markSchemeSha256": "bb36ef14b035d5d5b63343256cc832083cf5d3874541d869158ff5cb7ddb1563",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 9,
+          "ao": [
+            2,
+            4,
+            3
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 7,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 16,
+          "ao": [
+            5,
+            11,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 6,
+          "ao": [
+            6,
+            0,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 11,
+          "ao": [
+            1,
+            7,
+            3
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 8,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 10,
+          "ao": [
+            0,
+            7,
+            3
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 12,
+          "ao": [
+            4,
+            4,
+            4
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 7,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 8,
+          "ao": [
+            5,
+            0,
+            3
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        },
+        {
+          "number": 8,
+          "marks": 8,
+          "ao": [
+            5,
+            3,
+            0
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U30-1-2023-summer",
+      "unit": 3,
+      "level": "A2",
+      "unitTitle": "Oscillations and Nuclei",
+      "componentCode": "1420U30-1",
+      "year": 2023,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-1420u30-1-ms.pdf",
+      "markSchemeSha256": "f3768d9e1553fe34ae5c3baac6c56cddefd96150a367f06093ca136e6749ed23",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-1420u30-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 10,
+          "ao": [
+            5,
+            5,
+            0
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 15,
+          "ao": [
+            4,
+            7,
+            4
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 14,
+          "ao": [
+            7,
+            5,
+            2
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 6,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 9,
+          "ao": [
+            2,
+            3,
+            4
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 10,
+          "ao": [
+            5,
+            5,
+            0
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 22,
+          "ao": [
+            3,
+            12,
+            7
+          ],
+          "mathsMarks": 15,
+          "practicalMarks": 17,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 20,
+          "ao": [
+            4,
+            8,
+            8
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.orbits-universe"
+          ],
+          "notInTopicTree": [
+            "Radiation from stars: black body, Wien, Stefan and inverse-square intensity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U40-1-2023-summer",
+      "unit": 4,
+      "level": "A2",
+      "unitTitle": "Fields and Options",
+      "componentCode": "1420U40-1",
+      "year": 2023,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-1420u40-1-ms.pdf",
+      "markSchemeSha256": "f1a3202b4f511a8760a203728b0ab432e1aad311ca3386fb6bb0b9ab4e14b8a9",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-1420u40-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 11,
+          "ao": [
+            4,
+            3,
+            4
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.capacitance"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 14,
+          "ao": [
+            8,
+            6,
+            0
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.orbits-universe",
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 19,
+          "ao": [
+            2,
+            9,
+            8
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 17,
+          "ao": [
+            1,
+            8,
+            8
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 17,
+          "topicIds": [
+            "wjec-alevel-physics.fields",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 10,
+          "ao": [
+            7,
+            3,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 6,
+          "topicIds": [
+            "wjec-alevel-physics.electromagnetic-induction",
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 9,
+          "ao": [
+            2,
+            7,
+            0
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.alternating-currents"
+          ],
+          "option": "A"
+        },
+        {
+          "number": 8,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.medical-physics"
+          ],
+          "option": "B"
+        },
+        {
+          "number": 9,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.sports-physics"
+          ],
+          "option": "C"
+        },
+        {
+          "number": 10,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.energy-environment"
+          ],
+          "option": "D"
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U10-1-2023-summer",
+      "unit": 1,
+      "level": "AS",
+      "unitTitle": "Motion, Energy and Matter",
+      "componentCode": "2420U10-1",
+      "year": 2023,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-2420u10-1-ms.pdf",
+      "markSchemeSha256": "722eae20ef8ff6f4218f7c90eecf2f6f920e1a1b6a8be08efdfeb020c59728eb",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-2420u10-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 7,
+          "ao": [
+            1,
+            4,
+            2
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.materials"
+          ],
+          "notInTopicTree": [
+            "Moments, centre of gravity and equilibrium"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 11,
+          "ao": [
+            1,
+            6,
+            4
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 11,
+          "topicIds": [
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 15,
+          "ao": [
+            6,
+            6,
+            3
+          ],
+          "mathsMarks": 11,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 6,
+          "ao": [
+            6,
+            0,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.materials"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 11,
+          "ao": [
+            2,
+            7,
+            2
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 11,
+          "ao": [
+            3,
+            8,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.momentum"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 10,
+          "ao": [
+            6,
+            3,
+            1
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 8,
+          "marks": 9,
+          "ao": [
+            3,
+            2,
+            4
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Radiation from stars: black body, Wien, Stefan and inverse-square intensity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U20-1-2023-summer",
+      "unit": 2,
+      "level": "AS",
+      "unitTitle": "Electricity and Light",
+      "componentCode": "2420U20-1",
+      "year": 2023,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-2420u20-1-ms.pdf",
+      "markSchemeSha256": "38e80000ac817402d8d9e446206868c99ab620f81ea4a14dd6ca9bcf0be8fa64",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S23/s23-2420u20-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 13,
+          "ao": [
+            2,
+            1,
+            10
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 13,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 11,
+          "ao": [
+            5,
+            3,
+            3
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 12,
+          "ao": [
+            8,
+            4,
+            0
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 10,
+          "ao": [
+            4,
+            6,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 10,
+          "ao": [
+            4,
+            6,
+            0
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 8,
+          "ao": [
+            3,
+            5,
+            0
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 7,
+          "ao": [
+            0,
+            6,
+            1
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 7,
+          "topicIds": [
+            "wjec-alevel-physics.quantum",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 8,
+          "marks": 9,
+          "ao": [
+            2,
+            5,
+            2
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U30-1-2024-summer",
+      "unit": 3,
+      "level": "A2",
+      "unitTitle": "Oscillations and Nuclei",
+      "componentCode": "1420U30-1",
+      "year": 2024,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U30-1-ms.pdf",
+      "markSchemeSha256": "a56c77d1737a211fa8bd35d7e4afe17343d7d144aa9a7c6fa7cfb8000b626901",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U30-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 10,
+          "ao": [
+            1,
+            6,
+            3
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 10,
+          "ao": [
+            4,
+            4,
+            2
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 11,
+          "ao": [
+            7,
+            2,
+            2
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 6,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 23,
+          "ao": [
+            6,
+            11,
+            6
+          ],
+          "mathsMarks": 14,
+          "practicalMarks": 20,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 7,
+          "ao": [
+            3,
+            4,
+            0
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 7,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 7,
+          "ao": [
+            3,
+            4,
+            0
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 12,
+          "ao": [
+            3,
+            5,
+            4
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        },
+        {
+          "number": 8,
+          "marks": 20,
+          "ao": [
+            3,
+            9,
+            8
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum",
+            "wjec-alevel-physics.thermal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U40-1-2024-summer",
+      "unit": 4,
+      "level": "A2",
+      "unitTitle": "Fields and Options",
+      "componentCode": "1420U40-1",
+      "year": 2024,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U40-1-ms.pdf",
+      "markSchemeSha256": "3bd12473c3daf27c36da19c4a57dc9f77edd20d60689858a23562e8a5622e547",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-1420U40-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 10,
+          "ao": [
+            1,
+            6,
+            3
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.capacitance"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 6,
+          "ao": [
+            6,
+            0,
+            0
+          ],
+          "mathsMarks": 1,
+          "practicalMarks": 6,
+          "topicIds": [
+            "wjec-alevel-physics.capacitance",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 16,
+          "ao": [
+            4,
+            9,
+            3
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.orbits-universe"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 18,
+          "ao": [
+            6,
+            9,
+            3
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 18,
+          "ao": [
+            2,
+            5,
+            11
+          ],
+          "mathsMarks": 12,
+          "practicalMarks": 18,
+          "topicIds": [
+            "wjec-alevel-physics.fields",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 12,
+          "ao": [
+            5,
+            7,
+            0
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electromagnetic-induction"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.alternating-currents"
+          ],
+          "option": "A"
+        },
+        {
+          "number": 8,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.medical-physics"
+          ],
+          "option": "B"
+        },
+        {
+          "number": 9,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.sports-physics"
+          ],
+          "option": "C"
+        },
+        {
+          "number": 10,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.energy-environment"
+          ],
+          "option": "D"
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U10-1-2024-summer",
+      "unit": 1,
+      "level": "AS",
+      "unitTitle": "Motion, Energy and Matter",
+      "componentCode": "2420U10-1",
+      "year": 2024,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-2420U10-1-ms.pdf",
+      "markSchemeSha256": "760d9859b85fa2eb337014b06759148a19995ca992ca9d848929d9ec879e60c8",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-2420U10-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 10,
+          "ao": [
+            2,
+            5,
+            3
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.momentum"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 10,
+          "ao": [
+            2,
+            4,
+            4
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Moments, centre of gravity and equilibrium"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 10,
+          "ao": [
+            0,
+            9,
+            1
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 10,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 13,
+          "ao": [
+            10,
+            3,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 13,
+          "ao": [
+            4,
+            6,
+            3
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 12,
+          "ao": [
+            6,
+            6,
+            0
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 6,
+          "topicIds": [
+            "wjec-alevel-physics.energy-power",
+            "wjec-alevel-physics.materials"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 12,
+          "ao": [
+            4,
+            3,
+            5
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Radiation from stars: black body, Wien, Stefan and inverse-square intensity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U20-1-2024-summer",
+      "unit": 2,
+      "level": "AS",
+      "unitTitle": "Electricity and Light",
+      "componentCode": "2420U20-1",
+      "year": 2024,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-2420U20-1-ms.pdf",
+      "markSchemeSha256": "01a9ed468e987757a8f44c744c2135f45656d720675f0e72be043068cfe54743",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S24/S24-2420U20-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 6,
+          "ao": [
+            0,
+            3,
+            3
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 3,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 7,
+          "ao": [
+            2,
+            3,
+            2
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 14,
+          "ao": [
+            5,
+            6,
+            3
+          ],
+          "mathsMarks": 4,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 9,
+          "ao": [
+            4,
+            5,
+            0
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 9,
+          "ao": [
+            6,
+            3,
+            0
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 2,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 6,
+          "ao": [
+            6,
+            0,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 6,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 10,
+          "ao": [
+            0,
+            5,
+            5
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 10,
+          "topicIds": [
+            "wjec-alevel-physics.waves",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 8,
+          "marks": 8,
+          "ao": [
+            2,
+            3,
+            3
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        },
+        {
+          "number": 9,
+          "marks": 11,
+          "ao": [
+            3,
+            8,
+            0
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U30-1-2025-summer",
+      "unit": 3,
+      "level": "A2",
+      "unitTitle": "Oscillations and Nuclei",
+      "componentCode": "1420U30-1",
+      "year": 2025,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-1420U30-1-ms.pdf",
+      "markSchemeSha256": "f7bdf8858d2a1599f1993109c6fe8dc888196e07c6ca4e4c4141742695f7359b",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-1420U30-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 13,
+          "ao": [
+            4,
+            5,
+            4
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 16,
+          "ao": [
+            6,
+            5,
+            5
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 14,
+          "ao": [
+            5,
+            3,
+            6
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 15,
+          "ao": [
+            8,
+            4,
+            3
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 11,
+          "ao": [
+            2,
+            9,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 11,
+          "ao": [
+            2,
+            4,
+            5
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 11,
+          "topicIds": [
+            "wjec-alevel-physics.circular-shm",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 20,
+          "ao": [
+            3,
+            15,
+            2
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.thermal",
+            "wjec-alevel-physics.fields"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-1420U40-1-2025-summer",
+      "unit": 4,
+      "level": "A2",
+      "unitTitle": "Fields and Options",
+      "componentCode": "1420U40-1",
+      "year": 2025,
+      "series": "Summer",
+      "totalMarks": 100,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-1420U40-1-ms.pdf",
+      "markSchemeSha256": "0109b1d7f6bdf9259b6c23c889df34b3b857f3b5eaaf56557d784121ea9e26a6",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-1420U40-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 12,
+          "ao": [
+            4,
+            8,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 22,
+          "ao": [
+            11,
+            7,
+            4
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 6,
+          "ao": [
+            6,
+            0,
+            0
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.orbits-universe"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 14,
+          "ao": [
+            1,
+            7,
+            6
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.fields"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 7,
+          "ao": [
+            2,
+            5,
+            0
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electromagnetic-induction"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 19,
+          "ao": [
+            0,
+            9,
+            10
+          ],
+          "mathsMarks": 15,
+          "practicalMarks": 14,
+          "topicIds": [
+            "wjec-alevel-physics.capacitance",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.alternating-currents"
+          ],
+          "option": "A"
+        },
+        {
+          "number": 8,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.medical-physics"
+          ],
+          "option": "B"
+        },
+        {
+          "number": 9,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.sports-physics"
+          ],
+          "option": "C"
+        },
+        {
+          "number": 10,
+          "marks": 20,
+          "ao": [
+            6,
+            9,
+            5
+          ],
+          "mathsMarks": 10,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.energy-environment"
+          ],
+          "option": "D"
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U10-1-2025-summer",
+      "unit": 1,
+      "level": "AS",
+      "unitTitle": "Motion, Energy and Matter",
+      "componentCode": "2420U10-1",
+      "year": 2025,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-2420U10-1-ms.pdf",
+      "markSchemeSha256": "9584214327d3da0f66419a34590916f9724ae081c83d37098562a470c53bbf03",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-2420U10-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 8,
+          "ao": [
+            2,
+            2,
+            4
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Moments, centre of gravity and equilibrium"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 8,
+          "ao": [
+            2,
+            3,
+            3
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.materials"
+          ],
+          "notInTopicTree": [
+            "Moments, centre of gravity and equilibrium"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 13,
+          "ao": [
+            7,
+            4,
+            2
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 15,
+          "ao": [
+            3,
+            10,
+            2
+          ],
+          "mathsMarks": 7,
+          "practicalMarks": 15,
+          "topicIds": [
+            "wjec-alevel-physics.materials",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 16,
+          "ao": [
+            6,
+            10,
+            0
+          ],
+          "mathsMarks": 9,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.kinematics-dynamics",
+            "wjec-alevel-physics.momentum"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 9,
+          "ao": [
+            5,
+            2,
+            2
+          ],
+          "mathsMarks": 0,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.nuclear"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 11,
+          "ao": [
+            3,
+            5,
+            3
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [],
+          "notInTopicTree": [
+            "Radiation from stars: black body, Wien, Stefan and inverse-square intensity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wjec-physics-2420U20-1-2025-summer",
+      "unit": 2,
+      "level": "AS",
+      "unitTitle": "Electricity and Light",
+      "componentCode": "2420U20-1",
+      "year": 2025,
+      "series": "Summer",
+      "totalMarks": 80,
+      "markSchemeUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-2420U20-1-ms.pdf",
+      "markSchemeSha256": "3f83d169920c0aa6ab83c2c5d69de6adae8acee2679a4de4faa22c336d61c7db",
+      "paperUrl": "https://pastpapers.download.wjec.co.uk/S25/S25-2420U20-1.pdf",
+      "questions": [
+        {
+          "number": 1,
+          "marks": 11,
+          "ao": [
+            3,
+            8,
+            0
+          ],
+          "mathsMarks": 4,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 2,
+          "marks": 13,
+          "ao": [
+            8,
+            0,
+            5
+          ],
+          "mathsMarks": 2,
+          "practicalMarks": 3,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 3,
+          "marks": 7,
+          "ao": [
+            3,
+            1,
+            3
+          ],
+          "mathsMarks": 5,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.electric-circuits"
+          ]
+        },
+        {
+          "number": 4,
+          "marks": 11,
+          "ao": [
+            3,
+            0,
+            8
+          ],
+          "mathsMarks": 6,
+          "practicalMarks": 11,
+          "topicIds": [
+            "wjec-alevel-physics.waves",
+            "wjec-alevel-physics.practical-investigations"
+          ]
+        },
+        {
+          "number": 5,
+          "marks": 12,
+          "ao": [
+            4,
+            8,
+            0
+          ],
+          "mathsMarks": 1,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 6,
+          "marks": 13,
+          "ao": [
+            5,
+            8,
+            0
+          ],
+          "mathsMarks": 8,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.waves"
+          ]
+        },
+        {
+          "number": 7,
+          "marks": 8,
+          "ao": [
+            0,
+            8,
+            0
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        },
+        {
+          "number": 8,
+          "marks": 5,
+          "ao": [
+            2,
+            3,
+            0
+          ],
+          "mathsMarks": 3,
+          "practicalMarks": 0,
+          "topicIds": [
+            "wjec-alevel-physics.quantum"
+          ]
+        }
+      ]
+    }
+  ]
+}

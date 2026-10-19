@@ -25,6 +25,7 @@ import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner"
 import { ExamConditionMode } from "@/components/ExamConditionMode";
 import { GenerateMockPanel } from "@/components/GenerateMockPanel";
 import { TopicForecastPanel } from "@/components/TopicForecastPanel";
+import { PastPaperCoveragePanel } from "@/components/PastPaperCoveragePanel";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { ICON_SIZE, PhotoIcon, TimerIcon } from "@/components/icons";
 import { PdfPageImage } from "@/components/PdfPageImage";
@@ -174,6 +175,8 @@ function Papers() {
       />
 
       <TopicForecastPanel subjectId={subjectId} />
+
+      <PastPaperCoveragePanel subjectId={subjectId} />
 
       <Panel className="space-y-2">
         <SectionHeading title="Full exam conditions" hint="A fixed clock, no in-paper help, and feedback only after submission." />
