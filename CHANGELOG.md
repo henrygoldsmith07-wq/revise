@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-ninth pass
+
+- Diagnostic results screen now reads "Your diagnostic result" instead of staying on "Starting diagnostic". Guarded by tests/diagnostic-result-heading.test.ts (source-level; not rendered).
+
 ## 2026-10-19 — thirty-eighth pass
 
 - Readiness no longer offers "Starting diagnostic" (button and link) once the student has answered any question. Guarded by tests/starting-diagnostic-offer.test.ts (source-level; not rendered, Playwright not run).
