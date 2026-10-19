@@ -2,8 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useFocusTrap } from "./useFocusTrap";
-import { Button, cx } from "./ui";
+import dynamic from "next/dynamic";
+import { preloadWhenIdle } from "./preloadWhenIdle";
+
+// The help sheet is a modal nobody needs on first paint; keep Base UI out of
+// the shell bundle and fetch it once the page is idle.
+const loadShortcutHelp = () => import("./ShortcutHelp");
+const ShortcutHelp = dynamic(loadShortcutHelp, { ssr: false });
 
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts.
@@ -102,6 +107,8 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
     [register, sets],
   );
 
+  useEffect(() => preloadWhenIdle(loadShortcutHelp), []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
@@ -149,68 +156,4 @@ export function formatShortcut(shortcut: Shortcut): string {
   const key = shortcut.key === " " ? "Space" : shortcut.key.length === 1 ? shortcut.key.toUpperCase() : shortcut.key;
   parts.push(key.replace(/^arrow/i, "").replace(/^(up|down|left|right)$/i, (m) => m));
   return parts.join(" ");
-}
-
-function ShortcutHelp({ shortcuts, onClose }: { shortcuts: Shortcut[]; onClose: () => void }) {
-  const dialogRef = useFocusTrap(true, onClose);
-  const groups = useMemo(() => {
-    const map = new Map<string, Shortcut[]>();
-    for (const shortcut of shortcuts) {
-      const list = map.get(shortcut.group) ?? [];
-      // A screen can register the same key twice across remounts; show it once.
-      if (!list.some((s) => s.key === shortcut.key && s.label === shortcut.label)) list.push(shortcut);
-      map.set(shortcut.group, list);
-    }
-    return [...map.entries()];
-  }, [shortcuts]);
-
-  return (
-    <div
-      ref={dialogRef}
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="shortcut-help-title"
-      tabIndex={-1}
-    >
-      <div
-        className="card elev-pop w-full max-w-2xl max-h-[80vh] overflow-y-auto nice-scroll fade-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-baseline justify-between px-5 py-4 border-b border-line sticky top-0 bg-surface">
-          <h2 id="shortcut-help-title" className="text-sm font-semibold">Keyboard shortcuts</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-ink3">Esc to close · ? to reopen</span>
-            <Button size="sm" variant="ghost" type="button" onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-        <div className="p-5 grid sm:grid-cols-2 gap-x-8 gap-y-5">
-          {groups.map(([group, list]) => (
-            <div key={group}>
-              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2">{group}</p>
-              <ul className="space-y-1.5">
-                {list.map((shortcut) => (
-                  <li
-                    key={`${shortcut.key}:${shortcut.label}`}
-                    className={cx("flex items-baseline justify-between gap-3 text-sm", shortcut.disabled && "opacity-40")}
-                  >
-                    <span className="text-ink2">{shortcut.label}</span>
-                    <kbd className="shrink-0 text-[11px] font-mono px-1.5 py-0.5 rounded border border-line bg-surface2 text-ink2">
-                      {formatShortcut(shortcut)}
-                    </kbd>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-          {!groups.length ? (
-            <p className="text-sm text-ink3">No shortcuts are active on this screen.</p>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
 }

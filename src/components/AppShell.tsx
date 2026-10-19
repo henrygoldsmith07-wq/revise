@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -26,10 +27,15 @@ import {
   WarningIcon,
 } from "./icons";
 import type { LucideIcon } from "./icons";
-import { SearchOverlay } from "./SearchOverlay";
+import { preloadWhenIdle } from "./preloadWhenIdle";
 import { PilotOutcomesSync } from "./PilotOutcomesSync";
 import { useShortcuts } from "./shortcuts";
 import { Onboarding } from "./Onboarding";
+
+// Search is a modal opened on demand: keep it (and Base UI) out of the shell
+// bundle, then fetch it once the page is idle so it still opens offline.
+const loadSearchOverlay = () => import("./SearchOverlay").then((m) => m.SearchOverlay);
+const SearchOverlay = dynamic(loadSearchOverlay, { ssr: false });
 
 // Five destinations, one per thing a student does, plus Settings:
 //   Today     what should I do?              (and the session it starts)
@@ -101,6 +107,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     : syncStatus.failed > 0 || syncStatus.lastSyncError
       ? "bg-dangersoft text-danger"
       : "bg-surface2 text-ink2";
+
+  useEffect(() => preloadWhenIdle(loadSearchOverlay), []);
 
   // Theme and accessibility preferences live on <html> so Le Studio's tokens
   // flip everything at once, including anything rendered into a portal.
