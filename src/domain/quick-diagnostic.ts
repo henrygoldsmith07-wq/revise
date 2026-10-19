@@ -272,6 +272,10 @@ export function resumeQuickDiagnostic(
   if (!saved || typeof saved !== "object") return null;
   const run = saved as Partial<QuickDiagnosticRun>;
   if (run.version !== 1 || run.subjectId !== subjectId || !Array.isArray(run.items) || !run.items.length || !Array.isArray(run.doneAttemptIds)) return null;
+  // Nothing answered yet: nothing to preserve, so choose afresh. A run saved
+  // before reviewed questions arrived (onboarding starts the check at once)
+  // would otherwise pin a practice-tier set after trusted supply exists.
+  if (!run.doneAttemptIds.length) return null;
   const questionIds = new Set(questions.map((q) => q.id));
   if (!run.items.every((item) => item && questionIds.has(item.questionId))) return null;
   // Every item answered but the report not yet shown (a reload on the last

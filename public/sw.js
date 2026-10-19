@@ -11,8 +11,8 @@
 // which used to pile up for ever under one constant name. Bump CACHE_BASE only
 // to invalidate shells within one build id (never needed in production).
 //
-// Route chunks are not precached from the build manifest: the shells below
-// are, and each page's chunks are cached the first time they load online.
+// Each precached shell's /_next/static assets are cached at install too
+// (precacheShellAssets), so a route never visited online still runs offline.
 
 const CACHE_BASE = "revise-v8";
 const BUILD_ID = new URL(self.location.href).searchParams.get("v") || "dev";
@@ -57,12 +57,29 @@ const APP_SHELL = [
   "/diagrams/energy-profile.svg",
 ];
 
+// The /_next/static files a cached page needs. A route shell whose scripts were
+// never fetched (a route not visited online) opens offline as dead HTML, so
+// install caches every asset the precached pages reference, not just the HTML.
+const NEXT_ASSET = /\/_next\/static\/[^"'\s)\\]+/g;
+
+async function precacheShellAssets(cache) {
+  const assets = new Set();
+  for (const url of APP_SHELL) {
+    if (/\.[a-z0-9]+$/i.test(url)) continue; // fonts, icons, svg: no page markup
+    const page = await cache.match(url);
+    if (!page || typeof page.text !== "function") continue;
+    const html = await page.clone().text().catch(() => "");
+    for (const asset of html.match(NEXT_ASSET) ?? []) assets.add(asset);
+  }
+  await Promise.allSettled([...assets].map((asset) => cache.add(asset)));
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_VERSION)
       // Individually, so one 404 during a deploy cannot fail the whole install.
-      .then((cache) => Promise.allSettled(APP_SHELL.map((url) => cache.add(url))))
+      .then((cache) => Promise.allSettled(APP_SHELL.map((url) => cache.add(url))).then(() => precacheShellAssets(cache)))
       .then(() => self.skipWaiting()),
   );
 });

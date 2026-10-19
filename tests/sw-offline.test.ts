@@ -5,10 +5,15 @@ import { describe, expect, it } from "vitest";
 
 // Runs public/sw.js against a minimal fake service-worker global.
 
-interface FakeResponse { url: string; ok: boolean; clone(): FakeResponse }
+interface FakeResponse { url: string; ok: boolean; clone(): FakeResponse; text(): Promise<string> }
 
+// A route shell's HTML names its own chunk, the way Next's server output does.
 function response(url: string): FakeResponse {
-  return { url, ok: true, clone() { return response(url); } };
+  const path = new URL(url, "https://revise.test").pathname;
+  const html = path.startsWith("/_next/") || /\.[a-z0-9]+$/i.test(path)
+    ? ""
+    : `<script src="/_next/static/chunks/app${path === "/" ? "/index" : path}-abc123.js" async></script><link rel="stylesheet" href="/_next/static/css/app-1.css">`;
+  return { url, ok: true, clone() { return response(url); }, text: async () => html };
 }
 
 function loadWorker(scriptUrl: string, cachedKeys: string[] = []) {
@@ -24,6 +29,7 @@ function loadWorker(scriptUrl: string, cachedKeys: string[] = []) {
     stores.set(name, store);
     return {
       add: async (url: string) => { store.set(keyOf(url), response(url)); },
+      match: async (request: string | { url: string }) => store.get(keyOf(request)),
       put: async (request: { url: string }, value: FakeResponse) => { store.set(keyOf(request), value); },
     };
   };
@@ -75,6 +81,15 @@ describe("service worker", () => {
       const served = (await (await worker.dispatch("fetch", { request }))) as FakeResponse;
       expect(new URL(served.url, "https://revise.test").pathname).toBe(path.split("?")[0]);
     }
+  });
+
+  it("caches every script and stylesheet the precached shells reference, so an unvisited route still runs offline", async () => {
+    const worker = loadWorker("/sw.js?v=build-3");
+    await worker.dispatch("install");
+    const keys = [...worker.stores.get("revise-v8-build-3")!.keys()];
+    expect(keys).toContain("/_next/static/chunks/app/diagnostic-abc123.js");
+    expect(keys).toContain("/_next/static/chunks/app/index-abc123.js");
+    expect(keys).toContain("/_next/static/css/app-1.css");
   });
 
   it("names its cache after the build it was registered for, so activating a new build deletes old caches", async () => {
