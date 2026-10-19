@@ -12,7 +12,7 @@
 // Existing TS modules stay supported: they are validated through the same
 // functions in tests, so migration is incremental per subject.
 
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { contentQuestionSchema, contentTopicSchema } from "./schema";
 import type { Question, Topic } from "@/domain/types";
 

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 const id = z.string().trim().min(1);
 const nonEmpty = z.string().trim().min(1);

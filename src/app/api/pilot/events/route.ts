@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { sameOriginRequest } from "@/domain/account-deletion";
 import { rateLimit } from "@/lib/rate-limit";
 

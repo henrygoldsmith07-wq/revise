@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 // Shared request/response contracts for every AI task. These are imported by
 // both the browser and the route handler, so this module must stay free of

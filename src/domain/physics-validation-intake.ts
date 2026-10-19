@@ -63,7 +63,7 @@ import type {
   IsoInstant,
   Question,
 } from "./types";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 export const PHYSICS_REVIEW_PACKET_VERSION = 1 as const;
 export const PHYSICS_PREREQUISITE_PACKET_VERSION = 1 as const;
