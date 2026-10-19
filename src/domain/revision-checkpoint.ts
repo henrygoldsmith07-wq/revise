@@ -1,4 +1,4 @@
-import type { Id, IsoInstant, MissionAttemptContext } from "./types";
+import type { Attempt, Id, IsoInstant, MissionAttemptContext, ReviewLog } from "./types";
 
 export type RevisionActivity = "practice" | "review" | "paper" | "study" | "adaptive";
 
@@ -28,6 +28,12 @@ export interface RevisionCheckpointInput {
   retestMistakeId?: Id;
   repeatCount?: number;
   mission?: MissionCheckpointState;
+  /**
+   * When this run began. Carried across saves of the same run, so "answered
+   * since the run began" has a fixed cut-off (see checkpointHasProgress).
+   * Absent on checkpoints written before the twenty-sixth pass.
+   */
+  startedAt?: IsoInstant;
 }
 
 export interface RevisionCheckpoint extends RevisionCheckpointInput {
@@ -43,9 +49,13 @@ export function createRevisionCheckpoint(
   userId: Id,
   input: RevisionCheckpointInput,
   now = new Date().toISOString(),
+  previous: RevisionCheckpoint | null = null,
 ): RevisionCheckpoint {
+  const startedAt = input.startedAt
+    ?? (previous && sameRun(previous, userId, input) ? previous.startedAt ?? previous.updatedAt : now);
   return {
     ...input,
+    startedAt,
     version: 1,
     userId,
     position: clampInteger(input.position, 0, Math.max(0, input.total - 1)),
@@ -54,6 +64,37 @@ export function createRevisionCheckpoint(
     repeatCount: input.repeatCount == null ? undefined : Math.max(0, Math.floor(input.repeatCount)),
     updatedAt: now,
   };
+}
+
+/** The same run saved again: same learner, activity, route, mission and first question. */
+function sameRun(previous: RevisionCheckpoint, userId: Id, input: RevisionCheckpointInput): boolean {
+  return previous.userId === userId && previous.activity === input.activity && previous.href === input.href &&
+    previous.mission?.missionId === input.mission?.missionId && previous.queueIds?.[0] === input.queueIds?.[0];
+}
+
+type ProgressEvidence = {
+  attempts: ReadonlyArray<Pick<Attempt, "questionId" | "topicIds" | "createdAt">>;
+  reviewLogs: ReadonlyArray<Pick<ReviewLog, "cardId" | "topicId" | "reviewedAt">>;
+};
+
+/**
+ * Whether a saved run holds anything to resume. Every revision page saves a
+ * checkpoint as soon as its first question is on screen, so opening a step and
+ * going back used to leave Today offering "Resume interrupted revision" (and
+ * hiding its recommendation) for a run with nothing in it. A run counts once
+ * the student has moved past its first item, or has answered or reviewed
+ * something from it since it began. The checkpoint itself is kept either way:
+ * the page still uses it to restore the same questions on refresh.
+ */
+export function checkpointHasProgress(checkpoint: RevisionCheckpoint, evidence: ProgressEvidence): boolean {
+  if (checkpoint.position > 0) return true;
+  const since = checkpoint.mission?.startedAt ?? checkpoint.startedAt ?? checkpoint.updatedAt;
+  const ids = new Set([...(checkpoint.queueIds ?? []), ...(checkpoint.mission?.questionIds ?? [])]);
+  // Adaptive queue ids are step ids, not question or card ids; its steps are
+  // all on the pinned topic.
+  const topic = checkpoint.activity === "adaptive" ? checkpoint.topicId : undefined;
+  return evidence.attempts.some((a) => a.createdAt >= since && (ids.has(a.questionId) || (topic !== undefined && a.topicIds.includes(topic)))) ||
+    evidence.reviewLogs.some((l) => l.reviewedAt >= since && (ids.has(l.cardId) || (topic !== undefined && l.topicId === topic)));
 }
 
 export function isRevisionCheckpoint(value: unknown): value is RevisionCheckpoint {
@@ -76,6 +117,7 @@ export function isRevisionCheckpoint(value: unknown): value is RevisionCheckpoin
     (checkpoint.queueIds === undefined || (Array.isArray(checkpoint.queueIds) && checkpoint.queueIds.every((id) => typeof id === "string"))) &&
     (checkpoint.repeatCount === undefined || Number.isInteger(checkpoint.repeatCount)) &&
     (checkpoint.mission === undefined || isMissionCheckpointState(checkpoint.mission)) &&
+    (checkpoint.startedAt === undefined || typeof checkpoint.startedAt === "string") &&
     typeof checkpoint.updatedAt === "string"
   );
 }

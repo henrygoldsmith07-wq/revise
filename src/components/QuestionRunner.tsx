@@ -24,6 +24,7 @@ export type { QuestionDraft } from "@/state/question-execution";
 import { MarkedResult } from "./QuestionMarkedResult";
 import { ExamPaceTimer } from "./ExamPaceTimer";
 import type { PracticeStepMode } from "@/domain/practice-step-mode";
+import { marksLabel } from "@/domain/plural";
 const TIER_HINT_CTA: Record<HintTier, string> = {
   cue: "Reveal a small cue",
   prompt: "Reveal what to think about",
@@ -97,7 +98,7 @@ export function QuestionRunner({
       ) : null}
       <Panel>
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <Pill>{question.totalMarks} marks</Pill>
+          <Pill>{marksLabel(question.totalMarks)}</Pill>
           <Pill>{topic?.title ?? question.subjectId}</Pill>
           {retestMistake ? <Pill tone="review">Retest</Pill> : null}
           {question.origin === "past-paper" ? <Pill tone="review">Past paper</Pill> : null}

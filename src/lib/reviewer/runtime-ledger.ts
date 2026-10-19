@@ -20,7 +20,7 @@
 // a network client or a secret.
 // ---------------------------------------------------------------------------
 
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { physicsContentFingerprint, REQUIRED_HUMAN_CHECKS, requiresWjecContentReview } from "@/domain/content-trust";
 import { mergeHumanVerificationLedger, type HumanVerificationLedgerFile } from "@/domain/human-verification-ledger";
 import {

@@ -141,7 +141,15 @@ background and do other work while it runs. On Windows, invoke npm through
   `guided=1`, `unaided=1` and `timed=1&command=…`; `src/domain/practice-step-mode.ts`
   parses them. A new link parameter needs a consumer and a test, or the
   plan promises something the page does not do. Still unhonoured:
-  `/lesson?worked=1`, `/practice?transfer=1`, `/adaptive-session?proof=1`.
+  `/lesson?worked=1`, `/practice?transfer=1`. A proof check link is
+  `proofHref` (`/practice?proof=<topic>&subject=…`, ProofCheckMode); the
+  old `/adaptive-session?…&proof=1` was never read and is gone (thirtieth
+  pass, `tests/proof-links.test.ts`).
+- **A saved checkpoint is not an interrupted run** (twenty-ninth pass). Pages
+  save a resume point as soon as a question shows; anything that offers to
+  resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
+  titles that prefix "Recover N marks" compose through `missionActionTitle`,
+  never by concatenating `mission.title`.
 - **Outbox failures are classified** (`src/domain/sync-retry.ts`). Only a
   permanent (content) rejection spends an item's `MAX_OUTBOX_ATTEMPTS`
   budget; a transient one (network, timeout, 5xx, 429, expired JWT) records
@@ -190,6 +198,28 @@ background and do other work while it runs. On Windows, invoke npm through
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by
   `causeFit`, and re-sits the original only when none exists (and says so).
+- **Supported steps keep reviewed questions for proof** (thirtieth pass).
+  Anything that serves questions with help or as practice (mission repair,
+  practise, proof-barred apply; guided/worked plan steps) passes
+  `reserveReviewed` to `selectProofCandidates` or orders with
+  `deferProofSupply`: a reviewed question it serves becomes "seen" and can
+  never be the topic's proof. Spend one only when nothing else fits, and say
+  so (`reviewedSpent`).
+- **A Physics spec tag is a lesson link.** `tests/physics-spec-tags.test.ts`
+  checks every WJEC Physics tag is a real point in the question's topic and
+  pins the audited massive-authentic tags. Never retag a question to fill a
+  depth cell; `tests/subject-assessment-audit.test.ts` lists the honest gaps.
+- **Question builders take a spec point; never default to sp-01** (thirty-first
+  pass). The data, unfamiliar-context, authentic-source and evidence builders
+  used to tag every part sp-01 of its topic. Pass the point the part actually
+  tests, checked against the curriculum statement. `node
+  scripts/audit-physics-spec-tags.mjs` ranks likely mis-tags by keyword
+  agreement; it is triage, not accuracy, and every retag is a human decision
+  pinned in `tests/physics-spec-tags.test.ts`.
+- **Nothing on the marking path may reach a third party without AI consent**
+  (thirty-first pass). The semantic cache loads its embedding model only when
+  an embedded entry exists (`tests/semantic-cache-egress.test.ts`);
+  `e2e/fresh-student-360.spec.ts` fails on any huggingface.co request.
 - **Two pre-existing flake classes**, both evidenced on a clean baseline and both
   left documented rather than hidden: Vitest worker RPC timeouts on a loaded
   machine (`vitest.config.mts`), and wall-clock compile assertions

@@ -1,5 +1,5 @@
 import "server-only";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { getTopic, subjectLabel } from "@/domain/curriculum";
 import { seedQuestions } from "@/content";
 import type { Question, Topic } from "@/domain/types";

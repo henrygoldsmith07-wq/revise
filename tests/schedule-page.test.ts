@@ -78,3 +78,11 @@ describe("Schedule — page wiring", () => {
     expect(src).toContain("Last rebuild");
   });
 });
+
+describe("Schedule — today's past blocks", () => {
+  it("labels a pending block whose time has passed instead of presenting it as upcoming", () => {
+    const src = readFileSync(join(process.cwd(), "src/app/schedule/page.tsx"), "utf8");
+    expect(src).toContain("schedule-block-time-passed");
+    expect(src).toContain("session.startMinute + session.minutes <= nowMinute");
+  });
+});

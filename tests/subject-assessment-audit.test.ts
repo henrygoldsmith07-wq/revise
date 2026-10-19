@@ -58,7 +58,36 @@ describe("WJEC flagship depth pack", () => {
       "wjec-alevel-physics", "wjec-alevel-maths", "wjec-alevel-biology", "wjec-alevel-chemistry",
     ]);
     expect(dashboard.subjects[0]!.statements).toBe(108);
-    expect(dashboard.subjects[0]!.deepComplete).toBe(108);
+    // 99, not 108. The old 108 counted massive-authentic items tagged to the
+    // wrong spec point (a terminal-speed question on scalars/vectors, a
+    // half-life question on nuclear radius, ...); the thirtieth pass took it
+    // to 102. The thirty-first pass retagged the data, unfamiliar-context,
+    // authentic-source and evidence builders, which had hard-coded sp-01:
+    // kinematics-dynamics.sp-01 lost bench-projectile and cyclist-motion
+    // (explanation) and velocity-time, hovercraft and bench-projectile
+    // (calculation) to sp-02/04/06; energy-power.sp-01 lost lift-efficiency,
+    // wave-buoy and tidal-generator to sp-03 (power and efficiency);
+    // fields.sp-01 lost satellite-orbit, lunar-transfer and planetary-mission
+    // to sp-03/sp-04; thermal.sp-01 lost pressure-temperature to sp-03 (ideal
+    // gas). quantum.sp-02 gained photodiode (threshold) and is now complete.
+    // 102 - 4 + 1 = 99. These statements each now have one family, not two
+    // distinct ones, for the listed demand. Author a real second family to
+    // close a gap and remove it here; never retag a question back to fill one.
+    expect(dashboard.subjects[0]!.deepComplete).toBe(99);
+    const physics = auditFlagshipSubject({ subjectId: "wjec-alevel-physics", topics: wjecFlagshipCurricula.find((c) => c.subject.id === "wjec-alevel-physics")!.topics, questions: seedQuestions, nodes: wjecCapabilities });
+    const gaps = physics.capabilityCoverage.filter((row) => !row.complete)
+      .map((row) => `${row.specPointId.replace("wjec-alevel-physics.", "")}: ${row.demands.filter((d) => !(d.complete && d.distinct)).map((d) => d.demand).join("+")}`);
+    expect(gaps.sort()).toEqual([
+      "circular-shm.sp-02: explanation",
+      "electric-circuits.sp-01: calculation",
+      "energy-power.sp-01: calculation",
+      "fields.sp-01: explanation+misconception+calculation",
+      "fields.sp-02: calculation",
+      "kinematics-dynamics.sp-01: explanation+calculation",
+      "nuclear.sp-02: explanation+calculation",
+      "thermal.sp-01: calculation",
+      "waves.sp-03: explanation",
+    ]);
   }, 60_000);
 
   it("keeps the templated Maths/Biology/Chemistry depth pack out of the learner bank", () => {

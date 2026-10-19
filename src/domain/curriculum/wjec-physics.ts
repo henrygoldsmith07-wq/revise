@@ -3,7 +3,7 @@ import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
 import { wjecPhysicsExpansion } from "./wjec-alevel-expansions";
 
-// WJEC A Level Physics (A200QS). Grouped by the specification's broad content
+// WJEC A Level Physics (1420QS). Grouped by the specification's broad content
 // areas; check the current WJEC spec for exact assessment objectives.
 const SUBJECT_ID = "wjec-alevel-physics";
 
@@ -414,7 +414,7 @@ export const wjecPhysics: CurriculumModule = registerSubject({
     id: SUBJECT_ID,
     qualificationId: "wjec-alevel",
     name: "Physics",
-    specCode: "A200QS",
+    specCode: "1420QS",
     papers: [
       { id: `${SUBJECT_ID}.u3`, name: "Unit 3: Oscillations and Nuclei", weight: 0.25, durationMinutes: 135, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u4`, name: "Unit 4: Fields and Options", weight: 0.25, durationMinutes: 120, calculatorAllowed: true },
@@ -422,7 +422,7 @@ export const wjecPhysics: CurriculumModule = registerSubject({
       { id: `${SUBJECT_ID}.as`, name: "AS Units 1 & 2", weight: 0.4, durationMinutes: 210, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.wjec.co.uk/qualifications/" },
+    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.wjec.co.uk/qualifications/physics-asa-level/" },
   },
   units,
   topics,

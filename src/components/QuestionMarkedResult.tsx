@@ -306,12 +306,19 @@ export function MarkedResult({
       {result.workingAnalysis?.some((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0) ? (
         <div className="mt-4 card card-2 p-3 bg-surface2" role="status">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Working check</p>
-          {result.workingAnalysis.filter((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0).map((row) => (
+          {result.workingAnalysis.filter((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0).map((row) => {
+            const markedPart = result.marked.find((m) => m.partId === row.partId);
+            // A part that earned full marks has no divergence worth reporting.
+            const fullMarks = markedPart != null && markedPart.awarded >= markedPart.max;
+            const partLabel = question.parts.find((p) => p.id === row.partId)?.label;
+            return (
             <p key={row.partId} className="text-xs text-ink2 mt-1">
-              {row.firstIncorrectStep != null ? `First divergence at step ${row.firstIncorrectStep + 1}: ${row.firstErrorKind.replace(/-/g, " ")}. ` : "Working is consistent. "}
+              {partLabel && result.workingAnalysis!.length > 1 ? `${partLabel}: ` : ""}
+              {row.firstIncorrectStep != null && !fullMarks ? `First divergence at step ${row.firstIncorrectStep + 1}: ${row.firstErrorKind.replace(/-/g, " ")}. ` : "Working is consistent. "}
               {[row.methodMarksAwarded ? `${row.methodMarksAwarded} method` : "", row.followThroughMarksAwarded ? `${row.followThroughMarksAwarded} follow-through` : "", row.errorCarriedForward ? "error carried forward" : "", row.unitMarksAwarded ? `${row.unitMarksAwarded} unit` : "", row.precisionMarksAwarded ? `${row.precisionMarksAwarded} precision` : ""].filter(Boolean).join(", ")}
             </p>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
@@ -441,9 +448,10 @@ export function MarkedResult({
           // Otherwise the same score is practice, and says why.
           proved
             ? (
+              // The "passed" banner renders no link; href is required by the type only.
               <ProofCheckBanner
                 topicTitle={provedTopic}
-                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1`}
                 state="passed"
               />
             ) : (
@@ -454,11 +462,14 @@ export function MarkedResult({
                     ? "Revise records this as a correct answer. It only becomes proof once the same skill is answered unaided on a different question, after a delay."
                     : "Revise records this as a correct answer. This question has not been checked by a teacher yet, so it counts as practice; only answers on reviewed questions can prove a skill."}
                 </p>
+                {/* An ordinary adaptive session: practice, as the copy above says.
+                    It used to carry &proof=1, which nothing reads, and log a
+                    proof attempt that never happened. */}
                 <ButtonLink
-                  href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1&proof=1`}
+                  href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1`}
                   size="sm"
                   variant="secondary"
-                  onClick={() => captureProductEvent("proof.attempted", { kind: "delayed-proof" })}
+                  onClick={() => captureProductEvent("recommendation.accepted", { kind: "unseen-practice" })}
                 >
                   Try an unseen question
                 </ButtonLink>

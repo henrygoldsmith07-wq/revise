@@ -103,6 +103,16 @@ export function PracticeNextStep({
         ) : null}
       </section>
 
+      {relearn && relearnElsewhere ? (
+        <p className="text-xs text-ink2 px-1" data-testid="relearn-lesson-more">
+          Not sure why you lost the mark?{" "}
+          <Link href={relearn.href} className="font-medium text-ink underline inline-flex min-h-11 items-center">
+            Open the lesson for {relearn.ref} ({relearn.topicTitle})
+          </Link>
+          . {RELEARN_NOTE}
+        </p>
+      ) : null}
+
       <details
         className="rounded-[8px] border border-line"
         data-testid="practice-more-help"
@@ -112,17 +122,6 @@ export function PracticeNextStep({
           More help with this answer
         </summary>
         <div className="space-y-4 px-3 pb-3">
-          {relearn && relearnElsewhere ? (
-            <div data-testid="relearn-lesson-more">
-              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Re-learn the idea</p>
-              <p className="text-xs text-ink2 mt-1">
-                The lesson for {relearn.ref} ({relearn.topicTitle}) teaches this point with a worked example. {RELEARN_NOTE}
-              </p>
-              <Link href={relearn.href} className="font-medium text-sm text-ink underline inline-flex min-h-11 items-center">
-                Open the lesson for {relearn.ref}
-              </Link>
-            </div>
-          ) : null}
           {answerShowed || uncertainCause ? (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this answer showed</p>

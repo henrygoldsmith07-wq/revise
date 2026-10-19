@@ -2849,7 +2849,7 @@
       {
         "specPointId": "wjec-alevel-physics.circular-shm.sp-07",
         "topicId": "wjec-alevel-physics.circular-shm",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -2858,7 +2858,7 @@
       {
         "specPointId": "wjec-alevel-physics.electric-circuits.sp-01",
         "topicId": "wjec-alevel-physics.electric-circuits",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -2876,7 +2876,7 @@
       {
         "specPointId": "wjec-alevel-physics.electric-circuits.sp-05",
         "topicId": "wjec-alevel-physics.electric-circuits",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -2966,7 +2966,7 @@
       {
         "specPointId": "wjec-alevel-physics.energy-power.sp-01",
         "topicId": "wjec-alevel-physics.energy-power",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -2984,7 +2984,7 @@
       {
         "specPointId": "wjec-alevel-physics.energy-power.sp-03",
         "topicId": "wjec-alevel-physics.energy-power",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 17,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3020,7 +3020,7 @@
       {
         "specPointId": "wjec-alevel-physics.fields.sp-01",
         "topicId": "wjec-alevel-physics.fields",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 9,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3029,7 +3029,7 @@
       {
         "specPointId": "wjec-alevel-physics.fields.sp-02",
         "topicId": "wjec-alevel-physics.fields",
-        "currentQuestionCount": 17,
+        "currentQuestionCount": 16,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3038,7 +3038,7 @@
       {
         "specPointId": "wjec-alevel-physics.fields.sp-03",
         "topicId": "wjec-alevel-physics.fields",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3047,7 +3047,7 @@
       {
         "specPointId": "wjec-alevel-physics.fields.sp-04",
         "topicId": "wjec-alevel-physics.fields",
-        "currentQuestionCount": 11,
+        "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3083,7 +3083,7 @@
       {
         "specPointId": "wjec-alevel-physics.fields.sp-08",
         "topicId": "wjec-alevel-physics.fields",
-        "currentQuestionCount": 14,
+        "currentQuestionCount": 15,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3092,7 +3092,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-01",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 9,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3119,7 +3119,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-04",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 14,
+        "currentQuestionCount": 17,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3137,7 +3137,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-06",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3146,7 +3146,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-07",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3164,7 +3164,7 @@
       {
         "specPointId": "wjec-alevel-physics.materials.sp-01",
         "topicId": "wjec-alevel-physics.materials",
-        "currentQuestionCount": 14,
+        "currentQuestionCount": 15,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3173,7 +3173,7 @@
       {
         "specPointId": "wjec-alevel-physics.materials.sp-02",
         "topicId": "wjec-alevel-physics.materials",
-        "currentQuestionCount": 14,
+        "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3254,7 +3254,7 @@
       {
         "specPointId": "wjec-alevel-physics.momentum.sp-01",
         "topicId": "wjec-alevel-physics.momentum",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3263,7 +3263,7 @@
       {
         "specPointId": "wjec-alevel-physics.momentum.sp-02",
         "topicId": "wjec-alevel-physics.momentum",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3281,7 +3281,7 @@
       {
         "specPointId": "wjec-alevel-physics.momentum.sp-04",
         "topicId": "wjec-alevel-physics.momentum",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3308,7 +3308,7 @@
       {
         "specPointId": "wjec-alevel-physics.nuclear.sp-01",
         "topicId": "wjec-alevel-physics.nuclear",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 12,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3317,7 +3317,7 @@
       {
         "specPointId": "wjec-alevel-physics.nuclear.sp-02",
         "topicId": "wjec-alevel-physics.nuclear",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 10,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3326,7 +3326,7 @@
       {
         "specPointId": "wjec-alevel-physics.nuclear.sp-03",
         "topicId": "wjec-alevel-physics.nuclear",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 17,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3362,7 +3362,7 @@
       {
         "specPointId": "wjec-alevel-physics.nuclear.sp-07",
         "topicId": "wjec-alevel-physics.nuclear",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3443,7 +3443,7 @@
       {
         "specPointId": "wjec-alevel-physics.quantum.sp-01",
         "topicId": "wjec-alevel-physics.quantum",
-        "currentQuestionCount": 19,
+        "currentQuestionCount": 18,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3470,7 +3470,7 @@
       {
         "specPointId": "wjec-alevel-physics.quantum.sp-04",
         "topicId": "wjec-alevel-physics.quantum",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 13,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3542,7 +3542,7 @@
       {
         "specPointId": "wjec-alevel-physics.thermal.sp-01",
         "topicId": "wjec-alevel-physics.thermal",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3560,7 +3560,7 @@
       {
         "specPointId": "wjec-alevel-physics.thermal.sp-03",
         "topicId": "wjec-alevel-physics.thermal",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 15,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3605,7 +3605,7 @@
       {
         "specPointId": "wjec-alevel-physics.waves.sp-02",
         "topicId": "wjec-alevel-physics.waves",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 12,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3632,7 +3632,7 @@
       {
         "specPointId": "wjec-alevel-physics.waves.sp-05",
         "topicId": "wjec-alevel-physics.waves",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"

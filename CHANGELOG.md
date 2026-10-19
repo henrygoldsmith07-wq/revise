@@ -1,5 +1,181 @@
 # Changelog
 
+## 2026-10-19 — fortieth pass
+
+- Schedule: a pending block today whose time slot has already passed now says "Time passed, still to do" rather than looking upcoming. Guarded by tests/schedule-page.test.ts (source-level; not rendered).
+
+## 2026-10-19 — thirty-ninth pass
+
+- Diagnostic results screen now reads "Your diagnostic result" instead of staying on "Starting diagnostic". Guarded by tests/diagnostic-result-heading.test.ts (source-level; not rendered).
+
+## 2026-10-19 — thirty-eighth pass
+
+- Readiness no longer offers "Starting diagnostic" (button and link) once the student has answered any question. Guarded by tests/starting-diagnostic-offer.test.ts (source-level; not rendered, Playwright not run).
+
+## 2026-10-19 — thirty-seventh pass
+
+- Working check no longer says "First divergence at step 1: unit error" on a part that scored full marks, and names the part when several are checked. Guarded by tests/working-check-full-marks.test.ts (source-level; not rendered).
+
+## 2026-10-19 — thirty-fifth pass
+
+- When a lost mark has a written lesson but the main next step is something else (technique drill or repair plan), the lesson link is now shown under that step instead of hidden inside the collapsed "More help with this answer". Marks and proof rules unchanged. Playwright spec updated; not run this pass.
+
+## 2026-10-19 — thirty-sixth pass
+
+- Repair brief no longer claims 'Every question targets <cause>' (only some parts do); it says questions are chosen to target it.
+
+## 2026-10-19 — thirty-fourth pass
+
+- The centripetal force 'Calculate' question (WJEC and AQA copies) withheld a mark for not saying 'towards centre' without asking for direction; the prompt now asks 'and state its direction'. Marking logic unchanged.
+
+## 2026-10-19 — thirty-third pass
+
+- WJEC A level Physics now shows its published spec code 1420QS (was A200QS) and links to the physics-asa-level page. AS paper durations were not re-verified.
+
+## Thirty-second pass: no Zod eval probe under the CSP — 2026-10-19
+
+Zod v4 probes `new Function("")` on first schema build, which the nonce CSP reported
+as a `script-src` violation on every page load. All schemas now import `z` from
+`src/lib/zod.ts`, which sets `z.config({ jitless: true })` first;
+`tests/zod-jitless.test.ts` fails if any source imports `zod` directly. Not verified
+in a live browser's CSP report console.
+
+## 360px fresh-student walkthrough: no huggingface.co fetch, correct third-law MCQ, readable lesson objectives; Physics tags beyond massive-authentic — 2026-10-18 (thirty-first pass)
+
+- **No third-party model download on a student's first marked answer.** A
+  fresh Year 12 Physics walkthrough at 360px (AI never enabled) saw the
+  browser request `huggingface.co/Xenova/all-MiniLM-L6-v2` on the first
+  marked diagnostic answer. `lookupCachedMark` loaded the embedding model
+  before checking whether any embedded entry existed; nothing stores an
+  embedding today, so the tier could never hit. The model now loads only when
+  a fresh, current, embedded entry exists for the part
+  (`tests/semantic-cache-egress.test.ts`). Open PR #75 removes the embedding
+  tier outright; whichever lands second should take #75's version.
+- **Third-law MCQ.** One distractor was itself a correct Newton's third law
+  pair, so a right answer could be marked wrong. Replaced
+  (`tests/third-law-mcq.test.ts`).
+- **Lesson objectives read "Be able to define …"**, not "Explain that define
+  …" (`tests/lesson-objectives-grammar.test.ts`).
+- **Physics spec-point tags beyond massive-authentic.** The data-expansion,
+  unfamiliar-context, authentic-source and evidence-expansion builders
+  hard-coded (or defaulted to) sp-01 of the topic. They now take a `point`.
+  `scripts/audit-physics-spec-tags.mjs` ranks likely mis-tags by keyword
+  agreement (a triage tool, not an accuracy measure: agreement went from
+  1,136/1,720 to 1,149/1,720 parts, strong suspects from 155 to 139); each
+  retag was checked by hand against the curriculum statement. 26 parts on 23
+  question templates are retagged in every Physics variant, including the
+  banked-curve centripetal question moved from SHM (sp-04) to centripetal
+  motion (sp-02); 8 parts are left for teacher review with their old tags.
+  All pinned in `tests/physics-spec-tags.test.ts`, which also checks every
+  Physics variant's tags are real points in the question's own topic; the one
+  exception, `aqa-gcse-physics-practical-resistance` tagged to a nonexistent
+  sp-08, is allowlisted for its owner. Consequence, reported rather than
+  hidden: the internal Physics depth report drops from 102/108 to 99/108
+  (kinematics-dynamics.sp-01, energy-power.sp-01, fields.sp-01 and
+  thermal.sp-01 lose cells that projectile, efficiency, orbit and ideal-gas
+  items were wrongly filling; quantum.sp-02 gains the photodiode item and
+  is now complete). No question is approved, so no attestation is
+  invalidated. `wjec-authoring-backlog.json` is refreshed.
+- **Readiness fits 360px; counts read as English.** The readiness detail's
+  two-column grids kept their children at min-content width (373px on a
+  360px phone); `grid-cols-1` and `min-w-0` let them shrink. Students now see
+  "1 mark", "1 open mark" and "No timed answers yet" (`src/domain/plural.ts`,
+  `tests/count-labels.test.ts`).
+- **`e2e/fresh-student-360.spec.ts`** walks onboarding → quick check →
+  repair → lesson → Schedule → proof → readiness detail at 360px and fails
+  on sideways scroll (`scrollWidth` against 360, not `innerWidth`, which grows
+  with the overflow on a zoomed-out mobile page),
+  any huggingface.co request, or "Explain that define". Run locally with
+  `npm run test:e2e -- e2e/fresh-student-360.spec.ts` (the standard config
+  reuses a server already on `PORT`).
+- **Found, not fixed** (see the PR): Zod v4's `new Function` probe raises a
+  CSP eval report (`z.config({ jitless: true })`); no Year 12/AS awareness;
+  centripetal calculation marked 1/2 for omitting "towards the centre";
+  WJEC spec code shown as A200QS; lesson link hidden in collapsed "More
+  help"; a false "unit error" note on a full-mark part; and copy
+  inconsistencies on Today, mission, results, readiness and Schedule.
+
+## Repair keeps reviewed questions for proof; proof links reach the proof check; Physics tags point at the right lesson — 2026-10-18 (thirtieth pass)
+
+- **Repair and supported practice no longer spend proof supply.**
+  `selectProofCandidates` broke fit ties in favour of teacher-reviewed
+  questions even for non-proof steps, so once approvals exist a mission's
+  repair, supported practice or proof-barred unaided practice would have
+  served exactly the reviewed questions the topic's unaided/delayed proof
+  needs (a served question is "seen" and `unseenQuestion` then bars it from
+  proof). The new `reserveReviewed` option fills from unreviewed questions
+  first and spends a reviewed one only when nothing else fits; the step then
+  says so (`reviewedSpent`, plus a sentence in its "why"). Repair siblings
+  must still share the lost skill (`require`). Guided and worked plan steps on
+  `/practice` do the same through `deferProofSupply`; timed and unaided steps
+  are unchanged. Proof stages still take reviewed questions only. Every
+  flagship has 0 approved questions today, so nothing changes for learners
+  yet; `tests/proof-supply-reserve.test.ts` uses fixture approvals.
+- **Proof-check links open the proof check.** The repair plan's "Proof check"
+  step and the marked-answer panel linked to `/adaptive-session?…&proof=1`;
+  that page never read `proof`, so the "Proof check" was an ordinary
+  supported adaptive session. The plan step now links `proofHref`
+  (`/practice?proof=<topic>&subject=…`, ProofCheckMode). The marked-answer
+  "Try an unseen question" button keeps its adaptive session (its copy says
+  practice) without the dead flag, and no longer logs a `proof.attempted`
+  event for a proof that never ran.
+- **Mission proof banner.** MissionSessionMode passed the first question id as
+  `topic=` in the same dead link. It now uses `missionProofHref` (the
+  delayed-proof step's topic). The "due" banner renders no link at all, so
+  this was never visible; the href is now correct if it ever is.
+- **Physics spec-point tags.** The 24 WJEC Physics items in
+  `massive-authentic.ts` were checked one by one against the curriculum
+  statement and the authored teaching for each point; 15 were tagged to the
+  wrong point (e.g. a Young modulus calculation on 1.5(b) Hooke's law, a
+  half-life question on 4.3(b) nuclear radius) and are retagged; 2 are left
+  for teacher review. The offsets vary (−1 to +6), so there was no
+  systematic off-by-one. The same items feed `aqa-alevel-physics`, whose
+  topic tree is a clone of the WJEC one, so one number is right for both.
+  `tests/physics-spec-tags.test.ts` pins the audit and checks every WJEC
+  Physics tag in the bank is a real point in the question's own topic (all
+  3,654 are). Consequences, reported rather than hidden: the internal depth
+  report drops from 108/108 to 102/108 deep-complete statements (the wrong
+  tags were filling seven demand cells), and the audit now flags three
+  genuine duplicates the wrong tags had hidden. No question is approved, so
+  no review attestation is invalidated (the content fingerprint includes
+  part spec tags). `wjec-authoring-backlog.json` is refreshed for the 23
+  question counts the retags change (`npm run wjec:authoring:refresh`).
+
+## Today's headline says "Recover" once; opening a step no longer leaves a phantom "Resume interrupted revision" — 2026-10-17 (twenty-ninth pass)
+
+**Today's headline read "Recover 3 marks: Recover Motion marks".** A generic
+mission is titled "Recover <topic> marks" (`exam-mission.ts`) and the ranked
+action prefixed that with its own "Recover N marks: ". The regressed form
+doubled it the same way, and a deferred action's reason tripled it ("Recover
+the marks you lost again first: Recover 4 marks you lost again: Recover …").
+
+- A generic mission now carries `recoverFocus` (its topic), and
+  `missionActionTitle` (`src/domain/revision-engine.ts`) composes the
+  headline from the mission's parts: "Recover 3 marks in Motion",
+  "Recover 3 marks you lost again in Motion". Pattern and paper missions keep
+  their verb-led titles ("Recover 3 marks: Eliminate unit-conversion errors in
+  Motion"). The gate reason is "Do this first: <title>".
+- A delayed-check headline says "Prove it: …" only when the check would run on
+  teacher-reviewed questions (the same `proofEligible` the action's
+  `countsAsProof` already used); otherwise "Check it held: …". No predicate,
+  gate or ranking changed.
+
+**Opening a repair step and going back replaced Today's recommendation with
+"Resume interrupted revision".** Every revision page saves a resume point as
+soon as its first question is on screen, and Today showed the resume card
+(hiding the recommendation, week line and exam-date nudge) for any saved
+checkpoint, including one with nothing answered.
+
+- `checkpointHasProgress` (`src/domain/revision-checkpoint.ts`): a run counts
+  once the student has moved past its first item, or has answered or reviewed
+  something from it since it began (its own question/card ids; for an adaptive
+  run, its pinned topic). Checkpoints now carry `startedAt`, kept across saves
+  of the same run; older ones fall back to their last save.
+- Today and Schedule ask that question before offering the resume card. The
+  checkpoint itself is still written and still used by the page to restore the
+  same questions on refresh, so mission and proof-check restores are
+  unchanged.
+
 ## Lessons say they are not yet teacher-reviewed; a lost mark leads to the lesson for that point — 2026-10-17 (twenty-eighth pass)
 
 - **Review state on lessons.** The 108 authored WJEC Physics lessons

@@ -15,7 +15,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
-import { chooseWorkedExample, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, parseCommandParam, parsePracticeStepMode, parseStepMinutes, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
+import { chooseWorkedExample, deferProofSupply, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, parseCommandParam, parsePracticeStepMode, parseStepMinutes, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
 import { commandWordLabel } from "@/domain/command-word-validation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
@@ -29,6 +29,7 @@ import { buildWeakTopicExam } from "@/domain/weak-topic-exam";
 import { wrongAnswerQueue } from "@/domain/wrong-answers";
 import { reviewedWjecTopicEdges } from "@/content/capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
+import { learnerEvidenceTrusted } from "@/domain/content-trust";
 import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
 import { ProofCheckMode } from "@/components/ProofCheckMode";
 import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
@@ -308,8 +309,11 @@ function Practice() {
     // Wrong-answer-only mode: the queue is exactly the questions behind lost
     // marks — no exposure ranking, no unseen questions mixed in.
     if (wrongOnly) return wrongQueueIds;
-    const ranked = rankedPool(subject, topic);
-    if (!stepMode) return ranked.map((q) => q.id);
+    const pool = rankedPool(subject, topic);
+    if (!stepMode) return pool.map((q) => q.id);
+    // Guided and worked steps keep unseen teacher-reviewed questions for the
+    // topic's proof check while anything else can fill the step.
+    const ranked = deferProofSupply(pool, stepMode, store.attempts, store.questions).ordered;
     // A worked step is the example plus one fresh try outside its family.
     if (stepMode === "worked") {
       return fitStepQueueToMinutes(freshAfterExample(ranked, workedExample?.example ?? null), stepMinutes, WORKED_STEP_TRIES).queue.map((q) => q.id);
@@ -359,7 +363,13 @@ function Practice() {
     const over = stepMinutes !== null && seconds > stepMinutes * 60
       ? `, longer than this ${stepMinutes}-minute step as no shorter question is available here`
       : "";
-    return `${stepMode === "worked" ? `a worked example, then ${count} to try` : count}, about ${minutes} min at exam pace${over}`;
+    // deferProofSupply put reviewed questions last, so any left in a supported
+    // step are there because nothing else was available.
+    const reviewed = stepMode === "guided" || stepMode === "worked" ? queue.filter(learnerEvidenceTrusted).length : 0;
+    const spent = reviewed
+      ? `. It uses ${reviewed === 1 ? "a teacher-reviewed question" : `${reviewed} teacher-reviewed questions`} as nothing else is available here; once seen, ${reviewed === 1 ? "it" : "they"} cannot be your proof check`
+      : "";
+    return `${stepMode === "worked" ? `a worked example, then ${count} to try` : count}, about ${minutes} min at exam pace${over}${spent}`;
   }, [queue, stepMinutes, stepMode]);
 
   const checkpointHref = useMemo(() => {

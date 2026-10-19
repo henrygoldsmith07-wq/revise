@@ -83,7 +83,9 @@ describe("Today screen — one dominant next action (decision engine)", () => {
 
   it("shows the resume card instead of a fresh session when one was interrupted", () => {
     const source = page();
-    expect(source).toContain("revisionCheckpoint ? (");
+    // Only a run with progress in it is "interrupted" (checkpointHasProgress).
+    expect(source).toContain("checkpointHasProgress(revisionCheckpoint");
+    expect(source).toContain("resume ? (");
     expect(source).toContain("ResumeRevisionCard");
     expect(source).toContain("AdaptiveSessionHero");
   });
