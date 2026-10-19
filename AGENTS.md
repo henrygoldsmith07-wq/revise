@@ -113,7 +113,21 @@ background and do other work while it runs. On Windows, invoke npm through
   (`canonicalDirectionConflict`) applies only to very short or labelled
   answers: in longer answers it took marks from correct ones. Measure with
   `tests/marking-paraphrases.test.ts` (design, held-out and wrong sets) and
-  `tests/marking-contradictions.test.ts`; neither may get worse.
+  `tests/marking-contradictions.test.ts`; neither may get worse. The list
+  now also maps common reagents' formulae to their names (NaOH, CuSO₄, HCl,
+  H₂SO₄, KMnO₄, K₂Cr₂O₇, AgNO₃, CO₂, H₂O, NH₃…; "oxygen" and "hydrogen" stay
+  unmapped because they also name the atom) and reaction orders ("first
+  order" ↔ "order 1").
+- **Equation points are read as formulas** (`src/domain/marking-formula.ts`,
+  twenty-ninth pass). A scheme point that is an equation is credited when the
+  answer writes it rearranged (checked numerically at fixed sample values),
+  substitutes numbers into the same quantity's formula with the same shape
+  and a value the part's own scheme or model answer reaches, or works the
+  same quantity to the same value; a same-quantity equation that does not
+  hold vetoes the point (`formulaContradicted`). It only reads equations, never
+  prose. `tests/marking-self-consistency.test.ts` is a ratchet on model answers
+  scoring below full marks (687 after this pass); `tests/marking-false-negatives.test.ts`
+  pins each marker fix with wrong answers that must still lose the mark.
 - **Watch for TDZ and memo ordering** when adding a `useMemo` that reads another
   one. Declare dependencies first, and gate an expensive memo on a cheap
   condition (`plan.top === null`) when the answer is only needed in the empty case.

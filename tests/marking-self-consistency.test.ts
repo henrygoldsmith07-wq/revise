@@ -10,7 +10,16 @@ import { markPart } from "@/domain/marking";
 //
 // This is a ratchet: the count may only go down. Lower BASELINE whenever a
 // marker or content change reduces it; never raise it to fit a regression.
-const BASELINE = 883;
+//
+// 883 → 687 (twenty-ninth pass, 2026-10-19), marker changes only, no content
+// edits: equation points read as formulas (marking-formula.ts), reagent
+// formula ↔ name and reaction-order wording, either-or "A/B" points,
+// genotypes kept case-sensitive, word roots ("symmetrical"/"symmetry") in
+// coverage and the scaffolding guard, a narrower polarity veto, and the
+// recitation, short-answer and self-retraction caps no longer firing on
+// calculation working or "concentration". tests/marking-false-negatives.test.ts
+// pins each fix with wrong answers that must still lose the mark.
+const BASELINE = 687;
 
 describe("offline marker against the bank's own model answers", () => {
   it("never gets worse than the recorded baseline", () => {

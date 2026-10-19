@@ -91,13 +91,64 @@ export function withinEditDistance(a: string, b: string, maxEdits: number): bool
 function coverageTokens(text: string): string[] {
   const cached = COVERAGE_TOKEN_CACHE.get(text);
   if (cached) return cached;
-  const tokens = [...new Set([...tokenise(canonicalPhrases(text))].map(sentenceFinalStem).filter((w) => w.length > 1))];
+  // "Pioneer species / lichens": a spaced slash between two words is the
+  // same either-or as "iodine/KI" (one token, read by alternativesOf).
+  const joined = text.includes("/") ? text.replace(/([A-Za-z]{2,})\s+\/\s+(?=[A-Za-z]{2,})/g, "$1/") : text;
+  // "and/or" is a connective, like "and" and "or" themselves.
+  const tokens = [...new Set([...tokenise(canonicalPhrases(genotypeWords(joined)))].map(sentenceFinalStem).filter((w) => w.length > 1 && w !== "and/or"))];
   if (COVERAGE_TOKEN_CACHE.size > 4096) COVERAGE_TOKEN_CACHE.clear();
   COVERAGE_TOKEN_CACHE.set(text, tokens);
   return tokens;
 }
 
 const COVERAGE_TOKEN_CACHE = new Map<string, string[]>();
+
+/** Units and derivatives keep their slash: "mol/dm", "dy/dx" are not either-or. */
+const SLASH_KEEPS = /^(?:mol|dm|cm|mm|km|kg|ms|hz|kj|mj|kpa|pa|min|hr|nm|ml|kw|kwh|ohm|rad|d[a-z])$/;
+
+/**
+ * A scheme's "A/B" is an either-or ("digested/assimilated", "iodine/KI"):
+ * the token is matched when any alternative is. Null for any other token,
+ * including units ("mol/dm") and ratios of symbols ("dy/dx").
+ */
+export function alternativesOf(token: string): string[] | null {
+  if (!token.includes("/")) return null;
+  const parts = token.split("/");
+  if (parts.length < 2 || parts.some((part) => !/^[a-z]{2,}$/.test(part) || SLASH_KEEPS.test(part)) || !parts.some((part) => part.length >= 3)) return null;
+  return parts.map(stem);
+}
+
+const GENOTYPE = /(?<![A-Za-z])([A-Za-z])([A-Za-z])(?![A-Za-z])/g;
+
+/**
+ * Genotypes keep their case. Lower-casing made "Ss", "SS" and "ss" one
+ * token, so a cross of the wrong parents ("ss × ss") matched "Ss × Ss".
+ * Each becomes a word that says which it is (heterozygous S, homozygous
+ * dominant S, homozygous recessive S), and a cross written as "Ss × Ss"
+ * says "cross" whether or not the text adds "the parents are". Applied only
+ * to a text with a "×" between genotypes or two genotypes of one letter, so
+ * ordinary two-letter words are left alone.
+ */
+export function genotypeWords(text: string): string {
+  if (!/(?<![A-Za-z])([A-Za-z])\1(?![A-Za-z])|(?<![A-Za-z])[A-Z][a-z](?![A-Za-z])/i.test(text)) return text;
+  // "AA", "Aa" and "aa" are genotypes; "aA", "is", "an" are not.
+  const isGenotype = (a: string, b: string) => a.toLowerCase() === b.toLowerCase() && !(a === a.toLowerCase() && b !== b.toLowerCase());
+  const perLetter = new Map<string, number>();
+  for (const [, a, b] of text.matchAll(GENOTYPE)) {
+    if (isGenotype(a!, b!)) perLetter.set(a!.toLowerCase(), (perLetter.get(a!.toLowerCase()) ?? 0) + 1);
+  }
+  if (![...perLetter.values()].some((count) => count >= 2)) return text;
+  const name = (a: string, b: string) => {
+    const letter = a.toLowerCase();
+    if (a !== b) return ` heterozygous het${letter} `;
+    return a === a.toUpperCase() ? ` homozygous homdom${letter} ` : ` homozygous homrec${letter} `;
+  };
+  return text
+    .replace(/(?:(?:the\s+)?parents?\s+(?:are|is|were)\s+|(?:the\s+)?cross\s+(?:is\s+|of\s+)?)?(?<![A-Za-z])([A-Za-z])([A-Za-z])\s*[×x]\s*([A-Za-z])([A-Za-z])(?![A-Za-z])/gi,
+      (match, a: string, b: string, c: string, d: string) =>
+        isGenotype(a, b) && isGenotype(c, d) && a.toLowerCase() === c.toLowerCase() ? ` cross ${name(a, b)} ${name(c, d)} ` : match)
+    .replace(GENOTYPE, (match, a: string, b: string) => (isGenotype(a, b) ? name(a, b) : match));
+}
 
 /**
  * A full stop is punctuation, not part of the word: "genus." must stem like
@@ -146,7 +197,7 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" quarter ", "(?:four|4) times (?:" + SMALLER + ")"],
   [" fourfoldup ", "quadrupl(?:es|ed|ing|e)"],
   [" threequarters ", "three[- ]quarters"],
-  [" quarter ", "(?<!by )(?:one|a) quarter|quartered|quartering"],
+  [" quarter ", "(?<!by )(?:one|a) quarter|quartered|quartering|(?<![\\d./]|by )1\\s*/\\s*4(?![\\d./])"],
   [" half ", "(?:two|2) times (?:" + SMALLER + ")|halv(?:es|ed|ing|e)|one half"],
   [" twofoldup ", "twice (?:" + BIGGER + ")|(?:two|2) times (?:" + BIGGER + ")"],
   // Inequalities said in words.
@@ -167,11 +218,36 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   // Framing that carries no content of its own.
   [" ", "of (?:its|the) (?:previous|original|initial|old) value|of what it was|of the original|as big|as large|as strong|as much"],
   [" notlinear ", "not (?:just |simply |only )?(?:linearly|1\\s*/\\s*[rdx](?![²^\\d])|(?:proportional to |with )?(?:the )?(?:distance|separation|radius)(?! squared))"],
+  // A reagent or product named by its formula or by its name: one substance,
+  // so one word ("NaOH then CuSO₄" is "sodium hydroxide then copper(II)
+  // sulfate"). Only unambiguous names: "HCl" is the acid as the scheme
+  // writes it, and "hydrogen chloride" (the gas) is left alone; "oxygen" and
+  // "hydrogen" stay unmapped because they also name the atom.
+  [" naoh ", "sodium hydroxide|naoh"],
+  [" koh ", "potassium hydroxide|koh"],
+  [" cuso4 ", "copper\\s*\\(\\s*ii\\s*\\)\\s*sul(?:ph|f)ate|copper sul(?:ph|f)ate|cuso[4₄]"],
+  [" hcl ", "hydrochloric acid|hcl"],
+  [" h2so4 ", "sul(?:ph|f)uric acid|sul(?:ph|f)uric\\s*\\(\\s*vi\\s*\\)\\s*acid|h[2₂]so[4₄]"],
+  [" hno3 ", "nitric acid|nitric\\s*\\(\\s*v\\s*\\)\\s*acid|hno[3₃]"],
+  [" kmno4 ", "potassium manganate\\s*\\(\\s*vii\\s*\\)|potassium permanganate|kmno[4₄]"],
+  [" k2cr2o7 ", "potassium dichromate(?:\\s*\\(\\s*vi\\s*\\))?|k[2₂]cr[2₂]o[7₇]"],
+  [" agno3 ", "silver nitrate|agno[3₃]"],
+  [" nahco3 ", "sodium hydrogen\\s?carbonate|sodium bicarbonate|nahco[3₃]"],
+  [" na2co3 ", "sodium carbonate|na[2₂]co[3₃]"],
+  [" co2 ", "carbon dioxide|co[2₂]"],
+  [" h2o ", "water|h[2₂]o(?![2₂])"],
+  [" nh3 ", "ammonia|nh[3₃]"],
+  // A reaction order said as a number or as an ordinal ("order one", "first
+  // order", "order with respect to A is 1").
+  [" firstorder ", "first[- ]order|order (?:of |is |= ?)?(?:one|1)(?![\\d.])|(?<=order (?:in|with respect to|for) [a-z0-9₀-₉()]+ )(?:is |= ?)(?:one|1)(?![\\d.])"],
+  [" secondorder ", "second[- ]order|order (?:of |is |= ?)?(?:two|2)(?![\\d.])|(?<=order (?:in|with respect to|for) [a-z0-9₀-₉()]+ )(?:is |= ?)(?:two|2)(?![\\d.])"],
+  [" zeroorder ", "zero(?:th)?[- ]order|order (?:of |is |= ?)?(?:zero|0)(?![\\d.])|(?<=order (?:in|with respect to|for) [a-z0-9₀-₉()]+ )(?:is |= ?)(?:zero|0)(?![\\d.])"],
   // Same word, different spelling or register.
   [" collisions ", "collid(?:es|ed|ing|e)|collisions|hit(?:s|ting)?"],
   [" produces ", "produc(?:es|ed|ing)|synthesi[sz](?:es|ed|ing|e)|made"],
   [" amount ", "quantit(?:y|ies)|amounts"],
   [" successive ", "consecutive"],
+  [" attaches to ", "attach(?:es|ed|ing)? to|binds to|bind to|binding to"],
   [" eukarya ", "eukaryota"],
 ];
 
@@ -277,26 +353,54 @@ export function labelledAnswerScope(point: string, answer: string): string {
 
 /** Coverage tokens of a text, as a set (the scaffolding guard in marking.ts). */
 export function canonicalTokenSet(text: string): Set<string> {
-  return new Set(coverageTokens(text).map((t) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")).filter(Boolean));
+  const out = new Set<string>();
+  for (const raw of coverageTokens(text)) {
+    const t = raw.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+    if (!t) continue;
+    out.add(t);
+    for (const part of alternativesOf(t) ?? []) out.add(part);
+  }
+  return out;
+}
+
+/**
+ * The root of a word under one adjectival or adverbial ending, so that
+ * "symmetrical", "symmetric" and "symmetry", or "anaerobically" and
+ * "anaerobic", are one word. Only endings that keep the meaning: "-ive" and
+ * "-ion" are left out ("positive" is not "position"), as is "-al"
+ * ("general" is not "generic"). The root keeps at least five letters.
+ */
+const ROOT_ENDINGS = ["ically", "ical", "ally", "ic", "ly", "y"];
+export function wordRoot(word: string): string {
+  for (const ending of ROOT_ENDINGS) {
+    if (word.endsWith(ending) && word.length - ending.length >= 5) return word.slice(0, -ending.length);
+  }
+  return word;
 }
 
 export function pointCoverage(point: string, answer: string, earlyExitAt?: number): number {
   const wanted = coverageTokens(point);
   if (!wanted.length) return 0;
-  const given = coverageTokens(answer);
+  const given = coverageTokens(answer).flatMap((g) => [g, ...(alternativesOf(g) ?? [])]);
   const exact = new Set(given);
+  const exactHit = (w: string) => exact.has(w) || (alternativesOf(w)?.some((part) => exact.has(part)) ?? false);
   let exactHits = 0;
-  for (const w of wanted) if (exact.has(w)) exactHits++;
+  for (const w of wanted) if (exactHit(w)) exactHits++;
   // Fast path: when exact keyword coverage already clears the caller threshold,
   // skip the fuzzy scan entirely — the hot loop in marking and benchmarks.
   if (earlyExitAt != null && exactHits / wanted.length >= earlyExitAt) return exactHits / wanted.length;
-  const missing = earlyExitAt != null ? wanted.filter((w) => !exact.has(w)) : wanted;
-  const hits = missing.filter((w) => {
+  const missing = earlyExitAt != null ? wanted.filter((w) => !exactHit(w)) : wanted;
+  const fuzzyHit = (w: string) => {
     if (exact.has(w)) return true;
     if (w.length >= 8 && given.some((g) => g.length >= 8 && g.slice(0, 3) === w.slice(0, 3) && withinEditDistance(g, w, 2))) {
       return true;
     }
-    return w.length >= 5 && given.some((g) => g.length >= 5 && withinEditDistance(g, w, 1));
-  }).length;
+    if (w.length >= 5 && given.some((g) => g.length >= 5 && withinEditDistance(g, w, 1))) return true;
+    // Another form of the same word: "anaerobically" for "anaerobic".
+    const root = wordRoot(w);
+    return root !== w && given.some((g) => g !== w && /^[a-z]+$/.test(g) && wordRoot(g) === root) ||
+      (/^[a-z]{6,}$/.test(w) && given.some((g) => /^[a-z]+$/.test(g) && wordRoot(g) !== g && wordRoot(g) === w));
+  };
+  const hits = missing.filter((w) => fuzzyHit(w) || (alternativesOf(w)?.some(fuzzyHit) ?? false)).length;
   return (earlyExitAt != null ? exactHits + hits : hits) / wanted.length;
 }

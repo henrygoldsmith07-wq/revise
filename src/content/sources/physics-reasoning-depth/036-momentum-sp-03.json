@@ -101,7 +101,7 @@
         "The trolley's momentum change is −4 kg m s⁻¹",
         "The wall (and Earth) absorbed +4 kg m s⁻¹ — a real transfer, invisible only because Earth is enormously massive"
       ],
-      "answer": "Equal speeds are not equal velocities: the trolley's momentum flips from +2 to −2 kg m s⁻¹, a change of 4 kg m s⁻¹ delivered to the wall. The Earth received that momentum — its velocity change is 4/(6×10²⁴) m s⁻¹, which is why the transfer feels like nothing."
+      "answer": "Equal speeds are not equal velocities: the trolley's momentum flips from +2 to −2 kg m s⁻¹, a change of −4 kg m s⁻¹, so 4 kg m s⁻¹ is delivered to the wall. The Earth received that momentum — its velocity change is 4/(6×10²⁴) m s⁻¹, which is why the transfer feels like nothing."
     },
     {
       "demand": "calculation",
