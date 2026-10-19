@@ -39,6 +39,7 @@ import { BLOCKED_PROOF_COPY } from "./proof-copy";
 import { MIN_PROOF_DELAY_DAYS, type ProofLedger, type TopicProof } from "./proof-of-improvement";
 import { needsBaselineBeforeProof, proofFacts, proofOutcomeFor } from "./proof-action";
 import { PROOF_BARRIER_TEXT } from "./mark-recovery";
+import { localDaysBetween, todayLocal } from "./local-date";
 
 export type ActionType =
   | "proof-check" | "regression-recovery" | "mission" | "paper-repair" | "recurring-error" | "exam-urgent"
@@ -151,11 +152,34 @@ const DAY = 86_400_000;
 /** Fallback minute estimate for a proof check; buildProofCheck supplies the real one. */
 const PROOF_MINUTES = 6;
 
-/** Whole days from `now`'s date to the subject's nearest future exam; null with none. Independent of list order. */
+/**
+ * Fit ranked actions to the session's time. Steps that fit (with a two-minute
+ * allowance) keep their order and lead; the rest are returned as over budget
+ * so the caller can defer them with a reason. When nothing fits, nothing is
+ * deferred: the shortest step leads (the highest-ranked among equally short
+ * ones) with its duration shown honestly, and the rest follow in rank order —
+ * never a 90-minute paper at the top of a 10-minute session. Absent a
+ * positive budget the ranking is unchanged.
+ */
+export function fitActionsToBudget<T extends { minutes: number }>(ranked: readonly T[], budget: number | undefined): { ranked: T[]; overBudget: T[] } {
+  if (budget === undefined || !Number.isFinite(budget) || budget <= 0) return { ranked: [...ranked], overBudget: [] };
+  const fitting = ranked.filter((a) => a.minutes <= budget + 2);
+  if (fitting.length === ranked.length) return { ranked: [...ranked], overBudget: [] };
+  if (fitting.length > 0) return { ranked: fitting, overBudget: ranked.filter((a) => !fitting.includes(a)) };
+  let shortest = 0;
+  for (let i = 1; i < ranked.length; i++) if (ranked[i]!.minutes < ranked[shortest]!.minutes) shortest = i;
+  return { ranked: [ranked[shortest]!, ...ranked.filter((_, i) => i !== shortest)], overBudget: [] };
+}
+
+/**
+ * Whole local calendar days from `now`'s local date to the subject's nearest
+ * exam today or later (0 on exam day); null with none, so a past exam never
+ * drives urgency. Matches recommender.daysToExam. Independent of list order.
+ */
 export function daysToNearestExam(exams: readonly ExamDate[], subjectId: Id, now: Date): number | null {
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const dates = exams.filter((e) => e.subjectId === subjectId).map((e) => Date.parse(`${e.date}T00:00:00Z`)).filter((t) => t >= today);
-  return dates.length ? Math.round((Math.min(...dates) - today) / DAY) : null;
+  const today = todayLocal(now);
+  const dates = exams.filter((e) => e.subjectId === subjectId && e.date >= today).map((e) => e.date).sort();
+  return dates.length ? localDaysBetween(today, dates[0]!) : null;
 }
 
 const urgencyOf = (days: number | null) => (days === null ? 0.15 : days <= 0 ? 1 : clamp(1 - days / 60, 0.05, 1));
@@ -702,22 +726,13 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
     a.mistakeIds.forEach((id) => covered.add(id));
     kept.push(a);
   }
-  // Fit the winner to the time available: a step that does not fit defers
-  // with its reason, but the best fitting step always leads — even when
-  // nothing fits, the shortest useful step still leads with its duration
-  // shown honestly. Absent availableMinutes, ranking is unchanged.
-  let ranked = kept;
+  // Fit the winner to the time available (see fitActionsToBudget).
   const budget = input.availableMinutes;
-  if (budget !== undefined && Number.isFinite(budget) && budget > 0) {
-    const fitting = kept.filter((a) => a.minutes <= budget + 2);
-    if (fitting.length > 0 && fitting.length < kept.length) {
-      for (const a of kept) {
-        if (fitting.includes(a)) continue;
-        const reason = `Needs about ${Math.max(1, Math.ceil(a.minutes))} min — longer than this ${Math.max(1, Math.ceil(budget))}-minute session, so shorter work comes first.`;
-        deferred.push({ action: { ...a, blockedBy: reason }, reason });
-      }
-      ranked = fitting;
-    }
+  const fit = fitActionsToBudget(kept, budget);
+  let ranked = fit.ranked;
+  for (const a of fit.overBudget) {
+    const reason = `Needs about ${Math.max(1, Math.ceil(a.minutes))} min — longer than this ${Math.max(1, Math.ceil(budget ?? 0))}-minute session, so shorter work comes first.`;
+    deferred.push({ action: { ...a, blockedBy: reason }, reason });
   }
   if (ranked.length === 0 && !input.adaptive) {
     const fallback = keepPractisingDraft(scoped, enrolled, missions);

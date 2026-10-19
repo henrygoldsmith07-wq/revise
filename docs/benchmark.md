@@ -261,7 +261,11 @@ grammar, reordered working) mark identically. Pinned by
 Scheduler calibration also reports a leakage-free holdout view:
 `validateFsrsHoldout()` splits each card's history chronologically, scores only
 the final 30% of reviews, and uses earlier reviews strictly as prediction
-context — so tuning on the full history cannot flatter its own metrics.
+context — so tuning on the full history cannot flatter its own metrics. Each
+prediction uses the stability replayed from the reviews before it
+(`replayStabilityBefore` in `src/domain/scheduling.ts`), not the card's current
+stability, which already includes the scored reviews. A card whose log does
+not reach back to its first review is replayed from its first logged review.
 
 ## Marker hardening (unit-aware, sig-fig, wrong-reasoning, balancing)
 

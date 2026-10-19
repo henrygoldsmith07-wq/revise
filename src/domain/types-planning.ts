@@ -204,7 +204,14 @@ export interface TopicMastery {
   /** 0–1 predicted probability of recall right now (forgetting curve). */
   retention: number;
   confidence: number;
+  /** Every card on the topic, including installed seed cards never studied. */
   cardsTotal: number;
+  /**
+   * Cards studied at least once (reps > 0 or out of FSRS New). Installed seed
+   * cards exist for every topic, so this, not `cardsTotal`, says whether the
+   * topic has been touched. Absent on rows built before it existed.
+   */
+  cardsStudied?: number;
   cardsDue: number;
   attempts: number;
   /** Different questions behind `attempts`; repeats of one question add evidence only at a discount. */

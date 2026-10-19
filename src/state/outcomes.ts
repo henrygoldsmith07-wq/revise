@@ -15,6 +15,7 @@ import { buildExamReadiness, summariseExamReadiness } from "@/domain/exam-readin
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
 import type { GradePrediction } from "@/domain/grades";
 import { todayIso } from "@/domain/scheduling";
+import { topicHasEvidence } from "@/domain/mastery";
 import type { Id, InterventionOutcomeRecord, TopicMastery } from "@/domain/types";
 import type { RecallMasteryRow } from "@/domain/recall-mastery";
 import type { ResponseTimeCalibrationReport } from "@/domain/response-time-calibration";
@@ -186,12 +187,14 @@ export function useOutcomes(input: {
         const prediction = predictionBySubject.get(subject.id);
         if (!prediction) return [];
         const topicRows = mastery.filter((row) => row.subjectId === subject.id);
-        const evidencedTopics = topicRows.filter((row) => row.cardsTotal > 0 || row.attempts > 0).length;
+        // Installed seed cards exist for every topic; only studied cards or attempts are evidence.
+        const evidencedTopics = topicRows.filter(topicHasEvidence).length;
         const coverageAverage = topicRows.length ? topicRows.reduce((sum, row) => sum + row.mastery, 0) / topicRows.length : 0;
         const recallRows = recallMastery.filter((row) => row.subjectId === subject.id);
         const recallCards = recallRows.reduce((sum, row) => sum + row.cardsTotal, 0);
         const recallReviews = recallRows.reduce((sum, row) => sum + row.reviews, 0);
-        const retained = recallRows.filter((row) => row.cardsTotal > 0);
+        // A topic whose cards were only installed has no retention to report.
+        const retained = recallRows.filter((row) => row.lastReviewedAt !== null);
         const retentionAverage = retained.length ? retained.reduce((sum, row) => sum + row.currentRetention, 0) / retained.length : null;
         const timed = assessment.attempts.filter((attempt) => attempt.subjectId === subject.id && attempt.max > 0 &&
           trustedSnapshotAttempt(attempt, assessment.questions, assessment.attempts));

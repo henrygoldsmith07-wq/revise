@@ -1,22 +1,32 @@
-import { createEmptyCard, fsrs, generatorParameters, Rating, State } from "ts-fsrs";
+import { computeDecayFactor, createEmptyCard, fsrs, generatorParameters, Rating, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
-import type { Card, CardKind, Id, IsoDate, RecallGrade } from "./types";
-import { todayLocal, toLocalDateKey } from "./local-date";
+import type { Card, CardKind, Id, IsoDate, RecallGrade, ReviewLog } from "./types";
+import { addLocalDays, todayLocal, toLocalDateKey } from "./local-date";
 
 // FSRS is the empirically-fit successor to SM-2 (it is what current Anki
 // ships). It tracks memory *stability* and *difficulty* separately rather than
 // folding both into one ease multiplier, and schedules the next review for the
 // day predicted recall decays to the target retention.
-const scheduler = fsrs(
-  generatorParameters({
-    request_retention: 0.9,
-    // Spread same-day reviews so they don't clump into one brutal session.
-    enable_fuzz: true,
-    // Minute-scale learning steps are handled inside the session queue
-    // (see buildReviewQueue) rather than by FSRS's day-granularity model.
-    enable_short_term: false,
-  }),
-);
+const SCHEDULER_PARAMETERS = generatorParameters({
+  request_retention: 0.9,
+  // Spread same-day reviews so they don't clump into one brutal session.
+  enable_fuzz: true,
+  // Minute-scale learning steps are handled inside the session queue
+  // (see buildReviewQueue) rather than by FSRS's day-granularity model.
+  enable_short_term: false,
+});
+const scheduler = fsrs(SCHEDULER_PARAMETERS);
+// Replay must be deterministic: fuzz only moves due dates, never stability,
+// but a replay has no use for random intervals either.
+const replayScheduler = fsrs({ ...SCHEDULER_PARAMETERS, enable_fuzz: false });
+
+/**
+ * The FSRS weights the live scheduler grades with. ts-fsrs 5.x is FSRS-6:
+ * 21 weights, and the forgetting curve's decay is the last one (w[20]), so
+ * the curve below is derived from these rather than hard-coded.
+ */
+export const FSRS_WEIGHTS: readonly number[] = SCHEDULER_PARAMETERS.w;
+const DEFAULT_CURVE = computeDecayFactor(FSRS_WEIGHTS);
 
 /** A card this stable is safe to call "mastered" for progress reporting. */
 export const MASTERED_STABILITY_DAYS = 21;
@@ -177,26 +187,53 @@ export function previewIntervals(card: Card, now: Date = new Date()): Record<Rec
 }
 
 /**
- * FSRS forgetting curve: R = (1 + FACTOR * t/S)^DECAY with the v5 constants.
- * Shared by retrievability, interval previews and FSRS validation so every
- * surface computes identical predictions.
+ * FSRS forgetting curve, R = (1 + FACTOR · t/S)^DECAY, with DECAY = −w[20]
+ * and FACTOR = 0.9^(1/DECAY) − 1 taken from the scheduler's own weights
+ * (FSRS-6), so R(S, S) = 90% and every prediction matches the intervals the
+ * scheduler actually sets. Shared by retrievability, mastery, readiness, the
+ * forgetting-curve chart and FSRS validation so every surface computes
+ * identical predictions. Pass `weights` only for a scheduler built with
+ * different (personalised) weights.
  */
-export function forgettingCurve(elapsedDays: number, stabilityDays: number): number {
+export function forgettingCurve(elapsedDays: number, stabilityDays: number, weights: readonly number[] = FSRS_WEIGHTS): number {
   if (elapsedDays <= 0) return 1;
   const s = Math.max(0.1, stabilityDays);
-  const DECAY = -0.5;
-  const FACTOR = 19 / 81;
-  return Math.pow(1 + FACTOR * (elapsedDays / s), DECAY);
+  const { decay, factor } = weights === FSRS_WEIGHTS ? DEFAULT_CURVE : computeDecayFactor(weights);
+  return Math.pow(1 + factor * (elapsedDays / s), decay);
 }
 
 /**
- * Predicted probability the card is still recallable today. FSRS's forgetting
- * curve: R = (1 + FACTOR * t/S)^DECAY with the v5 constants.
+ * Predicted probability the card is still recallable now, on the scheduler's
+ * forgetting curve (see forgettingCurve).
  */
 export function retrievability(card: Card, now: Date = new Date()): number {
   if (!card.lastReviewedAt || card.stability <= 0) return 0;
   const elapsedDays = (now.getTime() - new Date(card.lastReviewedAt).getTime()) / 86_400_000;
   return forgettingCurve(elapsedDays, card.stability);
+}
+
+/**
+ * Memory stability (days) immediately *before* each review in a card's log,
+ * replayed from the log alone with the live scheduler's parameters: entry i
+ * uses only reviews 0..i-1, so it never sees the outcome it predicts or
+ * anything after it. Entry 0 is null (nothing has been learned yet). Logs
+ * must be one card's, sorted by `reviewedAt`. When the log does not start at
+ * the card's first review (pruned or imported history) the replay starts
+ * from the first logged review, which is still history-only.
+ */
+export function replayStabilityBefore(logs: readonly Pick<ReviewLog, "grade" | "reviewedAt">[]): (number | null)[] {
+  const out: (number | null)[] = [];
+  if (!logs.length) return out;
+  let card: FsrsCard = createEmptyCard(new Date(logs[0]!.reviewedAt));
+  for (const log of logs) {
+    out.push(card.reps > 0 ? card.stability : null);
+    const at = new Date(log.reviewedAt);
+    // A review stamped before the previous one (clock skew) replays at the
+    // previous instant rather than making ts-fsrs's elapsed time negative.
+    const when = card.last_review && at < card.last_review ? card.last_review : at;
+    card = replayScheduler.next(card, when, GRADE_TO_RATING[log.grade]).card;
+  }
+  return out;
 }
 
 export function isDue(card: Card, on: IsoDate = todayIso()): boolean {
@@ -214,9 +251,14 @@ export function isDueReview(card: Card, on: IsoDate = todayIso()): boolean {
   return card.state !== State.New && card.reps > 0 && isDue(card, on);
 }
 
+/** True once a card has been studied at least once (an installed seed card has not). */
+export function isStudiedCard(card: Pick<Card, "reps" | "state">): boolean {
+  return card.reps > 0 || card.state !== State.New;
+}
+
 /** Topics where the learner has studied at least one card (not merely had cards installed). */
 export function studiedCardTopicIds(cards: ReadonlyArray<Pick<Card, "topicId" | "reps" | "state">>): Set<Id> {
-  return new Set(cards.filter((c) => c.reps > 0 || c.state !== State.New).map((c) => c.topicId));
+  return new Set(cards.filter(isStudiedCard).map((c) => c.topicId));
 }
 
 /** Suspended cards never surface; buried ones come back the next day. */
@@ -300,11 +342,11 @@ export function reinsert<T>(queue: T[], card: T, gap = 4): T[] {
 }
 
 export function dueCountByDay(cards: Card[], days: number, from: IsoDate = todayIso()): { date: IsoDate; count: number }[] {
-  const start = new Date(`${from}T00:00:00.000Z`);
   const out: { date: IsoDate; count: number }[] = [];
   for (let i = 0; i < days; i++) {
-    const d = new Date(start.getTime() + i * 86_400_000);
-    const iso = toDateOnly(d);
+    // Pure calendar arithmetic: `from` is already a local day key, so
+    // converting it through an instant would shift it west of UTC.
+    const iso = addLocalDays(from, i);
     const count = cards.filter(
       (c) => isAvailable(c, iso) && (i === 0 ? c.due <= iso : c.due === iso),
     ).length;

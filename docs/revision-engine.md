@@ -22,7 +22,9 @@ Two configuration choices worth stating:
   reinserted four positions later in the same session (`reinsert`). Tomorrow is
   too late to repair a card you have just proved you cannot recall.
 
-The forgetting curve, `R = (1 + (19/81)·t/S)^-0.5`, is used directly for the
+The forgetting curve, `R = (1 + F·t/S)^D` with `D = −w[20]` and
+`F = 0.9^(1/D) − 1` taken from the scheduler's own FSRS-6 weights (ts-fsrs 5.x),
+is used directly for the
 "retention" figure in mastery, so the number shown is a real predicted recall
 probability rather than a proxy.
 

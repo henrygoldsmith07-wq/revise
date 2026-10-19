@@ -11,7 +11,7 @@
 
 import { learnerEvidenceTrusted } from "./content-trust";
 import type { ExamMission, MissionStageKind } from "./exam-mission";
-import { isTransferQuestion, partLearningMetadata, questionFamilies, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionFamilies, unseenQuestionTester } from "./learning-evidence";
 import type { RootCause } from "./mistake-patterns";
 import type { MissionCheckpointState, RevisionCheckpointInput } from "./revision-checkpoint";
 import type { Attempt, Id, MissionAttemptContext, Mistake, Question } from "./types";
@@ -49,7 +49,8 @@ export function selectProofCandidates(
   options: ProofCandidateOptions,
 ): Question[] {
   const excluded = new Set(options.excludeQuestionIds ?? []);
-  const pool = questions.filter((q) => !excluded.has(q.id) && q.topicIds.some((t) => topicIds.includes(t)) && unseenQuestion(q, attempts, questions));
+  const unseen = unseenQuestionTester(attempts, questions);
+  const pool = questions.filter((q) => !excluded.has(q.id) && q.topicIds.some((t) => topicIds.includes(t)) && unseen(q));
   const fit = options.fit ?? (() => 0);
   // `learnerEvidenceTrusted`, not `trustedAssessmentContent`: the latter is
   // deliberately permissive for subjects with no review gate, so it would treat

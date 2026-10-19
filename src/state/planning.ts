@@ -146,7 +146,10 @@ export function usePlanning(input: {
 
   const rescheduleMissedSessions = useCallback(async () => {
     if (!snapshot) return;
-    const healed = rescheduleMissed(snapshot.plannedSessions, todayIso(), 6);
+    const healed = rescheduleMissed(snapshot.plannedSessions, todayIso(), 6, undefined, {
+      exams: snapshot.examDates,
+      availability: snapshot.settings.availability,
+    });
     await repo.replacePlan(userId, healed);
     patch((prev) => ({ ...prev, plannedSessions: healed }));
   }, [snapshot, userId, patch]);

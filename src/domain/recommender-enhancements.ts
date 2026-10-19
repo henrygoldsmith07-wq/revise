@@ -1,3 +1,4 @@
+import { studiedCardCount, topicHasEvidence } from "./mastery";
 import type { Id, Topic, TopicMastery } from "./types";
 import type { OutcomePair } from "./recommender";
 
@@ -38,8 +39,9 @@ export function coldStartSignals(input: {
   const out: ColdStartSignal[] = [];
   for (const t of input.topics) {
     const m = byId.get(t.id);
-    const evidence = (m?.cardsTotal ?? 0) + (m?.attempts ?? 0) * 2;
-    const untouched = !m || (m.cardsTotal === 0 && m.attempts === 0);
+    // Installed, never-studied seed cards are not evidence (studiedCardCount).
+    const evidence = (m ? studiedCardCount(m) : 0) + (m?.attempts ?? 0) * 2;
+    const untouched = !m || !topicHasEvidence(m);
     const thin = evidence > 0 && evidence < 5;
     if (!untouched && !thin) continue;
     // Spec priority: foundational topics (intrinsic 1–2) and early-order units first
@@ -58,7 +60,7 @@ export function coldStartSignals(input: {
 
 /** How many sessions until the cold-start period is over (heuristic). */
 export function coldStartRemaining(mastery: TopicMastery[]): number {
-  const untouched = mastery.filter((m) => m.cardsTotal === 0 && m.attempts === 0).length;
+  const untouched = mastery.filter((m) => !topicHasEvidence(m)).length;
   return untouched;
 }
 

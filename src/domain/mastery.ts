@@ -1,7 +1,7 @@
 import { requiresWjecContentReview } from "./physics-content-review";
 import { hintEvidenceMultiplier } from "./hint-tiers";
 import { exposureWeights } from "./evidence-weights";
-import { isDueReview, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { isDueReview, isStudiedCard, retrievability, MASTERED_STABILITY_DAYS } from "./scheduling";
 import { todayLocal } from "./local-date";
 import { trustedAssessmentAttempt, trustedAssessmentMistake, trustworthyAttempt } from "./learning-evidence";
 import type { Attempt, Card, Id, Mistake, Question, ReviewLog, Topic, TopicMastery } from "./types";
@@ -179,6 +179,8 @@ export function computeTopicMastery(input: MasteryInput): TopicMastery[] {
       retention,
       confidence,
       cardsTotal: cards.length,
+      // Installed seed cards exist for every topic; only a studied one is evidence (studiedCardTopicIds).
+      cardsStudied: cards.filter(isStudiedCard).length,
       // Owed reviews only: an installed, never-studied card is not "due" (isDueReview).
       cardsDue: cards.filter((c) => isDueReview(c, today)).length,
       attempts: attempts.length,
@@ -202,8 +204,23 @@ export function weakTopics(mastery: TopicMastery[], limit = 10): TopicMastery[] 
     .slice(0, limit);
 }
 
+/**
+ * Cards the learner has actually studied on this topic. Seed cards are
+ * installed for every topic, so `cardsTotal` says nothing about study; rows
+ * built without `cardsStudied` (older callers, fixtures) fall back to it.
+ */
+export function studiedCardCount(m: Pick<TopicMastery, "cardsTotal" | "cardsStudied">): number {
+  return m.cardsStudied ?? m.cardsTotal;
+}
+
+/** True once the learner has studied a card or answered a question on the topic. */
+export function topicHasEvidence(m: TopicMastery): boolean {
+  return studiedCardCount(m) > 0 || m.attempts > 0;
+}
+
+/** Topics never studied: no studied card (installed cards do not count) and no attempt. */
 export function untouchedTopics(mastery: TopicMastery[]): TopicMastery[] {
-  return mastery.filter((m) => m.cardsTotal === 0 && m.attempts === 0);
+  return mastery.filter((m) => !topicHasEvidence(m));
 }
 
 export function subjectMastery(mastery: TopicMastery[], subjectId: Id): number {

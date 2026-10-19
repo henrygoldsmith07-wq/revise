@@ -8,7 +8,7 @@ import { Pill } from "./ui";
 // Forgetting-curve visualization.
 //
 // Mastery percentages are abstract; the decay curve is not. This renders the
-// actual FSRS forgetting curve R(t) = (1 + 19/81 · t/S)^-0.5 as an SVG path so
+// actual FSRS-6 forgetting curve R(t) = (1 + F · t/S)^D (decay D = −w[20]) as an SVG path so
 // the student can *see* when their memory of a topic is predicted to fall
 // below the recall line — turning the scheduler's maths into a visible,
 // personal deadline ("you will forget most of this by Thursday").

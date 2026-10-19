@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { trustedAssessmentContent } from "./content-trust";
-import { questionFamily, unseenQuestion } from "./learning-evidence";
+import { questionFamily, unseenQuestionTester } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Question } from "./types";
 
@@ -70,7 +70,9 @@ export function dimensionOf(question: Question, opts: { prerequisite?: boolean }
  * seen (including same-family variants). Trust is enforced by the selector.
  */
 export function quickDiagnosticPool(questions: readonly Question[], attempts: readonly Attempt[], subjectId: Id): Question[] {
-  return questions.filter((q) => q.subjectId === subjectId && unseenQuestion(q, attempts, questions));
+  // Index the bank and the history once per call, not once per question.
+  const unseen = unseenQuestionTester(attempts, questions);
+  return questions.filter((q) => q.subjectId === subjectId && unseen(q));
 }
 
 export interface QuickSelection {
