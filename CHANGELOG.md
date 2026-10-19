@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-eighth pass
+
+- Readiness no longer offers "Starting diagnostic" (button and link) once the student has answered any question. Guarded by tests/starting-diagnostic-offer.test.ts (source-level; not rendered, Playwright not run).
+
 ## 2026-10-19 — thirty-seventh pass
 
 - Working check no longer says "First divergence at step 1: unit error" on a part that scored full marks, and names the part when several are checked. Guarded by tests/working-check-full-marks.test.ts (source-level; not rendered).
