@@ -2,6 +2,10 @@
 
 ## 2026-10-19 — thirty-fifth pass
 
+- When a lost mark has a written lesson but the main next step is something else (technique drill or repair plan), the lesson link is now shown under that step instead of hidden inside the collapsed "More help with this answer". Marks and proof rules unchanged. Playwright spec updated; not run this pass.
+
+## 2026-10-19 — thirty-sixth pass
+
 - Repair brief no longer claims 'Every question targets <cause>' (only some parts do); it says questions are chosen to target it.
 
 ## 2026-10-19 — thirty-fourth pass

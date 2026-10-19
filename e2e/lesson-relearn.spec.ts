@@ -25,9 +25,9 @@ test("a lost Physics mark links to the lesson for its point, labelled not yet te
   const nextStep = main.getByTestId("practice-next-step");
   await expect(nextStep.getByRole("link")).toHaveCount(1);
 
-  const more = main.getByTestId("practice-more-help");
-  await more.getByText("More help with this answer", { exact: true }).click();
-  const relearn = more.getByTestId("relearn-lesson-more");
+  // The lesson link is visible without opening "More help".
+  const relearn = main.getByTestId("relearn-lesson-more");
+  await expect(relearn).toBeVisible();
   await expect(relearn).toContainText("not yet teacher-reviewed");
   const link = relearn.getByRole("link", { name: /^Open the lesson for Unit / });
   await expect(link).toHaveAttribute("href", /checkpoint=wjec-alevel-physics\.waves\.sp-04/);
