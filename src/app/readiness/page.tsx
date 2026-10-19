@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getSubject } from "@/domain/curriculum";
+import { shouldOfferStartingDiagnostic } from "@/domain/starting-diagnostic-offer";
 import { useStoreFields } from "@/state/store";
 import { ExamReadinessCard } from "@/components/ExamReadinessCard";
 import { MarksAtRiskPanel } from "@/components/MarksAtRiskPanel";
@@ -36,7 +37,9 @@ import { MarksLedger } from "@/components/MarksLedger";
 // stand, and what should happen next.
 
 export default function ReadinessPage() {
-  const store = useStoreFields("examReadinessSummary");
+  const store = useStoreFields("examReadinessSummary", "attempts");
+  // Once any question has been answered the starting diagnostic has done its job.
+  const offerDiagnostic = shouldOfferStartingDiagnostic(store.attempts.length);
   const weakest = store.examReadinessSummary.weakestSubjectId;
   const weakestSubject = weakest ? getSubject(weakest) : null;
 
@@ -125,7 +128,7 @@ export default function ReadinessPage() {
           </div>
           <div className="flex flex-wrap gap-2 max-w-full sm:shrink-0">
             <ButtonLink href="/twin" size="sm" variant="primary">Open Digital Twin</ButtonLink>
-            <ButtonLink href="/diagnostic" size="sm">Starting diagnostic</ButtonLink>
+            {offerDiagnostic ? <ButtonLink href="/diagnostic" size="sm">Starting diagnostic</ButtonLink> : null}
             {weakestSubject ? <ButtonLink href={`/practice?subject=${encodeURIComponent(weakestSubject.id)}`} size="sm">Practise {weakestSubject.name}</ButtonLink> : null}
           </div>
         </div>
@@ -134,7 +137,7 @@ export default function ReadinessPage() {
       <nav aria-label="Specialist views" className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink3">
         <Link href="/schedule" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Plan the run-up to your exams →</Link>
         <Link href="/twin" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">How your plan was chosen →</Link>
-        <Link href="/diagnostic" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Starting diagnostic →</Link>
+        {offerDiagnostic ? <Link href="/diagnostic" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Starting diagnostic →</Link> : null}
         <Link href="/readiness/spec" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Evidence for every specification statement →</Link>
         <Link href="/readiness/trusted-coverage" className="inline-flex min-h-11 items-center hover:text-ink hover:underline">Which content has been checked →</Link>
       </nav>
