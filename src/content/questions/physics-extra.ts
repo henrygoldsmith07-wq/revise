@@ -133,7 +133,7 @@ export const physicsExtraQuestions = defineQuestions([
     specVersion: "2024-1.0",
     aos: ["AO2"],
     parts: [
-      { prompt: "Calculate the required centripetal force.", marks: 2, scheme: ["F=mv2/r=5000 N", "Towards centre of circle"], specPointIds: ["wjec-alevel-physics.circular-shm.sp-02"] /* was sp-04 (SHM); centripetal force is 3.2(b), thirty-first pass */, learningClaims: ["calculate centripetal force requirement"], answer: "F=1000*400/80=5000 N toward centre." },
+      { prompt: "Calculate the required centripetal force and state its direction.", marks: 2, scheme: ["F=mv2/r=5000 N", "Towards centre of circle"], specPointIds: ["wjec-alevel-physics.circular-shm.sp-02"] /* was sp-04 (SHM); centripetal force is 3.2(b), thirty-first pass */, learningClaims: ["calculate centripetal force requirement"], answer: "F=1000*400/80=5000 N toward centre." },
     ],
   },
 ]);

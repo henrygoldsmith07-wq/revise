@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-fourth pass
+
+- The centripetal force 'Calculate' question (WJEC and AQA copies) withheld a mark for not saying 'towards centre' without asking for direction; the prompt now asks 'and state its direction'. Marking logic unchanged.
+
 ## 2026-10-19 — thirty-third pass
 
 - WJEC A level Physics now shows its published spec code 1420QS (was A200QS) and links to the physics-asa-level page. AS paper durations were not re-verified.
