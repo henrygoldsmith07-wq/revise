@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-seventh pass
+
+- Working check no longer says "First divergence at step 1: unit error" on a part that scored full marks, and names the part when several are checked. Guarded by tests/working-check-full-marks.test.ts (source-level; not rendered).
+
 ## 2026-10-19 — thirty-fifth pass
 
 - When a lost mark has a written lesson but the main next step is something else (technique drill or repair plan), the lesson link is now shown under that step instead of hidden inside the collapsed "More help with this answer". Marks and proof rules unchanged. Playwright spec updated; not run this pass.

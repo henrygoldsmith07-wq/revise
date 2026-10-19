@@ -306,12 +306,19 @@ export function MarkedResult({
       {result.workingAnalysis?.some((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0) ? (
         <div className="mt-4 card card-2 p-3 bg-surface2" role="status">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Working check</p>
-          {result.workingAnalysis.filter((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0).map((row) => (
+          {result.workingAnalysis.filter((row) => row.firstIncorrectStep != null || row.methodMarksAwarded + row.unitMarksAwarded + row.precisionMarksAwarded + row.followThroughMarksAwarded > 0).map((row) => {
+            const markedPart = result.marked.find((m) => m.partId === row.partId);
+            // A part that earned full marks has no divergence worth reporting.
+            const fullMarks = markedPart != null && markedPart.awarded >= markedPart.max;
+            const partLabel = question.parts.find((p) => p.id === row.partId)?.label;
+            return (
             <p key={row.partId} className="text-xs text-ink2 mt-1">
-              {row.firstIncorrectStep != null ? `First divergence at step ${row.firstIncorrectStep + 1}: ${row.firstErrorKind.replace(/-/g, " ")}. ` : "Working is consistent. "}
+              {partLabel && result.workingAnalysis!.length > 1 ? `${partLabel}: ` : ""}
+              {row.firstIncorrectStep != null && !fullMarks ? `First divergence at step ${row.firstIncorrectStep + 1}: ${row.firstErrorKind.replace(/-/g, " ")}. ` : "Working is consistent. "}
               {[row.methodMarksAwarded ? `${row.methodMarksAwarded} method` : "", row.followThroughMarksAwarded ? `${row.followThroughMarksAwarded} follow-through` : "", row.errorCarriedForward ? "error carried forward" : "", row.unitMarksAwarded ? `${row.unitMarksAwarded} unit` : "", row.precisionMarksAwarded ? `${row.precisionMarksAwarded} precision` : ""].filter(Boolean).join(", ")}
             </p>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
