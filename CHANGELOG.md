@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19 — thirty-third pass
+
+- WJEC A level Physics now shows its published spec code 1420QS (was A200QS) and links to the physics-asa-level page. AS paper durations were not re-verified.
+
 ## Thirty-second pass: no Zod eval probe under the CSP — 2026-10-19
 
 Zod v4 probes `new Function("")` on first schema build, which the nonce CSP reported
