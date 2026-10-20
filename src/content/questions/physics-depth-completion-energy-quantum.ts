@@ -3,7 +3,8 @@ import { depthQuestions, type PhysicsDepthItem, type PhysicsDepthPart } from "./
 const p = (
   demand: PhysicsDepthPart["demand"], family: string, context: string, move: string,
   prompt: string, marks: number, scheme: string[], answer: string,
-): PhysicsDepthPart => ({ demand, family, context, move, prompt, marks, scheme, answer });
+  lastChecked?: string,
+): PhysicsDepthPart => ({ demand, family, context, move, prompt, marks, scheme, answer, ...(lastChecked ? { lastChecked } : {}) });
 
 /**
  * Explicit completion pack for the remaining Unit 1.4 and Unit 2.5 cells.
@@ -12,6 +13,12 @@ const p = (
  * fingerprint.
  */
 const ITEMS: PhysicsDepthItem[] = [
+  {
+    topic: "energy-power", point: 1,
+    parts: [
+      p("calculation", "completion:energy1:work-energy", "completion:energy1:work-energy:braking-car", "use the work done by a constant braking force to remove kinetic energy", "A 1200 kg car travelling at 20 m s^-1 is brought to rest by a constant braking force over a distance of 48 m. Calculate the braking force.", 3, ["Initial kinetic energy = 1/2 mv^2 = 0.5 × 1200 × 20^2 = 2.4×10^5 J", "Work done by the brakes W = Fd equals the kinetic energy removed: F = 2.4×10^5 / 48", "F = 5.0×10^3 N"], "The kinetic energy removed is 1/2 mv^2 = 0.5 × 1200 × 400 = 2.4×10^5 J. This equals Fd, so F = 2.4×10^5 ÷ 48 = 5.0×10^3 N.", "2026-10-20"),
+    ],
+  },
   {
     topic: "energy-power", point: 5,
     parts: [

@@ -3,10 +3,17 @@ import { depthQuestions, type PhysicsDepthItem, type PhysicsDepthPart } from "./
 const p = (
   demand: PhysicsDepthPart["demand"], family: string, context: string, move: string,
   prompt: string, marks: number, scheme: string[], answer: string,
-): PhysicsDepthPart => ({ demand, family, context, move, prompt, marks, scheme, answer });
+  lastChecked?: string,
+): PhysicsDepthPart => ({ demand, family, context, move, prompt, marks, scheme, answer, ...(lastChecked ? { lastChecked } : {}) });
 
 /** Explicit completion questions for electrical power, momentum and SHM. */
 const ITEMS: PhysicsDepthItem[] = [
+  {
+    topic: "electric-circuits", point: 1,
+    parts: [
+      p("calculation", "completion:circuit1:charge-carriers", "completion:circuit1:charge-carriers:lamp-filament", "use Q = It and the elementary charge to count charge carriers", "A steady current of 0.50 A flows through a lamp filament for 2.0 minutes. Calculate the number of electrons that pass through a cross-section of the filament. (Elementary charge e = 1.60×10^-19 C.)", 3, ["Time t = 2.0 × 60 = 120 s; charge Q = It = 0.50 × 120 = 60 C", "Number of electrons N = Q/e = 60 / 1.60×10^-19", "N = 3.8×10^20"], "Q = It = 0.50 × 120 = 60 C. N = Q ÷ e = 60 ÷ 1.60×10^-19 = 3.75×10^20, so N ≈ 3.8×10^20 electrons.", "2026-10-20"),
+    ],
+  },
   {
     topic: "electric-circuits", point: 4,
     parts: [
