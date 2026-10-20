@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { authenticSourceQuestions, seedQuestions } from "@/content";
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
+import { AUTHORED_REFERENCE_SUBJECTS } from "@/domain/curriculum/honesty";
 import { wjecAlevelCoverageQuestions } from "@/content/questions/wjec-alevel-coverage";
 
-const ALL_SUBJECTS = allSubjects();
+// The expansion programmes cover the 32 science and maths subjects. Subjects
+// added later with their own authored outline (AUTHORED_REFERENCE_SUBJECTS)
+// ship their own starter bank instead; tests/new-subjects.test.ts covers them.
+const ALL_SUBJECTS = allSubjects().filter((subject) => !AUTHORED_REFERENCE_SUBJECTS.has(subject.id));
 // WJEC Maths/Biology/Chemistry extension topics were "covered" by one shared
 // template that failed its own marker (wjec-alevel-coverage.ts); it left the
 // learner bank on 2026-10-18. Those topics are honestly uncovered until real

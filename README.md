@@ -78,12 +78,16 @@ Manual modes (Review, Study, Lessons, Practice, Past papers, Session) stay in
 Tools. The main navigation is **Today, Learn, Practice, Progress, Library**, with
 manual and specialist tools kept secondary.
 
-Ships with **32 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
+Ships with **35 subjects across WJEC / AQA / Edexcel / OCR × A-level / GCSE**.
 Four WJEC A-level flagships — Mathematics, Biology, Chemistry, Physics — are
-authored against the specification. The other 28 are **reference-tier**: a
+authored against the specification. 28 are **reference-tier** clones: a
 cloned outline for navigation, labelled unverified, with GCSE paper structures
-taken from the spec manifest rather than the A-level clone. Adding a board
-still means one curriculum module and nothing else changing.
+taken from the spec manifest rather than the A-level clone. AQA A-level
+Psychology (7182), Computer Science (7517) and Economics (7136) are
+reference-tier too, but their topic lists are written for their own
+specification rather than cloned, with a two-question-per-topic starter bank;
+none of it is teacher-reviewed yet. Adding a board still means one curriculum
+module and nothing else changing.
 
 New students start on the four flagships. Settings and onboarding group subjects
 as Flagship vs Reference so cloned boards cannot look spec-checked, and
@@ -191,7 +195,7 @@ and honestly labelled, but not where authoring effort goes.
 ```
 src/domain/      Pure revision engine — no React, no I/O, fully unit-tested
   types.ts         The board-agnostic domain model
-  curriculum/      Registry + 32 WJEC/AQA/Edexcel/OCR × A-level/GCSE subjects (475 topics)
+  curriculum/      Registry + 35 WJEC/AQA/Edexcel/OCR × A-level/GCSE subjects (511 topics)
   scheduling.ts    FSRS wrapper: grading, queues, forgetting curve
   mastery.ts       Topic mastery with explicit evidence weighting
   recommender.ts   "What should I do right now?" (+ recommender-enhancements: cold-start, ties, exploration, gain)
@@ -363,9 +367,9 @@ provenance record (`source` / `verification` / `reviewer` / `lastChecked` /
 retrieval cards, how many have an exam question (*which* parts test *which*
 statements), which are verified, and — per `SPEC_MANIFEST` — which unit/paper
 (duration, marks, weighting) each belongs to. The statement model now covers all
-**32 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
+**35 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
 
-Runtime inventory: **475 topics, 3825 materialised seed questions, 2140 WJEC flagship questions**.
+Runtime inventory: **511 topics, 3897 materialised seed questions, 2140 WJEC flagship questions**.
 Recall-level coverage (a question whose demand is recall, which early
 diagnostics probe before application): every topic in all four WJEC
 flagships has at least one (Physics 19/19, Maths 23/23, Biology 25/25,

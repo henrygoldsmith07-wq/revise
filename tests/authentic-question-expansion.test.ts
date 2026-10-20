@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { authenticExpansionQuestions, seedQuestions } from "@/content";
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
+import { AUTHORED_REFERENCE_SUBJECTS } from "@/domain/curriculum/honesty";
 
+// The expansion programmes cover the 32 science and maths subjects. Subjects
+// added later with their own authored outline (AUTHORED_REFERENCE_SUBJECTS)
+// ship their own starter bank instead; tests/new-subjects.test.ts covers them.
 const CORE_A_LEVEL_SUBJECTS = allSubjects().filter(
-  (subject) => subject.id.startsWith("wjec-alevel") || subject.id.startsWith("aqa-alevel"),
+  (subject) => (subject.id.startsWith("wjec-alevel") || subject.id.startsWith("aqa-alevel")) && !AUTHORED_REFERENCE_SUBJECTS.has(subject.id),
 );
 
 describe("massive authentic question expansion", () => {
