@@ -8,12 +8,21 @@ import { build } from "esbuild";
 
 const ROOT = join(import.meta.dirname, "..");
 
+// Reference subjects build from a shared outline in ./outlines; their topics
+// and statements are counted from that outline, once per subject that uses it.
+function curriculumText(file) {
+  const dir = join(ROOT, "src/domain/curriculum");
+  const own = readFileSync(join(dir, file), "utf8");
+  const outline = own.match(/from "\.\/outlines\/([a-z-]+)"/);
+  return outline ? `${own}\n${readFileSync(join(dir, "outlines", `${outline[1]}.ts`), "utf8")}` : own;
+}
+
 function parseTopics() {
   const dir = join(ROOT, "src/domain/curriculum");
   const files = readdirSync(dir).filter((f) => !["helpers.ts", "index.ts", "registry.ts", "honesty.ts"].includes(f) && f.endsWith(".ts"));
   const all = [];
   for (const file of files) {
-    const text = readFileSync(join(dir, file), "utf8");
+    const text = curriculumText(file);
     const ids = [...text.matchAll(/slug:\s*"([^"]+)"/g)].map((m) => m[1]);
     const topicIds = file === "wjec-alevel-expansions.ts"
       ? [...text.matchAll(/specRef:\s*"/g)].length
@@ -113,7 +122,7 @@ if (!advertised) {
 }
 
 for (const t of topics) {
-  const text = readFileSync(join(ROOT, `src/domain/curriculum/${t.file}`), "utf8");
+  const text = curriculumText(t.file);
   if (!/verification/.test(text)) errors.push(`${t.file}: no verification metadata - run the migration`);
   if (!/specPoints|specVersion/.test(text)) errors.push(`${t.file}: no specPoints/specVersion - fine-grained coverage not modelled yet`);
   if (!/source:\s*"authored"/.test(text)) errors.push(`${t.file}: missing source tag`);
@@ -142,7 +151,7 @@ for (const t of topics) {
 // Stale-check enforcement: any lastChecked older than 365 days is a warning (not yet a fail; CI surfaces it)
 const stale = [];
 for (const topic of topics) {
-  const textS = readFileSync(join(ROOT, `src/domain/curriculum/${topic.file}`), "utf8");
+  const textS = curriculumText(topic.file);
   for (const m of textS.matchAll(/lastChecked:\s*"(\d{4}-\d{2}-\d{2})"/g)) {
     const d = m[1];
     const days = Math.round((Date.now() - new Date(d).getTime())/86_400_000);
@@ -158,7 +167,7 @@ if (stale.length) {
 // Enforce a minimum statement density per subject
 const minStatements = { "wjec-physics.ts": 60, "wjec-chemistry.ts": 60, "wjec-biology.ts": 60, "wjec-maths.ts": 40, "aqa-physics.ts": 60, "aqa-chemistry.ts": 60, "aqa-biology.ts": 60, "aqa-maths.ts": 40, "edexcel-physics.ts": 60, "edexcel-chemistry.ts": 60, "edexcel-biology.ts": 60, "edexcel-maths.ts": 40, "ocr-physics.ts": 60, "ocr-chemistry.ts": 60, "ocr-biology.ts": 60, "ocr-maths.ts": 40 };
 for (const t of topics) {
-  const text2 = readFileSync(join(ROOT, `src/domain/curriculum/${t.file}`), "utf8");
+  const text2 = curriculumText(t.file);
   const refCount = t.file === "wjec-alevel-expansions.ts"
     ? (text2.match(/point\(\s*"(?:Unit|Pure|Applied)/g) || []).length
     : (text2.match(/ref:\s*"(?:Unit|Pure|Applied|\d+\.\d)/g) || []).length;
