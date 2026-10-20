@@ -40,8 +40,12 @@ background and do other work while it runs. On Windows, invoke npm through
   `PERSISTED_SCHEMA_VERSION` in `src/data/persistence-schema.ts`, add a named
   entry to `PERSISTED_MIGRATIONS`, add the store to `PERSISTED_STORES`, and guard
   `createObjectStore` with `objectStoreNames.contains(...)` in `src/data/db.ts`.
-  Rename nothing and drop nothing — a downgrade must still read old rows. Any
-  store that reaches the server needs a migration before a client ships.
+  Rename nothing and drop nothing, so old rows stay readable by every later
+  build. An *older* build cannot open a newer database at all (IndexedDB
+  VersionError); that is shown as "this tab is running an older version —
+  reload" (`src/data/db-notice.ts`), and an old tab closes its connection on
+  `versionchange` so the new one can upgrade. Any store that reaches the
+  server needs a migration before a client ships.
 - **Treat a brief's claims as hypotheses.** Check the code first; if a claim is
   wrong, say so and skip it rather than implementing to the brief.
 
@@ -109,7 +113,21 @@ background and do other work while it runs. On Windows, invoke npm through
   (`canonicalDirectionConflict`) applies only to very short or labelled
   answers: in longer answers it took marks from correct ones. Measure with
   `tests/marking-paraphrases.test.ts` (design, held-out and wrong sets) and
-  `tests/marking-contradictions.test.ts`; neither may get worse.
+  `tests/marking-contradictions.test.ts`; neither may get worse. The list
+  now also maps common reagents' formulae to their names (NaOH, CuSO₄, HCl,
+  H₂SO₄, KMnO₄, K₂Cr₂O₇, AgNO₃, CO₂, H₂O, NH₃…; "oxygen" and "hydrogen" stay
+  unmapped because they also name the atom) and reaction orders ("first
+  order" ↔ "order 1").
+- **Equation points are read as formulas** (`src/domain/marking-formula.ts`,
+  twenty-ninth pass). A scheme point that is an equation is credited when the
+  answer writes it rearranged (checked numerically at fixed sample values),
+  substitutes numbers into the same quantity's formula with the same shape
+  and a value the part's own scheme or model answer reaches, or works the
+  same quantity to the same value; a same-quantity equation that does not
+  hold vetoes the point (`formulaContradicted`). It only reads equations, never
+  prose. `tests/marking-self-consistency.test.ts` is a ratchet on model answers
+  scoring below full marks (687 after this pass); `tests/marking-false-negatives.test.ts`
+  pins each marker fix with wrong answers that must still lose the mark.
 - **Watch for TDZ and memo ordering** when adding a `useMemo` that reads another
   one. Declare dependencies first, and gate an expensive memo on a cheap
   condition (`plan.top === null`) when the answer is only needed in the empty case.
@@ -132,6 +150,20 @@ background and do other work while it runs. On Windows, invoke npm through
   resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
   titles that prefix "Recover N marks" compose through `missionActionTitle`,
   never by concatenating `mission.title`.
+- **Outbox failures are classified** (`src/domain/sync-retry.ts`). Only a
+  permanent (content) rejection spends an item's `MAX_OUTBOX_ATTEMPTS`
+  budget; a transient one (network, timeout, 5xx, 429, expired JWT) records
+  `lastError`, sets a persisted push backoff (`outboxBackoff` meta, 15 s
+  doubling to 15 min) and stops the drain. A rejected batch is bisected so
+  only the poison row(s) are counted. `sync()` runs under the cross-tab
+  `revise-sync` Web Lock (`skipped: "busy"` in the losing tab), and a card
+  whose merged op log holds reviews the server copy lacks is re-queued on
+  pull with a newer `updatedAt` (the server drops older card updates).
+  `tests/sync-delivery-resilience.test.ts` covers all of it.
+- **The service worker's cache is named per build** (`public/sw.js` reads
+  `?v=` from its own URL; `ServiceWorker.tsx` registers
+  `/sw.js?v=${NEXT_PUBLIC_BUILD_ID}`, set in `next.config.ts`). Keep
+  `CACHE_BASE` pinned; activate deletes every other cache.
 - **`replacePlan` is serialised** (`src/data/repository.ts`). Two concurrent
   rebuilds used to union into overlapping blocks; keep plan writes going
   through it.
@@ -231,6 +263,16 @@ The transfer-pair batch (`/reviewer/pairs`, `src/lib/reviewer/batches.ts`)
 is ordering and context only, like the priority plan: never use it to skip a
 check or count a pair as proven before both halves are verified.
 
+The database re-runs `auditLogIssues` on every insert into
+`review_audit_events` (direct PostgREST inserts by a reviewer included):
+it recomputes `eventHash` in SQL (`review_audit_event_hash`), anchors the
+first runtime row to the committed tail (`review_audit_anchor`) and refuses a
+repeat approval by pseudonym or account. Change the event shape, the
+canonical JSON or `REVIEWED_WJEC_SUBJECT_IDS` and that SQL must change in a
+new migration too (`tests/reviewer-sql.test.ts` compares them). A reviewer's
+label never changes once granted (`grant_reviewer_role` refuses), because
+independence is counted by it.
+
 `docs/review-workflow.md` covers all of it.
 
 ## Current honest position
@@ -257,7 +299,7 @@ Until the seventh pass five circular motion/SHM items passed only as inverse
 problems on the baseline's own relations (`rearrangementOnly`); each now
 continues into a relation its baseline never uses (a test asserts none of the
 fourteen is `rearrangementOnly`). Do not reword an item to pass the check. Mathematics, Biology and Chemistry still
-have 71, 103 and 91 statements to write
+have 77, 106 and 96 statements to write
 (`src/content/reviews/wjec-authoring-backlog.json`).
 Earlier notes saying Physics was "authored to all 108" counted gate-blocked
 questions. Do not invent baseline links to close that: author real transfer

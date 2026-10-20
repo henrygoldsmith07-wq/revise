@@ -203,7 +203,7 @@
         "As v approaches terminal, drag → weight, resultant → 0, so a → 0",
         "The flattening tangent is the graph showing Newton's second law live"
       ],
-      "answer": "The tangent gives ≈0.7 m s⁻² — a small but non-zero acceleration at nearly-terminal speed. Each metre per second of extra speed grows the drag until it nearly balances the weight, so the gradient decays toward zero and the curve asymptotes to 55 m s⁻¹: Newton's second law drawn as a flattening slope."
+      "answer": "The tangent gives ≈0.67 m s⁻² — a small but non-zero acceleration at nearly-terminal speed. Each metre per second of extra speed grows the drag until it nearly balances the weight, so the gradient decays toward zero and the curve asymptotes to 55 m s⁻¹: Newton's second law drawn as a flattening slope."
     }
   ]
 }

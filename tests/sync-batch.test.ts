@@ -118,14 +118,16 @@ describe("batched sync push", () => {
     expect(calls.rpc.map((call) => call.args.p_rows.length)).toEqual([SYNC_BATCH_MAX_ROWS, 5]);
   });
 
-  it("keeps every entry durable and counts an attempt when the batch fails", async () => {
+  it("keeps every entry durable when the batch fails; a timeout records the error without spending the retry budget", async () => {
     const items = await queueMockPaper();
     const { client: c } = client("fail");
     const result = await sync(USER, { client: c, online: true });
     expect(result.failed).toBe(items.length);
     const left = (await (await getDb()).getAll("outbox")) as OutboxItem[];
     expect(left).toHaveLength(items.length);
-    expect(left.every((item) => item.attempts === 1 && item.lastError === "statement timeout")).toBe(true);
+    // 57014 statement timeout is transient (tests/sync-delivery-resilience.test.ts
+    // covers the backoff and the permanent-failure path).
+    expect(left.every((item) => item.attempts === 0 && item.lastError === "statement timeout")).toBe(true);
   });
 
   it("falls back to per-table upserts when the server has no batch RPC yet", async () => {

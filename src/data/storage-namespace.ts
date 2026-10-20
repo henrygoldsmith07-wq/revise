@@ -35,6 +35,10 @@ export const REVISE_META_KEYS = {
   runtimeReviewLedger: "revise.runtimeReviewLedger.v1",
   /** Unfinished quick-diagnostic runs by subject, so a reload resumes the same questions. */
   quickDiagnosticRuns: "revise.quickDiagnosticRuns.v1",
+  /** Push backoff after a transient sync failure (consecutive failures + next attempt time). */
+  outboxBackoff: "revise.outboxBackoff.v1",
+  /** Result of the last navigator.storage.persist() request on this device. */
+  storagePersistence: "revise.storagePersistence.v1",
 } as const;
 
 // New keys have no legacy spelling; lookups fall back gracefully.
@@ -78,4 +82,8 @@ export async function readReviseUserMeta<T>(name: keyof typeof REVISE_META_KEYS,
 
 export async function writeReviseUserMeta(name: keyof typeof REVISE_META_KEYS, userId: string, value: unknown): Promise<void> {
   await writeMeta(userMetaKey(name, userId), value);
+}
+
+export async function deleteReviseUserMeta(name: keyof typeof REVISE_META_KEYS, userId: string): Promise<void> {
+  await deleteMeta(userMetaKey(name, userId));
 }

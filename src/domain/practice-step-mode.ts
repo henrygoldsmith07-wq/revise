@@ -17,7 +17,7 @@
 import { commandOf } from "./assessment";
 import { learnerEvidenceTrusted } from "./content-trust";
 import type { HintTier } from "./hint-tiers";
-import { questionFamilies, unseenQuestion } from "./learning-evidence";
+import { questionFamilies, unseenQuestionTester } from "./learning-evidence";
 import type { Attempt, CommandWord, Question } from "./types";
 
 export type PracticeStepMode = "guided" | "timed" | "unaided" | "worked";
@@ -140,7 +140,8 @@ export function deferProofSupply<T extends Question>(
   const reserve: T[] = [];
   // learnerEvidenceTrusted first: it is cheap and false for every flagship
   // question today, so unseenQuestion runs only on reviewed questions.
-  for (const q of ranked) (learnerEvidenceTrusted(q) && unseenQuestion(q, attempts, questions) ? reserve : keep).push(q);
+  const unseen = unseenQuestionTester(attempts, questions);
+  for (const q of ranked) (learnerEvidenceTrusted(q) && unseen(q) ? reserve : keep).push(q);
   return { ordered: [...keep, ...reserve], deferred: reserve.length };
 }
 
@@ -201,12 +202,14 @@ export function chooseWorkedExample(input: {
   }
   const subjects = new Set(withSolution.map((q) => q.subjectId));
   // Reviewed questions that could still serve as unseen proof today.
-  const provable = questions.filter((q) => subjects.has(q.subjectId) && learnerEvidenceTrusted(q) && unseenQuestion(q, attempts, questions));
+  const unseenNow = unseenQuestionTester(attempts, questions);
+  const provable = questions.filter((q) => subjects.has(q.subjectId) && learnerEvidenceTrusted(q) && unseenNow(q));
   const unanswered = withSolution.filter((q) => !latest.has(q.id)).slice(0, input.maxCandidates ?? 6);
   for (const candidate of unanswered) {
     if (learnerEvidenceTrusted(candidate)) continue;
     const asIfAnswered = [...attempts, { questionId: candidate.id } as Attempt];
-    const spends = provable.some((q) => q.subjectId === candidate.subjectId && !unseenQuestion(q, asIfAnswered, questions));
+    const unseenAfter = unseenQuestionTester(asIfAnswered, questions);
+    const spends = provable.some((q) => q.subjectId === candidate.subjectId && !unseenAfter(q));
     if (!spends) return { example: candidate, basis: "practice-only" };
   }
   return null;

@@ -1,6 +1,6 @@
 import { valueNextAction, type NextActionKind } from "./next-best-action";
 import { deriveSkillEvidence, smallestUnprovenCapability, type CapabilityNode } from "./capability-graph";
-import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentMistake, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, partLearningMetadata, questionCapabilities, questionDemands, questionFreshness, trustedAssessmentMistake, unseenQuestionTester } from "./learning-evidence";
 import { repairTargetParts } from "./repair-evidence";
 import { calibrateInterventions, effectivenessFor } from "./intervention-calibration";
 import { trustedAssessmentContent } from "./physics-content-review";
@@ -62,6 +62,7 @@ export function selectLearningAction(input: {
   const baselineEvidence = evidence;
   const questionById = new Map(questions.map((question) => [question.id, question] as const));
   const exposedQuestions = attempts.flatMap(attempt => questionById.has(attempt.questionId) ? [questionById.get(attempt.questionId)!] : []);
+  const unseen = unseenQuestionTester(attempts, questions);
   const freshness = new Map<Question, ReturnType<typeof questionFreshness>>();
   const freshReasoning = (question: Question) => {
     let result = freshness.get(question);
@@ -127,12 +128,12 @@ export function selectLearningAction(input: {
     if (root && root.id !== capabilityId && ["weak", "unknown"].includes(evidence.get(root.id)?.state ?? "unknown")) {
       const probes = questions.filter((q) => q.subjectId === root.subjectId && hasLearningMetadata(q) &&
         !["rejected", "retired", "needs_changes"].includes(q.validation?.stage ?? "") &&
-        questionCapabilities(q).includes(root.id) && unseenQuestion(q, attempts, questions));
+        questionCapabilities(q).includes(root.id) && unseen(q));
       add("diagnose", root.id, probes, `First check whether you can ${skillPhrase(root.label)}; that earlier skill may be the real cause.`, mistake);
       if (probes.length) continue;
     }
     const relevant = eligible.filter((q) => repairTargetParts(mistake, q).length > 0);
-    const fresh = relevant.filter((q) => unseenQuestion(q, attempts, questions));
+    const fresh = relevant.filter(unseen);
     if (["detected", "diagnosed", "taught"].includes(stage)) {
       const source = relevant.filter((q) => q.id === mistake.questionId);
       add("guided", capabilityId, source, `Fix how you ${skillPhrase(target.label)}, then try one question with guidance.`, mistake);
@@ -157,7 +158,7 @@ export function selectLearningAction(input: {
       return rank(a.id) - rank(b.id);
     });
     for (const target of orderedTargets) {
-      const pool = eligible.filter((q) => questionCapabilities(q).includes(target.id) && unseenQuestion(q, attempts, questions) && !isTransferQuestion(q));
+      const pool = eligible.filter((q) => questionCapabilities(q).includes(target.id) && unseen(q) && !isTransferQuestion(q));
       if (!pool.length) continue;
       add("diagnose", target.id, pool, `One short question will check whether you can ${skillPhrase(target.label)} before choosing an explanation.`);
       break;

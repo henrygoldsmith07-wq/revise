@@ -268,7 +268,7 @@ describe("Pulse history route behaviour", () => {
 describe("AI route behaviour", () => {
   const SUPABASE_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
   const PROVIDER_KEYS = ["ANTHROPIC_API_KEY", "AI_PROVIDER", "OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_MODEL", "OPENAI_COMPATIBLE_API_KEY"];
-  const ALL_KEYS = [...SUPABASE_KEYS, ...PROVIDER_KEYS, "NODE_ENV", "RATE_LIMIT_BACKEND", "AI_DAILY_LIMIT"];
+  const ALL_KEYS = [...SUPABASE_KEYS, ...PROVIDER_KEYS, "NODE_ENV", "RATE_LIMIT_BACKEND", "AI_DAILY_LIMIT", "CLASSIFIER_DISABLED"];
 
   beforeEach(() => {
     saveEnv(...ALL_KEYS);
@@ -344,6 +344,61 @@ describe("AI route behaviour", () => {
     process.env.OPENAI_COMPATIBLE_MODEL = "test-model";
     const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }));
     expect(res.status).toBe(503);
+  });
+
+  it("fails closed in production without auth config even with no model key, because classifier.dev is on by default", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.CLASSIFIER_DISABLED;
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      const res = await aiPost(aiRequest({
+        task: "diagnose-error",
+        payload: { prompt: "Explain osmosis", point: "water potential", answer: "it moves", awarded: 0, maxMarks: 1 },
+      }));
+      expect(res.status).toBe(503);
+      // Local mode was never entered, so nothing was relayed to the classifier.
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("keeps local mode in production only when no third party is configured (classifier disabled, no model key)", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.CLASSIFIER_DISABLED = "1";
+    const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "unknown-topic" } }));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { source: string }).source).toBe("fallback");
+  });
+
+  it("refuses a declared Content-Length over the cap before reading the body", async () => {
+    const res = await aiPost(new Request("https://x/api/ai", {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": String(10_000_000), [AI_CONSENT_HEADER]: AI_CONSENT_HEADER_VALUE },
+      body: JSON.stringify({ task: "explain", payload: { topicId: "t" } }),
+    }));
+    expect(res.status).toBe(413);
+  });
+
+  it("stops reading a streamed body without Content-Length once it passes the cap", async () => {
+    let pulled = 0;
+    const chunk = new TextEncoder().encode("x".repeat(256 * 1024));
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 200) controller.close(); // 50 MB if read to the end
+        else controller.enqueue(chunk);
+      },
+    });
+    const res = await aiPost(new Request("https://x/api/ai", {
+      method: "POST",
+      headers: { "content-type": "application/json", [AI_CONSENT_HEADER]: AI_CONSENT_HEADER_VALUE },
+      body: stream,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" }));
+    expect(res.status).toBe(413);
+    // 1.5M chars is six 256 KiB chunks; reading stops long before the end.
+    expect(pulled).toBeLessThan(20);
   });
 
   it("refuses every task with 403 when the signed-in learner has no consent row", async () => {

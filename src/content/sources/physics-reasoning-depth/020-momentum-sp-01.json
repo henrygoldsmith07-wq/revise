@@ -54,9 +54,9 @@
       "scheme": [
         "Momentum change = 0.16 × 40 = 6.4 kg m s⁻¹ either way",
         "Fast stop: F = Δp/Δt = 6.4/0.050 = 128 N",
-        "Slow stop: F = 6.4/0.20 = 16 N — one eighth of the force"
+        "Slow stop: F = 6.4/0.20 = 32 N — one quarter of the force"
       ],
-      "answer": "The ball's momentum changes by 6.4 kg m s⁻¹ regardless. Stopping in 0.050 s requires 128 N; stretching the stop to 0.20 s needs only 16 N — the same impulse spread over four times the time, one quarter the force. That is the whole art of catching with soft hands."
+      "answer": "The ball's momentum changes by 6.4 kg m s⁻¹ regardless. Stopping in 0.050 s requires 128 N; stretching the stop to 0.20 s needs only 32 N — the same impulse spread over four times the time, one quarter the force. That is the whole art of catching with soft hands."
     },
     {
       "demand": "application",

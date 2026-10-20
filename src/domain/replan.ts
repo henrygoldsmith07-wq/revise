@@ -119,8 +119,15 @@ export function replanDynamically(input: ReplanInput): ReplanResult {
 
   let plan = input.existing;
   if (hadMissed) {
-    plan = rescheduleMissed(plan, today, input.dailyBlockCap ?? 6, nextId);
+    plan = rescheduleMissed(plan, today, input.dailyBlockCap ?? 6, nextId, {
+      exams: input.exams,
+      availability: input.availability,
+    });
   }
+  // Ids of the replacement blocks the roll-forward created, so the summary
+  // only claims what is still in the final plan.
+  const before = new Set(input.existing.map((s) => s.id));
+  const rolledIds = new Set(plan.filter((s) => !before.has(s.id) && s.status === "pending").map((s) => s.id));
   if (structural) {
     plan = buildPlan({
       userId: input.userId,
@@ -141,22 +148,29 @@ export function replanDynamically(input: ReplanInput): ReplanResult {
   }
 
   const changed = hadMissed || structural;
+  const rolledSurvived = plan.filter((s) => rolledIds.has(s.id)).length;
   return {
     plan,
     changed,
     reasons,
     fingerprint,
-    summary: changed ? describeReplan(reasons) : null,
+    summary: changed ? describeReplan(reasons, rolledSurvived) : null,
   };
 }
 
-function describeReplan(reasons: ReplanReason[]): string {
+function describeReplan(reasons: ReplanReason[], rolledSurvived: number): string {
   const parts: string[] = [];
   if (reasons.includes("exam-changed")) parts.push("an exam date changed");
   if (reasons.includes("target-changed")) parts.push("a target grade changed");
   if (reasons.includes("availability-changed")) parts.push("your availability changed");
   if (reasons.includes("session-length-changed")) parts.push("session length changed");
   if (reasons.includes("subject-set-changed")) parts.push("your subjects changed");
-  if (reasons.includes("sessions-missed")) parts.push("missed sessions were rolled forward");
+  if (reasons.includes("sessions-missed")) {
+    // Say only what survived: a structural rebuild replaces rolled-forward
+    // blocks, and work with no room before its exam is not re-queued.
+    parts.push(rolledSurvived > 0
+      ? `${rolledSurvived} missed session${rolledSurvived === 1 ? " was" : "s were"} rolled forward`
+      : "missed sessions stay marked as missed");
+  }
   return `Plan updated because ${parts.join(", ")}.`;
 }

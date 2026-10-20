@@ -341,8 +341,10 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                       </p>
                     </div>
                     <p className="mb-2 text-xs text-ink3">
-                      These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
-                      specification. Use them to navigate, not as a specification guarantee.
+                      {row.level === "GCSE"
+                        ? "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE. Only the practice questions were written for GCSE, and none has been checked against the specification."
+                        : <>These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
+                      specification. Use them to navigate, not as a specification guarantee.</>}
                     </p>
                     <SubjectPicker
                       options={row.subjects}
@@ -489,7 +491,11 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
               <ol className="mt-1.5 space-y-1 text-xs text-ink2 list-decimal pl-4">
                 <li>{diagnosticChoice === "quick" ? "Answer a few short questions with no hints." : "Open Today and start the recommended step."}</li>
                 <li>See what Revise found and why it chose the next action.</li>
-                <li>Mistakes turn into targeted repair, then an unseen proof check.</li>
+                <li>
+                  {flagshipChosen.length
+                    ? "Mistakes turn into targeted repair, then an unseen proof check."
+                    : "Mistakes turn into targeted repair, then a fresh practice question on the same skill."}
+                </li>
               </ol>
             </div>
           </Panel>

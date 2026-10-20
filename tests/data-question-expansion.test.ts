@@ -1,26 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { dataExpansionQuestions, seedQuestions } from "@/content";
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
+import { wjecAlevelCoverageQuestions } from "@/content/questions/wjec-alevel-coverage";
 
 const ALL_SUBJECTS = allSubjects();
+// WJEC Maths/Biology/Chemistry extension topics were "covered" by one shared
+// template that failed its own marker (wjec-alevel-coverage.ts); it left the
+// learner bank on 2026-10-18. Those topics are honestly uncovered until real
+// items are authored, so they are exempt here — never reinstate the template.
+const TEMPLATED_TOPICS = new Set(
+  wjecAlevelCoverageQuestions({ id: "data", prefix: "Data:", reviewer: "x", kind: "structured" }).flatMap((q) => q.topicIds),
+);
 
 describe("data-question expansion", () => {
   it("adds one data question for every topic across all board and qualification subjects", () => {
     expect(ALL_SUBJECTS).toHaveLength(32);
     // Physics extension topics are covered by authored physics-coverage items
     // instead of the shared template, so they are excluded here (8 topics).
-    expect(dataExpansionQuestions).toHaveLength(467);
+    expect(dataExpansionQuestions).toHaveLength(467 - TEMPLATED_TOPICS.size);
+    expect(dataExpansionQuestions.some((question) => question.id.includes("-coverage-"))).toBe(false);
 
     for (const subject of ALL_SUBJECTS) {
       const questions = dataExpansionQuestions.filter((question) => question.subjectId === subject.id);
       const expected = subject.id === "wjec-alevel-physics"
         ? topicsFor(subject.id).length - 8
-        : topicsFor(subject.id).length;
+        : topicsFor(subject.id).filter((topic) => !TEMPLATED_TOPICS.has(topic.id)).length;
       expect(questions, `${subject.id} should receive one data question per topic`).toHaveLength(expected);
       expect(new Set(questions.map((question) => question.id)).size).toBe(questions.length);
 
       for (const topic of topicsFor(subject.id)) {
         if (subject.id === "wjec-alevel-physics" && !questions.some((question) => question.topicIds.includes(topic.id))) continue;
+        if (TEMPLATED_TOPICS.has(topic.id)) continue;
         expect(
           questions.some((question) => question.topicIds.includes(topic.id)),
           `${subject.id} topic ${topic.id} has no data question`,

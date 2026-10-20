@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { learnerEvidenceTrusted } from "./content-trust";
-import { isTransferQuestion, unseenQuestion } from "./learning-evidence";
+import { isTransferQuestion, unseenQuestionTester } from "./learning-evidence";
 import type { Attempt, Id, Question } from "./types";
 
 export interface TopicSupply {
@@ -21,9 +21,10 @@ export function unseenSupplyByTopic(topicIds: Iterable<Id>, questions: readonly 
   const topics = new Set(topicIds);
   const out: Record<Id, TopicSupply> = {};
   for (const topic of topics) out[topic] = { provable: 0, practiceOnly: 0, transfer: 0 };
+  const unseen = unseenQuestionTester(attempts, questions);
   for (const q of questions) {
     const hits = q.topicIds.filter((t) => topics.has(t));
-    if (!hits.length || !unseenQuestion(q, attempts, questions)) continue;
+    if (!hits.length || !unseen(q)) continue;
     const trusted = learnerEvidenceTrusted(q);
     const transfer = trusted && isTransferQuestion(q);
     for (const t of hits) {

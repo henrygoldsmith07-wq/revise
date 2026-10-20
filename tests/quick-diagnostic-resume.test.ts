@@ -31,6 +31,10 @@ describe("resumeQuickDiagnostic", () => {
     expect(resumed?.done.map((d) => d.id)).toEqual(["a1", "a2", "a3"]);
   });
 
+  it("chooses afresh when nothing was answered, so a run saved before reviewed questions arrived is not pinned", () => {
+    expect(resumeQuickDiagnostic(run({ doneAttemptIds: [] }), "s", bank, [])).toBeNull();
+  });
+
   it("starts afresh for another subject, an overfull run, a missing question or an attempt that no longer matches", () => {
     expect(resumeQuickDiagnostic(run(), "other", bank, [a("a1", "q1"), a("a2", "q2")])).toBeNull();
     expect(resumeQuickDiagnostic(run({ doneAttemptIds: ["a1", "a2", "a3", "a4"] }), "s", bank, [a("a1", "q1"), a("a2", "q2"), a("a3", "q3"), a("a4", "q1")])).toBeNull();

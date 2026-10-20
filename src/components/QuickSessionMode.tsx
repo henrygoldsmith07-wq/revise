@@ -96,7 +96,7 @@ export function QuickSessionMode({
   if (!queue.length) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <SectionHeading title={`I Have ${minutes} Minutes`} hint="A focused question sprint" />
+        <SectionHeading title={`I have ${minutes} minutes`} hint="A focused question sprint" />
         <EmptyState
           title="No questions ready"
           body={
@@ -125,7 +125,7 @@ export function QuickSessionMode({
   if (!startedAt) {
     return (
       <div className="max-w-2xl mx-auto space-y-5">
-        <SectionHeading title={`I Have ${minutes} Minutes`} hint="A focused question sprint" />
+        <SectionHeading title={`I have ${minutes} minutes`} hint="A focused question sprint" />
         <Panel className="space-y-5">
           <div>
             <p className="text-lg font-semibold text-ink">Use the time you actually have.</p>
@@ -169,7 +169,7 @@ export function QuickSessionMode({
       <header className="sticky top-14 lg:top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-bg/95 backdrop-blur border-b border-line flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Question sprint</p>
-          <h1 className="text-sm font-semibold truncate">I Have {minutes} Minutes</h1>
+          <h1 className="text-sm font-semibold truncate">I have {minutes} minutes</h1>
           <p className="text-[11px] text-ink3">Question {index + 1} of {queue.length} · {subject?.name ?? subjectId}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -244,7 +244,7 @@ function QuickSessionSummary({
     <div className="max-w-lg mx-auto space-y-5">
       <SectionHeading
         title={result.reason === "timed-out" ? "Time is up" : "Sprint complete"}
-        hint={`I Have ${minutes} Minutes`}
+        hint={`I have ${minutes} minutes`}
       />
       <Panel className="space-y-4">
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -288,7 +288,7 @@ export function QuickSessionPicker({ onSelect }: { onSelect: (minutes: QuickSess
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-ink">I Have {minutes} Minutes</p>
+                <p className="text-sm font-semibold text-ink">I have {minutes} minutes</p>
                 <p className="text-xs text-ink3 mt-1">
                   Up to {quickSessionQuestionLimit(minutes)} focused questions
                   {minutes > 10 ? ` · about ${quickSessionMarkBudget(minutes)} marks` : ""} · stops at {minutes}:00

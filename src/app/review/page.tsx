@@ -561,7 +561,7 @@ const QUESTION_KIND_LABEL: Record<string, string> = {
   extended: "Extended response",
 };
 
-/** One official-style exam question that tests the point on the card just graded. */
+/** One official-style exam question on the spec point of the card just graded. */
 function ExamCheckPanel({ question, onNext }: { question: Question; onNext: () => void }) {
   const marks = question.totalMarks === 1 ? "1 mark" : `${question.totalMarks} marks`;
   return (
@@ -572,7 +572,7 @@ function ExamCheckPanel({ question, onNext }: { question: Question; onNext: () =
         <Pill>{QUESTION_KIND_LABEL[question.kind] ?? question.kind}</Pill>
       </div>
       <p className="text-[11px] text-ink3 mb-3">
-        This question tests the point on the card you just reviewed — now try it the way it will be asked.
+        This question is on the same specification point as the card you just reviewed — now try it the way it will be asked.
       </p>
 
       <div className="text-sm text-ink2 space-y-2">

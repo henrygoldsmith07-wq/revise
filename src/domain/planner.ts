@@ -86,6 +86,21 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
   const nextId = input.idFactory ?? (() => crypto.randomUUID());
 
   const kept = (input.existing ?? []).filter((s) => s.status !== "pending" || s.date < today);
+  // Time already committed on today or later by kept blocks (done or
+  // skipped): it comes out of that day's minutes, and new blocks start after
+  // the last of them, so a rebuild never double-books a slot or a minute.
+  const committed = new Map<IsoDate, { minutes: number; end: number }>();
+  for (const s of kept) {
+    if (s.date < today || s.status === "missed") continue;
+    const row = committed.get(s.date) ?? { minutes: 0, end: 0 };
+    row.minutes += s.minutes;
+    row.end = Math.max(row.end, s.startMinute + s.minutes);
+    committed.set(s.date, row);
+  }
+  // Today's blocks cannot start in the past: the first one waits for the
+  // next five-minute mark after `now` (device-local, like `today`).
+  const nowMinute = now.getHours() * 60 + now.getMinutes() + (now.getSeconds() || now.getMilliseconds() ? 1 : 0);
+  const todayEarliest = Math.ceil(nowMinute / 5) * 5;
 
   // Per-subject exam deadline: a subject stops being scheduled on its exam day
   // and after — the run-up is what the plan optimises, not the exam itself.
@@ -156,6 +171,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
     let minutes = input.availability.find((a) => a.weekday === weekday)?.minutes ?? 0;
     if (input.dailyMinutesCap != null) minutes = Math.min(minutes, input.dailyMinutesCap);
     if (minutes < 10) continue;
+    const committedToday = committed.get(date);
 
     // Fatigue: if the previous N days were heavy, throttle today by 40% so the plan is recoverable.
     const fatigueN = input.fatigueThresholdDays ?? 0;
@@ -170,8 +186,33 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
       if (heavyStreak >= fatigueN) minutes = Math.max(10, Math.round(minutes * 0.6));
     }
 
-    const blocks = Math.max(1, Math.floor(minutes / blockLength));
+    // Kept work has already used part of the day.
+    minutes -= committedToday?.minutes ?? 0;
+    if (minutes < 10) continue;
+
     let cursor = input.dayStartMinute ?? DEFAULT_DAY_START;
+    if (dayOffset === 0) cursor = Math.max(cursor, todayEarliest);
+    if (committedToday) cursor = Math.max(cursor, committedToday.end + 5);
+
+    // Whole blocks that fit the remaining minutes. A day shorter than one
+    // block gets a single block cut to the time there is, never a block
+    // longer than the day. Nothing is planned to run past midnight.
+    let blocks = Math.floor(minutes / blockLength);
+    let dayBlockMinutes = blockLength;
+    if (blocks === 0) {
+      blocks = 1;
+      dayBlockMinutes = minutes;
+    }
+    const room = 24 * 60 - cursor;
+    const fitting = Math.floor((room + 5) / (dayBlockMinutes + 5));
+    if (blocks > fitting) {
+      blocks = fitting;
+      if (blocks === 0 && room >= 10) {
+        blocks = 1;
+        dayBlockMinutes = Math.min(dayBlockMinutes, room);
+      }
+    }
+    if (blocks === 0) continue;
 
     // Subjects whose exam has passed (or is today) do not take blocks: their
     // run-up is over, so the day's attention goes to subjects still climbing
@@ -256,7 +297,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
           userId: input.userId,
           date,
           startMinute: cursor,
-          minutes: blockLength,
+          minutes: dayBlockMinutes,
           subjectId,
           ...(pick.topicId !== undefined ? { topicId: pick.topicId } : {}),
           activity: pick.activity,
@@ -265,7 +306,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
         };
         out.push(session);
         if (!dayFirst) dayFirst = session;
-        cursor += blockLength + 5; // a five-minute breather between blocks
+        cursor += dayBlockMinutes + 5; // a five-minute breather between blocks
         if (pick.topicId) {
           projected.set(pick.topicId, Math.min(1, (projected.get(pick.topicId) ?? 0) + 0.12));
           lastScheduled.set(pick.topicId, date);
@@ -579,36 +620,74 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
   };
 }
 
+/** What a roll-forward must respect so it never plans what buildPlan would refuse. */
+export interface RollForwardConstraints {
+  /** Exam dates: work is never rolled onto or past its subject's next exam day. */
+  exams?: readonly ExamDate[];
+  /** Weekly availability: work is never rolled onto a day with no study time (or less than the block needs). */
+  availability?: readonly Availability[];
+  /** Hard cap on minutes per day, as in PlanInput. */
+  dailyMinutesCap?: number;
+}
+
 /**
- * Missed-session recovery. Anything still pending on a past day is marked
- * `missed` and its work is re-queued onto the next day that has room, oldest
- * first, so nothing silently disappears from the plan.
+ * The first day (from `today`, within a fortnight) that can take `session`:
+ * under the block cap, before the subject's next exam, and — when
+ * availability is known — a study day (buildPlan's 10-minute floor) whose
+ * availability is at least the block's length. Null when none can. The block
+ * cap, not the day's remaining minutes, bounds how much is added: a plan
+ * fills each day, so a minutes test would never let missed work back in.
+ * Without constraints the old behaviour stands: when nothing is under the
+ * cap the work lands on `today`.
  */
-export function rescheduleMissed(
-  plan: PlannedSession[],
+function rollTarget(
+  session: PlannedSession,
   today: IsoDate,
   dailyBlockCap: number,
-  idFactory: () => string = () => crypto.randomUUID(),
-): PlannedSession[] {
-  const out = plan.map((s) => ({ ...s }));
-  const stale = out.filter((s) => s.date < today && s.status === "pending");
-  if (!stale.length) return out;
+  countByDate: Map<IsoDate, number>,
+  constraints: RollForwardConstraints | undefined,
+): IsoDate | null {
+  const exam = constraints?.exams
+    ?.filter((e) => e.subjectId === session.subjectId && e.date >= today)
+    .map((e) => e.date)
+    .sort()[0];
+  for (let i = 0; i < 14; i++) {
+    const candidate = addLocalDays(today, i);
+    if (exam && candidate >= exam) break;
+    if ((countByDate.get(candidate) ?? 0) >= dailyBlockCap) continue;
+    if (constraints?.availability) {
+      const weekday = new Date(`${candidate}T00:00:00Z`).getUTCDay();
+      let room = constraints.availability.find((a) => a.weekday === weekday)?.minutes ?? 0;
+      if (constraints.dailyMinutesCap != null) room = Math.min(room, constraints.dailyMinutesCap);
+      if (room < 10 || session.minutes > room) continue;
+    }
+    return candidate;
+  }
+  return constraints ? null : today;
+}
 
+/**
+ * Re-queue each stale session (oldest-first or in the caller's order) onto
+ * its roll target. A session with no target stays `missed` and is not
+ * re-queued: rolling it onto the exam day or a day with no time would plan
+ * work buildPlan refuses.
+ */
+function requeue(
+  out: PlannedSession[],
+  stale: PlannedSession[],
+  today: IsoDate,
+  dailyBlockCap: number,
+  idFactory: () => string,
+  constraints: RollForwardConstraints | undefined,
+): void {
   const countByDate = new Map<IsoDate, number>();
   for (const s of out) {
-    if (s.date >= today) countByDate.set(s.date, (countByDate.get(s.date) ?? 0) + 1);
+    if (s.date < today || s.status === "missed") continue;
+    countByDate.set(s.date, (countByDate.get(s.date) ?? 0) + 1);
   }
-
   for (const session of stale) {
-    session.status = "missed";
-    let target = today;
-    for (let i = 0; i < 14; i++) {
-      const candidate = addLocalDays(today, i);
-      if ((countByDate.get(candidate) ?? 0) < dailyBlockCap) {
-        target = candidate;
-        break;
-      }
-    }
+    const target = rollTarget(session, today, dailyBlockCap, countByDate, constraints);
+    if (!target) continue;
     countByDate.set(target, (countByDate.get(target) ?? 0) + 1);
     const lastOfDay = out
       .filter((s) => s.date === target)
@@ -623,7 +702,28 @@ export function rescheduleMissed(
       reason: `Rescheduled from ${session.date}. ${session.reason}`.trim(),
     });
   }
+}
 
+/**
+ * Missed-session recovery. Anything still pending on a past day is marked
+ * `missed` and its work is re-queued onto the next day that has room, oldest
+ * first, so nothing silently disappears from the plan. Pass `constraints`
+ * (exam dates, availability) so work is never rolled onto or after its
+ * subject's exam day or onto a day without the time; work that cannot be
+ * placed stays visibly `missed`.
+ */
+export function rescheduleMissed(
+  plan: PlannedSession[],
+  today: IsoDate,
+  dailyBlockCap: number,
+  idFactory: () => string = () => crypto.randomUUID(),
+  constraints?: RollForwardConstraints,
+): PlannedSession[] {
+  const out = plan.map((s) => ({ ...s }));
+  const stale = out.filter((s) => s.date < today && s.status === "pending");
+  if (!stale.length) return out;
+  for (const session of stale) session.status = "missed";
+  requeue(out, stale, today, dailyBlockCap, idFactory, constraints);
   return out.sort((a, b) => (a.date === b.date ? a.startMinute - b.startMinute : a.date < b.date ? -1 : 1));
 }
 
@@ -791,26 +891,8 @@ export function rescheduleMissedPrioritised(
     if (orig) orig.status = "missed";
   }
 
-  const countByDate = new Map<IsoDate, number>();
-  for (const s of out) if (s.date >= today) countByDate.set(s.date, (countByDate.get(s.date) ?? 0) + 1);
-
-  for (const session of stale) {
-    let target = today;
-    for (let i = 0; i < 14; i++) {
-      const candidate = addLocalDays(today, i);
-      if ((countByDate.get(candidate) ?? 0) < dailyBlockCap) { target = candidate; break; }
-    }
-    countByDate.set(target, (countByDate.get(target) ?? 0) + 1);
-    const lastOfDay = out.filter((s) => s.date === target).sort((a, b) => a.startMinute - b.startMinute).pop();
-    out.push({
-      ...session,
-      id: idFactory(),
-      date: target,
-      startMinute: lastOfDay ? lastOfDay.startMinute + lastOfDay.minutes + 5 : DEFAULT_DAY_START,
-      status: "pending",
-      reason: `Rescheduled from ${session.date}. ${session.reason}`.trim(),
-    });
-  }
+  // With exam dates known, nothing is rolled onto or past an exam day.
+  requeue(out, stale, today, dailyBlockCap, idFactory, exams.length ? { exams } : undefined);
 
   return out.sort((a, b) => (a.date === b.date ? a.startMinute - b.startMinute : a.date < b.date ? -1 : 1));
 }

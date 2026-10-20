@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { trustedAssessmentContent } from "./content-trust";
-import { questionFamily, unseenQuestion } from "./learning-evidence";
+import { questionFamily, unseenQuestionTester } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Question } from "./types";
 
@@ -70,7 +70,9 @@ export function dimensionOf(question: Question, opts: { prerequisite?: boolean }
  * seen (including same-family variants). Trust is enforced by the selector.
  */
 export function quickDiagnosticPool(questions: readonly Question[], attempts: readonly Attempt[], subjectId: Id): Question[] {
-  return questions.filter((q) => q.subjectId === subjectId && unseenQuestion(q, attempts, questions));
+  // Index the bank and the history once per call, not once per question.
+  const unseen = unseenQuestionTester(attempts, questions);
+  return questions.filter((q) => q.subjectId === subjectId && unseen(q));
 }
 
 export interface QuickSelection {
@@ -118,23 +120,32 @@ export function selectQuickDiagnostic(input: {
   const families = new Set<string>();
   const byId = new Map(pool.map((q) => [q.id, q] as const));
   const topicCount = new Map<Id, number>();
+  const dimensionCount = new Map<DiagnosticDimension, number>();
   let used = 0;
-  let progressed = true;
-  while (progressed) {
-    progressed = false;
-    for (const dimension of DIAGNOSTIC_DIMENSIONS) {
+  // Greedy, one item at a time. Each dimension offers its best item (least
+  // sampled topic first); the step takes, in order: a new dimension on a new
+  // topic, a new topic, a new dimension, then anything. A few questions fit
+  // in the budget, so spending one on a topic already sampled — just to tick
+  // a dimension — left a "quick check" covering two topics.
+  for (;;) {
+    const offers = DIAGNOSTIC_DIMENSIONS.flatMap((dimension) => {
       const list = byDimension.get(dimension) ?? [];
       const pick = [...list]
         .filter((i) => !families.has(questionFamily(byId.get(i.questionId)!)) && used + i.seconds <= budget)
         .sort((a, b) => (topicCount.get(a.topicId) ?? 0) - (topicCount.get(b.topicId) ?? 0) || input.topicIds.indexOf(a.topicId) - input.topicIds.indexOf(b.topicId))[0];
-      if (!pick) continue;
-      items.push(pick);
-      families.add(questionFamily(byId.get(pick.questionId)!));
-      topicCount.set(pick.topicId, (topicCount.get(pick.topicId) ?? 0) + 1);
-      list.splice(list.indexOf(pick), 1);
-      used += pick.seconds;
-      progressed = true;
-    }
+      return pick ? [{ dimension, pick, list }] : [];
+    });
+    if (!offers.length) break;
+    const rank = (offer: (typeof offers)[number]) =>
+      ((topicCount.get(offer.pick.topicId) ?? 0) > 0 ? 2 : 0) + ((dimensionCount.get(offer.dimension) ?? 0) > 0 ? 1 : 0);
+    const best = offers.reduce((a, b) => (rank(b) < rank(a) || (rank(b) === rank(a) && (dimensionCount.get(b.dimension) ?? 0) < (dimensionCount.get(a.dimension) ?? 0)) ? b : a));
+    const { pick, list, dimension } = best;
+    items.push(pick);
+    families.add(questionFamily(byId.get(pick.questionId)!));
+    topicCount.set(pick.topicId, (topicCount.get(pick.topicId) ?? 0) + 1);
+    dimensionCount.set(dimension, (dimensionCount.get(dimension) ?? 0) + 1);
+    list.splice(list.indexOf(pick), 1);
+    used += pick.seconds;
   }
   return {
     items,
@@ -261,6 +272,10 @@ export function resumeQuickDiagnostic(
   if (!saved || typeof saved !== "object") return null;
   const run = saved as Partial<QuickDiagnosticRun>;
   if (run.version !== 1 || run.subjectId !== subjectId || !Array.isArray(run.items) || !run.items.length || !Array.isArray(run.doneAttemptIds)) return null;
+  // Nothing answered yet: nothing to preserve, so choose afresh. A run saved
+  // before reviewed questions arrived (onboarding starts the check at once)
+  // would otherwise pin a practice-tier set after trusted supply exists.
+  if (!run.doneAttemptIds.length) return null;
   const questionIds = new Set(questions.map((q) => q.id));
   if (!run.items.every((item) => item && questionIds.has(item.questionId))) return null;
   // Every item answered but the report not yet shown (a reload on the last

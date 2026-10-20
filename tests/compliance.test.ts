@@ -88,14 +88,21 @@ describe("PII masking", () => {
     expect(maskSummaryMany([maskPii("clean text")])).toBeNull();
   });
 
-  it("maskStudentText and maskChatHistory scrub only user-authored text", () => {
+  it("maskStudentText and maskChatHistory scrub both roles, since the browser supplies the assistant turns too", () => {
     expect(maskStudentText("Ring 07700 900123")).not.toContain("07700 900123");
     const history = maskChatHistory([
       { role: "user", content: "My name is Anna, call 07700 900123" },
       { role: "assistant", content: "Anna, the answer is 42" },
+      { role: "assistant", content: "Email me at someone@example.com" },
     ]);
     expect(history[0].content).not.toContain("Anna");
-    expect(history[1].content).toBe("Anna, the answer is 42");
+    expect(history[0].content).not.toContain("07700 900123");
+    // A name established in one turn is masked where another turn repeats it.
+    expect(history[1].content).not.toContain("Anna");
+    expect(history[1].content).toContain("the answer is 42");
+    // An assistant turn is masked on its own terms as well.
+    expect(history[2].content).not.toContain("someone@example.com");
+    expect(history.map((h) => h.role)).toEqual(["user", "assistant", "assistant"]);
   });
 });
 

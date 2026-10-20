@@ -1,4 +1,4 @@
-import { tokenise, pointCoverage, stem, STOP_WORDS, withinEditDistance, canonicalTokenSet, inequalityWordsToSymbols, notationOnlyPoint, notationPresent, canonicalDirectionConflict, canonicalScalingConflict, labelledAnswerScope } from "./marking-language";
+import { tokenise, pointCoverage, stem, wordRoot, STOP_WORDS, withinEditDistance, canonicalTokenSet, inequalityWordsToSymbols, notationOnlyPoint, notationPresent, canonicalDirectionConflict, canonicalScalingConflict, labelledAnswerScope } from "./marking-language";
 export { tokenise, pointCoverage } from "./marking-language";
 import { numericEquivalent, numericMatch, extractNumbersCached, requiresStructuredNumericMatch, isNumericPoint, sameToTwoSigFigs } from "./marking-numeric";
 export { numericEquivalent, isNumericPoint } from "./marking-numeric";
@@ -6,6 +6,7 @@ import { symbolicMatch } from "./maths-equivalence";
 import { markCalculationWorking } from "./calculation-rubric";
 import { contradictionExplanation, schemeContested, schemeContradiction, VERY_SHORT_ANSWER_WORDS } from "./marking-contradiction";
 import { rejectedStatement, rejectExplanation } from "./marking-reject";
+import { formulaContradicted, formulaEvidence, joinThousands } from "./marking-formula";
 import type { MarkEvidence, MarkedPart, Question, QuestionPart } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -221,6 +222,30 @@ const ANTONYM_STEMS: Array<[string, string]> = [
   ["longer", "shorter"], ["stronger", "weaker"],
 ];
 
+/**
+ * The scaffolding guard's distinctive word, in another form of the same word:
+ * "symmetrical" for "symmetry", or one slip of the pen (the bounded typo
+ * match coverage itself uses). Two words are one family when they share a
+ * root (wordRoot in marking-language.ts); words that only start alike
+ * ("hydroxide", "hydroxyl") never are.
+ */
+function sameWordFamily(token: string, given: Set<string>): boolean {
+  if (token.length < 5 || /\d/.test(token)) return false;
+  const root = wordRoot(token);
+  for (const candidate of given) {
+    if (candidate.length < 4 || /\d/.test(candidate)) continue;
+    if (withinEditDistance(token, candidate, 1) || wordRoot(candidate) === root) return true;
+  }
+  return false;
+}
+
+/** Units and function names the anti-recitation cap does not count as wording. */
+const CAP_UNIT_WORDS = new Set(["mol", "kbq", "mbq", "gbq", "min", "kpa", "mpa", "kwh", "sin", "cos", "tan", "log", "ohm", "rad"]);
+
+/** A direction word as a word of its own: "less" is not in "colourless", "gain" is not in "against". */
+const STEM_AT_WORD_START = new Map(ANTONYM_STEMS.flat().map((s) => [s, new RegExp(`(?<![a-z])${s}`)]));
+const hasDirection = (text: string, s: string) => STEM_AT_WORD_START.get(s)!.test(text);
+
 function polarityConflict(point: string, answer: string): boolean {
   const p = point.toLowerCase();
   const a = answer.toLowerCase();
@@ -229,17 +254,78 @@ function polarityConflict(point: string, answer: string): boolean {
     // current") is a relationship, so one direction word in the answer says
     // nothing by itself: "the current is lower" is right. It is reversed only
     // when it is attached to what the point gives the other direction:
-    // "lower voltage", or "the current is higher".
-    if (p.includes(x) && p.includes(y)) {
+    // "lower voltage", or "the current is higher" — and the answer does not
+    // also state the point's own pairing for it (an answer that weighs a
+    // lower and a higher temperature in turn has not reversed either).
+    if (hasDirection(p, x) && hasDirection(p, y)) {
       return [[x, y], [y, x]].some(([said, other]) => {
         const reversed = directionTargets(p, other!);
         const kept = directionTargets(p, said!);
-        return [...directionTargets(a, said!)].some((word) => reversed.has(word) && !kept.has(word));
+        const statedAsPoint = directionTargets(a, other!);
+        return [...directionTargets(a, said!)].some((word) => reversed.has(word) && !kept.has(word) && !statedAsPoint.has(word));
       });
     }
-    return (p.includes(x) && a.includes(y) && !a.includes(x)) ||
-      (p.includes(y) && a.includes(x) && !a.includes(y));
+    return (hasDirection(p, x) && hasDirection(a, y) && !hasDirection(a, x) && !aboutSomethingElse(p, a, x, y)) ||
+      (hasDirection(p, y) && hasDirection(a, x) && !hasDirection(a, y) && !aboutSomethingElse(p, a, y, x));
   });
+}
+
+const POLARITY_CLAUSE = /[.;,:!?]\s|\s(?:but|while|whereas|although|so|because|since|and|which|therefore)\s/;
+
+/**
+ * True when every place the answer says the opposite direction (`said`) is
+ * not a reversal of the point (which says `wanted`):
+ *  - a comparison stated from the other side: "A is less diverse than B" is
+ *    "B is more even rather than dominated like A" (the answer's "than"
+ *    names the point's subject);
+ *  - the other direction of a reaction: "the forward reaction is exothermic"
+ *    for "favours the endothermic reverse reaction";
+ *  - in a longer answer, a different claim: the opposite word is attached
+ *    to a quantity the point never mentions, in a clause that shares almost
+ *    nothing with the point ("more insect larvae" beside "less phosphate").
+ * A very short answer gets only the first two: its words are all about the
+ * point. Any occurrence that fits none of these keeps the veto.
+ */
+function aboutSomethingElse(point: string, answer: string, wanted: string, said: string): boolean {
+  const pointTokens = new Set([...canonicalTokenSet(point)].filter((t) => !ANTONYM_STEMS.flat().some((s) => t.startsWith(s))));
+  const shortAnswer = answer.split(/\s+/).filter(Boolean).length <= VERY_SHORT_ANSWER_WORDS;
+  const pointWords = point.split(/[^a-z0-9²³]+/).filter(Boolean);
+  const wantedAt = pointWords.findIndex((w) => w.startsWith(wanted));
+  const pointThan = pointWords.indexOf("than", wantedAt);
+  const subject = new Set(pointWords.slice(0, wantedAt).flatMap((w) => [...canonicalTokenSet(w)]));
+  const object = new Set(pointThan > wantedAt ? pointWords.slice(pointThan + 1).flatMap((w) => [...canonicalTokenSet(w)]) : []);
+  const reactionSide = (words: string[], at: number) => {
+    const near = words.slice(Math.max(0, at - 3), at + 4);
+    return near.includes("forward") ? "forward" : near.some((w) => w === "reverse" || w === "backward") ? "reverse" : null;
+  };
+  const pointSide = wantedAt >= 0 ? reactionSide(pointWords, wantedAt) : null;
+  const clauses = answer.split(POLARITY_CLAUSE).filter((clause) => (clause ?? "").trim());
+  let any = false;
+  for (const clause of clauses) {
+    const words = clause.split(/[^a-z0-9²³]+/).filter(Boolean);
+    for (let i = 0; i < words.length; i++) {
+      if (!words[i]!.startsWith(said)) continue;
+      any = true;
+      // Swapped comparison: the answer's "than" names the point's subject.
+      const than = words.indexOf("than", i);
+      if (pointThan > wantedAt && than > i) {
+        const tail = words.slice(than + 1).flatMap((w) => [...canonicalTokenSet(w)]);
+        const onSubject = tail.filter((t) => subject.has(t)).length;
+        const onObject = tail.filter((t) => object.has(t)).length;
+        if (onSubject > 0 && onSubject > onObject) continue;
+      }
+      // The other direction of the reaction.
+      const side = reactionSide(words, i);
+      if (pointSide && side && side !== pointSide && /thermic$/.test(said)) continue;
+      if (shortAnswer) return false;
+      const targets = [...directionTargets(words.join(" "), said)];
+      if (!targets.length || targets.some((t) => [...canonicalTokenSet(t)].some((token) => pointTokens.has(token)))) return false;
+      const clauseTokens = canonicalTokenSet(clause);
+      const shared = [...pointTokens].filter((t) => clauseTokens.has(t)).length;
+      if (!pointTokens.size || shared / pointTokens.size > 0.25) return false;
+    }
+  }
+  return any;
 }
 
 /** Words that link a quantity to its direction, never the quantity itself. */
@@ -490,6 +576,11 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
 
   // "ΔG is zero or negative" is judged exactly as "ΔG ≤ 0" by every check below.
   const judged = inequalityWordsToSymbols(trimmed);
+  // Values the part's own scheme and model answer reach: a substituted
+  // formula counts only when it evaluates to one of them (marking-formula.ts).
+  let expectedValues: number[] | null = null;
+  const expected = () => (expectedValues ??= extractNumbersCached(joinThousands([...part.markScheme, part.modelAnswer ?? ""].join(" ")).replace(/[−–—]/g, "-"))
+    .flatMap((hit) => (hit.value == null ? [] : [hit.value])));
   for (const [pointIndex, point] of part.markScheme.entries()) {
     const thresh = perPointThreshold(point, calibration);
     const scope = labelledAnswerScope(point, judged);
@@ -517,14 +608,23 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
               : numeric
                 ? (num || cov >= thresh)
                 : (cov >= thresh || num);
+    // An equation point the answer shows rearranged, substituted with the
+    // right numbers, or worked to the same value (marking-formula.ts).
+    // Asked lazily: most points never need it.
+    let formulaChecked: boolean | null = null;
+    const formula = () => (formulaChecked ??= formulaEvidence(point, judged, expected));
+    if (!ok && formula()) ok = true;
     if (ok && !num && sym === "unknown") {
       const discriminative = [...(pointTokenSets[pointIndex] ?? [])].filter(
         (t) => (documentFrequency.get(t) ?? 0) === 1,
       );
-      if (discriminative.length >= 1 && !discriminative.some((t) => givenTokens.has(t))) ok = false;
+      if (discriminative.length >= 1 && !discriminative.some((t) => givenTokens.has(t) || sameWordFamily(t, givenTokens)) && !formula()) ok = false;
     }
     // Reversed reasoning vetoes the point even when its keywords otherwise land.
-    if (ok && sym !== "equivalent" && polarityConflict(point, judged)) ok = false;
+    if (ok && sym !== "equivalent" && polarityConflict(point, judged) && !formula()) ok = false;
+    // An equation point the answer writes differently in the same quantities
+    // ("v² = u² − 2as" for "v² = u² + 2as"): coverage cannot see the sign.
+    if (ok && formulaContradicted(point, judged)) ok = false;
     // The same check after equivalent wording is canonicalised ("goes down"
     // for "rises", "four times bigger" for "one quarter"). Only where the
     // answer's words are about this point: a very short answer, or the
@@ -570,7 +670,9 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   if (!trimmed) awarded = 0;
   // An answer that says almost nothing cannot score full marks however many
   // keywords it happens to contain.
-  if (trimmed.split(/\s+/).length < 3 && part.marks > 1) awarded = Math.min(awarded, 1);
+  // Words are counted between spaces, commas and equals signs, so compact
+  // working ("u_2=3(1)+2=5, u_3=3(5)+2=17") is not mistaken for two words.
+  if (trimmed.split(/[\s,;=]+/).filter(Boolean).length < 3 && part.marks > 1) awarded = Math.min(awarded, 1);
 
   // Physics uses recorded support exposure to judge independence. Correct
   // reasoning cannot lose an exam mark merely for using the rubric's wording.
@@ -579,11 +681,15 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // from the scheme's own vocabulary, the response recites rather than
   // engages — an examiner caps it below full marks. Genuine answers
   // paraphrase, so they keep novel wording. Filler words and stray
-  // punctuation do not count as engagement, on either side. The coverage
-  // ratio also catches numeric-dominant schemes whose verbatim restatement
-  // carries almost no independent wording.
+  // punctuation do not count as engagement, on either side.
+  // The cap reads words only. Numbers, units and one- or two-letter symbols
+  // are not wording: correct working for a calculation necessarily repeats
+  // the scheme's values and units ("q = 50.0 × 4.18 × 7.5 = 1567.5 J"), so
+  // counting them capped every terse correct calculation, while a recited
+  // prose scheme is still caught by its words.
   const stripEdges = (t: string) => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
-  const contentTokens = [...tokenise(trimmed)].map(stripEdges).filter((t) => t && !STOP_WORDS.has(t));
+  const contentTokens = [...tokenise(trimmed)].map(stripEdges)
+    .filter((t) => t && !STOP_WORDS.has(t) && /[a-z]{3}/.test(t) && !CAP_UNIT_WORDS.has(t));
   if (!part.capabilityIds?.some(id => id.startsWith("phys.")) &&
     contentTokens.length >= 5 && awarded >= part.marks && part.marks > 1) {
     const schemeVocabulary = new Set(
@@ -611,14 +717,24 @@ export function markPart(part: QuestionPart, answer: string, calibration?: Parti
   // cannot silently un-retract an answer ("reversed"→"reversde").
   const tailFragments = trimmed.split(/\.\s+/).slice(-2);
   const retractTail = tailFragments.join(". ");
-  const wordsOfTail = retractTail.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 4);
+  // "The reverse reaction" names a reaction, not a retraction: a cue word
+  // directly before "reaction" or "direction" is not a cue.
+  const tailWords = retractTail.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  const wordsOfTail = tailWords.filter((w) => w.length >= 4);
+  const cueWords = tailWords.filter((w, i) => w.length >= 4 && !/^(?:reactions?|directions?)$/.test(tailWords[i + 1] ?? ""));
   const CUE_WORDS = ["opposite", "reversed", "reverse", "incorrect", "wrong", "instead"];
-  const SELF_WORDS = ["answer", "statement", "claim", "assumption", "conclusion", "itself", "initial"];
+  // "Overall" refers to the answer's own conclusion ("therefore the overall
+  // effect reverses").
+  const SELF_WORDS = ["answer", "statement", "claim", "assumption", "conclusion", "itself", "initial", "overall"];
   const tailHasCue = CUE_WORDS.some((cue) =>
-    wordsOfTail.some((w) => w === cue || (cue.length >= 5 && withinEditDistance(w, cue, 1)) || (w.startsWith(cue.slice(0, 5)) && Math.abs(w.length - cue.length) <= 2)),
+    cueWords.some((w) => w === cue || (cue.length >= 5 && withinEditDistance(w, cue, 1)) || (w.startsWith(cue.slice(0, 5)) && Math.abs(w.length - cue.length) <= 2)),
   );
   const tailHasSelfRef = SELF_WORDS.some((cue) =>
-    wordsOfTail.some((w) => w === cue || (w.startsWith(cue.slice(0, 4)) && Math.abs(w.length - cue.length) <= 3)),
+    // A self-reference is the word itself, an inflection of it ("claims",
+    // "statements") or one slip of the pen from it. A four-letter prefix was
+    // too loose: it read "concentration" as "conclusion", so "the reverse
+    // reaction ... the concentration decreases" lost a mark as a retraction.
+    wordsOfTail.some((w) => w === cue || (w.startsWith(cue) && w.length - cue.length <= 2) || (cue.length >= 5 && withinEditDistance(w, cue, 1))),
   );
   if (awarded >= part.marks && part.marks > 1 && tailHasCue && tailHasSelfRef) {
     awarded = part.marks - 1;

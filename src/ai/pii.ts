@@ -119,15 +119,32 @@ export function maskStudentText(text: string): string {
   return maskPii(text).masked;
 }
 
-/** Mask every entry of a chat history without mutating the original. */
+/**
+ * Mask every entry of a chat history, both roles, without mutating the
+ * original. "Assistant" turns are sent back by the browser, so they are no
+ * more trustworthy than the student's own: a reply can echo the student's
+ * name, and a hand-written request can put anything in that role. A name
+ * established in any turn ("My name is Anna") is also masked wherever it
+ * recurs in the other turns ("Anna, the answer is…").
+ */
 export function maskChatHistory(history: { role: "user" | "assistant"; content: string }[]): {
   role: "user" | "assistant";
   content: string;
 }[] {
-  return history.map((entry) => ({
-    role: entry.role,
-    content: entry.role === "user" ? maskStudentText(entry.content) : entry.content,
-  }));
+  const results = history.map((entry) => maskPii(entry.content));
+  const names = new Map<string, string>();
+  for (const result of results) {
+    for (const e of result.entities) {
+      if (e.kind === "name" && !/^entity\d*$/i.test(e.original) && !names.has(e.original)) names.set(e.original, e.placeholder);
+    }
+  }
+  return history.map((entry, index) => {
+    let content = results[index]!.masked;
+    for (const [original, placeholder] of names) {
+      content = content.replace(new RegExp(`\\b${escapeRegExp(original)}\\b`, "gi"), placeholder);
+    }
+    return { role: entry.role, content };
+  });
 }
 
 /** Human-readable summary for the local disclosure ("2 details withheld"). */

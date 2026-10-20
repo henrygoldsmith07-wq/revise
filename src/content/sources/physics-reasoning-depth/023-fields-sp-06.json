@@ -140,9 +140,9 @@
         "Acceleration: eV = ½mv² → v = √(2eV/m)",
         "In the field: r = mv/(eB)",
         "Substituting v: r = m√(2eV/m)/(eB) = √(2mV/e)/B",
-        "For m = 1.0×10⁻²⁵ kg: r = √(2×10⁻²⁵×500/1.6×10⁻¹⁹)/0.080 = 0.25 m"
+        "For m = 1.0×10⁻²⁵ kg: r = √(2×10⁻²⁵×500/1.6×10⁻¹⁹)/0.080 ≈ 0.31 m"
       ],
-      "answer": "The accelerating voltage gives v = √(2eV/m); the field turns this into r = mv/eB = √(2mV/e)/B. For a 1.0×10⁻²⁵ kg ion at 500 V in 0.080 T, r = √(2×10⁻²⁵×500/1.6×10⁻¹⁹)/0.080 ≈ 0.25 m. The radius grows as √m — heavier ions curve less, which is exactly how a mass spectrometer sorts them."
+      "answer": "The accelerating voltage gives v = √(2eV/m); the field turns this into r = mv/eB = √(2mV/e)/B. For a 1.0×10⁻²⁵ kg ion at 500 V in 0.080 T, r = √(2×10⁻²⁵×500/1.6×10⁻¹⁹)/0.080 ≈ 0.31 m. The radius grows as √m — heavier ions curve less, which is exactly how a mass spectrometer sorts them."
     },
     {
       "demand": "synoptic",

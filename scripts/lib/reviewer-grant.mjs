@@ -57,6 +57,24 @@ export function grantProblems(args) {
   return problems;
 }
 
+/**
+ * What to tell the maintainer when public.grant_reviewer_role refuses. A
+ * reviewer's pseudonym never changes once granted: the two-independent-
+ * reviewer rule is counted by it, so re-granting the same account under a new
+ * --label would make one person count twice. Re-run with their existing label.
+ */
+export function grantFailureHint(message) {
+  const text = String(message ?? "");
+  const existing = /already reviewer ([a-z0-9][a-z0-9._-]*)/.exec(text)?.[1];
+  if (/pseudonym cannot change/.test(text)) {
+    return existing
+      ? ` (this account already reviews as ${existing}; re-run with --label ${existing}. A pseudonym never changes, because independent approvals are counted by it)`
+      : " (this account already has a reviewer pseudonym; re-run with its existing --label)";
+  }
+  if (/reviewer_label/.test(text)) return " (that pseudonym is already used by another reviewer)";
+  return "";
+}
+
 /** The portal page to send the teacher: the transfer-pair batch for one subject. */
 export function reviewerLink(site, subject = "physics") {
   return `${site}/reviewer/pairs?subject=${encodeURIComponent(subject)}`;

@@ -177,6 +177,36 @@ portal **continues the existing hash chain** in `public.review_audit_events`:
   Apply it through the operator release process before relying on this database
   guard in a deployed environment. It was executed locally in PostgreSQL/PGlite,
   not applied to live Supabase by this change.
+- An active reviewer can insert into `public.review_audit_events` directly
+  over PostgREST, bypassing the portal route, and one row that
+  `auditLogIssues` rejects would stop every reviewer recording or exporting
+  (the table is append-only even for the service role). So
+  `supabase/migrations/20261018000100_reviewer_audit_integrity.sql` makes the
+  insert trigger refuse every such row: it **recomputes the hash** in SQL
+  (`review_audit_canonical_json` / `review_audit_event_hash` reproduce
+  `canonicalJson` and `eventHash` exactly, and fail closed on non-integer
+  numbers or non-ASCII keys), accepts only the `ReviewAuditEvent` fields,
+  only a review-gated subject, uses JavaScript's `trim()` whitespace for
+  "nonblank", and refuses a second approval of the same question and
+  fingerprint by the same reviewer (same pseudonym **or** same account)
+  without a reject/revise between. `tests/reviewer-sql.test.ts` checks the
+  SQL hash against `eventHash` for awkward strings and that whatever the
+  database accepts passes `combineAuditLog`.
+- **The anchor.** The first row of an empty runtime table must continue the
+  committed log's tail recorded in `public.review_audit_anchor` (seeded
+  `0, genesis`, which is the committed log today). If events are ever
+  committed through the CLI before the portal records its first decision,
+  the operator records the new tail first, with the service role:
+  `select public.set_review_audit_anchor(<committed length>, '<last hash>');`.
+  Once the runtime table has a row the anchor is frozen (the chain continues
+  from its own tail). Until then a mismatch refuses portal decisions (the
+  route logs code `55000`) rather than forking the chain.
+- Reviewers can read every column of `review_audit_events` except
+  `reviewer_user_id` (column-level grants); the portal reads only
+  `seq, previous_hash, hash, event`.
+- Limit: the database cannot see approvals that exist only in the committed
+  file (CLI-recorded, never in the runtime table). Today the committed log is
+  empty, so there are none; the portal route still checks the combined log.
 
 ### How decisions reach students
 
@@ -213,7 +243,10 @@ email (with `--invite`, it sends Supabase's own invite email when there is
 none, landing on `/reviewer/pairs?subject=physics`), then calls
 `public.grant_reviewer_role` (or `revoke_reviewer_role`). It validates the
 same constraints as `public.reviewer_roles` first, refuses a label that reuses
-the email address, and refuses the obvious self-grant (the person granting is
+the email address, and refuses the obvious self-grant. **A reviewer's
+`--label` is permanent:** independent approvals are counted by it, so the
+database refuses to re-grant an existing account under a different label
+(the command says which label to re-run with) (the person granting is
 the maintainer who authored the questions; that is a guard against a mistake,
 not an identity proof). It prints the link to send the teacher.
 
@@ -234,11 +267,15 @@ The manual route still works and is what the command does:
    );
    ```
 
-   Re-running it updates the grant. `select public.revoke_reviewer_role(<uuid>);`
+   Re-running it with the **same** label updates the role, qualification and
+   granted-by, and lifts a revoke; a different label is refused.
+   `select public.revoke_reviewer_role(<uuid>);`
    stops further decisions immediately; past decisions stay in the chain.
    Neither function can be called by a signed-in user.
 3. Reviewer ids are what students and the committed ledger see; use a stable
-   pseudonym, not an email address.
+   pseudonym, not an email address. If a teacher returns with a new auth
+   account, grant it their **old** label: the database can only tell two
+   accounts are one person through the label.
 4. **Supabase redirect allow-list.** The portal's sign-in link (and the
    invite) return the teacher to the portal page they opened, such as
    `/reviewer/pairs?subject=physics`. Supabase only honours redirect URLs in

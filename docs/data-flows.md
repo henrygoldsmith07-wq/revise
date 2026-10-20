@@ -37,7 +37,7 @@ until the staging suite has passed against a migrated database.
 | Sink | What leaves the device | Trigger | Gate | Default state | Learner free text? | Where it is tested |
 |---|---|---|---|---|---|---|
 | **IndexedDB** (15 stores, `src/data/db.ts`) | Nothing, by itself. It is the primary durable store; egress only happens through the writers below. | Any repository write in `src/data/repository.ts` | `bindDatabaseProfile` pins one profile per application boundary. `clearAll()` and `deleteLocalDatabase()` are the only wipe paths. | Signed-out local profile named `revise`, profile id `local`. No network dependency. | **Yes** — answers, card text, `Mistake.description`, settings, E2EE key material. Plaintext at rest. | `tests/repository.test.ts`, `tests/content-id-migration.test.ts`, `tests/ai-resilience.test.ts` |
-| **Supabase sync** (`src/data/sync.ts`, `src/data/sync-contract.ts`, `src/data/sync-deletions.ts`) | Whole domain rows for the 8 collection stores plus settings, streak, lesson progress, learner records and tombstones. Columns: `user_id`, `subject_id`, `topic_id`, `due`, `date`, `data` (JSONB), `updated_at`. | `sync()` — debounced auto-sync timer, manual sync, and the background drain pass | `enqueue()` returns immediately when Supabase is unconfigured. `authIdentity()` must return `"ok"` and is re-checked before and after every batch. `userId !== "local"`. Row-level security scopes every table to `auth.uid()`. | **Off** for a signed-out learner. On for a signed-in learner with a working network. E2EE is **off** by default. | **Yes**, unless E2EE is switched on, in which case `data` is an AES-GCM blob. `user_id` and `updated_at` stay plaintext by design; `due`/`date` are nulled when E2EE is on. | `tests/sync-resilience.test.ts`, `tests/sync-pagination.test.ts`, `tests/sync-schema-parity.test.ts`, `tests/supabase-staging.test.ts`, `tests/compliance.test.ts`, `tests/learner-continuity.test.ts`, `tests/continuity-pull.test.ts` |
+| **Supabase sync** (`src/data/sync.ts`, `src/data/sync-contract.ts`, `src/data/sync-deletions.ts`) | Whole domain rows for the 8 collection stores plus settings, streak, lesson progress, learner records and tombstones. Columns: `user_id`, `subject_id`, `topic_id`, `due`, `date`, `data` (JSONB), `updated_at`. | `sync()` — debounced auto-sync timer, manual sync, and the background drain pass | `enqueue()` returns immediately when Supabase is unconfigured. `authIdentity()` must return `"ok"` and is re-checked before and after every batch. `userId !== "local"`. Row-level security scopes every table to `auth.uid()`. | **Off** for a signed-out learner. On for a signed-in learner with a working network. E2EE is **off** by default. | **Yes**, unless E2EE is switched on, in which case `data` is an AES-GCM blob. `user_id`, `updated_at`, `subject_id` and `topic_id` stay plaintext even with E2EE on (which subjects and topics a learner studies, and how much); `due`/`date` are nulled when E2EE is on. | `tests/sync-resilience.test.ts`, `tests/sync-pagination.test.ts`, `tests/sync-schema-parity.test.ts`, `tests/supabase-staging.test.ts`, `tests/compliance.test.ts`, `tests/learner-continuity.test.ts`, `tests/continuity-pull.test.ts` |
 | **AI provider** (`src/app/api/ai/route.ts`, `src/ai/transport.ts`, `src/ai/egress.ts`, `src/ai/client.ts`, `src/ai/provider.ts`, `src/ai/marking-resilience.ts`, `src/ai/mark-dlq.ts`) | A task name plus the output of the egress policy (`src/ai/egress.ts`): for `mark` a minimised question (no model answer, provenance or reviewer data) and PII-masked answers; for `diagnose` category plus masked description per mistake; for `cards-from-notes`, `extract-questions`, `explain`, `socratic`, `diagnose-error` and `route-spec` masked text; for `ocr` a JPEG/PNG with EXIF/GPS/text metadata stripped (the handwriting itself cannot be masked). Downstream: Anthropic or any OpenAI-compatible endpoint, plus classifier.dev on `diagnose-error`. | A learner action — submit an answer, ask for an explanation, photograph work, paste notes. Also the DLQ drain pass, through the **same transport** as the live request. | Browser: the learner's consent, read from IndexedDB on every call, then the egress policy, in `sendAiTask` — the only code that POSTs to `/api/ai`. Server: `getUser()` (401); fail-closed 503 in production when provider credentials exist but auth is not configured; **consent from `public.ai_consent` on every request (403 absent/disabled/revoked, 503 unreadable), before parsing**; zod `payloadSchemas` (bounded mark-question and mistake shapes); body-size caps; the egress policy re-applied; per-user quota via `consume_ai_quota`. | **Off.** `aiEnabled` defaults to `false`; legacy stored `true` without a recorded consent wording reads as off. | **Masked everywhere text can be masked**, by the same idempotent policy in the browser and on the server. OCR images are metadata-stripped and sent only with consent. | `tests/api-routes-behaviour.test.ts`, `tests/ai-consent.test.ts`, `tests/ai-egress.test.ts`, `tests/ai-task-policy.test.ts`, `tests/api-ai-failure.test.ts`, `tests/security.test.ts`, `tests/compliance.test.ts`, `tests/ai-resilience.test.ts` |
 | **Pulse** (`src/app/api/pulse/history/route.ts`, `src/data/pulse-consent.ts`) | A paginated view of the caller's own review logs and attempts: record id, card/topic/subject id, grade, confidence, elapsed time, awarded/max, mode, markedBy, timestamps. | An authenticated `GET` to the history endpoint. | `pulseHistoryAllowed()` reads the synced `user_settings.data` on **every** request, including every page of a pagination run. Missing row, missing flag, or anything other than boolean `true` withholds. | `UserSettings.pulseEnabled` defaults to `false` (`src/data/repository.ts`). There is a toggle in Settings. | **No.** The response shape has no free-text field; answers and feedback are not part of it. | `tests/api-routes-behaviour.test.ts` — executes the route and proves 403 when consent is absent, disabled, or revoked mid-pagination. Also `tests/pulse-history-pagination.test.ts`, `tests/api-boundary.test.ts`. `tests/pulse-consent.test.ts` covers the predicate only. |
 | **Telemetry** (`src/lib/observability.ts`) | `{ event, at, app: "revise", fields }` where `fields` is built key-by-key from a closed allowlist. | Sync completed/failed, migration failure, AI degraded, storage quota. | `safeTelemetryFields()` rebuilds the object from the 5 allowed event names and 15 allowed field names, clamping numbers and sanitising labels. Out-of-contract keys are dropped, not passed through. | **Nothing leaves the device** unless `NEXT_PUBLIC_OBSERVABILITY_ENDPOINT` is set. With it unset, `captureTelemetry` returns before any network call; events are still dispatched as an in-page `revise:telemetry` DOM event. | **No.** The allowlist cannot express it. | `tests/storage-quota.test.ts` — passes an out-of-contract `answer` and `userId` through a cast and proves both are dropped at runtime. |
@@ -68,7 +68,7 @@ until the staging suite has passed against a migrated database.
   disk, unread.
 
 The last two are device-local by design and never synced. `aiCache` holds
-previously AI-graded answers plus the embedding used to find them; `aiDlq`
+previously AI-graded answers, keyed by an answer hash; `aiDlq`
 holds marks awaiting an AI re-grade. Both hold learner answers in plaintext on
 the device. `clearAll()` wipes all fifteen.
 
@@ -107,6 +107,17 @@ is generated on the device and stored in the local `meta` store under
 `revise.e2ee.key.v1`; it is never transmitted, except through the explicit
 "reveal key" backup flow the learner initiates.
 
+What E2EE does **not** cover: every synced collection row still carries
+`subject_id` and `topic_id` in plaintext (lifted out of the payload in
+`toRow`, `src/data/sync.ts`), so the server can see which subjects and topics
+a learner studies and how many rows each has, alongside `user_id` and
+`updated_at`. Learner-record rows also keep their headers in plaintext
+(`kind`, `lamport`, `device_id`, `deleted`, `frozen_fingerprint`). The wire
+format is unchanged; this is a statement of scope. Decrypting never creates a
+key: a device without one (E2EE never switched on, or a second device with
+its own key) counts the row as unreadable, pins that table's pull cursor, and
+still pushes its own outbox.
+
 ### Live teacher classes
 
 `src/data/classes.ts` uses the signed-in learner/teacher session directly, never
@@ -137,7 +148,8 @@ label, role, qualification, date, six checks and comment, plus the reviewer's
 auth user id (`reviewer_user_id`, no foreign key) so RLS can bind a decision to
 its author. Audit rows are append-only and are kept after the reviewer's account
 is deleted, because they are the attestation trail behind trusted content; the
-user id is never served to students. `/api/review-ledger` publishes only the
+user id is never served to students, and other reviewers cannot select it
+either (column-level grants; only the service role reads it). `/api/review-ledger` publishes only the
 fields the committed ledger already publishes (label, role, qualification,
 date, checks), never comments, account ids or rejected decisions.
 
@@ -151,13 +163,18 @@ offline fallback, so losing the network mid-session degrades to the same result
 as having no provider configured.
 
 Four tiers decide who grades an answer (`src/ai/marking-resilience.ts`):
-device-local semantic cache → on-device model (`localAiMarking`, off by
+device-local answer cache → on-device model (`localAiMarking`, off by
 default) → cloud AI → deterministic rubric fallback. When the rubric fallback
 answers, the attempt is queued in `aiDlq` and retried later.
 
 What the tiers mean for data:
 
 - Cache, local-model and rubric tiers make **no network call**. Nothing leaves.
+  The cache is an exact answer-hash lookup in IndexedDB; there is no embedding
+  model and nothing is fetched from huggingface.co on the marking path. The
+  one download is opt-in: turning on on-device marking (`localAiMarking`)
+  makes WebLLM fetch its model weights once from the host in its prebuilt
+  model list (Hugging Face). That request carries no learner text.
 - The cloud tier sends the question plus `maskPii`-masked answers.
   `aiMark` sets the "details withheld" disclosure only for this tier, which is
   an honest signal.
@@ -171,7 +188,10 @@ What the tiers mean for data:
   question prompt, the mark-scheme point and the student answer (each truncated
   to 500/300/800 characters). Those arrive already masked, because
   `aiDiagnoseError` masks before posting to the AI route. `CLASSIFIER_DISABLED=1`
-  forces the deterministic local classifier instead.
+  forces the deterministic local classifier instead. Because the classifier
+  needs no key, the route counts it as a provider: a production deploy without
+  Supabase auth answers 503 rather than relaying to it in local mode, unless
+  it is disabled.
 
 ### Pulse
 

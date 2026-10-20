@@ -18,6 +18,24 @@ import type { CurriculumModule } from "./registry";
 export const REFERENCE_DISCLAIMER =
   "Reference-tier: this subject's topic list is adapted from a WJEC A-level outline and has not been checked against this board's current specification. Use it to navigate, not as a spec guarantee.";
 
+/**
+ * GCSE subjects are worse than "another board's outline": every GCSE topic
+ * tree is a copy of the WJEC A-level one (proof by contradiction, Young
+ * modulus, pV = nRT), so lessons and flashcards are A-level material. Only
+ * their practice questions were written for GCSE. Say so wherever the
+ * subject is offered.
+ */
+export const GCSE_REFERENCE_DISCLAIMER =
+  "Reference-tier GCSE: this subject currently uses the WJEC A-level topic list, so its lessons and flashcards go well beyond GCSE. Only its practice questions were written for GCSE, and none has been checked against this board's specification.";
+
+export function isGcseSubject(subjectId: string): boolean {
+  return subjectId.includes("-gcse-");
+}
+
+export function referenceDisclaimerFor(subjectId: string): string {
+  return isGcseSubject(subjectId) ? GCSE_REFERENCE_DISCLAIMER : REFERENCE_DISCLAIMER;
+}
+
 export function contentTierFor(subjectId: string): "flagship" | "reference" {
   return isFlagship(subjectId) ? "flagship" : "reference";
 }
@@ -83,7 +101,7 @@ export function honestSubject(entry: CurriculumModule): CurriculumModule {
     ...entry.subject,
     papers,
     contentTier: flagship ? "flagship" : "reference",
-    ...(flagship ? {} : { contentDisclaimer: REFERENCE_DISCLAIMER }),
+    ...(flagship ? {} : { contentDisclaimer: referenceDisclaimerFor(entry.subject.id) }),
   };
   return {
     subject,

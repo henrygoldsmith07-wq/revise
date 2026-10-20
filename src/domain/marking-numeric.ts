@@ -19,10 +19,18 @@ export function extractNumbersCached(text: string): NumberHitX[] {
   return result;
 }
 
+/** A superscript exponent on a unit that follows a number ("m s⁻²", "dm³ mol⁻¹"), not on a variable ("v²"). */
+const UNIT_POWER = /(?<=\d(?:\s*(?:[GMkcmnµμu]?(?:m|s|g|mol|J|N|Pa|V|A|W|Hz|C|K|L|l|Ω|eV|Bq|min|h|year|yr|day)(?:[⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)?))*\s*[GMkcmnµμu]?(?:m|s|g|mol|J|N|Pa|V|A|W|Hz|C|K|L|l|Ω|eV|Bq|min|h|year|yr|day))[⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g;
+
 function extractNumbersUncached(input: string): Array<{ raw: string; value: number | null; denom?: number }> {
   // Normalise unicode super/subscripts so "×10⁻³" reads as "x10-3".
   const SUPERS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9" };
-  const text = input.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻₀-₉]/g, (ch) => SUPERS[ch] ?? ch);
+  // A unit's exponent is not a value: "2.0 m s⁻²" states 2.0, not −2, so
+  // "4.7 m s⁻²" cannot match "2.0 m s⁻²" through the units they share.
+  // A power on a number is a power: "120²" is 120^2, not the number 1202
+  // (and "10⁻³" reads "10^-3", which the scientific-notation path expects).
+  const withoutUnitPowers = input.replace(UNIT_POWER, "").replace(/(?<=\d)(?=⁻?[⁰¹²³⁴⁵⁶⁷⁸⁹])/g, "^");
+  const text = withoutUnitPowers.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻₀-₉]/g, (ch) => SUPERS[ch] ?? ch);
   const out: Array<{ raw: string; value: number | null; denom?: number }> = [];
   // Fractions first so 1/2 is not read as two scalars.
   for (const m of text.matchAll(/(-?\d+(?:,\d{3})*(?:\.\d+)?)\s*\/\s*(-?\d+(?:,\d{3})*(?:\.\d+)?)/g)) {
@@ -170,6 +178,14 @@ function requiredMathNotationPresent(point: string, answer: string): boolean {
 
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 export function numericMatch(point: string, answer: string): boolean {
+  // "Magnitude = √(3² + 4²) = 5 km": the root is working, the result is "5 km".
+  // An answer that states the result needs no √ of its own, but then it is
+  // the result, and only the result, that it must state.
+  const lastEquals = point.lastIndexOf("=");
+  if (lastEquals > 0 && /√|\bsqrt\b|π|\bpi\b/i.test(point.slice(0, lastEquals))) {
+    const result = point.slice(lastEquals + 1);
+    if (/\d/.test(result) && !/√|\bsqrt\b|π|\bpi\b|[a-z]\s*[=<>≤≥]/i.test(result)) return numericMatch(result, answer);
+  }
   if (!requiredMathNotationPresent(point, answer)) return false;
   const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
   if (!wanted.length) return false;

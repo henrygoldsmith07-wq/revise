@@ -84,7 +84,7 @@ export function tutorFallback(
   if (mistake) {
     return {
       reply: [
-        "Working offline, so I will coach you from the spec content on this device rather than explain freely.",
+        "AI tutoring is off or unreachable, so I will coach you from the spec content on this device rather than explain freely.",
         "",
         `The mark you keep losing in **${topic.title}**: a ${mistake.category} slip worth ${mistake.marksLost} mark${mistake.marksLost === 1 ? "" : "s"}.`,
         "",
@@ -92,7 +92,7 @@ export function tutorFallback(
         `> ${mistake.point}`,
       ].join("\n"),
       checkQuestion:
-        "Say that point back in your own words, then apply it to one example from your notes — I will tell you whether it holds.",
+        "Say that point back in your own words, then apply it to one example from your notes and check it against the mark-scheme wording above.",
       suggestPractice: true,
     };
   }
@@ -101,7 +101,7 @@ export function tutorFallback(
     : topic.summary;
   return {
     reply: [
-      "Working offline, so I will teach you straight from the spec content on this device.",
+      "AI tutoring is off or unreachable, so I will teach you straight from the spec content on this device.",
       "",
       `**${topic.title}** — the next thing examiners reward here: *${firstClause(point)}*.`,
       "",
@@ -131,7 +131,7 @@ export function socraticFallback(topicId: string, turnCount: number): SocraticRe
   const error = topic.commonErrors[turnCount % topic.commonErrors.length];
   return {
     reply: [
-      `Working offline, so I will prompt rather than explain.`,
+      `AI tutoring is off or unreachable, so I will prompt rather than explain.`,
       "",
       `Think about **${topic.title}**. One thing examiners reward here: *${firstClause(point)}*.`,
       "",

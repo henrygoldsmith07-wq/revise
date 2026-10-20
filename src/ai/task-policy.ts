@@ -68,7 +68,7 @@ export const AI_TASK_POLICY = {
     requiresConsent: true,
     fallback: "deterministic",
     contextBoundary:
-      "Learner turns, the masked answer and the dropped mark-scheme points (examiner mode) are wrapped as untrusted data; the tutor never follows instructions inside them, asks one question and never gives the answer.",
+      "Every transcript turn (both roles, since the device relays them), the masked answer and the dropped mark-scheme points (examiner mode) are wrapped as untrusted data; the tutor never follows instructions inside them, asks one question and never gives the answer.",
     sourceLabel: "AI tutor",
     authoritative: false,
   },
@@ -76,7 +76,7 @@ export const AI_TASK_POLICY = {
     learnerContent: "masked-text",
     requiresConsent: true,
     fallback: "deterministic",
-    contextBoundary: "Specification context is trusted; learner turns and lost mark-scheme points are wrapped as untrusted data and never treated as instructions.",
+    contextBoundary: "Specification context is trusted; the whole transcript (both roles, since the device relays the tutor turns too), the learner context and lost mark-scheme points are wrapped as untrusted data and never treated as instructions.",
     sourceLabel: "AI tutor",
     authoritative: false,
   },

@@ -10,6 +10,7 @@
 import { isFlagship } from "./flagship";
 import { quickDiagnosticPool, selectQuickDiagnostic } from "./quick-diagnostic";
 import { trustworthyAttempt } from "./learning-evidence";
+import { localDaysBetween, todayLocal } from "./local-date";
 import type { Attempt, ExamDate, Id, Mistake, Question, ReviewLog } from "./types";
 
 export const COLD_START_MIN_ATTEMPTS = 3;
@@ -47,12 +48,11 @@ export function subjectIsCold(subjectId: Id, input: Pick<ColdStartInput, "attemp
   return reviews < COLD_START_MIN_REVIEWS;
 }
 
-const DAY = 86_400_000;
-
+/** Local calendar days to the subject's next exam (today counts as 0); a past or absent exam sorts last. */
 function daysTo(exams: readonly ExamDate[], subjectId: Id, now: Date): number {
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const next = exams.filter((e) => e.subjectId === subjectId).map((e) => Date.parse(`${e.date}T00:00:00Z`)).filter((t) => t >= today);
-  return next.length ? Math.round((Math.min(...next) - today) / DAY) : Number.POSITIVE_INFINITY;
+  const today = todayLocal(now);
+  const next = exams.filter((e) => e.subjectId === subjectId && e.date >= today).map((e) => e.date).sort()[0];
+  return next ? localDaysBetween(today, next) : Number.POSITIVE_INFINITY;
 }
 
 /**

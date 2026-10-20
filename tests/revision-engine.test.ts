@@ -6,7 +6,7 @@ import { buildMarkRecovery } from "@/domain/mark-recovery";
 import { recoveryBreakdown, recoveryWindow, weekLines } from "@/domain/marks-progress";
 import { buildMissionSession } from "@/domain/mission-session";
 import { buildPaperRecovery } from "@/domain/paper-recovery";
-import { collectMissions, daysToNearestExam, rankRevisionActions, type EngineInput } from "@/domain/revision-engine";
+import { collectMissions, daysToNearestExam, fitActionsToBudget, rankRevisionActions, type EngineInput } from "@/domain/revision-engine";
 import { evidenceLimits, limitsSentence, unseenSupplyByTopic } from "@/domain/supply";
 import type { Attempt, ExamDate, Mistake, Question } from "@/domain/types";
 import { attempt as mkAttempt, mistake as mkMistake, question as mkQuestion } from "./helpers-recovery";
@@ -626,9 +626,33 @@ describe("available session length", () => {
     const tiny = rankRevisionActions(engine({ ...s, subjectIds: [...subjects], availableMinutes: 1 }));
     expect(tiny.top).not.toBeNull();
     expect(tiny.actions.length).toBeGreaterThan(0);
-    // Either every kept action fits the minute, or nothing fit and the
-    // ranking stands unchanged with durations shown honestly.
+    // Either every kept action fits the minute, or nothing fit: then the
+    // shortest step leads (duration shown honestly) and every other action
+    // is still ranked behind it in the original order.
     const over = tiny.actions.filter((a) => a.minutes > 3);
-    expect(over.length === 0 || ids(tiny).join() === ids(full).join()).toBe(true);
+    if (over.length === tiny.actions.length) {
+      expect(tiny.top!.minutes).toBe(Math.min(...full.actions.map((a) => a.minutes)));
+      expect([...ids(tiny)].sort()).toEqual([...ids(full)].sort());
+      expect(ids(tiny).filter((id) => id !== tiny.top!.id)).toEqual(ids(full).filter((id) => id !== tiny.top!.id));
+    } else {
+      expect(over).toHaveLength(0);
+    }
+  });
+
+  it("leads with the shortest step when nothing fits the session, not the longest high scorer", () => {
+    const paper = { id: "paper", minutes: 90 };
+    const section = { id: "section", minutes: 25 };
+    const drill = { id: "drill", minutes: 15 };
+    const sameLength = { id: "drill-2", minutes: 15 };
+    const fit = fitActionsToBudget([paper, section, drill, sameLength], 10);
+    expect(fit.ranked.map((a) => a.id)).toEqual(["drill", "paper", "section", "drill-2"]);
+    expect(fit.overBudget).toEqual([]);
+    // Something fits: it leads and the rest are deferred, order kept.
+    const some = fitActionsToBudget([paper, section, drill], 20);
+    expect(some.ranked.map((a) => a.id)).toEqual(["drill"]);
+    expect(some.overBudget.map((a) => a.id)).toEqual(["paper", "section"]);
+    // No budget, or everything fits: unchanged.
+    expect(fitActionsToBudget([paper, drill], undefined).ranked.map((a) => a.id)).toEqual(["paper", "drill"]);
+    expect(fitActionsToBudget([paper, drill], 120).ranked.map((a) => a.id)).toEqual(["paper", "drill"]);
   });
 });

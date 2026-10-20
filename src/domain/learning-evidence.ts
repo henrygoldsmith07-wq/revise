@@ -253,17 +253,36 @@ export function reasoningNoveltyFor(
   return reasoningNovelty(question, [...practised.values()]);
 }
 
-/** A renamed or renumbered variant is still familiar evidence. */
-export function unseenQuestion(question: Question, history: readonly Attempt[], questions: readonly Question[]): boolean {
+/**
+ * `unseenQuestion` for many candidates against one history: the bank index,
+ * the answered questions and their families are built once, and the cheap
+ * id/family checks run before the reskin and reasoning checks. Returns the
+ * same verdict as `unseenQuestion` for every question. Use it whenever more
+ * than a handful of candidates are tested against the same history: the
+ * single-question form rebuilds the whole-bank index on every call.
+ */
+export function unseenQuestionTester(history: readonly Attempt[], questions: readonly Question[]): (question: Question) => boolean {
   const byId = new Map(questions.map((q) => [q.id, q]));
-  const families = new Set(questionFamilies(question));
+  const answeredIds = new Set(history.map((a) => a.questionId));
+  // One entry per attempt, in history order, as the single-question form had it.
   const previous = history.flatMap(a => byId.has(a.questionId) ? [byId.get(a.questionId)!] : []);
-  // A number, noun or same-reasoning reskin of something already answered is not new evidence.
-  const reskin = previous.some((seen) => seen.subjectId === question.subjectId && seen.topicIds.some((t) => question.topicIds.includes(t)) && isShallowReskin(question, seen));
-  return !reskin && !history.some((a) => a.questionId === question.id ||
-    (byId.has(a.questionId) && questionFamilies(byId.get(a.questionId)!).some((family) => families.has(family)))) &&
-    (question.subjectId !== "wjec-alevel-physics" || !questionReasoningMoves(question).length ||
-      questionFreshness(question, previous).newReasoning);
+  const answeredFamilies = new Set(previous.flatMap(questionFamilies));
+  return (question) => {
+    if (answeredIds.has(question.id)) return false;
+    if (questionFamilies(question).some((family) => answeredFamilies.has(family))) return false;
+    // A number, noun or same-reasoning reskin of something already answered is not new evidence.
+    if (previous.some((seen) => seen.subjectId === question.subjectId && seen.topicIds.some((t) => question.topicIds.includes(t)) && isShallowReskin(question, seen))) return false;
+    return question.subjectId !== "wjec-alevel-physics" || !questionReasoningMoves(question).length ||
+      questionFreshness(question, previous).newReasoning;
+  };
+}
+
+/**
+ * A renamed or renumbered variant is still familiar evidence. O(bank) per
+ * call: test many questions with `unseenQuestionTester` instead.
+ */
+export function unseenQuestion(question: Question, history: readonly Attempt[], questions: readonly Question[]): boolean {
+  return unseenQuestionTester(history, questions)(question);
 }
 
 /** A paper-mode flag alone cannot authenticate an unseen exam performance. */

@@ -100,6 +100,9 @@ describe("approval throughput from review_audit_events (PGlite, real schema)", (
       insert into auth.users values ('${TEACHER_ONE}'),('${TEACHER_TWO}');`);
     await db.exec(readFileSync("supabase/schema.sql", "utf8"));
     await db.exec(readFileSync("supabase/migrations/20261007000200_reviewer_portal.sql", "utf8"));
+    // The integrity guard recomputes each hash: the portal's events must pass it.
+    await db.exec(readFileSync("supabase/migrations/20261014000200_reviewer_validation.sql", "utf8"));
+    await db.exec(readFileSync("supabase/migrations/20261018000100_reviewer_audit_integrity.sql", "utf8"));
   }, 30_000);
   afterAll(async () => { await db?.close(); });
 

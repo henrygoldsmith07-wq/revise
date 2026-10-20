@@ -15,8 +15,11 @@ import { combineAuditLog, effectiveLedger, readRuntimeEventPages, REVIEW_AUDIT_E
 //
 // Every portal read and write goes through the CALLER's Supabase session
 // (anon key + request cookies), so RLS is the second wall behind these checks:
-// `review_audit_events` is readable and insertable only by an active reviewer,
-// and the insert trigger binds the event to the caller's own grant. The
+// `review_audit_events` is readable (every column but reviewer_user_id) and
+// insertable only by an active reviewer, and the insert trigger binds the event
+// to the caller's own grant and re-runs auditLogIssues' rules in SQL: it
+// recomputes the domain hash, makes the first runtime event continue the
+// committed tail (review_audit_anchor) and refuses a repeat approval. The
 // service role is used for exactly one read-only job: deriving the public
 // verified-ledger feed students merge (getPublicRuntimeLedger).
 // ---------------------------------------------------------------------------
@@ -93,12 +96,18 @@ export async function loadCombinedLog(client: SupabaseClient): Promise<CombinedA
   return combineAuditLog(committedAuditLog, await loadRuntimeRows(client));
 }
 
-/** Insert one event. A 40001/23505 means another reviewer appended first. */
+/**
+ * Insert one event (no RETURNING: reviewers cannot read reviewer_user_id).
+ * 40001/23505 mean the chain moved on or a repeat approval landed first; the
+ * caller re-reads and re-runs the domain rules. 55000 means the runtime log's
+ * anchor does not match the committed tail this server was built with.
+ */
 export async function appendRuntimeEvent(client: SupabaseClient, row: RuntimeEventInsert): Promise<"ok" | "conflict" | "forbidden" | "error"> {
   const { error } = await client.from("review_audit_events").insert(row);
   if (!error) return "ok";
   if (error.code === "40001" || error.code === "23505") return "conflict";
   if (error.code === "42501") return "forbidden";
+  console.error("[reviewer] audit event refused by the database", { code: error.code ?? "unknown" });
   return "error";
 }
 

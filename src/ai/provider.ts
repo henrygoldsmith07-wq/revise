@@ -42,6 +42,23 @@ export interface AiProvider {
 
 const TIMEOUT_MS = 45_000;
 
+/**
+ * A non-2xx provider reply. Carries the provider name and HTTP status only —
+ * never the response body, which can echo the prompt (learner text) or
+ * account details back.
+ */
+export class ProviderHttpError extends Error {
+  readonly provider: string;
+  readonly status: number;
+
+  constructor(provider: string, status: number) {
+    super(`${provider} ${status}`);
+    this.name = "ProviderHttpError";
+    this.provider = provider;
+    this.status = status;
+  }
+}
+
 /** How many allowlisted models a single request may rotate through on failure. */
 function maxRotations(): number {
   const parsed = Number(process.env.OPENAI_COMPATIBLE_MAX_ROTATIONS);
@@ -105,7 +122,9 @@ function anthropicProvider(): AiProvider | null {
           ]),
         },
       );
-      if (!res.ok) throw new Error(`anthropic ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      // Status only: the provider's response body can echo the request
+      // (learner text) or carry account details, so it never goes in the error.
+      if (!res.ok) throw new ProviderHttpError("anthropic", res.status);
       const json = (await res.json()) as { content?: { type: string; text?: string }[] };
       return (json.content ?? [])
         .filter((b) => b.type === "text")
@@ -215,7 +234,7 @@ function openAiCompatibleProvider(): AiProvider | null {
               ]),
             ],
           });
-          if (!res.ok) throw new Error(`openai-compatible ${res.status}: ${(await res.text()).slice(0, 200)}`);
+          if (!res.ok) throw new ProviderHttpError("openai-compatible", res.status);
           const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
           const content = (json.choices?.[0]?.message?.content ?? "").trim();
           if (!content) throw new Error("openai-compatible returned an empty completion");

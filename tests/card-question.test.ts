@@ -97,3 +97,14 @@ describe("review wiring — the check appears between cards", () => {
     expect(source).toContain("disabled: !revealed || Boolean(examCheck)");
   });
 });
+
+describe("card bridge never offers machine-generated questions", () => {
+  it("skips generated and AI questions on the card's point", () => {
+    const c = card({ specPointIds: ["sp-1"] });
+    const generated = q({ id: "gen", source: "generated", specPointIds: ["sp-1"] });
+    const ai = q({ id: "ai", origin: "ai", specPointIds: ["sp-1"] });
+    const authored = q({ id: "auth", source: "authored", specPointIds: ["sp-1"], totalMarks: 6 });
+    expect(questionsTestingCardPoint(c, [generated, ai, authored]).map((x) => x.id)).toEqual(["auth"]);
+    expect(pickExamQuestionForCard(c, [generated, ai])).toBeNull();
+  });
+});

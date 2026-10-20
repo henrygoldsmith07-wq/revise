@@ -20,6 +20,7 @@ import type { MarkingFlag } from "@/domain/marking-flag";
 import { PERSISTED_SCHEMA_VERSION } from "./persistence-schema";
 import { captureTelemetry, errorClass } from "@/lib/observability";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
+import { OutdatedTabError, currentDatabaseNotice, setDatabaseNotice } from "./db-notice";
 
 // ---------------------------------------------------------------------------
 // IndexedDB is the *primary* store, not a cache. Every write lands here first
@@ -28,7 +29,7 @@ import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 // in a school with blocked wifi, or with no account at all.
 //
 // Two local-only stores (never synced) support the AI-marking resilience
-// layer: `aiCache` (semantic cache of previously AI-graded answers) and
+// layer: `aiCache` (exact-answer cache of previously AI-graded answers) and
 // `aiDlq` (dead-letter queue of marks awaiting an AI re-grade). They are
 // device-local by design: a cached grade is only valid for the same student,
 // and the DLQ replays against the *local* attempt records.
@@ -45,13 +46,13 @@ import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 export const DB_NAME = "revise";
 export const DB_VERSION = PERSISTED_SCHEMA_VERSION;
 
-/** A cached AI mark: the graded result plus the embedding used to find it. */
+/** A cached AI mark: the graded result, keyed by question, part and answer hash. */
 export interface AiCacheEntry {
   /** questionId:partId:answerHash — exact-match tier. */
   key: string;
   /** questionId:partId prefix lets one query fetch a whole question's entries. */
   scope: string;
-  /** L2-normalised embedding of "answer \u0000 mark-scheme points". Null on legacy pre-embedding entries. */
+  /** Always null: the embedding tier was removed. Kept so stored rows keep their shape. */
   embedding: number[] | null;
   /** The AI grade being cached. */
   marked: Attempt["marked"][number];
@@ -123,7 +124,26 @@ export function profileDatabaseName(userId: string): string {
   return userId === "local" ? DB_NAME : `${DB_NAME}:account:${encodeURIComponent(userId)}`;
 }
 
+/** Set once another tab upgraded the database under this one (see db-notice.ts). */
+let outdatedTab = false;
+
+/** Test-only: drop cached connections and the outdated-tab verdict. */
+export function resetDbConnectionsForTests(): void {
+  outdatedTab = false;
+  dbPromise = null;
+  profileConnections.clear();
+}
+
+function forgetConnection(userId: string): void {
+  profileConnections.delete(userId);
+  if (userId === profileId) dbPromise = null;
+}
+
 export function getProfileDb(userId: string): Promise<ReviseDB> {
+  // After another tab upgraded the schema this build's code no longer
+  // matches the stored data: fail every call with the reload message rather
+  // than reopening (which would only reach VersionError the slow way).
+  if (outdatedTab) return Promise.reject(new OutdatedTabError());
   const existing = profileConnections.get(userId);
   if (existing) return existing;
   const opening = openProfileDb(userId).catch((error) => {
@@ -145,6 +165,29 @@ export function getDb(): Promise<ReviseDB> {
 
 function openProfileDb(userId: string): Promise<ReviseDB> {
   const opening = openDB<ReviseSchema>(profileDatabaseName(userId), DB_VERSION, {
+    // This tab's open is waiting for an older tab to let go of the database.
+    blocked() {
+      setDatabaseNotice("blocked");
+    },
+    // A newer build in another tab wants to upgrade: let it, and tell this
+    // tab to reload. Holding on would leave that tab stuck at its boot screen.
+    blocking(_currentVersion, _blockedVersion, event) {
+      outdatedTab = true;
+      try {
+        (event.target as IDBDatabase | null)?.close();
+      } catch {
+        /* already closing */
+      }
+      forgetConnection(userId);
+      setDatabaseNotice("stale");
+      captureTelemetry("migration.failure", { status: "warning", schemaVersion: DB_VERSION, errorClass: "versionchange" });
+    },
+    // The browser closed the connection abnormally (storage cleared, disk
+    // error). Forget it so the next call reopens instead of reusing a dead one.
+    terminated() {
+      forgetConnection(userId);
+      captureTelemetry("migration.failure", { status: "warning", schemaVersion: DB_VERSION, errorClass: "terminated" });
+    },
     async upgrade(db, oldVersion, _newVersion, tx) {
       // Migrations are strictly monotonic and idempotent. A single upgrade
       // transaction can jump from any historical version to the current one;
@@ -249,8 +292,19 @@ function openProfileDb(userId: string): Promise<ReviseDB> {
       });
     },
   });
-  return opening.catch((error) => {
+  return opening.then((db) => {
+    if (currentDatabaseNotice() === "blocked") setDatabaseNotice(null);
+    return db;
+  }, (error) => {
     dbPromise = null;
+    if (currentDatabaseNotice() === "blocked") setDatabaseNotice(null);
+    // The stored database is newer than this build: another tab (or an
+    // earlier visit) already runs a later version. That is not a failed
+    // migration and nothing is damaged; this tab only needs a reload.
+    if (error instanceof Error && error.name === "VersionError") {
+      captureTelemetry("migration.failure", { status: "warning", schemaVersion: DB_VERSION, errorClass: "VersionError" });
+      throw new OutdatedTabError();
+    }
     captureTelemetry("migration.failure", { status: "failed", schemaVersion: DB_VERSION, errorClass: errorClass(error) });
     throw error;
   });

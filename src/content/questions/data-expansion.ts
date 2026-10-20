@@ -1,6 +1,5 @@
 import type { AoCode, Question, QuestionKind } from "@/domain/types";
 import { defineQuestions } from "./authoring";
-import { wjecAlevelCoverageQuestions } from "./wjec-alevel-coverage";
 
 /** Original table, graph and experimental-data questions for every subject variant. */
 
@@ -149,7 +148,7 @@ const biology: DataItem[] = [
     stem: "Data: A germinating seed consumes 24 cm³ oxygen and produces 30 cm³ carbon dioxide in one hour.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Calculate the respiratory quotient and interpret it.", 3, ["RQ = carbon dioxide produced/oxygen consumed", "RQ = 30/24 = 1.25", "The value is above 1, so a substrate other than carbohydrate alone may be used"], "RQ = 30/24 = 1.25. The value above 1 suggests the seed is not respiring on carbohydrate alone, possibly using an organic acid or lipid mixture.", "calculate respiratory quotient from gas data")],
+    parts: [part("Calculate the respiratory quotient and interpret it.", 3, ["RQ = carbon dioxide produced/oxygen consumed", "RQ = 30/24 = 1.25", "The value is above 1, so some anaerobic respiration is likely alongside aerobic respiration"], "RQ = 30/24 = 1.25. Carbohydrate alone gives 1.0 and lipid about 0.7, so a value above 1 suggests some anaerobic respiration, releasing carbon dioxide without taking up oxygen.", "calculate respiratory quotient from gas data")],
   },
   {
     slug: "photosynthesis-light-data",
@@ -294,7 +293,7 @@ const chemistry: DataItem[] = [
     topic: "aromatics-nitrogen",
     stem: "Data: A proton NMR spectrum has signals at 1.3 ppm (triplet, 3H) and 4.2 ppm (quartet, 2H), with no other proton signals.",
     difficulty: 3,
-    parts: [part("Deduce a structure consistent with the data and explain the splitting pattern.", 3, ["The integration gives a 3H:2H ratio", "The triplet and quartet indicate adjacent CH₃ and CH₂ groups", "The shifts are consistent with CH₃CH₂ attached to oxygen, such as ethanol"], "The data fit ethanol, CH₃CH₂OH. The CH₃ signal is split into a triplet by two neighbouring CH₂ protons; the CH₂ signal is a quartet from three neighbouring CH₃ protons.", "deduce structure from proton NMR data")],
+    parts: [part("Deduce a structure consistent with the data and explain the splitting pattern.", 3, ["The integration gives a 3H:2H ratio", "The triplet and quartet indicate adjacent CH₃ and CH₂ groups", "The shifts fit only CH₃CH₂ bonded to oxygen, such as diethyl carbonate"], "The data fit diethyl carbonate, (CH₃CH₂O)₂CO: two equivalent ethyl groups bonded to oxygen give the 3H:2H ratio and no other signals. The CH₃ signal is split into a triplet by two neighbouring CH₂ protons; the CH₂ signal is a quartet from three neighbouring CH₃ protons. Ethanol does not fit because its OH proton would give another signal.", "deduce structure from proton NMR data")],
   },
   {
     slug: "spectroscopy-identification",
@@ -337,7 +336,7 @@ const maths: DataItem[] = [
     topic: "sequences",
     stem: "Data: The first five terms of a sequence are 4, 7, 12, 19 and 28.",
     difficulty: 2,
-    parts: [part("Find a formula for the nth term and use it to predict the sixth term.", 3, ["First differences are 3, 5, 7, 9; second differences are 2", "A quadratic model is n² + n + 2", "The sixth term is 36 + 6 + 2 = 44"], "The second difference is 2, giving the model aₙ = n² + n + 2. The sixth term is 44.", "identify a quadratic sequence from data")],
+    parts: [part("Find a formula for the nth term and use it to predict the sixth term.", 3, ["First differences are 3, 5, 7, 9; second differences are 2", "A quadratic model is n² + 3", "The sixth term is 36 + 3 = 39"], "The second difference is 2, so the n² coefficient is 1; comparing with n² gives aₙ = n² + 3. The sixth term is 36 + 3 = 39.", "identify a quadratic sequence from data")],
   },
   {
     slug: "trig-calibration-data",
@@ -371,7 +370,7 @@ const maths: DataItem[] = [
     stem: "Data: A curve has ordinates y = 2, 3, 5 and 4 at x = 0, 1, 2 and 3.",
     kind: "calculation",
     difficulty: 2,
-    parts: [part("Use the trapezium rule with width 1 to estimate the area from x = 0 to x = 3.", 3, ["Area ≈ 1/2 × 1 × [2 + 4(3 + 5) + 4]", "Area ≈ 19", "The estimate is based on straight-line chords between data points"], "Area ≈ ½[2 + 4(3 + 5) + 4] = 19 square units. It is an estimate because the curve between points is approximated by chords.", "apply the trapezium rule to tabulated data")],
+    parts: [part("Use the trapezium rule with width 1 to estimate the area from x = 0 to x = 3.", 3, ["Area ≈ 1/2 × 1 × [2 + 2(3 + 5) + 4]", "Area ≈ 11", "The estimate is based on straight-line chords between data points"], "Area ≈ ½[2 + 2(3 + 5) + 4] = 11 square units. It is an estimate because the curve between points is approximated by chords.", "apply the trapezium rule to tabulated data")],
   },
   {
     slug: "vector-coordinate-data",
@@ -548,5 +547,4 @@ export const dataExpansionQuestions: Question[] = [
   ...subjectIds.chemistry.flatMap((subjectId) => buildQuestions(subjectId, chemistry)),
   ...subjectIds.maths.flatMap((subjectId) => buildQuestions(subjectId, maths)),
   ...subjectIds.physics.flatMap((subjectId) => buildQuestions(subjectId, physics)),
-  ...wjecAlevelCoverageQuestions({ id: "data", prefix: "Data:", reviewer: "authored/data-question-expansion-review", kind: "structured" }),
 ];

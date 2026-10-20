@@ -9,8 +9,16 @@ import type { Id } from "@/domain/types";
  * migration entry below, (2) create it in `db.ts`'s upgrade guarded by
  * `objectStoreNames.contains`, (3) ship. There is no server table for a
  * device-local store, so migration always lands before client. Nothing is ever
- * renamed or dropped here — a downgrade reads the old version's rows and
- * ignores stores it does not know.
+ * renamed or dropped here, so the data stays readable by the code that wrote
+ * it and by every later build.
+ *
+ * What an older build does *not* do is open a newer database: IndexedDB
+ * refuses an open below the stored version with a VersionError. That is the
+ * stale-tab case (an old tab left open across a deploy, or a cached shell),
+ * and it is reported as "this tab is running an older version — reload", not
+ * as a failed migration (src/data/db-notice.ts, storage-recovery.ts). A tab
+ * holding the old version open while a newer one upgrades closes its
+ * connection on `versionchange` and asks to be reloaded.
  */
 export const PERSISTED_SCHEMA_VERSION = 7 as const;
 

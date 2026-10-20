@@ -283,13 +283,19 @@ export function summariseExamReadiness(rows: ExamReadiness[]): ExamReadinessSumm
     return { score: 0, confidence: 0, status: "building-evidence", subjectCount: 0, readyCount: 0, atRiskCount: 0, blockerCount: 0, weakestSubjectId: null };
   }
   const score = round01(mean(rows.map((row) => row.score)));
-  const confidence = round01(mean(rows.map((row) => row.confidence)));
+  // The summary is only as certain as its least-evidenced subject: averaging
+  // would let one evidenced subject vouch for another with no evidence.
+  const confidence = round01(Math.min(...rows.map((row) => row.confidence)));
   const atRiskCount = rows.filter((row) => row.status === "at-risk").length;
   const readyCount = rows.filter((row) => row.status === "ready").length;
-  const status: ExamReadinessStatus = confidence < 0.35
-    ? "building-evidence"
-    : atRiskCount
-      ? "at-risk"
+  const building = rows.some((row) => row.status === "building-evidence");
+  // An evidenced at-risk subject is never hidden behind another subject's
+  // missing evidence; otherwise any subject still building evidence keeps the
+  // summary at building-evidence rather than "nearly ready".
+  const status: ExamReadinessStatus = atRiskCount
+    ? "at-risk"
+    : building || confidence < 0.35
+      ? "building-evidence"
       : readyCount === rows.length && score >= 0.78
         ? "ready"
         : "nearly-ready";

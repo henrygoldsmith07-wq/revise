@@ -5,8 +5,9 @@
 //
 // Order of preference, cheapest and most honest first:
 //
-//   1. **Semantic cache** — an identical (or ≥0.95 cosine-similar) answer
-//      already AI-graded on this device answers instantly, free, offline.
+//   1. **Answer cache** — an identical (normalised) answer already AI-graded
+//      on this device under the same mark scheme answers instantly, free,
+//      offline. It reads IndexedDB only: no model download, no network.
 //   2. **Local model** — when the student opted into on-device grading and
 //      the weights are loaded, WebLLM grades without touching the network.
 //   3. **Cloud AI** — the /api/ai route with its provider rotation.
@@ -37,7 +38,7 @@ interface PartOutcome {
   partId: string;
   marked: MarkResponse["marked"][number];
   confidence: number;
-  via: "cache-exact" | "cache-semantic" | "local";
+  via: "cache-exact" | "local";
 }
 
 function partOutcomeToMarked(outcome: PartOutcome): MarkResponse["marked"][number] {
@@ -59,17 +60,17 @@ export async function resilientMark(
   const outcomes: PartOutcome[] = [];
   const remaining: Question["parts"] = [];
 
-  // --- tier 1: per-part semantic cache --------------------------------------
+  // --- tier 1: per-part answer cache (IndexedDB only) -----------------------
   for (const part of question.parts) {
     const answer = answers[part.id] ?? "";
     const policy = { schemeHash: schemeHashForPart(part), policyVersion: MARK_POLICY_VERSION };
-    const lookup = await lookupCachedMark(question.id, part.id, answer, part.markScheme, policy);
+    const lookup = await lookupCachedMark(question.id, part.id, answer, policy);
     if (lookup.hit) {
       outcomes.push({
         partId: part.id,
         marked: lookup.hit.marked,
         confidence: lookup.hit.confidence,
-        via: lookup.hit.via === "exact" ? "cache-exact" : "cache-semantic",
+        via: "cache-exact",
       });
     } else {
       remaining.push(part);
@@ -107,7 +108,7 @@ export async function resilientMark(
   const serverEnvelope = await callServer();
   if (serverEnvelope.source === "ai") {
     // Persist grades in the cache so the next identical answer skips the
-    // network entirely. Embeddings attach when the embedder is available.
+    // network entirely.
     for (const part of question.parts) {
       const markedPart = serverEnvelope.data.marked.find((m) => m.partId === part.id);
       if (!markedPart) continue;
@@ -117,7 +118,6 @@ export async function resilientMark(
         answers[part.id] ?? "",
         markedPart,
         typeof serverEnvelope.data.confidence === "number" ? serverEnvelope.data.confidence : 0.5,
-        null, // embedding attached lazily by storeCachedMark's caller when cheap
         { schemeHash: schemeHashForPart(part), policyVersion: MARK_POLICY_VERSION },
       );
     }
@@ -150,8 +150,7 @@ function assembleAllCached(question: Question, outcomes: PartOutcome[]): AiEnvel
     const outcome = outcomes.find((o) => o.partId === part.id);
     return outcome ? outcome.marked : { partId: part.id, awarded: 0, max: part.marks, creditedPoints: [], missedPoints: part.markScheme, comment: "ungraded" };
   });
-  const via = outcomes.map((o) => o.via);
-  const label = via.every((v) => v === "cache-exact") ? "exact cache" : "semantic cache";
+  const label = "exact cache";
   const confidence = outcomes.reduce((a, o) => a + o.confidence, 0) / Math.max(1, outcomes.length);
   return {
     data: { marked, feedback: `Graded from ${label} — identical answers previously marked by AI.`, confidence },

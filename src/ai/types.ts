@@ -34,6 +34,12 @@ export const generatedPartSchema = z.object({
   marks: z.number().int().min(1).max(12),
   markScheme: z.array(z.string().min(2).max(300)).min(1).max(10),
   modelAnswer: z.string().min(2).max(2000),
+  /**
+   * Extraction only: the model's claim about where `markScheme` came from.
+   * A claim, not a fact — the browser checks it against the uploaded scheme
+   * (src/domain/paper-extraction.ts markSchemeSourceFor) and fails closed.
+   */
+  markSchemeSource: z.enum(["uploaded", "written"]).optional(),
 });
 
 export const generatedQuestionSchema = z.object({

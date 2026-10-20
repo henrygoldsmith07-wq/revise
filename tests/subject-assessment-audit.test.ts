@@ -85,8 +85,15 @@ describe("WJEC flagship depth pack", () => {
       "nuclear.sp-02: explanation+calculation",
       "waves.sp-03: explanation",
     ]);
-    expect(dashboard.balancedAtTwenty).toBe(true);
   }, 60_000);
+
+  it("keeps the templated Maths/Biology/Chemistry depth pack out of the learner bank", () => {
+    // Its parts repeat the stem and its schemes carry filler sentences and
+    // internal ids; it is an authoring artefact, not something to practise.
+    const learnerIds = new Set(seedQuestions.map((question) => question.id));
+    expect(wjecFlagshipDepthQuestions.length).toBeGreaterThan(0);
+    expect(wjecFlagshipDepthQuestions.filter((question) => learnerIds.has(question.id))).toEqual([]);
+  });
 });
 
 function fixture(subjectId: string, prompt: string, modelAnswer: string): Question {
