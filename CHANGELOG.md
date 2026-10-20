@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-fifth pass
+
+- Physics electric-circuits.sp-01 (charge, current and pd) gains a distinct calculation family: counting electrons from Q = It and the elementary charge (0.50 A for 2.0 min gives 3.8×10²⁰, working checked by hand). Authored unreviewed with `lastChecked` recording only the arithmetic check; it counts for nothing as Proven until two teachers approve it. Depth gaps drop to 7.
+
 ## 2026-10-20 — forty-fourth pass
 
 - Physics energy-power.sp-01 (work, energy and power) gains a distinct calculation family: the constant braking force that stops a 1200 kg car from 20 m s⁻¹ over 48 m (5.0×10³ N, working checked by hand). It is a generated, unreviewed draft with `lastChecked` set only to record the author's arithmetic check; it counts for nothing as Proven until two teachers approve it. One of nine Physics depth gaps now closed (README inventory 3,997 / 2,312).
