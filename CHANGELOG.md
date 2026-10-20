@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-fourth pass
+
+- Physics energy-power.sp-01 (work, energy and power) gains a distinct calculation family: the constant braking force that stops a 1200 kg car from 20 m s⁻¹ over 48 m (5.0×10³ N, working checked by hand). It is a generated, unreviewed draft with `lastChecked` set only to record the author's arithmetic check; it counts for nothing as Proven until two teachers approve it. One of nine Physics depth gaps now closed (README inventory 3,997 / 2,312).
+
 ## 2026-10-20 — forty-third pass
 
 - Physics thermal.sp-01 (thermal physics, internal energy and state change) gains a second, distinct calculation family: specific latent heat of vaporisation from a 60 W heater boiling off 7.5 g of water (2.4×10⁶ J kg⁻¹, working checked by hand). Authored unreviewed, so it counts for nothing as trusted until two teachers approve it. The depth-gap list in tests/subject-assessment-audit.test.ts drops to 8 and deep-complete statements rise 99 to 100.
