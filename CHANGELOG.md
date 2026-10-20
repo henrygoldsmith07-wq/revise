@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-eighth pass
+
+Physics kinematics-dynamics.sp-01 (scalars, vectors, resolving): two explanation families (why perpendicular components act independently; distance vs displacement on a return walk) and a calculation family (resolving an angled pull). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the kinematics-dynamics.sp-01 depth gap (three left).
+
 ## 2026-10-20 — forty-seventh pass
 
 Physics waves.sp-03 (stationary waves): two new explanation families (why no net energy travels along a stationary wave; in-phase within a loop, antiphase across a node). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the waves.sp-03 depth gap (four left).
