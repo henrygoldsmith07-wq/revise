@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — fiftieth pass
+
+Physics nuclear.sp-02 (nuclear radius): a second explanation family (why visible light cannot resolve a nucleus but high-energy electrons can) and a second calculation family (nucleon number from a measured radius, A = 125, checked by hand). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the nuclear.sp-02 depth gap (one left: fields.sp-01).
+
 ## 2026-10-20 — forty-ninth pass
 
 Physics circular-shm.sp-02 (centripetal acceleration): a second explanation family (why constant-speed circular motion is accelerated without changing speed). Authored as unreviewed, so it counts for nothing as Proven until two teachers approve; closes the circular-shm.sp-02 depth gap (two left).
