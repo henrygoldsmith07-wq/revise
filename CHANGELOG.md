@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-seventh pass
+
+Physics waves.sp-03 (stationary waves): two new explanation families (why no net energy travels along a stationary wave; in-phase within a loop, antiphase across a node). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the waves.sp-03 depth gap (four left).
+
 ## 2026-10-20 — forty-sixth pass
 
 Physics fields.sp-02: two new calculation families (field strength at altitude measured from the planet centre; opposite-charge midpoint field adding as vectors). Authored as unreviewed; closes the fields.sp-02 depth gap.
