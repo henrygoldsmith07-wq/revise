@@ -7,6 +7,9 @@ import { biologyAqaExtraQuestions } from "./questions/biology-aqa-extra";
 import { aqaGcseQuestions } from "./questions/aqa-gcse";
 import { aqaGcsePracticalQuestions } from "./questions/aqa-gcse-practical";
 import { aqaGcseSynopticQuestions } from "./questions/aqa-gcse-synoptic";
+import { aqaPsychologyQuestions } from "./questions/aqa-new-subjects-psychology";
+import { aqaComputerScienceQuestions } from "./questions/aqa-new-subjects-computer-science";
+import { aqaEconomicsQuestions } from "./questions/aqa-new-subjects-economics";
 import { biologyExtraQuestions } from "./questions/biology-extra";
 import { chemistryQuestions } from "./questions/chemistry";
 import { chemistryAqaQuestions } from "./questions/chemistry-aqa";
@@ -133,6 +136,9 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...aqaGcseQuestions,
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
+  ...aqaPsychologyQuestions,
+  ...aqaComputerScienceQuestions,
+  ...aqaEconomicsQuestions,
   ...wjecRepairDepthQuestions,
   ...wjecRecallProbeQuestions,
   // Keep the generated Physics depth pack after the curated bank so a fresh
@@ -157,6 +163,7 @@ export function isSeedWjecReleaseQuestion(question: Question): boolean {
 }
 
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
+export { aqaComputerScienceQuestions, aqaEconomicsQuestions, aqaPsychologyQuestions };
 export { gcseExpansionQuestions };
 export { edexcelExpansionQuestions };
 export { dataExpansionQuestions };

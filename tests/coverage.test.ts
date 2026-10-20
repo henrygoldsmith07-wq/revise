@@ -13,7 +13,7 @@ describe("content pipeline — spec metadata", () => {
       expect(topic.specVersion, `${topic.id} missing specVersion`).toBe("2024-1.0");
       expect(topic.source, `${topic.id} missing source`).toBe("authored");
       expect(["unverified", "checked", "verified"], `${topic.id} bad verification`).toContain(topic.verification);
-      expect(topic.specRef).toMatch(/^(Unit|Pure|Applied)/);
+      expect(topic.specRef).toMatch(/^(Unit|Pure|Applied|\d+\.\d)/);
     }
   });
 

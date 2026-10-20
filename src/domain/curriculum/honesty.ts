@@ -6,7 +6,7 @@ import type { CurriculumModule } from "./registry";
 /**
  * Honest labelling for cloned/reference curricula.
  *
- * 28 of the 32 registered subjects are adapted from the four WJEC A-level
+ * 28 of the registered subjects are adapted from the four WJEC A-level
  * flagships. Their topic lists, paper shapes and "checked · WJEC reviewer"
  * stamps were never verified against that board's specification. This module
  * is the single place we tell the truth: flagship stays as authored;
@@ -28,11 +28,28 @@ export const REFERENCE_DISCLAIMER =
 export const GCSE_REFERENCE_DISCLAIMER =
   "Reference-tier GCSE: this subject currently uses the WJEC A-level topic list, so its lessons and flashcards go well beyond GCSE. Only its practice questions were written for GCSE, and none has been checked against this board's specification.";
 
+/**
+ * Reference subjects whose topic list was written for their own board's
+ * specification rather than cloned from a flagship. Still reference-tier:
+ * nobody has checked them against the spec, and their questions are
+ * unreviewed. They must not carry the "adapted from WJEC" disclaimer, which
+ * would be false.
+ */
+export const AUTHORED_REFERENCE_SUBJECTS: ReadonlySet<string> = new Set([
+  "aqa-alevel-psychology",
+  "aqa-alevel-computer-science",
+  "aqa-alevel-economics",
+]);
+
+export const AUTHORED_REFERENCE_DISCLAIMER =
+  "Reference-tier: this subject's topic list was written for this board's specification but has not yet been checked by a teacher. Use it to revise, not as a spec guarantee.";
+
 export function isGcseSubject(subjectId: string): boolean {
   return subjectId.includes("-gcse-");
 }
 
 export function referenceDisclaimerFor(subjectId: string): string {
+  if (AUTHORED_REFERENCE_SUBJECTS.has(subjectId)) return AUTHORED_REFERENCE_DISCLAIMER;
   return isGcseSubject(subjectId) ? GCSE_REFERENCE_DISCLAIMER : REFERENCE_DISCLAIMER;
 }
 

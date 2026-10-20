@@ -97,3 +97,19 @@ export const GCSE_BOUNDARIES = [
   { grade: "1", percent: 5 },
   { grade: "U", percent: 0 },
 ];
+
+/** The cloned outlines carry this reviewer stamp; Edexcel and OCR A level copies were relabelled. */
+const OUTLINE_REVIEWER = "authored/WJEC-2024-v1-review";
+
+/** The same outline with its reviewer stamp replaced on every topic and statement that carries it. */
+export function withReviewer(outline: UnitSpec[], reviewer: string): UnitSpec[] {
+  const relabel = <T extends { reviewer?: string | null }>(item: T): T =>
+    item.reviewer === OUTLINE_REVIEWER ? { ...item, reviewer } : item;
+  return outline.map((unit) => ({
+    ...unit,
+    topics: unit.topics.map((topic) => ({
+      ...relabel(topic),
+      ...(topic.specPoints ? { specPoints: topic.specPoints.map(relabel) } : {}),
+    })),
+  }));
+}

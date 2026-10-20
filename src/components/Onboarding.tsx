@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
 import { isFlagship } from "@/domain/flagship";
+import { AUTHORED_REFERENCE_SUBJECTS } from "@/domain/curriculum/honesty";
 import { todayIso } from "@/domain/scheduling";
 import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
@@ -83,7 +84,9 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
             detail:
               subject.contentTier === "flagship"
                 ? `${qualification.level} · Flagship`
-                : `${qualification.level} · Reference · not spec-checked`,
+                : AUTHORED_REFERENCE_SUBJECTS.has(subject.id)
+                  ? `${qualification.level} · Reference · not yet teacher-checked`
+                  : `${qualification.level} · Reference · not spec-checked`,
           }))
           .sort((a, b) => {
             const aRef = a.detail.includes("Reference") ? 1 : 0;
@@ -103,7 +106,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
     [subjectRows, subjectIds],
   );
 
-  // 28 of the 32 registered subjects reuse a WJEC A-level outline without having
+  // 28 of the registered subjects reuse a WJEC A-level outline without having
   // been checked against their own board's specification. They are offered, but
   // only behind an explicit "Unverified preview" choice — a student picking a
   // subject should never have to notice a disclaimer to find out it is a guess.
@@ -345,6 +348,9 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                         ? "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE. Only the practice questions were written for GCSE, and none has been checked against the specification."
                         : <>These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
                       specification. Use them to navigate, not as a specification guarantee.</>}
+                      {row.subjects.some((subject) => AUTHORED_REFERENCE_SUBJECTS.has(subject.id))
+                        ? ` Except ${row.subjects.filter((subject) => AUTHORED_REFERENCE_SUBJECTS.has(subject.id)).map((subject) => subject.name).join(", ")}: their topic lists were written for this specification, but have not yet been checked by a teacher.`
+                        : null}
                     </p>
                     <SubjectPicker
                       options={row.subjects}

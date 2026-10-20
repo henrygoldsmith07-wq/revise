@@ -100,9 +100,11 @@ background and do other work while it runs. On Windows, invoke npm through
 - **`perf:budget` has a route budget for `/`** (`routes` in
   `scripts/client-performance-budget.json`): root files plus the route's
   layout and page entry chunks. The bank left it in the seventeenth pass
-  (5.13 MB → 2.97 MB raw); the curriculum topic tree (~0.85 MB) is the
-  largest piece left. Lower it as more leaves; never raise it to fit a
-  regression.
+  (5.13 MB → 2.97 MB raw); the curriculum topic tree is the largest piece
+  left. The 28 reference subjects build from four shared outlines in
+  `src/domain/curriculum/outlines` (forty-sixth pass, → 2.41 MB raw); never
+  paste an outline back into a subject module. Lower the budget as more
+  leaves; never raise it to fit a regression.
 - **Equivalent wording in the offline marker is a curated list**
   (`PHRASE_EQUIVALENTS` in `src/domain/marking-language.ts`, sixteenth pass).
   It rewrites both the scheme point and the answer, for keyword coverage only.
