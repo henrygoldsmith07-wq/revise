@@ -13,6 +13,8 @@ export type PhysicsDepthPart = {
   scheme: string[];
   answer: string;
   aos?: AoCode[];
+  /** Set only when the author has re-worked the numbers by hand; it is not a teacher review. */
+  lastChecked?: string;
 };
 
 export type PhysicsDepthItem = {
@@ -42,7 +44,7 @@ export function depthQuestions(items: readonly PhysicsDepthItem[]): Question[] {
       source: "generated",
       verification: "unverified",
       reviewer: null,
-      lastChecked: null,
+      lastChecked: part.lastChecked ?? null,
       specVersion: "2024-1.0",
       parts: [{
         prompt: part.prompt,
