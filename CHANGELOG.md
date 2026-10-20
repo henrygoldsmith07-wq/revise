@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-sixth pass
+
+- Three new subjects: AQA A-level Psychology (7182, 11 topics), Computer Science (7517, 11 topics) and Economics (7136, 14 topics). Unlike the 28 cloned reference subjects, each topic list is written for its own specification's section structure, with 182 spec-numbered statements, key points and common errors (so flashcards and lesson outlines exist from day one) and a starter bank of 72 original questions, two per topic, whose model answers all earn full marks from the offline marker. Everything is labelled unverified and reference-tier; they carry a new disclaimer that does not claim a WJEC origin, and the specification map shows each subject's own disclaimer. The per-topic expansion programmes (data, unfamiliar-context, source-stimulus, massive-authentic) stay scoped to the original 32 subjects. Guarded by tests/new-subjects.test.ts.
+
 ## 2026-10-20 — forty-fifth pass
 
 - Physics electric-circuits.sp-01 (charge, current and pd) gains a distinct calculation family: counting electrons from Q = It and the elementary charge (0.50 A for 2.0 min gives 3.8×10²⁰, working checked by hand). Authored unreviewed with `lastChecked` recording only the arithmetic check; it counts for nothing as Proven until two teachers approve it. Depth gaps drop to 7.

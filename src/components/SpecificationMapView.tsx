@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { getTopic } from "@/domain/curriculum";
+import { getSubject, getTopic } from "@/domain/curriculum";
 import { REFERENCE_DISCLAIMER } from "@/domain/curriculum/honesty";
 import {
   buildSpecificationMap,
@@ -67,7 +67,7 @@ export function SpecificationMapView() {
         </p>
         {referenceTier ? (
           <p className="text-xs text-ink2 mt-2 max-w-3xl" role="note">
-            {REFERENCE_DISCLAIMER} Its questions are not teacher-reviewed, so &quot;secure&quot; here means secure in practice: it is not proof and not an exam prediction.
+            {getSubject(subjectId)?.contentDisclaimer ?? REFERENCE_DISCLAIMER} Its questions are not teacher-reviewed, so &quot;secure&quot; here means secure in practice: it is not proof and not an exam prediction.
           </p>
         ) : null}
       </header>

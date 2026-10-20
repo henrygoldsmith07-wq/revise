@@ -18,9 +18,9 @@ import { search } from "@/domain/search";
 import type { Attempt, StreakState, TopicMastery } from "@/domain/types";
 
 describe("curriculum registry", () => {
-  it("registers the four core subjects across boards (WJEC/AQA/Edexcel/OCR × A-level + GCSE)", () => {
+  it("registers the four core subjects across boards, plus AQA Psychology, Computer Science and Economics", () => {
     const names = allSubjects().map((s) => s.name).sort();
-    expect(names.filter((n,i,a)=>a.indexOf(n)===i).sort()).toEqual(["Biology", "Chemistry", "Mathematics", "Physics"]);
+    expect(names.filter((n,i,a)=>a.indexOf(n)===i).sort()).toEqual(["Biology", "Chemistry", "Computer Science", "Economics", "Mathematics", "Physics", "Psychology"]);
     expect(allSubjects().length).toBeGreaterThanOrEqual(8);
   });
 

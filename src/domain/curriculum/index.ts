@@ -107,6 +107,9 @@ import "./wjec-gcse-physics";
 import "./aqa-gcse-physics";
 import "./edexcel-gcse-physics";
 import "./ocr-gcse-physics";
+import "./aqa-psychology";
+import "./aqa-computer-science";
+import "./aqa-economics";
 
 export * from "./registry";
 export { A_LEVEL_BOUNDARIES } from "./helpers";
