@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-ninth pass
+
+Physics circular-shm.sp-02 (centripetal acceleration): a second explanation family (why constant-speed circular motion is accelerated without changing speed). Authored as unreviewed, so it counts for nothing as Proven until two teachers approve; closes the circular-shm.sp-02 depth gap (two left).
+
 ## 2026-10-20 — forty-eighth pass
 
 Physics kinematics-dynamics.sp-01 (scalars, vectors, resolving): two explanation families (why perpendicular components act independently; distance vs displacement on a return walk) and a calculation family (resolving an angled pull). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the kinematics-dynamics.sp-01 depth gap (three left).
