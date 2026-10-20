@@ -9,6 +9,13 @@ const p = (
 /** Explicit completion questions for fields, thermal physics and nuclei. */
 const ITEMS: PhysicsDepthItem[] = [
   {
+    topic: "fields", point: 2,
+    parts: [
+      p("calculation", "completion:fields2:altitude-g", "completion:fields2:altitude-g:satellite", "use g = GM/r² with r measured from the planet's centre", "A satellite orbits 3.6×10^6 m above the Earth's surface. Calculate the gravitational field strength at the satellite. (Earth: M = 5.97×10^24 kg, radius 6.37×10^6 m; G = 6.67×10^-11 N m^2 kg^-2.)", 3, ["r = 6.37×10^6 + 3.6×10^6 = 9.97×10^6 m (distance from the centre)", "g = GM/r^2 = 6.67×10^-11 × 5.97×10^24 / (9.97×10^6)^2", "g = 4.0 N kg^-1"], "r is measured from the Earth's centre: 9.97×10^6 m. g = GM/r² = 4.0 N kg⁻¹.", "2026-10-20"),
+      p("calculation", "completion:fields2:dipole-midpoint", "completion:fields2:dipole-midpoint:opposite-charges", "add two electric field vectors that point the same way at the midpoint", "Charges of +4.0 nC and -4.0 nC are 0.20 m apart in air. Calculate the resultant electric field strength at the midpoint and state its direction. Use k = 8.99×10^9 N m^2 C^-2.", 3, ["Each charge is 0.10 m from the midpoint: E = kQ/r^2 = 8.99×10^9 × 4.0×10^-9 / 0.10^2 = 3.6×10^3 N C^-1", "Both fields point the same way (away from +, towards -), so they add: 2 × 3.6×10^3", "E = 7.2×10^3 N C^-1, directed towards the negative charge"], "Each charge gives 3.6×10³ N C⁻¹ at 0.10 m, and both point towards the negative charge, so the resultant is 7.2×10³ N C⁻¹ towards the -4.0 nC charge.", "2026-10-20"),
+    ],
+  },
+  {
     topic: "fields", point: 3,
     parts: [
       p("recall", "completion:fields3:potential", "completion:fields3:potential:definition", "define electric and gravitational potential", "Define electric potential and gravitational potential at a point.", 2, ["Electric potential is work done per unit positive charge bringing it from infinity", "Gravitational potential is work done per unit mass bringing it from infinity"], "Electric potential is work per unit positive charge; gravitational potential is work per unit mass, both referenced to infinity."),
