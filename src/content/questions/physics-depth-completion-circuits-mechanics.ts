@@ -181,6 +181,12 @@ const ITEMS: PhysicsDepthItem[] = [
       p("calculation", "completion:vectors1:resolve-pull", "completion:vectors1:resolve-pull:suitcase", "resolve an angled force into horizontal and vertical components", "A suitcase is pulled with a force of 40 N at 30° above the horizontal. Calculate the horizontal and vertical components of the force.", 3, ["Horizontal component = 40 cos 30°", "= 35 N (34.6 N)", "Vertical component = 40 sin 30° = 20 N"], "The horizontal component is 40 cos 30° = 35 N and the vertical component is 40 sin 30° = 20 N, so the vertical part partly lifts the suitcase and the horizontal part drives it forward."),
     ],
   },
+  {
+    topic: "circular-shm", point: 2,
+    parts: [
+      p("explanation", "completion:circular2:speed-constant", "completion:circular2:speed-constant:conveyor", "explain why uniform circular motion is accelerated although speed is constant", "A ball moves round a horizontal circle at constant speed. Explain why it is accelerating and why the acceleration does not change its speed.", 3, ["Acceleration is a change in velocity, and velocity includes direction", "The direction of motion changes continuously, so the velocity changes", "The acceleration is towards the centre, perpendicular to the velocity, so it changes direction but not speed"], "Velocity is a vector, so a changing direction means a changing velocity even at constant speed. The acceleration points to the centre, at right angles to the motion, so it turns the velocity without speeding the ball up or slowing it down.", "2026-10-20"),
+    ],
+  },
 ];
 
 export const physicsDepthCompletionCircuitsMechanicsQuestions = depthQuestions(ITEMS);
