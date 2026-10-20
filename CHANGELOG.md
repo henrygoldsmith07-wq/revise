@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — fifty-second pass
+
+Practice: the "Topic reminders" key points (which restate the content a question tests) are no longer shown under an unaided question or an independent/transfer adaptive step, where the hint budget is zero. They still show in supported, guided and timed-free modes. Checked with eslint only; no component test covers this page, so the behaviour was not exercised in a browser.
+
 ## 2026-10-20 — fifty-first pass
 
 Physics fields.sp-01 (Newton's and Coulomb's laws): an explanation family (why gravity, not the much stronger electric force, controls planets), a misconception family (doubling distance does not halve the force) and a calculation family (Coulomb force between 3.0 nC and 5.0 nC at 0.050 m = 5.4×10⁻⁵ N, repulsive, checked by hand). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the last Physics depth gap.

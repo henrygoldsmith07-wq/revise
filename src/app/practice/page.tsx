@@ -970,7 +970,7 @@ function Practice() {
         />
       )}
 
-      {current ? (
+      {current && stepMode !== "unaided" && adaptiveHintBudget !== 0 ? (
         <section>
           <SectionHeading title="Topic reminders" hint="Read these after you have answered, not before." />
           <Panel>
