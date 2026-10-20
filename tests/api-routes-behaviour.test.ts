@@ -268,7 +268,7 @@ describe("Pulse history route behaviour", () => {
 describe("AI route behaviour", () => {
   const SUPABASE_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
   const PROVIDER_KEYS = ["ANTHROPIC_API_KEY", "AI_PROVIDER", "OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_MODEL", "OPENAI_COMPATIBLE_API_KEY"];
-  const ALL_KEYS = [...SUPABASE_KEYS, ...PROVIDER_KEYS, "NODE_ENV", "RATE_LIMIT_BACKEND", "AI_DAILY_LIMIT", "CLASSIFIER_DISABLED"];
+  const ALL_KEYS = [...SUPABASE_KEYS, ...PROVIDER_KEYS, "NODE_ENV", "RATE_LIMIT_BACKEND", "AI_DAILY_LIMIT", "CLASSIFIER_DISABLED", "CLASSIFIER_ENABLED"];
 
   beforeEach(() => {
     saveEnv(...ALL_KEYS);
@@ -346,9 +346,10 @@ describe("AI route behaviour", () => {
     expect(res.status).toBe(503);
   });
 
-  it("fails closed in production without auth config even with no model key, because classifier.dev is on by default", async () => {
+  it("fails closed in production without auth config even with no model key when classifier.dev is enabled", async () => {
     vi.stubEnv("NODE_ENV", "production");
     delete process.env.CLASSIFIER_DISABLED;
+    process.env.CLASSIFIER_ENABLED = "1";
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     try {
       const res = await aiPost(aiRequest({
@@ -369,6 +370,25 @@ describe("AI route behaviour", () => {
     const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "unknown-topic" } }));
     expect(res.status).toBe(200);
     expect(((await res.json()) as { source: string }).source).toBe("fallback");
+  });
+
+  it("never relays to classifier.dev by default: it is opt-in, and CLASSIFIER_DISABLED still wins", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      for (const env of [{}, { CLASSIFIER_ENABLED: "1", CLASSIFIER_DISABLED: "1" }] as Record<string, string>[]) {
+        delete process.env.CLASSIFIER_ENABLED;
+        delete process.env.CLASSIFIER_DISABLED;
+        Object.assign(process.env, env);
+        const res = await aiPost(aiRequest({
+          task: "diagnose-error",
+          payload: { prompt: "Explain osmosis", point: "water potential", answer: "it moves", awarded: 0, maxMarks: 1 },
+        }));
+        expect(res.status).toBe(200);
+      }
+      expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("classifier.dev"))).toBe(false);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("refuses a declared Content-Length over the cap before reading the body", async () => {

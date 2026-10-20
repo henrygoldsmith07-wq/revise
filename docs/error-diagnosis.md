@@ -130,7 +130,9 @@ replaces the display diagnosis; the marks on screen never move.
 
 ## Turning it off
 
-`CLASSIFIER_DISABLED=1` (see `.env.example`) forces the deterministic local
-classifier always — offline use, CI, and a strict no-third-party-text policy.
+classifier.dev is opt-in: without `CLASSIFIER_ENABLED=1` (see `.env.example`)
+the deterministic local classifier runs always, and `CLASSIFIER_DISABLED=1`
+forces it whatever `CLASSIFIER_ENABLED` says. Enable it only once a processing
+agreement covers a third party receiving (masked) student writing.
 Student text is PII-masked before any request leaves the device, exactly as
 for every other AI task in this app.

@@ -98,7 +98,7 @@ function withImages(
 function anthropicProvider(): AiProvider | null {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
-  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
   return {
     name: "anthropic",
     model,
@@ -107,9 +107,13 @@ function anthropicProvider(): AiProvider | null {
         "https://api.anthropic.com/v1/messages",
         { "x-api-key": key, "anthropic-version": "2023-06-01" },
         {
+          // No temperature: current Claude models reject sampling parameters
+          // with a 400, which silently sent every task to the offline fallback.
+          // Thinking is on by default, so effort stays low to keep short JSON
+          // replies inside max_tokens.
           model,
           max_tokens: request.maxTokens ?? 1200,
-          temperature: request.temperature ?? 0.3,
+          output_config: { effort: "low" },
           system: request.jsonHint
             ? `${request.system}\n\nReply with JSON only, matching: ${request.jsonHint}`
             : request.system,

@@ -1,5 +1,7 @@
 // classifier.dev HTTP client (server-only): post-marking error diagnosis.
 // Free tier, no key. Never touches marks — only classifies AFTER marking.
+// Off unless CLASSIFIER_ENABLED=1: it is a third-party recipient of a child's
+// (masked) writing, so a deployment opts in once a processing agreement exists.
 
 import "server-only";
 import { ERROR_TAXONOMY, ERROR_TAXONOMY_VERSION } from "@/domain/error-taxonomy";
@@ -54,7 +56,7 @@ function instructions(): string {
 }
 
 export function classifierConfigured(): boolean {
-  return process.env.CLASSIFIER_DISABLED !== "1";
+  return process.env.CLASSIFIER_ENABLED === "1" && process.env.CLASSIFIER_DISABLED !== "1";
 }
 
 async function postClassify(text: string, tier: "fast" | "smart"): Promise<{ label: string; confidence: number } | null> {

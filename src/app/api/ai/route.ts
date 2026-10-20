@@ -50,7 +50,7 @@ function providerCredentialsPresent(): boolean {
   // env means a deployment intends to call a model.
   //
   // classifier.dev is a third-party recipient too, and it needs no key: it is
-  // on unless CLASSIFIER_DISABLED=1. Counting it here means production
+  // off unless CLASSIFIER_ENABLED=1. Counting it here means production
   // without Supabase auth fails closed instead of relaying learner text to it
   // in local mode, where consent is only a browser header and the rate-limit
   // key comes from x-forwarded-for.
@@ -78,7 +78,7 @@ async function requireAiUser(request: Request): Promise<AiAuth> {
         error: NextResponse.json(
           {
             error:
-              "AI authentication is not configured. Set Supabase auth before enabling AI providers or the error classifier (CLASSIFIER_DISABLED=1 turns it off).",
+              "AI authentication is not configured. Set Supabase auth before enabling AI providers or the error classifier (unset CLASSIFIER_ENABLED to turn it off).",
           },
           { status: 503 },
         ),

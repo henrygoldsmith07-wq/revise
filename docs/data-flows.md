@@ -187,8 +187,9 @@ What the tiers mean for data:
   `diagnose-error` task via `src/ai/error-classifier.ts`. It receives the
   question prompt, the mark-scheme point and the student answer (each truncated
   to 500/300/800 characters). Those arrive already masked, because
-  `aiDiagnoseError` masks before posting to the AI route. `CLASSIFIER_DISABLED=1`
-  forces the deterministic local classifier instead. Because the classifier
+  `aiDiagnoseError` masks before posting to the AI route. It is off unless
+  `CLASSIFIER_ENABLED=1`; otherwise, and whenever `CLASSIFIER_DISABLED=1`, the
+  deterministic local classifier runs instead. Because the classifier
   needs no key, the route counts it as a provider: a production deploy without
   Supabase auth answers 503 rather than relaying to it in local mode, unless
   it is disabled.
