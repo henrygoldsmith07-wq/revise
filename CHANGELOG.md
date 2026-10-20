@@ -1,13 +1,25 @@
 # Changelog
 
-## 2026-10-20 — forty-sixth pass
-
-Physics fields.sp-02: two new calculation families (field strength at altitude measured from the planet centre; opposite-charge midpoint field adding as vectors). Authored as unreviewed; closes the fields.sp-02 depth gap.
-
-## 2026-10-20 — forty-seventh pass
+## 2026-10-20 — fiftieth pass
 
 - Three new subjects: AQA A-level Psychology (7182, 11 topics), Computer Science (7517, 11 topics) and Economics (7136, 14 topics). Unlike the 28 cloned reference subjects, each topic list is written for its own specification's section structure, with 182 spec-numbered statements, key points and common errors (so flashcards and lesson outlines exist from day one) and a starter bank of 72 original questions, two per topic, whose model answers all earn full marks from the offline marker. Everything is labelled unverified and reference-tier; they carry a new disclaimer that does not claim a WJEC origin, and the specification map shows each subject's own disclaimer. The per-topic expansion programmes (data, unfamiliar-context, source-stimulus, massive-authentic) stay scoped to the original 32 subjects. Guarded by tests/new-subjects.test.ts.
 - Boot bundle: the 28 reference subjects were seven byte-identical copies of each of four outlines (only the reviewer stamp differed). They now build from one shared outline per family (`src/domain/curriculum/outlines`, `withReviewer` for the Edexcel/OCR stamp); the runtime curriculum is byte-identical before and after. The `/` route drops from 3,116,672 raw / 774,752 gzip (which failed the budget with the new subjects) to 2,406,001 / 684,783, and the route budget is tightened to 2,450,000 / 700,000.
+
+## 2026-10-20 — forty-ninth pass
+
+Physics circular-shm.sp-02 (centripetal acceleration): a second explanation family (why constant-speed circular motion is accelerated without changing speed). Authored as unreviewed, so it counts for nothing as Proven until two teachers approve; closes the circular-shm.sp-02 depth gap (two left).
+
+## 2026-10-20 — forty-eighth pass
+
+Physics kinematics-dynamics.sp-01 (scalars, vectors, resolving): two explanation families (why perpendicular components act independently; distance vs displacement on a return walk) and a calculation family (resolving an angled pull). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the kinematics-dynamics.sp-01 depth gap (three left).
+
+## 2026-10-20 — forty-seventh pass
+
+Physics waves.sp-03 (stationary waves): two new explanation families (why no net energy travels along a stationary wave; in-phase within a loop, antiphase across a node). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the waves.sp-03 depth gap (four left).
+
+## 2026-10-20 — forty-sixth pass
+
+Physics fields.sp-02: two new calculation families (field strength at altitude measured from the planet centre; opposite-charge midpoint field adding as vectors). Authored as unreviewed; closes the fields.sp-02 depth gap.
 
 ## 2026-10-20 — forty-fifth pass
 
