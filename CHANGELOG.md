@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — fifty-first pass
+
+Physics fields.sp-01 (Newton's and Coulomb's laws): an explanation family (why gravity, not the much stronger electric force, controls planets), a misconception family (doubling distance does not halve the force) and a calculation family (Coulomb force between 3.0 nC and 5.0 nC at 0.050 m = 5.4×10⁻⁵ N, repulsive, checked by hand). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the last Physics depth gap.
+
 ## 2026-10-20 — fiftieth pass
 
 Physics nuclear.sp-02 (nuclear radius): a second explanation family (why visible light cannot resolve a nucleus but high-energy electrons can) and a second calculation family (nucleon number from a measured radius, A = 125, checked by hand). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the nuclear.sp-02 depth gap (one left: fields.sp-01).
