@@ -3,7 +3,8 @@ import { depthQuestions, type PhysicsDepthItem, type PhysicsDepthPart } from "./
 const p = (
   demand: PhysicsDepthPart["demand"], family: string, context: string, move: string,
   prompt: string, marks: number, scheme: string[], answer: string,
-): PhysicsDepthPart => ({ demand, family, context, move, prompt, marks, scheme, answer });
+  lastChecked?: string,
+): PhysicsDepthPart => ({ demand, family, context, move, prompt, marks, scheme, answer, ...(lastChecked ? { lastChecked } : {}) });
 
 /** Explicit completion questions for fields, thermal physics and nuclei. */
 const ITEMS: PhysicsDepthItem[] = [
@@ -43,6 +44,12 @@ const ITEMS: PhysicsDepthItem[] = [
       p("transfer", "completion:fields8:microphone", "completion:fields8:microphone:audio", "transfer Faraday law to an electromagnetic microphone", "An electromagnetic microphone has a moving coil in a permanent-magnet field. Explain how sound pressure becomes a voltage waveform and one source of distortion.", 3, ["Sound moves the diaphragm and attached coil", "Changing flux linkage induces emf proportional to the motion rate", "Non-uniform field, large excursions or coil resistance can distort amplitude/phase"], "Sound moves the coil, changing flux linkage and inducing a voltage waveform. Field non-uniformity or large motion can make the response non-linear."),
       p("synoptic", "completion:fields8:generator-load", "completion:fields8:generator-load:dynamo", "combine induced emf, Lenz opposition and load power", "A bicycle dynamo gives 6.0 V rms at 1.0 A to a lamp. Explain why pedalling becomes harder when the lamp is connected and calculate the electrical power.", 4, ["P_electrical = VI = 6.0 W", "Lamp current creates a magnetic effect opposing the changing flux", "The opposing torque requires extra mechanical work from the rider", "Energy balance: mechanical input exceeds 6.0 W because of losses"], "The lamp receives 6.0 W. Its current produces Lenz-law opposition, increasing the mechanical torque the rider must supply; losses make mechanical input larger than 6 W."),
       p("synoptic", "completion:fields8:induction-audit", "completion:fields8:induction-audit:rail", "combine Faraday calculation with a direction and model check", "A rail coil has N = 80, area 0.015 m^2 and field perpendicular to it. The field falls from 0.60 T to 0.10 T in 0.020 s. Calculate the emf and state the induced-field direction.", 4, ["Delta(NPhi) = N A Delta B = 80×0.015×(-0.50) = -0.60 Wb turns", "epsilon = -Delta(NPhi)/Delta t = +30 V in the chosen positive sense", "The induced field is in the original field direction because the original field is decreasing", "A sign reversal would indicate a changed terminal convention, not a different magnitude"], "The induced emf magnitude is 30 V. Because the external field decreases, the coil's field supports the original direction; the algebraic sign follows the chosen terminals."),
+    ],
+  },
+  {
+    topic: "thermal", point: 1,
+    parts: [
+      p("calculation", "completion:thermal1:latent-heat", "completion:thermal1:latent-heat:heater-boil-off", "use electrical energy supplied and mass boiled away to find a specific latent heat", "A 60 W immersion heater is switched on for 300 s in water already at its boiling point. The mass of the beaker falls by 7.5 g as water boils away. Assuming all the heater's energy boils water, calculate the specific latent heat of vaporisation of water.", 3, ["Energy supplied E = Pt = 60 × 300 = 1.8×10^4 J", "E = mL, so L = E/m = 1.8×10^4 / 7.5×10^-3", "L = 2.4×10^6 J kg^-1"], "E = Pt = 60 × 300 = 1.8×10^4 J. This boils m = 7.5×10^-3 kg of water, so L = E/m = 1.8×10^4 ÷ 7.5×10^-3 = 2.4×10^6 J kg^-1.", "2026-10-20"),
     ],
   },
   {

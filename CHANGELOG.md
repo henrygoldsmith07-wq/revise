@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-third pass
+
+- Physics thermal.sp-01 (thermal physics, internal energy and state change) gains a second, distinct calculation family: specific latent heat of vaporisation from a 60 W heater boiling off 7.5 g of water (2.4×10⁶ J kg⁻¹, working checked by hand). Authored unreviewed, so it counts for nothing as trusted until two teachers approve it. The depth-gap list in tests/subject-assessment-audit.test.ts drops to 8 and deep-complete statements rise 99 to 100.
+
 ## 2026-10-19 — forty-second pass
 
 - Flashcards: 1,071 of the 1,900 key-point seed cards printed their whole answer on the front ("<topic> — state and explain: <the answer>"). Fronts are now recall cues that keep the subject and hide the claim ("A tangent to a circle is …"); every card now hides at least 20% of its answer, and 90%+ hide at least 40%. Common-error cards paired each error with whichever key point shared its index; they now name a correct approach only when it is about the same thing, otherwise none. Cards already on a device are upgraded on read only when their stored face is exactly the old generator's output, so edits and FSRS history are untouched. Guarded by tests/seed-card-prompts.test.ts.
