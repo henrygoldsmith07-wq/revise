@@ -1,9 +1,13 @@
 # Changelog
 
-## 2026-10-20 — fiftieth pass
+## 2026-10-20 — fifty-first pass
 
 - Three new subjects: AQA A-level Psychology (7182, 11 topics), Computer Science (7517, 11 topics) and Economics (7136, 14 topics). Unlike the 28 cloned reference subjects, each topic list is written for its own specification's section structure, with 182 spec-numbered statements, key points and common errors (so flashcards and lesson outlines exist from day one) and a starter bank of 72 original questions, two per topic, whose model answers all earn full marks from the offline marker. Everything is labelled unverified and reference-tier; they carry a new disclaimer that does not claim a WJEC origin, and the specification map shows each subject's own disclaimer. The per-topic expansion programmes (data, unfamiliar-context, source-stimulus, massive-authentic) stay scoped to the original 32 subjects. Guarded by tests/new-subjects.test.ts.
 - Boot bundle: the 28 reference subjects were seven byte-identical copies of each of four outlines (only the reviewer stamp differed). They now build from one shared outline per family (`src/domain/curriculum/outlines`, `withReviewer` for the Edexcel/OCR stamp); the runtime curriculum is byte-identical before and after. The `/` route drops from 3,116,672 raw / 774,752 gzip (which failed the budget with the new subjects) to 2,406,001 / 684,783, and the route budget is tightened to 2,450,000 / 700,000.
+
+## 2026-10-20 — fiftieth pass
+
+Physics nuclear.sp-02 (nuclear radius): a second explanation family (why visible light cannot resolve a nucleus but high-energy electrons can) and a second calculation family (nucleon number from a measured radius, A = 125, checked by hand). Authored as unreviewed, so they count for nothing as Proven until two teachers approve; closes the nuclear.sp-02 depth gap (one left: fields.sp-01).
 
 ## 2026-10-20 — forty-ninth pass
 

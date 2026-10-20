@@ -187,6 +187,13 @@ const ITEMS: PhysicsDepthItem[] = [
       p("explanation", "completion:circular2:speed-constant", "completion:circular2:speed-constant:conveyor", "explain why uniform circular motion is accelerated although speed is constant", "A ball moves round a horizontal circle at constant speed. Explain why it is accelerating and why the acceleration does not change its speed.", 3, ["Acceleration is a change in velocity, and velocity includes direction", "The direction of motion changes continuously, so the velocity changes", "The acceleration is towards the centre, perpendicular to the velocity, so it changes direction but not speed"], "Velocity is a vector, so a changing direction means a changing velocity even at constant speed. The acceleration points to the centre, at right angles to the motion, so it turns the velocity without speeding the ball up or slowing it down.", "2026-10-20"),
     ],
   },
+  {
+    topic: "nuclear", point: 2,
+    parts: [
+      p("explanation", "completion:nuclear2:light-probe", "completion:nuclear2:light-probe:visible", "explain why visible light cannot be used to measure a nuclear radius", "Explain why visible light (wavelength about 5×10⁻⁷ m) cannot be used to measure the size of a nucleus, but high-energy electrons can.", 3, ["To resolve a target the probe wavelength must be comparable to or smaller than its size", "Visible light has a wavelength about 10⁸ times larger than a nucleus (about 10⁻¹⁵ m), so it shows no useful diffraction pattern", "High-energy electrons have a de Broglie wavelength of a few femtometres, so their scattering pattern depends on the nuclear size"], "A probe can only resolve detail about as large as its wavelength. Visible light at about 5×10⁻⁷ m is around 10⁸ times too long to resolve a nucleus of about 10⁻¹⁵ m, whereas high-energy electrons have de Broglie wavelengths of a few femtometres, so their diffraction pattern reveals the nuclear size.", "2026-10-20"),
+      p("calculation", "completion:nuclear2:nucleon-from-radius", "completion:nuclear2:nucleon-from-radius:inverse", "rearrange the radius law to find a nucleon number from a measured radius", "A nucleus has a radius of 6.0 fm. Use r = r₀A^(1/3) with r₀ = 1.2 fm to calculate its nucleon number.", 3, ["A^(1/3) = r / r₀ = 6.0 / 1.2 = 5.0", "A = 5.0³", "A = 125"], "Rearranging gives A^(1/3) = 6.0/1.2 = 5.0, so A = 5.0³ = 125 nucleons.", "2026-10-20"),
+    ],
+  },
 ];
 
 export const physicsDepthCompletionCircuitsMechanicsQuestions = depthQuestions(ITEMS);
