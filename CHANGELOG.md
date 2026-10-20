@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-20 — forty-sixth pass
+
+Physics fields.sp-02: two new calculation families (field strength at altitude measured from the planet centre; opposite-charge midpoint field adding as vectors). Authored as unreviewed; closes the fields.sp-02 depth gap.
+
 ## 2026-10-20 — forty-fifth pass
 
 - Physics electric-circuits.sp-01 (charge, current and pd) gains a distinct calculation family: counting electrons from Q = It and the elementary charge (0.50 A for 2.0 min gives 3.8×10²⁰, working checked by hand). Authored unreviewed with `lastChecked` recording only the arithmetic check; it counts for nothing as Proven until two teachers approve it. Depth gaps drop to 7.
