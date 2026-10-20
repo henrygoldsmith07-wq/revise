@@ -73,13 +73,11 @@ describe("WJEC flagship depth pack", () => {
     // 102 - 4 + 1 = 99. These statements each now have one family, not two
     // distinct ones, for the listed demand. Author a real second family to
     // close a gap and remove it here; never retag a question back to fill one.
-    expect(dashboard.subjects[0]!.deepComplete).toBe(107);
+    expect(dashboard.subjects[0]!.deepComplete).toBe(108);
     const physics = auditFlagshipSubject({ subjectId: "wjec-alevel-physics", topics: wjecFlagshipCurricula.find((c) => c.subject.id === "wjec-alevel-physics")!.topics, questions: seedQuestions, nodes: wjecCapabilities });
     const gaps = physics.capabilityCoverage.filter((row) => !row.complete)
       .map((row) => `${row.specPointId.replace("wjec-alevel-physics.", "")}: ${row.demands.filter((d) => !(d.complete && d.distinct)).map((d) => d.demand).join("+")}`);
-    expect(gaps.sort()).toEqual([
-      "fields.sp-01: explanation+misconception+calculation",
-    ]);
+    expect(gaps.sort()).toEqual([]);
   }, 60_000);
 
   it("keeps the templated Maths/Biology/Chemistry depth pack out of the learner bank", () => {
