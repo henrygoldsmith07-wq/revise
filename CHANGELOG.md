@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-21 — fifty-fourth pass
+
+Exam command centre: the per-lever times now read "about N min" like the rest of the app, since they are planning estimates. Copy only; not tested in a browser or with tsc (no node_modules in this sandbox).
+
 ## 2026-10-21 — fifty-third pass
 
 Today: the mission button now reads "Start step · about N min" instead of "Start N-minute step". The mission's step length is a fixed planning estimate while the Best next step line is sized from the questions chosen, so the two could differ (for example 12 vs 9); the word "about" says both are estimates. Copy only; not tested in a browser.
