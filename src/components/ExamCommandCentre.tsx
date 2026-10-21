@@ -117,7 +117,7 @@ function SubjectCard({ subject }: { subject: CommandCentreSubject }) {
           {t.levers.length > 1 ? (
             <div>
               <p className="font-semibold text-ink">What could change it</p>
-              <ul className="mt-1 space-y-0.5">{t.levers.map((l) => <li key={l.id}><Link href={l.href} className="underline underline-offset-2 hover:text-ink">{l.title}</Link> · {l.minutes} min</li>)}</ul>
+              <ul className="mt-1 space-y-0.5">{t.levers.map((l) => <li key={l.id}><Link href={l.href} className="underline underline-offset-2 hover:text-ink">{l.title}</Link> · about {l.minutes} min</li>)}</ul>
             </div>
           ) : null}
         </div>
