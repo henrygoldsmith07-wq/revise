@@ -27,7 +27,7 @@ export function MissionView({ mission }: { mission: ExamMission }) {
       <p className="text-sm text-ink2">{r.statement}</p>
       {!action.blocked ? (
         <ButtonLink href={action.href} variant="primary" size="md" className="w-full sm:w-auto">
-          {action.minutes > 0 ? `Start ${action.minutes}-minute step` : "See progress"}
+          {action.minutes > 0 ? `Start step · about ${action.minutes} min` : "See progress"}
         </ButtonLink>
       ) : (
         <div className="space-y-2">

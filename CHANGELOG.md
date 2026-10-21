@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-21 — fifty-third pass
+
+Today: the mission button now reads "Start step · about N min" instead of "Start N-minute step". The mission's step length is a fixed planning estimate while the Best next step line is sized from the questions chosen, so the two could differ (for example 12 vs 9); the word "about" says both are estimates. Copy only; not tested in a browser.
+
 ## 2026-10-20 — fifty-second pass
 
 Practice: the "Topic reminders" key points (which restate the content a question tests) are no longer shown under an unaided question or an independent/transfer adaptive step, where the hint budget is zero. They still show in supported, guided and timed-free modes. Checked with eslint only; no component test covers this page, so the behaviour was not exercised in a browser.
