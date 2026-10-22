@@ -268,7 +268,11 @@ export function delayedFarTransferRetests(input: {
       !trustedAssessmentAttempt(sourceAttempt, sourceQuestion, attemptsByUser.get(sourceAttempt.userId) ?? [], input.questions)) continue;
 
     const stored = sourceAttempt.farTransfer?.role === "source" ? sourceAttempt.farTransfer : undefined;
-    const link = stored ?? scheduleDelayedFarTransfer({
+    // A source with no stored link has its check derived on read. Once the
+    // check is taken its candidate counts as attempted and can no longer be
+    // selected, so a completed retest's own link stands in for the source's.
+    const taken = stored ? undefined : completedByRetestId.get(`far-transfer:${sourceAttempt.id}`)?.farTransfer;
+    const link = stored ?? (taken?.sourceAttemptId === sourceAttempt.id ? { ...taken, role: "source" as const, outcome: undefined } : undefined) ?? scheduleDelayedFarTransfer({
       attempt: sourceAttempt,
       question: sourceQuestion,
       questions: input.questions,

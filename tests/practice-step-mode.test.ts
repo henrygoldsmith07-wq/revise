@@ -160,7 +160,8 @@ describe("practice honours the flags (source wiring)", () => {
     // Clicked from a marked answer on the same route: the step must remount
     // with its own queue, not keep the answered question.
     expect(page).toContain("<Practice key={step ? `step:${step}:");
-    expect(page).toContain("hintBudget={adaptiveHintBudget ?? stepModeHintBudget(stepMode)}");
+    expect(page).toContain("const hintBudget = adaptiveHintBudget ?? (farTransferRetest ? 0 : stepModeHintBudget(stepMode));");
+    expect(page).toContain("hintBudget={hintBudget}");
     expect(page).toContain("stepMode={stepMode}");
     expect(page).toContain("fitStepQueueToMinutes(orderByCommand(ranked, timedCommand).ordered, stepMinutes)");
     expect(page).toContain("fitStepQueueToMinutes(freshAfterExample(ranked, workedExample?.example ?? null), stepMinutes, WORKED_STEP_TRIES)");

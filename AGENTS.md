@@ -140,13 +140,23 @@ background and do other work while it runs. On Windows, invoke npm through
   changing copy or adding a route.
 - **Repair-plan links carry a mode and `/practice` must honour it**
   (twenty-third pass). `src/domain/intervention-engine.ts` builds
-  `guided=1`, `unaided=1` and `timed=1&command=…`; `src/domain/practice-step-mode.ts`
-  parses them. A new link parameter needs a consumer and a test, or the
-  plan promises something the page does not do. Still unhonoured:
-  `/lesson?worked=1`, `/practice?transfer=1`. A proof check link is
+  `guided=1`, `unaided=1`, `worked=1` and `timed=1&command=…`;
+  `src/domain/practice-step-mode.ts` parses them. A new link parameter needs
+  a consumer and a test, or the plan promises something the page does not
+  do. Still unhonoured: `/practice?transfer=1`, which no plan emits (the
+  unfamiliar-context check is the delayed far-transfer retest). A proof check link is
   `proofHref` (`/practice?proof=<topic>&subject=…`, ProofCheckMode); the
   old `/adaptive-session?…&proof=1` was never read and is gone (thirtieth
   pass, `tests/proof-links.test.ts`).
+- **`/practice?retest=` takes a mistake id or a far-transfer check id**
+  (fifty-fifth pass). A far-transfer check (`far-transfer:<source attempt>`,
+  `src/domain/delayed-far-transfer.ts`) runs with no hints and no topic
+  reminders, since only an independent attempt completes it; Exam readiness
+  links the earliest due one. Until this pass the page showed "no longer
+  available" for it and nothing linked there. No shipped question can
+  schedule one yet (WJEC transfer needs two teacher reviews; no reference
+  question carries transfer demand); `e2e/far-transfer-check.spec.ts` drives
+  it with fixture-only reviews.
 - **A saved checkpoint is not an interrupted run** (twenty-ninth pass). Pages
   save a resume point as soon as a question shows; anything that offers to
   resume must ask `checkpointHasProgress` (Today and Schedule do). Mission

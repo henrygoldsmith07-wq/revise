@@ -47,6 +47,8 @@ export interface ExamReadinessInput {
     passRate: number | null;
     completed: number;
     due: number;
+    /** The earliest due delayed far-transfer check, so the action can open it. */
+    nextDueRetestId?: Id | null;
   };
 }
 
@@ -90,7 +92,8 @@ export interface ExamReadiness {
   referenceTier?: boolean;
   signals: ExamReadinessSignal[];
   blockers: ExamReadinessBlocker[];
-  nextAction: { label: string; action: ReadinessAction };
+  /** retestId is set when the action is a due far-transfer check to open. */
+  nextAction: { label: string; action: ReadinessAction; retestId?: Id };
   evidence: {
     topics: number;
     evidencedTopics: number;
@@ -244,7 +247,7 @@ export function buildExamReadiness(input: ExamReadinessInput): ExamReadiness {
   // they can read is "nearly ready". Flagships are unchanged.
   const measured = readinessStatus(score, confidence, blockers);
   const status: ExamReadinessStatus = measured === "ready" && !isFlagship(subject.id) ? "nearly-ready" : measured;
-  const nextAction = actionForBlocker(blockers[0]);
+  const nextAction = actionForBlocker(blockers[0], input.transfer.nextDueRetestId ?? null);
 
   return {
     subjectId: subject.id,
@@ -420,7 +423,7 @@ function buildBlockers(input: {
   return blockers.sort((a, b) => (a.severity === b.severity ? signalOrder[a.key] - signalOrder[b.key] : a.severity === "high" ? -1 : 1));
 }
 
-function actionForBlocker(blocker: ExamReadinessBlocker | undefined): { label: string; action: ReadinessAction } {
+function actionForBlocker(blocker: ExamReadinessBlocker | undefined, dueRetestId: Id | null): ExamReadiness["nextAction"] {
   if (!blocker) return { label: "Protect this level with a timed set", action: "timed" };
   switch (blocker.action) {
     case "review":
@@ -428,7 +431,11 @@ function actionForBlocker(blocker: ExamReadinessBlocker | undefined): { label: s
     case "timed":
       return { label: "Run a timed question set", action: "timed" };
     case "transfer":
-      return { label: "Take a transfer check", action: "transfer" };
+      // A check exists only once an unaided answer scored well and a week
+      // passed; until one is due, "take a check" would open plain practice.
+      return dueRetestId
+        ? { label: "Take a transfer check", action: "transfer", retestId: dueRetestId }
+        : { label: "Answer unaided to schedule a transfer check", action: "transfer" };
     case "practice":
       return { label: "Practise the highest-yield gap", action: "practice" };
   }
