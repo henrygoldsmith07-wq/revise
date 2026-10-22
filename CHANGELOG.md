@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-22 — fifty-sixth pass
+
+Calendar days computed from the UTC date instead of the student's local date (the rule in `src/domain/local-date.ts`). In the UK during British Summer Time, which covers the whole exam season, between midnight and 1am:
+
+- Today's exam countdown and each paper's countdown on Readiness were a day long, so an exam on its own day read "in 1 day" (`today-brief.ts`, `paper-readiness.ts`).
+- The exam command centre showed yesterday's exam date beside the countdown to the next one (`exam-command-centre.ts`).
+- "New questions count from …" on the proof panel named the day before proof could actually count (`proof-of-improvement.ts`).
+- Revision days were counted by UTC day, and a question's "last reviewed" date was its UTC day (`learner-intelligence.ts`, `trust-indicator.ts`).
+
+Each now uses the local-date helpers. tests/local-day-countdowns.test.ts (and a case in tests/learner-model.test.ts) pins the process to Europe/London at 00:30 BST and failed on every case before the fix; it also fails if UTC-day truncation reappears anywhere in `src/domain` outside a short list of justified uses (filename stamps, synthetic fixtures, date-key arithmetic).
+
 ## 2026-10-22 — fifty-fifth pass
 
 - Delayed far-transfer checks could be scheduled and counted as "due" by Exam readiness, but could never be taken: nothing linked to `/practice?retest=<check id>`, "Take a transfer check" opened plain subject practice, and the page read the id as a missing mistake ("That mistake or its source question is no longer available") and rendered no question. The page now runs the check, keeps the marked result on screen once it completes, and offers no hints on it (only an unaided answer completes the check, so one hint used to void it silently). Exam readiness opens the earliest due check, and says "Answer unaided to schedule a transfer check" when none is due. The "Proof check" banner shows on a far-transfer check only when the question can carry learner evidence. A check derived on read (its source answer stored no link, as when the question was reviewed after the answer) no longer vanishes once taken: its candidate then counts as attempted and could not be re-selected, so the check dropped out of both "due" and "completed"; the completed retest's own link now stands in. Topic reminders are now hidden wherever hints are off, which also covers timed repair steps (the fifty-second pass hid them for unaided steps only). Latent today: no shipped question can schedule a check yet (WJEC transfer needs two teacher reviews; no reference-tier question carries transfer demand). Verified with tests/far-transfer-check-route.test.ts, a new case in tests/delayed-far-transfer.test.ts, and e2e/far-transfer-check.spec.ts (fixture-only reviews in one browser), which caught the vanishing check.

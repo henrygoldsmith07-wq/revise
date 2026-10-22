@@ -20,6 +20,7 @@ import type { SubjectLearnerModel, TopicRef } from "./learner-model";
 import type { PaceForecast } from "./pace-forecast";
 import { daysToNearestExam, type RevisionAction } from "./revision-engine";
 import type { ExamDate, Id } from "./types";
+import { todayLocal } from "./local-date";
 
 export interface CommandCentreSubject {
   subjectId: Id;
@@ -91,7 +92,7 @@ export function buildCommandCentre(input: CommandCentreInput): CommandCentre {
       const id = model.subjectId;
       const days = daysToNearestExam(input.examDates, id, input.now);
       const date = days === null ? null : input.examDates
-        .filter((e) => e.subjectId === id && e.date.slice(0, 10) >= input.now.toISOString().slice(0, 10))
+        .filter((e) => e.subjectId === id && e.date.slice(0, 10) >= todayLocal(input.now))
         .map((e) => e.date.slice(0, 10))
         .sort()[0] ?? null;
       const actions = (input.actions ?? []).filter((a) => a.subjectId === id);

@@ -21,6 +21,7 @@ import type { RecallMasteryRow } from "./recall-mastery";
 import type { Attempt, ExamDate, Id, Mistake, TopicMastery } from "./types";
 import type { LearnerState } from "./learner-state";
 import type { TopicProof } from "./proof-of-improvement";
+import { localDayOfInstant } from "./local-date";
 
 export type EvidenceLabel =
   | "no-evidence"
@@ -309,8 +310,8 @@ export function buildLearnerIntelligence(
   const logs = input.reviewLogs ?? [];
   const recentDays = new Set(
     logs
-      .map((l) => l.reviewedAt.slice(0, 10))
-      .filter(Boolean),
+      .filter((l) => Number.isFinite(Date.parse(l.reviewedAt)))
+      .map((l) => localDayOfInstant(l.reviewedAt)),
   );
   const sessions = input.plannedSessions ?? [];
   const weekAgo = now.getTime() - 7 * DAY_MS;

@@ -12,8 +12,8 @@ import { questionDepthBySpecPoint, type DepthCategory } from "./flagship";
 import { trustedAssessmentAttempt, independentAttempt } from "./learning-evidence";
 import { buildSpecificationMap, type SpecPointEvidence } from "./specification-evidence";
 import type { Attempt, ExamDate, Id, Mistake, Question, Subject, Topic, Unit } from "./types";
+import { localDaysBetween, todayLocal } from "./local-date";
 
-const DAY_MS = 86_400_000;
 export const MIN_STRENGTH_ATTEMPTS = 3;
 const TRANSFER_PASS = 0.6;
 
@@ -121,9 +121,7 @@ function strength(rows: Array<{ awarded: number; max: number }>): PaperStrength 
 }
 
 function daysBetween(date: string, now: Date): number {
-  const target = Date.parse(`${date}T00:00:00`);
-  const today = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00`);
-  return Math.round((target - today) / DAY_MS);
+  return localDaysBetween(todayLocal(now), date.slice(0, 10));
 }
 
 export function buildPaperReadiness(input: PaperReadinessInput): PaperReadiness[] {

@@ -10,6 +10,7 @@ import type { AdaptiveSessionPlan, AdaptiveStepKind } from "./adaptive-contract"
 import type { PaperReadiness } from "./paper-readiness";
 import type { TopicLifecycle } from "./proof-lifecycle";
 import type { ExamDate, Id, Mistake } from "./types";
+import { localDaysBetween, todayLocal } from "./local-date";
 
 export interface TodayBrief {
   paperName: string | null;
@@ -59,10 +60,10 @@ export function buildTodayBrief(input: {
 
   let daysToExam: number | null = owning?.daysUntil ?? null;
   if (daysToExam === null) {
-    const today = Date.parse(`${(input.now ?? new Date()).toISOString().slice(0, 10)}T00:00:00`);
+    const today = todayLocal(input.now ?? new Date());
     const upcoming = (input.examDates ?? [])
       .filter((exam) => exam.subjectId === plan.subjectId)
-      .map((exam) => Math.round((Date.parse(`${exam.date}T00:00:00`) - today) / 86_400_000))
+      .map((exam) => localDaysBetween(today, exam.date.slice(0, 10)))
       .filter((days) => Number.isFinite(days) && days >= 0)
       .sort((a, b) => a - b)[0];
     daysToExam = upcoming ?? null;

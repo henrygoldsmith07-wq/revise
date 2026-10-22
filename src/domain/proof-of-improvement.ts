@@ -31,6 +31,7 @@ import { exposureWeights } from "./evidence-weights";
 import { betaInterval } from "./marks-value";
 import { topicShares } from "./topic-weight";
 import type { Attempt, Id, IsoDate, IsoInstant, Question, ReviewLog, Topic } from "./types";
+import { toLocalDateKey } from "./local-date";
 
 export const MIN_PROOF_DELAY_DAYS = 3;
 /** Earliest independent first answers used as the baseline. */
@@ -139,8 +140,9 @@ function windowOf(observations: readonly Observation[]): ProofWindow | null {
   return { rate: round(successes / observations.length), low: round(low), high: round(high), questions: observations.length, from: first.iso, to: last.iso };
 }
 
+/** The student's local calendar day of an instant (local-date.ts), not the UTC day. */
 function isoDay(ms: number): IsoDate {
-  return new Date(ms).toISOString().slice(0, 10);
+  return toLocalDateKey(new Date(ms));
 }
 
 function independent(attempt: Attempt): boolean {
