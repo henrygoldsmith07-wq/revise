@@ -55,7 +55,10 @@ function actionHref(subjectId: string, action: ReadinessAction, retestId?: strin
     case "review":
       return `/review?subject=${subject}`;
     case "timed":
-      return `/practice?subject=${subject}&mode=practice`;
+      // The 10-minute quick session: four questions on a clock, enough for
+      // the pace signal's three timed answers. (It used to pass a mode flag
+      // which /practice never reads, so "timed" opened untimed practice.)
+      return `/practice?quick=10&subject=${subject}`;
     case "transfer":
       return retestId ? `/practice?retest=${encodeURIComponent(retestId)}` : `/practice?subject=${subject}`;
     case "practice":

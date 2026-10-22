@@ -74,3 +74,12 @@ describe("practice page runs a far-transfer check", () => {
     expect(runner).toContain("(Boolean(farTransfer) && learnerEvidenceTrusted(question))");
   });
 });
+
+describe("timed readiness action", () => {
+  it("opens the timed quick session, not untimed practice", () => {
+    const card = readFileSync("src/components/ExamReadinessCard.tsx", "utf8");
+    // /practice reads mode only for "recall"; quick=N is its timed mode.
+    expect(card).toContain("return `/practice?quick=10&subject=${subject}`;");
+    expect(card).not.toContain("mode=practice");
+  });
+});
