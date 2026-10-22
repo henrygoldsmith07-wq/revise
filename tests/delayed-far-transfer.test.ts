@@ -185,6 +185,27 @@ describe("delayed far-transfer retesting", () => {
     expect(delayedFarTransferReport(history)).toMatchObject({ scheduled: 1, completed: 1, passed: 0, passRate: 0 });
   });
 
+  it("keeps a completed check whose source attempt stored no link", () => {
+    // A source answered before its question was reviewed has no stored link;
+    // its check is derived on read. Once the candidate is attempted it is no
+    // longer selectable, so the completed check must come from the retest's
+    // own link instead of vanishing.
+    const source = question("q-source", "A satellite orbits a planet. Calculate the force.");
+    const far = question("q-far", "A probe passes a moon. Determine the gravitational field strength.");
+    const sourceAttempt = attempt("a-source", source.id, 2);
+    const due = delayedFarTransferRetests({ attempts: [sourceAttempt], questions: [source, far], today: "2026-08-08" });
+    expect(due[0]).toMatchObject({ status: "due", candidateQuestionId: far.id });
+
+    const retestAttempt = attempt("a-retest", far.id, 2, 2, { createdAt: "2026-08-08T09:00:00.000Z" });
+    const history = delayedFarTransferRetests({
+      attempts: [sourceAttempt, { ...retestAttempt, farTransfer: completeDelayedFarTransfer(due[0], retestAttempt) }],
+      questions: [source, far],
+      today: "2026-08-09",
+    });
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ retestId: "far-transfer:a-source", status: "completed", outcome: { passed: true } });
+  });
+
   it("scores transfer independently from the original answer", () => {
     const strong = attempt("a-strong", "q-far", 2, 2, { createdAt: "2026-08-08T09:00:00.000Z" });
     const partial = attempt("a-partial", "q-far", 3, 5, { createdAt: "2026-08-08T09:00:00.000Z" });
