@@ -217,6 +217,8 @@ export function useOutcomes(input: {
             passRate: completedTransfers.length ? passedTransfers / completedTransfers.length : null,
             completed: completedTransfers.length,
             due: transfers.filter((retest) => retest.status === "due").length,
+            // delayedFarTransferRetests sorts due checks first, earliest first.
+            nextDueRetestId: transfers.find((retest) => retest.status === "due")?.retestId ?? null,
           },
         })];
       });

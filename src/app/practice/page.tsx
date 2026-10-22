@@ -108,9 +108,11 @@ function Practice() {
     () => delayedFarTransferRetests({ attempts: store.attempts, questions: store.questions, today }),
     [store.attempts, store.questions, today],
   );
-  const farTransferRetest = retestId
-    ? farTransferRetests.find((retest) => retest.retestId === retestId && retest.status !== "completed")
-    : undefined;
+  // ?retest= carries either a mistake id or a delayed far-transfer check id.
+  // The match is kept once the check completes so the marked result stays on
+  // screen; only an open check is passed on to be linked to the attempt.
+  const farTransferMatch = retestId ? farTransferRetests.find((retest) => retest.retestId === retestId) : undefined;
+  const farTransferRetest = farTransferMatch?.status === "completed" ? undefined : farTransferMatch;
   // Legacy deep links (?question=seed-q:...) predate the cnt: namespace
   // (see src/data/content-ids.ts) — remap so they keep resolving to the
   // seeded bank instead of landing on an empty queue.
@@ -583,6 +585,12 @@ function Practice() {
     );
   }
 
+  // A delayed far-transfer check only counts when answered without help
+  // (completeDelayedFarTransfer requires an independent attempt), so it
+  // offers none rather than letting one hint silently void the check. With
+  // no hints, the topic reminders (which restate the content) stay hidden too.
+  const hintBudget = adaptiveHintBudget ?? (farTransferRetest ? 0 : stepModeHintBudget(stepMode));
+
   return (
     <div className="space-y-5">
       <header className="space-y-3 sm:flex sm:flex-wrap sm:items-end sm:justify-between sm:gap-3 sm:space-y-0">
@@ -673,6 +681,7 @@ function Practice() {
               </div>
               <p className="text-xs text-ink2 mt-2">
                 A new-context question checks whether your original success on {getTopic(farTransferRetest.topicIds[0] ?? "")?.title ?? "this topic"} transfers after a delay.
+                No hints on this one: an answer given with help would not count as the check.
               </p>
             </div>
             <ButtonLink href="/practice" size="sm">Leave retest</ButtonLink>
@@ -870,9 +879,9 @@ function Practice() {
             Targeted retests: {retestMistake.retestCount ?? 0} · submit when you are ready to check the point again.
           </p>
         </Panel>
-      ) : retestId ? (
+      ) : retestId && !farTransferMatch ? (
         <Panel>
-          <p className="text-sm text-ink2">That mistake or its source question is no longer available.</p>
+          <p className="text-sm text-ink2">That retest or its source question is no longer available.</p>
           <ButtonLink href="/" variant="primary" className="inline-block mt-3">
             Back to Today
           </ButtonLink>
@@ -895,7 +904,7 @@ function Practice() {
         </p>
       ) : null}
 
-      {retestId && (!retestMistake || !retestQuestion) ? null : current ? (
+      {retestId && !farTransferMatch && (!retestMistake || !retestQuestion) ? null : current ? (
         <>
           {stepMode === "worked" && workedExample ? <WorkedExamplePanel choice={workedExample} /> : null}
           <QuestionNavigator
@@ -926,7 +935,7 @@ function Practice() {
             retestMistake={retestMistake}
             repairTeachingSeen={Boolean(retestRemediation)}
             farTransfer={farTransferRetest}
-            hintBudget={adaptiveHintBudget ?? stepModeHintBudget(stepMode)}
+            hintBudget={hintBudget}
             stepMode={stepMode}
             externalHintTier={stepModeSupportTier(stepMode)}
             draft={questionDrafts[current.id]}
@@ -970,7 +979,7 @@ function Practice() {
         />
       )}
 
-      {current && stepMode !== "unaided" && adaptiveHintBudget !== 0 ? (
+      {current && hintBudget !== 0 ? (
         <section>
           <SectionHeading title="Topic reminders" hint="Read these after you have answered, not before." />
           <Panel>

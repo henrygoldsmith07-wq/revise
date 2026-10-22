@@ -90,7 +90,10 @@ export function QuestionRunner({
 }) {
   const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit, submitError } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission, guided: stepMode === "guided" });
   const guided = stepMode === "guided";
-  const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || Boolean(farTransfer));
+  // The banner promises the answer "will count as evidence", so a far-transfer
+  // check shows it only on a question that can carry learner evidence; on an
+  // unreviewed one the check still runs unaided but is practice.
+  const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || (Boolean(farTransfer) && learnerEvidenceTrusted(question)));
   return (
     <div className="space-y-4">
       {isProofContext && !result ? (

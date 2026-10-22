@@ -49,7 +49,7 @@ function examCountdown(days: number | null): string {
   return `Exam in ${days} days`;
 }
 
-function actionHref(subjectId: string, action: ReadinessAction): string {
+function actionHref(subjectId: string, action: ReadinessAction, retestId?: string): string {
   const subject = encodeURIComponent(subjectId);
   switch (action) {
     case "review":
@@ -57,7 +57,7 @@ function actionHref(subjectId: string, action: ReadinessAction): string {
     case "timed":
       return `/practice?subject=${subject}&mode=practice`;
     case "transfer":
-      return `/practice?subject=${subject}`;
+      return retestId ? `/practice?retest=${encodeURIComponent(retestId)}` : `/practice?subject=${subject}`;
     case "practice":
       return `/practice?subject=${subject}`;
   }
@@ -135,7 +135,7 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
 
       <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-line">
         <p className="text-[11px] text-ink3">Evidence confidence: {confidenceWord(row.confidence, EVIDENCE_CONFIDENCE)} · {row.evidence.attempts} marked answers · {row.evidence.transferChecks} transfer checks</p>
-        <ButtonLink href={actionHref(row.subjectId, action.action)} size="sm" variant={row.status === "at-risk" ? "primary" : "secondary"}>
+        <ButtonLink href={actionHref(row.subjectId, action.action, action.retestId)} size="sm" variant={row.status === "at-risk" ? "primary" : "secondary"}>
           {action.label}
         </ButtonLink>
       </div>

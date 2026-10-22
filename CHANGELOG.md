@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-22 — fifty-fifth pass
+
+Delayed far-transfer checks could be scheduled and counted as "due" by Exam readiness, but could never be taken: nothing linked to `/practice?retest=<check id>`, "Take a transfer check" opened plain subject practice, and the page read the id as a missing mistake ("That mistake or its source question is no longer available") and rendered no question. The page now runs the check, keeps the marked result on screen once it completes, and offers no hints on it (only an unaided answer completes the check, so one hint used to void it silently). Exam readiness opens the earliest due check, and says "Answer unaided to schedule a transfer check" when none is due. The "Proof check" banner shows on a far-transfer check only when the question can carry learner evidence. Topic reminders are now hidden wherever hints are off, which also covers timed repair steps (the fifty-second pass hid them for unaided steps only). Latent today: no shipped question can schedule a check yet (WJEC transfer needs two teacher reviews; no reference-tier question carries transfer demand). Verified with tests/far-transfer-check-route.test.ts and e2e/far-transfer-check.spec.ts, which uses fixture-only reviews in one browser.
+
 ## 2026-10-21 — fifty-fourth pass
 
 Exam command centre: the per-lever times now read "about N min" like the rest of the app, since they are planning estimates. Copy only; not tested in a browser or with tsc (no node_modules in this sandbox).
