@@ -158,6 +158,20 @@ describe("exam command centre", () => {
     expect(centre.subjects[0]?.exam).toBeNull();
   });
 
+  it("names the next exam by the local day, not yesterday's (Europe/London, 00:30 BST)", () => {
+    const previous = process.env.TZ;
+    process.env.TZ = "Europe/London";
+    try {
+      const sitting = (date: string): ExamDate => ({ id: `e-${date}`, userId: "u1", subjectId: "maths", date, label: "maths" });
+      // 00:30 on 5 June in London is still 4 June in UTC; the 4 June exam is over.
+      const centre = buildCommandCentre({ now: new Date("2026-06-04T23:30:00Z"), subjectIds: ["maths"], subjectName: () => "Maths", models: [model()], examDates: [sitting("2026-06-04"), sitting("2026-06-10")] });
+      expect(centre.subjects[0]?.exam).toEqual({ date: "2026-06-10", days: 5 });
+    } finally {
+      if (previous === undefined) delete process.env.TZ;
+      else process.env.TZ = previous;
+    }
+  });
+
   it("ignores models for subjects the learner is not taking", () => {
     const centre = buildCommandCentre({ now: NOW, subjectIds: [], subjectName: () => "Maths", models: [model()], examDates: [] });
     expect(centre.subjects).toEqual([]);

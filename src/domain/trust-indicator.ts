@@ -20,6 +20,7 @@ import { shortDate } from "./proof-of-improvement";
 import { specFor } from "./spec";
 import { trustNoteFor, trustTier, type TrustTier } from "./trust-label";
 import type { Question, Subject, Topic } from "./types";
+import { localDayOfInstant } from "./local-date";
 
 const BOARD_NAME: Record<string, string> = { wjec: "WJEC", aqa: "AQA", edexcel: "Edexcel", ocr: "OCR" };
 
@@ -82,7 +83,8 @@ export function buildTrustIndicator(input: {
       }
     : null;
   const review = question.humanVerification;
-  const lastReviewed = tier === "trusted" && review?.status === "approved" && review.reviewedAt ? shortDate(review.reviewedAt.slice(0, 10)) : null;
+  const reviewedAt = tier === "trusted" && review?.status === "approved" ? review.reviewedAt : undefined;
+  const lastReviewed = reviewedAt && Number.isFinite(Date.parse(reviewedAt)) ? shortDate(localDayOfInstant(reviewedAt)) : null;
   return {
     tier,
     status: TRUST_STATUS_LABEL[tier],
