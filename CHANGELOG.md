@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-23 pass 60: year-aware readiness and missions
+Exam readiness coverage, paper readiness and mission building now respect the year group / Unit 4 option: a Year 12 student's readiness counts AS topics only, A2 papers are not listed, and missions are not built from A2 topics' lost marks. Unset year behaves as before. Tests: tests/year-aware-scope.test.ts.
+
 ## 2026-10-23 pass 59: Year 13 Unit 4 option
 Year 13 students can pick their one Unit 4 option (A–D) at onboarding or in Settings (local only, optional field on settings, restored through the existing settings read). Plan, quick check, Today/recommender scope and the replan fingerprint then use only that option's topics; a subject that does not offer the chosen letter keeps all its options. Year 12, Year 13 without a choice, and unknown year behave as before. Tests: tests/unit4-option.test.ts.
 

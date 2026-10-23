@@ -72,11 +72,13 @@ export function useOutcomes(input: {
   snapshot: Snapshot | null;
   predictions: GradePrediction[];
   subjectIds: readonly Id[];
+  /** Topics in scope for the learner's year group / Unit 4 option; readiness coverage counts only these. */
+  scopeTopicIds?: ReadonlySet<Id>;
   mastery: TopicMastery[];
   recallMastery: RecallMasteryRow[];
   responseTimeCalibration: ResponseTimeCalibrationReport;
 }): Outcomes {
-  const { userId, onError, snapshot, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration } = input;
+  const { userId, onError, snapshot, predictions, subjectIds, scopeTopicIds, mastery, recallMastery, responseTimeCalibration } = input;
   const [gradePredictionLog, setGradePredictionLog] = useState<GradePredictionRecord[]>([]);
   const [gradeActuals, setGradeActuals] = useState<ActualResultRecord[]>([]);
   // Sat papers with their sit-time prediction frozen in — the reality check
@@ -186,7 +188,7 @@ export function useOutcomes(input: {
       .flatMap((subject) => {
         const prediction = predictionBySubject.get(subject.id);
         if (!prediction) return [];
-        const topicRows = mastery.filter((row) => row.subjectId === subject.id);
+        const topicRows = mastery.filter((row) => row.subjectId === subject.id && (!scopeTopicIds || scopeTopicIds.has(row.topicId)));
         // Installed seed cards exist for every topic; only studied cards or attempts are evidence.
         const evidencedTopics = topicRows.filter(topicHasEvidence).length;
         const coverageAverage = topicRows.length ? topicRows.reduce((sum, row) => sum + row.mastery, 0) / topicRows.length : 0;
@@ -222,7 +224,7 @@ export function useOutcomes(input: {
           },
         })];
       });
-  }, [assessment, predictions, subjectIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
+  }, [assessment, predictions, subjectIds, scopeTopicIds, mastery, recallMastery, responseTimeCalibration.rows, farTransferRetests]);
 
   const examReadinessSummary = useMemo(() => summariseExamReadiness(examReadiness), [examReadiness]);
 
