@@ -7,6 +7,7 @@
 // There is no separate result. The summary reads the store's ledger after the
 // attempt is recorded, so what it says is exactly what Progress says.
 
+import { aboutMinutesLabel } from "@/domain/minutes";
 import { useCallback, useState } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { buildProofCheck, proofCheckCheckpoint, restoreProofCheck } from "@/domain/mission-session";
@@ -96,7 +97,7 @@ export function ProofCheckMode({ topicId, onExit }: { topicId: string; onExit: (
           <p>A score here moves your proof of improvement. It does not by itself show you will hold this in a different part of the paper.</p>
         </>
       )}
-      nextStep={plan.top ? { href: plan.top.route.href, label: `Continue: ${plan.top.title}`, detail: `${plan.top.title}, about ${Math.ceil(plan.top.minutes)} min.` } : null}
+      nextStep={plan.top ? { href: plan.top.route.href, label: `Continue: ${plan.top.title}`, detail: `${plan.top.title}, ${aboutMinutesLabel(plan.top.minutes)}.` } : null}
       renderSummary={() => <ProofOutcomeSummary topicId={topicId} label={label} />}
     />
   );

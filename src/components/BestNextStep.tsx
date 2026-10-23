@@ -5,6 +5,7 @@
 // Everything that explains the ranking sits behind a "Why this?" disclosure
 // built only from computed evidence — never invented numbers.
 
+import { displayMinutes } from "@/domain/minutes";
 import { useEffect } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { describeFocus } from "@/domain/today-focus";
@@ -126,7 +127,7 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
           <details className="mt-3 max-w-2xl">
             <summary className="cursor-pointer select-none text-sm font-medium text-ink2">What comes after</summary>
             <ul className="mt-2 space-y-1 text-sm text-ink2">
-              {queued.map((q) => <li key={q.id}>{q.title} · {Math.ceil(q.minutes)} min</li>)}
+              {queued.map((q) => <li key={q.id}>{q.title} · {displayMinutes(q.minutes)} min</li>)}
               {waiting.map((w) => <li key={w.action.id}>{w.action.title}: {w.reason.replace(/^Waiting for the delay to pass: /, "")}</li>)}
             </ul>
           </details>

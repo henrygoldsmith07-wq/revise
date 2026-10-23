@@ -15,6 +15,7 @@
 // Pure domain: no React, no storage, no clock.
 // ---------------------------------------------------------------------------
 
+import { displayMinutes } from "./minutes";
 import { MIN_OUTLOOK_ATTEMPTS, type ExamOutlookRow } from "./exam-outlook";
 import type { ExamReadiness } from "./exam-readiness";
 import type { SubjectLearnerModel, TopicRef } from "./learner-model";
@@ -145,7 +146,7 @@ export function buildExamTrajectory(input: ExamTrajectoryInput): ExamTrajectory 
     levers: (input.actions ?? [])
       .filter((a) => a.subjectId === model.subjectId)
       .slice(0, 2)
-      .map((a) => ({ id: a.id, title: a.title, minutes: Math.max(1, Math.ceil(a.minutes)), href: a.route.href })),
+      .map((a) => ({ id: a.id, title: a.title, minutes: displayMinutes(a.minutes), href: a.route.href })),
     provenLine: proven
       ? `${proven} topic${proven === 1 ? "" : "s"} improved on new questions after a delay: ${names(model.outcomes.proven, 3)}.`
       : null,

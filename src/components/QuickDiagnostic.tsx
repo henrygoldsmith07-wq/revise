@@ -3,6 +3,7 @@
 // 5–10 minute cold-start diagnostic. Answers go through the normal attempt
 // pipeline (QuestionRunner), so nothing here is a parallel evidence store.
 
+import { displayMinutes } from "@/domain/minutes";
 import { useEffect, useMemo, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { rootCauseOf } from "@/domain/mistake-patterns";
@@ -161,7 +162,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
           <p className="text-sm font-semibold text-ink">Best next step</p>
           {next ? (
             <>
-              <p className="text-sm text-ink2">{next.title} · {Math.ceil(next.minutes)} min</p>
+              <p className="text-sm text-ink2">{next.title} · {displayMinutes(next.minutes)} min</p>
               <p className="text-xs text-ink3 mt-1">{next.explanation.why}</p>
             </>
           ) : <p className="text-sm text-ink2">{report.lines.next}</p>}

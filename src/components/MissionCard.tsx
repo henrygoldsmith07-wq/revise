@@ -3,6 +3,7 @@
 // One mission, why it matters, and what proves it. Stages and the marks ledger
 // sit behind a disclosure so Today stays calm.
 
+import { aboutMinutesLabel, displayMinutes } from "@/domain/minutes";
 import { useMemo } from "react";
 import { buildPaperMission, missionNextAction, type ExamMission } from "@/domain/exam-mission";
 import { missionHref } from "@/domain/mission-session";
@@ -27,7 +28,7 @@ export function MissionView({ mission }: { mission: ExamMission }) {
       <p className="text-sm text-ink2">{r.statement}</p>
       {!action.blocked ? (
         <ButtonLink href={action.href} variant="primary" size="md" className="w-full sm:w-auto">
-          {action.minutes > 0 ? `Start step · about ${action.minutes} min` : "See progress"}
+          {action.minutes > 0 ? `Start step · ${aboutMinutesLabel(action.minutes)}` : "See progress"}
         </ButtonLink>
       ) : (
         <div className="space-y-2">
@@ -43,7 +44,7 @@ export function MissionView({ mission }: { mission: ExamMission }) {
         <ol className="mt-2 space-y-1 text-ink2">
           {mission.stages.map((s) => (
             <li key={s.kind} className={s.done ? "line-through opacity-70" : s === mission.current ? "font-medium text-ink" : ""}>
-              {s.title}{s.minutes ? `, ${s.minutes} min` : ""}: {s.reason}
+              {s.title}{s.minutes ? `, ${displayMinutes(s.minutes)} min` : ""}: {s.reason}
             </li>
           ))}
         </ol>

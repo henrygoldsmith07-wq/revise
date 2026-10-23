@@ -4,6 +4,7 @@
 // across its topics, with support set by the stage, and every attempt carrying
 // the mission, stage, method, target cause and source mistakes.
 
+import { aboutMinutesLabel } from "@/domain/minutes";
 import { useCallback, useState } from "react";
 import { stageForRoute, buildMissionSession, missionCheckpoint, missionProofHref, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
 import { collectMissions } from "@/domain/revision-engine";
@@ -86,7 +87,7 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
           {session.limit ? <p className="font-semibold">{session.limit}</p> : null}
         </>
       ) : null}
-      nextStep={plan.top ? { href: plan.top.route.href, label: `Continue: ${plan.top.title}`, detail: `${plan.top.title}, about ${Math.ceil(plan.top.minutes)} min. ${plan.top.explanation.stake}` } : null}
+      nextStep={plan.top ? { href: plan.top.route.href, label: `Continue: ${plan.top.title}`, detail: `${plan.top.title}, ${aboutMinutesLabel(plan.top.minutes)}. ${plan.top.explanation.stake}` } : null}
       renderSummary={(attempts) => <SessionEvidenceBlock attempts={attempts} />}
     />
   );

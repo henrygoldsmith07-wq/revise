@@ -1,5 +1,6 @@
 "use client";
 
+import { displayMinutes } from "@/domain/minutes";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { countdownGuidance } from "@/domain/exam-countdown";
@@ -391,7 +392,7 @@ function TodayLeadRow({ lead, hasBlocks }: { lead: TodayLead; hasBlocks: boolean
   const topic = pick.topicIds.length === 1 ? getTopic(pick.topicIds[0]!)?.title : undefined;
   return (
     <div className="mx-4 mb-2 rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source={pick.source}>
-      <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Do this first · About {Math.max(1, Math.ceil(pick.minutes))} min</p>
+      <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Do this first · About {displayMinutes(pick.minutes)} min</p>
       <p className="text-sm font-semibold text-ink mt-0.5">{pick.title}</p>
       <p className="text-xs text-ink2">{topic ? `${subject} · ${topic}` : subject}</p>
       <ButtonLink href={pick.href} size="sm" variant="primary" className="mt-2">Start</ButtonLink>

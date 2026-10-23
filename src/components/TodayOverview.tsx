@@ -1,5 +1,6 @@
 "use client";
 
+import { displayMinutes } from "@/domain/minutes";
 import Link from "next/link";
 import { getBoard, getQualification, getSubject } from "@/domain/curriculum";
 import type { ActivityKind, ExamDate, PlannedSession, Subject } from "@/domain/types";
@@ -63,7 +64,7 @@ function RevisionPlanner({ exam, nextBlock, today }: { exam?: ExamDate; nextBloc
                 {blockSubject?.name ?? nextBlock.subjectId} · {ACTIVITY_LABEL[nextBlock.activity]}
               </p>
               <p className="mt-1 text-sm text-ink2">
-                {nextBlock.date === today ? "Today" : humanDate(nextBlock.date)} · {nextBlock.minutes} min
+                {nextBlock.date === today ? "Today" : humanDate(nextBlock.date)} · {displayMinutes(nextBlock.minutes)} min
               </p>
             </div>
           ) : (
