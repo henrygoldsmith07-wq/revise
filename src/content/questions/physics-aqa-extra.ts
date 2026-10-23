@@ -14,7 +14,7 @@ export const physicsAqaExtraQuestions = defineQuestions([
     specVersion: "2024-1.0",
     aos: ["AO2"],
     parts: [
-      { prompt: "Calculate the specific heat capacity.", marks: 3, scheme: ["Q=mcDeltaT", "4800=0.20*c*60", "c=400 J kg-1 K-1"], specPointIds: ["aqa-alevel-physics.thermal.sp-01"], learningClaims: ["calculate specific heat capacity"], answer: "4800=0.20*c*60 so c=400 J/kg K." },
+      { prompt: "Calculate the specific heat capacity.", marks: 3, scheme: ["Q=mcDeltaT", "4800=0.20*c*60", "c=400 J kg-1 K-1"], specPointIds: ["aqa-alevel-physics.thermal.sp-02"], learningClaims: ["calculate specific heat capacity"], answer: "4800=0.20*c*60 so c=400 J/kg K." },
     ],
   },
   {
@@ -29,7 +29,7 @@ export const physicsAqaExtraQuestions = defineQuestions([
     specVersion: "2024-1.0",
     aos: ["AO2"],
     parts: [
-      { prompt: "Calculate the amount in moles (R=8.31).", marks: 3, scheme: ["pV=nRT", "n=pV/RT=1.0e5*0.02/(8.31*300)", "0.80 mol"], specPointIds: ["aqa-alevel-physics.thermal.sp-04"], learningClaims: ["apply pV=nRT"], answer: "n=1e5*0.02/(8.31*300)=0.80 mol." },
+      { prompt: "Calculate the amount in moles (R=8.31).", marks: 3, scheme: ["pV=nRT", "n=pV/RT=1.0e5*0.02/(8.31*300)", "0.80 mol"], specPointIds: ["aqa-alevel-physics.thermal.sp-03"], learningClaims: ["apply pV=nRT"], answer: "n=1e5*0.02/(8.31*300)=0.80 mol." },
     ],
   },
   {
@@ -44,7 +44,7 @@ export const physicsAqaExtraQuestions = defineQuestions([
     specVersion: "2024-1.0",
     aos: ["AO2"],
     parts: [
-      { prompt: "Calculate the average force on the ball.", marks: 4, scheme: ["Change in momentum = m(v-u) with sign: 0.06*(-15-20)=-2.1 kg m s-1", "Impulse = F*t", "F=210 N (magnitude)", "Direction away from wall"], specPointIds: ["aqa-alevel-physics.momentum.sp-03"], learningClaims: ["calculate impulse and average force from momentum change"], answer: "Delta p=0.06*(-15-20)=-2.1 kg m/s. F*t=delta p so |F|=2.1/0.01=210 N away from wall." },
+      { prompt: "Calculate the average force on the ball.", marks: 4, scheme: ["Change in momentum = m(v-u) with sign: 0.06*(-15-20)=-2.1 kg m s-1", "Impulse = F*t", "F=210 N (magnitude)", "Direction away from wall"], specPointIds: ["aqa-alevel-physics.momentum.sp-01"], learningClaims: ["calculate impulse and average force from momentum change"], answer: "Delta p=0.06*(-15-20)=-2.1 kg m/s. F*t=delta p so |F|=2.1/0.01=210 N away from wall." },
     ],
   },
   {
@@ -89,7 +89,7 @@ export const physicsAqaExtraQuestions = defineQuestions([
     specVersion: "2024-1.0",
     aos: ["AO2"],
     parts: [
-      { prompt: "Calculate the binding energy per nucleon for He-4.", marks: 4, scheme: ["Mass defect =2*1.00728+2*1.00867-4.00150=0.0304 u", "Energy=0.0304*931.5=28.3 MeV", "Per nucleon ~7.1 MeV", "Explain whether positive or negative mass defect sign"], specPointIds: ["aqa-alevel-physics.nuclear.sp-03"], learningClaims: ["calculate binding energy per nucleon from mass defect"], answer: "Defect 0.0304 u =28.3 MeV total, /4=7.1 MeV/nucleon." },
+      { prompt: "Calculate the binding energy per nucleon for He-4.", marks: 4, scheme: ["Mass defect =2*1.00728+2*1.00867-4.00150=0.0304 u", "Energy=0.0304*931.5=28.3 MeV", "Per nucleon ~7.1 MeV", "Explain whether positive or negative mass defect sign"], specPointIds: ["aqa-alevel-physics.nuclear.sp-04"], learningClaims: ["calculate binding energy per nucleon from mass defect"], answer: "Defect 0.0304 u =28.3 MeV total, /4=7.1 MeV/nucleon." },
     ],
   },
   {

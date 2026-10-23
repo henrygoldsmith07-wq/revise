@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-23 pass 63: Physics lesson links for four core questions
+The spec-tag audit's top suspects in physics-extra.ts (WJEC and AQA copies) sent a lost mark to the wrong lesson: binding energy to activity/half-life (now nuclear.sp-04), impulse force to elastic vs inelastic collisions (now momentum.sp-01), specific heat to internal energy (now thermal.sp-02), pV = nRT to thermal.sp-04 (now thermal.sp-03). Pinned in tests/physics-spec-tags.test.ts. Keyword agreement is a triage signal, not accuracy; each retag was checked by hand. About 135 strong suspects remain, left for teacher review.
+
 ## 2026-10-23 pass 62: Year 12 Physics own-words marking
 Seven Year 12 Physics questions, each answered correctly and wrongly in a student's own words (author-judged marks, tests/fixtures/marking-y12-physics-set.ts). Before: 4 wrong answers earned a mark (e.g. "drag bigger than weight" at terminal speed, "all areas as positives" for displacement); correct answers scored 10/15. Now: authored do-not-accept rules (src/content/questions/physics-answer-guards.ts, applied after the verification ledger so no review status changes) stop all four, and "air resistance"/"same size as" are read as drag/equals; correct answers score 11/15. Still under-credited: three correct answers at 1 mark short.
 
