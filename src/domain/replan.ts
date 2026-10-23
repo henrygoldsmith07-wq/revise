@@ -26,7 +26,8 @@ export type ReplanReason =
   | "target-changed"
   | "availability-changed"
   | "session-length-changed"
-  | "subject-set-changed";
+  | "subject-set-changed"
+  | "year-changed";
 
 /** The replan-relevant inputs, reduced to comparable strings/values. */
 export interface ReplanFingerprint {
@@ -35,6 +36,8 @@ export interface ReplanFingerprint {
   availability: string;
   sessionLength: number;
   subjects: string;
+  /** School year ("" when unset): Year 12 drops A2-only topics from the plan. */
+  year?: string;
 }
 
 export function computeFingerprint(input: {
@@ -43,6 +46,7 @@ export function computeFingerprint(input: {
   availability: Availability[];
   sessionLengthMinutes: number;
   subjectIds: Id[];
+  yearGroup?: string;
 }): ReplanFingerprint {
   return {
     exams: input.exams
@@ -59,6 +63,7 @@ export function computeFingerprint(input: {
       .join("|"),
     sessionLength: input.sessionLengthMinutes,
     subjects: [...input.subjectIds].sort().join("|"),
+    year: input.yearGroup ?? "",
   };
 }
 
@@ -76,6 +81,7 @@ export interface ReplanInput {
   sessionLengthMinutes: number;
   subjectIds: Id[];
   targetGrades: Record<Id, string>;
+  yearGroup?: string;
   existing: PlannedSession[];
   /** Live cross-subject evidence so scarce blocks go to the strongest work. */
   evidence?: Map<Id, SubjectEvidence>;
@@ -111,6 +117,7 @@ export function replanDynamically(input: ReplanInput): ReplanResult {
     if (fingerprint.availability !== previous.availability) reasons.push("availability-changed");
     if (fingerprint.sessionLength !== previous.sessionLength) reasons.push("session-length-changed");
     if (fingerprint.subjects !== previous.subjects) reasons.push("subject-set-changed");
+    if ((fingerprint.year ?? "") !== (previous.year ?? "")) reasons.push("year-changed");
   }
   const structural = reasons.length > 0;
 
@@ -165,6 +172,7 @@ function describeReplan(reasons: ReplanReason[], rolledSurvived: number): string
   if (reasons.includes("availability-changed")) parts.push("your availability changed");
   if (reasons.includes("session-length-changed")) parts.push("session length changed");
   if (reasons.includes("subject-set-changed")) parts.push("your subjects changed");
+  if (reasons.includes("year-changed")) parts.push("your year group changed");
   if (reasons.includes("sessions-missed")) {
     // Say only what survived: a structural rebuild replaces rolled-forward
     // blocks, and work with no room before its exam is not re-queued.

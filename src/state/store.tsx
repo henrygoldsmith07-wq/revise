@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { allTopics } from "@/domain/curriculum";
+import { topicsForYear } from "@/domain/year-group";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
 
 import type { GradePrediction } from "@/domain/grades";
@@ -429,7 +430,11 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   // --- derived state -------------------------------------------------------
 
   const subjectIds = useMemo(() => snapshot?.settings.subjectIds ?? [], [snapshot?.settings.subjectIds]);
+  const yearGroup = snapshot?.settings.yearGroup;
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
+  // Year 12 plans and recommends AS (Units 1-2) topics only; mastery and
+  // readiness still see every topic.
+  const scopedTopics = useMemo(() => topicsForYear(topics, yearGroup), [topics, yearGroup]);
   const { evidence, mastery, recallMastery, applicationMastery, masteryUncertainty } = useLearnerMastery(snapshot, topics);
 
   const dueCards = useMemo(() => {
@@ -641,7 +646,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const recommendations = useMemo(() => {
     if (!snapshot) return [];
     return recommend({
-      topics,
+      topics: scopedTopics,
       mastery,
       cards: snapshot.cards,
       mistakes: snapshot.mistakes,
@@ -659,7 +664,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       recallMastery,
       applicationMastery,
     });
-  }, [snapshot, mastery, topics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog, recallMastery, applicationMastery]);
+  }, [snapshot, mastery, scopedTopics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog, recallMastery, applicationMastery]);
 
   // Unlike `recommendations`, this is not a list of competing activity
   // queues. It is one optimiser pass over the same snapshot, then one
@@ -967,7 +972,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     updateSettings,
     refreshPhaseNotices,
     dismissExamPhaseNotice,
-  } = usePlanning({ userId, snapshot, setSnapshot, patch, topics, mastery, bumpGamification });
+  } = usePlanning({ userId, snapshot, setSnapshot, patch, topics: scopedTopics, mastery, bumpGamification });
 
   const completeLesson = useCallback<StoreValue["completeLesson"]>(
     async (lessonId) => {

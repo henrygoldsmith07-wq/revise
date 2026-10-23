@@ -11,6 +11,7 @@ import { trustedAssessmentContent } from "./content-trust";
 import { questionFamily, unseenQuestionTester } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Question } from "./types";
+import { isA2Topic, type YearGroup } from "./year-group";
 
 export type DiagnosticDimension =
   | "recall"
@@ -289,4 +290,21 @@ export function resumeQuickDiagnostic(
     done.push(attempt);
   }
   return { run: run as QuickDiagnosticRun, done };
+}
+
+/**
+ * Topics a quick check samples, in priority order. Year 12 learners get AS
+ * topics (Units 1–2) only, unless the subject has no AS topic in the pool;
+ * everyone else keeps the sorted list. `isA2` is injected so this module needs
+ * no curriculum import.
+ */
+export function quickCheckTopicIds(
+  pool: readonly Question[],
+  year: YearGroup | undefined,
+  topicOf: (id: Id) => { specRef?: string } | undefined,
+): Id[] {
+  const all = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
+  if (year !== "year-12") return all;
+  const as = all.filter((id) => !isA2Topic(topicOf(id) ?? {}));
+  return as.length ? as : all;
 }

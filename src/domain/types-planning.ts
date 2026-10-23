@@ -183,6 +183,8 @@ export interface UserSettings {
   examNotifications?: boolean;
   /** Subjects the learner chose to skip the optional first quick check for. */
   quickCheckSkipped?: Id[];
+  /** Optional school year ("year-12" prioritises AS units). Unset keeps every topic. Local only. */
+  yearGroup?: "year-12" | "year-13";
   updatedAt: IsoInstant;
 }
 

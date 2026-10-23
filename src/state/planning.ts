@@ -84,6 +84,7 @@ export function usePlanning(input: {
       availability: snapshot.settings.availability,
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
       subjectIds: snapshot.settings.subjectIds,
+      yearGroup: snapshot.settings.yearGroup,
     });
     if (lastFingerprint.current === null) {
       lastFingerprint.current = current;
@@ -103,6 +104,7 @@ export function usePlanning(input: {
         sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
         subjectIds: snapshot.settings.subjectIds,
         targetGrades: snapshot.settings.targetGrades,
+        yearGroup: snapshot.settings.yearGroup,
         evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
         existing: snapshot.plannedSessions,
         previous,

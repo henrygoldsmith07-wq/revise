@@ -44,6 +44,7 @@ import { useStoreFields } from "@/state/store";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
 import { ACCOUNT_DELETION_CONFIRMATION, ACCOUNT_DELETION_EXPLANATION, LOCAL_ERASE_EXPLANATION } from "@/domain/account-deletion";
 import { recordAiConsentChoice } from "@/ai/consent-client";
+import type { YearGroup } from "@/domain/year-group";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
 import { clearPilotQueue, flushPilotEvents, pendingPilotEvents } from "@/lib/pilot-telemetry";
@@ -110,6 +111,18 @@ export default function SettingsPage() {
               value={settings.displayName}
               onChange={(e) => void store.updateSettings({ displayName: e.target.value })}
               className="field text-sm"
+            />
+          </Field>
+          <Field label="Year group" hint="Year 12 plans and quick checks start with the AS units (1 and 2) and leave A2-only topics for later.">
+            <Segmented
+              ariaLabel="Year group"
+              value={settings.yearGroup ?? "unknown"}
+              onChange={(value) => void store.updateSettings({ yearGroup: value === "unknown" ? undefined : (value as YearGroup) })}
+              options={[
+                { value: "year-12", label: "Year 12" },
+                { value: "year-13", label: "Year 13" },
+                { value: "unknown", label: "Not sure" },
+              ]}
             />
           </Field>
           <Field label="Session length" hint="How long one block of revision runs.">
