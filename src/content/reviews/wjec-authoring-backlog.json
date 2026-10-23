@@ -3254,7 +3254,7 @@
       {
         "specPointId": "wjec-alevel-physics.momentum.sp-01",
         "topicId": "wjec-alevel-physics.momentum",
-        "currentQuestionCount": 11,
+        "currentQuestionCount": 12,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3272,7 +3272,7 @@
       {
         "specPointId": "wjec-alevel-physics.momentum.sp-03",
         "topicId": "wjec-alevel-physics.momentum",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3326,7 +3326,7 @@
       {
         "specPointId": "wjec-alevel-physics.nuclear.sp-03",
         "topicId": "wjec-alevel-physics.nuclear",
-        "currentQuestionCount": 17,
+        "currentQuestionCount": 16,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3335,7 +3335,7 @@
       {
         "specPointId": "wjec-alevel-physics.nuclear.sp-04",
         "topicId": "wjec-alevel-physics.nuclear",
-        "currentQuestionCount": 13,
+        "currentQuestionCount": 14,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3542,7 +3542,7 @@
       {
         "specPointId": "wjec-alevel-physics.thermal.sp-01",
         "topicId": "wjec-alevel-physics.thermal",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3551,7 +3551,7 @@
       {
         "specPointId": "wjec-alevel-physics.thermal.sp-02",
         "topicId": "wjec-alevel-physics.thermal",
-        "currentQuestionCount": 11,
+        "currentQuestionCount": 12,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3560,7 +3560,7 @@
       {
         "specPointId": "wjec-alevel-physics.thermal.sp-03",
         "topicId": "wjec-alevel-physics.thermal",
-        "currentQuestionCount": 15,
+        "currentQuestionCount": 16,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3569,7 +3569,7 @@
       {
         "specPointId": "wjec-alevel-physics.thermal.sp-04",
         "topicId": "wjec-alevel-physics.thermal",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"

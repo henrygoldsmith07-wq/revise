@@ -167,3 +167,30 @@ describe("Physics spec-point tags (thirty-first pass)", () => {
     expect(problems).toEqual(["cnt:question:aqa-gcse-physics-practical-resistance: aqa-gcse-physics.electric-circuits.sp-08 is not in the curriculum"]);
   });
 });
+
+// Sixty-third pass. The tag audit's top suspects in physics-extra.ts (and its AQA
+// clone) pointed a lost mark at the wrong lesson: binding energy went to the
+// activity/half-life lesson, impulse force to the impulse-in-collisions lesson,
+// specific heat to internal energy, and pV = nRT to the kinetic theory lesson.
+// Each was checked against the curriculum statement and matches the mapping the
+// thirtieth-pass table already uses for the same physics.
+const RETAGGED_63: Record<string, string> = {
+  "phys-nuclear-binding": "nuclear.sp-04", // 4.4(b) mass-energy equivalence for binding energy (was sp-03, activity and half-life)
+  "phys-momentum-impulse": "momentum.sp-01", // 3.1(a) momentum and impulse as force x time (was sp-03, elastic vs inelastic)
+  "phys-thermal-specific-heat": "thermal.sp-02", // specific heat capacity (was sp-01, internal energy)
+  "phys-thermal-ideal-gas": "thermal.sp-03", // pV = nRT (was sp-04)
+};
+
+describe("Physics spec-point tags (sixty-third pass)", () => {
+  const byId = new Map<string, Question>(seedQuestions.map((q) => [q.id, q]));
+  it("the core Physics questions carry the audited point in WJEC and AQA", () => {
+    for (const [slug, tag] of Object.entries(RETAGGED_63)) {
+      for (const [subjectId, suffix] of [[PHYSICS, ""], ["aqa-alevel-physics", "-aqa"]] as const) {
+        const q = byId.get(`cnt:question:${slug}${suffix}`);
+        expect(q, `${slug}${suffix}`).toBeDefined();
+        expect(q!.parts[0].specPointIds, `${slug}${suffix}`).toEqual([`${subjectId}.${tag}`]);
+      }
+      expect(TAUGHT_SPEC_POINT_IDS.includes(`${PHYSICS}.${tag}`), tag).toBe(true);
+    }
+  });
+});
