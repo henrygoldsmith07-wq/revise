@@ -1,5 +1,6 @@
 import type { Id, Misconception, Question } from "@/domain/types";
 import { honestQuestion } from "@/domain/curriculum/honesty";
+import { applyPhysicsAnswerGuards } from "./questions/physics-answer-guards";
 import { enrichCuratedPhysicsLearning } from "./questions/physics-part-learning";
 import { biologyQuestions } from "./questions/biology";
 import { biologyAqaQuestions } from "./questions/biology-aqa";
@@ -152,7 +153,7 @@ const ledgerApplication = applyHumanVerificationLedger(authoredSeedQuestions, hu
 const releaseSetApplication = resolveWjecReleaseSet(authoredSeedQuestions, wjecReleaseSet);
 
 /** Current runtime bank after exact-fingerprint human attestations are applied. */
-export const seedQuestions: Question[] = ledgerApplication.questions;
+export const seedQuestions: Question[] = applyPhysicsAnswerGuards(ledgerApplication.questions);
 /** CI/operator diagnostics; historical fingerprints are non-blocking audit history. */
 export const seedHumanVerificationLedgerIssues = ledgerApplication.issues;
 /** Explicit operator-selected release candidates. Selection is not approval. */
