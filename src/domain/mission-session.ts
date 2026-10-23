@@ -559,3 +559,17 @@ export function restoreMissionSession(session: MissionSession, saved: MissionChe
     contextFor: { ...saved.contextFor },
   };
 }
+
+/**
+ * The minutes a mission stage will really take: the sum of its session's
+ * per-question estimates, never the generic stage constant. Today, the mission
+ * card, the paper result and the session all call this so they agree. Falls
+ * back to the stage constant only when no session can be built (no questions).
+ */
+export function missionStageMinutes(mission: ExamMission, input: MissionSessionInput, stage?: MissionStageKind): number {
+  const kind = stage ?? mission.current.kind;
+  const fallback = mission.stages.find((x) => x.kind === kind)?.minutes ?? mission.current.minutes;
+  const real = buildMissionSession(mission, input, kind).minutes;
+  const minutes = real > 0 ? real : fallback;
+  return minutes > 0 ? Math.max(3, Math.ceil(minutes - 1e-9)) : 0;
+}

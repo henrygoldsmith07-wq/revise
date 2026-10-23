@@ -11,9 +11,11 @@ import { buildPaperResult } from "@/domain/paper-result";
 import { Button, ButtonLink, Pill } from "./ui";
 import { usePaperRecovery } from "./PaperRecoveryPanel";
 import { useRecoveryEvidence } from "./recovery-evidence";
+import { useStoreFields } from "@/state/store";
 
 export function PaperResultCard({ paperId, title, onNavigate }: { paperId: string; title: string; onNavigate?: (href: string) => void }) {
   const ev = useRecoveryEvidence();
+  const store = useStoreFields("questions", "attempts");
   const recovery = usePaperRecovery(paperId, title);
   const result = useMemo(() => {
     if (!recovery) return null;
@@ -22,8 +24,8 @@ export function PaperResultCard({ paperId, title, onNavigate }: { paperId: strin
       supplyByTopic: ev.supplyByTopic, topicTitle: ev.topicTitle, repairWeight: ev.repairWeight, paperTitles: { [paperId]: title },
     });
     const due = ev.recovery.items.filter((i) => i.paperId === paperId && i.state === "awaiting-proof" && i.proofDueAt).map((i) => i.proofDueAt!).sort()[0];
-    return buildPaperResult({ recovery, mission, nextCheckAt: due, now: new Date() });
-  }, [ev, paperId, recovery, title]);
+    return buildPaperResult({ recovery, mission, nextCheckAt: due, now: new Date(), sessionInput: { questions: store.questions, attempts: store.attempts, mistakes: ev.mistakes } });
+  }, [ev, paperId, recovery, title, store.questions, store.attempts]);
   if (!result) return null;
   const next = result.next;
   return (
