@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-23 — fifty-seventh pass
+
+Year 12 / AS awareness. A new optional "Which year are you in?" choice (Year 12 / Year 13 / Not sure) at onboarding and in Settings, stored locally on the settings record (unset keeps today's behaviour). For Year 12, recommendations, the plan and the quick check use AS topics (Units 1–2) only, so A2-only topics (Units 3–4) are not scheduled ahead of them. Changing the year replans the pending sessions ("your year group changed"). A subject whose spec has no numbered units is never emptied. Not yet done: Year 13 single Unit 4 option choice; mission/readiness views still see every topic.
+
 ## 2026-10-22 — fifty-sixth pass
 
 Calendar days computed from the UTC date instead of the student's local date (the rule in `src/domain/local-date.ts`). In the UK during British Summer Time, which covers the whole exam season, between midnight and 1am:

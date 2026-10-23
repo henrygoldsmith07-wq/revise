@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { rootCauseOf } from "@/domain/mistake-patterns";
-import { quickDiagnosticPool, quickDiagnosticReport, resumeQuickDiagnostic, selectQuickDiagnostic, type QuickDiagnosticRun, type QuickProbe } from "@/domain/quick-diagnostic";
+import { quickCheckTopicIds, quickDiagnosticPool, quickDiagnosticReport, resumeQuickDiagnostic, selectQuickDiagnostic, type QuickDiagnosticRun, type QuickProbe } from "@/domain/quick-diagnostic";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { QuestionRunner } from "./QuestionRunner";
 import { ButtonLink, Button, Panel } from "./ui";
@@ -56,7 +56,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
         return;
       }
       const pool = quickDiagnosticPool(store.questions, store.attempts, subjectId);
-      const topicIds = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
+      const topicIds = quickCheckTopicIds(pool, store.settings.yearGroup, getTopic);
       const trusted = selectQuickDiagnostic({ questions: pool, topicIds });
       // No trusted supply (the normal flagship state until human review lands):
       // offer an authored practice-tier check, labelled as practice, not proof.
