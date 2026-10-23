@@ -431,10 +431,11 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
 
   const subjectIds = useMemo(() => snapshot?.settings.subjectIds ?? [], [snapshot?.settings.subjectIds]);
   const yearGroup = snapshot?.settings.yearGroup;
+  const unit4Option = snapshot?.settings.unit4Option;
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
   // Year 12 plans and recommends AS (Units 1-2) topics only; mastery and
   // readiness still see every topic.
-  const scopedTopics = useMemo(() => topicsForYear(topics, yearGroup), [topics, yearGroup]);
+  const scopedTopics = useMemo(() => topicsForYear(topics, yearGroup, unit4Option), [topics, yearGroup, unit4Option]);
   const { evidence, mastery, recallMastery, applicationMastery, masteryUncertainty } = useLearnerMastery(snapshot, topics);
 
   const dueCards = useMemo(() => {

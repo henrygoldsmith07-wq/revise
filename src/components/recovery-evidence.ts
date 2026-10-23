@@ -85,7 +85,7 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
     const now = new Date();
     const today = todayLocal();
     const subjectIds = store.settings.subjectIds;
-    const topics = topicsForYear(allTopics(subjectIds), store.settings.yearGroup);
+    const topics = topicsForYear(allTopics(subjectIds), store.settings.yearGroup, store.settings.unit4Option);
     const shares = topicShares(topics);
     const perSubject = new Map<string, number>();
     for (const t of topics) perSubject.set(t.subjectId, (perSubject.get(t.subjectId) ?? 0) + 1);
@@ -118,7 +118,7 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
     const coldStart = planColdStart({
       subjectIds, attempts: store.attempts, mistakes: store.mistakes, reviewLogs: store.reviewLogs, questions: store.questions, examDates: store.examDates,
       skipped: store.settings.quickCheckSkipped, topicSubject: (id) => getTopic(id)?.subjectId,
-      yearGroup: store.settings.yearGroup, topicOf: (id) => getTopic(id), now,
+      yearGroup: store.settings.yearGroup, unit4Option: store.settings.unit4Option, topicOf: (id) => getTopic(id), now,
     });
     return rankRevisionActions({
       coldStart,
@@ -130,7 +130,7 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
       paperTitles: Object.fromEntries(store.papers.map((p) => [p.id, p.title])),
       availableMinutes: store.settings.sessionLengthMinutes,
     });
-  }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.reviewLogs, store.settings.quickCheckSkipped, store.settings.yearGroup, store.settings.sessionLengthMinutes, store.settings.subjectIds, store.settings.targetGrades]);
+  }, [evidence, store.adaptiveSession, store.attempts, store.cards, store.examDates, store.mastery, store.mistakes, store.papers, store.questions, store.reviewLogs, store.settings.quickCheckSkipped, store.settings.yearGroup, store.settings.unit4Option, store.settings.sessionLengthMinutes, store.settings.subjectIds, store.settings.targetGrades]);
   // Only computed when Today has nothing to rank: measuring unseen supply is an
   // O(questions x topic) reskin check, and Today re-renders often.
   const supplyNote = useMemo(

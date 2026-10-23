@@ -11,7 +11,7 @@ import { trustedAssessmentContent } from "./content-trust";
 import { questionFamily, unseenQuestionTester } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Question } from "./types";
-import { isA2Topic, type YearGroup } from "./year-group";
+import { isA2Topic, topicsForUnit4Option, type Unit4Option, type YearGroup } from "./year-group";
 
 export type DiagnosticDimension =
   | "recall"
@@ -301,9 +301,16 @@ export function resumeQuickDiagnostic(
 export function quickCheckTopicIds(
   pool: readonly Question[],
   year: YearGroup | undefined,
-  topicOf: (id: Id) => { specRef?: string } | undefined,
+  topicOf: (id: Id) => { specRef?: string; subjectId?: string } | undefined,
+  unit4Option?: Unit4Option,
 ): Id[] {
-  const all = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
+  let all = [...new Set(pool.flatMap((q) => q.topicIds))].sort();
+  if (unit4Option && year === "year-13") {
+    const known = all.map((id) => ({ id, specRef: topicOf(id)?.specRef, subjectId: topicOf(id)?.subjectId ?? "" }));
+    const keep = new Set(topicsForUnit4Option(known, unit4Option).map((t) => t.id));
+    const scoped = all.filter((id) => keep.has(id));
+    if (scoped.length) all = scoped;
+  }
   if (year !== "year-12") return all;
   const as = all.filter((id) => !isA2Topic(topicOf(id) ?? {}));
   return as.length ? as : all;

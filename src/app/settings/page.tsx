@@ -44,7 +44,7 @@ import { useStoreFields } from "@/state/store";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
 import { ACCOUNT_DELETION_CONFIRMATION, ACCOUNT_DELETION_EXPLANATION, LOCAL_ERASE_EXPLANATION } from "@/domain/account-deletion";
 import { recordAiConsentChoice } from "@/ai/consent-client";
-import type { YearGroup } from "@/domain/year-group";
+import { UNIT4_OPTIONS, isUnit4Option, type Unit4Option, type YearGroup } from "@/domain/year-group";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 import { PwaInstallSettings } from "@/components/PwaInstall";
 import { clearPilotQueue, flushPilotEvents, pendingPilotEvents } from "@/lib/pilot-telemetry";
@@ -125,6 +125,19 @@ export default function SettingsPage() {
               ]}
             />
           </Field>
+          {settings.yearGroup === "year-13" ? (
+            <Field label="Unit 4 option" hint="Pick the one option your class studies. Plans, quick checks and Today then use only that option's topics.">
+              <Segmented
+                ariaLabel="Unit 4 option"
+                value={settings.unit4Option ?? "unknown"}
+                onChange={(value) => void store.updateSettings({ unit4Option: isUnit4Option(value) ? value : undefined })}
+                options={[
+                  ...UNIT4_OPTIONS.map((o: Unit4Option) => ({ value: o, label: `Option ${o}` })),
+                  { value: "unknown", label: "Not sure" },
+                ]}
+              />
+            </Field>
+          ) : null}
           <Field label="Session length" hint="How long one block of revision runs.">
             <Segmented
               ariaLabel="Session length"

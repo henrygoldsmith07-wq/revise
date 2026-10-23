@@ -185,6 +185,8 @@ export interface UserSettings {
   quickCheckSkipped?: Id[];
   /** Optional school year ("year-12" prioritises AS units). Unset keeps every topic. Local only. */
   yearGroup?: "year-12" | "year-13";
+  /** Optional Year 13 Unit 4 option letter; plans and checks then use only that option. Local only. */
+  unit4Option?: "A" | "B" | "C" | "D";
   updatedAt: IsoInstant;
 }
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-23 pass 59: Year 13 Unit 4 option
+Year 13 students can pick their one Unit 4 option (A–D) at onboarding or in Settings (local only, optional field on settings, restored through the existing settings read). Plan, quick check, Today/recommender scope and the replan fingerprint then use only that option's topics; a subject that does not offer the chosen letter keeps all its options. Year 12, Year 13 without a choice, and unknown year behave as before. Tests: tests/unit4-option.test.ts.
+
 ## 2026-10-23 pass 58: one minute estimate everywhere
 Today, mission card, command centre, schedule, quick check and session pages now share `src/domain/minutes.ts` (round up, never 0 for real work, one "about N min" phrase) instead of mixing Math.round/ceil/raw values. Tests in tests/minutes.test.ts.
 

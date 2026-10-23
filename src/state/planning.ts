@@ -85,6 +85,7 @@ export function usePlanning(input: {
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
       subjectIds: snapshot.settings.subjectIds,
       yearGroup: snapshot.settings.yearGroup,
+      unit4Option: snapshot.settings.yearGroup === "year-13" ? snapshot.settings.unit4Option : undefined,
     });
     if (lastFingerprint.current === null) {
       lastFingerprint.current = current;
@@ -105,6 +106,7 @@ export function usePlanning(input: {
         subjectIds: snapshot.settings.subjectIds,
         targetGrades: snapshot.settings.targetGrades,
         yearGroup: snapshot.settings.yearGroup,
+        unit4Option: snapshot.settings.yearGroup === "year-13" ? snapshot.settings.unit4Option : undefined,
         evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
         existing: snapshot.plannedSessions,
         previous,

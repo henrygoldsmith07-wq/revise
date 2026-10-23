@@ -33,7 +33,7 @@ import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import type { CollectionStore } from "./db";
 import { migrateContentIds } from "./content-ids";
 import { enqueue } from "./sync";
-import { isYearGroup } from "@/domain/year-group";
+import { isUnit4Option, isYearGroup } from "@/domain/year-group";
 import { readReviseMeta, readReviseUserMeta, REVISE_META_KEYS, writeReviseMeta, writeReviseUserMeta } from "./storage-namespace";
 
 // ---------------------------------------------------------------------------
@@ -229,6 +229,7 @@ export async function loadSnapshot(userId: Id, opts?: { historyLimit?: number })
         accessibility: { ...fallback.accessibility, ...stored.accessibility },
         labMode: stored.labMode === true,
         ...(isYearGroup(stored.yearGroup) ? { yearGroup: stored.yearGroup } : { yearGroup: undefined }),
+        ...(isUnit4Option(stored.unit4Option) ? { unit4Option: stored.unit4Option } : { unit4Option: undefined }),
         pulseEnabled: stored.pulseEnabled === true,
         sundayPlanEnabled: stored.sundayPlanEnabled === true,
         pilotTelemetry: stored.pilotTelemetry === true,
