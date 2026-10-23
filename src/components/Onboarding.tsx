@@ -10,7 +10,8 @@ import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStoreFields } from "@/state/store-context";
 import type { StoreValue } from "@/state/store";
-import { Button, Field, Panel, Pill, ProgressBar, cx } from "./ui";
+import { Button, Field, Panel, Pill, ProgressBar, Segmented, cx } from "./ui";
+import type { YearGroup } from "@/domain/year-group";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
 
@@ -59,6 +60,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const [subjectIds, setSubjectIds] = useState<Id[]>([]);
   const [examDates, setExamDates] = useState<Record<string, string>>({});
   const [diagnosticChoice, setDiagnosticChoice] = useState<"quick" | "skip">("quick");
+  const [yearGroup, setYearGroup] = useState<YearGroup | undefined>(undefined);
   const [showReference, setShowReference] = useState(false);
   const [saving, setSaving] = useState(false);
   // The student pressed the final button before the store was ready.
@@ -159,6 +161,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
       availability,
       targetGrades: Object.fromEntries(subjectIds.map((id) => [id, gradesFor(id)[0] ?? "A*"])),
       // A skipped quick check stays skipped on Today; otherwise Today leads with it.
+      ...(yearGroup ? { yearGroup } : {}),
       quickCheckSkipped: diagnosticChoice === "skip" ? [...subjectIds] : [],
     });
 
@@ -382,6 +385,18 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
 
         {phase === 2 ? (
           <Panel className="space-y-3">
+            <Field label="Which year are you in? (optional)" hint="Year 12 plans start with the AS units (1 and 2). Skip it and everything stays in play.">
+              <Segmented
+                ariaLabel="Which year are you in?"
+                value={yearGroup ?? "unknown"}
+                onChange={(value) => setYearGroup(value === "unknown" ? undefined : (value as YearGroup))}
+                options={[
+                  { value: "year-12", label: "Year 12" },
+                  { value: "year-13", label: "Year 13" },
+                  { value: "unknown", label: "Not sure" },
+                ]}
+              />
+            </Field>
             <div>
               <h2 className="text-sm font-semibold">When are the exams? <span className="text-ink3 font-normal">(optional)</span></h2>
               <p className="text-xs text-ink3 mt-0.5">
