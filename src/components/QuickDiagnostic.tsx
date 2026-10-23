@@ -57,7 +57,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
         return;
       }
       const pool = quickDiagnosticPool(store.questions, store.attempts, subjectId);
-      const topicIds = quickCheckTopicIds(pool, store.settings.yearGroup, getTopic);
+      const topicIds = quickCheckTopicIds(pool, store.settings.yearGroup, getTopic, store.settings.unit4Option);
       const trusted = selectQuickDiagnostic({ questions: pool, topicIds });
       // No trusted supply (the normal flagship state until human review lands):
       // offer an authored practice-tier check, labelled as practice, not proof.

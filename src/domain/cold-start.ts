@@ -9,7 +9,7 @@
 
 import { isFlagship } from "./flagship";
 import { quickCheckTopicIds, quickDiagnosticPool, selectQuickDiagnostic } from "./quick-diagnostic";
-import type { YearGroup } from "./year-group";
+import type { Unit4Option, YearGroup } from "./year-group";
 import { trustworthyAttempt } from "./learning-evidence";
 import { localDaysBetween, todayLocal } from "./local-date";
 import type { Attempt, ExamDate, Id, Mistake, Question, ReviewLog } from "./types";
@@ -39,7 +39,8 @@ export interface ColdStartInput {
   topicSubject: (topicId: Id) => Id | undefined;
   /** Optional school year: Year 12 samples AS topics only (needs topicOf). */
   yearGroup?: YearGroup;
-  topicOf?: (topicId: Id) => { specRef?: string } | undefined;
+  unit4Option?: Unit4Option;
+  topicOf?: (topicId: Id) => { specRef?: string; subjectId?: string } | undefined;
   now: Date;
 }
 
@@ -71,7 +72,7 @@ export function planColdStart(input: ColdStartInput): ColdStartPlan | null {
     .sort((a, b) => daysTo(input.examDates, a, input.now) - daysTo(input.examDates, b, input.now) || a.localeCompare(b));
   for (const subjectId of candidates) {
     const pool = quickDiagnosticPool(input.questions, input.attempts, subjectId);
-    const topicIds = quickCheckTopicIds(pool, input.yearGroup, input.topicOf ?? (() => undefined));
+    const topicIds = quickCheckTopicIds(pool, input.yearGroup, input.topicOf ?? (() => undefined), input.unit4Option);
     const selection = selectQuickDiagnostic({ questions: pool, topicIds });
     const topics = new Set(selection.items.map((i) => i.topicId)).size;
     if (selection.items.length >= COLD_START_MIN_QUESTIONS && (!isFlagship(subjectId) || topics >= COLD_START_FLAGSHIP_MIN_TOPICS)) {
