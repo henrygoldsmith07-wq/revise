@@ -1,5 +1,6 @@
 "use client";
 
+import { displayMinutes } from "@/domain/minutes";
 import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -146,7 +147,7 @@ function Diagnostic() {
         </Panel>
       ) : question && (probe || pending) ? (
         <>
-          <p className="text-xs text-ink3">{records.length} answered · about {Math.round(report.minutes)} of 25 minutes{probe ? ` · ${probe.reason}` : ""}</p>
+          <p className="text-xs text-ink3">{records.length} answered · about {displayMinutes(report.minutes)} of 25 minutes{probe ? ` · ${probe.reason}` : ""}</p>
           <QuestionRunner
             key={question.id}
             question={question}

@@ -13,6 +13,7 @@
 // Pure domain: no React, no storage, no clock beyond `now`.
 // ---------------------------------------------------------------------------
 
+import { displayMinutes } from "./minutes";
 import { buildExamTrajectory, type ExamTrajectory, type RiskLevel } from "./exam-trajectory";
 import type { ExamOutlookRow } from "./exam-outlook";
 import type { ExamReadiness } from "./exam-readiness";
@@ -108,7 +109,7 @@ export function buildCommandCentre(input: CommandCentreInput): CommandCentre {
           targetGrade: input.targetGrades?.[id] ?? null,
           actions,
         }),
-        next: top ? { title: top.title, minutes: Math.max(1, Math.ceil(top.minutes)), href: top.route.href, why: top.explanation.why } : null,
+        next: top ? { title: top.title, minutes: displayMinutes(top.minutes), href: top.route.href, why: top.explanation.why } : null,
         strongest: strongestOf(model),
         weaknesses: weaknessesOf(model),
         proven: model.outcomes.proven.slice(0, 3),

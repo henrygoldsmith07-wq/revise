@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-23 pass 58: one minute estimate everywhere
+Today, mission card, command centre, schedule, quick check and session pages now share `src/domain/minutes.ts` (round up, never 0 for real work, one "about N min" phrase) instead of mixing Math.round/ceil/raw values. Tests in tests/minutes.test.ts.
+
 ## 2026-10-22 — fifty-sixth pass
 
 Calendar days computed from the UTC date instead of the student's local date (the rule in `src/domain/local-date.ts`). In the UK during British Summer Time, which covers the whole exam season, between midnight and 1am:
