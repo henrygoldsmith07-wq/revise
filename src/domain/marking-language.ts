@@ -215,6 +215,10 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" enter ", "(?:mov|go|flow|pass)(?:es|ed|ing|e)? into|goes into|went into|enters|entered|entering"],
   [" exit ", "(?:mov|go|flow|pass)(?:es|ed|ing|e)? out of|goes out of|went out of|is lost from|are lost from|lost from|exits|exited|leaves(?= (?:the|a|an|its|their|through|via) )"],
   [" initially ", "at first|to begin with|at the start"],
+  // Physics wording a Year 12 student uses for the same thing (pass 62).
+  [" drag ", "air resistance|fluid resistance"],
+  [" equals ", "(?:is |are )?(?:exactly )?(?:the same (?:size|magnitude|value) as|equal (?:in (?:size|magnitude) )?to|equals|same as)"],
+  [" smallintervals ", "(?:small|short|tiny|many) (?:time )?(?:intervals|steps|sections|chunks)"],
   // Framing that carries no content of its own.
   [" ", "of (?:its|the) (?:previous|original|initial|old) value|of what it was|of the original|as big|as large|as strong|as much"],
   [" notlinear ", "not (?:just |simply |only )?(?:linearly|1\\s*/\\s*[rdx](?![²^\\d])|(?:proportional to |with )?(?:the )?(?:distance|separation|radius)(?! squared))"],

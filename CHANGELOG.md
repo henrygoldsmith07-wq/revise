@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-23 pass 62: Year 12 Physics own-words marking
+Seven Year 12 Physics questions, each answered correctly and wrongly in a student's own words (author-judged marks, tests/fixtures/marking-y12-physics-set.ts). Before: 4 wrong answers earned a mark (e.g. "drag bigger than weight" at terminal speed, "all areas as positives" for displacement); correct answers scored 10/15. Now: authored do-not-accept rules (src/content/questions/physics-answer-guards.ts, applied after the verification ledger so no review status changes) stop all four, and "air resistance"/"same size as" are read as drag/equals; correct answers score 11/15. Still under-credited: three correct answers at 1 mark short.
+
 ## 2026-10-23 pass 60: year-aware readiness and missions
 Exam readiness coverage, paper readiness and mission building now respect the year group / Unit 4 option: a Year 12 student's readiness counts AS topics only, A2 papers are not listed, and missions are not built from A2 topics' lost marks. Unset year behaves as before. Tests: tests/year-aware-scope.test.ts.
 
