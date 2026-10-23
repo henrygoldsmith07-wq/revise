@@ -436,6 +436,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   // Year 12 plans and recommends AS (Units 1-2) topics only; mastery and
   // readiness still see every topic.
   const scopedTopics = useMemo(() => topicsForYear(topics, yearGroup, unit4Option), [topics, yearGroup, unit4Option]);
+  const scopeTopicIds = useMemo(() => new Set(scopedTopics.map((t) => t.id)), [scopedTopics]);
   const { evidence, mastery, recallMastery, applicationMastery, masteryUncertainty } = useLearnerMastery(snapshot, topics);
 
   const dueCards = useMemo(() => {
@@ -634,6 +635,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     closePaperOutcome,
     recordInterventionOutcome,
   } = useOutcomes({
+    scopeTopicIds,
     onError: setBootError,
     userId,
     snapshot,

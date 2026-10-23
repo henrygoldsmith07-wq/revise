@@ -123,6 +123,7 @@ export function useRevisionPlan(): { plan: RevisionPlan; evidence: RecoveryEvide
     return rankRevisionActions({
       coldStart,
       now, subjectIds, subjectName: (id) => getSubject(id)?.name ?? id, topicTitle: evidence.topicTitle,
+      scopeTopicIds: new Set(topics.map((t) => t.id)),
       mistakes: evidence.mistakes, attempts: store.attempts, questions: store.questions, recovery: evidence.recovery, examDates: store.examDates,
       adaptive: store.adaptiveSession, supplyByTopic: evidence.supplyByTopic, effectiveness: evidence.effectiveness, topicWeight, papers, untouched,
       proof: evidence.proof,

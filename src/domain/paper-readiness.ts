@@ -13,6 +13,7 @@ import { trustedAssessmentAttempt, independentAttempt } from "./learning-evidenc
 import { buildSpecificationMap, type SpecPointEvidence } from "./specification-evidence";
 import type { Attempt, ExamDate, Id, Mistake, Question, Subject, Topic, Unit } from "./types";
 import { localDaysBetween, todayLocal } from "./local-date";
+import { topicsForYear, type Unit4Option, type YearGroup } from "./year-group";
 
 export const MIN_STRENGTH_ATTEMPTS = 3;
 const TRANSFER_PASS = 0.6;
@@ -72,6 +73,9 @@ export interface PaperReadinessInput {
   subject: Subject;
   topics: readonly Topic[];
   units?: readonly Unit[];
+  /** Year group / Unit 4 option. A paper that sits wholly outside it is not reported (Year 12 sees AS papers only). */
+  yearGroup?: YearGroup;
+  unit4Option?: Unit4Option;
   questions: readonly Question[];
   attempts: readonly Attempt[];
   mistakes: readonly Mistake[];
@@ -144,17 +148,22 @@ export function buildPaperReadiness(input: PaperReadinessInput): PaperReadiness[
   const depth = new Map(questions.map((question) => [question.id, questionDepthBySpecPoint(question)] as const));
   const mapping = resolvePaperTopics(subject, input.topics, input.units ? [...input.units] : [], input.topicPaperMap);
 
-  return subject.papers.map((paper) => {
+  const inScope = new Set(topicsForYear(input.topics, input.yearGroup, input.unit4Option).map((topic) => topic.id));
+  const scopedPapers = subject.papers.filter((paper) => {
+    const ids = mapping.get(paper.id)?.topicIds ?? [];
+    return ids.length === 0 || ids.some((id) => inScope.has(id));
+  });
+  return scopedPapers.map((paper) => {
     const resolved = mapping.get(paper.id) ?? { topicIds: [], mapping: "unknown" as const };
-    const topicSet = new Set(resolved.topicIds);
-    const known = resolved.topicIds.length > 0;
+    const topicSet = new Set(resolved.topicIds.filter((id) => inScope.has(id)));
+    const known = topicSet.size > 0;
 
     const upcoming = (input.examDates ?? [])
       .filter((exam) => exam.subjectId === subject.id && exam.paperSpecId === paper.id)
       .map((exam) => ({ date: exam.date, days: daysBetween(exam.date, now) }))
       .sort((a, b) => (a.days < 0 ? 1 : 0) - (b.days < 0 ? 1 : 0) || a.days - b.days)[0];
 
-    const points = resolved.topicIds.flatMap((id) => pointsByTopic.get(id) ?? []);
+    const points = [...topicSet].flatMap((id) => pointsByTopic.get(id) ?? []);
     const secure = points.filter((point) => point.status === "secure").length;
     const missing = points.filter((point) => point.status === "no-evidence").length;
     const weak = points.length - secure - missing;
@@ -199,7 +208,7 @@ export function buildPaperReadiness(input: PaperReadinessInput): PaperReadiness[
     const evidence: PaperEvidenceLabel = !known || attemptsInPaper === 0 ? "none"
       : attemptsInPaper < 8 ? "thin" : secure / Math.max(1, points.length) >= 0.5 ? "solid" : "building";
 
-    const topicRows = resolved.topicIds.map((id) => {
+    const topicRows = [...topicSet].map((id) => {
       const rows = pointsByTopic.get(id) ?? [];
       const topicOpen = open.filter((mistake) => mistake.topicId === id);
       return {
@@ -231,7 +240,7 @@ export function buildPaperReadiness(input: PaperReadinessInput): PaperReadiness[
       examDate: upcoming?.date ?? null,
       daysUntil: days,
       mapping: resolved.mapping,
-      topicIds: resolved.topicIds,
+      topicIds: [...topicSet],
       statements: points.length,
       secure,
       weak,

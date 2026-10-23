@@ -65,9 +65,10 @@ export function PaperReadinessPanel() {
       return rankPapers(buildPaperReadiness({
         subject, topics: subjectTopics, units: unitsFor(subjectId), questions: store.questions,
         attempts: store.attempts, mistakes: store.mistakes, examDates: store.examDates,
+        yearGroup: store.settings.yearGroup, unit4Option: store.settings.unit4Option,
       }));
     });
-  }, [store.attempts, store.mistakes, store.questions, store.examDates, store.settings.subjectIds]);
+  }, [store.attempts, store.mistakes, store.questions, store.examDates, store.settings.subjectIds, store.settings.yearGroup, store.settings.unit4Option]);
 
   if (!rows.length) return null;
   return (

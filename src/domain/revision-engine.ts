@@ -106,6 +106,12 @@ export interface EngineInput {
   attempts: readonly Attempt[];
   questions: readonly Question[];
   recovery: MarkRecovery;
+  /**
+   * Topics the learner is studying now (year group / Unit 4 option). Missions,
+   * and the lost marks that feed them, are built only from these topics, so a
+   * Year 12 student is not sent to repair an A2 topic. Unset keeps every topic.
+   */
+  scopeTopicIds?: ReadonlySet<Id>;
   examDates: readonly ExamDate[];
   adaptive?: AdaptiveSessionPlan | null;
   dueReviews?: ReadonlyArray<{ subjectId: Id; count: number; overdue: number }>;
@@ -630,7 +636,14 @@ function keepPractisingDraft(input: EngineInput, enrolled: ReadonlySet<Id>, miss
 
 export function rankRevisionActions(input: EngineInput): RevisionPlan {
   const enrolled = new Set(input.subjectIds);
-  const scoped: EngineInput = { ...input, mistakes: input.mistakes.filter((m) => enrolled.has(m.subjectId)) };
+  const inScope = (m: Mistake) => enrolled.has(m.subjectId) && (!input.scopeTopicIds || input.scopeTopicIds.has(m.topicId));
+  const scopedMistakes = input.mistakes.filter(inScope);
+  const keptIds = new Set(scopedMistakes.map((m) => m.id));
+  const scoped: EngineInput = {
+    ...input,
+    mistakes: scopedMistakes,
+    recovery: input.scopeTopicIds ? { ...input.recovery, items: input.recovery.items.filter((i) => keptIds.has(i.mistakeId)) } : input.recovery,
+  };
   const estimate: Estimate = (kind, cause) => estimateEffectiveness(input.effectiveness ?? {}, { kind, cause });
   const drafts: Draft[] = [];
   const deferred: DeferredAction[] = [];
