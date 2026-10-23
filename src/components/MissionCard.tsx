@@ -6,13 +6,16 @@
 import { aboutMinutesLabel, displayMinutes } from "@/domain/minutes";
 import { useMemo } from "react";
 import { buildPaperMission, missionNextAction, type ExamMission } from "@/domain/exam-mission";
-import { missionHref } from "@/domain/mission-session";
+import { missionHref, missionStageMinutes, type MissionSessionInput } from "@/domain/mission-session";
+import { useStoreFields } from "@/state/store";
 import { LEARNER_STATE_LABEL, LEARNER_STATE_TONE, missionLearnerState } from "@/domain/learner-state";
 import { ButtonLink, Pill } from "./ui";
 import { useRecoveryEvidence } from "./recovery-evidence";
 
-export function MissionView({ mission }: { mission: ExamMission }) {
-  const action = missionNextAction(mission);
+export function MissionView({ mission, sessionInput }: { mission: ExamMission; sessionInput?: MissionSessionInput }) {
+  const base = missionNextAction(mission);
+  // The button states the minutes the session will really take (sum of its questions), as Today and the session do.
+  const action = sessionInput && !base.blocked ? { ...base, minutes: missionStageMinutes(mission, sessionInput) } : base;
   const r = mission.recovery;
   return (
     <div className="space-y-3">
@@ -58,10 +61,11 @@ export function MissionView({ mission }: { mission: ExamMission }) {
 /** The mission that starts from one paper's autopsy. */
 export function PaperMission({ paperId, title }: { paperId: string; title: string }) {
   const ev = useRecoveryEvidence();
+  const store = useStoreFields("questions", "attempts");
   const mission = useMemo(
     () => buildPaperMission(paperId, { mistakes: ev.mistakes, recovery: ev.recovery, patterns: ev.patterns, daysToExam: ev.daysToExam, unseenByTopic: ev.unseenByTopic, supplyByTopic: ev.supplyByTopic, topicTitle: ev.topicTitle, repairWeight: ev.repairWeight, paperTitles: { [paperId]: title } }),
     [ev, paperId, title],
   );
   if (!mission) return null;
-  return <div className="rounded-[8px] border border-line px-3 py-3"><MissionView mission={mission} /></div>;
+  return <div className="rounded-[8px] border border-line px-3 py-3"><MissionView mission={mission} sessionInput={{ questions: store.questions, attempts: store.attempts, mistakes: ev.mistakes }} /></div>;
 }

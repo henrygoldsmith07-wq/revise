@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { missionNextAction, type ExamMission } from "./exam-mission";
+import { missionStageMinutes, type MissionSessionInput } from "./mission-session";
 import { missionLearnerState, type LearnerState } from "./learner-state";
 import { missionHref } from "./mission-session";
 import type { PaperRecovery } from "./paper-recovery";
@@ -40,7 +41,7 @@ const STATEMENT: Record<LearnerState, string> = {
 const round = (n: number) => Math.round(n * 10) / 10;
 const marks = (n: number) => `${round(n)} mark${n === 1 ? "" : "s"}`;
 
-export function buildPaperResult(input: { recovery: PaperRecovery; mission: ExamMission | null; nextCheckAt?: string; now: Date }): PaperResult {
+export function buildPaperResult(input: { recovery: PaperRecovery; mission: ExamMission | null; nextCheckAt?: string; now: Date; sessionInput?: MissionSessionInput }): PaperResult {
   const { recovery: r, mission } = input;
   const lost = r.totals.previouslyLost;
   const byTopic = new Map<Id, number>();
@@ -65,10 +66,10 @@ export function buildPaperResult(input: { recovery: PaperRecovery; mission: Exam
     after = action.after;
     if (action.blocked) {
       check = "There aren't enough new questions to prove this yet. You can still practise it, but it won't count as recovered.";
-      next = { href: missionHref(mission.id, "practise"), label: `Practise ${marks(recoverable)}`, minutes: Math.max(5, mission.stages.find((s) => s.kind === "practise")?.minutes ?? 10) };
+      next = { href: missionHref(mission.id, "practise"), label: `Practise ${marks(recoverable)}`, minutes: input.sessionInput ? missionStageMinutes(mission, input.sessionInput, "practise") : Math.max(5, mission.stages.find((s) => s.kind === "practise")?.minutes ?? 10) };
     } else {
       const verb = state === "awaiting-proof" ? "Prove" : "Recover";
-      next = { href: action.href, label: `${verb} ${marks(Math.max(recoverable, r.totals.awaitingProof))}`, minutes: action.minutes };
+      next = { href: action.href, label: `${verb} ${marks(Math.max(recoverable, r.totals.awaitingProof))}`, minutes: input.sessionInput ? missionStageMinutes(mission, input.sessionInput) : action.minutes };
     }
   }
   if (!check && input.nextCheckAt && state === "awaiting-proof") {
