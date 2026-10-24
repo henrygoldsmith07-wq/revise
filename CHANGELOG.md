@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 73: damping, field-strength and thermistor answers marked like an examiner
+Six more Year 12 Physics questions were tested with a correct and a wrong answer in a student's own words. A wrong "heavy damping gives a bigger, sharper peak" and a wrong "thermistor resistance rises so the output rises" each kept a mark; both now earn 0, as does "field strength is inversely proportional to the distance". "The peak is much lower" and "less heat is lost" now count as the scheme's reduced amplitude and reduced heat loss. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass73.test.ts.
+
 ## 2026-10-24 pass 72: four more Physics questions open the right lesson
 Capacitor energy (two questions), the photoelectric kinetic-energy balance and the thermistor sensor bridge were tagged to a neighbouring spec point; each now links to the lesson it tests (capacitance.sp-02, quantum.sp-01, electric-circuits.sp-02). Question ids are unchanged so saved progress stays attached; reasoning-depth sources can now carry an optional audited `specPoint` per part.
 
