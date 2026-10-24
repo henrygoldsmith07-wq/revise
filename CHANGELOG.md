@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 64: more Year 12 Physics wrong answers stop earning marks
+Nine more questions got a correct and a plausible wrong own-words answer (author judgement, not moderated marks). Four wrong answers earned credit an examiner would not give: transverse/longitudinal swapped, angular velocity as metres per second, 0 °C called absolute zero, efficiency inverted with heat as a motor's useful output. Each now has a do-not-accept rule that only removes credit. Not fixed: seven correct answers still lose a mark to wording (e.g. 'how fast the angle changes with time'); a wording-equivalent attempt did not help and was dropped. Tests: tests/marking-y12-physics.test.ts.
+
 ## 2026-10-23 pass 63: Physics lesson links for four core questions
 The spec-tag audit's top suspects in physics-extra.ts (WJEC and AQA copies) sent a lost mark to the wrong lesson: binding energy to activity/half-life (now nuclear.sp-04), impulse force to elastic vs inelastic collisions (now momentum.sp-01), specific heat to internal energy (now thermal.sp-02), pV = nRT to thermal.sp-04 (now thermal.sp-03). Pinned in tests/physics-spec-tags.test.ts. Keyword agreement is a triage signal, not accuracy; each retag was checked by hand. About 135 strong suspects remain, left for teacher review.
 
