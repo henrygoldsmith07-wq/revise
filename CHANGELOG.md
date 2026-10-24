@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 71: swapped rules, inverted formulas and plain notation in Physics marking
+Ten more Year 12 Physics questions got a correct and a wrong own-words answer (author judgement, not moderated marks). Before, eight wrong answers earned marks (constructive/destructive swapped, parallel capacitors using reciprocals, efficiency upside down, polarisation "only longitudinal", diffraction as bouncing back, ...) and three correct ones lost marks. Guards now remove those marks; notation ("V_out"/"Vout", "R₂"/"R2", "R1+R2", "y-axis"/"y axis", "bigger than"/"exceeds") reads as one form, and a scheme point that is an equation with a trailing gloss ("Gradient = acceleration (rate of change ...)") is satisfied by the equation. The self-consistency baseline (687) is unchanged; tsc errors are only the missing @base-ui package in this sandbox.
+
 ## 2026-10-24 pass 70: two more Physics questions link to the right lesson
 The single-slit 'narrower slit, central maximum' question now opens the single-slit diffraction lesson (waves.sp-08, was sp-06) and the 230 V rms mains heater question opens rms and peak values (alternating-currents.sp-01, was sp-02), found with the keyword audit and checked against each statement. No depth gap opens (test confirms). Not teacher-reviewed.
 

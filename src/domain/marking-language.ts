@@ -88,6 +88,20 @@ export function withinEditDistance(a: string, b: string, maxEdits: number): bool
  * of `tokenise` itself so the anti-recitation cap in marking.ts, which also
  * reads `tokenise`, behaves exactly as before.
  */
+/**
+ * One spelling for the same notation (pass 71): "V_out", "Vout"; "R₂", "R2";
+ * "R1+R2", "R1 + R2". Both the scheme and the answer pass
+ * through it, so only equal notation becomes equal.
+ */
+const SUBSCRIPTS = "₀₁₂₃₄₅₆₇₈₉";
+export function normaliseNotation(text: string): string {
+  return text
+    .replace(/[₀-₉]/g, (c) => String(SUBSCRIPTS.indexOf(c)))
+    .replace(/\b([xyXY])[- ]axis/g, "$1axis")
+    .replace(/([A-Za-z])_([A-Za-z0-9]+)/g, "$1$2")
+    .replace(/([A-Za-z0-9])\+([A-Za-z0-9])/g, "$1 + $2");
+}
+
 function coverageTokens(text: string): string[] {
   const cached = COVERAGE_TOKEN_CACHE.get(text);
   if (cached) return cached;
@@ -95,7 +109,7 @@ function coverageTokens(text: string): string[] {
   // same either-or as "iodine/KI" (one token, read by alternativesOf).
   const joined = text.includes("/") ? text.replace(/([A-Za-z]{2,})\s+\/\s+(?=[A-Za-z]{2,})/g, "$1/") : text;
   // "and/or" is a connective, like "and" and "or" themselves.
-  const tokens = [...new Set([...tokenise(canonicalPhrases(genotypeWords(joined)))].map(sentenceFinalStem).filter((w) => w.length > 1 && w !== "and/or"))];
+  const tokens = [...new Set([...tokenise(canonicalPhrases(genotypeWords(normaliseNotation(joined))))].map(sentenceFinalStem).filter((w) => w.length > 1 && w !== "and/or"))];
   if (COVERAGE_TOKEN_CACHE.size > 4096) COVERAGE_TOKEN_CACHE.clear();
   COVERAGE_TOKEN_CACHE.set(text, tokens);
   return tokens;
@@ -236,6 +250,7 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" smallintervals ", "(?:small|short|tiny|many) (?:time )?(?:intervals|steps|sections|chunks)"],
   // Pass 69: gradient is slope; "measured in" introduces the unit; BAcosθ run together.
   [" slope ", "gradient"],
+  [" exceeds ", "(?:is )?(?:bigger|larger|greater|more) than"],
   [" unit ", "measured in|in units of"],
   [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],
   // Framing that carries no content of its own.
@@ -401,7 +416,19 @@ export function wordRoot(word: string): string {
   return word;
 }
 
+/**
+ * "Gradient = acceleration (rate of change of velocity)": a scheme point that is
+ * one equation plus a trailing gloss. The gloss restates the right-hand side,
+ * so a student who writes the equation is not penalised for omitting it.
+ */
+const GLOSSED_EQUATION = /^([^()=]{3,60}=[^()=]{3,60}?)\s*\([^()]{5,80}\)\.?$/;
 export function pointCoverage(point: string, answer: string, earlyExitAt?: number): number {
+  const gloss = GLOSSED_EQUATION.exec(point);
+  if (gloss) return Math.max(pointCoverageOf(point, answer, earlyExitAt), pointCoverageOf(gloss[1]!, answer, earlyExitAt));
+  return pointCoverageOf(point, answer, earlyExitAt);
+}
+
+function pointCoverageOf(point: string, answer: string, earlyExitAt?: number): number {
   const wanted = coverageTokens(point);
   if (!wanted.length) return 0;
   const given = coverageTokens(answer).flatMap((g) => [g, ...(alternativesOf(g) ?? [])]);
