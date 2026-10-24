@@ -176,6 +176,66 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
       reason: "A downward transition emits a photon; an upward one absorbs it." },
   ],
+  // pass 71
+  [`${Q}physics-depth-waves-sp-07-path-difference-rule-0`]: [
+    { point: 0, phrases: ["constructive … odd number", "constructive … antiphase", "constructive … half wavelength"],
+      reason: "Constructive interference needs a whole number of wavelengths (waves in phase); an odd number of half wavelengths is destructive." },
+    { point: 1, phrases: ["destructive … whole number", "destructive … nλ"],
+      except: ["odd number of half wavelengths for destructive", "destructive when it is an odd", "destructive … odd"],
+      reason: "Destructive interference needs an odd number of half wavelengths (waves in antiphase), not a whole number." },
+    { point: 2, phrases: ["whole number"],
+      except: ["n is", "n =", "n=", "integer", "where n", "n can", "n stands"],
+      reason: "The point is to say what n is (0, 1, 2, …); saying 'a whole number of wavelengths' names the condition, not n." },
+  ],
+  [`${Q}physics-depth-capacitance-sp-03-parallel-capacitance-rule-1`]: [
+    { point: 0, phrases: ["reciprocal", "1/c = 1/", "1/c1"],
+      reason: "Capacitors in parallel simply add; the reciprocal rule is for capacitors in series." },
+    { point: 2, phrases: ["smaller than the smallest", "less than the smallest", "below the smallest", "lower than the smallest"],
+      except: ["unlike", "in series", "series"],
+      reason: "In parallel the total exceeds the largest capacitor; it only falls below the smallest in series." },
+  ],
+  [`${Q}physics-depth-practical-investigations-sp-03-gradient-units-rule-0`]: [
+    { point: 0, phrases: ["multiply the unit", "multiplied by the unit", "times the unit", "unit of the y axis times", "y axis times"],
+      except: ["divide"],
+      reason: "The gradient's unit is the y-axis unit divided by the x-axis unit." },
+    { point: 1, phrases: ["times s which", "× s which", "x s which", "times s gives", "multiplied by s"],
+      except: ["divided"],
+      reason: "A velocity–time gradient is m s⁻¹ divided by s = m s⁻² (acceleration), not multiplied." },
+  ],
+  [`${Q}physics-depth-kinematics-dynamics-sp-02-vt-graph-rules-0`]: [
+    { point: 0, phrases: ["gradient is the displacement", "gradient is displacement", "gradient = displacement", "gradient represents displacement", "gradient is the distance", "gradient is the velocity"],
+      reason: "On a velocity–time graph the gradient is the acceleration." },
+    { point: 1, phrases: ["area under it is the acceleration", "area is the acceleration", "area under the graph is the acceleration", "area under the line is the acceleration", "area represents acceleration", "area is acceleration"],
+      reason: "On a velocity–time graph the area under the line is the displacement." },
+  ],
+  [`${Q}physics-depth-electric-circuits-sp-02-divider-unloaded-rule-0`]: [
+    { point: 0, phrases: ["vout = vin × r1/", "vout = vin x r1/", "vout = vin r1/", "vout = r1/", "v out = vin × r1/"],
+      reason: "The output across the lower resistor is Vin × R₂/(R₁ + R₂), with the resistor you measure across on top." },
+    { point: 1, phrases: ["whatever the load", "any load", "even if a low", "large current", "regardless of the load"],
+      reason: "The simple divider formula only holds when the output draws negligible current." },
+  ],
+  [`${Q}physics-depth50-energy-power-sp-06-efficiency-definition-0`]: [
+    { point: 0, phrases: ["input divided by useful", "input over useful", "input / useful", "total energy input divided by useful", "total input divided by useful"],
+      reason: "Efficiency is useful output divided by total input, not the other way up." },
+    { point: 1, phrases: ["over 100%", "more than 100%", "above 100%", "greater than 100%", "exceed 100%"],
+      except: ["cannot", "can't", "never", "not be", "not exceed", "no more than"],
+      reason: "A passive machine cannot be more than 100% efficient." },
+  ],
+  [`${Q}physics-depth50-waves-sp-05-definition-0`]: [
+    { point: 0, phrases: ["along the direction of travel", "parallel to the direction", "in the direction of travel"],
+      except: ["perpendicular", "right angle", "plane"],
+      reason: "Polarisation limits the oscillations to a single plane at right angles to the direction of travel." },
+    { point: 1, phrases: ["only longitudinal", "longitudinal waves such as sound can be polarised", "sound can be polarised", "longitudinal waves can be polarised"],
+      except: ["cannot", "can't", "not"],
+      reason: "Only transverse waves can be polarised; longitudinal waves such as sound cannot." },
+  ],
+  [`${Q}physics-depth50-waves-sp-08-definition-0`]: [
+    { point: 0, phrases: ["bouncing back", "bounce back", "bounces back", "reflected back", "reflecting off"],
+      except: ["spread", "bend"],
+      reason: "Diffraction is the spreading or bending of waves round an obstacle or through a gap; reflection is bouncing back." },
+    { point: 1, phrases: ["without spreading", "straight line", "carry on straight", "do not spread", "don't spread", "no spreading"],
+      reason: "A narrow gap makes the wavefronts spread into the region behind it." },
+  ],
 };
 
 export function applyPhysicsAnswerGuards(questions: Question[]): Question[] {
