@@ -3443,7 +3443,7 @@
       {
         "specPointId": "wjec-alevel-physics.quantum.sp-01",
         "topicId": "wjec-alevel-physics.quantum",
-        "currentQuestionCount": 18,
+        "currentQuestionCount": 19,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3452,7 +3452,7 @@
       {
         "specPointId": "wjec-alevel-physics.quantum.sp-02",
         "topicId": "wjec-alevel-physics.quantum",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"

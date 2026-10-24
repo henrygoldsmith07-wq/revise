@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 72: four more Physics questions open the right lesson
+Capacitor energy (two questions), the photoelectric kinetic-energy balance and the thermistor sensor bridge were tagged to a neighbouring spec point; each now links to the lesson it tests (capacitance.sp-02, quantum.sp-01, electric-circuits.sp-02). Question ids are unchanged so saved progress stays attached; reasoning-depth sources can now carry an optional audited `specPoint` per part.
+
 ## 2026-10-24 pass 71: swapped rules, inverted formulas and plain notation in Physics marking
 Ten more Year 12 Physics questions got a correct and a wrong own-words answer (author judgement, not moderated marks). Before, eight wrong answers earned marks (constructive/destructive swapped, parallel capacitors using reciprocals, efficiency upside down, polarisation "only longitudinal", diffraction as bouncing back, ...) and three correct ones lost marks. Guards now remove those marks; notation ("V_out"/"Vout", "R₂"/"R2", "R1+R2", "y-axis"/"y axis", "bigger than"/"exceeds") reads as one form, and a scheme point that is an equation with a trailing gloss ("Gradient = acceleration (rate of change ...)") is satisfied by the equation. The self-consistency baseline (687) is unchanged; tsc errors are only the missing @base-ui package in this sandbox.
 

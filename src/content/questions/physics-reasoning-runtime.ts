@@ -26,6 +26,8 @@ export type DepthPart = {
   scheme: string[];
   answer: string;
   aos?: AoCode[];
+  /** Audited spec point when it differs from the file's point; the question id keeps the file's point so saved progress stays attached. */
+  specPoint?: number;
   /** "Do not accept" lines for individual scheme points (MarkSchemeReject). */
   rejects?: QuestionPart["rejects"];
 };
@@ -56,8 +58,8 @@ export function reasoningDepthQuestions(items: DepthItem[]): Question[] {
         scheme: part.scheme,
         answer: part.answer,
         aos: part.aos ?? (part.demand === "recall" ? ["AO1"] : ["AO2"] as const),
-        specPointIds: [`${S}.${item.topic}.${point(item.point)}`],
-        capabilityIds: [item.capability ?? `phys.${item.topic}.${point(item.point)}`],
+        specPointIds: [`${S}.${item.topic}.${point(part.specPoint ?? item.point)}`],
+        capabilityIds: [part.specPoint ? `phys.${item.topic}.${point(part.specPoint)}` : (item.capability ?? `phys.${item.topic}.${point(item.point)}`)],
         learningClaims: [part.move],
         learning: { familyId: part.family, contextId: part.context, demand: part.demand, reasoningMoves: [part.move] },
         ...(part.rejects?.length ? { rejects: part.rejects } : {}),

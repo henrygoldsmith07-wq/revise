@@ -75,6 +75,7 @@
     {
       "demand": "calculation",
       "family": "physics-depth:energy-stored-calc",
+      "specPoint": 2,
       "context": "physics-depth:energy-stored-calc:half-cv-squared",
       "move": "compute stored energy with the squared-voltage relation",
       "prompt": "A 470 μF capacitor is charged to 12 V. Calculate the energy stored. Then state the energy stored if the voltage doubles to 24 V.",
@@ -133,6 +134,7 @@
     {
       "demand": "synoptic",
       "family": "physics-depth:capacitor-energy-half-charging",
+      "specPoint": 2,
       "context": "physics-depth:capacitor-energy-half-charging:battery-work-split",
       "move": "combine charging energy accounting with the energy dissipated in the resistor",
       "prompt": "A 100 μF capacitor charges through a resistor to a final 10 V from a 10 V battery. Calculate the energy supplied by the battery, the energy stored on the capacitor, and explain where the difference went.",
