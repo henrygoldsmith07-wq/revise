@@ -79,7 +79,7 @@ const TOPICS: TopicSpec[] = [
         move: "define rms through heating equivalence rather than waveform shape",
       },
       {
-        family: "physics-coverage:ac:power", context: "physics-coverage:ac:power:mains-heater", point: 2, demand: "calculation",
+        family: "physics-coverage:ac:power", context: "physics-coverage:ac:power:mains-heater", point: 1, demand: "calculation",
         prompt: "A 230 V rms mains supply drives a 11.5 Ω resistive heater. Calculate the peak current and the mean power dissipated.",
         marks: 3,
         scheme: ["I_rms = V_rms/R = 230/11.5 = 20 A", "I₀ = √2 × 20 = 28 A (accept 28.3)", "P = V_rms I_rms = 230 × 20 = 4600 W"],

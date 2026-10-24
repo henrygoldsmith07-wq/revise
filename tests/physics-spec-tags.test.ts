@@ -199,4 +199,10 @@ describe("Physics spec-point tags (sixty-third pass)", () => {
     expect(tagOf("cnt:question:phys-shm-pendulum")).toEqual([`${PHYSICS}.circular-shm.sp-05`]);
     expect(tagOf("cnt:question:physics-coverage-capacitance-timing-curve")).toEqual([`${PHYSICS}.capacitance.sp-04`]);
   });
+
+  it("pass 70: single-slit width question is tagged to single-slit diffraction (sp-08) and the mains heater rms/peak item to rms and peak values (sp-01)", () => {
+    const tagOf = (id: string) => seedQuestions.find((q) => q.id === id)?.parts[0]?.specPointIds ?? [];
+    expect(tagOf("cnt:question:physics-statement-waves-sp-08-central-maximum")).toEqual([`${PHYSICS}.waves.sp-08`]);
+    expect(tagOf("cnt:question:physics-coverage-alternating-currents-mains-heater")).toEqual([`${PHYSICS}.alternating-currents.sp-01`]);
+  });
 });

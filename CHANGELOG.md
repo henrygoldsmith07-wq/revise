@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 70: two more Physics questions link to the right lesson
+The single-slit 'narrower slit, central maximum' question now opens the single-slit diffraction lesson (waves.sp-08, was sp-06) and the 230 V rms mains heater question opens rms and peak values (alternating-currents.sp-01, was sp-02), found with the keyword audit and checked against each statement. No depth gap opens (test confirms). Not teacher-reviewed.
+
 ## 2026-10-24 pass 69: inverted formulas and swapped definitions stop earning marks
 Nine more Year 12 Physics questions got a correct and a wrong own-words answer (author judgement, not moderated marks). Before, six wrong answers earned credit (inverted stress/strain/Young modulus scored 3/3, sin and cos swapped scored 2/2, swapped random/systematic, mass times acceleration for momentum, area instead of gradient on a displacement-time graph, BA sin θ to the plane). Each now loses the point via per-question "do not accept" rules. Correct answers gain from three wording equivalents (gradient = slope, "measured in" = unit, BAcosθ run together): the nine correct answers go from 16 to 18 of 23. Still under-credited: the transition-rule answer (0/2), vector point of momentum, and tangent point.
 
