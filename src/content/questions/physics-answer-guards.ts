@@ -61,6 +61,65 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["useful output is the heat", "useful output is heat", "useful output is the sound", "useful output is sound"],
       reason: "A motor's useful output is mechanical (kinetic) power; heat and sound are losses." },
   ],
+  // pass 66
+  [`${Q}physics-depth-momentum-sp-03-elastic-definition-0`]: [
+    { point: 1, phrases: ["momentum is not conserved", "momentum isn't conserved", "momentum … not conserved", "momentum … is lost", "momentum … not the same"],
+      reason: "Momentum is conserved in every closed collision, elastic or not." },
+  ],
+  [`${Q}physics-depth-thermal-sp-01-internal-energy-definition-0`]: [
+    { point: 0, phrases: ["whole object", "object as it moves", "moves through space", "motion of the whole", "ignoring the molecules"],
+      except: ["random", "potential"],
+      reason: "Internal energy is the random kinetic plus potential energy of the molecules, not the bulk motion of the object." },
+  ],
+  [`${Q}physics-depth-kinematics-dynamics-sp-04-acceleration-definition-0`]: [
+    { point: 0, phrases: ["rate of change of speed", "change in speed", "change of speed", "speeding up"],
+      except: ["velocity"],
+      reason: "Acceleration is the rate of change of velocity (a vector), not of speed." },
+    { point: 1, phrases: ["cannot be accelerating", "can't be accelerating", "cant be accelerating", "not accelerating", "no acceleration"],
+      except: ["circular", "direction", "going round", "turning"],
+      reason: "A change in direction is a change in velocity, so constant speed can still be acceleration." },
+  ],
+  [`${Q}physics-depth-momentum-sp-01-impulse-definition-1`]: [
+    { point: 0, phrases: ["force divided by", "force over the time", "divided by the time"],
+      except: ["multiplied by", "multiply"],
+      reason: "Impulse is force multiplied by the time it acts, not divided by it." },
+    { point: 2, phrases: ["change in kinetic energy", "kinetic energy"],
+      except: ["momentum"],
+      reason: "Impulse equals the change in momentum, not in kinetic energy." },
+  ],
+  [`${Q}physics-depth50-circular-shm-sp-04-definitions-0`]: [
+    { point: 0, phrases: ["acceleration is constant", "constant in size", "constant acceleration", "acceleration … constant"],
+      except: ["proportional"],
+      reason: "In SHM the acceleration is proportional to displacement, so it is not constant." },
+    { point: 1, phrases: ["away from", "points away", "directed away", "away … equilibrium"],
+      except: ["towards", "toward"],
+      reason: "The acceleration is directed towards the equilibrium position (hence the minus sign)." },
+  ],
+  [`${Q}physics-depth50-electric-circuits-sp-03-resistance-definition-14`]: [
+    { point: 0, phrases: ["current divided by", "current over the p.d.", "current over the voltage", "i/v"],
+      except: ["p.d. divided by", "voltage divided by", "v/i"],
+      reason: "Resistance is p.d. divided by current (V/I), not current divided by p.d." },
+    { point: 1, phrases: ["whatever … temperature", "any temperature", "regardless … temperature", "any component", "every component"],
+      except: ["constant temperature", "fixed temperature", "same temperature"],
+      reason: "V/I is constant only for an ohmic conductor at constant temperature." },
+  ],
+  [`${Q}physics-depth-practical-investigations-sp-02-accuracy-precision-definitions-1`]: [
+    { point: 0, phrases: ["accuracy is how close repeated", "accuracy is the closeness of repeated", "accuracy … close … each other", "accuracy … repeated readings"],
+      reason: "Accuracy is closeness to the true value; closeness of repeats is precision." },
+    { point: 1, phrases: ["precision is how close the result", "precision is how close a measurement", "precision is how close a reading", "precision … close … to the true value", "precision … closeness … true value"],
+      except: ["repeated readings are", "repeat readings are", "each other"],
+      reason: "Precision is the closeness of repeated readings to each other; closeness to the true value is accuracy." },
+  ],
+  [`${Q}physics-depth-sports-physics-sp-02-moment-definition-1`]: [
+    { point: 0, phrases: ["force divided by", "force over the distance", "force / distance"],
+      except: ["multiplied", "times", " x ", "×"],
+      reason: "A moment is force multiplied by perpendicular distance, not divided by it." },
+  ],
+  [`${Q}physics-depth-materials-sp-04-energy-area-definition-0`]: [
+    { point: 0, phrases: ["gradient of the force", "gradient … force-extension", "slope of the force", "the gradient"],
+      except: ["area"],
+      reason: "Strain energy is the area under the force-extension graph; the gradient is the stiffness (force constant)." },
+  ],
 };
 
 export function applyPhysicsAnswerGuards(questions: Question[]): Question[] {
