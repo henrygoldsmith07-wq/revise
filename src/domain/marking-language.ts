@@ -250,6 +250,9 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" smallintervals ", "(?:small|short|tiny|many) (?:time )?(?:intervals|steps|sections|chunks)"],
   // Pass 69: gradient is slope; "measured in" introduces the unit; BAcosθ run together.
   [" slope ", "gradient"],
+  // Pass 73: own-words forms of two scheme points that Year 12 students phrase differently.
+  [" reduces the maximum amplitude ", "(?:the )?(?:resonance )?peak (?:is |becomes |gets )?(?:much |far |a lot |a bit )?(?:lower|smaller|reduced)"],
+  [" reduced heat loss ", "less (?:heat|energy|thermal energy) (?:is |gets )?(?:lost|transferred)"],
   [" exceeds ", "(?:is )?(?:bigger|larger|greater|more) than"],
   [" unit ", "measured in|in units of"],
   [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],

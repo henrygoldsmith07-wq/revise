@@ -176,6 +176,34 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
       reason: "A downward transition emits a photon; an upward one absorbs it." },
   ],
+  // pass 73
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-resonance-damping`]: [
+    { point: 0, phrases: ["damping … narrower", "damping … sharper", "damping … bigger", "damping … larger", "damping … higher peak", "damping … increases"],
+      except: ["not narrower", "broader", "wider", "lower", "smaller", "reduce"],
+      reason: "Heavier damping lowers and broadens the resonance peak; a bigger, sharper peak is what light damping gives." },
+    { point: 1, phrases: ["damping makes the amplitude … bigger", "damping makes the amplitude … larger", "damping … amplitude … bigger", "damping … amplitude … larger", "damping … amplitude … increases", "damping … amplitude … higher"],
+      except: ["less damping", "light damping", "lighter damping"],
+      reason: "Damping removes energy, so heavy damping reduces the maximum amplitude." },
+  ],
+  [`${Q}authentic-source-aqa-alevel-physics-planetary-mission-report`]: [
+    { point: 0, phrases: ["inversely proportional to the distance", "inversely proportional to r.", "doubling r halves", "doubling the distance halves", "halves g"],
+      except: ["squared", "r²", "r^2", "inverse square", "inverse-square"],
+      reason: "Gravitational field strength follows an inverse-square law; it is not inversely proportional to the distance." },
+    { point: 1, phrases: ["halves g", "halves the field", "g is halved", "g halves", "g is half", "half as much", "half the"],
+      except: ["quarter", "four", "÷ 4", "/ 4", "÷4"],
+      reason: "Doubling r divides g by four, not two." },
+  ],
+  [`${Q}authentic-source-wjec-gcse-physics-sensor-circuit-note`]: [
+    { point: 0, phrases: ["resistance goes up", "resistance increases", "resistance rises", "resistance is higher", "resistance gets bigger", "resistance gets higher", "resistance is bigger"],
+      except: ["resistance goes down", "resistance decreases", "resistance drops", "resistance falls", "resistance is lower", "resistance gets smaller", "resistance gets lower", "resistance reduces"],
+      reason: "A thermistor's resistance decreases as it warms." },
+    { point: 1, phrases: ["bigger share", "larger share", "greater share", "bigger proportion", "larger proportion", "greater proportion"],
+      except: ["smaller share", "smaller proportion", "less"],
+      reason: "With the thermistor's resistance falling, its share of the total resistance gets smaller." },
+    { point: 2, phrases: ["output rises", "output increases", "output goes up", "output is higher", "output gets bigger", "output gets higher"],
+      except: ["output falls", "output decreases", "output goes down", "output drops", "output is lower"],
+      reason: "The output across the thermistor falls when the temperature rises." },
+  ],
   // pass 71
   [`${Q}physics-depth-waves-sp-07-path-difference-rule-0`]: [
     { point: 0, phrases: ["constructive … odd number", "constructive … antiphase", "constructive … half wavelength"],
