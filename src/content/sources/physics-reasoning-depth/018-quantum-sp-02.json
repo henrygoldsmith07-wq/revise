@@ -61,6 +61,7 @@
     {
       "demand": "application",
       "family": "physics-depth:photoelectric-balance",
+      "specPoint": 1,
       "context": "physics-depth:photoelectric-balance:energy-accounting",
       "move": "apply the photoelectric equation to find a maximum kinetic energy",
       "prompt": "Light of wavelength 400 nm falls on a metal of work function 1.9 eV. Calculate the maximum kinetic energy of the emitted photoelectrons in joules and in eV. (h = 6.63×10⁻³⁴ J s, c = 3.00×10⁸ m s⁻¹, 1 eV = 1.60×10⁻¹⁹ J)",

@@ -12,6 +12,7 @@ export const physicsDepthPartSchema = z.object({
   family: text, context: text, move: text, prompt: text, answer: text,
   marks: z.number().int().positive(), scheme: z.array(text).min(1),
   aos: z.array(z.enum(["AO1", "AO2", "AO3"])).min(1).optional(),
+  specPoint: z.number().int().min(1).max(20).optional(),
   // Authored "do not accept" lines (MarkSchemeReject); defineQuestion checks each point index.
   rejects: z.array(z.object({
     point: z.number().int().nonnegative(), phrases: z.array(text).min(1), except: z.array(text).min(1).optional(),

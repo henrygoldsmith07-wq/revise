@@ -117,6 +117,7 @@
     {
       "demand": "transfer",
       "family": "physics-depth:sensor-bridge-design",
+      "specPoint": 2,
       "context": "physics-depth:sensor-bridge-design:thermistor-compensation",
       "move": "transfer potential-divider reasoning to a thermistor sensing circuit",
       "prompt": "A thermistor has resistance 10 kΩ at 20 °C falling to 2.0 kΩ at 60 °C. It is placed in a potential divider with a fixed 5.0 kΩ resistor across a 6.0 V supply, with the output taken across the thermistor. Calculate the output voltage at 20 °C and at 60 °C.",

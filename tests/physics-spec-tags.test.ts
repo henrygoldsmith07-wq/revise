@@ -205,4 +205,18 @@ describe("Physics spec-point tags (sixty-third pass)", () => {
     expect(tagOf("cnt:question:physics-statement-waves-sp-08-central-maximum")).toEqual([`${PHYSICS}.waves.sp-08`]);
     expect(tagOf("cnt:question:physics-coverage-alternating-currents-mains-heater")).toEqual([`${PHYSICS}.alternating-currents.sp-01`]);
   });
+
+  it("pass 72: reasoning-depth parts carry their audited spec point while keeping their ids", () => {
+    const part = (id: string) => seedQuestions.find((q) => q.id === id)?.parts[0];
+    const expected: Record<string, string> = {
+      "cnt:question:physics-depth-capacitance-sp-01-energy-stored-calc-5": "capacitance.sp-02",
+      "cnt:question:physics-depth-capacitance-sp-01-capacitor-energy-half-charging-9": "capacitance.sp-02",
+      "cnt:question:physics-depth-quantum-sp-02-photoelectric-balance-4": "quantum.sp-01",
+      "cnt:question:physics-depth-electric-circuits-sp-01-sensor-bridge-design-8": "electric-circuits.sp-02",
+    };
+    for (const [id, tag] of Object.entries(expected)) {
+      expect(part(id)?.specPointIds, id).toEqual([`${PHYSICS}.${tag}`]);
+      expect(part(id)?.capabilityIds, id).toEqual([`phys.${tag}`]);
+    }
+  });
 });
