@@ -222,6 +222,17 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" release ", "free(?:s|d)?(?= (?:an |the |a |one )?electrons?)|remov(?:e|es|ed|ing)(?= (?:an |the |a |one )?electrons? from)"],
   [" angular displacement ", "(?:the )?angle (?:turned|swept|rotated|moved) through"],
   [" rate of change of angular displacement ", "how fast (?:the )?(?:angle|angular displacement)(?: turned through| swept out| rotated)? changes(?: with time)?"],
+  // Pass 68: more correct Year 12 Physics wordings the schemes phrase differently.
+  [" rate of flow of charge ", "how (?:much|many) (?:electric )?charge (?:flows?|passes?|moves?) (?:past|through)(?: a| any| the)?(?: given)?(?: point| section| cross[- ]section)? (?:each|every|per|in one) second"],
+  [" sum of ", "total of|adding up|add up"],
+  [" spherical area ", "(?:the )?surface of a sphere(?:, whose area is)?|area of a sphere"],
+  [" perpendicular distance ", "perpendicular (?:distance )?from the pivot"],
+  [" 1 c s-1 ", "(?:one |1 )?coulombs? per second"],
+  [" kg m s-1 ", "kg m ?/ ?s"],
+  [" equals ", "identical to"],
+  [" closed ", "no external force(?:s)? (?:act|acts|acting)"],
+  [" closeness ", "how close(?:ly)?(?: [a-z]+){0,3}? (?:is|are) to"],
+  [" find signed area ", "add(?:ing)? up the areas?"],
   [" smallintervals ", "(?:small|short|tiny|many) (?:time )?(?:intervals|steps|sections|chunks)"],
   // Framing that carries no content of its own.
   [" ", "of (?:its|the) (?:previous|original|initial|old) value|of what it was|of the original|as big|as large|as strong|as much"],

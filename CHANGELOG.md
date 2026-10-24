@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 68: more correct Year 12 Physics wordings earn their mark
+Six wording equivalents in `marking-language.ts` (coulomb per second, kg m/s, identical to, no external force = closed, how close X is to = closeness, adding up the areas). The impulse unit point now credits 'N s, the same as kg m/s' (3/3, was 2/3); accuracy and momentum-conservation coverage rises; the author-judged fixture still shows no wrong answer over-credited. Still under-credited: answers that omit a second scheme point (e.g. moment's F d sinθ) are correctly left at one mark.
+
 ## 2026-10-24 pass 67: two more Physics questions link to the right lesson
 The pendulum period question now opens the SHM period lesson (circular-shm.sp-05, was sp-01) and the ln V against t time-constant question opens the RC curves lesson (capacitance.sp-04, was sp-03), found with the keyword audit and checked against each statement. This honestly opens two single-family depth gaps (capacitance.sp-03 application, circular-shm.sp-01 calculation) that the audit test now lists; flagship depth is 103 of the previous 105. Not teacher-reviewed.
 
