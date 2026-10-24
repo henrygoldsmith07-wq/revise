@@ -193,4 +193,10 @@ describe("Physics spec-point tags (sixty-third pass)", () => {
       expect(TAUGHT_SPEC_POINT_IDS.includes(`${PHYSICS}.${tag}`), tag).toBe(true);
     }
   });
+
+  it("pass 67: pendulum period is tagged to SHM period (sp-05) and the ln V-t time-constant item to RC curves (sp-04)", () => {
+    const tagOf = (id: string, part = 0) => seedQuestions.find((q) => q.id === id)?.parts[part]?.specPointIds ?? [];
+    expect(tagOf("cnt:question:phys-shm-pendulum")).toEqual([`${PHYSICS}.circular-shm.sp-05`]);
+    expect(tagOf("cnt:question:physics-coverage-capacitance-timing-curve")).toEqual([`${PHYSICS}.capacitance.sp-04`]);
+  });
 });
