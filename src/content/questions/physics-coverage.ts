@@ -56,7 +56,7 @@ const TOPICS: TopicSpec[] = [
         move: "invert the stored-energy relation to find a cut-off voltage from a remaining energy fraction",
       },
       {
-        family: "physics-coverage:capacitance:rc", context: "physics-coverage:capacitance:rc:timing-curve", point: 3, demand: "application",
+        family: "physics-coverage:capacitance:rc", context: "physics-coverage:capacitance:rc:timing-curve", point: 4, demand: "application",
         prompt: "In a discharge experiment a student measures the capacitor voltage at 20 s intervals and plots ln V against t. State what the graph should look like for exponential decay and how the time constant is extracted from it.",
         marks: 3,
         scheme: ["ln V = ln V₀ − t/RC, so the plot is a straight line", "The gradient equals −1/RC", "RC = −1/gradient (or RC from the intercept V₀)"],

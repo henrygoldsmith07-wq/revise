@@ -61,7 +61,7 @@ export const physicsQuestions = defineQuestions([
           "Substitutes 0.85 and 9.81 correctly",
           "T = 1.85 s (accept 1.8 to 1.9)",
         ],
-                specPointIds: ["wjec-alevel-physics.circular-shm.sp-01"],
+                specPointIds: ["wjec-alevel-physics.circular-shm.sp-05"],
         learningClaims: ["calculate the period of a simple pendulum from its length"],
         answer: "T = 2π√(l/g) = 2π√(0.85/9.81) = 2π × 0.2944 = 1.85 s.",
       },

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 67: two more Physics questions link to the right lesson
+The pendulum period question now opens the SHM period lesson (circular-shm.sp-05, was sp-01) and the ln V against t time-constant question opens the RC curves lesson (capacitance.sp-04, was sp-03), found with the keyword audit and checked against each statement. This honestly opens two single-family depth gaps (capacitance.sp-03 application, circular-shm.sp-01 calculation) that the audit test now lists; flagship depth is 103 of the previous 105. Not teacher-reviewed.
+
 ## 2026-10-24 pass 66: swapped and inverted Physics definitions stop earning marks
 Ten more Year 12 Physics questions got a correct and a plausible wrong own-words answer (author judgement, not moderated marks). Before, eight wrong answers kept keywords and earned marks (accuracy/precision swapped, resistance as I/V, impulse as force divided by time or equal to kinetic energy, SHM acceleration constant or away from equilibrium, speed instead of velocity, force/distance for a moment, bulk motion as internal energy). They now score at or below the examiner mark through hand-authored do-not-accept rules (`physics-answer-guards.ts`); rules only remove credit. Not teacher-reviewed. Still open: five correct answers are under-credited by one mark (elastic, internal energy, current, accuracy, moment).
 

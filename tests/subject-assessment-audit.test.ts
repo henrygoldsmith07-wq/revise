@@ -73,13 +73,15 @@ describe("WJEC flagship depth pack", () => {
     // 102 - 4 + 1 = 99. These statements each now have one family, not two
     // distinct ones, for the listed demand. Author a real second family to
     // close a gap and remove it here; never retag a question back to fill one.
-    expect(dashboard.subjects[0]!.deepComplete).toBe(105);
+    expect(dashboard.subjects[0]!.deepComplete).toBe(103);
     const physics = auditFlagshipSubject({ subjectId: "wjec-alevel-physics", topics: wjecFlagshipCurricula.find((c) => c.subject.id === "wjec-alevel-physics")!.topics, questions: seedQuestions, nodes: wjecCapabilities });
     const gaps = physics.capabilityCoverage.filter((row) => !row.complete)
       .map((row) => `${row.specPointId.replace("wjec-alevel-physics.", "")}: ${row.demands.filter((d) => !(d.complete && d.distinct)).map((d) => d.demand).join("+")}`);
     // Pass 63 retagged four questions to their true lesson; that honestly
     // leaves these three statements with one family. Author a second family to close.
-    expect(gaps.sort()).toEqual(["momentum.sp-03: calculation", "thermal.sp-01: calculation", "thermal.sp-04: calculation"]);
+    // Pass 67 retagged the pendulum period (sp-01 -> sp-05) and the ln V-t
+    // time-constant question (sp-03 -> sp-04), which opens two honest gaps.
+    expect(gaps.sort()).toEqual(["capacitance.sp-03: application", "circular-shm.sp-01: calculation", "momentum.sp-03: calculation", "thermal.sp-01: calculation", "thermal.sp-04: calculation"]);
   }, 60_000);
 
   it("keeps the templated Maths/Biology/Chemistry depth pack out of the learner bank", () => {
