@@ -44,3 +44,19 @@ describe("pass 65 wording equivalents", () => {
     expect(pointCoverage("minimum energy needed to release an electron", "the largest energy an electron can have")).toBeLessThan(0.7);
   });
 });
+
+describe("pass 66 swapped, inverted and bulk-motion definitions", () => {
+  const second = rows.slice(30);
+  it("none of the ten new wrong answers earns more than an examiner would", () => {
+    expect(second.filter((r) => r.kind === "wrong" && r.awarded > r.examiner).map((r) => r.answer)).toEqual([]);
+  });
+  it("the ten new correct answers are never over-credited", () => {
+    expect(second.filter((r) => r.kind === "correct" && r.awarded > r.examiner)).toEqual([]);
+  });
+  it("swapped accuracy/precision and I/V vs V/I lose the point", () => {
+    const wrong = (id: string) => second.find((r) => r.id.endsWith(id) && r.kind === "wrong")!;
+    expect(wrong("accuracy-precision-definitions-1").awarded).toBe(0);
+    expect(wrong("resistance-definition-14").awarded).toBe(0);
+    expect(wrong("impulse-definition-1").awarded).toBe(0);
+  });
+});

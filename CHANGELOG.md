@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 66: swapped and inverted Physics definitions stop earning marks
+Ten more Year 12 Physics questions got a correct and a plausible wrong own-words answer (author judgement, not moderated marks). Before, eight wrong answers kept keywords and earned marks (accuracy/precision swapped, resistance as I/V, impulse as force divided by time or equal to kinetic energy, SHM acceleration constant or away from equilibrium, speed instead of velocity, force/distance for a moment, bulk motion as internal energy). They now score at or below the examiner mark through hand-authored do-not-accept rules (`physics-answer-guards.ts`); rules only remove credit. Not teacher-reviewed. Still open: five correct answers are under-credited by one mark (elastic, internal energy, current, accuracy, moment).
+
 ## 2026-10-24 pass 65: correct Year 12 Physics answers worded differently now earn their marks
 Four wording equivalents in `marking-language.ts` (smallest/least energy = minimum energy, free an electron = release it, angle turned through = angular displacement, how fast the angle changes = rate of change). Author-judged Year 12 fixture: correct answers 23 to 25 marks, still no wrong answer credited. Not a moderated measurement.
 
