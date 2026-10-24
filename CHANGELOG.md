@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 69: inverted formulas and swapped definitions stop earning marks
+Nine more Year 12 Physics questions got a correct and a wrong own-words answer (author judgement, not moderated marks). Before, six wrong answers earned credit (inverted stress/strain/Young modulus scored 3/3, sin and cos swapped scored 2/2, swapped random/systematic, mass times acceleration for momentum, area instead of gradient on a displacement-time graph, BA sin θ to the plane). Each now loses the point via per-question "do not accept" rules. Correct answers gain from three wording equivalents (gradient = slope, "measured in" = unit, BAcosθ run together): the nine correct answers go from 16 to 18 of 23. Still under-credited: the transition-rule answer (0/2), vector point of momentum, and tangent point.
+
 ## 2026-10-24 pass 68: more correct Year 12 Physics wordings earn their mark
 Six wording equivalents in `marking-language.ts` (coulomb per second, kg m/s, identical to, no external force = closed, how close X is to = closeness, adding up the areas). The impulse unit point now credits 'N s, the same as kg m/s' (3/3, was 2/3); accuracy and momentum-conservation coverage rises; the author-judged fixture still shows no wrong answer over-credited. Still under-credited: answers that omit a second scheme point (e.g. moment's F d sinθ) are correctly left at one mark.
 

@@ -80,3 +80,33 @@ describe("pass 68 wording equivalents", () => {
     expect(rows.filter((r) => r.kind === "wrong" && r.awarded > r.examiner)).toEqual([]);
   });
 });
+
+describe("pass 69 swapped formulas, sin/cos, area/gradient and random/systematic", () => {
+  const third = rows.slice(-18);
+  const wrong = (id: string) => third.find((r) => r.id.endsWith(id) && r.kind === "wrong")!;
+  const right = (id: string) => third.find((r) => r.id.endsWith(id) && r.kind === "correct")!;
+  it("none of the nine new wrong answers earns more than an examiner would (was 6 over-credited)", () => {
+    expect(third.filter((r) => r.kind === "wrong" && r.awarded > r.examiner).map((r) => r.answer)).toEqual([]);
+  });
+  it("the nine new correct answers are never over-credited and earn at least 18 of 23 (was 16)", () => {
+    const ok = third.filter((r) => r.kind === "correct");
+    expect(ok.filter((r) => r.awarded > r.examiner)).toEqual([]);
+    expect(sum(ok)).toBeGreaterThanOrEqual(18);
+  });
+  it("inverted stress/strain/Young modulus, sin for cos and swapped random/systematic lose the points", () => {
+    expect(wrong("materials-sp-02-definitions-0").awarded).toBe(0);
+    expect(wrong("kin-resolve-rule-1").awarded).toBe(0);
+    expect(wrong("random-systematic-definitions-0").awarded).toBe(0);
+    expect(wrong("momentum-definition-0").awarded).toBe(0);
+  });
+  it("correct answers keep their marks where the wording differs from the scheme", () => {
+    expect(right("momentum-definition-0").awarded).toBeGreaterThanOrEqual(2);
+    expect(right("flux-definition-0").awarded).toBeGreaterThanOrEqual(2);
+    expect(right("materials-sp-02-definitions-0").awarded).toBe(3);
+    expect(right("kin-resolve-rule-1").awarded).toBe(2);
+  });
+  it("gradient reads as slope but an area-under-graph answer is not credited", () => {
+    expect(pointCoverage("Draw the tangent and take its slope", "find the gradient of the tangent")).toBeGreaterThanOrEqual(0.5);
+    expect(wrong("dt-gradient-rule-1").awarded).toBe(0);
+  });
+});

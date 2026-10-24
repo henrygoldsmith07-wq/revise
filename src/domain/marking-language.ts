@@ -234,6 +234,10 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" closeness ", "how close(?:ly)?(?: [a-z]+){0,3}? (?:is|are) to"],
   [" find signed area ", "add(?:ing)? up the areas?"],
   [" smallintervals ", "(?:small|short|tiny|many) (?:time )?(?:intervals|steps|sections|chunks)"],
+  // Pass 69: gradient is slope; "measured in" introduces the unit; BAcosθ run together.
+  [" slope ", "gradient"],
+  [" unit ", "measured in|in units of"],
+  [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],
   // Framing that carries no content of its own.
   [" ", "of (?:its|the) (?:previous|original|initial|old) value|of what it was|of the original|as big|as large|as strong|as much"],
   [" notlinear ", "not (?:just |simply |only )?(?:linearly|1\\s*/\\s*[rdx](?![²^\\d])|(?:proportional to |with )?(?:the )?(?:distance|separation|radius)(?! squared))"],
