@@ -218,6 +218,10 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   // Physics wording a Year 12 student uses for the same thing (pass 62).
   [" drag ", "air resistance|fluid resistance"],
   [" equals ", "(?:is |are )?(?:exactly )?(?:the same (?:size|magnitude|value) as|equal (?:in (?:size|magnitude) )?to|equals|same as)"],
+  [" minimum ", "(?:smallest|least|lowest) (?:amount of )?(?=energy|work)"],
+  [" release ", "free(?:s|d)?(?= (?:an |the |a |one )?electrons?)|remov(?:e|es|ed|ing)(?= (?:an |the |a |one )?electrons? from)"],
+  [" angular displacement ", "(?:the )?angle (?:turned|swept|rotated|moved) through"],
+  [" rate of change of angular displacement ", "how fast (?:the )?(?:angle|angular displacement)(?: turned through| swept out| rotated)? changes(?: with time)?"],
   [" smallintervals ", "(?:small|short|tiny|many) (?:time )?(?:intervals|steps|sections|chunks)"],
   // Framing that carries no content of its own.
   [" ", "of (?:its|the) (?:previous|original|initial|old) value|of what it was|of the original|as big|as large|as strong|as much"],

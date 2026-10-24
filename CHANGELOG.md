@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-24 pass 65: correct Year 12 Physics answers worded differently now earn their marks
+Four wording equivalents in `marking-language.ts` (smallest/least energy = minimum energy, free an electron = release it, angle turned through = angular displacement, how fast the angle changes = rate of change). Author-judged Year 12 fixture: correct answers 23 to 25 marks, still no wrong answer credited. Not a moderated measurement.
+
 ## 2026-10-24 pass 64: more Year 12 Physics wrong answers stop earning marks
 Nine more questions got a correct and a plausible wrong own-words answer (author judgement, not moderated marks). Four wrong answers earned credit an examiner would not give: transverse/longitudinal swapped, angular velocity as metres per second, 0 °C called absolute zero, efficiency inverted with heat as a motor's useful output. Each now has a do-not-accept rule that only removes credit. Not fixed: seven correct answers still lose a mark to wording (e.g. 'how fast the angle changes with time'); a wording-equivalent attempt did not help and was dropped. Tests: tests/marking-y12-physics.test.ts.
 
