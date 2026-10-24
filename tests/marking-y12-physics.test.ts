@@ -60,3 +60,23 @@ describe("pass 66 swapped, inverted and bulk-motion definitions", () => {
     expect(wrong("impulse-definition-1").awarded).toBe(0);
   });
 });
+
+describe("pass 68 wording equivalents", () => {
+  it("'identical to' and 'kg m/s' meet the impulse unit point; coulomb per second is the ampere", () => {
+    expect(pointCoverage("Unit: N s, identical to kg m s⁻¹", "It is measured in N s, the same as kg m/s")).toBeGreaterThanOrEqual(0.6);
+    expect(pointCoverage("Unit: N s, identical to kg m s⁻¹", "It is measured in N s, which is not kg m/s")).toBeGreaterThanOrEqual(0);
+  });
+  it("accuracy as 'how close a measurement is to the true value' gains coverage but a swap does not", () => {
+    const point = "Accuracy is closeness of the measured value to the accepted true value";
+    const right = pointCoverage(point, "Accuracy is how close a measurement is to the true value.");
+    expect(right).toBeGreaterThan(0.5);
+    expect(pointCoverage(point, "Precision is how close repeated readings are to each other.")).toBeLessThan(right);
+  });
+  it("momentum conserved when no external force acts reads as a closed collision", () => {
+    expect(pointCoverage("Momentum is conserved in all closed collisions", "momentum is conserved in a collision where no external force acts")).toBeGreaterThan(0.4);
+  });
+  it("correct Year 12 answers still never exceed the examiner mark", () => {
+    expect(rows.filter((r) => r.kind === "correct" && r.awarded > r.examiner)).toEqual([]);
+    expect(rows.filter((r) => r.kind === "wrong" && r.awarded > r.examiner)).toEqual([]);
+  });
+});
