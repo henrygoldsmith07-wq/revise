@@ -21,10 +21,10 @@ describe("Year 12 Physics answers in a student's own words", () => {
   it("no wrong answer earns a mark (was 4 over-credited)", () => {
     expect(rows.filter((r) => r.kind === "wrong" && r.awarded > r.examiner).map((r) => r.answer)).toEqual([]);
   });
-  it("correct answers are never over-credited and score at least 11/15 (was 10)", () => {
+  it("correct answers are never over-credited and score at least 11/15", () => {
     const correct = rows.filter((r) => r.kind === "correct");
     expect(correct.filter((r) => r.awarded > r.examiner)).toEqual([]);
-    expect(sum(correct)).toBeGreaterThanOrEqual(11);
+    expect(sum(correct)).toBeGreaterThanOrEqual(23);
   });
   it("air resistance counts as drag; 'the same size as' as equals", () => {
     expect(pointCoverage("At terminal speed drag equals weight", "air resistance is the same size as the weight")).toBeGreaterThanOrEqual(0.5);

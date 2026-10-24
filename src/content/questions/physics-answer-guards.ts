@@ -30,6 +30,37 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
       except: ["constant acceleration", "acceleration is constant", "a is constant", "uniform acceleration"],
       reason: "The SUVAT equations are derived for constant acceleration only." },
   ],
+  [`${Q}physics-depth-waves-sp-01-transverse-longitudinal-1`]: [
+    { point: 0, phrases: ["transverse … parallel", "transverse … along the", "transverse … same direction", "transverse … in line"],
+      except: ["not parallel", "transverse … perpendicular", "transverse … right angle"],
+      reason: "In a transverse wave the oscillations are perpendicular to the energy transfer; parallel describes a longitudinal wave." },
+    { point: 1, phrases: ["longitudinal … perpendicular", "longitudinal … right angle", "longitudinal … at 90"],
+      except: ["not perpendicular", "longitudinal … parallel", "longitudinal … along the same", "longitudinal … same direction"],
+      reason: "In a longitudinal wave the oscillations are parallel to the energy transfer; perpendicular describes a transverse wave." },
+  ],
+  [`${Q}physics-depth-circular-shm-sp-01-angular-velocity-definition-0`]: [
+    { point: 0, phrases: ["distance travelled per second", "distance per second", "distance travelled each second", "metres per second", "m s-1", "m/s"],
+      except: ["angle", "angular displacement", "radian", "rad"],
+      reason: "Angular velocity is the rate of change of angle, not distance travelled per second (that is linear speed)." },
+    { point: 1, phrases: ["metres per second", "meters per second", "m s-1", "m/s", "ms-1"],
+      except: ["radian", "rad"],
+      reason: "The SI unit of angular velocity is rad s⁻¹; metres per second is the unit of linear speed." },
+  ],
+  [`${Q}physics-depth50-thermal-sp-05-zero-celsius-7`]: [
+    { point: 0, phrases: ["0 °c is absolute zero", "0°c is absolute zero", "0 c is absolute zero", "zero celsius is absolute zero", "0 °c … stop moving", "0°c … stop moving", "0 °c … no kinetic", "0 °c is 0 k", "0°c is 0 k"],
+      except: ["273", "not absolute zero", "not 0 k", "not stop"],
+      reason: "0 °C is 273 K; molecules only stop (in the ideal limit) at 0 K." },
+    { point: 1, phrases: ["0 °c is absolute zero", "0°c is absolute zero", "0 c is absolute zero", "0 °c … stop moving", "0°c … stop moving", "0 °c is 0 k", "0°c is 0 k"],
+      except: ["273", "not absolute zero", "not 0 k", "not stop"],
+      reason: "Absolute zero is 0 K (−273 °C), not 0 °C." },
+  ],
+  [`${Q}physics-depth50-electric-circuits-sp-05-efficiency-1`]: [
+    { point: 0, phrases: ["total power in divided by the useful", "total power in divided by useful", "input power divided by the useful", "input divided by useful", "total … divided by … useful output"],
+      except: ["useful … divided by … total", "useful … over … total"],
+      reason: "Efficiency is useful output divided by total input; the ratio is not inverted." },
+    { point: 1, phrases: ["useful output is the heat", "useful output is heat", "useful output is the sound", "useful output is sound"],
+      reason: "A motor's useful output is mechanical (kinetic) power; heat and sound are losses." },
+  ],
 };
 
 export function applyPhysicsAnswerGuards(questions: Question[]): Question[] {
