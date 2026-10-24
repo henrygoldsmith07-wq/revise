@@ -120,6 +120,62 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
       except: ["area"],
       reason: "Strain energy is the area under the force-extension graph; the gradient is the stiffness (force constant)." },
   ],
+  // pass 69
+  [`${Q}physics-depth-kinematics-dynamics-sp-01-kin-resolve-rule-1`]: [
+    { point: 0, phrases: ["along the axis is f sin", "along the axis is sin", "parallel … is f sin"],
+      reason: "The component along the axis is F cos θ (θ from the axis); sin θ is the perpendicular component." },
+    { point: 1, phrases: ["perpendicular to it is f cos", "perpendicular to the axis is f cos", "perpendicular … is f cos", "right angles … is f cos"],
+      reason: "The component perpendicular to the axis is F sin θ (θ from the axis)." },
+  ],
+  [`${Q}physics-depth-momentum-sp-01-momentum-definition-0`]: [
+    { point: 0, phrases: ["mass multiplied by acceleration", "mass times acceleration", "mass x acceleration", "mass × acceleration"],
+      except: ["velocity"],
+      reason: "Momentum is mass multiplied by velocity; mass times acceleration is force." },
+    { point: 1, phrases: ["m/s squared", "m s-2", "m s⁻²", "m/s²", "metres per second squared"],
+      reason: "The unit of momentum is kg m s⁻¹ (or N s); kg m s⁻² is the newton." },
+    { point: 2, phrases: ["is a scalar", "it's a scalar", "no direction", "scalar quantity"],
+      except: ["not a scalar", "not scalar", "vector"],
+      reason: "Momentum is a vector: its direction matters." },
+  ],
+  [`${Q}physics-depth-electromagnetic-induction-sp-01-flux-definition-0`]: [
+    { point: 0, phrases: ["sin θ", "sinθ", "sin(θ)", "sin theta", "b a sin", "ba sin"],
+      except: ["cos"],
+      reason: "Flux is BA cos θ with θ measured from the normal; BA sin θ uses the angle to the plane." },
+    { point: 2, phrases: ["plane of the surface", "plane of the area", "plane of the coil", "field and the plane", "angle to the plane"],
+      except: ["normal"],
+      reason: "θ is the angle between the field and the normal to the surface, not the plane." },
+  ],
+  [`${Q}physics-depth-kinematics-dynamics-sp-02-dt-gradient-rule-1`]: [
+    { point: 0, phrases: ["area under", "area beneath"],
+      except: ["gradient", "tangent", "slope"],
+      reason: "Velocity is the gradient (tangent) of a displacement–time graph; the area under it means nothing here." },
+    { point: 1, phrases: ["constant velocity", "steady velocity", "constant speed", "moving at a constant", "uniform velocity"],
+      except: ["stationary", "not moving", "at rest", "zero velocity", "velocity is zero"],
+      reason: "A horizontal displacement–time line means the position is not changing: the object is stationary." },
+  ],
+  [`${Q}physics-depth50-materials-sp-02-definitions-0`]: [
+    { point: 0, phrases: ["force times", "force multiplied by", "force x", "force ×", "force multiplied"],
+      except: ["force divided", "force over"],
+      reason: "Stress is force divided by cross-sectional area, not multiplied by it." },
+    { point: 1, phrases: ["original length divided by", "original length over", "length divided by extension"],
+      except: ["extension divided by", "extension over"],
+      reason: "Strain is extension divided by original length, not the other way up." },
+    { point: 2, phrases: ["strain divided by stress", "strain over stress", "strain / stress"],
+      except: ["stress divided by strain", "stress over strain", "stress / strain"],
+      reason: "The Young modulus is stress divided by strain, not the other way up." },
+  ],
+  [`${Q}physics-depth-practical-investigations-sp-02-random-systematic-definitions-0`]: [
+    { point: 0, phrases: ["systematic error makes readings scatter", "systematic error scatters", "systematic uncertainty scatters", "systematic … averaging reduces"],
+      reason: "Random uncertainty scatters readings either side of the mean and averaging reduces it; a systematic error shifts them all the same way." },
+    { point: 1, phrases: ["random uncertainty moves every", "random error moves every", "random … same way", "random … shifts every"],
+      reason: "A systematic error shifts every reading the same way; a random uncertainty scatters them." },
+  ],
+  [`${Q}physics-depth50-quantum-sp-07-transition-rule-1`]: [
+    { point: 0, phrases: ["sum of the", "adding the two", "added together", "total of the two"],
+      reason: "The photon energy is the difference between the two levels, not their sum." },
+    { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
+      reason: "A downward transition emits a photon; an upward one absorbs it." },
+  ],
 };
 
 export function applyPhysicsAnswerGuards(questions: Question[]): Question[] {
