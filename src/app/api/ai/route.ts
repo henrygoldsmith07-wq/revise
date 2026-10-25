@@ -162,6 +162,10 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
+  // `null` parses, and reading `.task` off it would throw an unhandled 500.
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
 
   const task = body.task as AiTask;
   if (!AI_TASKS.includes(task)) {

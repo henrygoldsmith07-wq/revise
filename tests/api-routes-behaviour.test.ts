@@ -106,6 +106,10 @@ vi.mock("@supabase/ssr", () => ({
 
 import { GET as pulseGet } from "@/app/api/pulse/history/route";
 import { GET as aiGet, POST as aiPost } from "@/app/api/ai/route";
+import { POST as markingDisputesPost } from "@/app/api/marking-disputes/route";
+import { POST as pilotEventsPost } from "@/app/api/pilot/events/route";
+import { POST as reviewerDecisionsPost } from "@/app/api/reviewer/decisions/route";
+import { POST as accountDeletePost } from "@/app/api/account/delete/route";
 import { resetRateLimiterForTests } from "@/lib/rate-limit";
 import { AI_CONSENT_HEADER, AI_CONSENT_HEADER_VALUE, AI_CONSENT_VERSION } from "@/domain/ai-consent";
 
@@ -315,6 +319,13 @@ describe("AI route behaviour", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a JSON body that is not an object with 400, never a thrown 500", async () => {
+    for (const body of ["null", "5", "[]", '"explain"']) {
+      const res = await aiPost(aiRequest(body));
+      expect(res.status, body).toBe(400);
+    }
+  });
+
   it("rejects oversized bodies with 413", async () => {
     const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "x".repeat(1_600_000) } }));
     expect(res.status).toBe(413);
@@ -419,6 +430,35 @@ describe("AI route behaviour", () => {
     expect(res.status).toBe(413);
     // 1.5M chars is six 256 KiB chunks; reading stops long before the end.
     expect(pulled).toBeLessThan(20);
+  });
+
+  it("every body-reading route stops a streamed oversized body instead of buffering it", async () => {
+    configureAuth();
+    const routes = [
+      ["/api/marking-disputes", markingDisputesPost],
+      ["/api/pilot/events", pilotEventsPost],
+      ["/api/reviewer/decisions", reviewerDecisionsPost],
+      ["/api/account/delete", accountDeletePost],
+    ] as const;
+    const chunk = new TextEncoder().encode("x".repeat(64 * 1024));
+    for (const [path, post] of routes) {
+      let pulled = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulled += 1;
+          if (pulled > 200) controller.close(); // ~13 MB if read to the end
+          else controller.enqueue(chunk);
+        },
+      });
+      const res = await post(new Request(`https://x${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://x", "sec-fetch-site": "same-origin" },
+        body: stream,
+        duplex: "half",
+      } as RequestInit & { duplex: "half" }));
+      expect(res.status, path).toBe(413);
+      expect(pulled, path).toBeLessThan(5);
+    }
   });
 
   it("refuses every task with 403 when the signed-in learner has no consent row", async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { buildContentSecurityPolicy, createNonce } from "@/lib/csp";
 import { REVIEW_AUDIT_EVENT_COLUMNS } from "@/lib/reviewer/runtime-ledger";
@@ -299,6 +299,19 @@ describe("security — API route guards", () => {
     expect(lib).toContain('import "server-only";');
     expect(lib).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(lib).not.toContain("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY");
+  });
+
+  it("every API route reads its body through readBoundedText, never an unbounded request.text()/json()", () => {
+    const dir = join(process.cwd(), "src/app/api");
+    const routes = (readdirSync(dir, { recursive: true }) as string[]).filter((f) => f.endsWith("route.ts"));
+    expect(routes.length).toBeGreaterThan(0);
+    for (const file of routes) {
+      const source = readFileSync(join(dir, file), "utf8");
+      expect(source, file).not.toMatch(/\b(?:request|req)\.(?:text|json|arrayBuffer|formData|blob)\(\)/);
+      if (/export async function (?:POST|PUT|PATCH)\b/.test(source)) {
+        expect(source, file).toContain("readBoundedText(request");
+      }
+    }
   });
 
   it("/api/ai uses account-aware shared quota enforcement with an IP fallback", () => {
