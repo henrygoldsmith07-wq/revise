@@ -176,6 +176,20 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
       reason: "A downward transition emits a photon; an upward one absorbs it." },
   ],
+  // pass 79
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-ideal-gas`]: [
+    { point: 1, phrases: ["rt / pv", "rt/pv", "rt divided by pv", "8.31 x 27 ", "8.31 × 27 ", "8.31 x 27)", "8.31 × 27)"],
+      reason: "n = pV / RT with T in kelvin (300 K): that gives 0.963 mol." },
+  ],
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-projectile-components`]: [
+    { point: 2, phrases: ["horizontal speed gets bigger", "horizontal speed increases", "horizontal speed gets faster", "horizontal speed speeds up", "horizontal speed accelerates", "horizontal velocity increases", "horizontal velocity gets bigger"],
+      except: ["does not", "doesn't", "not get", "not increase"],
+      reason: "With no horizontal force, the horizontal speed stays constant at 12 m s⁻¹." },
+  ],
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-specific-heat`]: [
+    { point: 1, phrases: ["= 72000", "=72000", "72000 j", "72 000", "72000 j/kg", "multiply 12000", "12000 times"],
+      reason: "c = Q / (m ΔT) = 12000 / (0.40 × 15): the energy is divided by mass and temperature rise." },
+  ],
   // pass 77
   [`${Q}authentic-expansion-wjec-alevel-physics-physics-radioactive-half-life`]: [
     { point: 1, phrases: ["takes off", "take off", "subtract", "minus 320", "- 960", "which is zero", "reaches zero", "goes to zero"],
