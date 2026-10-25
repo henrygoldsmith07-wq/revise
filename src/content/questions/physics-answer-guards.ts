@@ -176,6 +176,19 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
       reason: "A downward transition emits a photon; an upward one absorbs it." },
   ],
+  // pass 76
+  [`${Q}authentic-expansion-wjec-alevel-physics-more-alevel-physics-kinetic-energy`]: [
+    { point: 2, phrases: ["four times", "quadruple", "quadruples", "x4", "× 4", "goes up by 4", "squared"],
+      except: ["not four", "not quadruple"],
+      reason: "Mean kinetic energy is proportional to absolute temperature (3/2 kT), so doubling T doubles it; it is not squared." },
+  ],
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-particle-conservation`]: [
+    { point: 0, phrases: ["a positron", "positron and", "and a neutrino", "and neutrino", "plus a neutrino"],
+      except: ["antineutrino", "not a positron", "no positron"],
+      reason: "Beta-minus decay emits an electron and an electron antineutrino, not a positron or a neutrino." },
+    { point: 1, phrases: ["charge is +2", "charge of +2", "charge is 2", "so the charge is +2"],
+      reason: "In beta-minus decay the neutron (0) becomes a proton (+1) and an electron (−1): the totals are 0 and 0." },
+  ],
   // pass 74
   [`${Q}authentic-expansion-wjec-alevel-physics-physics-polarisation`]: [
     ...[0, 1, 2].map((point) => ({ point, phrases: ["light is longitudinal", "shows … is longitudinal", "shows … light is a longitudinal", "light is a longitudinal"],

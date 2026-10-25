@@ -261,6 +261,10 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" a shorter wavelength allows smaller separations to be distinguished ", "(?:the )?wavelength is (?:tiny|small|short)[a-z ,]{0,160}small objects (?:can be )?(?:told apart|resolved|distinguished|seen)"],
   [" drag increases with speed ", "(?:the )?(?:air resistance|drag) (?:grows|increases|gets bigger|gets larger|rises)(?: as (?:it|the object) (?:speeds up|goes faster|falls faster))?"],
   [" drag equals weight ", "drag (?:is |becomes )?(?:the same|equal)(?: size)?(?: as| to)? (?:its |the )?weight|(?:air resistance|drag) balances (?:its |the )?weight"],
+  // Pass 76: own-words forms for beta-minus charge balance.
+  [" an electron and an electron antineutrino are emitted ", "an electron and (?:an |the )?(?:electron )?antineutrino (?:come|comes|is emitted|are emitted|are given off|is given off) ?(?:out)?"],
+  [" neutron charge 0 becomes proton charge +1 and electron charge −1 ", "(?:the )?neutron is (?:neutral|uncharged|0)[a-z ,]{0,40}(?:turns|changes|decays) into a proton \\(\\+1\\) and an electron \\((?:-|−)1\\)"],
+  [" the antineutrino has zero charge ", "(?:the )?antineutrino (?:has no charge|is neutral|is uncharged)[a-z ]{0,40}"],
   [" exceeds ", "(?:is )?(?:bigger|larger|greater|more) than"],
   [" unit ", "measured in|in units of"],
   [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],
