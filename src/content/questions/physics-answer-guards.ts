@@ -176,6 +176,17 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
       reason: "A downward transition emits a photon; an upward one absorbs it." },
   ],
+  // pass 74
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-polarisation`]: [
+    ...[0, 1, 2].map((point) => ({ point, phrases: ["light is longitudinal", "shows … is longitudinal", "shows … light is a longitudinal", "light is a longitudinal"],
+      except: ["not longitudinal", "isn't longitudinal", "cannot be longitudinal", "transverse"],
+      reason: "Polarisation can only happen for a transverse wave, so it shows light is transverse, not longitudinal." })),
+  ],
+  [`${Q}authentic-expansion-wjec-alevel-physics-more-alevel-physics-filament-lamp`]: [
+    ...[0, 1, 2].map((point) => ({ point, phrases: ["resistance goes down", "resistance decreases", "resistance falls", "resistance drops", "resistance gets lower", "resistance is lower", "resistance gets smaller", "more electrons are freed", "more free electrons", "more electrons to carry"],
+      except: ["not go down", "does not decrease", "doesn't fall", "rather than"],
+      reason: "The lamp's resistance rises with current: the hotter filament has more lattice-ion vibrations, which scatter more electrons." })),
+  ],
   // pass 73
   [`${Q}authentic-expansion-wjec-alevel-physics-physics-resonance-damping`]: [
     { point: 0, phrases: ["damping … narrower", "damping … sharper", "damping … bigger", "damping … larger", "damping … higher peak", "damping … increases"],
