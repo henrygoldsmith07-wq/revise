@@ -176,6 +176,22 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
     { point: 1, phrases: ["going up a level emits", "going up emits", "upward … emits", "up a level emits", "going down a level absorbs", "going down absorbs", "downward … absorbs", "down a level absorbs"],
       reason: "A downward transition emits a photon; an upward one absorbs it." },
   ],
+  // pass 77
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-radioactive-half-life`]: [
+    { point: 1, phrases: ["takes off", "take off", "subtract", "minus 320", "- 960", "which is zero", "reaches zero", "goes to zero"],
+      except: ["not subtract"],
+      reason: "Activity halves each half-life (exponential decay); it does not fall by a fixed amount, so it never reaches zero after three half-lives." },
+  ],
+  [`${Q}authentic-expansion-wjec-alevel-physics-physics-momentum-explosion`]: [
+    { point: 2, phrases: ["also goes east", "also moves east", "also travels east", "goes east at 7.5", "moves east at 7.5", "east at 7.5"],
+      except: ["not east", "not also east"],
+      reason: "Total momentum is zero, so the second part must move opposite to the first: 7.5 m s⁻¹ west." },
+  ],
+  [`${Q}authentic-expansion-wjec-alevel-physics-more-alevel-physics-field-potential`]: [
+    { point: 2, phrases: ["potential gets bigger", "potential increases", "potential rises", "potential goes up", "potential gets larger", "potential is higher"],
+      except: ["against the field", "opposite to the field", "opposite the field"],
+      reason: "Electric potential decreases in the direction of the electric field." },
+  ],
   // pass 76
   [`${Q}authentic-expansion-wjec-alevel-physics-more-alevel-physics-kinetic-energy`]: [
     { point: 2, phrases: ["four times", "quadruple", "quadruples", "x4", "× 4", "goes up by 4", "squared"],
