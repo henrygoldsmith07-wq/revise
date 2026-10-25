@@ -187,7 +187,7 @@ const GUARDS: Record<string, MarkSchemeReject[]> = {
       reason: "With no horizontal force, the horizontal speed stays constant at 12 m s⁻¹." },
   ],
   [`${Q}authentic-expansion-wjec-alevel-physics-physics-specific-heat`]: [
-    { point: 1, phrases: ["12000 x 0.40 x 15", "12000 × 0.40 × 15", "12000 x 0.4 x 15", "12000 × 0.4 × 15"],
+    { point: 1, phrases: ["= 72000", "=72000", "72000 j", "72 000", "72000 j/kg", "multiply 12000", "12000 times"],
       reason: "c = Q / (m ΔT) = 12000 / (0.40 × 15): the energy is divided by mass and temperature rise." },
   ],
   // pass 77
