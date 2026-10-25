@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 81: every API route caps its body while reading, and `/api/ai` refuses a `null` body cleanly
+Four routes (marking disputes, pilot events, reviewer decisions, account deletion) checked their size cap only after `request.text()` had buffered the whole body, which `src/lib/bounded-body.ts` already names as no cap at all; a chunked or lying-length request could make them hold any amount in memory. They now read through `readBoundedText`, as `/api/ai` does. `/api/ai` also threw an unhandled 500 on a JSON body of `null`; it now answers 400. Tests: tests/api-routes-behaviour.test.ts (streamed oversized body on each route, non-object bodies), tests/security.test.ts (no route reads an unbounded body).
+
 ## 2026-10-25 pass 80: wall-rebound elasticity and cliff-projectile questions link to the right lesson
 A lost mark on "is the wall collision elastic?" now opens the elastic/inelastic lesson (momentum 3.1(c)) rather than the momentum-definition one, and both cliff-projectile parts open the projectile-motion lesson (1.2(a)). Chosen by hand from the keyword audit, each with a written reason. Honest side effect: momentum.sp-01 (explanation) and kinematics-dynamics.sp-01 (calculation) now show as having one question family, so the depth count reads 98, not 100; a real second family should close them (not by retagging back). Tests: tests/physics-spec-tags.test.ts.
 

@@ -5,6 +5,7 @@ import { z } from "@/lib/zod";
 import { sameOriginRequest } from "@/domain/account-deletion";
 import { MARKING_FLAG_REASONS } from "@/domain/marking-flag";
 import { rateLimit } from "@/lib/rate-limit";
+import { readBoundedText } from "@/lib/bounded-body";
 
 // ---------------------------------------------------------------------------
 // Shared marking-dispute intake. A dispute never changes a mark, question
@@ -41,11 +42,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cross-site request refused." }, { status: 403 });
   }
 
+  const read = await readBoundedText(request, MAX_BODY_CHARS);
+  if (!read.ok) {
+    return read.reason === "too-large"
+      ? NextResponse.json({ error: "Request body is too large." }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
   let body: unknown;
   try {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY_CHARS) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
-    body = JSON.parse(raw);
+    body = JSON.parse(read.text);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }

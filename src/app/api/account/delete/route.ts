@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { checkDeletionRequest, residualScopes } from "@/domain/account-deletion";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { errorClass } from "@/lib/observability";
+import { readBoundedText } from "@/lib/bounded-body";
 
 // ---------------------------------------------------------------------------
 // Authenticated account deletion.
@@ -33,6 +34,8 @@ import { errorClass } from "@/lib/observability";
 
 export const runtime = "nodejs";
 
+const MAX_BODY_CHARS = 2_000;
+
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -43,11 +46,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const read = await readBoundedText(request, MAX_BODY_CHARS);
+  if (!read.ok) {
+    return read.reason === "too-large"
+      ? NextResponse.json({ error: "Request body is too large." }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
   let body: unknown = null;
   try {
-    const raw = await request.text();
-    if (raw.length > 2_000) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
-    body = raw ? JSON.parse(raw) : null;
+    body = read.text ? JSON.parse(read.text) : null;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
