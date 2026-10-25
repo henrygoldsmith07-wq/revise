@@ -265,6 +265,10 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" an electron and an electron antineutrino are emitted ", "an electron and (?:an |the )?(?:electron )?antineutrino (?:come|comes|is emitted|are emitted|are given off|is given off) ?(?:out)?"],
   [" neutron charge 0 becomes proton charge +1 and electron charge −1 ", "(?:the )?neutron is (?:neutral|uncharged|0)[a-z ,]{0,40}(?:turns|changes|decays) into a proton \\(\\+1\\) and an electron \\((?:-|−)1\\)"],
   [" the antineutrino has zero charge ", "(?:the )?antineutrino (?:has no charge|is neutral|is uncharged)[a-z ]{0,40}"],
+  // Pass 77: field potential falls along the field.
+  [" electric potential decreases in the direction of the electric field ", "(?:the )?(?:electric )?potential (?:falls|drops|gets (?:smaller|lower)|goes down|decreases)[a-z ,]{0,40}(?:direction of|along|with) the (?:electric )?field|(?:direction of|along) the (?:electric )?field[a-z ,]{0,20}(?:the )?(?:electric )?potential (?:falls|drops|gets (?:smaller|lower)|goes down|decreases)"],
+  // Pass 77: potential difference from field strength and separation; explosion recoil direction.
+  [" use e = Δv/d ", "(?:v|δv|Δv|potential difference) ?= ?e ?(?:x|×|\\*)? ?d|e ?= ?(?:δv|Δv|v) ?/ ?d"],
   [" exceeds ", "(?:is )?(?:bigger|larger|greater|more) than"],
   [" unit ", "measured in|in units of"],
   [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],

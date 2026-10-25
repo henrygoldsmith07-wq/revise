@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 77: SHM, half-life, explosion and field-potential answers marked like an examiner
+Four more Year 12 Physics questions were tested with a correct and a wrong own-words answer. A correct field-potential answer ("V = E x d ... potential falls along the field") now reaches 3/3. A wrong "activity falls by 320 each half-life to zero", "the second fragment also goes east" and "potential gets bigger along the field" no longer earn those marks. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass77.test.ts.
+
 ## 2026-10-25 pass 76: beta decay, kinetic energy, binding energy and critical-angle answers marked like an examiner
 Four more Year 12 Physics questions were tested with a correct and a wrong own-words answer. A correct beta-minus answer ("an electron and an antineutrino come out... 0 and +1 and -1") scored 1/3 and now reaches 3/3. A wrong "a positron and a neutrino, so charge is +2" and a wrong "kinetic energy goes up four times when T doubles" no longer earn the explanation marks. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass76.test.ts.
 
