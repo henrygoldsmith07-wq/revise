@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 79: wrong inversions and "horizontal speed grows" no longer earn the final-answer mark
+Seven more Year 12 Physics calculation questions (de Broglie, ideal gas, induced emf, orbital speed, projectile, specific heat, standing wave) were tested with correct and wrong own-words answers. Now n = RT/pV or a Celsius temperature in the ideal-gas law, "horizontal speed gets bigger", and c = Q x m x ΔT no longer earn the calculation mark. Answers and marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass79.test.ts.
+
 ## 2026-10-25 pass 78: photoelectric balance written in symbols is credited
 Four more Year 12 Physics calculation questions (efficiency, Young modulus, internal resistance, work function) were tested with correct and wrong answers. "hf = phi + KEmax" now earns the photoelectric balance mark; a flipped sign still does not. Compact one-line answers that skip a stated intermediate value still lose that point (not changed). Answers and marks are author judgement. Tests: tests/marking-y12-physics-pass78.test.ts.
 

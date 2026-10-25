@@ -1,0 +1,38 @@
+// Year 12 Physics calculation answers in a student's own words (pass 79, 2026-10-25).
+// Every answer and examiner mark is AUTHOR JUDGEMENT, not a moderated mark.
+import type { Y12Case } from "./marking-y12-physics-set";
+const Q = "cnt:question:authentic-expansion-wjec-alevel-physics-physics-";
+export const y12PhysicsCasesPass79: Y12Case[] = [
+  { id: `${Q}de-broglie`, kind: "correct", examiner: 2,
+    answer: "Momentum p = mv = 1.822e-24 kg m/s. The wavelength is Planck constant over momentum: 6.63e-34 / 1.822e-24 = 3.64e-10 m." },
+  { id: `${Q}de-broglie`, kind: "wrong", examiner: 1,
+    answer: "p = mv = 1.822e-24 kg m/s. Wavelength = p / h = 1.822e-24 / 6.63e-34 = 2.75e9 m." },
+  { id: `${Q}de-broglie`, kind: "wrong", examiner: 0,
+    answer: "The wavelength is the speed divided by the frequency of the electron." },
+  { id: `${Q}ideal-gas`, kind: "correct", examiner: 2,
+    answer: "Use pV = nRT so n = pV / RT = (1.2e5 x 0.020) / (8.31 x 300) = 0.963 mol." },
+  { id: `${Q}ideal-gas`, kind: "wrong", examiner: 1,
+    answer: "pV = nRT so n = RT / pV = (8.31 x 300) / (1.2e5 x 0.020) = 1.04 mol." },
+  { id: `${Q}ideal-gas`, kind: "wrong", examiner: 1,
+    answer: "Use pV = nRT. With T = 27 the answer is n = (1.2e5 x 0.020) / (8.31 x 27) = 10.7 mol." },
+  { id: `${Q}induced-emf`, kind: "correct", examiner: 2,
+    answer: "The flux linkage changes by 0.030 Wb turns. Induced emf = change in flux linkage over time = 0.030 / 0.015 = 2.0 V." },
+  { id: `${Q}induced-emf`, kind: "wrong", examiner: 1,
+    answer: "Change in flux linkage = 0.030 Wb turns. emf = 0.030 x 0.015 = 4.5e-4 V." },
+  { id: `${Q}orbital-speed`, kind: "correct", examiner: 3,
+    answer: "Orbital radius = 6.37e6 + 0.54e6 = 6.91e6 m. v = square root of GM/r = sqrt(4.0e14 / 6.91e6) = 7.61e3 m/s. Period T = 2 pi r / v = 5706 s, about 95 minutes." },
+  { id: `${Q}orbital-speed`, kind: "wrong", examiner: 1,
+    answer: "Use the height as the radius: r = 0.54e6 m. v = sqrt(4.0e14 / 0.54e6) = 2.7e4 m/s." },
+  { id: `${Q}projectile-components`, kind: "correct", examiner: 4,
+    answer: "Vertically 5.0 = 1/2 g t^2 so t = 1.01 s. The horizontal speed stays 12 m/s, so range = 12 x 1.01 = 12.1 m." },
+  { id: `${Q}projectile-components`, kind: "wrong", examiner: 2,
+    answer: "5.0 = 1/2 g t^2 so t = 1.01 s. The horizontal speed gets bigger as it falls because gravity pulls it, so range = 12 x 1.01 x 2 = 24 m." },
+  { id: `${Q}specific-heat`, kind: "correct", examiner: 2,
+    answer: "Use Q = mc delta T, so c = Q / (m delta T) = 12000 / (0.40 x 15) = 2000 J/kg/K." },
+  { id: `${Q}specific-heat`, kind: "wrong", examiner: 1,
+    answer: "Q = mc delta T. c = 12000 x 0.40 x 15 = 72000 J/kg/K." },
+  { id: `${Q}standing-wave`, kind: "correct", examiner: 3,
+    answer: "The third harmonic has three half wavelengths on the string, so 0.80 = 3 lambda / 2 and lambda = 0.533 m. Wave speed v = f lambda = 96 m/s." },
+  { id: `${Q}standing-wave`, kind: "wrong", examiner: 1,
+    answer: "Third harmonic means 0.80 = 3 lambda so lambda = 0.267 m. v = f lambda = 48 m/s." },
+];
