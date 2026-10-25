@@ -68,3 +68,21 @@ export function topicsForUnit4Option<T extends Pick<Topic, "specRef" | "subjectI
     return own === null || own === option || !offers.has(t.subjectId);
   });
 }
+
+/**
+ * Drops lost marks that belong to a topic outside the learner's year scope
+ * (an A2 topic for Year 12, another Unit 4 option for Year 13). Mistakes on a
+ * topic the curriculum does not know are kept, so nothing is hidden by a gap
+ * in the topic list. Unknown year keeps everything.
+ */
+export function mistakesInYearScope<M extends { topicId: string }>(
+  mistakes: readonly M[],
+  allKnown: readonly (Pick<Topic, "specRef" | "subjectId"> & { id: string })[],
+  year: YearGroup | undefined,
+  unit4Option?: Unit4Option,
+): M[] {
+  if (!year) return [...mistakes];
+  const known = new Set(allKnown.map((t) => t.id));
+  const kept = new Set(topicsForYear(allKnown, year, unit4Option).map((t) => t.id));
+  return mistakes.filter((m) => !known.has(m.topicId) || kept.has(m.topicId));
+}

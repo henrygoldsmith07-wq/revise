@@ -54,3 +54,19 @@ describe("year-aware missions", () => {
     expect(missionTopics(y12)).not.toContain("shm");
   });
 });
+
+describe("mistakesInYearScope", () => {
+  const ms = [{ id: "1", topicId: "motion" }, { id: "2", topicId: "shm" }, { id: "3", topicId: "custom-unknown" }];
+  it("Year 12 drops A2 lost marks but keeps unknown topics; unset keeps all", async () => {
+    const { mistakesInYearScope } = await import("@/domain/year-group");
+    expect(mistakesInYearScope(ms, topics, "year-12").map((m) => m.id)).toEqual(["1", "3"]);
+    expect(mistakesInYearScope(ms, topics, "year-13").map((m) => m.id)).toEqual(["1", "2", "3"]);
+    expect(mistakesInYearScope(ms, topics, undefined).map((m) => m.id)).toEqual(["1", "2", "3"]);
+  });
+  it("Year 13 with a Unit 4 option drops other options' lost marks", async () => {
+    const { mistakesInYearScope } = await import("@/domain/year-group");
+    const t4 = [topic("a", "a", "Unit 4 Option A(a)"), topic("b", "a", "Unit 4 Option B(a)")];
+    const list = [{ id: "x", topicId: "a" }, { id: "y", topicId: "b" }];
+    expect(mistakesInYearScope(list, t4, "year-13", "B").map((m) => m.id)).toEqual(["y"]);
+  });
+});

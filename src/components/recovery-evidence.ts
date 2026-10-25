@@ -19,7 +19,7 @@ import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { isDueReview, studiedCardTopicIds } from "@/domain/scheduling";
 import { reviewedSupplyNote, unseenSupplyByTopic, type TopicSupply } from "@/domain/supply";
 import { topicShares } from "@/domain/topic-weight";
-import { topicsForYear } from "@/domain/year-group";
+import { mistakesInYearScope, topicsForYear } from "@/domain/year-group";
 import { useStoreFields } from "@/state/store";
 import type { Mistake } from "@/domain/types";
 
@@ -47,7 +47,9 @@ export function useRecoveryEvidence(): RecoveryEvidence {
   const store = useStoreFields("attempts", "examDates", "interventionOutcomes", "mistakes", "proofLedger", "questions", "settings");
   return useMemo(() => {
     const subjects = new Set(store.settings.subjectIds);
-    const mistakes = store.mistakes.filter((m) => subjects.has(m.subjectId));
+    // Missions, patterns and the paper-result card read the same year scope as
+    // Today, so a Year 12 student is never sent into an A2 repair mission.
+    const mistakes = mistakesInYearScope(store.mistakes.filter((m) => subjects.has(m.subjectId)), allTopics([...subjects]), store.settings.yearGroup, store.settings.unit4Option);
     const now = new Date();
     const recovery = buildMarkRecovery({
       mistakes,
@@ -74,7 +76,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
       mistakes, recovery, patterns, unseenByTopic, supplyByTopic, proof, daysToExam: days, topicTitle: (id: string) => getTopic(id)?.title ?? id, effectiveness,
       repairWeight: (kind: InterventionKind) => estimateEffectiveness(effectiveness, { kind }).weight,
     };
-  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.proofLedger, store.questions, store.settings.subjectIds, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
+  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.proofLedger, store.questions, store.settings.subjectIds, store.settings.yearGroup, store.settings.unit4Option, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
 }
 
 /** The single ranked plan Today, the command centre, the diagnostic and mission routes all read. */

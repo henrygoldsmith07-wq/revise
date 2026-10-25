@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-25 pass 75: missions and paper results follow your year and Unit 4 option
+
+A Year 12 student's lost marks on A2 topics (or a Year 13 student's on another Unit 4 option) no longer feed repair missions or the paper-result mission card; they now match Today.
+
 ## 2026-10-25 pass 74: filament-lamp, polarisation, sonar and terminal-speed answers marked like an examiner
 Four more Year 12 Physics questions were tested with a correct and a wrong own-words answer. A wrong "the lamp's resistance goes down as the filament heats" scored 3/3 and a wrong "polarisation shows light is longitudinal" kept a mark; both now earn 0. Correct own-words polarisation, sonar-wavelength and terminal-speed answers (were 1/3, 2/3 and 2/3) now reach 3/3. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass74.test.ts.
 
