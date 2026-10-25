@@ -74,7 +74,7 @@ describe("WJEC flagship depth pack", () => {
     // distinct ones, for the listed demand. Author a real second family to
     // close a gap and remove it here; never retag a question back to fill one.
     // Pass 72: four more reasoning-depth parts moved to their true point (capacitor energy x2 -> capacitance.sp-02, photoelectric balance -> quantum.sp-01, sensor bridge -> electric-circuits.sp-02): 103 - 3 = 100.
-    expect(dashboard.subjects[0]!.deepComplete).toBe(100);
+    expect(dashboard.subjects[0]!.deepComplete).toBe(98);
     const physics = auditFlagshipSubject({ subjectId: "wjec-alevel-physics", topics: wjecFlagshipCurricula.find((c) => c.subject.id === "wjec-alevel-physics")!.topics, questions: seedQuestions, nodes: wjecCapabilities });
     const gaps = physics.capabilityCoverage.filter((row) => !row.complete)
       .map((row) => `${row.specPointId.replace("wjec-alevel-physics.", "")}: ${row.demands.filter((d) => !(d.complete && d.distinct)).map((d) => d.demand).join("+")}`);
@@ -83,7 +83,8 @@ describe("WJEC flagship depth pack", () => {
     // Pass 67 retagged the pendulum period (sp-01 -> sp-05) and the ln V-t
     // time-constant question (sp-03 -> sp-04), which opens two honest gaps.
     // Pass 72 retags open three more honest gaps (capacitance.sp-01, electric-circuits.sp-01, quantum.sp-02).
-    expect(gaps.sort()).toEqual(["capacitance.sp-01: calculation+synoptic", "capacitance.sp-03: application", "circular-shm.sp-01: calculation", "electric-circuits.sp-01: transfer", "momentum.sp-03: calculation", "quantum.sp-02: application", "thermal.sp-01: calculation", "thermal.sp-04: calculation"]);
+    // Pass 80 retags open two more honest gaps (kinematics-dynamics.sp-01 calculation, momentum.sp-01 explanation); deepComplete 100 - 2 = 98.
+    expect(gaps.sort()).toEqual(["capacitance.sp-01: calculation+synoptic", "capacitance.sp-03: application", "circular-shm.sp-01: calculation", "electric-circuits.sp-01: transfer", "kinematics-dynamics.sp-01: calculation", "momentum.sp-01: explanation", "momentum.sp-03: calculation", "quantum.sp-02: application", "thermal.sp-01: calculation", "thermal.sp-04: calculation"]);
   }, 60_000);
 
   it("keeps the templated Maths/Biology/Chemistry depth pack out of the learner bank", () => {

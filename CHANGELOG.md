@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 80: wall-rebound elasticity and cliff-projectile questions link to the right lesson
+A lost mark on "is the wall collision elastic?" now opens the elastic/inelastic lesson (momentum 3.1(c)) rather than the momentum-definition one, and both cliff-projectile parts open the projectile-motion lesson (1.2(a)). Chosen by hand from the keyword audit, each with a written reason. Honest side effect: momentum.sp-01 (explanation) and kinematics-dynamics.sp-01 (calculation) now show as having one question family, so the depth count reads 98, not 100; a real second family should close them (not by retagging back). Tests: tests/physics-spec-tags.test.ts.
+
 ## 2026-10-25 pass 79: wrong inversions and "horizontal speed grows" no longer earn the final-answer mark
 Seven more Year 12 Physics calculation questions (de Broglie, ideal gas, induced emf, orbital speed, projectile, specific heat, standing wave) were tested with correct and wrong own-words answers. Now n = RT/pV or a Celsius temperature in the ideal-gas law, "horizontal speed gets bigger", and c = Q x m x ΔT no longer earn the calculation mark. Answers and marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass79.test.ts.
 

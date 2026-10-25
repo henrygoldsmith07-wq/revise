@@ -3092,7 +3092,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-01",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 12,
+        "currentQuestionCount": 11,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3101,7 +3101,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-02",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 39,
+        "currentQuestionCount": 38,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3137,7 +3137,7 @@
       {
         "specPointId": "wjec-alevel-physics.kinematics-dynamics.sp-06",
         "topicId": "wjec-alevel-physics.kinematics-dynamics",
-        "currentQuestionCount": 14,
+        "currentQuestionCount": 15,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -3272,7 +3272,7 @@
       {
         "specPointId": "wjec-alevel-physics.momentum.sp-03",
         "topicId": "wjec-alevel-physics.momentum",
-        "currentQuestionCount": 11,
+        "currentQuestionCount": 12,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
