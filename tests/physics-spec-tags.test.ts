@@ -219,4 +219,11 @@ describe("Physics spec-point tags (sixty-third pass)", () => {
       expect(part(id)?.capabilityIds, id).toEqual([`phys.${tag}`]);
     }
   });
+
+  it("pass 80: the wall-rebound elasticity part and the cliff projectile parts are tagged to their true points", () => {
+    const parts = (id: string) => seedQuestions.find((q) => q.id === id)?.parts ?? [];
+    expect(parts("cnt:question:phys-momentum-collision")[1]?.specPointIds).toEqual([`${PHYSICS}.momentum.sp-03`]);
+    expect(parts("cnt:question:phys-kinematics-projectile")[0]?.specPointIds).toEqual([`${PHYSICS}.kinematics-dynamics.sp-06`]);
+    expect(parts("cnt:question:phys-kinematics-projectile")[1]?.specPointIds).toEqual([`${PHYSICS}.kinematics-dynamics.sp-06`]);
+  });
 });
