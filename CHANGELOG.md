@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 74: filament-lamp, polarisation, sonar and terminal-speed answers marked like an examiner
+Four more Year 12 Physics questions were tested with a correct and a wrong own-words answer. A wrong "the lamp's resistance goes down as the filament heats" scored 3/3 and a wrong "polarisation shows light is longitudinal" kept a mark; both now earn 0. Correct own-words polarisation, sonar-wavelength and terminal-speed answers (were 1/3, 2/3 and 2/3) now reach 3/3. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass74.test.ts.
+
 ## 2026-10-24 pass 73: damping, field-strength and thermistor answers marked like an examiner
 Six more Year 12 Physics questions were tested with a correct and a wrong answer in a student's own words. A wrong "heavy damping gives a bigger, sharper peak" and a wrong "thermistor resistance rises so the output rises" each kept a mark; both now earn 0, as does "field strength is inversely proportional to the distance". "The peak is much lower" and "less heat is lost" now count as the scheme's reduced amplitude and reduced heat loss. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass73.test.ts.
 

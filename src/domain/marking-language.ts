@@ -253,6 +253,14 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   // Pass 73: own-words forms of two scheme points that Year 12 students phrase differently.
   [" reduces the maximum amplitude ", "(?:the )?(?:resonance )?peak (?:is |becomes |gets )?(?:much |far |a lot |a bit )?(?:lower|smaller|reduced)"],
   [" reduced heat loss ", "less (?:heat|energy|thermal energy) (?:is |gets )?(?:lost|transferred)"],
+  // Pass 74: own-words forms for polarisation, sonar and terminal speed.
+  [" polarisation restricts oscillations to one direction ", "polarisation means (?:that )?(?:the )?(?:waves?|light) (?:only )?(?:vibrates?|oscillates?) in (?:just |only )?one (?:plane|direction)"],
+  [" only transverse oscillations can be restricted in this way ", "(?:so )?(?:the )?(?:light|wave) (?:must be|has to be) transverse"],
+  [" longitudinal waves oscillate parallel to propagation and cannot be polarised ", "(?:a )?longitudinal waves? (?:vibrates?|oscillates?) (?:along|parallel to) (?:its|the) (?:direction|propagation)[a-z ]{0,30}(?:so|and) (?:a |the )?filter (?:could not|cannot|can't|would not) (?:stop|block|polari[sz]e)[a-z ]{0,20}"],
+  [" λ = v/f ", "wavelength (?:=|is|equals) (?:the )?speed (?:divided by|over|/) frequency"],
+  [" a shorter wavelength allows smaller separations to be distinguished ", "(?:the )?wavelength is (?:tiny|small|short)[a-z ,]{0,160}small objects (?:can be )?(?:told apart|resolved|distinguished|seen)"],
+  [" drag increases with speed ", "(?:the )?(?:air resistance|drag) (?:grows|increases|gets bigger|gets larger|rises)(?: as (?:it|the object) (?:speeds up|goes faster|falls faster))?"],
+  [" drag equals weight ", "drag (?:is |becomes )?(?:the same|equal)(?: size)?(?: as| to)? (?:its |the )?weight|(?:air resistance|drag) balances (?:its |the )?weight"],
   [" exceeds ", "(?:is )?(?:bigger|larger|greater|more) than"],
   [" unit ", "measured in|in units of"],
   [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],
