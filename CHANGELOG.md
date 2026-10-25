@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 76: beta decay, kinetic energy, binding energy and critical-angle answers marked like an examiner
+Four more Year 12 Physics questions were tested with a correct and a wrong own-words answer. A correct beta-minus answer ("an electron and an antineutrino come out... 0 and +1 and -1") scored 1/3 and now reaches 3/3. A wrong "a positron and a neutrino, so charge is +2" and a wrong "kinetic energy goes up four times when T doubles" no longer earn the explanation marks. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass76.test.ts.
+
 ## 2026-10-25 pass 75: missions and paper results follow your year and Unit 4 option
 
 A Year 12 student's lost marks on A2 topics (or a Year 13 student's on another Unit 4 option) no longer feed repair missions or the paper-result mission card; they now match Today.
