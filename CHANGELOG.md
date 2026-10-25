@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-25 pass 78: photoelectric balance written in symbols is credited
+Four more Year 12 Physics calculation questions (efficiency, Young modulus, internal resistance, work function) were tested with correct and wrong answers. "hf = phi + KEmax" now earns the photoelectric balance mark; a flipped sign still does not. Compact one-line answers that skip a stated intermediate value still lose that point (not changed). Answers and marks are author judgement. Tests: tests/marking-y12-physics-pass78.test.ts.
+
 ## 2026-10-25 pass 77: SHM, half-life, explosion and field-potential answers marked like an examiner
 Four more Year 12 Physics questions were tested with a correct and a wrong own-words answer. A correct field-potential answer ("V = E x d ... potential falls along the field") now reaches 3/3. A wrong "activity falls by 320 each half-life to zero", "the second fragment also goes east" and "potential gets bigger along the field" no longer earn those marks. Answers and examiner marks are author judgement, not moderated marks. Tests: tests/marking-y12-physics-pass77.test.ts.
 
