@@ -7,6 +7,7 @@ import type { ImportReport } from "@/domain/deck-io";
 import type { Card, Id } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading } from "./ui";
+import { countLabel } from "@/domain/plural";
 
 // ---------------------------------------------------------------------------
 // Import and export.
@@ -32,7 +33,7 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
     link.download = `${name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "deck"}.revise.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setDone(`Exported ${cards.length} cards${includeScheduling ? " with scheduling" : " as a shared deck"}.`);
+    setDone(`Exported ${countLabel(cards.length, "card")}${includeScheduling ? " with scheduling" : " as a shared deck"}.`);
   }
 
   return (
@@ -119,7 +120,7 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
     if (!preview?.cards.length) return;
     await store.addCards(preview.cards);
     setStatus(
-      `Imported ${preview.cards.length} cards${preview.duplicates ? `, skipped ${preview.duplicates} duplicates` : ""}. Tagged "imported".`,
+      `Imported ${countLabel(preview.cards.length, "card")}${preview.duplicates ? `, skipped ${countLabel(preview.duplicates, "duplicate")}` : ""}. Tagged "imported".`,
     );
     onImported?.(preview.cards.length);
     setReport(null);
@@ -174,9 +175,9 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
           {report.deck ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <Pill tone="success">{report.accepted} cards read</Pill>
+                <Pill tone="success">{countLabel(report.accepted, "card")} read</Pill>
                 {report.rejected.length ? <Pill tone="danger">{report.rejected.length} rejected</Pill> : null}
-                {preview?.duplicates ? <Pill tone="review">{preview.duplicates} duplicates</Pill> : null}
+                {preview?.duplicates ? <Pill tone="review">{countLabel(preview.duplicates, "duplicate")}</Pill> : null}
                 {preview?.retargeted ? <Pill>{preview.retargeted} need a topic</Pill> : null}
               </div>
 
@@ -247,7 +248,7 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
 
               <div className="flex items-center gap-3">
                 <Button variant="primary" onClick={() => void commit()} disabled={!preview?.cards.length}>
-                  Import {preview?.cards.length ?? 0} cards
+                  Import {countLabel(preview?.cards.length ?? 0, "card")}
                 </Button>
                 <Button onClick={() => setReport(null)}>Cancel</Button>
               </div>

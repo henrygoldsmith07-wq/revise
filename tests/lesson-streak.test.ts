@@ -28,6 +28,11 @@ describe("nextLessonStreak", () => {
     });
   });
 
+  it("keeps the streak when today is before the last lesson day (a flight west, a device ahead)", () => {
+    const current = { count: 6, lastDay: "2026-09-03" };
+    expect(nextLessonStreak(current, today, yesterday)).toEqual(current);
+  });
+
   it("any longer gap restarts the streak at 1", () => {
     expect(nextLessonStreak({ count: 9, lastDay: "2026-08-30" }, today, yesterday)).toEqual({
       count: 1,

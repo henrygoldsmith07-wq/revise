@@ -5,6 +5,7 @@ import { cardStats, deckStats, retentionVerdict } from "@/domain/card-stats";
 import { curveStats, ForgettingCurveChart } from "./ForgettingCurve";
 import type { Card, ReviewLog } from "@/domain/types";
 import { Panel, Pill, ProgressBar, StatTile, cx } from "./ui";
+import { countLabel } from "@/domain/plural";
 
 // Statistics that answer a question rather than filling a dashboard: is this
 // card worth keeping, and are my intervals right?
@@ -121,7 +122,7 @@ export function DeckStatsPanel({ cards, logs }: { cards: Card[]; logs: ReviewLog
         <StatTile
           label="True retention"
           value={stats.trueRetention == null ? "—" : `${Math.round(stats.trueRetention * 100)}%`}
-          sub={`${stats.reviewsTotal} reviews`}
+          sub={countLabel(stats.reviewsTotal, "review")}
           tone={
             stats.trueRetention == null ? undefined : stats.trueRetention >= 0.87 ? "success" : "review"
           }

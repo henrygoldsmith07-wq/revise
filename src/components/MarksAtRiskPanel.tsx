@@ -6,6 +6,7 @@ import { buildMarksAtRisk, buildRecoverySession } from "@/domain/marks-at-risk";
 import { useStoreFields } from "@/state/store";
 import { BreakdownList } from "./BreakdownList";
 import { ButtonLink, Panel, Pill, SectionHeading, StatTile } from "./ui";
+import { countLabel } from "@/domain/plural";
 
 function useMarksAtRisk(subjectId?: string) {
   const store = useStoreFields("attempts", "mistakes", "papers", "questions", "settings");
@@ -75,7 +76,7 @@ export function MarksAtRiskPanel({ subjectId }: { subjectId?: string }) {
                   share: topic.share,
                   detail:
                     topic.lossRate !== null
-                      ? `Losing ${Math.round(topic.lossRate * 100)}% of marks attempted here recently (${topic.marksAttempted} marks)`
+                      ? `Losing ${Math.round(topic.lossRate * 100)}% of marks attempted here recently (${countLabel(topic.marksAttempted, "mark")})`
                       : undefined,
                 }))}
               />
@@ -96,7 +97,7 @@ export function MarksAtRiskPanel({ subjectId }: { subjectId?: string }) {
                   {report.recurring.slice(0, 4).map((row) => (
                     <li key={row.key} className="flex items-start justify-between gap-3 text-xs">
                       <span className="text-ink2">{row.label}</span>
-                      <Pill tone="danger" className="shrink-0">{row.count}× · {row.marks} marks{row.paperCount >= 2 ? ` · across ${row.paperCount} papers` : ""}</Pill>
+                      <Pill tone="danger" className="shrink-0">{row.count}× · {countLabel(row.marks, "mark")}{row.paperCount >= 2 ? ` · across ${row.paperCount} papers` : ""}</Pill>
                     </li>
                   ))}
                 </ul>

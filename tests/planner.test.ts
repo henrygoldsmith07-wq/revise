@@ -403,6 +403,14 @@ describe("rescheduleMissed", () => {
     expect(replacement.date > TODAY).toBe(true);
   });
 
+  it("never stacks rolled work past midnight: a full evening passes it to the next day", () => {
+    const lateToday: PlannedSession = { ...stale[0], id: "late", date: TODAY, startMinute: 23 * 60, minutes: 50, status: "pending" };
+    const healed = rescheduleMissed([...stale, lateToday], TODAY, 6, ids());
+    const replacement = healed.find((s) => s.reason.startsWith("Rescheduled"))!;
+    expect(replacement.date > TODAY).toBe(true);
+    expect(replacement.startMinute + replacement.minutes).toBeLessThanOrEqual(24 * 60);
+  });
+
   it("is a no-op when nothing was missed", () => {
     const clean: PlannedSession[] = [{ ...stale[0], date: "2025-06-05" }];
     expect(rescheduleMissed(clean, TODAY, 6, ids())).toHaveLength(1);

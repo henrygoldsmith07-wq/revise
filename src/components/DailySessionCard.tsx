@@ -9,6 +9,7 @@ import { trustedAssessmentContent } from "@/domain/physics-content-review";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, cx } from "./ui";
 import { PlayIcon, ICON_SIZE } from "./icons";
+import { countLabel } from "@/domain/plural";
 
 // The default daily session: one 18-minute memory session made of labelled
 // blocks, driven entirely by the engine — the queue split comes from the
@@ -106,7 +107,7 @@ export function DailySessionCard({ subjectIds }: { subjectIds: string[] }) {
 
       <div className="flex flex-wrap items-center gap-2">
         <Pill>
-          {plan.newCount} new, {plan.reviewCount} reviews
+          {plan.newCount} new, {countLabel(plan.reviewCount, "review")}
         </Pill>
         <Pill tone="accent">
           <PlayIcon size={ICON_SIZE.sm} /> {plan.totalMinutes} min

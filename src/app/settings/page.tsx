@@ -31,7 +31,7 @@ import {
 import { clearAll } from "@/data/db";
 import { restorePortableSnapshot } from "@/data/portable-restore";
 import { STORAGE_PERSISTENCE_COPY, readStoragePersistence, requestPersistentStorage, type StoragePersistenceState } from "@/data/storage-persistence";
-import { exportEncryptionKey, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
+import { exportEncryptionKey, fingerprintOfJwk, importEncryptionKey, keyFingerprint } from "@/data/e2ee";
 import { getSupabase, isSupabaseConfigured } from "@/data/supabase";
 import {
   discardFailedOutboxItem,
@@ -60,6 +60,8 @@ export default function SettingsPage() {
   const [keyMessage, setKeyMessage] = useState<string | null>(null);
   const [keyText, setKeyText] = useState("");
   const [keyFp, setKeyFp] = useState<string | null>(null);
+  /** Fingerprint of a pasted key that would replace this device's own, awaiting a second click. */
+  const [replaceFp, setReplaceFp] = useState<string | null>(null);
 
   useEffect(() => {
     // The fingerprint only renders inside the enabled block, so there is
@@ -67,6 +69,31 @@ export default function SettingsPage() {
     if (!settings.e2eeEnabled) return;
     void keyFingerprint().then(setKeyFp);
   }, [settings.e2eeEnabled]);
+
+  async function installPastedKey() {
+    const pasted = keyInput.trim();
+    const pastedFp = await fingerprintOfJwk(pasted);
+    if (!pastedFp) {
+      setKeyMessage("That does not look like a valid key.");
+      return;
+    }
+    // Rows this device already encrypted stay readable only with its own key,
+    // so replacing it silently could strand them on the server.
+    if (keyFp && pastedFp !== keyFp && replaceFp !== pastedFp) {
+      setReplaceFp(pastedFp);
+      setKeyMessage(`This replaces this device's key (${keyFp}). Data it already encrypted needs that key to read, so back it up first.`);
+      return;
+    }
+    const ok = await importEncryptionKey(pasted);
+    setKeyMessage(ok ? "Key installed. Pull your data to decrypt it here." : "That does not look like a valid key.");
+    if (!ok) return;
+    setKeyInput("");
+    setReplaceFp(null);
+    // The pill and a revealed backup still describe the replaced key.
+    setKeyRevealed(false);
+    setKeyText("");
+    void keyFingerprint().then(setKeyFp);
+  }
 
   function revealKey() {
     if (keyRevealed) {
@@ -410,7 +437,10 @@ export default function SettingsPage() {
                   <input
                     type="password"
                     value={keyInput}
-                    onChange={(e) => setKeyInput(e.target.value)}
+                    onChange={(e) => {
+                      setKeyInput(e.target.value);
+                      setReplaceFp(null);
+                    }}
                     placeholder="Paste a backed-up key"
                     aria-label="Paste a backed-up encryption key"
                     className="flex-1 min-w-0 card p-2 text-xs font-mono"
@@ -419,19 +449,9 @@ export default function SettingsPage() {
                     size="sm"
                     variant="secondary"
                     disabled={!keyInput.trim()}
-                    onClick={() =>
-                      void importEncryptionKey(keyInput.trim()).then((ok) => {
-                        setKeyMessage(ok ? "Key installed. Pull your data to decrypt it here." : "That does not look like a valid key.");
-                        if (!ok) return;
-                        setKeyInput("");
-                        // The pill and a revealed backup still describe the replaced key.
-                        setKeyRevealed(false);
-                        setKeyText("");
-                        void keyFingerprint().then(setKeyFp);
-                      })
-                    }
+                    onClick={() => void installPastedKey()}
                   >
-                    Use key
+                    {replaceFp ? "Replace key" : "Use key"}
                   </Button>
                 </div>
                 {keyMessage ? (

@@ -41,6 +41,9 @@ function dayDelta(a: IsoDate, b: IsoDate): number {
 export function touchStreak(state: StreakState, today: IsoDate): StreakState {
   if (state.lastActiveDate === today) return state;
   const gap = state.lastActiveDate ? dayDelta(state.lastActiveDate, today) : Infinity;
+  // A "today" before the last active day (a flight west, a synced device whose
+  // clock runs ahead) is a day already counted, not a broken streak.
+  if (gap < 0) return state;
   // gap === 2 is the grace day: the streak holds but does not increment.
   const current = gap === 1 ? state.current + 1 : gap === 2 ? state.current : 1;
   return {

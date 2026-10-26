@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { PostSessionClosure as Closure } from "@/domain/post-session-closure";
 import { Button, Panel, Pill, ProgressBar, SectionHeading, StatTile } from "./ui";
+import { marksLabel } from "@/domain/plural";
 
 const NEXT_ACTIONS = {
   mistakes: { href: "/review?mode=mistakes", label: "Review mistakes", tone: "danger" as const },
@@ -44,7 +45,7 @@ export function PostSessionClosure({
           ) : (
             <StatTile label="Score" value={`${closure.scorePercent}%`} sub={`${closure.awardedMarks}/${closure.availableMarks} marks`} tone={scoreTone} />
           )}
-          <StatTile label="Next" value={next.label} sub={closure.recommended ? "Based on latest evidence" : closure.missedMarks ? `${closure.missedMarks} marks to repair` : "keep the gain"} />
+          <StatTile label="Next" value={next.label} sub={closure.recommended ? "Based on latest evidence" : closure.missedMarks ? `${marksLabel(closure.missedMarks)} to repair` : "keep the gain"} />
         </div>
 
         <ProgressBar value={closure.completionPercent / 100} label="Session completion" tone={closure.completionPercent === 100 ? "success" : "review"} />

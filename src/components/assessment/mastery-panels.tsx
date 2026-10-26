@@ -7,6 +7,7 @@ import { Button, Panel, Pill, ProgressBar, SectionHeading, StatTile } from "../u
 import { EmptyHint, UncertaintyGlyph } from "./shared";
 import { plainEvidenceLine } from "@/domain/plain-evidence";
 import { StudentOnly, TeacherOnly, useTeacherMode } from "../TeacherMode";
+import { marksLabel } from "@/domain/plural";
 
 function accuracyLabel(accuracy: number | null): string {
   return accuracy == null ? "—" : `${Math.round(accuracy * 100)}%`;
@@ -117,13 +118,13 @@ export function TechniqueVsKnowledgeCard() {
         <StatTile
           label="Knowledge gaps"
           value={`${knowledgePercent}%`}
-          sub={`${split.knowledgeLost} marks lost`}
+          sub={`${marksLabel(split.knowledgeLost)} lost`}
           tone={knowledgePercent >= techniquePercent ? "danger" : undefined}
         />
         <StatTile
           label="Exam technique"
           value={`${techniquePercent}%`}
-          sub={`${split.techniqueLost} marks lost`}
+          sub={`${marksLabel(split.techniqueLost)} lost`}
           tone={techniquePercent > knowledgePercent ? "review" : undefined}
         />
       </div>
@@ -452,7 +453,7 @@ export function RecurringMisconceptions() {
                 >
                   {entry.statement}
                 </Link>
-                <Pill tone="danger">{marksLost} marks</Pill>
+                <Pill tone="danger">{marksLabel(marksLost)}</Pill>
               </div>
               <p className="text-[11px] text-ink3 mt-1">
                 {subject?.name ?? entry.subjectId}

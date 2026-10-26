@@ -11,6 +11,7 @@ import { useStoreFields } from "@/state/store";
 import { PaperMission } from "./MissionCard";
 import { useRecoveryEvidence } from "./recovery-evidence";
 import { Pill } from "./ui";
+import { marksLabel } from "@/domain/plural";
 
 
 export function usePaperRecovery(paperId: string, title: string): PaperRecovery | null {
@@ -37,7 +38,7 @@ export function PaperRecoveryPanel({ paperId, title, withMission = false }: { pa
     <section aria-label={`Recovery: ${title}`} className="space-y-3">
       <div>
         <p className="text-sm font-semibold text-ink">{title}</p>
-        <p className="text-xs text-ink2">Score {Math.round(r.score * 10) / 10} / {r.max} · {t.previouslyLost} marks lost</p>
+        <p className="text-xs text-ink2">Score {Math.round(r.score * 10) / 10} / {r.max} · {marksLabel(t.previouslyLost)} lost</p>
         <ul className="mt-1 text-xs text-ink2 space-y-0.5">
           <li>{addressed} addressed</li>
           <li>{t.proven} proven recovered</li>

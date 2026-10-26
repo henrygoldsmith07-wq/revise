@@ -6,6 +6,7 @@ import { buildMistakePatterns } from "@/domain/mistake-patterns";
 import { INTERVENTION_LABEL } from "@/domain/intervention-ranking";
 import { useStoreFields } from "@/state/store";
 import { Panel, Pill, SectionHeading } from "./ui";
+import { marksLabel } from "@/domain/plural";
 
 const NEXT: Record<string, string> = {
   "misconception-correction": "misconception repair",
@@ -43,7 +44,7 @@ export function MistakePatternsPanel() {
               {row.papers.length ? ` · ${row.papers.length} paper${row.papers.length === 1 ? "" : "s"}` : ""} · next: {NEXT[row.intervention] ?? INTERVENTION_LABEL[row.intervention]}
             </p>
             <Pill tone={row.repaired ? "success" : row.recurring ? "danger" : "neutral"}>
-              {row.repaired ? "Repaired on a different question" : row.openMarks ? `${row.openMarks} marks still open` : "Awaiting proof on a different question"}
+              {row.repaired ? "Repaired on a different question" : row.openMarks ? `${marksLabel(row.openMarks)} still open` : "Awaiting proof on a different question"}
             </Pill>
           </article>
         ))}

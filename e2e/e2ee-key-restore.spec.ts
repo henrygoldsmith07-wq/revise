@@ -5,7 +5,7 @@ import { completeOnboarding, todayOrOnboarding } from "./helpers";
 // Restoring on a second device: the fingerprint is how a learner checks both
 // devices hold the same key, so it must describe the key just pasted, not the
 // one this device generated when encryption was switched on.
-test("pasting a backed-up key updates the key fingerprint to that key's", async ({ page }) => {
+test("pasting a backed-up key asks before replacing this device's key, then shows the new key's fingerprint", async ({ page }) => {
   const key = await webcrypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
   const jwk = JSON.stringify(await webcrypto.subtle.exportKey("jwk", key));
   const digest = await webcrypto.subtle.digest("SHA-256", await webcrypto.subtle.exportKey("raw", key));
@@ -24,6 +24,10 @@ test("pasting a backed-up key updates the key fingerprint to that key's", async 
 
   await section.getByLabel("Paste a backed-up encryption key").fill(jwk);
   await section.getByRole("button", { name: "Use key" }).click();
+  // A different key replaces this device's own, so it asks once, naming the key it replaces.
+  await expect(section.getByRole("status")).toContainText(`This replaces this device's key (${generated})`);
+  await expect(section.getByText(`Key fingerprint: ${generated}`)).toBeVisible();
+  await section.getByRole("button", { name: "Replace key" }).click();
   await expect(section.getByRole("status")).toHaveText("Key installed. Pull your data to decrypt it here.");
   await expect(section.getByText(`Key fingerprint: ${expected}`)).toBeVisible();
 });

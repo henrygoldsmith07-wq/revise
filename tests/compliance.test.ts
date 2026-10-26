@@ -10,7 +10,7 @@ import {
   maskSummaryMany,
   hasMaskedContent,
 } from "@/ai/pii";
-import { decryptPayload, encryptPayload, isEncryptedPayload } from "@/data/e2ee";
+import { decryptPayload, encryptPayload, fingerprintOfJwk, isEncryptedPayload, keyFingerprint } from "@/data/e2ee";
 
 const src = (p: string) => resolve(process.cwd(), p);
 
@@ -175,6 +175,14 @@ describe("client wiring: masking precedes every outbound AI call", () => {
 });
 
 describe("E2EE for the sync outbox", () => {
+  it("fingerprints a pasted key without installing it, and refuses anything that is not one", async () => {
+    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+    const jwk = JSON.stringify(await crypto.subtle.exportKey("jwk", key));
+    expect(await fingerprintOfJwk(jwk)).toBe(await keyFingerprint(key));
+    expect(await fingerprintOfJwk("not a key")).toBeNull();
+    expect(await fingerprintOfJwk(JSON.stringify({ kty: "oct" }))).toBeNull();
+  });
+
   it("encrypt → decrypt round-trips arbitrary payloads", async () => {
     const key = await crypto.subtle.generateKey(
       { name: "AES-GCM", length: 256 },

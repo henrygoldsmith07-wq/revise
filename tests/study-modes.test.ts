@@ -53,6 +53,14 @@ describe("shuffleWithSeed", () => {
   it("keeps every element", () => {
     expect(shuffleWithSeed(deck, 3).map((c) => c.id).sort()).toEqual(deck.map((c) => c.id).sort());
   });
+
+  it("puts a multiple-choice answer in each of four positions equally often", () => {
+    // The old LCG took `state % 4` from its low bits and put the answer first
+    // a third of the time and second only a sixth.
+    const counts = [0, 0, 0, 0];
+    for (let seed = 1; seed <= 20_000; seed++) counts[shuffleWithSeed([0, 1, 2, 3], seed).indexOf(0)]!++;
+    for (const count of counts) expect(Math.abs(count / 20_000 - 0.25)).toBeLessThan(0.02);
+  });
 });
 
 describe("learn mode", () => {
@@ -144,6 +152,26 @@ describe("matchesWritten", () => {
     expect(matchesWritten("", "The newton")).toBe(false);
   });
 
+  it("never marks a blank answer right, even when the expected answer is a symbol", () => {
+    for (const symbol of ["Ω", "λ", "∝", "π"]) {
+      expect(matchesWritten("", symbol), symbol).toBe(false);
+      expect(matchesWritten("   ", symbol), symbol).toBe(false);
+    }
+    expect(matchesWritten("Ω", "Ω")).toBe(true);
+    expect(matchesWritten("ω", "Ω")).toBe(true);
+    expect(matchesWritten("λ", "Ω")).toBe(false);
+    expect(matchesWritten("∝", "∝")).toBe(true);
+    expect(matchesWritten("→", "∝")).toBe(false);
+  });
+
+  it("reads accented and Greek letters as letters, with accents optional", () => {
+    expect(matchesWritten("dwr", "dŵr")).toBe(true);
+    expect(matchesWritten("dŵr", "dŵr")).toBe(true);
+    expect(matchesWritten("tân", "dŵr")).toBe(false);
+    expect(matchesWritten("lambda λ", "wavelength λ")).toBe(false);
+    expect(matchesWritten("wavelength", "wavelength λ")).toBe(true);
+  });
+
   it("passes a long answer on most of its content words, not all", () => {
     const expected = "Concentration of reactants falls so there are fewer successful collisions per second";
     expect(matchesWritten("concentration of reactants falls, fewer successful collisions per second", expected)).toBe(true);
@@ -189,6 +217,17 @@ describe("test mode", () => {
     const questions = buildTest(deck, { multipleChoice: true, written: false, trueFalse: false, limit: 5 }, 1);
     for (const question of questions) {
       expect(question.options![question.correctIndex!]).toBe(question.answer.trim());
+    }
+  });
+
+  it("does not alternate the true/false key, and makes about half of them false", () => {
+    const many = Array.from({ length: 24 }, (_, i) => card(`tf${i}`, `Q${i}`, `A${i}`));
+    for (const seed of [1, 2, 4242]) {
+      const key = buildTest(many, { multipleChoice: false, written: false, trueFalse: true, limit: 24 }, seed)
+        .map((q) => (q.correctIndex === 0 ? "T" : "F"))
+        .join("");
+      expect(key, `seed ${seed}`).not.toMatch(/^(?:TF)+T?$|^(?:FT)+F?$/);
+      expect(key.split("F").length - 1, `seed ${seed}`).toBe(12);
     }
   });
 

@@ -175,6 +175,11 @@ export function buildTest(cards: Card[], spec: TestSpec, seed = 1): TestQuestion
   if (!kinds.length) return [];
 
   const chosen = shuffleWithSeed(cards, seed).slice(0, Math.max(1, spec.limit));
+  // Half the true/false questions are given a wrong answer to judge —
+  // otherwise "true" is always right and the question tests nothing. Which
+  // half is shuffled: deciding by parity made the key alternate T, F, T, F.
+  const trueFalseIndices = chosen.map((_, index) => index).filter((index) => kinds[index % kinds.length] === "true-false");
+  const lies = new Set(shuffleWithSeed(trueFalseIndices, seed + 1).slice(0, Math.floor(trueFalseIndices.length / 2)));
 
   return chosen.map((card, index) => {
     const kind = kinds[index % kinds.length];
@@ -191,9 +196,7 @@ export function buildTest(cards: Card[], spec: TestSpec, seed = 1): TestQuestion
       };
     }
     if (kind === "true-false") {
-      // Half the true/false questions are given a wrong answer to judge —
-      // otherwise "true" is always right and the question tests nothing.
-      const lie = (index + seed) % 2 === 1;
+      const lie = lies.has(index);
       const other = cards.find((c) => c.id !== card.id && c.back.trim() !== card.back.trim());
       const shown = lie && other ? other.back : card.back;
       return {
@@ -247,16 +250,23 @@ export function gradeTest(questions: TestQuestion[], answers: Record<Id, string>
  * A student who writes "the newton" for "newton (N)" knew the answer.
  */
 export function matchesWritten(given: string, expected: string): boolean {
+  // Letters in any script count, so "Ω", "λ" and Welsh "dŵr" are words, and an
+  // accent is optional ("dwr" is "dŵr"). Stripping everything outside a–z
+  // left a symbol answer with no words, and a blank answer then matched it.
   const normalise = (text: string) =>
     text
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
       .split(/\s+/)
       .filter((w) => w && !["the", "a", "an", "is", "are", "of", "to", "in", "and", "it"].includes(w));
 
+  if (!given.trim()) return !expected.trim();
   const all = normalise(expected);
   const got = new Set(normalise(given));
-  if (!all.length) return got.size === 0;
+  // An answer that is only symbols ("∝", "→") has no words: compare the symbols.
+  if (!all.length) return given.normalize("NFKC").replace(/\s+/g, "") === expected.normalize("NFKC").replace(/\s+/g, "");
   if (!got.size) return false;
 
   // Single characters in an expected answer are almost always a bracketed
