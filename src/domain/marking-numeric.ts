@@ -69,8 +69,12 @@ function extractNumbersUncached(input: string): Array<{ raw: string; value: numb
 }
 
 /** Tolerance for numeric equivalence: absolute for |expected|<1, relative otherwise. */
-function numbersClose(a: number, b: number, relEps = 0.01, absEps = 0.005): boolean {
+function numbersClose(a: number, b: number, relEps = 0.01, absEps = 0.005, flatSlack = false): boolean {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  // Two small non-zero values (1.0×10⁻⁶ and 0.50×10⁻⁶, or 6.6×10⁻³⁴ and 9.1×10⁻³¹)
+  // are compared by ratio: a flat 0.005 slack would call every pair of them equal (pass 82).
+  const big = Math.max(Math.abs(a), Math.abs(b));
+  if (!flatSlack && big < 0.01 && a !== 0 && b !== 0) return Math.abs(a - b) <= relEps * big;
   const scale = Math.max(1, Math.abs(a), Math.abs(b));
   return Math.abs(a - b) <= Math.max(absEps, relEps * scale);
 }
@@ -176,6 +180,23 @@ function requiredMathNotationPresent(point: string, answer: string): boolean {
   return true;
 }
 
+/** "1911 N" in the scheme, "1.91 kN" in the answer: the same result at an SI-prefix scale (powers of 1000). */
+function prefixScaledResultPresent(result: string, answer: string): boolean {
+  const wanted = extractNumbersCached(result.replace(/[−–—]/g, "-"));
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-"));
+  for (const w of wanted) {
+    if (w.value == null || w.value === 0) continue;
+    for (const g of given) {
+      if (g.value == null || g.value === 0) continue;
+      for (const k of [-9, -6, -3, 3, 6, 9]) {
+        const scaled = w.value * 10 ** k;
+        if (Math.abs(scaled - g.value) <= 0.015 * Math.max(Math.abs(scaled), Math.abs(g.value))) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 export function numericMatch(point: string, answer: string): boolean {
   // "Magnitude = √(3² + 4²) = 5 km": the root is working, the result is "5 km".
@@ -185,6 +206,18 @@ export function numericMatch(point: string, answer: string): boolean {
   if (lastEquals > 0 && /√|\bsqrt\b|π|\bpi\b/i.test(point.slice(0, lastEquals))) {
     const result = point.slice(lastEquals + 1);
     if (/\d/.test(result) && !/√|\bsqrt\b|π|\bpi\b|[a-z]\s*[=<>≤≥]/i.test(result)) return numericMatch(result, answer);
+  }
+  // "ρ = RA/L = 4.0×0.50×10⁻⁶/2.0 = 1.0×10⁻⁶ Ω m": a chained calculation point is
+  // earned by its final value. A number that only shows up in the working (R = 4.0)
+  // must not earn the result mark when the answer's own result is wrong (pass 82).
+  // Follow-through points deliberately credit a different number, so they keep the flat slack.
+  const followThrough = /follow[- ]?through|\becf\b|\ballow\b|\baccept\b/i.test(point);
+  const segments = point.split("=");
+  // Only when the answer shows its own working and the point is one unbroken chain: an answer that
+  // legitimately states just the final value must still earn an intermediate point.
+  if (segments.length >= 4 && !followThrough && !point.includes(";") && (answer.match(/=/g) ?? []).length >= 2) {
+    const result = segments[segments.length - 1] ?? "";
+    if (/^\s*-?\d[\d.,]*\s*(?:[×x*]\s*10\s*[⁻-]?[⁰¹²³⁴⁵⁶⁷⁸⁹\d^]+)?\s*[A-Za-zΩµ°/ ⁻⁰¹²³⁴⁵⁶⁷⁸⁹^-]*$/.test(result) && !numericMatch(result, answer) && !prefixScaledResultPresent(result, answer)) return false;
   }
   if (!requiredMathNotationPresent(point, answer)) return false;
   const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
@@ -203,7 +236,7 @@ export function numericMatch(point: string, answer: string): boolean {
     if (w.value == null) continue;
     for (const g of given) {
       if (g.value == null) continue;
-      if (numbersClose(w.value, g.value)) {
+      if (numbersClose(w.value, g.value, 0.01, 0.005, followThrough)) {
         // Values are close; the unit gate can still veto cross-family pairs.
         const qw = wantQuantities().find((q) => q.value === w.value);
         if (!qw?.unit) return true;
