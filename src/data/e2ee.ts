@@ -134,6 +134,16 @@ export async function importEncryptionKey(jwkJson: string): Promise<boolean> {
   }
 }
 
+/** Fingerprint of a pasted key without installing it, or null when it is not a valid key. */
+export async function fingerprintOfJwk(jwkJson: string): Promise<string | null> {
+  try {
+    const key = await crypto.subtle.importKey("jwk", JSON.parse(jwkJson) as JsonWebKey, { name: ALG }, true, ["encrypt", "decrypt"]);
+    return await keyFingerprint(key);
+  } catch {
+    return null;
+  }
+}
+
 // One key per session: generation/persist happens once, every later call
 // reuses the memoised CryptoKey instead of re-reading IndexedDB per row.
 let memoized: Promise<CryptoKey> | null = null;
