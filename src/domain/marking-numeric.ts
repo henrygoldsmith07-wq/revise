@@ -180,6 +180,23 @@ function requiredMathNotationPresent(point: string, answer: string): boolean {
   return true;
 }
 
+/** "1911 N" in the scheme, "1.91 kN" in the answer: the same result at an SI-prefix scale (powers of 1000). */
+function prefixScaledResultPresent(result: string, answer: string): boolean {
+  const wanted = extractNumbersCached(result.replace(/[−–—]/g, "-"));
+  const given = extractNumbersCached(answer.replace(/[−–—]/g, "-"));
+  for (const w of wanted) {
+    if (w.value == null || w.value === 0) continue;
+    for (const g of given) {
+      if (g.value == null || g.value === 0) continue;
+      for (const k of [-9, -6, -3, 3, 6, 9]) {
+        const scaled = w.value * 10 ** k;
+        if (Math.abs(scaled - g.value) <= 0.015 * Math.max(Math.abs(scaled), Math.abs(g.value))) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** True when the answer contains a number equivalent to any number in the mark scheme. */
 export function numericMatch(point: string, answer: string): boolean {
   // "Magnitude = √(3² + 4²) = 5 km": the root is working, the result is "5 km".
@@ -196,9 +213,11 @@ export function numericMatch(point: string, answer: string): boolean {
   // Follow-through points deliberately credit a different number, so they keep the flat slack.
   const followThrough = /follow[- ]?through|\becf\b|\ballow\b|\baccept\b/i.test(point);
   const segments = point.split("=");
-  if (segments.length >= 4 && !followThrough) {
+  // Only when the answer shows its own working and the point is one unbroken chain: an answer that
+  // legitimately states just the final value must still earn an intermediate point.
+  if (segments.length >= 4 && !followThrough && !point.includes(";") && (answer.match(/=/g) ?? []).length >= 2) {
     const result = segments[segments.length - 1] ?? "";
-    if (/^\s*-?\d[\d.,]*\s*(?:[×x*]\s*10\s*[⁻-]?[⁰¹²³⁴⁵⁶⁷⁸⁹\d^]+)?\s*[A-Za-zΩµ°/ ⁻⁰¹²³⁴⁵⁶⁷⁸⁹^-]*$/.test(result) && !numericMatch(result, answer)) return false;
+    if (/^\s*-?\d[\d.,]*\s*(?:[×x*]\s*10\s*[⁻-]?[⁰¹²³⁴⁵⁶⁷⁸⁹\d^]+)?\s*[A-Za-zΩµ°/ ⁻⁰¹²³⁴⁵⁶⁷⁸⁹^-]*$/.test(result) && !numericMatch(result, answer) && !prefixScaledResultPresent(result, answer)) return false;
   }
   if (!requiredMathNotationPresent(point, answer)) return false;
   const wanted = extractNumbersCached(point.replace(/[−–—]/g, "-"));
