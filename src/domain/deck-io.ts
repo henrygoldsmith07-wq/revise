@@ -1,6 +1,6 @@
 import { createCard, normaliseTags } from "./scheduling";
 import { normaliseCloze } from "./cloze";
-import { todayLocal } from "./local-date";
+import { isLocalDateKey, todayLocal } from "./local-date";
 import type { Card, DeckExport, DeckExportCard, Id } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -141,6 +141,10 @@ export function parseDeckJson(text: string): ImportReport {
 
   const cards: DeckExportCard[] = [];
   rows.slice(0, MAX_CARDS).forEach((row, index) => {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) {
+      rejected.push({ row: index + 1, reason: "not a card" });
+      return;
+    }
     const record = row as Record<string, unknown>;
     const front = str(record.front ?? record.question ?? record.Front);
     const back = str(record.back ?? record.answer ?? record.Back);
@@ -172,13 +176,16 @@ export function parseDeckJson(text: string): ImportReport {
       subjectId: str(record.subjectId, 200) || undefined,
       scheduling: scheduling
         ? {
-            due: str(scheduling.due, 10) || todayLocal(),
+            due: isLocalDateKey(scheduling.due) ? scheduling.due : todayLocal(),
             stability: clamp(Number(scheduling.stability) || 0, 0, 36500),
             difficulty: clamp(Number(scheduling.difficulty) || 5, 1, 10),
             reps: clamp(Math.round(Number(scheduling.reps) || 0), 0, 100000),
             lapses: clamp(Math.round(Number(scheduling.lapses) || 0), 0, 100000),
             state: clamp(Math.round(Number(scheduling.state) || 0), 0, 3),
-            lastReviewedAt: typeof scheduling.lastReviewedAt === "string" ? scheduling.lastReviewedAt : null,
+            lastReviewedAt:
+              typeof scheduling.lastReviewedAt === "string" && Number.isFinite(Date.parse(scheduling.lastReviewedAt))
+                ? scheduling.lastReviewedAt
+                : null,
           }
         : undefined,
     });
@@ -205,40 +212,56 @@ export function parseDeckJson(text: string): ImportReport {
   };
 }
 
+/** Anki's named `#separator:` values; anything else is taken as the literal character. */
+const ANKI_SEPARATORS: Record<string, string> = { tab: "\t", comma: ",", semicolon: ";", pipe: "|", space: " ", colon: ":" };
+/** Anki columns that are neither side of the card. */
+const ANKI_META_COLUMNS = ["notetype column", "deck column", "guid column"];
+
 /**
  * Parse delimited text — the lingua franca of shared decks (Anki, Quizlet and
- * every spreadsheet export). Columns: front, back, tags.
+ * every spreadsheet export). Columns: front, back, tags. Anki's leading
+ * `#key:value` lines name the separator and the tag column.
  */
 export function parseDeckCsv(text: string, name = "Imported deck"): ImportReport {
   const rejected: ImportReport["rejected"] = [];
   const warnings: string[] = [];
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (!lines.length) return { deck: null, accepted: 0, rejected, warnings: ["That file is empty."] };
-
+  // Excel writes a byte-order mark, which would otherwise hide a header row.
+  const body = text.replace(/^\uFEFF/, "");
+  const directives = leadingDirectives(body);
+  const firstRow = body.split(/\r?\n/).find((line) => line.trim() && !line.startsWith("#")) ?? "";
+  const separator = directives.get("separator");
   // Tabs win when present: Anki exports are tab-separated and answers commonly
   // contain commas, so guessing comma-first mangles them.
-  const delimiter = lines[0].includes("\t") ? "\t" : ",";
+  const delimiter = separator
+    ? (ANKI_SEPARATORS[separator.toLowerCase()] ?? separator[0]!)
+    : firstRow.includes("\t") ? "\t" : ",";
+  const columnIndex = (key: string) => {
+    const column = Number(directives.get(key));
+    return Number.isInteger(column) && column >= 1 ? column - 1 : null;
+  };
+  const tagIndex = columnIndex("tags column") ?? 2;
+  const skipped = new Set([tagIndex, ...ANKI_META_COLUMNS.map(columnIndex).filter((i): i is number => i !== null)]);
+
+  const records = readDelimitedRecords(body, delimiter, MAX_CARDS + 1);
+  if (!records.length) return { deck: null, accepted: 0, rejected, warnings: ["That file is empty."] };
   const cards: DeckExportCard[] = [];
 
-  lines.slice(0, MAX_CARDS).forEach((line, index) => {
-    // Skip Anki's `#`-prefixed metadata lines.
-    if (line.startsWith("#")) return;
-    const fields = splitDelimited(line, delimiter);
-    if (index === 0 && /^(front|question|term)$/i.test(fields[0]?.trim() ?? "")) return; // header
-    const [front, back, tags] = fields;
+  records.slice(0, MAX_CARDS).forEach((record, index) => {
+    const [front, back] = record.fields.filter((_, column) => !skipped.has(column));
+    if (index === 0 && /^(front|question|term)$/i.test(front?.trim() ?? "")) return; // header
     if (!front?.trim() || !back?.trim()) {
-      rejected.push({ row: index + 1, reason: "needs at least two columns" });
+      rejected.push({ row: record.line, reason: "needs at least two columns" });
       return;
     }
     cards.push({
       front: front.slice(0, MAX_FIELD),
       back: back.slice(0, MAX_FIELD),
       kind: "basic",
-      tags: normaliseTags((tags ?? "").split(/[ ,;]+/)),
+      tags: normaliseTags((record.fields[tagIndex] ?? "").split(/[ ,;]+/)),
     });
   });
 
-  if (lines.length > MAX_CARDS) warnings.push(`Only the first ${MAX_CARDS} rows were read.`);
+  if (records.length > MAX_CARDS) warnings.push(`Only the first ${MAX_CARDS} rows were read.`);
   if (!cards.length) {
     warnings.push("No rows had both a front and a back.");
     return { deck: null, accepted: 0, rejected, warnings };
@@ -257,31 +280,84 @@ export function parseDeckCsv(text: string, name = "Imported deck"): ImportReport
   };
 }
 
-/** Respects quoted fields so a comma inside an answer does not split it. */
-function splitDelimited(line: string, delimiter: string): string[] {
-  const out: string[] = [];
-  let current = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (quoted && line[i + 1] === '"') {
-        current += '"';
-        i++;
-        continue;
-      }
-      quoted = !quoted;
-      continue;
-    }
-    if (char === delimiter && !quoted) {
-      out.push(current);
-      current = "";
-      continue;
-    }
-    current += char;
+/** Anki's `#key:value` header lines, keys lower-cased. Only the ones before the first row count. */
+function leadingDirectives(text: string): Map<string, string> {
+  const directives = new Map<string, string>();
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    if (!line.startsWith("#")) break;
+    const match = /^#([^:]+):(.*)$/.exec(line);
+    if (match) directives.set(match[1]!.trim().toLowerCase(), match[2]!.trim());
   }
-  out.push(current);
-  return out;
+  return directives;
+}
+
+interface DelimitedRecord {
+  fields: string[];
+  /** 1-based source line the record starts on, for the rejection report. */
+  line: number;
+}
+
+/**
+ * RFC 4180 records: a quote opens a field only at its first character, `""`
+ * inside one is a literal quote, and a quoted field may span lines (a
+ * spreadsheet cell with line breaks). A quote anywhere else is plain text, so
+ * `A 5" screen` cannot swallow the rest of the file. Blank records and
+ * `#`-prefixed lines (Anki directives and comments) are skipped.
+ */
+function readDelimitedRecords(text: string, delimiter: string, limit: number): DelimitedRecord[] {
+  const records: DelimitedRecord[] = [];
+  let fields: string[] = [];
+  let field = "";
+  let quoted = false;
+  let fieldStart = true;
+  let comment = false;
+  let line = 1;
+  let recordLine = 1;
+  const endRecord = () => {
+    fields.push(field);
+    if (!comment && fields.some((value) => value.trim())) records.push({ fields, line: recordLine });
+    fields = [];
+    field = "";
+    fieldStart = true;
+    comment = false;
+  };
+  for (let i = 0; i < text.length && records.length < limit; i++) {
+    const char = text[i]!;
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+      } else if (char === "\r" && text[i + 1] === "\n") {
+        continue;
+      } else {
+        if (char === "\n") line++;
+        field += char;
+      }
+      continue;
+    }
+    if (char === '"' && fieldStart) {
+      quoted = true;
+      fieldStart = false;
+    } else if (char === delimiter) {
+      fields.push(field);
+      field = "";
+      fieldStart = true;
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      endRecord();
+      line++;
+      recordLine = line;
+    } else {
+      if (char === "#" && fieldStart && !fields.length) comment = true;
+      field += char;
+      fieldStart = false;
+    }
+  }
+  if (records.length < limit) endRecord();
+  return records;
 }
 
 export function parseDeckFile(text: string, filename: string): ImportReport {
