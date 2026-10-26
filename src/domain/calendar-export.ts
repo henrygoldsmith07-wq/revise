@@ -29,11 +29,18 @@ export function icsEscape(text: string): string {
     .replace(/\r?\n/g, "\\n");
 }
 
-/** Floating local datetime in basic format, e.g. 20261005T143000. */
+/**
+ * Floating local datetime in basic format, e.g. 20261005T143000. A minute past
+ * the end of the day (a session that runs over midnight) rolls into the next
+ * date: hour 24 is not a valid DATE-TIME, and calendar apps reject the file.
+ */
 export function icsDateTime(date: IsoDate, startMinute: number): string {
-  const hours = Math.floor(startMinute / 60);
-  const minutes = startMinute % 60;
-  return `${date.replace(/-/g, "")}T${String(hours).padStart(2, "0")}${String(minutes).padStart(2, "0")}00`;
+  const dayOffset = Math.floor(startMinute / (24 * 60));
+  const minuteOfDay = startMinute - dayOffset * 24 * 60;
+  const day = dayOffset ? isoDatePlusDays(date, dayOffset) : date;
+  const hours = Math.floor(minuteOfDay / 60);
+  const minutes = minuteOfDay % 60;
+  return `${day.replace(/-/g, "")}T${String(hours).padStart(2, "0")}${String(minutes).padStart(2, "0")}00`;
 }
 
 /** The ISO date exactly n days after the given date. */

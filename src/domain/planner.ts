@@ -640,12 +640,24 @@ export interface RollForwardConstraints {
  * Without constraints the old behaviour stands: when nothing is under the
  * cap the work lands on `today`.
  */
+/** The block that starts last on a day: rolled work is placed after it. */
+interface DayTail {
+  start: number;
+  end: number;
+}
+
+function rolledStart(tails: Map<IsoDate, DayTail>, date: IsoDate): number {
+  const tail = tails.get(date);
+  return tail ? tail.end + 5 : DEFAULT_DAY_START;
+}
+
 function rollTarget(
   session: PlannedSession,
   today: IsoDate,
   dailyBlockCap: number,
   countByDate: Map<IsoDate, number>,
   constraints: RollForwardConstraints | undefined,
+  endByDate: Map<IsoDate, DayTail>,
 ): IsoDate | null {
   const exam = constraints?.exams
     ?.filter((e) => e.subjectId === session.subjectId && e.date >= today)
@@ -655,6 +667,8 @@ function rollTarget(
     const candidate = addLocalDays(today, i);
     if (exam && candidate >= exam) break;
     if ((countByDate.get(candidate) ?? 0) >= dailyBlockCap) continue;
+    // Rolled work goes after the day's last block; nothing runs past midnight.
+    if (rolledStart(endByDate, candidate) + session.minutes > 24 * 60) continue;
     if (constraints?.availability) {
       const weekday = new Date(`${candidate}T00:00:00Z`).getUTCDay();
       let room = constraints.availability.find((a) => a.weekday === weekday)?.minutes ?? 0;
@@ -681,23 +695,26 @@ function requeue(
   constraints: RollForwardConstraints | undefined,
 ): void {
   const countByDate = new Map<IsoDate, number>();
+  const endByDate = new Map<IsoDate, DayTail>();
   for (const s of out) {
-    if (s.date < today || s.status === "missed") continue;
+    if (s.date < today) continue;
+    // The last block's end, as the old placement read it (missed rows included).
+    const last = endByDate.get(s.date);
+    if (last === undefined || s.startMinute > last.start) endByDate.set(s.date, { start: s.startMinute, end: s.startMinute + s.minutes });
+    if (s.status === "missed") continue;
     countByDate.set(s.date, (countByDate.get(s.date) ?? 0) + 1);
   }
   for (const session of stale) {
-    const target = rollTarget(session, today, dailyBlockCap, countByDate, constraints);
+    const target = rollTarget(session, today, dailyBlockCap, countByDate, constraints, endByDate);
     if (!target) continue;
     countByDate.set(target, (countByDate.get(target) ?? 0) + 1);
-    const lastOfDay = out
-      .filter((s) => s.date === target)
-      .sort((a, b) => a.startMinute - b.startMinute)
-      .pop();
+    const startMinute = rolledStart(endByDate, target);
+    endByDate.set(target, { start: startMinute, end: startMinute + session.minutes });
     out.push({
       ...session,
       id: idFactory(),
       date: target,
-      startMinute: lastOfDay ? lastOfDay.startMinute + lastOfDay.minutes + 5 : DEFAULT_DAY_START,
+      startMinute,
       status: "pending",
       reason: `Rescheduled from ${session.date}. ${session.reason}`.trim(),
     });

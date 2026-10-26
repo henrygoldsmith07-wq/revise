@@ -44,6 +44,12 @@ describe("icsDateTime", () => {
     expect(icsDateTime("2026-10-06", 1050)).toBe("20261006T173000");
     expect(icsDateTime("2026-10-06", 0)).toBe("20261006T000000");
   });
+
+  it("rolls a time past midnight into the next day instead of writing hour 24", () => {
+    expect(icsDateTime("2026-12-31", 24 * 60 + 30)).toBe("20270101T003000");
+    const ics = buildIcsCalendar({ sessions: [session({ startMinute: 23 * 60 + 30, minutes: 60 })], exams: [], subjectName: () => "Physics" });
+    expect(ics).toContain("DTEND:20261007T003000");
+  });
 });
 
 describe("isoDatePlusDays", () => {

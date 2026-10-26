@@ -106,7 +106,9 @@ export function buildSearchIndex(corpus: SearchCorpus): SearchIndex {
 export function searchIndex(index: SearchIndex, rawQuery: string, limit = 30): SearchResult[] {
   const query = rawQuery.trim().toLowerCase();
   if (query.length < 2) return [];
-  const words = terms(query);
+  // Compiled once per keystroke, not once per word per document: the scan
+  // runs over every card the student owns.
+  const words = terms(query).map((word) => ({ word, atWordStart: new RegExp(`\\b${escapeRegExp(word)}`) }));
   const out: SearchResult[] = [];
 
   // Titles outweigh bodies, and topics outrank cards at equal strength: a
@@ -132,14 +134,17 @@ export function searchIndex(index: SearchIndex, rawQuery: string, limit = 30): S
   return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
-/** As scoreText, but the haystack is already lower-cased. */
-function scoreLower(hay: string, query: string, words: string[], weight: number): number {
+/** As scoreText, but the haystack is already lower-cased and the word patterns compiled. */
+function scoreLower(hay: string, query: string, words: { word: string; atWordStart: RegExp }[], weight: number): number {
   let score = 0;
   if (hay.includes(query)) score += 10 * weight;
-  for (const w of words) {
-    if (hay.startsWith(w)) score += 4 * weight;
-    else if (new RegExp(`\\b${escapeRegExp(w)}`).test(hay)) score += 3 * weight;
-    else if (hay.includes(w)) score += 1 * weight;
+  for (const { word, atWordStart } of words) {
+    // Most documents contain most words nowhere; `includes` rules them out
+    // before the regular expression runs.
+    if (!hay.includes(word)) continue;
+    if (hay.startsWith(word)) score += 4 * weight;
+    else if (atWordStart.test(hay)) score += 3 * weight;
+    else score += 1 * weight;
   }
   return score;
 }
