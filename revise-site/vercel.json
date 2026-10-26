@@ -4,5 +4,54 @@
   "outputDirectory": ".",
   "cleanUrls": true,
   "trailingSlash": false,
-  "ignoreCommand": "node \"$(git rev-parse --show-toplevel)/scripts/vercel-ignore.mjs\" --project revise-site"
+  "ignoreCommand": "node \"$(git rev-parse --show-toplevel)/scripts/vercel-ignore.mjs\" --project revise-site",
+  "headers": [
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/index.md>; rel=\"alternate\"; type=\"text/markdown\", <https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/llms.txt>; rel=\"describedby\"; type=\"text/plain\", <https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/ai.txt>; rel=\"describedby\"; type=\"text/plain\""
+        }
+      ]
+    },
+    {
+      "source": "/index.md",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/markdown; charset=utf-8"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        },
+        {
+          "key": "Link",
+          "value": "<https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/>; rel=\"canonical\", <https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/llms.txt>; rel=\"describedby\"; type=\"text/plain\", <https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/ai.txt>; rel=\"describedby\"; type=\"text/plain\""
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/(llms|ai|robots).txt",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
 }

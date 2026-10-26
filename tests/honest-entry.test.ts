@@ -5,6 +5,10 @@ import { resolve } from "node:path";
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const layout = read("src/app/layout.tsx");
 const welcome = read("src/app/welcome/route.ts");
+// The words on /welcome and the site-wide descriptions live in data modules
+// shared with the markdown twins and /llms.txt; the claims are asserted there.
+const welcomeWords = read("src/lib/welcome.ts");
+const site = read("src/lib/site.ts");
 const sw = read("public/sw.js");
 
 // The honest entry point: what a browser without JavaScript, or a crawler, or a
@@ -36,12 +40,13 @@ describe("no-JS entry point", () => {
   });
 
   it("states the current trust position rather than implying a finished product", () => {
-    expect(welcome).toMatch(/No question has been through human review yet/);
-    expect(welcome).toMatch(/cannot yet prove|cannot certify/i);
-    expect(welcome).toMatch(/Practising works/i);
+    expect(welcome).toContain('from "@/lib/welcome"');
+    expect(welcomeWords).toMatch(/No question has been through human review yet/);
+    expect(welcomeWords).toMatch(/cannot yet prove|cannot certify/i);
+    expect(welcomeWords).toMatch(/Practising works/i);
     // The four flagships are named, and the reference-tier position is honest.
-    expect(welcome).toContain("Mathematics, Biology, Chemistry and Physics");
-    expect(welcome).toMatch(/None of their questions have been signed off by two\s+independent human reviewers/);
+    expect(welcomeWords).toContain("Mathematics, Biology, Chemistry and Physics");
+    expect(welcomeWords).toMatch(/None of their questions have been signed off by two\s+independent human reviewers/);
   });
 
   it("gives /welcome the metadata a shared link needs", () => {
@@ -76,8 +81,10 @@ describe("no-JS entry point", () => {
 describe("metadata honesty", () => {
   it("describes the flagship scope rather than every registered board", () => {
     expect(layout).toContain("export const metadata: Metadata");
-    expect(layout).toMatch(/authored to their specification/);
-    expect(layout).toMatch(/everything else is labelled reference material/);
+    expect(layout).toContain("description: SITE.description");
+    expect(site).toMatch(/authored to their specification/);
+    expect(site).toMatch(/everything else is labelled reference material/);
+    expect(site).toMatch(/no question has been human-reviewed yet/i);
     expect(layout).toContain("openGraph:");
     expect(layout).toContain("twitter:");
     expect(layout).toContain('alternates: { canonical: "/" }');
@@ -92,12 +99,21 @@ describe("metadata honesty", () => {
 
   it("uses a deploy-time origin rather than a request header for canonicals", () => {
     // A Host-derived canonical can be pointed at a spoofed origin.
-    expect(layout).toContain("NEXT_PUBLIC_SITE_URL");
+    expect(site).toContain("process.env.NEXT_PUBLIC_SITE_URL");
+    expect(layout).toContain("metadataBase: new URL(SITE_URL)");
     // The layout reads request headers only for the CSP nonce (src/proxy.ts),
     // never the host, so canonicals cannot follow a spoofed Host header.
     const headerReads = [...layout.matchAll(/\(await headers\(\)\)\.get\(["']([^"']+)["']\)/g)].map((m) => m[1]);
     expect(headerReads).toEqual(["x-nonce"]);
     expect(layout).not.toMatch(/get\(["'](?:host|x-forwarded-host)["']\)/i);
+    // The only other header it reads is the markdown twin's URL, which the
+    // proxy derives from the request path and always overwrites or removes,
+    // so a client cannot choose what the page links to.
+    expect(layout).toContain("(await headers()).get(MARKDOWN_ALTERNATE_HEADER)");
+    const proxy = read("src/proxy.ts");
+    expect(proxy).toContain("requestHeaders.set(MARKDOWN_ALTERNATE_HEADER, alternate)");
+    expect(proxy).toContain("requestHeaders.delete(MARKDOWN_ALTERNATE_HEADER)");
+    expect(proxy).not.toMatch(/get\(["'](?:host|x-forwarded-host)["']\)/i);
   });
 });
 

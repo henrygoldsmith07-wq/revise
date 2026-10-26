@@ -4,42 +4,39 @@ import "./globals.css";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { PwaInstallProvider } from "@/components/PwaInstall";
 import { RouteShell } from "@/components/RouteShell";
+import { MARKDOWN_ALTERNATE_HEADER } from "@/lib/md/routes";
+import { jsonLdScript, SITE, SITE_URL, siteJsonLd } from "@/lib/site";
 
-/**
- * Canonical origin. Deliberately the same origin the app is served from; set
- * SITE_URL at deploy time rather than trusting a Host header, so OG tags and
- * canonicals can never be pointed at a spoofed origin.
- */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
+// Canonical origin: SITE_URL in src/lib/site.ts, set from NEXT_PUBLIC_SITE_URL at
+// deploy time rather than a Host header, so OG tags and canonicals can never be
+// pointed at a spoofed origin.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Revise — exam revision that knows what to do next",
-  description:
-    "WJEC A-level revision, Physics first: tells you the one thing to do next — spaced repetition, exam-style practice with examiner marking, and a plan that rebuilds itself. Four subjects are authored to their specification; everything else is labelled reference material.",
-  applicationName: "Revise",
+  title: SITE.title,
+  description: SITE.description,
+  applicationName: SITE.name,
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Revise", statusBarStyle: "default" },
   icons: { icon: "/logo.svg", apple: "/logo.svg" },
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    siteName: "Revise",
-    title: "Revise — exam revision that knows what to do next",
-    description:
-      "WJEC A-level revision, Physics first: tells you the one thing to do next. Four subjects are authored to their specification; everything else is labelled reference material.",
+    siteName: SITE.name,
+    title: SITE.title,
+    description: SITE.shortDescription,
     url: "/",
     locale: "en_GB",
   },
   twitter: {
     card: "summary",
-    title: "Revise — exam revision that knows what to do next",
-    description:
-      "WJEC A-level revision, Physics first: tells you the one thing to do next. Four subjects are authored to their specification; everything else is labelled reference material.",
+    title: SITE.title,
+    description: SITE.shortDescription,
   },
   // This is an app, not a marketing site: only /welcome is meant to be indexed,
   // and only because it is the page that works without JavaScript.
   robots: { index: false, follow: true },
+  // Read by AI agents that have already fetched the page; invisible to people.
+  other: { "ai-summary": SITE.aiSummary },
 };
 
 export const viewport: Viewport = {
@@ -62,6 +59,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Reading request headers also opts every page into the dynamic rendering
   // a nonce needs.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  // Also set by src/proxy.ts, from the request path (never the Host), and
+  // cleared on every request it does not set: the page's markdown twin, if any.
+  const markdownAlternate = (await headers()).get(MARKDOWN_ALTERNATE_HEADER) ?? undefined;
   // Locale is read from localStorage on the client (AppShell hydrates it);
   // the html lang stays en-GB for the SSR shell. A future step can make this
   // dynamic via a cookie + middleware when i18n leaves scaffolding.
@@ -70,6 +70,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+        {markdownAlternate ? <link rel="alternate" type="text/markdown" href={markdownAlternate} /> : null}
+        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(siteJsonLd()) }} />
       </head>
       <body className="antialiased">
         {/* AccountBoundary resolves its profile in a client effect, so without

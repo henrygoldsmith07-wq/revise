@@ -243,6 +243,20 @@ background and do other work while it runs. On Windows, invoke npm through
   from the root must work without the store (only `ShortcutProvider` is
   there). `ReviewerSessionKeeper` keeps the session cookie fresh. Use
   `isReviewerPath` (exact segment; `/review` is the student flashcard route).
+- **Public pages have markdown twins for AI agents** (eighty-ninth pass).
+  `src/lib/md/registry.ts` renders `/`, `/welcome`, `/library`, `/lesson` and
+  `/technique` (same query strings as the HTML) from the content modules;
+  `src/proxy.ts` rewrites `<path>.md` and `Accept: text/markdown` to
+  `/api/md/<path>`. A new `page.tsx` needs a renderer (add it to
+  `MARKDOWN_PAGES`) or a reason in `NO_TWIN` in
+  `tests/markdown-twins.test.ts`, which fails otherwise. Twins never show a
+  check's answer, a model answer or the question bank. `/llms.txt`,
+  `/llms-full.txt` (kept under 500k characters), `/ai.txt` and `/robots.txt`
+  come from `src/lib/md/agent-files.ts`; the production URL is `SITE_URL` in
+  `src/lib/site.ts`. After editing `revise-site/index.html`, run
+  `npm run site:ai-files`: it regenerates the landing site's `index.md`,
+  agent files, head block and `vercel.json` headers, and `verify` fails while
+  they are stale.
 
 ## Review workflow
 

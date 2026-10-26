@@ -95,11 +95,17 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/api/:path*",
+        // Every API except the markdown twins, which are public, shared-cacheable
+        // text and set their own Cache-Control (src/lib/md/http.ts).
+        source: "/api/:path((?!md(?:/|$)).*)",
         headers: [
           { key: "Cache-Control", value: "no-store" },
           { key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" },
         ],
+      },
+      {
+        source: "/api/md/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" }],
       },
     ];
   },
