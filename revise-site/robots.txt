@@ -1,0 +1,24 @@
+# Revise — robots.txt
+# Generated from src/lib/site.ts and src/lib/md; keep in sync with /llms.txt, /ai.txt and /robots.txt (one generator: src/lib/md/agent-files.ts).
+# AI agents: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/llms.txt maps the site, https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/ai.txt says how the content may be used,
+# and every public page has a markdown version at <path>.md.
+
+# AI search, user-fetch and training crawlers: allowed on every public path.
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Bytespider
+Allow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app/sitemap.xml

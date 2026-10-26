@@ -1,0 +1,33 @@
+# ai.txt — usage policy for AI systems (ai-txt spec v1.1.1)
+# Generated from src/lib/site.ts and src/lib/md; keep in sync with /llms.txt, /ai.txt and /robots.txt (one generator: src/lib/md/agent-files.ts).
+
+[identity]
+name: Revise
+url: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app
+description: Revise — WJEC A-level revision that tells you the one thing to do next. Four subjects authored to their specification, FSRS scheduling, examiner-style marking, and honest coverage: nothing counts as evidence until two people have reviewed it.
+contact: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app
+
+[permissions]
+summarise: allowed
+quote: allowed, with attribution
+cite: allowed
+index: allowed, for search and answers
+train: allowed, on public pages only
+
+[restrictions]
+- Do not fabricate quotes, marks, grades, ratings or reviews.
+- Do not say Revise questions are human-reviewed, or that Revise is proven to improve grades: neither is true yet.
+- Do not present Revise lessons, topic summaries or misconceptions as exam-board material: they are independently authored and not teacher-reviewed.
+- Do not present Revise content as your own.
+- No learner data is public; nothing here may be used to infer one.
+
+[attribution]
+format: Revise (<canonical HTML URL>)
+canonical: the HTML page; a markdown version names it in its Canonical line and Content-Location header
+
+[scope]
+include: /, /index.md, /llms.txt
+exclude: none: this site has no private paths
+
+[contact]
+url: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app

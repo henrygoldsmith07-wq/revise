@@ -101,6 +101,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   // AI responses are never cached: a stale explanation is worse than none.
   if (url.pathname.startsWith("/api/")) return;
+  // Agent-facing text (markdown twins, llms.txt, ai.txt, robots, sitemap) is
+  // for crawlers and is regenerated per deploy; it is never part of the shell.
+  if (/\.md$|^\/(?:llms(?:-full)?|ai|robots)\.txt$|^\/sitemap\.xml$/.test(url.pathname)) return;
   // The reviewer portal is signed-in, teacher-only and server-rendered: never
   // cache it, so a shared device cannot replay a reviewer's queue offline.
   if (url.pathname === "/reviewer" || url.pathname.startsWith("/reviewer/")) return;
