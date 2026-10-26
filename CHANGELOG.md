@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-26 pass 82: a wrong tiny answer no longer earns the result mark just because it is tiny
+Marking compared small numbers with a flat 0.005 slack, so any two values of order 1e-6 (resistivities, Planck-scale numbers, strains) counted as equal, and a number in the working (R = 4.0) could earn a chained calculation's result mark. A wrong resistivity of 1.6e7 ohm m (from R L / A) scored 2/2; it now scores 1/2. Small values are compared by ratio, and a chained "= ... = result" point needs its result (follow-through points keep the old slack). Also fixed two under-credits: "only vibrates in one plane ... can only be done to transverse waves" (polarisation) and "wider and flatter, peak a little below" (damping). Answers and marks are author judgement. Tests: tests/marking-numeric-small-values.test.ts, tests/marking-y12-physics-pass82.test.ts.
+
 ## 2026-10-25 pass 81: every API route caps its body while reading, and `/api/ai` refuses a `null` body cleanly
 Four routes (marking disputes, pilot events, reviewer decisions, account deletion) checked their size cap only after `request.text()` had buffered the whole body, which `src/lib/bounded-body.ts` already names as no cap at all; a chunked or lying-length request could make them hold any amount in memory. They now read through `readBoundedText`, as `/api/ai` does. `/api/ai` also threw an unhandled 500 on a JSON body of `null`; it now answers 400. Tests: tests/api-routes-behaviour.test.ts (streamed oversized body on each route, non-object bodies), tests/security.test.ts (no route reads an unbounded body).
 

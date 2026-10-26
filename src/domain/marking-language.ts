@@ -271,6 +271,10 @@ const PHRASE_EQUIVALENTS: Array<[string, string]> = [
   [" use e = Δv/d ", "(?:v|δv|Δv|potential difference) ?= ?e ?(?:x|×|\\*)? ?d|e ?= ?(?:δv|Δv|v) ?/ ?d"],
   // Pass 78: photoelectric balance written with symbols or abbreviations.
   [" hf = work function + maximum kinetic energy ", "hf = (?:phi|φ|ϕ|the work function|work function) ?\\+ ?(?:ke ?max|ek ?max|e ?k ?max|k ?e ?max|max(?:imum)? ke|max(?:imum)? kinetic energy|kinetic energy)"],
+  // Pass 82: own-words forms for polarisation and heavy-damping answers.
+  [" polarisation restricts oscillations to one direction ", "(?:only )?(?:vibrates|oscillates|vibrate|oscillate) (?:in )?(?:just |only )?(?:in )?one (?:plane|direction)"],
+  [" only transverse oscillations can be restricted in this way ", "(?:that |this )?can only be (?:done|done to|polarised)[a-z ]{0,20}transverse waves"],
+  [" heavy damping broadens the response and shifts the peak slightly lower ", "(?:wider|broader|flatter)[a-z ,]{0,60}peak (?:a little|slightly|somewhat) (?:below|lower)"],
   [" exceeds ", "(?:is )?(?:bigger|larger|greater|more) than"],
   [" unit ", "measured in|in units of"],
   [" ba cos θ ", "ba ?cos ?(?:θ|theta)"],
