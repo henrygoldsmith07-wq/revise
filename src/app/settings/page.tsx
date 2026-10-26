@@ -422,7 +422,12 @@ export default function SettingsPage() {
                     onClick={() =>
                       void importEncryptionKey(keyInput.trim()).then((ok) => {
                         setKeyMessage(ok ? "Key installed. Pull your data to decrypt it here." : "That does not look like a valid key.");
-                        if (ok) setKeyInput("");
+                        if (!ok) return;
+                        setKeyInput("");
+                        // The pill and a revealed backup still describe the replaced key.
+                        setKeyRevealed(false);
+                        setKeyText("");
+                        void keyFingerprint().then(setKeyFp);
                       })
                     }
                   >

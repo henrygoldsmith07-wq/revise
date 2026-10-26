@@ -190,9 +190,13 @@ export async function GET(request: Request) {
     ...(reviews.data ?? []).map((row) => reviewRecord(row as JsonRow)).filter((row): row is PulseRecord => row !== null),
     ...(attempts.data ?? []).map((row) => attemptRecord(row as JsonRow)).filter((row): row is PulseRecord => row !== null),
   ]
-    // Drop rows at/below the floor that the coarse >= scan over-fetched.
-    // First page (no cursor): strict > since to preserve legacy since semantics.
-    .filter((row) => (cursor ? isAfterPulseCursor({ kind: row.kind, id: row.id, updatedAt: row.updatedAt }, cursor) : row.updatedAt > since))
+    // Drop rows at/below the cursor that a table's `>=` tail over-fetched.
+    // The first page needs no filter: its query is already a strict
+    // `updated_at > since`, compared as timestamps by the database. Comparing
+    // strings here instead would drop real rows, because Postgres writes
+    // `…10:00:00.5+00:00` and a caller writes `…10:00:00Z`, and "." sorts
+    // before "Z".
+    .filter((row) => !cursor || isAfterPulseCursor({ kind: row.kind, id: row.id, updatedAt: row.updatedAt }, cursor))
     .sort((a, b) => comparePulseRow(
       { kind: a.kind, id: a.id, updatedAt: a.updatedAt },
       { kind: b.kind, id: b.id, updatedAt: b.updatedAt },

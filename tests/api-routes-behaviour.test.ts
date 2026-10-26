@@ -54,8 +54,9 @@ function makeQuery(table: string) {
     for (const [col, value] of eqs) {
       rows = rows.filter((r) => (r as unknown as Record<string, unknown>)[col] === value);
     }
-    if (gt) rows = rows.filter((r) => r.updated_at > gt![1]);
-    if (gte) rows = rows.filter((r) => r.updated_at >= gte![1]);
+    // Postgres compares timestamptz values as instants, whatever their text form.
+    if (gt) rows = rows.filter((r) => Date.parse(r.updated_at) > Date.parse(gt![1]));
+    if (gte) rows = rows.filter((r) => Date.parse(r.updated_at) >= Date.parse(gte![1]));
     if (orRaw) rows = rows.filter(matchOr);
     return applyOrders(rows, orders).slice(0, limit ?? rows.length);
   };
@@ -251,6 +252,21 @@ describe("Pulse history route behaviour", () => {
     }
     expect(seen).toHaveLength(60);
     expect(new Set(seen).size).toBe(60);
+  });
+
+  it("keeps first-page rows after `since` when Postgres and the caller write timestamps differently", async () => {
+    authUser = { id: USER };
+    db.user_settings = [{ id: "s", updated_at: "2026-01-01T00:00:00.000Z", user_id: USER, data: { pulseEnabled: true } }];
+    // PostgREST renders timestamptz as `+00:00` with trailing zeros trimmed.
+    db.review_logs = [
+      reviewRow("r-early", "2026-01-02T09:59:59+00:00"),
+      reviewRow("r-half", "2026-01-02T10:00:00.5+00:00"),
+    ];
+    db.attempts = [attemptRow("a-quarter", "2026-01-02T10:00:00.25+00:00")];
+    const res = await pulseGet(new Request("https://x/api/pulse/history?limit=10&since=2026-01-02T10:00:00Z"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { records: Array<{ kind: string; id: string }> };
+    expect(body.records.map((r) => `${r.kind}:${r.id}`)).toEqual(["attempt:a-quarter", "review:r-half"]);
   });
 
   it("withholds history when consent is revoked between pages", async () => {
