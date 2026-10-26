@@ -16,6 +16,7 @@ import { useRevisionPlan } from "./recovery-evidence";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { flushPilotEvents, recordPilotEvent } from "@/lib/pilot-telemetry";
 import type { Attempt } from "@/domain/types";
+import { countLabel } from "@/domain/plural";
 
 export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: string; autoStart?: boolean }) {
   const store = useStoreFields("questions", "attempts", "mistakes", "recordFunnel", "userId", "settings");
@@ -143,7 +144,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
             Practice, not proof: no reviewed questions exist here yet, so this check uses authored questions and cannot count as evidence.
           </p>
         ) : null}
-        <p className="text-sm text-ink2">{selection.items.length} questions across {new Set(selection.items.map((i) => i.topicId)).size} topics, about {selection.minutes} minutes. No hints.</p>
+        <p className="text-sm text-ink2">{countLabel(selection.items.length, "question")} across {countLabel(new Set(selection.items.map((i) => i.topicId)).size, "topic")}, about {countLabel(selection.minutes, "minute")}. No hints.</p>
         <p className="text-sm text-ink2">This is an initial signal about where to start, not a predicted grade. You can skip it from Today.</p>
         {selection.uncovered.length ? <p className="text-xs text-ink3">Not enough reviewed questions to sample: {selection.uncovered.join(", ")}.</p> : null}
         <Button variant="primary" onClick={() => setStarted(true)}>Start quick diagnostic</Button>

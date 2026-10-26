@@ -1,6 +1,7 @@
 import { buildMockStudyPlan, type MockPlanActivity, type MockStudyPlan, type MockTopicCoverage } from "@/domain/mock-planning";
 import type { Attempt, Mistake, Paper, Question, Topic, TopicMastery } from "@/domain/types";
 import { Button, ButtonLink, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
+import { countLabel } from "@/domain/plural";
 
 const ACTIVITY_LABEL: Record<MockPlanActivity, string> = {
   learn: "Learn in steps",
@@ -68,7 +69,7 @@ export function MockStudyPlan({
             <p className="text-xs text-ink2 mt-1">{plan.summary}</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-1.5">
-            <Pill tone="accent">{plan.questionCount} questions</Pill>
+            <Pill tone="accent">{countLabel(plan.questionCount, "question")}</Pill>
             <Pill>{plan.mappedMarks}/{plan.totalMarks} marks mapped</Pill>
           </div>
         </div>
@@ -80,7 +81,7 @@ export function MockStudyPlan({
                 <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this mock tests</p>
                 <p className="text-xs text-ink2 mt-0.5">Readiness and mark share decide the order. Retrieve each topic before applying it to a question.</p>
               </div>
-              <span className="text-[11px] text-ink3 shrink-0">{plan.topics.length} topics</span>
+              <span className="text-[11px] text-ink3 shrink-0">{countLabel(plan.topics.length, "topic")}</span>
             </div>
             <ol className="space-y-3">
               {plan.topics.map((topic, index) => (

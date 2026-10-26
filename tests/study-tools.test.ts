@@ -80,6 +80,19 @@ describe("suspend and bury", () => {
     expect(isBuried(buried, "2025-06-11")).toBe(false);
   });
 
+  it("buries for one calendar day across the spring clock change", () => {
+    const previous = process.env.TZ;
+    process.env.TZ = "Europe/London";
+    try {
+      // 23:30 GMT the night before British Summer Time starts (29 March 2026).
+      const lateNight = new Date("2026-03-28T23:30:00.000Z");
+      expect(buryCard(card("a", { due: "2026-03-28" }), 1, lateNight).buriedUntil).toBe("2026-03-29");
+    } finally {
+      if (previous === undefined) delete process.env.TZ;
+      else process.env.TZ = previous;
+    }
+  });
+
   it("unburying clears the field rather than leaving a stale date", () => {
     const unburied = unburyCard(buryCard(card("a", { due: "2025-06-01" }), 1, NOW), NOW);
     expect(unburied.buriedUntil).toBeUndefined();

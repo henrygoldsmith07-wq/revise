@@ -287,7 +287,9 @@ export function setSuspended(card: Card, suspended: boolean, now: Date = new Dat
  * expires on its own, so nothing is lost by using it liberally.
  */
 export function buryCard(card: Card, days = 1, now: Date = new Date()): Card {
-  const until = toDateOnly(new Date(now.getTime() + Math.max(1, days) * 86_400_000));
+  // Calendar days, not 24-hour steps: across the spring clock change, 23:30
+  // plus 24 hours is 00:30 two days on, which buried the card for two days.
+  const until = addLocalDays(todayLocal(now), Math.max(1, days));
   return { ...card, buriedUntil: until, updatedAt: now.toISOString() };
 }
 

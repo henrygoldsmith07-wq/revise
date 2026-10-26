@@ -7,6 +7,7 @@ import { confidenceWord, EVIDENCE_CONFIDENCE } from "@/domain/plain-numbers";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill, ProgressBar, SectionHeading } from "../ui";
 import { EmptyHint } from "./shared";
+import { marksLabel } from "@/domain/plural";
 
 export function NextGradeView() {
   const store = useStoreFields("predictions");
@@ -222,7 +223,7 @@ export function MarksLostByCause() {
               {misconRows.slice(0, 6).map(([tag, marks]) => (
                 <li key={tag} className="flex justify-between gap-2 text-xs">
                   <span className="text-ink2">{tag}</span>
-                  <span className="tabular-nums text-danger font-semibold">{marks as number} marks</span>
+                  <span className="tabular-nums text-danger font-semibold">{marksLabel(marks as number)}</span>
                 </li>
               ))}
             </ul>
@@ -235,7 +236,7 @@ export function MarksLostByCause() {
               {commandRows.slice(0, 6).map(([word, marks]) => (
                 <li key={word} className="flex justify-between gap-2 text-xs">
                   <span className="text-ink2">{word}</span>
-                  <span className="tabular-nums text-review font-semibold">{marks as number} marks</span>
+                  <span className="tabular-nums text-review font-semibold">{marksLabel(marks as number)}</span>
                 </li>
               ))}
             </ul>
@@ -247,7 +248,7 @@ export function MarksLostByCause() {
         <div className="flex flex-wrap gap-1.5">
           {(["AO1", "AO2", "AO3"] as const).map((ao) => (
             <Pill key={ao} tone={(insight.marksLostByAo[ao] ?? 0) > 0 ? "danger" : "neutral"}>
-              {ao}: {(insight.marksLostByAo[ao] ?? 0)} marks
+              {ao}: {marksLabel(insight.marksLostByAo[ao] ?? 0)}
             </Pill>
           ))}
         </div>

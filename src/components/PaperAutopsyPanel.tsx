@@ -6,6 +6,7 @@ import { BreakdownList, type BreakdownRow } from "./BreakdownList";
 import { PaperRecoveryPanel } from "./PaperRecoveryPanel";
 import { PaperResultCard } from "./PaperResultCard";
 import { Button, ButtonLink, Panel, Pill, SectionHeading, StatTile } from "./ui";
+import { countLabel } from "@/domain/plural";
 
 const asRows = (rows: PaperAutopsy["byTopic"]): BreakdownRow[] =>
   rows.map((row) => ({ key: row.key, label: row.label, marks: row.marksLost, share: row.share }));
@@ -101,7 +102,7 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-ink">Equivalent retest</p>
-                <Pill tone={retest.available ? "accent" : "neutral"}>{retest.available ? `${retest.questionIds.length} questions · ${retest.totalMarks} marks` : "Not ready"}</Pill>
+                <Pill tone={retest.available ? "accent" : "neutral"}>{retest.available ? `${countLabel(retest.questionIds.length, "question")} · ${countLabel(retest.totalMarks, "mark")}` : "Not ready"}</Pill>
               </div>
               <p className="text-xs text-ink2 mt-1">{retest.summary}</p>
               {retest.available ? <p className="text-[11px] text-ink3 mt-1">Different questions matched on topic, marks and difficulty. Sit it after the repair steps, ideally a couple of days later.</p> : null}

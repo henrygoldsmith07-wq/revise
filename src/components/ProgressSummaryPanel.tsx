@@ -7,6 +7,7 @@ import { STAGE_LABEL, stageMeaning, type MasteryStage } from "@/domain/mastery-s
 import { buildProgressSummary } from "@/domain/progress-summary";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Panel, Pill } from "./ui";
+import { marksLabel } from "@/domain/plural";
 
 const TONE: Record<MasteryStage, "neutral" | "review" | "success" | "accent" | "danger"> = {
   untouched: "neutral", learning: "review", practised: "accent", secure: "success", proven: "success", fading: "danger",
@@ -52,7 +53,7 @@ export function ProgressSummaryPanel() {
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Where am I losing marks?</p>
           {summary.losing.totalMarks > 0 || summary.losing.patterns.length ? (
             <>
-              {summary.losing.totalMarks > 0 ? <p className="text-sm text-ink">{summary.losing.totalMarks} marks lost and not yet recovered{summary.losing.topics.length ? `, mostly in ${summary.losing.topics.map((row) => row.title).join(", ")}` : ""}.</p> : null}
+              {summary.losing.totalMarks > 0 ? <p className="text-sm text-ink">{marksLabel(summary.losing.totalMarks)} lost and not yet recovered{summary.losing.topics.length ? `, mostly in ${summary.losing.topics.map((row) => row.title).join(", ")}` : ""}.</p> : null}
               {summary.losing.scopeNote ? <p className="text-xs text-ink2" data-testid="lost-marks-scope">{summary.losing.scopeNote}</p> : null}
               {summary.losing.patterns.map((row) => <p key={row.cause} className="text-xs text-ink2">{row.headline}</p>)}
             </>

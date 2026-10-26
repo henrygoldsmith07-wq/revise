@@ -48,6 +48,8 @@ export function nextLessonStreak(
   yesterday: string,
 ): LessonStreak {
   if (current.lastDay === today) return current;
+  // A day already counted, not a broken streak (local day keys compare as strings).
+  if (current.lastDay > today) return current;
   if (current.lastDay === yesterday) return { count: current.count + 1, lastDay: today };
   return { count: 1, lastDay: today };
 }

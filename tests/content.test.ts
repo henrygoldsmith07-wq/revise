@@ -302,6 +302,10 @@ describe("gamification", () => {
     expect(touchStreak(state, "2025-06-05").current).toBe(1);
   });
 
+  it("keeps the streak when today's date is behind the last active day (travel west, a device ahead)", () => {
+    expect(touchStreak(state, "2025-05-31")).toBe(state);
+  });
+
   it("tracks the longest streak ever reached", () => {
     const long = touchStreak({ ...state, current: 9 }, "2025-06-02");
     expect(long.longest).toBe(10);

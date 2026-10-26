@@ -14,6 +14,7 @@ import { useStoreFields } from "@/state/store";
 import { useRecoveryEvidence } from "./recovery-evidence";
 import { EvidenceClassNote } from "./EvidenceClassNote";
 import { Button } from "./ui";
+import { marksLabel } from "@/domain/plural";
 
 const BY: Array<[BreakdownBy, string]> = [["subject", "Subject"], ["topic", "Topic"], ["paper", "Paper"], ["cause", "Cause"], ["ao", "Skill (AO)"], ["intervention", "Method"]];
 
@@ -49,7 +50,7 @@ export function RecoverySummaryPanel() {
         <details className="mt-2">
           <summary className="cursor-pointer select-none text-xs text-ink2">Evidence</summary>
           <ul className="mt-1 text-xs text-ink2 space-y-0.5">
-            <li>{t.previouslyLost} marks previously lost</li>
+            <li>{marksLabel(t.previouslyLost)} previously lost</li>
             <li>{t.targeted} targeted by revision</li>
             <li>{t.provisional - t.awaitingProof} provisionally recovered</li>
             <li>{t.awaitingProof} awaiting delayed proof</li>
