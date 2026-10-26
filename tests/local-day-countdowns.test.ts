@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildTodayBrief } from "@/domain/today-brief";
 import { buildPaperReadiness } from "@/domain/paper-readiness";
+import { buildLearnerIntelligence } from "@/domain/learner-intelligence";
 import { buildProofLedger, MIN_PROOF_DELAY_DAYS } from "@/domain/proof-of-improvement";
 import { physicsContentFingerprint } from "@/domain/content-trust";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-contract";
@@ -44,6 +45,16 @@ describe("calendar days in Europe/London just after midnight (BST)", () => {
     expect(rows[0]!.daysUntil).toBe(0);
   });
 
+  it("learner intelligence counts an exam today as today", () => {
+    const intel = buildLearnerIntelligence({
+      topicIds: ["t"], topicSubject: () => "s",
+      mastery: [], attempts: [], mistakes: [], examDates: [exam("2026-06-04")], now: EXAM_DAY_0030_BST,
+    });
+    const subject = intel.subjects.find((row) => row.subjectId === "s")!;
+    expect(subject.examDays).toBe(0);
+    expect(subject.topics[0]!.daysToExam).toBe(0);
+  });
+
   it("the proof ledger dates the first day proof can count by the local day", () => {
     const topic: Topic = { id: "t1", subjectId: "wjec-alevel-physics", unitId: "u", title: "t1", order: 1, intrinsicDifficulty: 3, summary: "", keyPoints: [], commonErrors: [], specPoints: [{ id: "t1.0", ref: "t1.0", text: "t1.0", aos: ["AO1"] }] };
     const questions = ["q0", "q1"].map((id): Question => {
@@ -71,7 +82,8 @@ describe("UTC-day truncation in domain code", () => {
     "large-history-fixture.ts": "deterministic synthetic fixture",
     "portability.ts": "export filename stamp",
   };
-  const pattern = /toISOString\(\)\.(slice|substring)\(0, ?10\)|toISOString\(\)\.split\("T"\)|(createdAt|reviewedAt|updatedAt|completedAt|startedAt|submittedAt|lastStudiedAt)\??\.slice\(0, ?10\)/;
+  // `Date.UTC(now.getUTCFullYear(), …)` is the same UTC day built from parts.
+  const pattern = /toISOString\(\)\.(slice|substring)\(0, ?10\)|toISOString\(\)\.split\("T"\)|(createdAt|reviewedAt|updatedAt|completedAt|startedAt|submittedAt|lastStudiedAt)\??\.slice\(0, ?10\)|Date\.UTC\(\w+\.getUTCFullYear\(\)/;
 
   it("is confined to the listed files", () => {
     const offenders: string[] = [];

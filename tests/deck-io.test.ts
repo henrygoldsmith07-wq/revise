@@ -187,6 +187,19 @@ describe("parseDeckJson", () => {
     expect(scheduling.state).toBeLessThanOrEqual(3);
   });
 
+  it("skips a row that is not an object instead of failing the whole file", () => {
+    const report = parseDeckJson(JSON.stringify({ cards: [null, 7, "x", { front: "a", back: "b" }] }));
+    expect(report.accepted).toBe(1);
+    expect(report.rejected.map((r) => r.row)).toEqual([1, 2, 3]);
+  });
+
+  it("schedules a card with an unreadable due date for today, not for the garbage it carried", () => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const report = parseDeckJson(JSON.stringify({ cards: [{ front: "a", back: "b", scheduling: { due: "soonish" } }] }));
+    expect(report.deck!.cards[0].scheduling!.due).toBe(today);
+  });
+
   it("normalises tags", () => {
     const report = parseDeckJson(JSON.stringify({ cards: [{ front: "a", back: "b", tags: ["Paper 1", "PAPER 1"] }] }));
     expect(report.deck!.cards[0].tags).toEqual(["paper-1"]);
@@ -218,6 +231,34 @@ describe("parseDeckCsv", () => {
 
   it("reports an empty file rather than crashing", () => {
     expect(parseDeckCsv("").deck).toBeNull();
+  });
+
+  it("reads a current Anki export, whose first lines are #-directives with no tab in them", () => {
+    const report = parseDeckCsv("#separator:tab\n#html:false\n#tags column:3\nDefine work\tForce times distance, in the direction of motion\tphysics\nUnit of power\twatt\t");
+    expect(report.accepted).toBe(2);
+    expect(report.deck!.cards[0]).toMatchObject({ front: "Define work", back: "Force times distance, in the direction of motion", tags: ["physics"] });
+  });
+
+  it("honours Anki's named separators and tag column", () => {
+    const report = parseDeckCsv("#separator:semicolon\n#tags column:1\nmechanics;Define work;W = Fd");
+    expect(report.deck!.cards[0]).toMatchObject({ front: "Define work", back: "W = Fd", tags: ["mechanics"] });
+  });
+
+  it("keeps a quoted multi-line answer in one card, as spreadsheets export it", () => {
+    const report = parseDeckCsv('front,back\n"Newton\'s laws","1. Inertia\n2. F = ma\n3. Action, reaction"\nq,a');
+    expect(report.accepted).toBe(2);
+    expect(report.rejected).toEqual([]);
+    expect(report.deck!.cards[0].back).toBe("1. Inertia\n2. F = ma\n3. Action, reaction");
+  });
+
+  it("treats a quote inside an unquoted field as text, so it cannot swallow the rest of the file", () => {
+    const report = parseDeckCsv('A 5" screen,small\nq,a');
+    expect(report.deck!.cards.map((c) => [c.front, c.back])).toEqual([['A 5" screen', "small"], ["q", "a"]]);
+  });
+
+  it("skips a header after Anki directives and behind an Excel byte-order mark", () => {
+    expect(parseDeckCsv("#separator:comma\nFront,Back\nq,a").deck!.cards.map((c) => c.front)).toEqual(["q"]);
+    expect(parseDeckCsv("\uFEFFfront,back\nq,a").deck!.cards.map((c) => c.front)).toEqual(["q"]);
   });
 });
 

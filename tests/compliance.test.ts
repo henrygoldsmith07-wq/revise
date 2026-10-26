@@ -71,6 +71,47 @@ describe("PII masking", () => {
     expect(masked).not.toContain("Priya");
   });
 
+  it("leaves an answer's reasoning words alone: only a capitalised name is masked", () => {
+    for (const answer of [
+      "This is because the resistance increases as the temperature rises.",
+      "I am confident that the gradient gives the acceleration.",
+      "I'm going to use F = ma, and this is because the mass is constant.",
+      "The pulse takes 20 ms before the echo returns.",
+      "Students often miss the point that energy is conserved.",
+      "This is Newton's second law, and this is Kirchhoff's first law.",
+      "The form was signed off by the examiner.",
+      "The car travels 30 m along the road at constant speed.",
+      "The cyclist freewheels 20 m down the hill.",
+      "The 12 V cells drive a current, and the 2 charges close together repel.",
+      "Energy is conserved, so the college lab result matches.",
+    ]) {
+      const { masked, entities } = maskPii(answer);
+      expect(masked, answer).toBe(answer);
+      expect(entities, answer).toEqual([]);
+    }
+    for (const [text, name] of [
+      ["Hi, I'm Anna and I need help.", "Anna"],
+      ["this is Priya Shah speaking", "Priya Shah"],
+      ["Ask mr Patel or Miss Jones.", "Patel"],
+      ["Dr Evans marked it.", "Dr Evans"],
+      ["I go to St Bede's College.", "Bede"],
+      ["Bedford Sixth Form College", "Bedford"],
+      ["Post it to 34a High St.", "34a High St"],
+    ] as const) {
+      expect(maskPii(text).masked, text).not.toContain(name);
+    }
+  });
+
+  it("propagates a name only where it is written as a name, so a student called Ray keeps every light ray", () => {
+    const { masked } = maskPii("My name is Ray. A ray of light refracts, so Ray says the ray bends. I will get 1 mark.");
+    expect(masked).toBe("My name is [ENTITY_1]. A ray of light refracts, so [ENTITY_1] says the ray bends. I will get 1 mark.");
+    const history = maskChatHistory([
+      { role: "user", content: "I'm Will" },
+      { role: "assistant", content: "Will, the current will increase." },
+    ]);
+    expect(history[1]!.content).toBe("[ENTITY_1], the current will increase.");
+  });
+
   it("never masks mark-scheme keywords or subject terminology", () => {
     const { masked } = maskPii("Photosynthesis occurs in the Mitochondria of the cell.");
     expect(masked).toBe("Photosynthesis occurs in the Mitochondria of the cell.");

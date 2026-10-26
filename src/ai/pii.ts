@@ -40,6 +40,14 @@ export interface MaskResult {
   entities: MaskedEntity[];
 }
 
+/** `a|bc d` → `[Aa]|[Bb]c\s+[Dd]`: each word's first letter in either case. */
+function anyCase(alternatives: string): string {
+  return alternatives
+    .split("|")
+    .map((phrase) => phrase.split(" ").map((word) => `[${word[0]!.toUpperCase()}${word[0]}]${word.slice(1)}`).join("\\s+"))
+    .join("|");
+}
+
 // Ordered high-precision → lower-precision: earlier patterns claim their
 // matches so later, broader ones cannot double-mask overlapping text.
 const PATTERNS: { kind: PiiKind; re: RegExp }[] = [
@@ -49,22 +57,36 @@ const PATTERNS: { kind: PiiKind; re: RegExp }[] = [
   // UK postcodes (incl. partial on its own is too noisy; full only).
   { kind: "postcode", re: /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/g },
   // School-ish institutions: catches "X High School", "St Bede's College",
-  // "Grange Primary School", "X Sixth Form College", "X Academy".
+  // "Grange Primary School", "X Sixth Form College", "X Academy". The name is
+  // a proper noun, so it must be capitalised: matching any words made "so the
+  // college" lose "so the".
   {
     kind: "school",
-    re: /\b((?:st\.?|saint)\s+[a-z]+(?:'s)?|[a-z]+(?:\s+[a-z]+)?)\s+(high\s+school|secondary\s+(?:school|college)|grammar\s+school|primary\s+school|sixth\s+form\s+college|college|academy|free\s+school)\b/gi,
+    re: new RegExp(
+      `\\b((?:St\\.?|Saint)\\s+[A-Z][a-z]+(?:['’]s)?|[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)?)\\s+(?:${anyCase("high school|secondary school|secondary college|grammar school|primary school|sixth form college|college|academy|free school")})\\b`,
+      "g",
+    ),
   },
-  // Street addresses: number + street-type word ("12 Maple Road", "34a High St").
+  // Street addresses: number + capitalised street name + street-type word
+  // ("12 Maple Road", "34a High St"). Lower-case words made "30 m along the
+  // road" and "12 V cells drive" an address and took the data off an answer.
   {
     kind: "address",
-    re: /\b\d{1,4}[a-z]?\s+[a-z]+(?:\s+[a-z]+){0,2}\s+(?:street|st|road|rd|avenue|ave|lane|ln|drive|dr|close|court|way|gardens|grove|terrace|walk|hill|park)\b\.?/gi,
+    re: new RegExp(
+      `\\b\\d{1,4}[a-zA-Z]?\\s+[A-Z][a-z]+(?:\\s+[A-Z][a-z]+){0,2}\\s+(?:${anyCase("street|st|road|rd|avenue|ave|lane|ln|drive|dr|close|court|way|gardens|grove|terrace|walk|hill|park")})\\b\\.?`,
+      "g",
+    ),
   },
   // Person-name introductions: "My name is X", "I am X", "I'm X", "teacher
-  // Mr/Mrs/… X". Case-insensitive — real essays open with "My name is…" and
-  // "Mr Patel", both capitalised, and a case-sensitive pattern silently
-  // misses them (the bug the property tests caught).
-  { kind: "name", re: /\b(?:my name is|name's|i am|i'm|this is|written by|signed)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi },
-  { kind: "name", re: /\b(?:mr|mrs|ms|miss|dr|sir|madam)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?/gi },
+  // Mr/Mrs/… X". The trigger may open a sentence, so its first letter takes
+  // either case; the name itself must be capitalised. An `i` flag here made
+  // the name class match any word, so "This is because the…" and "I am
+  // confident that…" lost their reasoning words before marking, and the
+  // propagation pass below then masked every repeat. A possessive is a law
+  // or a scientist ("This is Newton's second law"), not an introduction.
+  { kind: "name", re: /\b(?:[Mm]y name is|[Nn]ame['’]s|[Ii] am|[Ii]['’]m|[Tt]his is|[Ww]ritten by|[Ss]igned)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b(?!['’]s\b)/g },
+  // Lower-case "ms" (milliseconds) and "miss" are ordinary words in answers.
+  { kind: "name", re: /\b(?:[Mm]rs?|[Dd]r|Ms|Miss|Sir|Madam)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?/g },
 ];
 
 /**
@@ -103,7 +125,9 @@ export function maskPii(text: string): MaskResult {
   for (const e of entities) {
     if (e.kind !== "name") continue;
     if (/^entity\d*$/i.test(e.original)) continue; // never touch our own marker
-    masked = masked.replace(new RegExp(`\\b${escapeRegExp(e.original)}\\b`, "gi"), e.placeholder);
+    // Case-sensitive: a student called Ray or Will must not take every "ray"
+    // and "will" out of a physics answer.
+    masked = masked.replace(new RegExp(`\\b${escapeRegExp(e.original)}\\b`, "g"), e.placeholder);
   }
 
   return { masked, entities };
@@ -141,7 +165,7 @@ export function maskChatHistory(history: { role: "user" | "assistant"; content: 
   return history.map((entry, index) => {
     let content = results[index]!.masked;
     for (const [original, placeholder] of names) {
-      content = content.replace(new RegExp(`\\b${escapeRegExp(original)}\\b`, "gi"), placeholder);
+      content = content.replace(new RegExp(`\\b${escapeRegExp(original)}\\b`, "g"), placeholder);
     }
     return { role: entry.role, content };
   });

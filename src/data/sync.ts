@@ -1081,14 +1081,24 @@ async function fromRow(entity: SyncEntity, row: Record<string, unknown>): Promis
     try {
       const data = await decryptPayload<Record<string, unknown>>(raw);
       if (data.userId !== undefined && data.userId !== row.user_id) throw new Error("Mixed-owner sync payload.");
-      return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: row.updated_at } : {}) });
+      return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: canonicalInstant(row.updated_at) } : {}) });
     } catch (error) {
       throw new Error(`E2EE decrypt failed for a synced row: ${error instanceof Error ? error.message : "unknown"}`);
     }
   }
   const data = (raw ?? {}) as Record<string, unknown>;
   if (data.userId !== undefined && data.userId !== row.user_id) throw new Error("Mixed-owner sync payload.");
-  return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: row.updated_at } : {}) });
+  return remap({ ...data, userId: row.user_id ?? data.userId, ...(data.updatedAt && row.updated_at ? { updatedAt: canonicalInstant(row.updated_at) } : {}) });
+}
+
+/**
+ * Postgres writes `…10:00:00.5+00:00`; everything this device writes is
+ * `…10:00:00.500Z`. Code that orders `updatedAt` as strings would misorder the
+ * two forms, so a pulled row is stored in the device's form.
+ */
+function canonicalInstant(value: unknown): unknown {
+  const ms = typeof value === "string" ? Date.parse(value) : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : value;
 }
 
 /** An ISO instant strictly after `serverUpdatedAt` and no earlier than now. */

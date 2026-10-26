@@ -20,6 +20,7 @@ import { isDataAnalysis, topicQuestionClusters, type SupplyAuditOptions } from "
 import { relativeTopicWeight, topicShares } from "./topic-weight";
 import { MIN_PROVABLE_QUESTIONS } from "./supply";
 import type { Id, Question, Topic } from "./types";
+import { todayLocal } from "./local-date";
 
 export const REQUIRED_TRUSTED_DISTINCT = MIN_PROVABLE_QUESTIONS;
 export const REQUIRED_TRUSTED_TRANSFER = 1;
@@ -169,7 +170,7 @@ const isTransferDemand = (q: Question) => [q.learning?.demand, ...q.parts.map((p
 
 function proximityMultiplier(date: string | undefined, now: Date): number {
   if (!date) return 1;
-  const days = (Date.parse(`${date}T00:00:00Z`) - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) / 86_400_000;
+  const days = (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${todayLocal(now)}T00:00:00Z`)) / 86_400_000;
   if (!Number.isFinite(days) || days < 0) return 1;
   return days <= 60 ? 1.5 : days <= 120 ? 1.25 : 1;
 }

@@ -21,7 +21,7 @@ import type { RecallMasteryRow } from "./recall-mastery";
 import type { Attempt, ExamDate, Id, Mistake, TopicMastery } from "./types";
 import type { LearnerState } from "./learner-state";
 import type { TopicProof } from "./proof-of-improvement";
-import { localDayOfInstant } from "./local-date";
+import { localDayOfInstant, todayLocal } from "./local-date";
 
 export type EvidenceLabel =
   | "no-evidence"
@@ -136,7 +136,8 @@ function daysToExamFor(
   subjectId: Id,
   now: Date,
 ): number | null {
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  // The student's local day, as every other countdown counts it.
+  const today = Date.parse(`${todayLocal(now)}T00:00:00Z`);
   const dates = exams
     .filter((e) => e.subjectId === subjectId)
     .map((e) => Date.parse(`${e.date}T00:00:00Z`))

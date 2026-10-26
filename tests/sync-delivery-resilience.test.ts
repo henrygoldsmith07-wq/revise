@@ -241,6 +241,21 @@ describe("card reviews merged on pull reach the server", () => {
   });
 });
 
+describe("pulled timestamps", () => {
+  it("stores a pulled row's updatedAt in the device's ISO form, not Postgres's", async () => {
+    const db = await getDb();
+    const server = fakeSyncServer(USER);
+    // PostgREST renders timestamptz with `+00:00` and trailing zeros trimmed.
+    server.tables.set("attempts", [{
+      id: syncWireIdValue(USER, "pulled-attempt"), user_id: USER, updated_at: "2026-09-01T10:00:00.5+00:00",
+      data: { id: "pulled-attempt", userId: USER, subjectId: "s", updatedAt: "2026-09-01T09:00:00.000Z" },
+    }]);
+    await sync(USER, { client: server.client, online: true });
+    const local = (await db.get("attempts", "pulled-attempt")) as { updatedAt: string } | undefined;
+    expect(local?.updatedAt).toBe("2026-09-01T10:00:00.500Z");
+  });
+});
+
 describe("one sync pass at a time across tabs", () => {
   it("skips as busy when another tab holds the sync lock, and runs under the lock otherwise", async () => {
     const db = await getDb();
