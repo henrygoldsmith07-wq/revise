@@ -23,6 +23,9 @@ import { MissionSessionMode } from "@/components/MissionSessionMode";
 import { SessionEvidenceBlock } from "@/components/SessionEvidenceBlock";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
+import { RunCounter } from "@/components/RunCounter";
+import { AnswerFeedbackSheet } from "@/components/AnswerFeedbackSheet";
+import { attemptExtendsRun, trailingRun } from "@/domain/study-week";
 import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { parseQuickSessionMinutes, type QuickSessionMinutes } from "@/domain/quick-session";
 import { buildWeakTopicExam } from "@/domain/weak-topic-exam";
@@ -469,6 +472,10 @@ function Practice() {
     return Boolean(draft && (draft.choice !== null || Object.values(draft.answers).some((answer) => answer.trim())));
   });
   const currentAnswered = current ? answered[index] : false;
+  const goNext = () => {
+    if (index >= queue.length - 1) void finishSession();
+    else setIndex((i) => Math.min(queue.length - 1, i + 1));
+  };
 
   if (closed) {
     return (
@@ -914,15 +921,13 @@ function Practice() {
             drafted={drafted}
             onSelect={(nextIndex) => { if (!finishing) setIndex(nextIndex); }}
             onPrevious={() => setIndex((i) => Math.max(0, i - 1))}
-            onNext={() => {
-              if (index >= queue.length - 1) void finishSession();
-              else setIndex((i) => Math.min(queue.length - 1, i + 1));
-            }}
+            onNext={goNext}
             previousDisabled={finishing || index === 0}
             nextDisabled={finishing || (index >= queue.length - 1 && !currentAnswered)}
             nextLabel={index >= queue.length - 1 ? "Finish session" : currentAnswered ? "Next question" : "Skip question"}
             controlsClassName="grid grid-cols-2 gap-2"
           />
+          <RunCounter run={trailingRun(sessionAttempts.map(attemptExtendsRun))} />
           {latestCurrentAttempt ? (
             <p className="text-sm text-ink2" aria-live="polite">
               Latest attempt: {latestCurrentAttempt.awarded}/{latestCurrentAttempt.max} marks. Earlier attempts stay in your session history.
@@ -949,6 +954,16 @@ function Practice() {
               });
             }}
           />
+          {latestCurrentAttempt ? (
+            <AnswerFeedbackSheet
+              key={latestCurrentAttempt.id}
+              question={current}
+              attempt={latestCurrentAttempt}
+              continueLabel={index >= queue.length - 1 ? "Finish session" : "Continue"}
+              onContinue={goNext}
+              disabled={finishing}
+            />
+          ) : null}
           {retestMistake && !returnHref ? (
             <ButtonLink href="/" variant="primary" className="inline-block">
               Back to Today
