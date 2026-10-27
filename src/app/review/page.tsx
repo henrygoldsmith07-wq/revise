@@ -17,6 +17,8 @@ import { buildRepairPlan, repairProgress } from "@/domain/mistake-repair";
 import { useStoreFields } from "@/state/store";
 import { PostSessionClosure } from "@/components/PostSessionClosure";
 import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar } from "@/components/ui";
+import { RunCounter } from "@/components/RunCounter";
+import { gradeExtendsRun, nextRun } from "@/domain/study-week";
 import { SpeakButton } from "@/components/SpeakButton";
 import { RichText } from "@/components/RichText";
 import { cardRevealNote, cardSpeechText } from "@/domain/card-display";
@@ -65,6 +67,7 @@ function ReviewSession() {
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   // Time is accumulated per card rather than measured against a wall clock, so
   // a session left open in a background tab does not report an hour of work.
+  const [run, setRun] = useState(0);
   const [done, setDone] = useState(() => ({
     reviewed: savedCheckpoint?.position ?? 0,
     again: savedCheckpoint?.repeatCount ?? 0,
@@ -314,6 +317,7 @@ function ReviewSession() {
         // An authored question checks this card's spec point between cards.
         setGradedCard(current);
         setExamCheck(pickExamQuestionForCard(current, store.questions));
+        setRun((r) => nextRun(r, gradeExtendsRun(value)));
         setDone((d) => ({
           reviewed: d.reviewed + 1,
           again: d.again + (value === "again" ? 1 : 0),
@@ -405,6 +409,7 @@ function ReviewSession() {
             {custom ? "Custom study" : mode === "mistakes" ? "Mistake repair" : "Spaced repetition"}
           </h1>
         </div>
+        <span className="ml-auto"><RunCounter run={run} /></span>
         <ButtonLink href={returnHref ?? "/"} size="sm" variant="ghost">{returnHref ? "Back to tutor" : "End session"}</ButtonLink>
       </div>
 

@@ -10,6 +10,7 @@ import { useStoreFields } from "@/state/store";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
 import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { explainSession } from "@/domain/session-explanation";
+import { aboutMinutesLabel } from "@/domain/minutes";
 import { describePathway } from "@/domain/study-pathway";
 import { ButtonLink, Pill } from "./ui";
 import { ForwardIcon } from "./icons";
@@ -54,7 +55,7 @@ export function AdaptiveSessionHero({
             a pill floated right, which wrapped onto its own row on phones. */}
         <p className="today-focus-eyebrow text-sm font-semibold text-speak">
           Your highest-value session
-          <span className="font-medium text-ink3 tabular-nums">· About {Math.ceil(session.totalMinutes)} min</span>
+          <span className="font-medium text-ink3 tabular-nums">· {aboutMinutesLabel(session.totalMinutes)}</span>
         </p>
         <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:mt-3 sm:text-3xl">
           Your next session is ready

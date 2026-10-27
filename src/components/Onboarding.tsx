@@ -10,7 +10,7 @@ import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStoreFields } from "@/state/store-context";
 import type { StoreValue } from "@/state/store";
-import { Button, Field, Panel, Pill, ProgressBar, Segmented, cx } from "./ui";
+import { Button, Field, Panel, Pill, Segmented, cx } from "./ui";
 import { UNIT4_OPTIONS, isUnit4Option, type Unit4Option, type YearGroup } from "@/domain/year-group";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
@@ -27,6 +27,11 @@ import { CreditedIcon } from "./icons";
 // ---------------------------------------------------------------------------
 
 const PHASES = ["Board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;
+
+/** "Pearson Edexcel" reads as "Edexcel" on a tile; single-word boards stay whole. */
+function boardMonogram(name: string): string {
+  return name.split(" ").pop() ?? name;
+}
 
 /** Default time budget while the student has not yet tuned Settings. */
 const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
@@ -232,7 +237,20 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2" aria-live="polite">
             Step {phase + 1} of {PHASES.length} · {PHASES[phase]}
           </p>
-          <ProgressBar value={(phase + 1) / PHASES.length} label={`Step ${phase + 1} of ${PHASES.length}`} />
+          {/* One segment per step, so the length of the setup is visible at a glance. */}
+          <div
+            className="grid gap-1.5"
+            style={{ gridTemplateColumns: `repeat(${PHASES.length}, minmax(0, 1fr))` }}
+            role="progressbar"
+            aria-valuenow={phase + 1}
+            aria-valuemin={1}
+            aria-valuemax={PHASES.length}
+            aria-label={`Step ${phase + 1} of ${PHASES.length}`}
+          >
+            {PHASES.map((name, step) => (
+              <span key={name} className={cx("h-2 rounded-full transition-colors", step <= phase ? "bg-accent" : "bg-surface2")} />
+            ))}
+          </div>
         </div>
 
         {phase === 0 ? (
@@ -242,7 +260,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
               Your specification, questions and past papers follow your board&apos;s syllabus. Pick the one your school
               uses.
             </p>
-            <ul className="space-y-2 pt-2">
+            <ul className="grid grid-cols-2 gap-2 pt-2">
               {boards.map((option) => {
                 const on = boardId === option.id;
                 return (
@@ -252,22 +270,29 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                       onClick={() => chooseBoard(option.id)}
                       aria-pressed={on}
                       className={cx(
-                        "w-full text-left card px-4 py-3.5 min-h-[3.5rem] flex items-center gap-3 transition-colors",
-                        on ? "border-ink3 bg-surface2" : "hover:border-ink3",
+                        "relative w-full h-full text-left card p-3 min-h-[7rem] flex flex-col gap-3 transition-all active:scale-[0.98]",
+                        on ? "border-accent bg-accentsoft" : "hover:border-ink3",
                       )}
                     >
+                      {/* The board's own short name as a tile: recognisable at a glance, and no borrowed logo. */}
                       <span
+                        aria-hidden
                         className={cx(
-                          "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
-                          on ? "bg-accent border-transparent text-onaccent" : "border-line",
+                          "grid h-11 min-w-11 place-items-center self-start rounded-xl px-2 text-sm font-bold tracking-tight",
+                          on ? "bg-accent text-onaccent" : "bg-surface2 text-ink",
                         )}
                       >
-                        {on ? <CreditedIcon size={12} aria-hidden /> : null}
+                        {boardMonogram(option.name)}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm text-ink">{option.name}</span>
+                        <span className="block text-sm font-semibold text-ink">{option.name}</span>
                         <span className="block text-[11px] text-ink3 truncate">{option.country}</span>
                       </span>
+                      {on ? (
+                        <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-accent text-onaccent">
+                          <CreditedIcon size={12} aria-hidden />
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 );
