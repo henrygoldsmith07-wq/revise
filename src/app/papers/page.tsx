@@ -25,6 +25,7 @@ import { QuestionNavigator } from "@/components/QuestionNavigator";
 import { QuestionRunner, type QuestionDraft } from "@/components/QuestionRunner";
 import { ExamConditionMode } from "@/components/ExamConditionMode";
 import { GenerateMockPanel } from "@/components/GenerateMockPanel";
+import { UnitMockPanel } from "@/components/UnitMockPanel";
 import { TopicForecastPanel } from "@/components/TopicForecastPanel";
 import { PastPaperCoveragePanel } from "@/components/PastPaperCoveragePanel";
 import { Button, ButtonLink, EmptyState, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
@@ -169,6 +170,8 @@ function Papers() {
       </header>
 
       <UploadPaper subjectId={subjectId} />
+
+      <UnitMockPanel subjectId={subjectId} onStart={(paperId) => setGeneratedPaperId(paperId)} />
 
       <GenerateMockPanel
         subjectId={subjectId}

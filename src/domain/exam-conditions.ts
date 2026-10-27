@@ -1,4 +1,5 @@
-import type { Question } from "./types";
+import { MOCK_READING_MINUTES, MOCK_TIME_PER_MARK_MINUTES } from "./mock-generator";
+import type { Paper, PaperSpec, Question } from "./types";
 
 export const EXAM_WARNING_SECONDS = 5 * 60;
 
@@ -42,4 +43,54 @@ export function unansweredQuestionCount(questions: Question[], answers: Record<s
 export function examQuestionProgress(index: number, questionCount: number): number {
   if (questionCount <= 0) return 0;
   return Math.min(1, Math.max(0, (index + 1) / questionCount));
+}
+
+export const GENERATED_PAPER_SPEC_PREFIX = "generated:";
+
+/**
+ * The paper format the exam-conditions clock runs to, and the formats the
+ * learner may switch between before starting.
+ *
+ * - A paper tied to a real format of its subject (an uploaded past paper, a
+ *   unit mock) uses that format. A unit mock is locked to it: switching would
+ *   turn an 80-mark, 90-minute paper into something else.
+ * - A bespoke mock is timed to its own mark budget. Before this it fell back
+ *   to the subject's first format, so a 30-mark Physics mock got Unit 3's
+ *   135 minutes. Mocks saved before the duration was stored are timed from
+ *   their marks with the generator's own pacing.
+ * - Anything else keeps the old behaviour: the subject's first format.
+ */
+export function examPaperFormat(
+  paper: Pick<Paper, "id" | "paperSpecId" | "generated" | "totalMarks">,
+  subjectPapers: readonly PaperSpec[],
+  fallback: PaperSpec,
+): { initial: PaperSpec; options: PaperSpec[]; locked: boolean; generated: boolean } {
+  const real = paper.paperSpecId ? subjectPapers.find((spec) => spec.id === paper.paperSpecId) : undefined;
+  if (paper.generated?.unitMock) {
+    const spec = real ?? subjectPapers.find((candidate) => candidate.id === paper.generated?.unitMock?.paperSpecId);
+    if (spec) {
+      const minutes = paper.generated.durationMinutes ?? spec.durationMinutes;
+      const timed = minutes === spec.durationMinutes ? spec : { ...spec, durationMinutes: minutes };
+      return { initial: timed, options: [timed], locked: true, generated: false };
+    }
+  }
+  if (real) return { initial: real, options: [...subjectPapers], locked: false, generated: false };
+  if (paper.generated) {
+    const minutes = paper.generated.durationMinutes ?? Math.round(MOCK_READING_MINUTES + paper.totalMarks * MOCK_TIME_PER_MARK_MINUTES);
+    const own: PaperSpec = {
+      id: `${GENERATED_PAPER_SPEC_PREFIX}${paper.id}`,
+      name: "Bespoke mock",
+      weight: 0,
+      durationMinutes: Math.max(1, minutes),
+      calculatorAllowed: true,
+    };
+    return { initial: own, options: [own, ...subjectPapers], locked: false, generated: true };
+  }
+  const first = subjectPapers[0] ?? fallback;
+  return { initial: first, options: subjectPapers.length ? [...subjectPapers] : [fallback], locked: false, generated: false };
+}
+
+/** True for a format id that names a real paper of the subject, not a mock's own clock. */
+export function isRealPaperSpecId(id: string | undefined): id is string {
+  return Boolean(id) && !id!.startsWith(GENERATED_PAPER_SPEC_PREFIX);
 }

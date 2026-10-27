@@ -416,10 +416,11 @@ export const wjecPhysics: CurriculumModule = registerSubject({
     name: "Physics",
     specCode: "1420QS",
     papers: [
+      { id: `${SUBJECT_ID}.u1`, name: "Unit 1: Motion, Energy and Matter", weight: 0.2, durationMinutes: 90, marks: 80, calculatorAllowed: true },
+      { id: `${SUBJECT_ID}.u2`, name: "Unit 2: Electricity and Light", weight: 0.2, durationMinutes: 90, marks: 80, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u3`, name: "Unit 3: Oscillations and Nuclei", weight: 0.25, durationMinutes: 135, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u4`, name: "Unit 4: Fields and Options", weight: 0.25, durationMinutes: 120, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u5`, name: "Unit 5: Practical Examination", weight: 0.1, durationMinutes: 180, calculatorAllowed: true },
-      { id: `${SUBJECT_ID}.as`, name: "AS Units 1 & 2", weight: 0.4, durationMinutes: 210, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
     spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.wjec.co.uk/qualifications/physics-asa-level/" },

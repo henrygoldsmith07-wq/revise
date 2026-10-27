@@ -88,6 +88,7 @@ export function papersFromManifest(subjectId: string): PaperSpec[] | undefined {
       name,
       weight: pb.weight,
       durationMinutes: pb.durationMinutes,
+      marks: pb.marks,
       calculatorAllowed: !nonCalc,
     };
   });

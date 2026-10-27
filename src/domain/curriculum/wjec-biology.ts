@@ -479,10 +479,11 @@ export const wjecBiology: CurriculumModule = registerSubject({
     name: "Biology",
     specCode: "A400QS",
     papers: [
+      { id: `${SUBJECT_ID}.u1`, name: "Unit 1: Basic Biochemistry and Cell Organisation", weight: 0.2, durationMinutes: 90, marks: 80, calculatorAllowed: true },
+      { id: `${SUBJECT_ID}.u2`, name: "Unit 2: Biodiversity and Physiology of Body Systems", weight: 0.2, durationMinutes: 90, marks: 80, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u3`, name: "Unit 3: Energy, Homeostasis and the Environment", weight: 0.25, durationMinutes: 120, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u4`, name: "Unit 4: Variation, Inheritance and Options", weight: 0.25, durationMinutes: 105, calculatorAllowed: true },
       { id: `${SUBJECT_ID}.u5`, name: "Unit 5: Practical Examination", weight: 0.1, durationMinutes: 120, calculatorAllowed: true },
-      { id: `${SUBJECT_ID}.as`, name: "AS Units 1 & 2", weight: 0.4, durationMinutes: 210, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
     spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.wjec.co.uk/qualifications/" },
