@@ -165,7 +165,7 @@ export function AdaptiveRetrievalBlock({
                       type="button"
                       onClick={() => setConfidence(value as 1 | 2 | 3 | 4 | 5)}
                       aria-pressed={confidence === value}
-                      className={`flex-1 min-h-[2.5rem] text-xs font-semibold rounded-[8px] border transition-colors ${
+                      className={`flex-1 min-h-[2.5rem] text-xs font-semibold rounded-lg border transition-colors ${
                         confidence === value
                           ? "bg-accent text-onaccent border-transparent"
                           : "border-line text-ink3 hover:text-ink"

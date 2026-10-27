@@ -28,11 +28,13 @@ import {
   Clock,
   Ellipsis,
   FileText,
+  FlaskConical,
   Flame,
   GraduationCap,
   LayoutGrid,
   Layers,
   Library,
+  ListChecks,
   Mic,
   Pause,
   Play,
@@ -90,6 +92,10 @@ export const TeacherIcon = UsersRound;
 /** Study modes other than plain review. */
 export const ModesIcon = Shapes;
 export const LessonsIcon = GraduationCap;
+/** Exam-technique drills: command words, timing, structure. */
+export const TechniqueIcon = ListChecks;
+/** Required practicals and practical skills. */
+export const PracticalIcon = FlaskConical;
 /** One-click generation from notes. */
 export const GenerateIcon = Sparkle;
 export const BenchmarkIcon = BarChart3;

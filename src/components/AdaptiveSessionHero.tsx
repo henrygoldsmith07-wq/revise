@@ -12,7 +12,7 @@ import type { ProofLedger } from "@/domain/proof-of-improvement";
 import { explainSession } from "@/domain/session-explanation";
 import { describePathway } from "@/domain/study-pathway";
 import { ButtonLink, Pill } from "./ui";
-import { ForwardIcon, TodayIcon } from "./icons";
+import { ForwardIcon } from "./icons";
 
 /** Today's lead action, with the session steps shown when space permits. */
 export function AdaptiveSessionHero({
@@ -50,12 +50,13 @@ export function AdaptiveSessionHero({
       <div className="min-w-0">
         {greeting ? <p className="mb-0.5 text-sm text-ink3">{greeting}, {displayName}</p> : null}
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="today-focus-icon" aria-hidden="true"><TodayIcon size={18} /></span>
-          <p className="text-sm font-semibold text-speak">Your highest-value session</p>
-          <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">About {Math.ceil(session.totalMinutes)} min</span>
-        </div>
-        <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">
+        {/* One eyebrow line: what this is, and how long. The duration used to be
+            a pill floated right, which wrapped onto its own row on phones. */}
+        <p className="today-focus-eyebrow text-sm font-semibold text-speak">
+          Your highest-value session
+          <span className="font-medium text-ink3 tabular-nums">· About {Math.ceil(session.totalMinutes)} min</span>
+        </p>
+        <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:mt-3 sm:text-3xl">
           Your next session is ready
         </h2>
         <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{subject?.name ?? session.subjectId} · {session.topicTitle}</p>
@@ -72,14 +73,16 @@ export function AdaptiveSessionHero({
           Start session <ForwardIcon size={17} aria-hidden />
         </ButtonLink>
 
-        {brief.provisional ? <p className="mt-3 text-sm text-ink2" role="note">{brief.provisional}</p> : <p className="mt-3 text-sm text-ink2">{explanation.stakes}</p>}
+        {/* The reasons stay visible, but set as supporting text under a hairline
+            so the title and Start lead the card. */}
+        {brief.provisional ? <p className="mt-4 border-t border-line pt-3 text-[13px] leading-5 text-ink2" role="note">{brief.provisional}</p> : <p className="mt-4 border-t border-line pt-3 text-[13px] leading-5 text-ink2">{explanation.stakes}</p>}
         {brief.lifecycle ? (
-          <p className="mt-1 text-sm text-ink2">
+          <p className="mt-1.5 text-[13px] leading-5 text-ink2">
             <span className="font-medium text-ink">{brief.lifecycle.label}.</span> {brief.lifecycle.line}
           </p>
         ) : null}
         {brief.produces.length ? (
-          <p className="mt-1 text-sm text-ink2">
+          <p className="mt-1.5 text-[13px] leading-5 text-ink2">
             In this session: {brief.produces.join(", ")}.{brief.doesNotProve ? ` ${brief.doesNotProve}` : ""}
           </p>
         ) : null}
@@ -88,12 +91,12 @@ export function AdaptiveSessionHero({
           <p className="mt-2 text-sm text-ink2" role="note">{session.stoppedEarly.reason}</p>
         ) : null}
 
-        <p className="mt-3 text-sm text-ink2">
+        <p className="mt-1.5 text-[13px] leading-5 text-ink2">
           <span className="font-medium text-ink">How:</span> {pathway.steps.join(" → ")}
         </p>
 
         {pathway.endsWithDelayedCheck ? (
-          <p className="mt-3 max-w-2xl text-sm text-ink2">
+          <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-ink2">
             <span className="font-medium text-ink">After this:</span> a check in a few days, on a question you have not seen, shows whether it stuck.
           </p>
         ) : null}

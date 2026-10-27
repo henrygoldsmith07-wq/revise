@@ -63,7 +63,7 @@ export function RetentionMasteryPanel() {
           />
         </div>
       ) : (
-        <div className="mt-4 rounded-[8px] bg-surface2 px-3 py-2.5 text-xs text-ink2">
+        <div className="mt-4 rounded-lg bg-surface2 px-3 py-2.5 text-xs text-ink2">
           Retention becomes a useful measure after 20 reviews in the last 30 days. Until then, the dashboard will not
           turn a small sample into a score.
         </div>
@@ -71,7 +71,7 @@ export function RetentionMasteryPanel() {
 
       <div className="grid grid-cols-3 gap-2 mt-4">
         {report.checkpoints.map((checkpoint) => (
-          <div key={checkpoint.checkpoint} className="rounded-[8px] border border-line px-2.5 py-2">
+          <div key={checkpoint.checkpoint} className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
               {CHECKPOINT_LABELS.get(checkpoint.checkpoint)}
             </p>

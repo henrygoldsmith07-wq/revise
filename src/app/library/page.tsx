@@ -137,7 +137,7 @@ function Library() {
       </header>
 
       {subject?.contentDisclaimer ? (
-        <p className="text-xs text-ink2 border border-line rounded-[10px] px-3 py-2.5 bg-surface2">
+        <p className="text-xs text-ink2 border border-line rounded-lg px-3 py-2.5 bg-surface2">
           {subject.contentDisclaimer}
         </p>
       ) : null}
@@ -621,7 +621,7 @@ function ManualCard({ subjectId }: { subjectId: string }) {
           />
         </Field>
         {kind === "cloze" && front.trim() && back.trim() ? (
-          <div className="rounded-[9px] bg-surface2 px-3 py-2.5">
+          <div className="rounded-lg bg-surface2 px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Review prompt</p>
             <RichText className="text-sm text-ink mt-1">
               {cloze?.front ?? "The hidden answer does not appear in the complete sentence yet."}

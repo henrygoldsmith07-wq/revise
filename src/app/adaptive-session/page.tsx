@@ -391,8 +391,8 @@ function AdaptiveSession() {
 
       {heldStep || showContinue || sessionFinished ? (
         <div className={heldStep
-          ? "sticky bottom-20 lg:bottom-4 z-10 rounded-[10px] border border-line bg-surface px-3 py-2.5"
-          : "rounded-[10px] border border-line bg-surface2/60 px-3 py-2.5"}>
+          ? "sticky bottom-20 lg:bottom-4 z-10 rounded-lg border border-line bg-surface px-3 py-2.5"
+          : "rounded-lg border border-line bg-surface2/60 px-3 py-2.5"}>
           <p className="text-[11px] uppercase tracking-wide text-ink2 font-bold">Next step</p>
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-1">
             {justCompleted?.result === "passed-independent"
@@ -572,13 +572,13 @@ function StepPanel({
       {step.kind === "misconception-repair" ? (
         <div className="space-y-3">
           {step.focus === "technique" ? (
-            <div className="rounded-[8px] border border-review/40 bg-reviewsoft px-3 py-2.5">
+            <div className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-wide text-review font-semibold">Exam technique</p>
               <p className="text-sm text-ink mt-1">{step.description}</p>
               <p className="text-xs text-ink3 mt-1">This is a new question on purpose: the technique only counts as fixed when it works somewhere different.</p>
             </div>
           ) : mistake ? (
-            <div className="rounded-[8px] border border-danger/30 bg-dangersoft/40 px-3 py-2.5">
+            <div className="rounded-lg border border-danger/30 bg-dangersoft/40 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-wide text-danger font-semibold">The skill to repair</p>
               <p className="text-sm text-ink mt-1">{mistake.description}</p>
               {mistake.point ? (
@@ -662,7 +662,7 @@ function StepPanel({
       ) : null}
 
       {step.kind === "delayed-retrieval" ? (
-        <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-3">
+        <div className="rounded-lg border border-accent bg-accentsoft px-3 py-3">
           <p className="text-sm text-ink2">
             Tomorrow&apos;s short check is part of today&apos;s learning, not an optional extra: an improvement only
             counts once it lasts.
@@ -729,7 +729,7 @@ function ExplanationGate({
   const topic = getTopic(plan.topicId);
   return (
     <div className="space-y-3">
-      <div className="space-y-2 rounded-[8px] border border-line bg-surface2/60 px-3 py-3">
+      <div className="space-y-2 rounded-lg border border-line bg-surface2/60 px-3 py-3">
         <label className="block text-xs font-semibold text-ink2" htmlFor="adaptive-recall">
           Before reading: explain {plan.topicTitle} in your own words.
         </label>
@@ -747,7 +747,7 @@ function ExplanationGate({
           </Button>
         ) : (
           <div className="space-y-3">
-            <div className="rounded-[8px] border border-line bg-surface2 px-3 py-3">
+            <div className="rounded-lg border border-line bg-surface2 px-3 py-3">
               {topic?.summary ? <p className="text-sm text-ink2">{topic.summary}</p> : null}
               {topic?.keyPoints.length ? (
                 <ul className="mt-2 space-y-1 list-disc list-inside text-xs text-ink2">

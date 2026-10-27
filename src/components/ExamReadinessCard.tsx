@@ -109,7 +109,7 @@ function SubjectReadiness({ row }: { row: ExamReadiness }) {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
         {row.signals.map((signal) => (
-          <div key={signal.key} className="rounded-[9px] bg-surface2 px-3 py-2.5 min-w-0">
+          <div key={signal.key} className="rounded-lg bg-surface2 px-3 py-2.5 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold text-ink2 truncate">{signal.label}</p>
               <Pill tone={signalTone(signal.status)}>{SIGNAL_LABEL[signal.status]}</Pill>
@@ -175,7 +175,7 @@ export function ExamReadinessCard({ compact = false }: { compact?: boolean }) {
             <p className="text-[11px] text-ink3 mt-2">{readinessSummaryText(summary)}</p>
           </div>
           {weakest ? (
-            <div className="rounded-[9px] bg-surface2 px-3 py-2.5 sm:min-w-52">
+            <div className="rounded-lg bg-surface2 px-3 py-2.5 sm:min-w-52">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Needs most attention</p>
               <p className="text-sm font-semibold text-ink truncate mt-0.5">{weakestSubject?.name ?? weakest.subjectId}</p>
               <p className="text-[11px] text-ink3 mt-0.5">{weakest.nextAction.label}</p>

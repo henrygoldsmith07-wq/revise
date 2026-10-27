@@ -86,7 +86,7 @@ export function DailySessionCard({ subjectIds }: { subjectIds: string[] }) {
             <Link
               href={phase.href}
               className={cx(
-                "flex items-center gap-3 rounded-[8px] border border-line px-3 py-2 transition-colors hover:border-ink3",
+                "flex items-center gap-3 rounded-lg border border-line px-3 py-2 transition-colors hover:border-ink3",
               )}
             >
               <span className="tabular-nums text-sm font-semibold text-ink w-10 shrink-0 text-right">

@@ -17,6 +17,7 @@ import type { Attempt, Id, InterventionAttemptContext, Mistake, Question } from 
 import { AnswerInput } from "./AnswerInput";
 import { RichText } from "./RichText";
 import { Button, Panel, Pill, cx } from "./ui";
+import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 import { ProofCheckBanner } from "./ProofCheckBanner";
 
 import { useQuestionExecution, type QuestionDraft } from "@/state/question-execution";
@@ -130,7 +131,7 @@ export function QuestionRunner({
         ) : null}
 
         {farTransfer ? (
-          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mb-4 text-sm text-ink2">
+          <div className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5 mb-4 text-sm text-ink2">
             <p className="font-semibold text-ink">Does it hold in a new context?</p>
             <p className="text-xs mt-1">
               This checks the same idea, {farTransfer.delayDays} days later, on a question set in a different context. It is
@@ -142,7 +143,7 @@ export function QuestionRunner({
         {stemRepeatsOnlyPart(question) ? null : <RichText className="text-base leading-7 text-ink">{question.stem}</RichText>}
 
         {guided && !result ? (
-          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5 mt-4 space-y-2" data-testid="guided-steps" aria-live="polite">
+          <div className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5 mt-4 space-y-2" data-testid="guided-steps" aria-live="polite">
             <p className="text-sm font-semibold text-ink">Guided try: use these steps as you write</p>
             {visibleHints.length ? (
               <ol className="space-y-1.5 list-decimal pl-5">
@@ -182,9 +183,9 @@ export function QuestionRunner({
                       wrongPick && "border-danger bg-dangersoft",
                     )}
                   >
-                    <span className="text-xs font-semibold text-ink3 mt-0.5">
+                    <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-ink3 mt-0.5">
                       {String.fromCharCode(65 + index)}
-                      {correct ? " ✓" : wrongPick ? " ✗" : ""}
+                      {correct ? <CreditedIcon size={ICON_SIZE.sm} aria-hidden className="text-success" /> : wrongPick ? <MissedIcon size={ICON_SIZE.sm} aria-hidden className="text-danger" /> : null}
                     </span>
                     <span className="sr-only">
                       {correct ? "Correct answer. " : wrongPick ? "Your incorrect pick. " : ""}

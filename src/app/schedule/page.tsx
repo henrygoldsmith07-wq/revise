@@ -379,7 +379,7 @@ function DayCard({ date, sessions, exams, today, lead }: { date: string; session
 function TodayLeadRow({ lead, hasBlocks }: { lead: TodayLead; hasBlocks: boolean }) {
   if (lead.kind === "resume") {
     return (
-      <div className="mx-4 mb-2 rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source="resume">
+      <div className="mx-4 mb-2 rounded-lg border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source="resume">
         <p className="text-sm font-semibold text-ink">Finish the session you started</p>
         <p className="text-[11px] text-ink2 mt-0.5">Your Today screen picks up where you left off.</p>
         <ButtonLink href="/" size="sm" variant="primary" className="mt-2">Resume on Today</ButtonLink>
@@ -391,7 +391,7 @@ function TodayLeadRow({ lead, hasBlocks }: { lead: TodayLead; hasBlocks: boolean
   const subject = getSubject(pick.subjectId)?.name ?? pick.subjectId;
   const topic = pick.topicIds.length === 1 ? getTopic(pick.topicIds[0]!)?.title : undefined;
   return (
-    <div className="mx-4 mb-2 rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source={pick.source}>
+    <div className="mx-4 mb-2 rounded-lg border border-accent bg-accentsoft px-3 py-2.5" data-testid="schedule-today-pick" data-source={pick.source}>
       <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Do this first · About {displayMinutes(pick.minutes)} min</p>
       <p className="text-sm font-semibold text-ink mt-0.5">{pick.title}</p>
       <p className="text-xs text-ink2">{topic ? `${subject} · ${topic}` : subject}</p>

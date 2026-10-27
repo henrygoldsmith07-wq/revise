@@ -107,7 +107,7 @@ export function MarksAtRiskPanel({ subjectId }: { subjectId?: string }) {
         ) : null}
 
         {session.questionIds.length ? (
-          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-lg border border-accent bg-accentsoft px-3 py-3 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Next best action</p>
               <p className="text-sm font-semibold text-ink mt-0.5">Recover these marks</p>

@@ -44,8 +44,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f4f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0b0d" },
+    // The top bar's --surface, so the status bar and the bar read as one piece.
+    // AppShell re-points both when the in-app theme differs from the OS one.
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#17171a" },
   ],
 };
 

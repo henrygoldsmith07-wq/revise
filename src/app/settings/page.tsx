@@ -845,7 +845,7 @@ function FailedSyncRecovery() {
         </p>
         <ul className="space-y-2">
           {items.map((item) => (
-            <li key={item.id} className="rounded-[10px] border border-line bg-surface2 p-3">
+            <li key={item.id} className="rounded-lg border border-line bg-surface2 p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-medium text-ink">
@@ -1135,7 +1135,7 @@ function DataControls() {
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => { void exportDataPortable(store, filename).catch(error => setRestoreMessage(error instanceof Error ? error.message : "Export failed.")); }}>Export portable snapshot</Button>
           <Button onClick={() => exportDataLegacy(store)}>Export legacy JSON</Button>
-          <label className="inline-flex min-h-9 cursor-pointer items-center rounded-[10px] border border-line px-3 text-sm font-medium text-ink hover:bg-surface2">
+          <label className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-surface2">
             Choose snapshot to restore
             <input
               type="file"
@@ -1179,7 +1179,7 @@ function DataControls() {
         </div>
         <p className="text-[11px] text-ink3">Portable snapshot: {filename} — single-file, machine-readable, GDPR Art. 20 portable.</p>
         {restorePreview ? (
-          <div className="rounded-[10px] border border-line bg-surface2 p-3 text-xs text-ink2">
+          <div className="rounded-lg border border-line bg-surface2 p-3 text-xs text-ink2">
             <p className="font-semibold text-ink">
               Restore preview · {restorePreview.counts.cards} cards · {restorePreview.counts.reviewLogs} reviews · {restorePreview.counts.attempts} attempts
             </p>

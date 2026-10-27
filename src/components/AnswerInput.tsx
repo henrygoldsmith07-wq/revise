@@ -251,7 +251,7 @@ export function AnswerInput({
                 title={token.title}
                 aria-label={token.title}
                 onClick={() => insertMath(token.id)}
-                className="min-w-10 min-h-10 rounded-md border border-line bg-surface px-2 text-sm font-medium text-ink hover:border-ink3 active:scale-[0.98]"
+                className="min-w-10 min-h-10 rounded-lg border border-line bg-surface px-2 text-sm font-medium text-ink hover:border-ink3 active:scale-[0.98]"
               >
                 {token.label}
               </button>

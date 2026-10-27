@@ -54,7 +54,7 @@ function inline(text: string): string {
   out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (whole, alt: string, url: string) => {
     const safe = safeUrl(decode(url));
     if (!safe) return escapeHtml(whole);
-    return `<img src="${safe}" alt="${alt}" class="max-w-full h-auto rounded-[8px] border border-line my-2" loading="lazy" />`;
+    return `<img src="${safe}" alt="${alt}" class="max-w-full h-auto rounded-lg border border-line my-2" loading="lazy" />`;
   });
   out = out.replace(/@\[([^\]]*)\]\(([^)]+)\)/g, (whole, _label: string, url: string) => {
     const safe = safeUrl(decode(url));
@@ -96,7 +96,7 @@ function tableHtml(lines: string[]): string | null {
     )
     .join("");
   // Wrapped so a wide table scrolls itself instead of the page.
-  return `<div class="overflow-x-auto nice-scroll my-2"><table class="w-full text-sm border border-line rounded-[8px] border-separate border-spacing-0"><thead class="bg-surface2 text-ink2">${head}</thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="overflow-x-auto nice-scroll my-2"><table class="w-full text-sm border border-line rounded-lg border-separate border-spacing-0"><thead class="bg-surface2 text-ink2">${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 
 export function toHtml(markdown: string): string {

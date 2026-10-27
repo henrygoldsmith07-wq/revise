@@ -132,7 +132,7 @@ export function DoubleMarkedCorpus() {
         </div>
         {notice ? <p className="text-xs text-ink2 mt-3" role="status" aria-live="polite">{notice}</p> : null}
         {errors.length ? (
-          <div className="mt-3 rounded-[8px] border border-review bg-reviewsoft p-3 text-xs text-ink2" role="alert">
+          <div className="mt-3 rounded-lg border border-review bg-reviewsoft p-3 text-xs text-ink2" role="alert">
             <p className="font-semibold">Import warnings</p>
             <ul className="mt-1 space-y-1 list-disc list-inside">
               {errors.slice(0, 5).map((error) => <li key={error}>{error}</li>)}

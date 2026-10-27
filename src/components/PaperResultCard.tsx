@@ -29,7 +29,7 @@ export function PaperResultCard({ paperId, title, onNavigate }: { paperId: strin
   if (!result) return null;
   const next = result.next;
   return (
-    <section aria-label="Paper result" className="rounded-[10px] border border-line px-4 py-4 space-y-3">
+    <section aria-label="Paper result" className="rounded-lg border border-line px-4 py-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Paper result</p>
         {result.state ? <Pill tone={LEARNER_STATE_TONE[result.state]}>{LEARNER_STATE_LABEL[result.state]}</Pill> : null}

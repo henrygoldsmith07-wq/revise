@@ -67,5 +67,5 @@ export function PaperMission({ paperId, title }: { paperId: string; title: strin
     [ev, paperId, title],
   );
   if (!mission) return null;
-  return <div className="rounded-[8px] border border-line px-3 py-3"><MissionView mission={mission} sessionInput={{ questions: store.questions, attempts: store.attempts, mistakes: ev.mistakes }} /></div>;
+  return <div className="rounded-lg border border-line px-3 py-3"><MissionView mission={mission} sessionInput={{ questions: store.questions, attempts: store.attempts, mistakes: ev.mistakes }} /></div>;
 }

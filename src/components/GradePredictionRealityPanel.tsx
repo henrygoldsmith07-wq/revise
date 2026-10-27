@@ -316,7 +316,7 @@ export function GradePredictionRealityPanel() {
           <p className="text-sm font-semibold text-ink">Accuracy by subject</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {report.bySubject.map((row) => (
-              <div key={row.key} className="rounded-[9px] bg-surface2 px-3 py-2.5">
+              <div key={row.key} className="rounded-lg bg-surface2 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-ink truncate">{getSubject(row.key)?.name ?? row.key}</p>
                   <Pill>{row.pairs} pair{row.pairs === 1 ? "" : "s"}</Pill>

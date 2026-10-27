@@ -106,7 +106,7 @@ export function LearnMode({ cards, onExit }: { cards: Card[]; onExit: () => void
         <RichText className="text-base text-ink">{current.front}</RichText>
         {current.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={current.imageUrl} alt="" className="mt-3 max-h-52 rounded-[8px] border border-line" />
+          <img src={current.imageUrl} alt="" className="mt-3 max-h-52 rounded-lg border border-line" />
         ) : null}
 
         {state?.stage === "multiple-choice" ? (

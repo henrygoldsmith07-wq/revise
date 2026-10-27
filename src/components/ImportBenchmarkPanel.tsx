@@ -50,15 +50,15 @@ export function ImportBenchmarkPanel() {
       <SectionHeading title="Paper-import benchmark" hint="Segmentation F1, mapping accuracy, and confidence-aware import" />
       <Panel>
         <div className="grid grid-cols-3 gap-2 text-xs">
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Phase 1 · {IMPORT_PHASE_1_PAPERS} papers</p>
             <p className="text-sm font-semibold tabular-nums">0 collected</p>
           </div>
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Phase 2 · 400+</p>
             <p className="text-sm font-semibold tabular-nums">planned</p>
           </div>
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Review threshold</p>
             <p className="text-sm font-semibold tabular-nums">{Math.round(IMPORT_REVIEW_THRESHOLD * 100)}%</p>
           </div>
@@ -73,7 +73,7 @@ export function ImportBenchmarkPanel() {
         <p className="text-xs text-ink2 mt-3 mb-1">Confidence-aware import in practice:</p>
         <ul className="text-xs space-y-1" data-testid="import-confidence-examples">
           {demoConfidence.map((ex) => (
-            <li key={ex.label} className={`rounded-[8px] px-2.5 py-1.5 border ${ex.needsReview ? "border-danger bg-dangersoft" : "border-success bg-successsoft"}`}>
+            <li key={ex.label} className={`rounded-lg px-2.5 py-1.5 border ${ex.needsReview ? "border-danger bg-dangersoft" : "border-success bg-successsoft"}`}>
               <span className="font-semibold">Question {ex.label}</span> —{" "}
               <span className="tabular-nums">{Math.round(ex.c * 100)}% confident</span> · Topic: {ex.topic} · Spec:{" "}
               {ex.spec}

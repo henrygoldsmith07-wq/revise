@@ -85,7 +85,7 @@ export function ReviewerSignIn() {
     <>
     <form onSubmit={(event) => void send(event)} className="space-y-2" aria-describedby="reviewer-signin-status">
       {linkProblem ? (
-        <p role="alert" className="text-xs text-ink2 rounded-md border border-line bg-surface2/40 px-2 py-1.5">
+        <p role="alert" className="text-xs text-ink2 rounded-lg border border-line bg-surface2/40 px-2 py-1.5">
           {LINK_PROBLEM_TEXT[linkProblem]}
         </p>
       ) : null}

@@ -81,14 +81,14 @@ export function CardStatsPanel({ card, logs }: { card: Card; logs: ReviewLog[] }
                   role="img"
                   aria-label={`${GRADE_LABEL[entry.grade] ?? entry.grade} on ${new Date(entry.reviewedAt).toLocaleDateString("en-GB")} (${entry.seconds.toFixed(1)}s)`}
                   title={`${new Date(entry.reviewedAt).toLocaleString("en-GB")} — ${entry.grade} (${entry.seconds.toFixed(1)}s)`}
-                  className={cx("h-5 w-2 rounded-[2px]", GRADE_COLOUR[entry.grade])}
+                  className={cx("h-5 w-2 rounded-full", GRADE_COLOUR[entry.grade])}
                 />
               ))}
             </div>
             <div className="flex flex-wrap gap-x-2.5 gap-y-1 mt-1.5 text-[10px] text-ink3">
               {GRADE_LEGEND.map(([grade, label]) => (
                 <span key={grade} className="inline-flex items-center gap-1">
-                  <span aria-hidden="true" className={cx("inline-block h-2 w-2 rounded-[2px]", GRADE_COLOUR[grade])} />
+                  <span aria-hidden="true" className={cx("inline-block h-2 w-2 rounded-full", GRADE_COLOUR[grade])} />
                   {label}
                 </span>
               ))}

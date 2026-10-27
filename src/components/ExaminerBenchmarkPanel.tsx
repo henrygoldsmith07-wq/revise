@@ -51,19 +51,19 @@ export function ExaminerBenchmarkPanel() {
       <SectionHeading title="Examiner benchmark" hint="Four blind markers; the human ceiling is the yardstick" />
       <Panel>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Rows marked</p>
             <p className="text-sm font-semibold tabular-nums">{report.n}</p>
           </div>
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Phase 1 · {PHASE_1_TARGET}</p>
             <p className="text-sm font-semibold tabular-nums">{Math.round(report.phase1Progress * 100)}%</p>
           </div>
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Phase 2 · {PHASE_2_TARGET}+</p>
             <p className="text-sm font-semibold tabular-nums">{Math.round(report.phase2Progress * 100)}%</p>
           </div>
-          <div className="rounded-[8px] border border-line px-2.5 py-2">
+          <div className="rounded-lg border border-line px-2.5 py-2">
             <p className="text-[11px] text-ink3">Strata unmet</p>
             <p className="text-sm font-semibold tabular-nums">{strataGaps}</p>
           </div>

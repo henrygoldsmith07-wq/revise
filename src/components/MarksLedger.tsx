@@ -23,7 +23,7 @@ export function MarksLedger() {
       <Panel className="space-y-3">
         <h2 id="marks-ledger-heading" className="sr-only">Marks ledger</h2>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-[8px] border border-line px-3 py-2.5">
+          <div className="rounded-lg border border-line px-3 py-2.5">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Recovered on practice</p>
             <p className="text-xl font-semibold tabular-nums mt-0.5">
               {ledger.practice.marks} <span className="text-sm font-normal text-ink3">marks</span>
@@ -32,7 +32,7 @@ export function MarksLedger() {
               {ledger.practice.count} in progress · unreviewed questions only, never proof
             </p>
           </div>
-          <div className="rounded-[8px] border border-line px-3 py-2.5">
+          <div className="rounded-lg border border-line px-3 py-2.5">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Proven on trusted unseen</p>
             <p className="text-xl font-semibold tabular-nums mt-0.5">
               {ledger.proven.marks} <span className="text-sm font-normal text-ink3">marks</span>

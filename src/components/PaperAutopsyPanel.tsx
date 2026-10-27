@@ -51,7 +51,7 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
           <summary className="cursor-pointer select-none text-sm font-medium text-ink2">Full breakdown and other ways to repair</summary>
           <div className="mt-4 space-y-5">
         {autopsy.headline.lines.length ? (
-          <div className="rounded-[8px] border border-line px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-lg border border-line px-3 py-3 flex flex-wrap items-center justify-between gap-3">
             <ul className="min-w-0 space-y-0.5 text-sm text-ink">
               {autopsy.headline.lines.map((line, index) => <li key={line} className={index === 0 ? "font-semibold" : "text-ink2"}>{line}</li>)}
             </ul>
@@ -98,7 +98,7 @@ export function PaperAutopsyPanel({ autopsy, onNavigate }: { autopsy: PaperAutop
         ) : null}
 
         {autopsy.marksLost ? (
-          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-lg border border-accent bg-accentsoft px-3 py-3 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-ink">Equivalent retest</p>

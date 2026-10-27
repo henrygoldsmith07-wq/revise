@@ -34,6 +34,10 @@
   --ink-3: #6a6a74;
   --accent: #131316;
   --on-accent: #ffffff;
+  /* Soft accent: the quiet fill behind accent-bordered callouts and step
+     dots (bg-accentsoft). Thirty components used it before it existed, so
+     they rendered with no fill at all. */
+  --accent-soft: #e9e9ee;
   /* Semantic accents — used sparingly on a monochrome base to signal state:
      success (goal met / correct), speak (conversation), review (due).
      Each doubles as text and as a fill, so the light-mode values are set dark
@@ -54,11 +58,20 @@
   --shadow-md: 0 6px 20px -6px rgba(19, 19, 22, 0.14), 0 2px 6px -2px rgba(19, 19, 22, 0.08);
   --shadow-nav: 0 -1px 0 var(--line), 0 -6px 20px -12px rgba(19, 19, 22, 0.16);
   --shadow-lg: 0 -12px 40px -12px rgba(19, 19, 22, 0.28), 0 -1px 0 var(--line);
-  /* radii — one scale, so cards/buttons/sheets agree across apps */
+  /* radii — one scale, so cards/buttons/sheets agree across apps.
+     The rule: controls (buttons, inputs, segmented options, menu rows) are 8;
+     cards and icon tiles are 12; large panels and sheets are 16; badges,
+     chips and progress bars are pills; inline code and <kbd> are 4.
+     In Tailwind: rounded-lg / rounded-xl / rounded-2xl / rounded-full / rounded.
+     Nothing else: no arbitrary rounded-[Npx]. */
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
   --radius-xl: 22px;
+  /* motion — one curve for everything that is not a finger-driven gesture.
+     Strong ease-out: fast to respond, gentle to settle. Built-in `ease-out`
+     is too weak to read as responsive. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .dark,
@@ -73,6 +86,7 @@
   --ink-3: #8f8f99;
   --accent: #f4f4f5;
   --on-accent: #0b0b0d;
+  --accent-soft: #232328;
   --success: #37c47e;
   --success-soft: #16311f;
   --speak: #6fa0ff;
@@ -133,6 +147,7 @@
   --color-ink3: var(--ink-3);
   --color-accent: var(--accent);
   --color-onaccent: var(--on-accent);
+  --color-accentsoft: var(--accent-soft);
   --color-success: var(--success);
   --color-successsoft: var(--success-soft);
   --color-speak: var(--speak);
@@ -195,10 +210,12 @@ html { -webkit-text-size-adjust: 100%; }
   letter-spacing: 0.01em;
   border-radius: var(--radius-sm);
   padding: 0.55rem 0.95rem;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
-    transform 0.1s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s var(--ease-out), border-color 0.15s var(--ease-out),
+    color 0.15s var(--ease-out), transform 0.12s var(--ease-out), box-shadow 0.15s var(--ease-out);
 }
-.btn:active:not(:disabled) { transform: scale(0.98); }
+/* Press feedback lands on press-in: a small scale on buttons and cards,
+   never on list rows (rows get a background highlight instead). */
+.btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-primary {
   background: var(--accent);
@@ -246,9 +263,13 @@ html { -webkit-text-size-adjust: 100%; }
 }
 
 /* ---- press feedback, focus, motion ---- */
+/* Only .btn (above) and opted-in cards scale on press. A blanket
+   `button:active` scale used to shrink full-width list rows and segmented
+   controls too, and its `transition` shorthand wiped .btn's colour
+   transitions. */
 button { -webkit-tap-highlight-color: transparent; }
-.btn:active, button:active { transform: scale(0.985); }
-.btn, button { transition: transform 0.06s ease-out; }
+.press { transition: transform 0.12s var(--ease-out), border-color 0.15s var(--ease-out), background-color 0.15s var(--ease-out); }
+.press:active:not(:disabled) { transform: scale(0.97); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
 :focus:not(:focus-visible) { outline: none; }
 
@@ -275,24 +296,29 @@ button { -webkit-tap-highlight-color: transparent; }
 .snap-rail::-webkit-scrollbar { display: none; }
 .snap-rail > * { scroll-snap-align: start; }
 
-/* ---- motion vocabulary ---- */
+/* ---- motion vocabulary ----
+   Everything here is under 300ms on the shared strong ease-out, and enters
+   from a small offset/scale rather than from nothing. */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.fade-in { animation: fade-in 0.25s ease-out; }
+.fade-in { animation: fade-in 0.22s var(--ease-out); }
 
 @keyframes app-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-.app-enter { animation: app-enter 0.35s ease-out; }
+.app-enter { animation: app-enter 0.24s var(--ease-out); }
 
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.sheet-enter { animation: sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.sheet-enter { animation: sheet-up 0.28s var(--ease-out); }
+
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+.scrim-enter { animation: scrim-in 0.2s var(--ease-out); }
 
 @keyframes bubble-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.bubble-in { animation: bubble-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
+.bubble-in { animation: bubble-in 0.24s var(--ease-out); }
 
 /* ---- typing indicator (three bouncing dots) ---- */
 @keyframes dot-bounce {
@@ -310,7 +336,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .typing-dot:nth-child(3) { animation-delay: 0.3s; }
 
 /* Progress bars animate smoothly when their width changes. */
-.bar-anim { transition: width 0.7s cubic-bezier(0.3, 0.8, 0.3, 1); }
+.bar-anim { transition: width 0.4s var(--ease-out); }
 
 /* iOS safe areas */
 .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.75rem); }
@@ -319,7 +345,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .skip-link {
   position: absolute; left: 8px; top: -48px; z-index: 100;
   background: var(--accent); color: var(--on-accent);
-  padding: 0.5rem 0.875rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;
+  padding: 0.5rem 0.875rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600;
   transition: top 0.15s ease-out;
 }
 .skip-link:focus { top: 8px; }
@@ -379,7 +405,7 @@ button { -webkit-tap-highlight-color: transparent; }
   width: 2.25rem;
   height: 2.25rem;
   place-items: center;
-  border-radius: 0.75rem;
+  border-radius: var(--radius);
   background: var(--mode-soft);
   color: var(--mode-color);
 }

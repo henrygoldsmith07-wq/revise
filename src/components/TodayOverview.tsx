@@ -9,7 +9,6 @@ import { useStoreFields } from "@/state/store";
 import { ButtonLink } from "./ui";
 import { CreditedIcon, ForwardIcon, LessonsIcon, LibraryIcon, PlanIcon, PracticeIcon, ReviewIcon } from "./icons";
 
-const SUBJECT_COLOURS = ["green", "purple", "pink", "blue"] as const;
 
 const ACTIVITY_LABEL: Record<ActivityKind, string> = {
   learn: "Learn",
@@ -42,7 +41,7 @@ function RevisionPlanner({ exam, nextBlock, today }: { exam?: ExamDate; nextBloc
   const blockSubject = nextBlock ? getSubject(nextBlock.subjectId) : undefined;
 
   return (
-    <section aria-label="Revision planner" className="today-planner card p-5 sm:p-6">
+    <section aria-label="Revision planner" className="card p-5 sm:p-6">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-speaksoft text-speak" aria-hidden="true">
           <PlanIcon size={20} />
@@ -135,19 +134,19 @@ export function TodayOverview() {
         </div>
         {subjects.length ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {subjects.map((subject, index) => (
+            {subjects.map((subject) => (
               <Link
                 key={subject.id}
                 href={"/library?subject=" + encodeURIComponent(subject.id)}
-                className={"today-subject-card today-subject-card--" + SUBJECT_COLOURS[index % SUBJECT_COLOURS.length]}
+                className="today-subject-card"
                 aria-label={"Explore " + subject.name + " topics"}
               >
-                <span className="relative z-10 flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 text-white" aria-hidden="true">
-                  <LibraryIcon size={19} />
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface2 text-ink2" aria-hidden="true">
+                  <LibraryIcon size={18} />
                 </span>
-                <span className="relative z-10 mt-3 text-xs font-semibold text-white/85">{subjectLabel(subject)}</span>
-                <strong className="relative z-10 mt-1 block text-xl font-semibold leading-tight text-white">{subject.name}</strong>
-                <span className="relative z-10 mt-auto inline-flex w-fit items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-ink">
+                <span className="mt-3 text-xs font-medium text-ink3">{subjectLabel(subject)}</span>
+                <strong className="mt-0.5 block text-lg font-semibold leading-tight text-ink">{subject.name}</strong>
+                <span className="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-medium text-ink2">
                   Explore topics <ForwardIcon size={15} aria-hidden />
                 </span>
               </Link>

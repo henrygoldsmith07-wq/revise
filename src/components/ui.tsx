@@ -124,7 +124,7 @@ export function StatTile({
   const toneClass =
     tone === "success" ? "text-success" : tone === "review" ? "text-review" : tone === "danger" ? "text-danger" : "text-ink";
   return (
-    <div className="rounded-[8px] border border-line bg-transparent p-3 sm:p-3.5">
+    <div className="rounded-lg border border-line bg-transparent p-3 sm:p-3.5">
       <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">{label}</p>
       <p className={cx("text-xl font-semibold tabular-nums mt-0.5", toneClass)}>{value}</p>
       {sub ? <p className="text-[11px] text-ink3 mt-0.5">{sub}</p> : null}
@@ -219,7 +219,7 @@ export function Segmented<T extends string>({
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
           className={cx(
-            "px-3 py-1.5 text-xs font-semibold rounded-[10px] transition-colors",
+            "px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors",
             option.value === value ? "bg-surface text-ink elev-card" : "text-ink3 hover:text-ink",
           )}
         >

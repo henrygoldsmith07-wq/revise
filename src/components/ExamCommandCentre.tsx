@@ -87,7 +87,7 @@ function SubjectCard({ subject }: { subject: CommandCentreSubject }) {
         <p className="mt-1 text-sm text-ink2">{t.heading}</p>
       </div>
       {subject.next ? (
-        <div className="rounded-[10px] bg-surface2 px-3 py-2.5">
+        <div className="rounded-lg bg-surface2 px-3 py-2.5">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Best next step</p>
           <p className="mt-0.5 text-sm font-medium text-ink">{subject.next.title} · about {subject.next.minutes} min</p>
           <ButtonLink href={subject.next.href} size="sm" className="mt-2 min-h-11 w-full sm:w-auto">

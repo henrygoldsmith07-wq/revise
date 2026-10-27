@@ -77,7 +77,7 @@ export function PracticeNextStep({
   return (
     <>
       <section
-        className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5"
+        className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5"
         aria-labelledby={`next-step-${question.id}`}
         data-testid="practice-next-step"
         data-step-kind={step.kind}
@@ -114,7 +114,7 @@ export function PracticeNextStep({
       ) : null}
 
       <details
-        className="rounded-[8px] border border-line"
+        className="rounded-lg border border-line"
         data-testid="practice-more-help"
         onToggle={(event) => setMoreOpen((event.currentTarget as HTMLDetailsElement).open)}
       >

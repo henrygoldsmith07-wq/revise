@@ -215,7 +215,7 @@ export function MarkedResult({
         </div>
       </div>
       {result.source === "fallback" && result.aiRemarkQueued ? (
-        <div className="mb-3 rounded-[8px] border border-line bg-surface2 px-3 py-2.5 text-sm text-ink2" role="status">
+        <div className="mb-3 rounded-lg border border-line bg-surface2 px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-ink">AI marking did not respond</p>
           <p className="text-xs mt-1">
             This answer was marked against the mark scheme on your device instead. Revise will try the AI marker
@@ -224,7 +224,7 @@ export function MarkedResult({
         </div>
       ) : null}
       {provisional ? (
-        <div className="mb-3 rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
+        <div className="mb-3 rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Provisional mark</p>
           <p className="text-xs mt-1">
             {result.assessment?.explanation ??
@@ -233,7 +233,7 @@ export function MarkedResult({
         </div>
       ) : null}
       {result.escalation ? (
-        <div className="rounded-[8px] border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
+        <div className="rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Human review requested</p>
           <p className="text-xs mt-1">{result.escalation.message}</p>
           <p className="text-[11px] text-ink3 mt-1">This pending escalation is saved with the attempt for a second-marker decision.</p>
@@ -432,7 +432,7 @@ export function MarkedResult({
         {/* Full marks keeps its short "what this taught us" read (support used,
             familiar question or bank it); a lost mark folds it into the next step. */}
         {!inDiagnostic && !marksLost ? (
-          <div className="rounded-[8px] border border-accent bg-accentsoft px-3 py-2.5">
+          <div className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
             <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
             <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
@@ -455,7 +455,7 @@ export function MarkedResult({
                 state="passed"
               />
             ) : (
-              <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="What this answer establishes">
+              <div className="rounded-lg border border-line px-3 py-2.5 space-y-2" aria-label="What this answer establishes">
                 <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Full marks — practice, not proof</p>
                 <p className="text-sm text-ink2">
                   {reviewedQuestion
