@@ -19,6 +19,7 @@ import { useRevisionPlan } from "@/components/recovery-evidence";
 import { todayPick } from "@/domain/today-pick";
 import { checkpointHasProgress } from "@/domain/revision-checkpoint";
 import { WeekLine } from "@/components/RecoverySummary";
+import { StudyWeek } from "@/components/StudyWeek";
 import { ExamDateNudge } from "@/components/ExamDateNudge";
 import { TodayOverview } from "@/components/TodayOverview";
 import { SundayPlan } from "@/components/SundayPlan";
@@ -141,6 +142,7 @@ export default function TodayPage() {
           <Link href="/study" className="inline-flex min-h-11 items-center font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
         </p>
       )}
+      {resume ? null : <StudyWeek />}
       {resume ? null : <WeekLine />}
       {resume ? null : <ExamDateNudge />}
       <details className="card p-4 sm:p-5">

@@ -166,3 +166,10 @@
 :root.reduce-motion .proof-moment-banner { opacity: 1; animation: none; }
 :root.reduce-motion .proof-moment__to::after { animation: none; }
 :root.reduce-motion .proof-moment__check path { stroke-dashoffset: 0; animation: none; }
+
+/* A run of correct answers grows in once per new answer (RunCounter keys on the count). */
+.run-pop { animation: proof-to 0.3s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .run-pop { animation: none; }
+}
+:root.reduce-motion .run-pop { animation: none; }
