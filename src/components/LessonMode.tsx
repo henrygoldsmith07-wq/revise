@@ -6,7 +6,7 @@ import { buildRoadmapLessons, roadmapLessonIndex } from "@/content/lessons";
 import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import type { Topic } from "@/domain/types";
 import type { RoadmapLessonEntry } from "@/content/lessons";
-import { AchievementIcon, StreakIcon, ICON_SIZE } from "./icons";
+import { AchievementIcon, CreditedIcon, MissedIcon, StreakIcon, ICON_SIZE } from "./icons";
 import { RichText } from "./RichText";
 import { useShortcuts } from "./shortcuts";
 import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
@@ -210,7 +210,7 @@ export function LessonMode({
           </div>
 
           {lesson.learningObjectives?.length ? (
-            <div className="text-left rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-3">
+            <div className="text-left rounded-lg border border-accent/30 bg-accentsoft/30 px-3 py-3">
               <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">What to practise next</p>
               <ul className="mt-2 space-y-1.5">
                 {lesson.learningObjectives.map((objective, index) => (
@@ -226,7 +226,7 @@ export function LessonMode({
           {summary.missed.length ? (
             <ul className="text-left space-y-2 max-w-md mx-auto">
               {summary.missed.map((m, i) => (
-                <li key={i} className="text-xs border border-line rounded-[8px] px-3 py-2">
+                <li key={i} className="text-xs border border-line rounded-lg px-3 py-2">
                   <RichText className="text-sm text-success">{`✓ ${m.answer}`}</RichText>
                   <RichText className="mt-1 text-ink3">{m.body}</RichText>
                   <RichText className="mt-2 text-ink2">{m.explanation}</RichText>
@@ -273,7 +273,7 @@ export function LessonMode({
             </div>
           ) : upNextSubject ? (
             <div className="pt-2 border-t border-line">
-              <p className="text-sm text-ink3">All lessons in this subject are complete. 🎉</p>
+              <p className="text-sm text-ink3">All lessons in this subject are complete.</p>
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-3">Up next</p>
               <p className="text-sm font-medium text-ink mt-1">
                 {upNextSubject.name} — {upNextSubject.remaining} {upNextSubject.remaining === 1 ? "lesson" : "lessons"} left
@@ -288,7 +288,7 @@ export function LessonMode({
             </div>
           ) : (
             <div className="pt-2 border-t border-line">
-              <p className="text-sm text-ink3">All lessons in your subjects are complete. 🎉</p>
+              <p className="text-sm text-ink3">All lessons in your subjects are complete.</p>
               <Button variant="primary" className="mt-3" onClick={exitLesson}>
                 Back to lessons
               </Button>
@@ -323,12 +323,12 @@ export function LessonMode({
         <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label="Lesson progress" />
 
         {lesson.outline ? (
-          <p className="rounded-[8px] border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
+          <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
             Outline only: Revise has not written teaching for this checkpoint yet, so these steps are built from the
             specification wording. Use it as a checklist, and learn the idea from your notes or textbook.
           </p>
         ) : lesson.teachingReview === "not-teacher-reviewed" ? (
-          <p className="rounded-[8px] border border-line bg-surface2 px-3 py-2 text-xs text-ink2" role="note" data-testid="lesson-review-state">
+          <p className="rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-ink2" role="note" data-testid="lesson-review-state">
             <span className="font-semibold text-ink">Not yet teacher-reviewed.</span> Revise wrote this lesson and no teacher
             has checked it yet. If anything disagrees with your notes or textbook, go with those. Finishing it is practice, not proof.
           </p>
@@ -369,7 +369,7 @@ export function LessonMode({
           <RichText className="text-base text-ink">{step.body}</RichText>
 
           {step.objective ? (
-            <div className="rounded-[8px] border border-line bg-surface2/60 px-3 py-2.5">
+            <div className="rounded-lg border border-line bg-surface2/60 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">What you should be able to do</p>
               <RichText className="mt-1 text-sm text-ink2">{step.objective}</RichText>
             </div>
@@ -403,13 +403,13 @@ export function LessonMode({
           </div>
 
           {step.examLink ? (
-            <div className="rounded-[8px] border border-line bg-surface2/50 px-3 py-2.5">
+            <div className="rounded-lg border border-line bg-surface2/50 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Exam link</p>
               <RichText className="text-xs text-ink2 mt-1">{step.examLink}</RichText>
             </div>
           ) : null}
 
-          <div className="rounded-[8px] border border-accent/30 bg-accentsoft/30 px-3 py-3 space-y-2.5">
+          <div className="rounded-lg border border-accent/30 bg-accentsoft/30 px-3 py-3 space-y-2.5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Active recall</p>
@@ -436,7 +436,7 @@ export function LessonMode({
                 </div>
               </>
             ) : (
-              <div role="status" aria-live="polite" className="rounded-[8px] border border-success/30 bg-successsoft/50 px-3 py-2.5">
+              <div role="status" aria-live="polite" className="rounded-lg border border-success/30 bg-successsoft/50 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Now compare</p>
                 <RichText className="text-sm text-ink mt-1">{step.takeaway}</RichText>
               </div>
@@ -464,7 +464,7 @@ export function LessonMode({
                         onClick={() => answer(oi)}
                         aria-pressed={isChosen}
                         className={cx(
-                          "w-full text-left text-sm px-3 py-2 rounded-[8px] border transition-colors flex items-center gap-2",
+                          "w-full text-left text-sm px-3 py-2 rounded-lg border transition-colors flex items-center gap-2",
                           checkReveal
                             ? isCorrect
                               ? "border-success text-success"
@@ -476,8 +476,8 @@ export function LessonMode({
                       >
                         <span className="text-[11px] font-mono text-ink3 shrink-0">{oi + 1}</span>
                         <span className="min-w-0 flex-1">{option}</span>
-                        {checkReveal && isCorrect ? <span className="ml-auto shrink-0">✓</span> : null}
-                        {checkReveal && isChosen && !isCorrect ? <span className="ml-auto shrink-0">✗</span> : null}
+                        {checkReveal && isCorrect ? <CreditedIcon size={ICON_SIZE.md} aria-hidden className="ml-auto shrink-0" /> : null}
+                        {checkReveal && isChosen && !isCorrect ? <MissedIcon size={ICON_SIZE.md} aria-hidden className="ml-auto shrink-0" /> : null}
                       </button>
                     </li>
                   );
@@ -488,7 +488,7 @@ export function LessonMode({
                   role="status"
                   aria-live="polite"
                   className={cx(
-                    "rounded-[8px] border px-3 py-2.5",
+                    "rounded-lg border px-3 py-2.5",
                     selectedCorrect ? "border-success/40 bg-successsoft/50" : "border-review/40 bg-reviewsoft/50",
                   )}
                 >
@@ -500,7 +500,7 @@ export function LessonMode({
               ) : null}
             </div>
           ) : (
-            <div className="rounded-[8px] border border-line bg-surface2/50 px-3 py-2.5">
+            <div className="rounded-lg border border-line bg-surface2/50 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Pause and say it back</p>
               <p className="text-sm text-ink2 mt-1">
                 Explain the idea aloud or in your head without looking. When it feels clear, continue to the next step.
@@ -509,14 +509,14 @@ export function LessonMode({
           )}
 
           {step.examTechnique ? (
-            <div className="rounded-[8px] border border-line bg-surface2/50 px-3 py-2.5">
+            <div className="rounded-lg border border-line bg-surface2/50 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Exam technique</p>
               <RichText className="mt-1 text-sm text-ink2">{step.examTechnique}</RichText>
             </div>
           ) : null}
 
           {step.application ? (
-            <div className="space-y-3 rounded-[8px] border border-accent/30 bg-accentsoft/20 px-3 py-3">
+            <div className="space-y-3 rounded-lg border border-accent/30 bg-accentsoft/20 px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Apply it</p>
@@ -534,7 +534,7 @@ export function LessonMode({
                   Reveal model answer
                 </Button>
               ) : (
-                <div role="status" aria-live="polite" className="space-y-3 rounded-[8px] border border-success/30 bg-successsoft/40 px-3 py-2.5">
+                <div role="status" aria-live="polite" className="space-y-3 rounded-lg border border-success/30 bg-successsoft/40 px-3 py-2.5">
                   <div>
                     <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Model answer</p>
                     <RichText className="mt-1 text-sm text-ink2">{step.application.modelAnswer}</RichText>
@@ -610,19 +610,21 @@ export function LessonMode({
         </Button>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border-2 border-accent/30 bg-surface2 shadow-sm">
-        <div className="bg-accent px-4 py-4 text-onaccent sm:px-6 sm:py-5">
+      <section className="overflow-hidden rounded-2xl border border-line bg-surface2">
+        {/* Tinted, not inverted: a full-bleed bg-accent header became a solid
+            white slab in dark mode. */}
+        <div className="border-b border-line bg-surface px-4 py-4 text-ink sm:px-6 sm:py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.14em] font-bold opacity-75">Your learning path</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] font-bold text-ink3">Your learning path</p>
               <h3 className="mt-1 text-xl font-bold tracking-tight">{roadmapTitle}</h3>
-              <p className="mt-1 max-w-xl text-sm opacity-85">
+              <p className="mt-1 max-w-xl text-sm text-ink2">
                 Follow the path from foundations to exam-ready ideas. Each node opens written teaching, active recall, worked application and quick checks.
               </p>
             </div>
-            <div className="shrink-0 rounded-2xl border-2 border-onaccent/30 px-3 py-2 text-center">
+            <div className="shrink-0 rounded-xl border border-line bg-surface2 px-3 py-2 text-center">
               <p className="text-2xl font-bold leading-none tabular-nums">{doneCount}</p>
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-75">of {lessons.length}</p>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink3 tabular-nums">of {lessons.length}</p>
             </div>
           </div>
         </div>
@@ -695,32 +697,32 @@ export function LessonMode({
           const unitProgress = entries.length ? unitDone / entries.length : 0;
           return (
             <li key={unit.id}>
-              <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-                <header className="flex items-start justify-between gap-4 bg-accent px-4 py-4 text-onaccent sm:px-6">
+              <section className="overflow-hidden rounded-2xl border border-line bg-surface">
+                <header className="flex items-start justify-between gap-4 border-b border-line bg-surface2 px-4 py-4 text-ink sm:px-6">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[11px] uppercase tracking-[0.14em] font-bold opacity-75">Unit {unitIndex + 1}</p>
-                      <span className="rounded-full border border-onaccent/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                      <p className="text-[11px] uppercase tracking-[0.14em] font-bold text-ink3">Step {unitIndex + 1}</p>
+                      <span className="rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink2">
                         {unitComplete ? "Complete" : unitCurrent ? "Your next unit" : "In your path"}
                       </span>
                     </div>
                     <h3 className="mt-1 text-lg font-bold tracking-tight">{unit.title}</h3>
-                    <p className="mt-0.5 text-xs opacity-80">
+                    <p className="mt-0.5 text-xs text-ink2">
                       {unitDone} of {entries.length} lessons complete · follow this unit in order
                     </p>
                   </div>
                   <div className="w-24 shrink-0 pt-1 sm:w-32">
                     <div
-                      className="h-2 overflow-hidden rounded-full bg-onaccent/20"
+                      className="h-2 overflow-hidden rounded-full bg-line"
                       role="progressbar"
-                      aria-label={`Unit ${unitIndex + 1} progress`}
+                      aria-label={`${unit.title} progress`}
                       aria-valuenow={Math.round(unitProgress * 100)}
                       aria-valuemin={0}
                       aria-valuemax={100}
                     >
-                      <div className="h-full rounded-full bg-onaccent transition-[width] duration-700" style={{ width: `${Math.round(unitProgress * 100)}%` }} />
+                      <div className="h-full rounded-full bg-accent bar-anim" style={{ width: `${Math.round(unitProgress * 100)}%` }} />
                     </div>
-                    <p className="mt-1 text-right text-[10px] font-semibold opacity-80">{Math.round(unitProgress * 100)}%</p>
+                    <p className="mt-1 text-right text-[10px] font-semibold text-ink3 tabular-nums">{Math.round(unitProgress * 100)}%</p>
                   </div>
                 </header>
 

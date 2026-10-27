@@ -106,7 +106,7 @@ export function StorageRecovery({ error, onRetry }: { error: unknown; onRetry: (
           <h1 className="text-xl font-semibold tracking-tight text-ink">Your revision work is still recoverable</h1>
           <p className="text-sm text-ink2 mt-2 leading-6">{storageFailureMessage(error)}</p>
         </div>
-        <div className="rounded-[10px] bg-surface2 p-3 text-xs text-ink3 leading-5">
+        <div className="rounded-lg bg-surface2 p-3 text-xs text-ink3 leading-5">
           Revise never sends answer content as diagnostics. Export a local recovery copy before repair if you need support or want a last-resort backup.
         </div>
         <div className="flex flex-wrap gap-2">

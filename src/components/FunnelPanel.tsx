@@ -50,7 +50,7 @@ export function FunnelPanel() {
       <Panel>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
           {report.goals.map((goal) => (
-            <div key={goal.label} className="rounded-[8px] border border-line px-2.5 py-2" data-testid={`funnel-${goal.label}`}>
+            <div key={goal.label} className="rounded-lg border border-line px-2.5 py-2" data-testid={`funnel-${goal.label}`}>
               <p className="text-[11px] text-ink3">{goal.label}</p>
               <p className={`text-sm font-semibold tabular-nums mt-0.5 ${goalTone(goal.meets)}`}>
                 {goal.value == null

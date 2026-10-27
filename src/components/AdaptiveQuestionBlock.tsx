@@ -65,7 +65,7 @@ export function AdaptiveQuestionBlock({
   return (
     <div className="space-y-3">
       {hintsAllowed ? (
-        <div className="rounded-[10px] border border-line bg-surface2/60 px-3 py-2.5">
+        <div className="rounded-lg border border-line bg-surface2/60 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone="accent">Support available</Pill>
             <span className="text-[11px] text-ink3">

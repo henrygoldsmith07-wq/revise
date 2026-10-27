@@ -14,7 +14,7 @@ import { Button } from "./ui";
 import { LEARNER_STATE_LABEL } from "@/domain/learner-state";
 import type { RevisionAction, RevisionPlan } from "@/domain/revision-engine";
 import { ButtonLink, Pill } from "./ui";
-import { ForwardIcon, TodayIcon } from "./icons";
+import { ForwardIcon } from "./icons";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { flushPilotEvents, recordPilotEvent } from "@/lib/pilot-telemetry";
 
@@ -55,14 +55,15 @@ export function BestNextStep({ action, plan }: { action: RevisionAction; plan: R
   return (
     <section aria-label="What to do now" className="grid gap-4">
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="today-focus-icon" aria-hidden="true"><TodayIcon size={18} /></span>
-          <p className="text-sm font-semibold text-speak">Do this now</p>
+        {/* One eyebrow line: what this is, and how long; state pills follow it. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="today-focus-eyebrow text-sm font-semibold text-speak">
+            Do this now <span className="font-medium text-ink3 tabular-nums">· {focus.duration}</span>
+          </p>
           {action.proofStatus && action.proofStatus !== "not-checked" ? <Pill tone={TONE[action.proofStatus]}>{LEARNER_STATE_LABEL[action.proofStatus]}</Pill> : null}
           {isProof ? <Pill tone="review">Proof check</Pill> : null}
-          <span className="ml-auto rounded-full bg-speaksoft px-3 py-1 text-sm font-semibold text-speak">{focus.duration}</span>
         </div>
-        <h2 className="mt-3 text-xl font-semibold tracking-tight text-ink sm:mt-4 sm:text-3xl">{focus.title}</h2>
+        <h2 className="mt-2 text-xl font-semibold tracking-tight text-ink sm:mt-3 sm:text-3xl">{focus.title}</h2>
         <p className="mt-1 text-base font-medium text-ink sm:mt-2 sm:text-lg">{topicTitle ? `${focus.subject} · ${topicTitle}` : focus.subject}</p>
         <p className="mt-1 text-sm text-ink2">{focus.examLine} · {focus.stake}</p>
         {isProof ? (

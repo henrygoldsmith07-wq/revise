@@ -23,7 +23,7 @@ export function CardPromptMedia({ card }: { card: Card }) {
   if (!card.imageUrl) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={card.imageUrl} alt="" className="mt-3 max-h-60 rounded-[8px] border border-line mx-auto" />
+    <img src={card.imageUrl} alt="" className="mt-3 max-h-60 rounded-lg border border-line mx-auto" />
   );
 }
 
@@ -68,7 +68,7 @@ function DiagramFigure({ spec, title }: { spec: DiagramSpec; title: string }) {
       <img
         src={spec.imageUrl}
         alt={`Unlabelled diagram: ${title}`}
-        className="w-full h-auto rounded-[8px] border border-line select-none"
+        className="w-full h-auto rounded-lg border border-line select-none"
         draggable={false}
       />
       {spec.hotspots.map((hotspot, index) => (

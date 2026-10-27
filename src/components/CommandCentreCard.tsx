@@ -38,7 +38,7 @@ export function CommandCentreCard() {
       <div role="group" aria-label="Time available" className="grid grid-cols-5 gap-2">
         {TIME_BOXES.map((m) => <Button key={m} size="md" variant={m === box ? "primary" : "secondary"} aria-pressed={m === box} onClick={() => setBox(m)}>{label(m)}</Button>)}
       </div>
-      <div className="rounded-[8px] border border-line px-3 py-3 space-y-2">
+      <div className="rounded-lg border border-line px-3 py-3 space-y-2">
         <p className="text-sm font-semibold text-ink">{strategy.label}</p>
         <ol className="text-sm text-ink2 space-y-0.5">{strategy.steps.map((s) => <li key={s.label}>{s.minutes} min: {s.label}</li>)}</ol>
         <p className="text-xs text-ink3">{strategy.reason}</p>

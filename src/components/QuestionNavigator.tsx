@@ -61,7 +61,7 @@ export function QuestionNavigator({
                 aria-current={isCurrent ? "step" : undefined}
                 onClick={() => onSelect(index)}
                 className={cx(
-                  "min-w-9 h-9 px-2 rounded-[9px] border text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none",
+                  "min-w-9 h-9 px-2 rounded-lg border text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none",
                   isCurrent && "border-accent bg-accentsoft text-accent",
                   !isCurrent && isAnswered && "border-success bg-successsoft text-success",
                   !isCurrent && hasDraft && "border-review bg-reviewsoft text-review",

@@ -77,7 +77,7 @@ function ChoiceList({ compact }: { compact: boolean }) {
 
   if (!choices.length) {
     return (
-      <div className="rounded-[10px] bg-surface2 px-4 py-4 text-sm text-ink2">
+      <div className="rounded-lg bg-surface2 px-4 py-4 text-sm text-ink2">
         Set an exam date or complete a marked question and the twin will have enough evidence to rank your next block.
       </div>
     );
@@ -96,7 +96,7 @@ function ChoiceList({ compact }: { compact: boolean }) {
           const title = revisionChoiceTitle(choice);
           const disabled = Boolean(active) || starting !== null;
           return (
-            <li key={choice.key} className="rounded-[10px] border border-line bg-surface px-3 py-3 sm:px-3.5">
+            <li key={choice.key} className="rounded-lg border border-line bg-surface px-3 py-3 sm:px-3.5">
               <div className="grid sm:grid-cols-[minmax(0,1fr)_auto_auto] gap-3 items-center">
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="w-6 h-6 rounded-full bg-surface2 text-ink3 grid place-items-center text-xs font-semibold tabular-nums shrink-0" aria-hidden>
@@ -166,7 +166,7 @@ export function RevisionTwinCard({ compact = false }: { compact?: boolean }) {
       </div>
 
       {active ? (
-        <div className="mt-4 rounded-[10px] border border-speak bg-speaksoft px-3.5 py-3 flex flex-wrap items-center justify-between gap-3" role="status" aria-live="polite">
+        <div className="mt-4 rounded-lg border border-speak bg-speaksoft px-3.5 py-3 flex flex-wrap items-center justify-between gap-3" role="status" aria-live="polite">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-wide text-speak font-semibold">Block in progress</p>
             <p className="text-sm font-semibold text-ink truncate mt-0.5">{revisionSessionTitle(active)}</p>

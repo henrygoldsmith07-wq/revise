@@ -149,7 +149,7 @@ function Tutor() {
                 </label>
                 <select
                   id="tutor-topic"
-                  className="mt-1 w-full rounded-[8px] border border-line bg-surface px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
                   value={topicId}
                   onChange={(event) => setTopicId(event.target.value)}
                 >
@@ -278,7 +278,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
       </div>
 
       {learner.coachOpener ? (
-        <div className="rounded-[8px] border border-accent/30 bg-accentsoft/50 px-3 py-2" role="status">
+        <div className="rounded-lg border border-accent/30 bg-accentsoft/50 px-3 py-2" role="status">
           <p className="text-xs font-semibold text-accent">Study coach</p>
           <p className="mt-0.5 text-sm text-ink">{learner.coachOpener}</p>
           <ButtonLink href={`/practice?topic=${encodeURIComponent(topic.id)}`} variant="ghost" size="sm" className="mt-1">
@@ -287,7 +287,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         </div>
       ) : null}
       {learner.applicationGapLine ? (
-        <p className="rounded-[8px] border border-line bg-surface2/60 px-3 py-2 text-xs text-ink2" role="note">
+        <p className="rounded-lg border border-line bg-surface2/60 px-3 py-2 text-xs text-ink2" role="note">
           {learner.applicationGapLine}
         </p>
       ) : null}
@@ -296,7 +296,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         {messages.map((message, index) =>
           message.role === "user" ? (
             <div key={index} className="flex justify-end">
-              <div className="max-w-[85%] rounded-[12px] rounded-br-[4px] bg-accentsoft px-3 py-2 text-sm text-ink whitespace-pre-wrap">
+              <div className="max-w-[85%] rounded-xl rounded-br bg-accentsoft px-3 py-2 text-sm text-ink whitespace-pre-wrap">
                 {message.content}
               </div>
             </div>
@@ -305,10 +305,10 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
               <div className="flex items-center gap-2">
                 <SourceBadge source={message.source ?? "fallback"} note={message.note} />
               </div>
-              <div className="max-w-[92%] rounded-[12px] rounded-bl-[4px] border border-line bg-surface2/60 px-3 py-2">
+              <div className="max-w-[92%] rounded-xl rounded-bl border border-line bg-surface2/60 px-3 py-2">
                 <RichText>{message.content}</RichText>
                 {message.checkQuestion ? (
-                  <div className="mt-2 rounded-[8px] border border-accent/30 bg-accentsoft/50 px-3 py-2">
+                  <div className="mt-2 rounded-lg border border-accent/30 bg-accentsoft/50 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Your turn</p>
                     <p className="text-sm text-ink mt-0.5">{message.checkQuestion}</p>
                   </div>
@@ -326,7 +326,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
         )}
       </div>
       {pending ? (
-        <div className="inline-flex items-center gap-2 self-start rounded-[12px] border border-line bg-surface2/60 px-3 py-2" role="status">
+        <div className="inline-flex items-center gap-2 self-start rounded-xl border border-line bg-surface2/60 px-3 py-2" role="status">
           <span className="flex items-center gap-1" aria-hidden="true">
             <span className="typing-dot" />
             <span className="typing-dot" />
@@ -338,7 +338,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
       <div ref={endRef} aria-hidden="true" />
 
       {error ? (
-        <p className="rounded-[8px] border border-review/30 bg-reviewsoft px-3 py-2 text-xs text-ink2" role="status">{error}</p>
+        <p className="rounded-lg border border-review/30 bg-reviewsoft px-3 py-2 text-xs text-ink2" role="status">{error}</p>
       ) : null}
 
       <div className="flex flex-wrap gap-1.5" aria-label="Quick prompts">
@@ -378,7 +378,7 @@ function TutorChat({ topic, mistakes }: { topic: Topic; mistakes: Mistake[] }) {
             }
           }}
           placeholder="Ask anything on this topic — or answer the tutor's question here"
-          className="flex-1 rounded-[8px] border border-line bg-surface px-3 py-2 text-sm resize-none"
+          className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm resize-none"
           aria-describedby={pending ? "tutor-pending" : undefined}
         />
         <Button type="submit" variant="primary" disabled={pending || !draft.trim()}>

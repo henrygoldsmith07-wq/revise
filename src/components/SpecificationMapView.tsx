@@ -102,7 +102,7 @@ export function SpecificationMapView() {
                 </summary>
                 <div className="mt-3 space-y-2">
                   {unit.topics.map((topic) => (
-                    <details key={topic.topic.id} className="rounded-[8px] border border-line px-3 py-2">
+                    <details key={topic.topic.id} className="rounded-lg border border-line px-3 py-2">
                       <summary className="cursor-pointer select-none flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm text-ink">{topic.topic.title}</span>
                         <RollupPills rollup={topic.rollup} referenceTier={referenceTier} />

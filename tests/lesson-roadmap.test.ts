@@ -63,7 +63,10 @@ describe("learning roadmap", () => {
     expect(source).toContain("buildRoadmapLessons(topics)");
     expect(source).toContain("unitsFor(currentSubjectId)");
     expect(source).toContain('aria-label="Learning roadmap units"');
-    expect(source).toContain("Unit ${unitIndex + 1} progress");
+    // Units are labelled by their curriculum title, not "Unit <list position>":
+    // some titles already name their exam unit ("Unit 4 options: …").
+    expect(source).toContain("${unit.title} progress");
+    expect(source).toContain("Step {unitIndex + 1}");
     expect(source).toContain("See detailed lesson outline");
     expect(source).toContain("What you will learn");
     expect(source).toContain("Recommended next");

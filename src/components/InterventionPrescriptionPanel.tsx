@@ -76,7 +76,7 @@ export function InterventionPrescriptionPanel({ topicId, marksLost }: { topicId:
   if (!first) return null;
   const isApplicationGap = row.applicationGap !== null;
   return (
-    <div className="rounded-[8px] border border-line px-3 py-2.5 space-y-2" aria-label="Your repair plan">
+    <div className="rounded-lg border border-line px-3 py-2.5 space-y-2" aria-label="Your repair plan">
       <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
         {isApplicationGap ? "You remember it — now make it score" : "Your repair plan"}
       </p>

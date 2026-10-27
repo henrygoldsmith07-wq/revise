@@ -165,7 +165,7 @@ export default function RevisionTwinPage() {
               {proofCandidates.length ? (
                 <ul className="space-y-2" aria-label="Eligible marked checks">
                   {proofCandidates.map(({ attempt, proof }) => (
-                    <li key={attempt.id} className="rounded-[10px] border border-line bg-surface2 px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <li key={attempt.id} className="rounded-lg border border-line bg-surface2 px-3 py-3 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-ink">{proof.actualMarks}/{proof.actualMax} marked</p>
                         <p className="text-[11px] text-ink3 mt-0.5">
@@ -179,7 +179,7 @@ export default function RevisionTwinPage() {
                   ))}
                 </ul>
               ) : (
-                <div className="rounded-[10px] bg-surface2 px-3 py-3">
+                <div className="rounded-lg bg-surface2 px-3 py-3">
                   <p className="text-sm text-ink2">No eligible trusted before/after check yet.</p>
                   <p className="text-[11px] text-ink3 mt-1">Open the task and complete a marked question. If there is no comparable trusted baseline, Revise will keep the block in history without changing the forecast.</p>
                 </div>

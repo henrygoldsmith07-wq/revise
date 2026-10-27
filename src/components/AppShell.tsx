@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useStoreFields } from "@/state/store";
 import { cx } from "./ui";
@@ -16,12 +16,15 @@ import {
   OfflineIcon,
   PapersIcon,
   PlanIcon,
+  PracticalIcon,
   PracticeIcon,
   ProgressIcon,
   ReviewIcon,
   SearchIcon,
   SettingsIcon,
   SyncIcon,
+  TeacherIcon,
+  TechniqueIcon,
   TodayIcon,
   TutorIcon,
   WarningIcon,
@@ -66,10 +69,13 @@ const TOOLS_NAV: NavItem[] = [
   { href: "/study", label: "Choose how to study", Icon: ModesIcon },
   { href: "/tutor", label: "Tutor", Icon: TutorIcon },
   { href: "/schedule", label: "Schedule", Icon: PlanIcon },
-  { href: "/technique", label: "Exam-technique drills", Icon: PracticeIcon },
-  { href: "/practicals", label: "Practical skills", Icon: LessonsIcon },
-  { href: "/classes", label: "Your classes", Icon: LibraryIcon },
+  { href: "/technique", label: "Exam-technique drills", Icon: TechniqueIcon },
+  { href: "/practicals", label: "Practical skills", Icon: PracticalIcon },
+  { href: "/classes", label: "Your classes", Icon: TeacherIcon },
 ];
+
+// Status-bar colours: the top bar's --surface in each theme (src/app/le-studio.css).
+const THEME_COLOR = { light: "#ffffff", dark: "#17171a" } as const;
 
 const SETTINGS_NAV: NavItem[] = [{ href: "/settings", label: "Settings", Icon: SettingsIcon }];
 
@@ -78,6 +84,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { settings, dueCards, syncStatus, syncNow, updateSettings, needsOnboarding, completeOnboarding } = useStoreFields("settings", "dueCards", "syncStatus", "syncNow", "updateSettings", "needsOnboarding", "completeOnboarding");
   const [searchOpen, setSearchOpen] = useState(false);
+  // The Tools sheet is transient: it is open only on the route it was opened
+  // from, so any navigation (including browser back) closes it, and Escape
+  // closes it too. It never lingers over the next screen.
+  const [toolsOpenOn, setToolsOpenOn] = useState<string | null>(null);
+  const toolsOpen = toolsOpenOn === pathname;
+  const toolsRef = useRef<HTMLDetailsElement>(null);
+  const setToolsOpen = (open: boolean) => setToolsOpenOn(open ? pathname : null);
+  // Close through the element as well as state: a tap before hydration opens
+  // the <details> natively while React still holds "closed", and setting an
+  // unchanged state would not re-render to close it.
+  const closeTools = () => {
+    toolsRef.current?.removeAttribute("open");
+    setToolsOpenOn(null);
+  };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !toolsRef.current?.open) return;
+      toolsRef.current.removeAttribute("open");
+      setToolsOpenOn(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const syncNotice = !syncStatus.online
     ? {
@@ -119,6 +148,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       const dark = settings.theme === "dark" || (settings.theme === "system" && prefersDark.matches);
       root.classList.toggle("dark", dark);
       root.dataset.theme = dark ? "dark" : "light";
+      // The browser/PWA status bar follows the in-app theme, not only the OS
+      // one, and matches the top bar's surface so the two read as one piece.
+      document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+        meta.content = dark ? THEME_COLOR.dark : THEME_COLOR.light;
+      });
     };
     apply();
     prefersDark.addEventListener("change", apply);
@@ -183,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="px-4 py-5">
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element -- 22px static icon; next/image adds setup cost with no benefit here */}
-            <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
+            <img src="/logo.svg" alt="" width={22} height={22} aria-hidden="true" />
             <p className="text-sm font-semibold tracking-tight">Revise</p>
           </div>
           <p className="text-[11px] text-ink3 mt-0.5">{settings.displayName}</p>
@@ -196,7 +230,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           {/* Collapsed unless the current page is one of the tools, so it never competes with Today. */}
           <details className="mt-4 group/tools" open={toolsActive || undefined}>
-            <summary className="list-none cursor-pointer select-none flex items-center gap-2 px-2.5 py-1.5 min-h-9 rounded-[10px] text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3 hover:bg-surface2">
+            <summary className="list-none cursor-pointer select-none flex items-center gap-2 px-2.5 py-1.5 min-h-9 rounded-lg text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3 hover:bg-surface2">
               <span className="flex-1">Tools</span>
               <svg viewBox="0 0 12 12" aria-hidden="true" className="w-3 h-3 transition-transform group-open/tools:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 4.5l3 3 3-3" />
@@ -233,11 +267,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element -- 22px static icon; next/image adds setup cost with no benefit here */}
-            <img src="/logo.svg" alt="" width={22} height={22} className="rounded-md" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-semibold tracking-tight">Revise</p>
-              <p className="text-[11px] text-ink3">Exam revision</p>
-            </div>
+            <img src="/logo.svg" alt="" width={22} height={22} aria-hidden="true" />
+            <p className="text-base font-semibold tracking-tight">Revise</p>
           </div>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => setSearchOpen(true)} className="btn btn-ghost" aria-label="Search">
@@ -298,19 +329,43 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : null}
             </Link>
           ))}
-          <details className="relative group">
-            <summary className="list-none cursor-pointer flex flex-col items-center justify-center gap-0.5 py-2 min-h-12 text-[10px] font-medium text-ink3">
+          {/* Tools is a short interruption over the current screen, so it is a
+              bottom sheet with a scrim: a tap outside, Escape, or picking a
+              destination dismisses it. (It used to be an unanchored popover
+              that stayed open over the page until its own button was tapped
+              again.) Still a <details>, so it works before hydration. */}
+          <details
+            ref={toolsRef}
+            className={cx("group", toolsOpen && "text-ink")}
+            open={toolsOpen}
+            onToggle={(event) => setToolsOpen(event.currentTarget.open)}
+          >
+            <summary
+              className={cx(
+                "list-none cursor-pointer flex flex-col items-center justify-center gap-0.5 py-2 min-h-12 text-[10px] font-medium transition-colors",
+                toolsOpen || toolsActive ? "text-ink" : "text-ink3",
+              )}
+            >
               <MoreIcon size={ICON_SIZE.lg} aria-hidden />
               Tools
             </summary>
-            <div className="absolute bottom-full right-2 mb-2 w-60 max-h-[70dvh] overflow-y-auto card p-2 shadow-lg">
-              <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink3">Tools</p>
+            <div className="fixed inset-0 z-30 bg-black/40 scrim-enter" aria-hidden="true" onClick={closeTools} />
+            <div
+              role="dialog"
+              aria-label="Tools"
+              className="fixed inset-x-0 bottom-0 z-40 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t border-line bg-surface elev-sheet px-2 pt-2 pb-safe sheet-enter"
+            >
+              <span className="mx-auto mb-1 block h-1 w-9 rounded-full bg-line" aria-hidden="true" />
+              <p className="px-3 pt-1 pb-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink3">Tools</p>
               {[...TOOLS_NAV, ...SETTINGS_NAV].map((item) => (
-                <Link key={item.href} href={item.href} onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
+                <Link key={item.href} href={item.href} onClick={closeTools}
                   aria-current={isActive(item.href) ? "page" : undefined}
-                  className="flex items-center gap-2 px-3 py-3 min-h-11 rounded-lg text-sm hover:bg-surface2">
-                  <item.Icon size={ICON_SIZE.md} aria-hidden />{item.label}
-                  {item.href === "/review" && dueCards.length > 0 ? <span className="ml-auto text-[11px] font-semibold tabular-nums text-review">{dueCards.length}</span> : null}
+                  className={cx(
+                    "flex items-center gap-3 px-3 py-3 min-h-12 rounded-lg text-[15px] transition-colors hover:bg-surface2 active:bg-surface2",
+                    isActive(item.href) ? "font-semibold text-ink" : "text-ink",
+                  )}>
+                  <item.Icon size={ICON_SIZE.lg} aria-hidden className="shrink-0 text-ink2" />{item.label}
+                  {item.href === "/review" && dueCards.length > 0 ? <span className="ml-auto text-xs font-semibold tabular-nums text-review">{dueCards.length}</span> : null}
                 </Link>
               ))}
             </div>
@@ -330,7 +385,7 @@ function RailLink({ item, active, current, due }: { item: NavItem; active: boole
       href={item.href}
       aria-current={current ? "page" : undefined}
       className={cx(
-        "flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] text-sm transition-colors",
+        "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors",
         active ? "bg-surface2 text-ink font-semibold" : "text-ink2 hover:bg-surface2",
       )}
     >

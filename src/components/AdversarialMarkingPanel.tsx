@@ -51,7 +51,7 @@ export function AdversarialMarkingPanel() {
         hint="Hostile answers through the shipped marker"
       />
       <Panel>
-        <div className="overflow-auto nice-scroll rounded-[8px] border border-line">
+        <div className="overflow-auto nice-scroll rounded-lg border border-line">
           <table className="w-full text-xs">
             <thead className="bg-surface2 text-ink3">
               <tr>

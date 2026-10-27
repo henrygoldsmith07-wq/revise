@@ -18,7 +18,7 @@ import type { Attempt, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { QuestionRunner } from "./QuestionRunner";
 import { Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
-import { ICON_SIZE, TimerIcon } from "./icons";
+import { ForwardIcon, ICON_SIZE, TimerIcon } from "./icons";
 
 interface QuickSessionResult {
   reason: "completed" | "timed-out";
@@ -278,27 +278,32 @@ export function QuickSessionPicker({ onSelect }: { onSelect: (minutes: QuickSess
   return (
     <section>
       <SectionHeading title="Short on time?" hint="Pick 5 to 60 minutes. Revise builds the best set that fits, with a real clock." />
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {/* One grouped list, one row per length. The old two-column grid
+          wrapped "I have 20 minutes" over three lines on a phone and repeated
+          the length in a pill. "I have" stays in the accessible name. */}
+      <ul className="card divide-y divide-line overflow-hidden">
         {QUICK_SESSION_MINUTES.map((minutes) => (
-          <button
-            key={minutes}
-            type="button"
-            onClick={() => onSelect(minutes)}
-            className="card p-4 text-left hover:border-ink3 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-ink">I have {minutes} minutes</p>
-                <p className="text-xs text-ink3 mt-1">
-                  Up to {quickSessionQuestionLimit(minutes)} focused questions
+          <li key={minutes}>
+            <button
+              type="button"
+              onClick={() => onSelect(minutes)}
+              className="flex w-full items-center gap-3 px-4 py-3 min-h-14 text-left transition-colors hover:bg-surface2 active:bg-surface2"
+            >
+              <TimerIcon size={ICON_SIZE.md} aria-hidden className="shrink-0 text-ink3" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-ink tabular-nums">
+                  <span className="sr-only">I have </span>{minutes} minutes
+                </span>
+                <span className="mt-0.5 block text-xs text-ink3 tabular-nums">
+                  Up to {quickSessionQuestionLimit(minutes)} questions
                   {minutes > 10 ? ` · about ${quickSessionMarkBudget(minutes)} marks` : ""} · stops at {minutes}:00
-                </p>
-              </div>
-              <Pill tone="accent"><TimerIcon size={ICON_SIZE.sm} aria-hidden /> {minutes}m</Pill>
-            </div>
-          </button>
+                </span>
+              </span>
+              <ForwardIcon size={ICON_SIZE.md} aria-hidden className="shrink-0 text-ink3" />
+            </button>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

@@ -120,7 +120,7 @@ export default async function ReviewQuestionPage({ params, searchParams }: { par
                     explicit capability mapping. Without this the reviewer ticks a
                     check they cannot see. */}
                 {part.learningClaims.length || part.aoCodes.length || part.capabilityIds.length ? (
-                  <div className="mt-2 rounded-md border border-line bg-surface px-2 py-1.5 space-y-1">
+                  <div className="mt-2 rounded-lg border border-line bg-surface px-2 py-1.5 space-y-1">
                     <p className="text-[11px] font-semibold text-ink3">Skills &amp; capability mapping (check 4)</p>
                     {part.learningClaims.length ? <p className="text-[11px] text-ink2">Assesses: {part.learningClaims.join("; ")}</p> : null}
                     {part.aoCodes.length ? <p className="text-[11px] text-ink2">Objectives: {part.aoCodes.join(", ")}</p> : null}

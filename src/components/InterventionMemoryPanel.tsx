@@ -56,7 +56,7 @@ export function InterventionMemoryPanel() {
 
 function ChainRow({ chain }: { chain: InterventionChainView }) {
   return (
-    <li className="rounded-[10px] border border-line px-3 py-2.5">
+    <li className="rounded-lg border border-line px-3 py-2.5">
       <p className="text-sm font-medium text-ink">{chain.steps[0]?.detail}</p>
       <ol className="mt-2 grid gap-1 sm:grid-cols-2" aria-label="Steps from problem to outcome">
         {chain.steps.slice(1).map((step) => (

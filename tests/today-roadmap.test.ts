@@ -19,7 +19,10 @@ describe("Today learning roadmap", () => {
     expect(roadmap).toContain("Continue roadmap");
     expect(roadmap).toContain("Path by unit");
     expect(roadmap).toContain('aria-label="Learning roadmap units"');
-    expect(roadmap).toContain("Unit ${unitIndex + 1} progress");
+    // Units are labelled by their curriculum title, not "Unit <list position>":
+    // some titles already name their exam unit ("Unit 4 options: …").
+    expect(roadmap).toContain("${unit.title} progress");
+    expect(roadmap).not.toContain("Unit {unitIndex + 1} ·");
     expect(roadmap).toContain("View full roadmap");
   });
 

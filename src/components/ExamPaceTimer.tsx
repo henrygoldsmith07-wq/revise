@@ -30,7 +30,7 @@ export function ExamPaceTimer({ marks, stopped }: { marks: number; stopped: bool
   return (
     <div
       className={cx(
-        "rounded-[8px] border px-3 py-2 mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1",
+        "rounded-lg border px-3 py-2 mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1",
         state === "over" ? "border-danger bg-dangersoft" : "border-accent bg-accentsoft",
       )}
       data-testid="exam-pace-timer"

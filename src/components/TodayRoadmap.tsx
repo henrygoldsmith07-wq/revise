@@ -5,6 +5,7 @@ import { allTopics, getSubject, unitsFor } from "@/domain/curriculum";
 import { buildRoadmapLessons, type RoadmapLessonEntry } from "@/content/lessons";
 import { useStoreFields } from "@/state/store";
 import { ButtonLink, Pill, ProgressBar, cx } from "@/components/ui";
+import { CreditedIcon, ForwardIcon } from "@/components/icons";
 
 /**
  * A compact learning-path preview for Today.
@@ -95,7 +96,7 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
             </p>
           </div>
           <ButtonLink href={subjectHref} variant="secondary" size="sm" className="shrink-0 min-h-11">
-            View full roadmap →
+            View full roadmap <ForwardIcon size={15} aria-hidden />
           </ButtonLink>
         </div>
 
@@ -116,7 +117,7 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
                 <p className="text-[10px] uppercase tracking-wide text-accent font-bold">
                   {roadmapComplete ? "Roadmap complete" : "Recommended next"}
                 </p>
-                <h3 className="mt-1 text-sm font-bold text-ink">{nextEntry.lesson.title}</h3>
+                <h3 className="mt-1 text-sm font-bold text-ink">{capitalise(nextEntry.lesson.title)}</h3>
                 <p className="mt-0.5 text-xs text-ink2">
                   {nextEntry.topic.title} · checkpoint {nextEntry.lesson.checkpointIndex} of {nextEntry.lesson.checkpointTotal}
                 </p>
@@ -125,7 +126,7 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
                 {nextEntry.lesson.teachingReview === "not-teacher-reviewed" ? <p className="mt-1 text-[11px] text-ink3">Not yet teacher-reviewed</p> : null}
               </div>
               <ButtonLink href={nextHref} variant="primary" size="sm" className="shrink-0 min-h-11">
-                {roadmapComplete ? "Review roadmap" : "Continue roadmap"} →
+                {roadmapComplete ? "Review roadmap" : "Continue roadmap"} <ForwardIcon size={15} aria-hidden />
               </ButtonLink>
             </div>
           </div>
@@ -167,20 +168,22 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
                     )}
                     aria-hidden="true"
                   >
-                    {unitComplete ? "✓" : unitIndex + 1}
+                    {unitComplete ? <CreditedIcon size={14} strokeWidth={2.5} /> : unitIndex + 1}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                      <p className="text-xs font-bold text-ink">
-                        Unit {unitIndex + 1} · {unit.title}
-                      </p>
+                      {/* The circle carries the step number. The title is the
+                          curriculum's own: some already name their exam unit
+                          ("Unit 4 options: …"), so prefixing the list position
+                          printed "Unit 3 · Unit 4 options". */}
+                      <p className="text-xs font-bold text-ink">{unit.title}</p>
                       {unitCurrent ? <Pill tone="accent">Next</Pill> : unitComplete ? <Pill tone="success">Done</Pill> : null}
                     </div>
                     <p className="mt-0.5 text-[11px] text-ink3">
                       {unitDone} of {entries.length} checkpoints complete
                     </p>
                     <div className="mt-2">
-                      <ProgressBar value={unitProgress} label={`Unit ${unitIndex + 1} progress`} tone={unitComplete ? "success" : "accent"} />
+                      <ProgressBar value={unitProgress} label={`${unit.title} progress`} tone={unitComplete ? "success" : "accent"} />
                     </div>
                   </div>
                 </div>
@@ -195,4 +198,9 @@ export default function TodayRoadmap({ preferredSubjectId }: { preferredSubjectI
       </div>
     </section>
   );
+}
+
+/** Spec statements read as sentences ("distinguish scalars…"); a title starts with a capital. */
+function capitalise(text: string): string {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }

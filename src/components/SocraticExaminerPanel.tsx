@@ -153,7 +153,7 @@ function SocraticExaminer({ focus, topicId }: { focus: SocraticFocus; topicId: s
   };
 
   return (
-    <section aria-labelledby={headingId} className="mt-4 rounded-[12px] border border-line bg-surface2 px-3.5 py-3.5 sm:px-4">
+    <section aria-labelledby={headingId} className="mt-4 rounded-xl border border-line bg-surface2 px-3.5 py-3.5 sm:px-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={headingId} className="text-sm font-semibold text-ink">
           Think it through
@@ -196,14 +196,14 @@ function SocraticExaminer({ focus, topicId }: { focus: SocraticFocus; topicId: s
       >
         {turns.map((turn, index) =>
           turn.role === "examiner" ? (
-            <div key={index} className="bubble-in max-w-[92%] rounded-[12px] rounded-bl-[4px] border border-line bg-surface px-3 py-2.5">
+            <div key={index} className="bubble-in max-w-[92%] rounded-xl rounded-bl border border-line bg-surface px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Examiner · AI, provisional</p>
               {turn.lead ? <p className="text-sm text-ink2 mt-1">{turn.lead}</p> : null}
               <p className="text-[15px] leading-relaxed text-ink mt-1 font-medium">{turn.question}</p>
             </div>
           ) : turn.role === "student" ? (
             <div key={index} className="flex justify-end">
-              <p className="max-w-[85%] rounded-[12px] rounded-br-[4px] bg-accentsoft px-3 py-2 text-sm text-ink whitespace-pre-wrap">
+              <p className="max-w-[85%] rounded-xl rounded-br bg-accentsoft px-3 py-2 text-sm text-ink whitespace-pre-wrap">
                 <span className="sr-only">You said: </span>
                 {turn.text}
               </p>
@@ -217,7 +217,7 @@ function SocraticExaminer({ focus, topicId }: { focus: SocraticFocus; topicId: s
       </div>
 
       {thinking ? (
-        <div role="status" className="mt-2.5 inline-flex items-center gap-2 rounded-[12px] border border-line bg-surface px-3 py-2">
+        <div role="status" className="mt-2.5 inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2">
           <span className="flex items-center gap-1" aria-hidden="true">
             <span className="typing-dot" />
             <span className="typing-dot" />
@@ -252,7 +252,7 @@ function SocraticExaminer({ focus, topicId }: { focus: SocraticFocus; topicId: s
               }
             }}
             placeholder="Your answer, in your own words"
-            className="flex-1 rounded-[8px] border border-line bg-surface px-3 py-2 text-sm resize-none min-h-11"
+            className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm resize-none min-h-11"
           />
           <Button type="submit" variant="primary" disabled={thinking || !draft.trim()} className="min-h-11">
             Reply

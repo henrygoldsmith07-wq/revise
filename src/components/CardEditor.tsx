@@ -409,7 +409,7 @@ export function CardEditor({
               <img
                 src={draft.imageUrl}
                 alt="Card attachment"
-                className="mt-2 max-h-56 rounded-[8px] border border-line"
+                className="mt-2 max-h-56 rounded-lg border border-line"
               />
             ) : null}
           </div>

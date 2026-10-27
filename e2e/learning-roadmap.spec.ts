@@ -13,13 +13,17 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   const today = page.locator("main#main");
   await expect(today).toContainText("Learning roadmap");
   await expect(today).toContainText(/Continue roadmap|Review roadmap/);
-  await expect(today).toContainText("Unit 1");
+  // Units show their curriculum title, not "Unit <list position>" (some titles
+  // already name their exam unit, e.g. "Unit 4 options: …").
+  // (The roadmap sits in the collapsed "Plan, pace and outlook" section.)
+  await expect(today.getByRole("list", { name: "Learning roadmap units", includeHidden: true })).toHaveCount(1);
+  await expect(today).not.toContainText(/Unit \d+ · Unit \d/);
 
   await page.goto("/lesson");
   const main = page.locator("main#main");
   await expect(main).toContainText("Learning roadmap");
   await expect(main).toContainText("Your learning path");
-  await expect(main).toContainText("Unit 1");
+  await expect(main).toContainText("Step 1");
   await expect(main).toContainText("Recommended next");
   await expect(main).not.toContainText(/video|commute pack/i);
 

@@ -140,7 +140,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
     return (
       <Panel className="space-y-3">
         {selection.practiceTier ? (
-          <p className="rounded-[8px] border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
+          <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
             Practice, not proof: no reviewed questions exist here yet, so this check uses authored questions and cannot count as evidence.
           </p>
         ) : null}

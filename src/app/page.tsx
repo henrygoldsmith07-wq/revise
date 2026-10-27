@@ -184,11 +184,11 @@ function TodayWelcome({ name, greeting, hasSession = true, context }: { name: st
     <header className="today-welcome">
       {/* Narrow phones get a compact header (no eyebrow: the bottom nav already
           says Today) so the session's Start button stays in the first viewport. */}
-      <span className="relative z-10 hidden text-xs font-bold uppercase tracking-[0.13em] text-ink2 sm:inline">Today</span>
-      <h1 className="relative z-10 text-xl font-semibold tracking-tight text-ink sm:mt-1 sm:text-3xl">
+      <span className="hidden text-xs font-semibold uppercase tracking-[0.12em] text-ink3 sm:inline">Today</span>
+      <h1 className="text-2xl font-semibold tracking-tight text-ink sm:mt-1 sm:text-3xl">
         {salutation}{name ? ", " + name : ""}
       </h1>
-      <p className="relative z-10 mt-1 max-w-xl text-sm leading-6 text-ink2 sm:mt-2 sm:text-base">
+      <p className="mt-1 max-w-xl text-sm leading-6 text-ink2 sm:mt-2 sm:text-base">
         {hasSession ? context ?? "Your next session is ready. Start, get feedback and keep going." : "Choose a lesson that interests you, or make a plan for your exams."}
       </p>
     </header>
@@ -202,7 +202,9 @@ function EmptyToday({ name, greeting, pace, supplyNote }: { name: string; greeti
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
       <div className="today-focus card p-5 sm:p-7">
-        <p className="text-sm font-semibold text-speak">Do this now</p>
+        <p className="today-focus-eyebrow text-sm font-semibold text-speak">
+          Do this now <span className="font-medium text-ink3 tabular-nums">· 5–10 min</span>
+        </p>
         <h2 className="mt-2 text-xl font-semibold text-ink">Find where to start</h2>
         <p className="mt-2 text-sm leading-6 text-ink2">A 5–10 minute quick check across several topics — no hints, so answers count as evidence. Revise then chooses your personalised next step.</p>
         <p className="mt-1 text-sm leading-6 text-ink2">After that, this space shows one session chosen for you, with the reason why.</p>
