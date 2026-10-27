@@ -46,6 +46,7 @@ import { ACCOUNT_DELETION_CONFIRMATION, ACCOUNT_DELETION_EXPLANATION, LOCAL_ERAS
 import { recordAiConsentChoice } from "@/ai/consent-client";
 import { UNIT4_OPTIONS, isUnit4Option, type Unit4Option, type YearGroup } from "@/domain/year-group";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
+import { UnitExamTimetable } from "@/components/UnitExamTimetable";
 import { PwaInstallSettings } from "@/components/PwaInstall";
 import { clearPilotQueue, flushPilotEvents, pendingPilotEvents } from "@/lib/pilot-telemetry";
 
@@ -217,6 +218,16 @@ export default function SettingsPage() {
           </div>
         </Panel>
       </section>
+
+      <UnitExamTimetable
+        subjectIds={settings.subjectIds}
+        exams={store.examDates}
+        userId={store.userId}
+        yearGroup={settings.yearGroup}
+        onSave={store.upsertExamDate}
+        onRemove={store.removeExamDate}
+        onChanged={() => void store.regeneratePlan()}
+      />
 
       <section>
         <SectionHeading title="Subjects" hint="Only these are planned, recommended and predicted." />
@@ -1291,5 +1302,5 @@ function exportDataLegacy(store: ReturnType<typeof usePageStore>) {
 }
 
 function usePageStore() {
-  return useStoreFields("attempts", "cards", "examDates", "experimentArm", "funnelEvents", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
+  return useStoreFields("attempts", "cards", "examDates", "removeExamDate", "upsertExamDate", "experimentArm", "funnelEvents", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
 }

@@ -10,6 +10,7 @@ import { circadianFatigue, fatigueFactor, type FatigueContext } from "./fatigue"
 import { paperOutcomeGainMultiplier } from "./paper-outcome";
 import { trustedAssessmentMistake } from "./learning-evidence";
 import { localDayOfInstant, todayLocal } from "./local-date";
+import { daysToTopicExam, examForTopic } from "./exam-timetable";
 import type { ActivityKind, Card, ExamDate, Id, IsoDate, Mistake, Recommendation, RecommendationExplanation, RecommendationFactors, Topic, TopicMastery } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -223,6 +224,15 @@ export function recommend(input: RecommendInput): Recommendation[] {
     input.subjectIds.map((s) => [s, examUrgency(daysToExam(input.exams, s, today))]),
   );
   const urgency = (subjectId: Id) => urgencyBySubject.get(subjectId) ?? 1;
+  // A topic is governed by its own unit's exam when the student dated units
+  // separately; otherwise by the whole-subject date, exactly as before.
+  const hasUnitDates = (subjectId: Id) => input.exams.some((e) => e.subjectId === subjectId && e.paperSpecId);
+  const topicDays = (topic: Topic): number | null =>
+    hasUnitDates(topic.subjectId) ? daysToTopicExam(input.exams, topic, today) : daysToExam(input.exams, topic.subjectId, today);
+  const topicUrgency = (topic: Topic): number =>
+    hasUnitDates(topic.subjectId) ? examUrgency(topicDays(topic)) : urgency(topic.subjectId);
+  const topicLabel = (topic: Topic): string | null =>
+    hasUnitDates(topic.subjectId) ? examForTopic(input.exams, topic, today)?.label ?? null : paperLabelFor(input.exams, topic.subjectId, today);
 
   function daysSinceFor(row: TopicMastery | undefined): number | null {
     if (!row?.lastStudiedAt) return null;
@@ -389,7 +399,7 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const recoverable = mph != null ? mph * (minutes / 60) : (1 - weakRow.mastery) * 8;
     // For the "18 min" electrolysis spec, tests may pass 18 as block; keep honest.
     const examGain = recoverable;
-    const u = urgency(weakRow.subjectId);
+    const u = topicUrgency(topic);
     const weak = weaknessFactor(weakRow.mastery);
     const forgetting = forgettingFactor(weakRow.retention, daysSinceFor(weakRow));
     const unc = uncertaintyFactor(weakRow.cardsTotal, weakRow.attempts);
@@ -399,11 +409,11 @@ export function recommend(input: RecommendInput): Recommendation[] {
       factors.applicationGap = appGapValue;
       factors.recallMastery = Math.round(clamp01(recallByTopic.get(weakRow.topicId)!.mastery) * 100) / 100;
     }
-    const daysTo = daysToExam(input.exams, weakRow.subjectId, today);
+    const daysTo = topicDays(topic);
     const prox = proximityFor(daysTo, examGain, minutes);
     const adaptive = adaptiveDifficultyFactor(topic, weakRow, input.adaptiveDifficultyOffset?.get(weakRow.topicId));
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive * appGap;
-    const label = paperLabelFor(input.exams, weakRow.subjectId, today);
+    const label = topicLabel(topic);
     const mphRounded = mph != null ? Math.round(mph * 10) / 10 : null;
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(recoverable * 10) / 10,
@@ -450,16 +460,16 @@ export function recommend(input: RecommendInput): Recommendation[] {
     const minutes = Math.min(block, 20);
     // First pass is coverage, not recovery: modest gain, high uncertainty.
     const examGain = 2.2 + (6 - topic.intrinsicDifficulty) * 0.25;
-    const u = urgency(fresh.subjectId);
+    const u = topicUrgency(topic);
     const weak = 1.6; // unknown is maximally weak
     const forgetting = 1.1;
     const unc = 1.4;
     const factors: RecommendationFactors = { examGain: Math.round(examGain * 10) / 10, urgency: u, weakness: weak, forgetting, uncertainty: unc };
-    const daysTo = daysToExam(input.exams, fresh.subjectId, today);
+    const daysTo = topicDays(topic);
     const prox = proximityFor(daysTo, examGain, minutes);
     const adaptive = adaptiveDifficultyFactor(topic, undefined, input.adaptiveDifficultyOffset?.get(fresh.topicId));
     const score = scoreFromGain(examGain, u, weak, forgetting, unc, minutes) * prox * adaptive;
-    const label = paperLabelFor(input.exams, fresh.subjectId, today);
+    const label = topicLabel(topic);
     const explanation: RecommendationExplanation = {
       recoverableMarks: Math.round(examGain * 10) / 10,
       marksPerHour: Math.round((examGain / Math.max(5, minutes)) * 60 * 10) / 10,
