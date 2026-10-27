@@ -133,7 +133,7 @@ describe("buildUnitMock", () => {
 
   function bank(): Question[] {
     const out: Question[] = [];
-    for (const topicId of [t1, t2, t3]) {
+    for (const topicId of unit1.topicIds) {
       for (let index = 0; index < 12; index += 1) out.push(q(`${topicId}-${index}`, [topicId], [2, 3, 4, 5, 6][index % 5]));
     }
     // A Unit 2 question and a question spanning Unit 1 and Unit 2 must never appear.
@@ -193,7 +193,7 @@ describe("buildUnitMock", () => {
     expect(mock.totalMarks).toBe(20);
     expect(mock.complete).toBe(false);
     expect(mock.notes.join(" ")).toMatch(/20 marks of the real 80/);
-    expect(mock.notes.join(" ")).toMatch(/does not sample it/);
+    expect(mock.notes.join(" ")).toMatch(/does not sample (it|them)/);
     expect(unitMockMinutes(unit1, 20)).toBe(23);
     expect(unitMockMinutes(unit1, 80)).toBe(90);
   });
