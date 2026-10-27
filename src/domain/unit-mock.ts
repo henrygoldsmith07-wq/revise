@@ -27,18 +27,18 @@ import { topicUnitNumber, topicsForUnit4Option, type Unit4Option, type YearGroup
 import type { Attempt, Id, Paper, Question, Subject, Topic } from "./types";
 
 /**
- * Subjects whose topics carry WJEC unit numbers ("Unit 1.3") reliably enough
- * to scope a paper to one unit. WJEC Maths topics are numbered "Pure 1.x" /
- * "Applied 2.x" without separating AS from A2 content, so a Maths unit mock
- * would mix Unit 1 and Unit 3; it is left out until that split exists.
+ * Subjects whose topics map to WJEC unit numbers reliably enough to scope a
+ * paper to one unit. Maths topics are placed in Units 1-4 by `mathsUnitNumber`
+ * (year-group.ts), so a Year 12 Maths student gets Unit 1 and Unit 2 only.
  */
-export const UNIT_MOCK_SUBJECTS: readonly Id[] = ["wjec-alevel-biology", "wjec-alevel-chemistry", "wjec-alevel-physics"];
+export const UNIT_MOCK_SUBJECTS: readonly Id[] = ["wjec-alevel-biology", "wjec-alevel-chemistry", "wjec-alevel-physics", "wjec-alevel-maths"];
 
 /** The WJEC specification each paper shape was read from. */
 export const UNIT_MOCK_SOURCES: Readonly<Record<Id, string>> = {
   "wjec-alevel-biology": "https://www.wjec.co.uk/qualifications/biology-asa-level/",
   "wjec-alevel-chemistry": "https://www.wjec.co.uk/media/akbbkvwh/wjec-gce-chemistry-spec-from-2015.pdf",
   "wjec-alevel-physics": "https://www.wjec.co.uk/media/gxbjl243/wjec-gce-physics-spec-from-2015-e-22-09-22.pdf",
+  "wjec-alevel-maths": "https://www.wjec.co.uk/qualifications/mathematics-as-a-level/",
 };
 
 /** Written papers only: Unit 5 is a practical examination and cannot be sat on screen. */

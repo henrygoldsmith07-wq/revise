@@ -117,8 +117,8 @@ describe("unitMockBlueprints", () => {
     expect(unit4.topicIds).not.toContain(`${PHYSICS}.sports-physics`);
   });
 
-  it("offers nothing where unit scoping is not reliable yet (WJEC Maths) or the subject is not WJEC", () => {
-    for (const id of ["wjec-alevel-maths", "aqa-alevel-physics"]) {
+  it("offers nothing where unit scoping is not reliable yet (non-WJEC subjects)", () => {
+    for (const id of ["aqa-alevel-physics"]) {
       const subject = getSubject(id);
       if (!subject) continue;
       expect(unitMockBlueprints({ subject, topics: topicsFor(id) })).toEqual([]);

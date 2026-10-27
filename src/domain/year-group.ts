@@ -16,13 +16,36 @@ export function isYearGroup(value: unknown): value is YearGroup {
 }
 
 /** The spec unit number from a topic's specRef ("Unit 2.4" -> 2), or null when the spec does not number units. */
-export function topicUnitNumber(topic: Pick<Topic, "specRef">): number | null {
+export function topicUnitNumber(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "subjectId" | "title">>): number | null {
   const match = /^Unit\s+(\d+)/i.exec(topic.specRef ?? "");
-  return match ? Number(match[1]) : null;
+  if (match) return Number(match[1]);
+  return mathsUnitNumber(topic);
+}
+
+/**
+ * WJEC Maths numbers topics "Pure 1.x" / "Applied 2.x" without separating AS
+ * from A2. The split follows the four WJEC units (Unit 1 Pure A and Unit 2
+ * Applied A are AS; Unit 3 Pure B and Unit 4 Applied B are A2). Topics are
+ * whole, so each sits in the unit that owns most of its content: numerical
+ * methods and differential equations are Unit 3; Poisson, Normal, correlation
+ * tests and moments are Unit 4. Anything unrecognised stays unnumbered, which
+ * never counts as A2.
+ */
+export const MATHS_SUBJECT_ID = "wjec-alevel-maths";
+const MATHS_A2_PURE_TITLE = /numerical methods|differential equations/i;
+const MATHS_A2_APPLIED_TITLE = /poisson|normal|correlation|moments|centres? of mass|hypothesis testing and decision errors/i;
+export function mathsUnitNumber(topic: Partial<Pick<Topic, "specRef" | "subjectId" | "title">>): number | null {
+  if (topic.subjectId !== MATHS_SUBJECT_ID) return null;
+  const ref = /^(Pure|Applied)\s+\d+\./i.exec(topic.specRef ?? "");
+  if (!ref) return null;
+  const title = topic.title ?? "";
+  if (/differential equations/i.test(title)) return 3;
+  if (/^pure/i.test(ref[1])) return /^Pure\s+1\.10\b/i.test(topic.specRef ?? "") || MATHS_A2_PURE_TITLE.test(title) ? 3 : 1;
+  return MATHS_A2_APPLIED_TITLE.test(title) ? 4 : 2;
 }
 
 /** True for A2-only topics (Unit 3 or above). Topics with no unit number are never treated as A2. */
-export function isA2Topic(topic: Pick<Topic, "specRef">): boolean {
+export function isA2Topic(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "subjectId" | "title">>): boolean {
   const unit = topicUnitNumber(topic);
   return unit !== null && unit >= 3;
 }
