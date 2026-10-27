@@ -522,6 +522,7 @@ export function buildGeneratedPaper(mock: GeneratedMock, userId: Id, id?: Id): P
       focus: mock.focus,
       targetMarks: mock.targetMarks,
       topicIds: mock.topics.map((topic) => topic.topicId),
+      durationMinutes: mock.estimatedMinutes,
     },
   };
 }

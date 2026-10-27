@@ -6,13 +6,18 @@ import { aiMark } from "@/lib/optional-ai";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import {
   examClockState,
+  examPaperFormat,
   examQuestionProgress,
+  isRealPaperSpecId,
   formatExamTime,
   secondsRemaining,
   unansweredQuestionCount,
   questionHasAnswer,
 } from "@/domain/exam-conditions";
 import { markMcq } from "@/domain/marking";
+import { buildPaperRunBreakdown } from "@/domain/paper-run-breakdown";
+import { UNIT_MOCK_GRADE_NOTE } from "@/domain/unit-mock";
+import { PaperBreakdown } from "./PaperBreakdown";
 import { assessDeterministicMark, markAssessmentRecord, type MarkConfidenceAssessment } from "@/domain/marking-confidence";
 import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/mark-escalation";
 import type { Attempt, MarkedPart, Paper, PaperSpec, Question } from "@/domain/types";
@@ -28,6 +33,7 @@ interface ExamResult {
   allowedSeconds: number;
   unanswered: number;
   paperSpecName: string;
+  durationMinutes: number;
 }
 
 const FALLBACK_PAPER_SPEC: PaperSpec = {
@@ -41,10 +47,10 @@ const FALLBACK_PAPER_SPEC: PaperSpec = {
 export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () => void }) {
   const store = useStoreFields("addPaper", "beginPaperOutcome", "closePaperOutcome", "previewPaper", "questions", "recordAttempt", "userId");
   const subject = getSubject(paper.subjectId);
-  const initialPaperSpecId = paper.paperSpecId && subject?.papers.some((candidate) => candidate.id === paper.paperSpecId)
-    ? paper.paperSpecId
-    : subject?.papers[0]?.id ?? FALLBACK_PAPER_SPEC.id;
-  const [paperSpecId, setPaperSpecId] = useState(initialPaperSpecId);
+  // Unit mocks are locked to their real unit format; bespoke mocks get their
+  // own clock instead of the subject's first paper format.
+  const format = useMemo(() => examPaperFormat(paper, subject?.papers ?? [], FALLBACK_PAPER_SPEC), [paper, subject]);
+  const [paperSpecId, setPaperSpecId] = useState(format.initial.id);
   // Correlates the frozen prediction with the closed outcome for this run.
   const [paperRunId] = useState(() => crypto.randomUUID());
   const [index, setIndex] = useState(0);
@@ -70,7 +76,9 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
     [paper.questionIds, store.questions],
   );
   const current = questions[index];
-  const paperSpec = subject?.papers.find((candidate) => candidate.id === paperSpecId) ?? subject?.papers[0] ?? FALLBACK_PAPER_SPEC;
+  const paperSpec = format.options.find((candidate) => candidate.id === paperSpecId) ?? format.initial;
+  // Only a real paper format of the subject is recorded on attempts and the paper.
+  const recordedPaperSpecId = isRealPaperSpecId(paperSpec.id) && paperSpec.id !== FALLBACK_PAPER_SPEC.id ? paperSpec.id : undefined;
   const totalMarks = questions.reduce((total, question) => total + question.totalMarks, 0);
   const allowedSeconds = paperSpec.durationMinutes * 60;
   const remaining = startedAt ? secondsRemaining(startedAt, now, paperSpec.durationMinutes) : allowedSeconds;
@@ -168,7 +176,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
             elapsedMs: elapsedByQuestion[question.id] ?? 0,
             mode: "paper",
             paperId: question.paperId ?? paper.id,
-            paperSpecId,
+            ...(recordedPaperSpecId ? { paperSpecId: recordedPaperSpecId } : {}),
             paperRunId,
             paperMarking: { status: "unreviewed" as const },
             createdAt,
@@ -178,7 +186,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
           attempts.push(attempt);
         }
 
-        await store.addPaper({ ...paper, paperSpecId, status: "practised" });
+        await store.addPaper({ ...paper, ...(recordedPaperSpecId ? { paperSpecId: recordedPaperSpecId } : {}), status: "practised" });
         // Close the outcome loop: actual awarded marks vs the frozen
         // sit-time prediction. Feeds the paper gain factor on the next pass.
         const actualMarks = attempts.reduce((total, attempt) => total + attempt.awarded, 0);
@@ -190,6 +198,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
           allowedSeconds,
           unanswered,
           paperSpecName: paperSpec.name,
+          durationMinutes: paperSpec.durationMinutes,
         });
       } catch (error) {
         finishing.current = false;
@@ -216,7 +225,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
     // any question is answered.
     if (!outcomeStartedRef.current) {
       outcomeStartedRef.current = true;
-      const simulation = store.previewPaper(paper.subjectId, paperSpecId, questions.map((q) => q.id));
+      const simulation = store.previewPaper(paper.subjectId, recordedPaperSpecId ?? paperSpecId, questions.map((q) => q.id));
       if (simulation && simulation.totalMarks > 0) {
         void store.beginPaperOutcome({
           subjectId: paper.subjectId,
@@ -253,7 +262,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
     );
   }
 
-  if (result) return <ExamResultView paper={paper} result={result} onExit={onExit} />;
+  if (result) return <ExamResultView paper={paper} questions={questions} result={result} onExit={onExit} />;
 
   if (!startedAt) {
     return (
@@ -267,11 +276,15 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
             </p>
           </div>
 
-          {subject?.papers.length ? (
+          {format.locked ? (
+            <p className="text-xs font-semibold text-ink2">
+              Paper format <span className="block text-sm font-normal text-ink mt-1">{paperSpec.name} · {paperSpec.durationMinutes} minutes</span>
+            </p>
+          ) : format.options.length > 1 ? (
             <label className="block text-xs font-semibold text-ink2">
               Paper format
               <select value={paperSpecId} onChange={(event) => setPaperSpecId(event.target.value)} className="field text-sm mt-1">
-                {subject.papers.map((candidate) => (
+                {format.options.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
                     {candidate.name} · {candidate.durationMinutes} minutes
                   </option>
@@ -512,7 +525,18 @@ function ReviewAnswers({
   );
 }
 
-function ExamResultView({ paper, result, onExit }: { paper: Paper; result: ExamResult; onExit: () => void }) {
+function ExamResultView({ paper, questions, result, onExit }: { paper: Paper; questions: Question[]; result: ExamResult; onExit: () => void }) {
+  const breakdown = useMemo(
+    () =>
+      buildPaperRunBreakdown({
+        questions,
+        attempts: result.attempts,
+        durationMinutes: result.durationMinutes,
+        usedMs: result.elapsedMs,
+        topicTitle: (topicId) => getTopic(topicId)?.title ?? topicId,
+      }),
+    [questions, result],
+  );
   const awarded = result.attempts.reduce((total, attempt) => total + attempt.awarded, 0);
   const maximum = result.attempts.reduce((total, attempt) => total + attempt.max, 0);
   const percentage = maximum ? awarded / maximum : 0;
@@ -548,20 +572,12 @@ function ExamResultView({ paper, result, onExit }: { paper: Paper; result: ExamR
         ) : null}
       </Panel>
 
-      <Panel>
-        <SectionHeading title="Question breakdown" hint={`${result.paperSpecName} · feedback is now available in your review history`} />
-        <ul className="divide-y divide-line">
-          {result.attempts.map((attempt, index) => (
-            <li key={attempt.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
-              <span className="text-ink2">
-                Question {index + 1}
-                {attempt.markAssessment?.provisional ? <Pill tone="review" className="ml-2">Provisional</Pill> : null}
-              </span>
-              <span className={cx("font-semibold tabular-nums", attempt.awarded === attempt.max ? "text-success" : "text-ink")}>{attempt.awarded}/{attempt.max}</span>
-            </li>
-          ))}
-        </ul>
-      </Panel>
+      <PaperBreakdown
+        breakdown={breakdown}
+        subjectId={paper.subjectId}
+        formatName={result.paperSpecName}
+        gradeNote={paper.generated?.unitMock ? UNIT_MOCK_GRADE_NOTE : undefined}
+      />
 
       <Button variant="primary" className="w-full" onClick={onExit}>Back to papers</Button>
     </div>

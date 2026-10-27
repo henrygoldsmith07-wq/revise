@@ -29,6 +29,8 @@ export interface PaperSpec {
   /** Share of the total qualification mark, 0–1. Weights grade prediction. */
   weight: number;
   durationMinutes: number;
+  /** Raw marks on the real paper, when the specification states it. */
+  marks?: number;
   calculatorAllowed: boolean;
 }
 

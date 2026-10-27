@@ -62,6 +62,11 @@ export interface Paper {
     focus: number;
     targetMarks: number;
     topicIds: Id[];
+    /** Minutes the exam-conditions clock allows. A bespoke mock is timed to its own
+     *  mark budget, never to an unrelated paper format of the subject. */
+    durationMinutes?: number;
+    /** Present when the paper was built to the shape of one real WJEC unit paper. */
+    unitMock?: { unit: number; paperSpecId: Id };
   };
   totalMarks: number;
   questionIds: Id[];
