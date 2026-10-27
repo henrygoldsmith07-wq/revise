@@ -16,8 +16,10 @@ export function isYearGroup(value: unknown): value is YearGroup {
 }
 
 /** The spec unit number from a topic's specRef ("Unit 2.4" -> 2), or null when the spec does not number units. */
-export function topicUnitNumber(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "subjectId" | "title">>): number | null {
+export function topicUnitNumber(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "id" | "subjectId" | "title">>): number | null {
   const match = /^Unit\s+(\d+)/i.exec(topic.specRef ?? "");
+  const mapped = physicsUnitNumber(topic);
+  if (mapped !== null) return mapped;
   if (match) return Number(match[1]);
   return mathsUnitNumber(topic);
 }
@@ -31,6 +33,30 @@ export function topicUnitNumber(topic: Pick<Topic, "specRef"> & Partial<Pick<Top
  * tests and moments are Unit 4. Anything unrecognised stays unnumbered, which
  * never counts as A2.
  */
+/**
+ * WJEC Physics topics were tagged with spec references that do not follow the
+ * four WJEC units: momentum ("Unit 3.1") is AS Unit 1 dynamics, so Year 12 never
+ * saw it; fields ("Unit 3.4-3.6") belong to Unit 4; thermal physics and nuclear
+ * decay ("Unit 4.x") are Unit 3 (Oscillations and nuclei). The override is
+ * keyed on topic id, so display refs and stored data stay untouched. Topics
+ * not listed keep the unit read from their specRef.
+ */
+export const PHYSICS_SUBJECT_ID = "wjec-alevel-physics";
+const PHYSICS_UNIT_BY_TOPIC: Readonly<Record<string, number>> = {
+  "wjec-alevel-physics.momentum": 1,
+  "wjec-alevel-physics.circular-shm": 3,
+  "wjec-alevel-physics.thermal": 3,
+  "wjec-alevel-physics.nuclear": 3,
+  "wjec-alevel-physics.fields": 4,
+  "wjec-alevel-physics.capacitance": 4,
+  "wjec-alevel-physics.orbits-universe": 4,
+  "wjec-alevel-physics.electromagnetic-induction": 4,
+};
+export function physicsUnitNumber(topic: Partial<Pick<Topic, "id" | "subjectId">>): number | null {
+  if (topic.subjectId !== PHYSICS_SUBJECT_ID || !topic.id) return null;
+  return PHYSICS_UNIT_BY_TOPIC[topic.id] ?? null;
+}
+
 export const MATHS_SUBJECT_ID = "wjec-alevel-maths";
 const MATHS_A2_PURE_TITLE = /numerical methods|differential equations/i;
 const MATHS_A2_APPLIED_TITLE = /poisson|normal|correlation|moments|centres? of mass|hypothesis testing and decision errors/i;
@@ -45,7 +71,7 @@ export function mathsUnitNumber(topic: Partial<Pick<Topic, "specRef" | "subjectI
 }
 
 /** True for A2-only topics (Unit 3 or above). Topics with no unit number are never treated as A2. */
-export function isA2Topic(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "subjectId" | "title">>): boolean {
+export function isA2Topic(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "id" | "subjectId" | "title">>): boolean {
   const unit = topicUnitNumber(topic);
   return unit !== null && unit >= 3;
 }
@@ -55,7 +81,7 @@ export function isA2Topic(topic: Pick<Topic, "specRef"> & Partial<Pick<Topic, "s
  * only in a subject that still has AS topics left, so a subject whose spec
  * has no numbered units never goes empty. Year 13 and unknown keep everything.
  */
-export function topicsForYear<T extends Pick<Topic, "specRef" | "subjectId">>(
+export function topicsForYear<T extends Pick<Topic, "specRef" | "subjectId"> & Partial<Pick<Topic, "id" | "title">>>(
   topics: readonly T[],
   year: YearGroup | undefined,
   unit4Option?: Unit4Option,

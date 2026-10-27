@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-27 pass 92: Year 12 Physics now includes momentum; thermal, nuclear, SHM and fields sit in the right WJEC units
+Momentum was tagged Unit 3.1 so Year 12 never saw it and the Unit 1 mock skipped it; thermal physics and nuclear decay (Unit 3) were tagged Unit 4 and fields (Unit 4) Unit 3. `physicsUnitNumber` (year-group.ts) maps topics by id without changing stored data. Chemistry and the missing stars and particles topics are not changed. Tests: tests/physics-units.test.ts.
+
 ## 2026-10-27 pass 91: WJEC Maths splits into AS and A2 units, so Year 12 Maths and Unit 1/2 mocks work
 Every WJEC Maths topic was numbered "Pure 1.x" or "Applied 2.x" with no unit, so a Year 12 student was quizzed on A2 content and could not sit a Maths mock. `mathsUnitNumber` (year-group.ts) now places each topic in Unit 1-4 (numerical methods and differential equations in Unit 3; Poisson, Normal, correlation tests, moments and hypothesis-testing errors in Unit 4; the rest AS). Year 12 scope drops the A2 topics, and Maths now offers Unit 1 (150 min, 120 marks) and Unit 2 (105 min, 75 marks) mocks (Units 1-4 for Year 13). Topics are placed whole, so a few A2 sub-points inside AS topics (e.g. proof by contradiction) stay in Unit 1. Tests: tests/maths-units.test.ts, tests/unit-mock.test.ts.
 ## 2026-10-27 pass 91: the week you studied, a run of right answers, a bar to carry on, and a board you can pick at a glance
