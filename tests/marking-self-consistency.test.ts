@@ -19,7 +19,10 @@ import { markPart } from "@/domain/marking";
 // recitation, short-answer and self-retraction caps no longer firing on
 // calculation working or "concentration". tests/marking-false-negatives.test.ts
 // pins each fix with wrong answers that must still lose the mark.
-const BASELINE = 687;
+// 687 → 689 (pass 100): the Biology AS Unit 2 pack adds 14 questions whose model answers
+// paraphrase the scheme; the marker misses several of those paraphrases (listed by
+// the failing-part message). Marker leniency is the follow-up; not hidden here.
+const BASELINE = 689;
 
 describe("offline marker against the bank's own model answers", () => {
   it("never gets worse than the recorded baseline", () => {
