@@ -36,6 +36,12 @@ describe("a11y scaffolding", () => {
     expect(src).toContain('role="option"');
     expect(src).toContain('aria-activedescendant');
     expect(src).toContain('aria-controls="search-results"');
+    // Options are keyboard-reachable through the combobox, so their <li>
+    // wrappers must not read as extra list items inside a listbox.
+    expect(src).toContain('role="presentation"');
+    // The highlight must stay visible while arrowing: the list scrolls the
+    // active option back into view.
+    expect(src).toContain("scrollIntoView");
   });
   it("shared controls: buttons do not submit accidentally and segmented controls expose pressed state", async () => {
     const src = readFileSync(join(process.cwd(), "src/components/ui.tsx"), "utf8");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { seedMisconceptions } from "@/content/misconceptions";
 import { allTopics } from "@/domain/curriculum";
 import { buildSearchIndex, searchIndex } from "@/domain/search";
@@ -9,6 +9,12 @@ import type { SearchResult } from "@/domain/search";
 import { useStoreFields } from "@/state/store";
 import { Modal } from "./Modal";
 import { cx, Pill } from "./ui";
+
+/** Escape a string for use inside a CSS attribute/id selector. */
+function cssEscape(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, (ch) => `\\${ch}`);
+}
+
 
 /** ⌘K search across topics, cards, questions and misconceptions. Runs
  *  locally, so it works offline and returns within a keystroke. */
@@ -18,6 +24,8 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Indexed once per corpus change so each keystroke is a scan of prepared
   // strings rather than a re-lower-casing of the whole deck.
@@ -32,6 +40,13 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
     [cards, questions, settings.subjectIds],
   );
   const results = useMemo(() => searchIndex(index, query, 20), [index, query]);
+
+  // Keyboard focus must follow the highlight: with 20 options in a scrolling
+  // list, arrowing past the fold selected an option the student could not see.
+  useEffect(() => {
+    const node = listRef.current?.querySelector<HTMLButtonElement>(`#search-result-${cssEscape(results[cursor]?.id ?? "")}`);
+    node?.scrollIntoView({ block: "nearest" });
+  }, [cursor, results]);
 
   const open = (result: SearchResult) => {
     onClose();
@@ -49,6 +64,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
       <div className="flex items-center border-b border-line">
         <input
           ref={inputRef}
+          id={inputId}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -85,14 +101,15 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
           Close
         </button>
       </div>
-      <ul id="search-results" className="max-h-[60vh] overflow-y-auto nice-scroll cv-list" role="listbox" aria-label="Search results">
+      <ul id="search-results" ref={listRef} className="max-h-[60vh] overflow-y-auto nice-scroll cv-list" role="listbox" aria-label="Search results">
         {results.map((result, i) => (
-          <li key={`${result.kind}:${result.id}`}>
+          <li key={`${result.kind}:${result.id}`} role="presentation">
             <button
               type="button"
               id={`search-result-${result.kind}-${result.id}`}
               role="option"
               aria-selected={i === cursor}
+              aria-label={`${result.kind}: ${result.title}`}
               onClick={() => open(result)}
               onMouseEnter={() => setCursor(i)}
               className={cx(
@@ -116,7 +133,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
           </li>
         ) : null}
         {query.length < 2 ? (
-          <li className="px-4 py-5">
+          <li className="px-4 py-5" role="presentation">
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mb-2">Try</p>
             <div className="flex flex-wrap gap-1.5">
               {["photosynthesis", "moles", "momentum", "enzymes", "integration"].map((suggestion) => (
