@@ -63,7 +63,8 @@ describe("year group scoping", () => {
   });
 
   it("onboarding and Settings both offer the optional year choice and save it", () => {
-    const onboarding = readFileSync("src/components/Onboarding.tsx", "utf8");
+    // The year question is in onboarding's first step (OnboardingSchoolStep); the flow saves it.
+    const onboarding = readFileSync("src/components/Onboarding.tsx", "utf8") + readFileSync("src/components/OnboardingSchoolStep.tsx", "utf8");
     const settings = readFileSync("src/app/settings/page.tsx", "utf8");
     expect(onboarding).toContain("Which year are you in?");
     expect(onboarding).toMatch(/\.\.\.\(yearGroup \? \{ yearGroup \} : \{\}\)/);

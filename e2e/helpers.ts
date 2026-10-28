@@ -55,7 +55,7 @@ export async function completeOnboarding(
   const board = opts.board ?? "AQA";
   // Phase 1 — exam board. The onboarding dialog can paint before React has
   // attached its handlers, so a single click may land on inert markup and
-  // leave Continue disabled ("Step 1 of 5 · Board"). Click until the board
+  // leave Continue disabled ("Step 1 of 5 · You & board"). Click until the board
   // reports aria-pressed, then move on.
   const boardButton = page.getByRole("button", { name: new RegExp(board, "i") }).first();
   await expect(async () => {
