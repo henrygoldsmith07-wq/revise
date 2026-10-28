@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { allTopics, topicsFor } from "@/domain/curriculum";
 import { exportDeck, materialiseDeck, parseDeckFile, serialiseDeck } from "@/domain/deck-io";
 import type { ImportReport } from "@/domain/deck-io";
@@ -8,6 +8,9 @@ import type { Card, Id } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
 import { Button, Field, Panel, Pill, SectionHeading } from "./ui";
 import { countLabel } from "@/domain/plural";
+
+/** A downloaded deck's blob URL outlives the click by this long before revoking. */
+const DOWNLOAD_REVOKE_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // Import and export.
@@ -23,6 +26,13 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
   const [name, setName] = useState(defaultName);
   const [includeScheduling, setIncludeScheduling] = useState(true);
   const [done, setDone] = useState<string | null>(null);
+  const revokeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (revokeTimer.current) clearTimeout(revokeTimer.current);
+    },
+    [],
+  );
 
   function download() {
     const deck = exportDeck(cards, { name, includeScheduling, subjectId: cards[0]?.subjectId });
@@ -32,7 +42,11 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
     link.href = url;
     link.download = `${name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "deck"}.revise.json`;
     link.click();
-    URL.revokeObjectURL(url);
+    // Chrome tears the download down with the element, so the URL must outlive
+    // it: revoking synchronously aborts large exports mid-save. Revoke after
+    // a tick, tracked so a quick exit from settings leaves no timer running.
+    if (revokeTimer.current) clearTimeout(revokeTimer.current);
+    revokeTimer.current = setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_REVOKE_MS);
     setDone(`Exported ${countLabel(cards.length, "card")}${includeScheduling ? " with scheduling" : " as a shared deck"}.`);
   }
 
@@ -87,6 +101,7 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
   const [keepScheduling, setKeepScheduling] = useState(false);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
   const [pasted, setPasted] = useState("");
 
   const knownTopicIds = useMemo(() => new Set(allTopics().map((t) => t.id)), []);
@@ -110,10 +125,24 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
   }, [report, store.userId, subjectId, topicId, knownTopicIds, existingFronts, skipDuplicates, keepScheduling]);
 
   function read(text: string, filename: string) {
-    const parsed = parseDeckFile(text, filename);
-    setReport(parsed);
-    setStatus(null);
-    if (parsed.deck?.cards.some((c) => c.scheduling)) setKeepScheduling(true);
+    try {
+      const parsed = parseDeckFile(text, filename);
+      setReport(parsed);
+      setStatus(null);
+      setReadError(null);
+      if (parsed.deck?.cards.some((c) => c.scheduling)) setKeepScheduling(true);
+    } catch (error) {
+      // A malformed file or paste must not crash the settings page: report it
+      // where the student is looking, and drop any half-read preview so an
+      // earlier import cannot be committed by mistake.
+      setReport(null);
+      setStatus(null);
+      setReadError(
+        error instanceof Error && error.message
+          ? `That file could not be read: ${error.message}`
+          : "That file could not be read as a Revise deck or a CSV/TSV of cards.",
+      );
+    }
   }
 
   async function commit() {
@@ -157,12 +186,21 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
       <Field label="…or paste it" hint="One card per line: front, back, tags">
         <textarea
           value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
+          onChange={(e) => {
+            setPasted(e.target.value);
+            if (readError) setReadError(null);
+          }}
           rows={3}
           placeholder="What is the unit of force?, The newton (N), physics"
           className="field nice-scroll text-sm"
         />
       </Field>
+
+      {readError ? (
+        <p className="text-xs text-danger" role="alert">
+          {readError}
+        </p>
+      ) : null}
 
       {report ? (
         <div className="space-y-3 border-t border-line pt-3">
