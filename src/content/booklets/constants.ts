@@ -25,6 +25,9 @@ export const CONSTANTS: Record<string, BookletConstant> = {
   R: c("R", "Molar gas constant", "R", "8.314462618", "J K^-1 mol^-1"),
   G: c("G", "Gravitational constant", "G", "6.67430 × 10^-11", "N m^2 kg^-2"),
   eps0: c("eps0", "Permittivity of free space", "ε0", "8.8541878128 × 10^-12", "F m^-1"),
+  mu0: c("mu0", "Permeability of free space", "μ0", "1.25663706212 × 10^-6", "H m^-1"),
+  sigma: c("sigma", "Stefan constant", "σ", "5.670374419 × 10^-8", "W m^-2 K^-4"),
+  wien: c("wien", "Wien constant", "W", "2.897771955 × 10^-3", "m K"),
   me: c("me", "Electron mass", "m_e", "9.1093837015 × 10^-31", "kg"),
   mp: c("mp", "Proton mass", "m_p", "1.67262192369 × 10^-27", "kg"),
   mn: c("mn", "Neutron mass", "m_n", "1.67492749804 × 10^-27", "kg"),
@@ -32,7 +35,7 @@ export const CONSTANTS: Record<string, BookletConstant> = {
   F: c("F", "Faraday constant", "F", "96485.33212", "C mol^-1"),
 };
 
-const PHYSICS = ["c", "e", "h", "kB", "NA", "R", "G", "eps0", "me", "mp", "mn", "u"];
+const PHYSICS = ["c", "e", "h", "kB", "NA", "R", "G", "eps0", "mu0", "sigma", "wien", "me", "mp", "mn", "u"];
 const CHEMISTRY = ["R", "NA", "F", "e", "h", "c", "kB", "me", "mp", "mn", "u"];
 
 const BY_SUBJECT: Record<string, { title: string; ids: string[] }> = {

@@ -1,9 +1,10 @@
 import { effectiveMinutes } from "./fatigue";
 import { countdownGuidance } from "./exam-countdown";
 import { daysToExam, examUrgency } from "./recommender";
+import { daysToTopicExam, subjectRunUpEnd, topicUnitSat } from "./exam-timetable";
 import { valueNextAction } from "./next-best-action";
 import { toDateOnly } from "./scheduling";
-import { addLocalDays } from "./local-date";
+import { addLocalDays, localDaysBetween } from "./local-date";
 import { REVIEW_CAP, allocateDay, reviewBlocksNeeded, type AllocOpportunity, type SubjectEvidence } from "./subject-allocation";
 import type {
   ActivityKind,
@@ -64,7 +65,7 @@ const DEFAULT_DAY_START = 16 * 60; // 16:00 — after school, the realistic defa
 const MAX_HORIZON_DAYS = 90;
 
 /**
- * Default horizon: the whole run-up to each subject's next exam. The plan is
+ * Default horizon: the whole run-up to the end of each subject's exams (subjectRunUpEnd). The plan is
  * optimised to exam day, so with exams on the calendar it reaches the furthest
  * of them (capped) rather than a rolling fortnight; without exams it stays a
  * rolling DEFAULT_HORIZON.
@@ -72,7 +73,8 @@ const MAX_HORIZON_DAYS = 90;
 function horizonToExams(subjectIds: Id[], exams: ExamDate[], today: IsoDate): number {
   let furthest = DEFAULT_HORIZON;
   for (const subjectId of subjectIds) {
-    const days = daysToExam(exams, subjectId, today);
+    const end = subjectRunUpEnd(exams, subjectId, today);
+    const days = end ? localDaysBetween(today, end) : null;
     if (days != null && days > furthest) furthest = days;
   }
   return Math.min(furthest, MAX_HORIZON_DAYS);
@@ -105,19 +107,11 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
   // Per-subject exam deadline: a subject stops being scheduled on its exam day
   // and after — the run-up is what the plan optimises, not the exam itself.
   const examBySubject = new Map<Id, IsoDate>();
+  // With per-unit paper dates the run-up lasts until the last paper; each
+  // unit's own topics stop at its own paper (chooseActivity).
   for (const subjectId of input.subjectIds) {
-    const next = input.exams
-      .filter((e) => e.subjectId === subjectId && e.date >= today)
-      .map((e) => e.date)
-      .sort()[0];
-    if (next) examBySubject.set(subjectId, next);
-    // Once a subject has per-unit paper dates, its run-up lasts until the LAST
-    // dated paper: sitting Unit 1 must not stop Unit 2 revision being planned.
-    const hasUnitDates = input.exams.some((e) => e.subjectId === subjectId && e.paperSpecId);
-    if (hasUnitDates) {
-      const last = input.exams.filter((e) => e.subjectId === subjectId && e.paperSpecId && e.date >= today).map((e) => e.date).sort().pop();
-      if (last) examBySubject.set(subjectId, last);
-    }
+    const end = subjectRunUpEnd(input.exams, subjectId, today);
+    if (end) examBySubject.set(subjectId, end);
   }
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
 
@@ -556,8 +550,12 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
     };
   }
 
+  // With per-unit dates a topic is governed by its own unit's paper: once that
+  // is sat it takes no more blocks, and its urgency is its own countdown.
+  const unitDated = input.exams.some((e) => e.subjectId === input.subjectId && e.paperSpecId);
+  const topicDays = (t: Topic) => (unitDated ? daysToTopicExam(input.exams, t, input.date) : days);
   const candidates = input.topics
-    .filter((t) => t.subjectId === input.subjectId)
+    .filter((t) => t.subjectId === input.subjectId && !(unitDated && topicUnitSat(input.exams, t, input.date)))
     .map((t) => {
       const mastery = input.projected.get(t.id) ?? 0;
       const last = input.lastScheduled.get(t.id);
@@ -570,12 +568,12 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
         subjectId: t.subjectId, topicId: t.id, minutes: 20,
         signals: {
           weakness: 1 - mastery, learningBenefit: (1 - mastery) * (0.9 + t.intrinsicDifficulty * 0.02),
-          examUrgency: Math.max(0, Math.min(1, examUrgency(days) - 1)),
+          examUrgency: Math.max(0, Math.min(1, examUrgency(topicDays(t)) - 1)),
           examWeighting: 1, diagnosticValue: evidenceConfidence === 0 ? 1 : 0,
           evidenceConfidence,
         },
       });
-      return { topic: t, score: value.score * spacing };
+      return { topic: t, days: topicDays(t), score: value.score * spacing };
     })
     .sort((a, b) => b.score - a.score);
 
@@ -584,9 +582,12 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
 
   const mastery = input.projected.get(pick.topic.id) ?? 0;
 
-  // Final days: opening a brand-new topic this close adds stress faster than
-  // marks, so the blocks stay on light, evidence-backed work instead.
-  if (mastery === 0 && guidance.phase === "final") {
+  // Final days before the pick's own paper: opening a brand-new topic this
+  // close adds stress faster than marks, so the blocks stay on light,
+  // evidence-backed work instead.
+  const pickDays = pick.days;
+  const pickPhase = countdownGuidance(pickDays).phase;
+  if (mastery === 0 && pickPhase === "final") {
     const studied = candidates.find(
       (c) => c.topic.id !== pick.topic.id && (input.projected.get(c.topic.id) ?? 0) > 0,
     );
@@ -594,12 +595,12 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
       return {
         activity: "recall",
         topicId: studied.topic.id,
-        reason: `${days} day${days === 1 ? "" : "s"} to the exam — light final recall on ${studied.topic.title}, nothing new.`,
+        reason: `${pickDays} day${pickDays === 1 ? "" : "s"} to the exam — light final recall on ${studied.topic.title}, nothing new.`,
       };
     }
     return {
       activity: "flashcards",
-      reason: `${days} day${days === 1 ? "" : "s"} to the exam — no new first passes. Keep due cards clear and protect sleep.`,
+      reason: `${pickDays} day${pickDays === 1 ? "" : "s"} to the exam — no new first passes. Keep due cards clear and protect sleep.`,
     };
   }
 
@@ -608,8 +609,8 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
       activity: "learn",
       topicId: pick.topic.id,
       reason:
-        guidance.phase === "technique"
-          ? `${days} days out — targeted first pass over ${pick.topic.title}.`
+        pickPhase === "technique"
+          ? `${pickDays} days out — targeted first pass over ${pick.topic.title}.`
           : `First pass over ${pick.topic.title}.`,
     };
   }
@@ -629,7 +630,7 @@ function chooseActivity(input: ChooseInput): { activity: ActivityKind; topicId?:
 
 /** What a roll-forward must respect so it never plans what buildPlan would refuse. */
 export interface RollForwardConstraints {
-  /** Exam dates: work is never rolled onto or past its subject's next exam day. */
+  /** Exam dates: work is never rolled onto or past the end of its subject's run-up (subjectRunUpEnd). */
   exams?: readonly ExamDate[];
   /** Weekly availability: work is never rolled onto a day with no study time (or less than the block needs). */
   availability?: readonly Availability[];
@@ -639,7 +640,7 @@ export interface RollForwardConstraints {
 
 /**
  * The first day (from `today`, within a fortnight) that can take `session`:
- * under the block cap, before the subject's next exam, and — when
+ * under the block cap, before the end of the subject's run-up, and — when
  * availability is known — a study day (buildPlan's 10-minute floor) whose
  * availability is at least the block's length. Null when none can. The block
  * cap, not the day's remaining minutes, bounds how much is added: a plan
@@ -666,10 +667,7 @@ function rollTarget(
   constraints: RollForwardConstraints | undefined,
   endByDate: Map<IsoDate, DayTail>,
 ): IsoDate | null {
-  const exam = constraints?.exams
-    ?.filter((e) => e.subjectId === session.subjectId && e.date >= today)
-    .map((e) => e.date)
-    .sort()[0];
+  const exam = constraints?.exams ? subjectRunUpEnd(constraints.exams, session.subjectId, today) : null;
   for (let i = 0; i < 14; i++) {
     const candidate = addLocalDays(today, i);
     if (exam && candidate >= exam) break;
