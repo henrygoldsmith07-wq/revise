@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { exportDeck, serialiseDeck } from "@/domain/deck-io";
 import { buildShareLink } from "@/domain/sharing";
 import type { Card } from "@/domain/types";
@@ -11,9 +11,22 @@ import { ICON_SIZE, ShareIcon } from "./icons";
 // sent to any host), and a file goes through the Web Share API on a phone or a
 // plain download everywhere else. Shared decks always drop scheduling.
 
+/** How long a downloaded deck's blob URL (and the "Copied" flag) live. */
+const DOWNLOAD_REVOKE_MS = 10_000;
+const COPIED_RESET_MS = 2500;
+
 export function ShareDeck({ cards, name }: { cards: Card[]; name: string }) {
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState<string | null>(null);
+  const revokeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (revokeTimer.current) clearTimeout(revokeTimer.current);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
 
   const link = useMemo(
     () => (typeof window === "undefined" ? null : buildShareLink(cards, name, window.location.origin)),
@@ -40,7 +53,10 @@ export function ShareDeck({ cards, name }: { cards: Card[]; name: string }) {
     anchor.href = url;
     anchor.download = file.name;
     anchor.click();
-    URL.revokeObjectURL(url);
+    // Chrome tears the download down with the element, so the URL must outlive
+    // it: revoking synchronously aborts large exports mid-save.
+    if (revokeTimer.current) clearTimeout(revokeTimer.current);
+    revokeTimer.current = setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_REVOKE_MS);
     setShared("Downloaded — send the file however you like.");
   }
 
@@ -49,7 +65,8 @@ export function ShareDeck({ cards, name }: { cards: Card[]; name: string }) {
     try {
       await navigator.clipboard.writeText(link.url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {
       setShared("Copying was blocked. Use the file instead.");
     }
