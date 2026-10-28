@@ -53,6 +53,27 @@ export interface ParticipantTrajectory {
   finalAssessment?: Array<{ questionId: Id; topicId: Id; awarded: number; max: number }>;
 }
 
+/** Subject id of a topic id ("p1.b2.3" -> "p1"), or null when there is none. */
+export function subjectIdOf(topicId: string): string | null {
+  const dot = topicId.indexOf(".");
+  return dot > 0 ? topicId.slice(0, dot) : null;
+}
+
+/**
+ * Resolve the exam weight for a topic id from the recorded subject weights.
+ *
+ * Weights are keyed by subject id; the trajectory logs topic ids. A direct
+ * topic-key entry wins (some feeds record weights per topic), then the topic's
+ * subject prefix, then the neutral 0.5 — a missing weight must not read as
+ * "worthless subject", which would starve that subject of recommendations.
+ * `split(".")[0]` on an id with no dot returns the whole id, so a bare topic
+ * key and a subject key used to collapse into one lookup; the prefix is only
+ * consulted when the id actually carries one.
+ */
+export function subjectWeightFor(weights: Record<string, number>): (topicId: Id) => number {
+  return (topicId) => weights[topicId] ?? (subjectIdOf(topicId) ? (weights[subjectIdOf(topicId)!] ?? 0.5) : 0.5);
+}
+
 // --- policy context (folded from the past only) -------------------------------
 
 export interface TopicState {
@@ -492,8 +513,7 @@ export function runTournament(
           topics,
           overdueByTopic: foldOverdue(past),
           mistakeByTopic: foldMistakes(past),
-          subjectWeightOf: (topicId) =>
-            participant.subjectWeights[topicId.split(".")[0]] ?? participant.subjectWeights[topicId] ?? 0.5,
+          subjectWeightOf: subjectWeightFor(participant.subjectWeights),
           random: rng,
         };
 
