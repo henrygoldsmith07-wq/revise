@@ -6,7 +6,7 @@ import {
   MATCH_PAIRS,
   type MatchTile,
 } from "@/domain/study-modes";
-import { nextMove } from "@/components/modes/MatchGame";
+import { subjectWeightFor, subjectIdOf } from "@/domain/recommender-tournament";
 import type { Card } from "@/domain/types";
 import { createCard } from "@/domain/scheduling";
 import { allTopics } from "@/domain/curriculum";
@@ -66,8 +66,6 @@ describe("match board", () => {
     }
   });
 });
-
-import { subjectWeightFor, subjectIdOf } from "@/domain/recommender-tournament";
 
 describe("subject weight resolution", () => {
   it("resolves a topic id through its subject prefix", () => {
