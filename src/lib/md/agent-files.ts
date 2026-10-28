@@ -8,6 +8,7 @@
 import { SITE } from "@/lib/site";
 import { mdLink, mdList } from "./format";
 import { isFlagship } from "@/domain/flagship";
+import { subjectIdOf } from "@/domain/recommender-tournament";
 import { listMarkdownRoutes, renderMarkdown, type MarkdownGroup, type MarkdownRoute } from "./registry";
 import { markdownPathFor } from "./routes";
 
@@ -85,7 +86,12 @@ function inFullText(route: MarkdownRoute): boolean {
   if (route.group === "lessons") return !route.query.topic || Boolean(route.query.checkpoint);
   if (route.group !== "curriculum") return true;
   if (route.query.subject) return false;
-  return !route.query.topic || isFlagship(route.query.topic.split(".")[0] ?? "");
+  // Flagship status is a property of the subject, and the subject id of a
+  // topic id is the prefix before the first dot — but only when there is one:
+  // a dotless id is not its own subject.
+  if (!route.query.topic) return true;
+  const subject = subjectIdOf(route.query.topic);
+  return subject === null ? true : isFlagship(subject);
 }
 
 /** /llms-full.txt: every listed page, rendered by the same registry, joined. */
