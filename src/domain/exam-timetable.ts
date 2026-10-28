@@ -61,7 +61,7 @@ export function subjectRunUpEnd(exams: readonly ExamDate[], subjectId: Id, today
   const ahead = exams.filter((exam) => exam.subjectId === subjectId && exam.date >= today).map((exam) => exam.date).sort();
   if (!ahead.length) return null;
   const unitDated = exams.some((exam) => exam.subjectId === subjectId && exam.paperSpecId);
-  return unitDated ? ahead[ahead.length - 1] : ahead[0];
+  return (unitDated ? ahead[ahead.length - 1] : ahead[0]) ?? null;
 }
 
 export type UnitExamStatus = "upcoming" | "today" | "past" | "undated";
