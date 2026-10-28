@@ -246,13 +246,20 @@ export function useSyncEngine(input: {
     // Debounced rather than per-write: snapshot changes on every graded card,
     // and a full drain+pull cycle per keystroke would hammer the network while
     // a session runs. The interval covers quiet periods.
+    //
+    // The debounce keys on whether there is unsynced work, not on the whole
+    // snapshot object: a dependency on `snapshot` itself restarted this 5 s
+    // timer on every snapshot commit — including the pull that lands after a
+    // successful sync and every background hydration chunk — so a continuously
+    // busy session could keep deferring its own flush indefinitely.
     const first = setTimeout(() => void syncNow(), 5_000);
     const timer = setInterval(() => void syncNow(), 120_000);
     return () => {
       clearTimeout(first);
       clearInterval(timer);
     };
-  }, [snapshot, syncNow, syncStatus.online, userId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the flush is gated by the outbox, not by which row changed
+  }, [snapshot !== null, syncNow, syncStatus.online, userId]);
 
   return { syncStatus, syncNow, startHydration };
 }
