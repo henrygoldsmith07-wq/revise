@@ -31,7 +31,13 @@ export interface OnboardingExamDatesStepProps {
 export function OnboardingExamDatesStep({ subjects, values, autoFilled, today, onChange, missing, invalidCount }: OnboardingExamDatesStepProps) {
   const filled = Object.values(autoFilled);
   const timetabled = filled.filter((s) => s.status === "timetabled").length;
-  const estimated = filled.length - timetabled;
+  const provisional = filled.filter((s) => s.status === "provisional").length;
+  const estimated = filled.length - timetabled - provisional;
+  const parts = [
+    timetabled ? `${timetabled === 1 ? "1 date" : `${timetabled} dates`} from the official timetable` : "",
+    provisional ? `${provisional === 1 ? "1 provisional date" : `${provisional} provisional dates`}` : "",
+    estimated ? `${estimated === 1 ? "1 estimated date" : `${estimated} estimated dates`}` : "",
+  ].filter(Boolean);
   return (
     <Panel className="space-y-3">
       <div>
@@ -43,9 +49,7 @@ export function OnboardingExamDatesStep({ subjects, values, autoFilled, today, o
       </div>
       {filled.length ? (
         <p className="text-xs text-ink2" role="status" aria-live="polite">
-          {timetabled ? `Filled in ${timetabled === 1 ? "1 date" : `${timetabled} dates`} from the official timetable` : ""}
-          {timetabled && estimated ? " and " : ""}
-          {estimated ? `${timetabled ? "" : "Filled in "}${estimated === 1 ? "1 estimated date" : `${estimated} estimated dates`}` : ""}
+          {`Filled in ${parts.join(" and ")}`}
           {" "}for your year. Check them against your school&apos;s exam timetable.
         </p>
       ) : null}
@@ -65,7 +69,7 @@ export function OnboardingExamDatesStep({ subjects, values, autoFilled, today, o
             />
             {sitting ? (
               <p id={noteId} className="mt-1 text-[11px] text-ink3" data-sitting-status={sitting.status}>
-                {sitting.status === "timetabled" ? (
+                {sitting.status !== "estimated" && sitting.sourceUrl ? (
                   <>
                     {sitting.note}{" "}
                     <a className="underline" href={sitting.sourceUrl} target="_blank" rel="noreferrer">
