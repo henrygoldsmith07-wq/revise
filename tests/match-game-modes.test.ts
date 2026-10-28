@@ -67,6 +67,39 @@ describe("match board", () => {
   });
 });
 
+import { subjectWeightFor, subjectIdOf } from "@/domain/recommender-tournament";
+
+describe("subject weight resolution", () => {
+  it("resolves a topic id through its subject prefix", () => {
+    const weight = subjectWeightFor({ physics: 0.9 });
+    expect(weight("physics.p1.moments")).toBe(0.9);
+  });
+
+  it("prefers a direct topic-key weight when one is recorded", () => {
+    const weight = subjectWeightFor({ physics: 0.9, "physics.p1.moments": 0.2 });
+    expect(weight("physics.p1.moments")).toBe(0.2);
+  });
+
+  it("falls back to neutral 0.5 for an unknown subject, not to a falsy collapse", () => {
+    const weight = subjectWeightFor({ physics: 0.9 });
+    expect(weight("biology.b1.cells")).toBe(0.5);
+    // A weight recorded as 0 means "never recommend this subject", and must
+    // survive: it is an explicit choice, not a missing entry.
+    expect(subjectWeightFor({ physics: 0 })("physics.p1.moments")).toBe(0);
+  });
+
+  it("never reads a bare topic key as a subject key", () => {
+    // split(".")[0] on "solo" returns "solo", so a weight recorded under the
+    // topic key was consumed by the prefix lookup too. The prefix is only
+    // consulted when the id actually carries a dot.
+    const weight = subjectWeightFor({ solo: 0.7, other: 0.1 });
+    expect(weight("solo")).toBe(0.7);
+    expect(subjectIdOf("solo")).toBeNull();
+    expect(subjectIdOf("p1.b2.3")).toBe("p1");
+    expect(subjectIdOf(".leading")).toBeNull();
+  });
+});
+
 describe("match score", () => {
   beforeEach(() => {
     vi.useFakeTimers();
