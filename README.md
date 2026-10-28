@@ -370,7 +370,7 @@ statements), which are verified, and — per `SPEC_MANIFEST` — which unit/pape
 (duration, marks, weighting) each belongs to. The statement model now covers all
 **35 subjects (WJEC/AQA/Edexcel/OCR × A-level/GCSE)**.
 
-Runtime inventory: **511 topics, 3900 materialised seed questions, 2143 WJEC flagship questions**.
+Runtime inventory: **511 topics, 3914 materialised seed questions, 2157 WJEC flagship questions**.
 Recall-level coverage (a question whose demand is recall, which early
 diagnostics probe before application): every topic in all four WJEC
 flagships has at least one (Physics 19/19, Maths 23/23, Biology 25/25,
