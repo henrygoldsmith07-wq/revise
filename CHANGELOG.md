@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-28 pass 94: Today names the paper your session is for, and planning continues after Unit 1
+Today's session header now counts down to the unit paper of the chosen topic (with its own label) and adds one line for the nearest dated paper in the subject ("Physics Unit 1 is in 23 days (90 minutes, 80 marks)"). A Unit 2 topic no longer borrows Unit 1's date. The planner keeps scheduling a subject until its last dated unit paper instead of dropping it once the first unit is sat. Tests: tests/today-brief.test.ts. Verified: tsc, strict tsc, eslint, targeted vitest; no browser run.
+
 ## 2026-10-27 pass 93: a date for each unit paper, and revision that counts down to the paper a topic belongs to
 Exam dates could only be set once, in onboarding, one per subject, and never edited. Settings now has an Exam timetable: one date per WJEC unit paper (Year 12 sees Units 1 and 2 only, with duration, marks and topic count), validated, replaced not duplicated, clearable, and it regenerates the plan. `src/domain/exam-timetable.ts` gives each topic the date of its own unit (falling back to the old whole-subject date, never borrowing another unit's), and the recommender uses it for urgency, countdown and paper label on weak and first-pass topics. Tests: tests/exam-timetable.test.ts. Verified: tsc, eslint, targeted vitest; no browser run.
 

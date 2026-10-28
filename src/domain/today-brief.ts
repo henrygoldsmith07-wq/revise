@@ -11,6 +11,8 @@ import type { PaperReadiness } from "./paper-readiness";
 import type { TopicLifecycle } from "./proof-lifecycle";
 import type { ExamDate, Id, Mistake } from "./types";
 import { localDaysBetween, todayLocal } from "./local-date";
+import { examForTopic } from "./exam-timetable";
+import type { Topic } from "./types";
 
 export interface TodayBrief {
   paperName: string | null;
@@ -27,6 +29,8 @@ export interface TodayBrief {
   provisional: string | null;
   /** Where this topic stands on proof, so a good session is never mistaken for mastery. */
   lifecycle: { label: string; line: string; dueNow: boolean } | null;
+  /** The nearest dated paper in this subject, e.g. "Physics Unit 1 is in 23 days (90 minutes, 80 marks)." */
+  nextPaper: string | null;
 }
 
 const EVIDENCE: Partial<Record<AdaptiveStepKind, string>> = {
@@ -51,6 +55,9 @@ export function buildTodayBrief(input: {
   examDates?: readonly ExamDate[];
   mistakes?: readonly Mistake[];
   lifecycle?: TopicLifecycle;
+  /** The session topic, so a unit-dated subject counts down to this topic's own unit. */
+  topic?: Pick<Topic, "specRef" | "id" | "subjectId" | "title">;
+  nextPaper?: string | null;
   now?: Date;
 }): TodayBrief {
   const { plan } = input;
@@ -58,9 +65,16 @@ export function buildTodayBrief(input: {
     .filter((paper) => paper.subjectId === plan.subjectId && paper.topicIds.includes(plan.topicId))
     .sort((a, b) => (a.daysUntil === null || a.daysUntil < 0 ? 1e9 : a.daysUntil) - (b.daysUntil === null || b.daysUntil < 0 ? 1e9 : b.daysUntil))[0];
 
+  const today = todayLocal(input.now ?? new Date());
+  const unitDated = (input.examDates ?? []).some((exam) => exam.subjectId === plan.subjectId && exam.paperSpecId);
   let daysToExam: number | null = owning?.daysUntil ?? null;
-  if (daysToExam === null) {
-    const today = todayLocal(input.now ?? new Date());
+  let unitLabel: string | null = null;
+  if (unitDated && input.topic) {
+    // Unit dates exist: count down to this topic's own unit, never to a sibling unit's paper.
+    const exam = examForTopic((input.examDates ?? []).map((e) => ({ ...e, date: e.date.slice(0, 10) })), input.topic, today);
+    daysToExam = exam ? localDaysBetween(today, exam.date) : null;
+    unitLabel = exam?.label ?? null;
+  } else if (daysToExam === null) {
     const upcoming = (input.examDates ?? [])
       .filter((exam) => exam.subjectId === plan.subjectId)
       .map((exam) => localDaysBetween(today, exam.date.slice(0, 10)))
@@ -86,7 +100,8 @@ export function buildTodayBrief(input: {
   return {
     provisional,
     lifecycle: input.lifecycle && input.lifecycle.stage !== "not-started" ? { label: input.lifecycle.label, line: input.lifecycle.line, dueNow: input.lifecycle.dueNow } : null,
-    paperName: owning?.name ?? null,
+    paperName: unitLabel ?? owning?.name ?? null,
+    nextPaper: input.nextPaper ?? null,
     daysToExam,
     examLabel: countdownLabel(daysToExam),
     marksAtRisk,
