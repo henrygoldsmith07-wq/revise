@@ -81,6 +81,7 @@ describe("UTC-day truncation in domain code", () => {
     "recommender.ts": "deterministic synthetic benchmark dates",
     "large-history-fixture.ts": "deterministic synthetic fixture",
     "portability.ts": "export filename stamp",
+    "exam-timetable.ts": "round-trip check that a typed YYYY-MM-DD is a real calendar date (parsed and printed in UTC)",
   };
   // `Date.UTC(now.getUTCFullYear(), …)` is the same UTC day built from parts.
   const pattern = /toISOString\(\)\.(slice|substring)\(0, ?10\)|toISOString\(\)\.split\("T"\)|(createdAt|reviewedAt|updatedAt|completedAt|startedAt|submittedAt|lastStudiedAt)\??\.slice\(0, ?10\)|Date\.UTC\(\w+\.getUTCFullYear\(\)/;
