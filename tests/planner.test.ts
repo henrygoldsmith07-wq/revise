@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { allocateBlocks, buildPlan, formatTime, planForDate, rescheduleMissed, summarizePlanChange } from "@/domain/planner";
+import { allocateBlocks, buildPlan, formatTime, planForDate, rescheduleMissed, rescheduleMissedPrioritised, summarizePlanChange } from "@/domain/planner";
+import { topicsFor } from "@/domain/curriculum";
+import { topicUnitNumber } from "@/domain/year-group";
 import type { Availability, ExamDate, PlannedSession, Topic, TopicMastery } from "@/domain/types";
 
 const NOW = new Date("2025-06-02T08:00:00.000Z"); // a Monday
@@ -354,6 +356,53 @@ describe("buildPlan", () => {
     // 2025-06-02 + 90 days = 2025-08-31; the exam is 8 months out.
     const lastDate = plan.map((s) => s.date).sort().at(-1);
     expect(lastDate).toBe("2025-08-30");
+  });
+});
+
+describe("buildPlan with per-unit paper dates", () => {
+  const PHYS = "wjec-alevel-physics";
+  const physics = topicsFor(PHYS).filter((t) => topicUnitNumber(t) === 1 || topicUnitNumber(t) === 2);
+  const unit1 = new Set(physics.filter((t) => topicUnitNumber(t) === 1).map((t) => t.id));
+  const unitRow = (unit: number, date: string): ExamDate => ({ id: `e-u${unit}`, userId: "u", subjectId: PHYS, paperSpecId: `${PHYS}.u${unit}`, date, label: `Physics Unit ${unit}` });
+  const plan = (exams: ExamDate[]) =>
+    buildPlan({
+      userId: "u",
+      topics: physics,
+      mastery: physics.map((t) => mastery(t.id, PHYS, 0.4)),
+      exams,
+      availability: everyDay(120),
+      sessionLengthMinutes: 30,
+      subjectIds: [PHYS],
+      now: NOW,
+      idFactory: ids(),
+    });
+
+  it("stops planning a unit's topics once its paper is sat, and keeps the next unit going", () => {
+    const sessions = plan([unitRow(1, "2025-06-09"), unitRow(2, "2025-06-30")]);
+    expect(sessions.some((s) => s.topicId && unit1.has(s.topicId) && s.date < "2025-06-09")).toBe(true);
+    expect(sessions.some((s) => s.topicId && unit1.has(s.topicId) && s.date >= "2025-06-09")).toBe(false);
+    expect(sessions.some((s) => s.date > "2025-06-20")).toBe(true);
+    expect(sessions.some((s) => s.date >= "2025-06-30")).toBe(false);
+  });
+
+  it("reaches the last dated paper by default, not just the first", () => {
+    // Unit 2 is 40 days out, beyond the default fortnight; Unit 1 is 7 days out.
+    const sessions = plan([unitRow(1, "2025-06-09"), unitRow(2, "2025-07-12")]);
+    expect(sessions.some((s) => s.date > "2025-07-01")).toBe(true);
+  });
+
+  it("keeps a later whole-subject date governing the units that have no date of their own", () => {
+    const whole: ExamDate = { id: "e-whole", userId: "u", subjectId: PHYS, date: "2025-07-01", label: "Physics" };
+    const sessions = plan([unitRow(1, "2025-06-09"), whole]);
+    expect(sessions.some((s) => s.date > "2025-06-20" && s.date < "2025-07-01")).toBe(true);
+    expect(sessions.some((s) => s.date >= "2025-07-01")).toBe(false);
+  });
+
+  it("rolls missed work past a sat unit's paper while a later paper is still ahead", () => {
+    const missed: PlannedSession = { id: "m", userId: "u", date: "2025-06-01", startMinute: 960, minutes: 30, subjectId: PHYS, activity: "practice", reason: "weak topic", status: "pending" };
+    const exams = [unitRow(1, "2025-06-02"), unitRow(2, "2025-06-30")];
+    const healed = rescheduleMissedPrioritised([missed], TODAY, 6, [], exams, ids());
+    expect(healed.some((s) => s.id !== "m" && s.status === "pending")).toBe(true);
   });
 });
 

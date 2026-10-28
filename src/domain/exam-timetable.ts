@@ -44,6 +44,26 @@ export function daysToTopicExam(exams: readonly ExamDate[], topic: Pick<Topic, "
   return exam ? daysBetween(today, exam.date) : null;
 }
 
+/** True once every dated paper for this topic's own unit falls on or before `date`: the unit has been sat. */
+export function topicUnitSat(exams: readonly ExamDate[], topic: Pick<Topic, "specRef" | "id" | "subjectId" | "title">, date: IsoDate): boolean {
+  const unit = topicUnitNumber(topic);
+  if (unit === null) return false;
+  const own = exams.filter((exam) => exam.subjectId === topic.subjectId && exam.paperSpecId === unitPaperSpecId(topic.subjectId, unit));
+  return own.length > 0 && own.every((exam) => exam.date <= date);
+}
+
+/**
+ * The day a subject's run-up ends: its next exam, or, once any unit is dated
+ * separately, the latest paper still ahead (a whole-subject date included,
+ * since it governs every undated unit). Sitting Unit 1 does not end Unit 2's run-up.
+ */
+export function subjectRunUpEnd(exams: readonly ExamDate[], subjectId: Id, today: IsoDate): IsoDate | null {
+  const ahead = exams.filter((exam) => exam.subjectId === subjectId && exam.date >= today).map((exam) => exam.date).sort();
+  if (!ahead.length) return null;
+  const unitDated = exams.some((exam) => exam.subjectId === subjectId && exam.paperSpecId);
+  return unitDated ? ahead[ahead.length - 1] : ahead[0];
+}
+
 export type UnitExamStatus = "upcoming" | "today" | "past" | "undated";
 
 export interface UnitTimetableRow {

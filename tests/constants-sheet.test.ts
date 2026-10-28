@@ -20,6 +20,13 @@ describe("constants reference sheet", () => {
     expect(value("NA")).toBe("6.02214076 × 10^23");
     expect(value("c")).toBe("2.99792458 × 10^8");
   });
+  it("carries the Physics constants the bank's radiation and field questions need", () => {
+    const sheet = constantsSheetFor("wjec-alevel-physics")!;
+    const value = (id: string) => sheet.constants.find((c) => c.id === id)?.value;
+    expect(value("sigma")).toBe("5.670374419 × 10^-8");
+    expect(value("wien")).toBe("2.897771955 × 10^-3");
+    expect(value("mu0")).toBe("1.25663706212 × 10^-6");
+  });
   it("renders as a keyboard-operable disclosure with the source note", () => {
     const html = render("wjec-alevel-physics");
     expect(html).toContain("<details");
