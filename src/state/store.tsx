@@ -44,6 +44,7 @@ import { isDueReview, todayIso } from "@/domain/scheduling";
 import { saveCardReview } from "@/data/card-review";
 import { mergeCard } from "@/domain/sync-crdt";
 import { addXp, newlyUnlocked, touchStreak, unlockedAchievements, XP } from "@/domain/gamification";
+import { subjectIdOf } from "@/domain/recommender-tournament";
 import { calibrateDifficulty } from "@/domain/knowledge-tracing";
 import type { DifficultyCalibrationReport, QuestionTrace } from "@/domain/knowledge-tracing";
 import { calculateCalculationMastery } from "@/domain/calculation-mastery";
@@ -560,7 +561,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       // The legacy topic graph remains useful for reference subjects, but
       // All four WJEC flagships require the exact capability-edge attestation.
       edges: [
-        ...prerequisiteEdges().filter((edge) => !requiresWjecContentReview(edge.topicId.split(".")[0])),
+        ...prerequisiteEdges().filter((edge) => !requiresWjecContentReview(subjectIdOf(edge.topicId) ?? edge.topicId)),
         ...reviewedWjecTopicEdges(),
       ],
     }),

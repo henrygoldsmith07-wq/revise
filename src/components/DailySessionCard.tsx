@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { buildDailySessionPlan, MAX_SESSION_MINUTES } from "@/domain/daily-session";
+import { buildDailySessionPlan, MAX_SESSION_MINUTES, MIN_SESSION_MINUTES } from "@/domain/daily-session";
 import { capabilitySentence } from "@/domain/capability-mastery";
 import { deriveCapabilityProfiles } from "@/domain/capability-source";
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
@@ -63,7 +63,10 @@ export function DailySessionCard({ subjectIds }: { subjectIds: string[] }) {
   }, [store.recallMastery, store.applicationMastery, store.attempts, store.mastery, store.questions, subjectIds]);
 
   const requested = store.settings.sessionLengthMinutes;
-  const capped = Math.min(Math.max(requested, 12), MAX_SESSION_MINUTES);
+  // The plan builder owns the 12–25 minute clamp (the same rule the planner's
+  // orchestrator applies); the card only needs to know whether the student's
+  // request was truncated, so the pill says "capped" honestly.
+  const capped = Math.min(Math.max(requested, MIN_SESSION_MINUTES), MAX_SESSION_MINUTES);
   const shapeLabel =
     plan.shape === "scaffolded" ? "Scaffolded" : plan.shape === "retrieval" ? "Retrieval" : "Balanced";
 

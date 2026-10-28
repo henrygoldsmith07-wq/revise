@@ -14,6 +14,22 @@ import { Modal, ModalTitle } from "./Modal";
 
 export const CUSTOM_STUDY_KEY = "revise.customStudy";
 
+/**
+ * Add a tag chip to the filter without breaking the query that is already
+ * there. Chips are alternatives (this tag OR the current filter), not extra
+ * ANDs: the browser's parser joins bare terms within a group with AND, so
+ * appending ` tag:x` to a non-empty query silently produced `everything AND
+ * tag:x` — an empty session unless the text already matched. Tags already in
+ * the query are not duplicated.
+ */
+export function addTagToQuery(query: string, tag: string): string {
+  const term = `tag:${tag}`;
+  const existing = query.trim();
+  const wanted = existing.toLowerCase().split(/\s+/).filter(Boolean);
+  if (wanted.includes(term)) return existing;
+  return existing ? `${existing} or ${term}` : term;
+}
+
 export function CustomStudyDialog({
   cards,
   initialQuery = "",
@@ -88,7 +104,8 @@ export function CustomStudyDialog({
               <button
                 key={tag}
                 type="button"
-                onClick={() => set({ query: `${spec.query} tag:${tag}`.trim() })}
+                onClick={() => set({ query: addTagToQuery(spec.query, tag) })}
+                title={`Add tag:${tag} to the filter`}
                 className="pill hover:border-ink3 transition-colors"
               >
                 {tag} <span className="text-ink3">{count}</span>

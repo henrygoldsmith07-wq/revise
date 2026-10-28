@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useId } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 // The shared vocabulary every screen is built from. Le Studio's tokens carry
@@ -230,21 +231,52 @@ export function Segmented<T extends string>({
   );
 }
 
+/**
+ * A labelled form field. The label is wired to the control with htmlFor/id
+ * (generated when the caller does not pass one), so screen readers announce
+ * it and tapping the label focuses the control; wrapping the control in the
+ * `<label>` did the second but not the first, and nested controls read as
+ * one field named by every control inside it. To wire the label to a control
+ * inside `children`, pass `htmlFor` with that control's id; pass `labelled`
+ * when the child names itself with its own aria-label.
+ *
+ * When the child carries its own accessible name (an element with an
+ * aria-label), pass `labelled` to keep the visible caption as plain text
+ * instead of a second, clashing label.
+ */
 export function Field({
   label,
   hint,
   children,
   htmlFor,
+  labelled = false,
 }: {
   label: string;
   hint?: string;
   children: ReactNode;
   htmlFor?: string;
+  /** The child is named by its own aria-label; the caption stays plain text. */
+  labelled?: boolean;
 }) {
-  return (
-    <label className="block" htmlFor={htmlFor}>
+  const generatedId = useId();
+  const id = htmlFor ?? generatedId;
+  const caption = (
+    <>
       <span className="text-xs font-semibold text-ink2">{label}</span>
       {hint ? <span className="block text-[11px] text-ink3 mb-1">{hint}</span> : <span className="block h-1" />}
+    </>
+  );
+  if (labelled) {
+    return (
+      <div className="block">
+        {caption}
+        {children}
+      </div>
+    );
+  }
+  return (
+    <label className="block" htmlFor={id}>
+      {caption}
       {children}
     </label>
   );
