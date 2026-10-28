@@ -129,7 +129,7 @@ describe("step 3: exam dates arrive filled in and stay editable", () => {
     expect(html).not.toContain("From the WJEC");
   });
 
-  it("an estimate says 'Estimated' and never claims a timetable", () => {
+  it("a Year 13 AQA date comes from the AQA summer 2027 timetable with its source link", () => {
     const sitting = examSittingFor({ boardId: "aqa", subjectId: "aqa-alevel-biology", level: "A Level", yearGroup: "year-13", today })!;
     const html = renderToStaticMarkup(
       createElement(OnboardingExamDatesStep, {
@@ -142,7 +142,28 @@ describe("step 3: exam dates arrive filled in and stay editable", () => {
         invalidCount: 0,
       }),
     );
-    expect(html).toContain("Estimated: the summer 2027 series usually runs mid-May to late June.");
+    expect(html).toContain('value="2027-06-07"');
+    expect(html).toContain("From the AQA summer 2027 timetable: Paper 1 Mon 7 Jun (pm), Paper 2 Mon 14 Jun (pm), Paper 3 Fri 18 Jun (am).");
+    expect(html).toContain("Filled in 1 date from the official timetable");
+    expect(html).toContain('href="https://www.aqa.org.uk/files/');
+    expect(html).not.toContain("Estimated");
+  });
+
+  it("an estimate says 'Estimated' and never claims a timetable", () => {
+    // Year 13 in autumn 2027 sits in summer 2028, which no board has timetabled yet.
+    const sitting = examSittingFor({ boardId: "aqa", subjectId: "aqa-alevel-biology", level: "A Level", yearGroup: "year-13", today: "2027-10-01" })!;
+    const html = renderToStaticMarkup(
+      createElement(OnboardingExamDatesStep, {
+        subjects: [{ id: "aqa-alevel-biology", name: "Biology" }],
+        values: { "aqa-alevel-biology": sitting.firstDate },
+        autoFilled: { "aqa-alevel-biology": sitting },
+        today: "2027-10-01",
+        onChange: noop,
+        missing: [],
+        invalidCount: 0,
+      }),
+    );
+    expect(html).toContain("Estimated: the summer 2028 series usually runs mid-May to late June.");
     expect(html).toContain("Filled in 1 estimated date");
     expect(html).not.toContain("official timetable");
   });

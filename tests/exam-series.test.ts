@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { getSubject } from "@/domain/curriculum";
 import {
+  AQA_SUMMER_2027_SOURCE,
+  OCR_SUMMER_2027_SOURCE,
+  PEARSON_SUMMER_2027_SOURCE,
   WJEC_SUMMER_2027_SOURCE,
   estimatedSeriesStart,
   examRowsForSitting,
@@ -80,14 +83,87 @@ describe("examSittingFor: WJEC from the official summer 2027 timetable", () => {
   });
 });
 
-describe("examSittingFor: linear boards are estimates", () => {
-  it("Year 13 on AQA sits in summer 2027; Year 12 not until summer 2028", () => {
-    const y13 = sitting("aqa-alevel-biology", "year-13", AUTUMN, "aqa");
-    expect(y13?.status).toBe("estimated");
-    expect(y13?.firstDate).toBe("2027-05-10");
+describe("examSittingFor: linear boards from their official summer 2027 timetables", () => {
+  const dates = (subjectId: string, boardId: string) => sitting(subjectId, "year-13", AUTUMN, boardId)?.papers.map((p) => [p.unit, p.date, p.session]);
+
+  it("Year 13 AQA Biology returns all three papers from the AQA timetable", () => {
+    const result = sitting("aqa-alevel-biology", "year-13", AUTUMN, "aqa");
+    expect(result?.status).toBe("timetabled");
+    expect(result?.kind).toBe("paper");
+    expect(result?.seriesYear).toBe(2027);
+    expect(result?.firstDate).toBe("2027-06-07");
+    expect(result?.papers.map((p) => [p.unit, p.code, p.date, p.session])).toEqual([
+      [1, "7402/1", "2027-06-07", "pm"],
+      [2, "7402/2", "2027-06-14", "pm"],
+      [3, "7402/3", "2027-06-18", "am"],
+    ]);
+    expect(result?.note).toBe("From the AQA summer 2027 timetable: Paper 1 Mon 7 Jun (pm), Paper 2 Mon 14 Jun (pm), Paper 3 Fri 18 Jun (am).");
+    expect(result?.sourceUrl).toBe(AQA_SUMMER_2027_SOURCE);
+  });
+
+  it("covers every AQA A level Revise offers", () => {
+    expect(dates("aqa-alevel-chemistry", "aqa")).toEqual([[1, "2027-05-28", "am"], [2, "2027-06-10", "am"], [3, "2027-06-17", "am"]]);
+    expect(dates("aqa-alevel-physics", "aqa")).toEqual([[1, "2027-05-21", "am"], [2, "2027-05-27", "pm"], [3, "2027-06-08", "am"]]);
+    expect(dates("aqa-alevel-maths", "aqa")).toEqual([[1, "2027-05-26", "pm"], [2, "2027-06-09", "pm"], [3, "2027-06-16", "pm"]]);
+    expect(dates("aqa-alevel-computer-science", "aqa")).toEqual([[1, "2027-06-07", "pm"], [2, "2027-06-15", "am"]]);
+    expect(dates("aqa-alevel-economics", "aqa")).toEqual([[1, "2027-05-10", "am"], [2, "2027-05-17", "pm"], [3, "2027-06-07", "am"]]);
+    expect(dates("aqa-alevel-psychology", "aqa")).toEqual([[1, "2027-05-18", "am"], [2, "2027-05-25", "am"], [3, "2027-06-09", "am"]]);
+  });
+
+  it("covers Pearson Edexcel and OCR A level sciences and maths", () => {
+    expect(sitting("edexcel-alevel-biology", "year-13", AUTUMN, "edexcel")?.sourceUrl).toBe(PEARSON_SUMMER_2027_SOURCE);
+    expect(sitting("edexcel-alevel-biology", "year-13", AUTUMN, "edexcel")?.note).toContain("From the Pearson Edexcel summer 2027 timetable");
+    expect(dates("edexcel-alevel-biology", "edexcel")).toEqual([[1, "2027-06-07", "pm"], [2, "2027-06-14", "pm"], [3, "2027-06-18", "am"]]);
+    expect(dates("edexcel-alevel-chemistry", "edexcel")).toEqual([[1, "2027-05-28", "am"], [2, "2027-06-10", "am"], [3, "2027-06-17", "am"]]);
+    expect(dates("edexcel-alevel-physics", "edexcel")).toEqual([[1, "2027-05-21", "am"], [2, "2027-05-27", "pm"], [3, "2027-06-08", "am"]]);
+    expect(dates("edexcel-alevel-maths", "edexcel")).toEqual([[1, "2027-05-26", "pm"], [2, "2027-06-09", "pm"], [3, "2027-06-16", "pm"]]);
+    expect(sitting("ocr-alevel-physics", "year-13", AUTUMN, "ocr")?.sourceUrl).toBe(OCR_SUMMER_2027_SOURCE);
+    expect(dates("ocr-alevel-biology", "ocr")).toEqual([[1, "2027-06-07", "pm"], [2, "2027-06-14", "pm"], [3, "2027-06-18", "am"]]);
+    expect(dates("ocr-alevel-chemistry", "ocr")).toEqual([[1, "2027-05-28", "am"], [2, "2027-06-10", "am"], [3, "2027-06-17", "am"]]);
+    expect(dates("ocr-alevel-physics", "ocr")).toEqual([[1, "2027-05-21", "am"], [2, "2027-05-27", "pm"], [3, "2027-06-08", "am"]]);
+    expect(dates("ocr-alevel-maths", "ocr")).toEqual([[1, "2027-05-26", "pm"], [2, "2027-06-09", "pm"], [3, "2027-06-16", "pm"]]);
+  });
+
+  it("every recorded paper number matches a paper on the subject's spec", () => {
+    const ids = [
+      ["aqa", ["biology", "chemistry", "physics", "maths", "computer-science", "economics", "psychology"]],
+      ["edexcel", ["biology", "chemistry", "physics", "maths"]],
+      ["ocr", ["biology", "chemistry", "physics", "maths"]],
+    ] as const;
+    for (const [board, names] of ids) {
+      for (const name of names) {
+        const subjectId = `${board}-alevel-${name}`;
+        const spec = getSubject(subjectId);
+        expect(spec, subjectId).toBeDefined();
+        const papers = sitting(subjectId, "year-13", AUTUMN, board)!.papers;
+        expect(papers.length, subjectId).toBe(spec!.papers.length);
+        for (const p of papers) expect(spec!.papers.map((x) => x.id), subjectId).toContain(`${subjectId}.p${p.unit}`);
+      }
+    }
+  });
+
+  it("drops a paper already sat, and returns nothing once the last one is over", () => {
+    expect(sitting("aqa-alevel-biology", "year-13", "2027-06-10", "aqa")?.papers.map((p) => p.unit)).toEqual([2, 3]);
+    expect(sitting("aqa-alevel-biology", "year-13", "2027-06-19", "aqa")).toBeNull();
+  });
+
+  it("Year 12 on a linear board sits in summer 2028, which is not timetabled, so it stays an estimate", () => {
     const y12 = sitting("aqa-alevel-biology", "year-12", AUTUMN, "aqa");
+    expect(y12?.status).toBe("estimated");
     expect(y12?.seriesYear).toBe(2028);
+    expect(y12?.firstDate).toBe("2028-05-08");
     expect(y12?.note).toContain("summer 2028");
+    expect(y12?.sourceUrl).toBeUndefined();
+  });
+
+  it("a subject with no recorded timetable falls back to the labelled estimate", () => {
+    const unknown = sitting("aqa-alevel-history", "year-13", AUTUMN, "aqa");
+    expect(unknown?.status).toBe("estimated");
+    expect(unknown?.firstDate).toBe("2027-05-10");
+    expect(unknown?.papers).toEqual([]);
+    expect(unknown?.note).toMatch(/^Estimated/);
+    // A board's dates never leak onto another board's subject id.
+    expect(sitting("aqa-alevel-biology", "year-13", AUTUMN, "ocr")?.status).toBe("estimated");
   });
 });
 
@@ -119,9 +195,24 @@ describe("examRowsForSitting: what onboarding saves", () => {
     expect(rows[0]?.label).toBe(`${biology.name} Unit 1`);
   });
 
+  it("a timetabled linear sitting becomes one whole-subject row per paper, so every topic counts to the next paper", () => {
+    let n = 0;
+    const rows = examRowsForSitting({
+      sitting: sitting("ocr-alevel-chemistry", "year-13", AUTUMN, "ocr")!,
+      subject: { id: "ocr-alevel-chemistry", name: "Chemistry", paperIds: ["ocr-alevel-chemistry.p1", "ocr-alevel-chemistry.p2", "ocr-alevel-chemistry.p3"] },
+      userId: "u",
+      newId: () => `id-${++n}`,
+    });
+    expect(rows.map((r) => [r.label, r.date, r.paperSpecId])).toEqual([
+      ["Chemistry Paper 1", "2027-05-28", undefined],
+      ["Chemistry Paper 2", "2027-06-10", undefined],
+      ["Chemistry Paper 3", "2027-06-17", undefined],
+    ]);
+  });
+
   it("an estimate is one whole-subject row whose label says it is estimated", () => {
     const rows = examRowsForSitting({
-      sitting: sitting("aqa-alevel-biology", "year-13", AUTUMN, "aqa")!,
+      sitting: sitting("aqa-alevel-biology", "year-12", AUTUMN, "aqa")!,
       subject: { id: "aqa-alevel-biology", name: "Biology", paperIds: [] },
       userId: "u",
       newId: () => "x",
