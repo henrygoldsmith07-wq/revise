@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-28 pass 95: a constants reference sheet in practice and exam conditions
+WJEC Physics and Chemistry papers come with a Data Booklet, but the app offered no constants, so students either memorised what the exam gives them or lost the lookup. A keyboard-operable reference sheet (CODATA 2018 values from NIST, with a note that WJEC's own booklet is authoritative) now sits above questions in practice and stays available in full exam conditions. Maths and Biology show none. Formula-booklet content is not included (no verified source). Tests: tests/constants-sheet.test.ts. Verified: tsc, eslint, targeted vitest; no browser run.
+
 ## 2026-10-28 pass 94: Today names the paper your session is for, and planning continues after Unit 1
 Today's session header now counts down to the unit paper of the chosen topic (with its own label) and adds one line for the nearest dated paper in the subject ("Physics Unit 1 is in 23 days (90 minutes, 80 marks)"). A Unit 2 topic no longer borrows Unit 1's date. The planner keeps scheduling a subject until its last dated unit paper instead of dropping it once the first unit is sat. Tests: tests/today-brief.test.ts. Verified: tsc, strict tsc, eslint, targeted vitest; no browser run.
 
