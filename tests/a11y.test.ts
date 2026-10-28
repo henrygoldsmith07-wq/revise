@@ -81,7 +81,10 @@ describe("a11y scaffolding", () => {
     // dialog/modal semantics that would trap a screen reader on one block.
     expect(src).toContain('<h1');
     expect(src).toContain('aria-live="polite"');
-    expect(src).toContain('aria-pressed');
+    // The year, school and board toggles live in the first step's own component.
+    const firstStep = readFileSync(join(process.cwd(), "src/components/OnboardingSchoolStep.tsx"), "utf8");
+    expect(firstStep).toContain('aria-pressed');
+    expect(firstStep).not.toContain('role="dialog"');
     expect(src).not.toContain('role="dialog"');
     expect(src).not.toContain('aria-modal');
     const shell = readFileSync(join(process.cwd(), "src/components/AppShell.tsx"), "utf8");

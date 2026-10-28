@@ -10,28 +10,30 @@ import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStoreFields } from "@/state/store-context";
 import type { StoreValue } from "@/state/store";
-import { Button, Field, Panel, Pill, Segmented, cx } from "./ui";
-import { UNIT4_OPTIONS, isUnit4Option, type Unit4Option, type YearGroup } from "@/domain/year-group";
+import { Button, Panel, Pill, cx } from "./ui";
+import type { Unit4Option, YearGroup } from "@/domain/year-group";
+import { examRowsForSitting, examSittingFor, type ExamSitting } from "@/domain/exam-series";
+import { boardAfterRegionChange, regionBoardMissing, type SchoolRegion } from "@/domain/school-region";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
+import { OnboardingSchoolStep } from "./OnboardingSchoolStep";
+import { OnboardingExamDatesStep } from "./OnboardingExamDatesStep";
 
 // ---------------------------------------------------------------------------
 // First screen. Not a dialog over the app — the app itself waits (AppShell
 // renders nothing else until onboarding completes), so this is a full page.
 //
 // Five steps that end in value, not configuration:
-//   1. board → 2. subjects → 3. exam dates → 4. quick check → 5. first step.
+//   1. year, school and board → 2. subjects → 3. exam dates → 4. quick check → 5. first step.
+// Step 1 infers the board from where the school is (Wales → WJEC) and step 3
+// fills in exam dates from the year group, board and subject
+// (src/domain/exam-series.ts); both stay editable.
 // The diagnostic preferentially uses trusted/reviewed content; unreviewed
 // questions never provide trusted evidence. After onboarding Today shows the
 // personalised next action immediately.
 // ---------------------------------------------------------------------------
 
-const PHASES = ["Board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;
-
-/** "Pearson Edexcel" reads as "Edexcel" on a tile; single-word boards stay whole. */
-function boardMonogram(name: string): string {
-  return name.split(" ").pop() ?? name;
-}
+const PHASES = ["You & board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;
 
 /** Default time budget while the student has not yet tuned Settings. */
 const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
@@ -63,7 +65,11 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const [phase, setPhase] = useState(0);
   const [boardId, setBoardId] = useState<Id | null>(null);
   const [subjectIds, setSubjectIds] = useState<Id[]>([]);
+  // Dates the student typed (or cleared, as ""). Anything not here shows the auto-filled sitting.
   const [examDates, setExamDates] = useState<Record<string, string>>({});
+  const [region, setRegion] = useState<SchoolRegion | undefined>(undefined);
+  const [boardInferred, setBoardInferred] = useState(false);
+  const [pickingBoard, setPickingBoard] = useState(false);
   const [diagnosticChoice, setDiagnosticChoice] = useState<"quick" | "skip">("quick");
   const [yearGroup, setYearGroup] = useState<YearGroup | undefined>(undefined);
   const [unit4Option, setUnit4Option] = useState<Unit4Option | undefined>(undefined);
@@ -74,6 +80,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const router = useRouter();
 
   const boards = useMemo(() => availableBoards(), []);
+  const boardIds = useMemo(() => boards.map((b) => b.id), [boards]);
   const today = todayIso();
 
   const board = boardId ? (getBoard(boardId) ?? null) : null;
@@ -127,9 +134,31 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
     };
   }, [subjectRows]);
 
-  const missingDates = chosenSubjects.filter((s) => !examDates[s.id]);
+  /** The next sitting Revise can work out for each chosen subject (none for "Not sure" or GCSE). */
+  const sittings = useMemo(() => {
+    const out: Record<string, ExamSitting> = {};
+    if (!boardId) return out;
+    for (const row of subjectRows) {
+      for (const subject of row.subjects) {
+        if (!subjectIds.includes(subject.id)) continue;
+        const sitting = examSittingFor({ boardId, subjectId: subject.id, level: row.level, yearGroup, today });
+        if (sitting) out[subject.id] = sitting;
+      }
+    }
+    return out;
+  }, [boardId, subjectRows, subjectIds, yearGroup, today]);
+  /** Auto-filled sittings the student has not typed over. */
+  const autoFilled = useMemo(
+    () => Object.fromEntries(Object.entries(sittings).filter(([id]) => !(id in examDates))),
+    [sittings, examDates],
+  );
+  const shownDates: Record<string, string> = Object.fromEntries(
+    chosenSubjects.map((s) => [s.id, s.id in examDates ? (examDates[s.id] ?? "") : (sittings[s.id]?.firstDate ?? "")]),
+  );
+
+  const missingDates = chosenSubjects.filter((s) => !shownDates[s.id]);
   const invalidDates = chosenSubjects.filter((s) => {
-    const date = examDates[s.id];
+    const date = shownDates[s.id];
     return !isOptionalExamDateValid(date, today);
   });
   const enteredDatesValid = invalidDates.length === 0;
@@ -140,12 +169,21 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const canContinue =
     phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : phase === 2 ? enteredDatesValid : true;
 
-  function chooseBoard(id: Id) {
+  function chooseBoard(id: Id | null, inferred = false) {
+    setBoardInferred(inferred);
+    if (id === boardId) return;
     // Changing board resets subject + date choices: they belonged to the
     // previous board's qualifications.
     setBoardId(id);
     setSubjectIds([]);
     setExamDates({});
+  }
+
+  function chooseRegion(next: SchoolRegion) {
+    setRegion(next);
+    setPickingBoard(false);
+    const result = boardAfterRegionChange({ region: next, currentBoardId: boardId, currentWasInferred: boardInferred, availableBoardIds: boardIds });
+    chooseBoard(result.boardId, result.inferred);
   }
 
   function requestFinish() {
@@ -173,6 +211,14 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
     });
 
     for (const subject of chosenSubjects) {
+      const sitting = autoFilled[subject.id];
+      if (sitting) {
+        // Auto-filled and untouched: one row per unit paper when timetabled.
+        const paperIds = getSubject(subject.id)?.papers.map((paper) => paper.id) ?? [];
+        const rows = examRowsForSitting({ sitting, subject: { id: subject.id, name: subject.name, paperIds }, userId: store.userId, newId: () => crypto.randomUUID() });
+        for (const row of rows) await store.upsertExamDate(row);
+        continue;
+      }
       const date = examDates[subject.id];
       if (!date) continue;
       const exam: ExamDate = {
@@ -229,7 +275,8 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Welcome</p>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Revision that knows what to do next</h1>
           <p className="text-sm text-ink2">
-            Pick your exam board, your subjects and when the exams are — the plan, flashcards and questions follow.
+            Tell us your year, where you study and your subjects — Revise works out your board and exam dates, then
+            the plan, flashcards and questions follow.
           </p>
         </header>
 
@@ -254,51 +301,21 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
         </div>
 
         {phase === 0 ? (
-          <Panel className="space-y-3">
-            <h2 className="text-sm font-semibold">Which exam board are you studying with?</h2>
-            <p className="text-xs text-ink3 mt-0.5 -mb-1">
-              Your specification, questions and past papers follow your board&apos;s syllabus. Pick the one your school
-              uses.
-            </p>
-            <ul className="grid grid-cols-2 gap-2 pt-2">
-              {boards.map((option) => {
-                const on = boardId === option.id;
-                return (
-                  <li key={option.id}>
-                    <button
-                      type="button"
-                      onClick={() => chooseBoard(option.id)}
-                      aria-pressed={on}
-                      className={cx(
-                        "relative w-full h-full text-left card p-3 min-h-[7rem] flex flex-col gap-3 transition-all active:scale-[0.98]",
-                        on ? "border-accent bg-accentsoft" : "hover:border-ink3",
-                      )}
-                    >
-                      {/* The board's own short name as a tile: recognisable at a glance, and no borrowed logo. */}
-                      <span
-                        aria-hidden
-                        className={cx(
-                          "grid h-11 min-w-11 place-items-center self-start rounded-xl px-2 text-sm font-bold tracking-tight",
-                          on ? "bg-accent text-onaccent" : "bg-surface2 text-ink",
-                        )}
-                      >
-                        {boardMonogram(option.name)}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-ink">{option.name}</span>
-                        <span className="block text-[11px] text-ink3 truncate">{option.country}</span>
-                      </span>
-                      {on ? (
-                        <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-accent text-onaccent">
-                          <CreditedIcon size={12} aria-hidden />
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </Panel>
+          <OnboardingSchoolStep
+            yearGroup={yearGroup}
+            onYearGroup={setYearGroup}
+            unit4Option={unit4Option}
+            onUnit4Option={setUnit4Option}
+            region={region}
+            onRegion={chooseRegion}
+            boards={boards}
+            boardId={boardId}
+            onBoard={(id) => chooseBoard(id)}
+            boardInferred={boardInferred}
+            regionBoardMissing={regionBoardMissing(region, boardIds)}
+            pickingBoard={pickingBoard}
+            onChangeBoard={() => setPickingBoard(true)}
+          />
         ) : null}
 
         {phase === 1 && board ? (
@@ -411,64 +428,15 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
         ) : null}
 
         {phase === 2 ? (
-          <Panel className="space-y-3">
-            <Field label="Which year are you in? (optional)" hint="Year 12 plans start with the AS units (1 and 2). Skip it and everything stays in play.">
-              <Segmented
-                ariaLabel="Which year are you in?"
-                value={yearGroup ?? "unknown"}
-                onChange={(value) => setYearGroup(value === "unknown" ? undefined : (value as YearGroup))}
-                options={[
-                  { value: "year-12", label: "Year 12" },
-                  { value: "year-13", label: "Year 13" },
-                  { value: "unknown", label: "Not sure" },
-                ]}
-              />
-            </Field>
-            {yearGroup === "year-13" ? (
-              <Field label="Your Unit 4 option (optional)" hint="Your plan then uses only that option's topics.">
-                <Segmented
-                  ariaLabel="Your Unit 4 option"
-                  value={unit4Option ?? "unknown"}
-                  onChange={(value) => setUnit4Option(isUnit4Option(value) ? value : undefined)}
-                  options={[
-                    ...UNIT4_OPTIONS.map((o: Unit4Option) => ({ value: o, label: `Option ${o}` })),
-                    { value: "unknown", label: "Not sure" },
-                  ]}
-                />
-              </Field>
-            ) : null}
-            <div>
-              <h2 className="text-sm font-semibold">When are the exams? <span className="text-ink3 font-normal">(optional)</span></h2>
-              <p className="text-xs text-ink3 mt-0.5">
-                If you know a date, add it so the plan can pace revision towards it. If you do not know yet, skip this
-                step and add dates later in Settings.
-              </p>
-            </div>
-            {chosenSubjects.map((subject) => (
-              <Field key={subject.id} label={`${subject.name} exam date`}>
-                <input
-                  type="date"
-                  min={today}
-                  value={examDates[subject.id] ?? ""}
-                  onChange={(e) => setExamDates({ ...examDates, [subject.id]: e.target.value })}
-                  className="field"
-                  aria-label={`${subject.name} exam date`}
-                />
-              </Field>
-            ))}
-            {missingDates.length ? (
-              <p className="text-xs text-ink3" role="status">
-                {missingDates.length === chosenSubjects.length
-                  ? "No dates yet is fine — build your plan now and add them later in Settings."
-                  : `Still to add: ${missingDates.map((s) => s.name).join(", ")}. You can build now and add them later in Settings.`}
-              </p>
-            ) : null}
-            {invalidDates.length ? (
-              <p className="text-xs text-danger" role="status">
-                Choose today or a future date, or clear the invalid date before building your plan.
-              </p>
-            ) : null}
-          </Panel>
+          <OnboardingExamDatesStep
+            subjects={chosenSubjects}
+            values={shownDates}
+            autoFilled={autoFilled}
+            today={today}
+            onChange={(id, value) => setExamDates({ ...examDates, [id]: value })}
+            missing={missingDates}
+            invalidCount={invalidDates.length}
+          />
         ) : null}
 
         {phase === 3 ? (

@@ -47,9 +47,14 @@ describe("availableBoards: only boards with content are offered", () => {
 });
 
 describe("first screen collects board → subjects → optional exam dates", () => {
-  const srcText = readFileSync(src("src/components/Onboarding.tsx"), "utf8");
+  // Step 1 (year, school, board) and step 3 (exam dates) live in their own components.
+  const srcText = ["src/components/Onboarding.tsx", "src/components/OnboardingSchoolStep.tsx", "src/components/OnboardingExamDatesStep.tsx"]
+    .map((file) => readFileSync(src(file), "utf8"))
+    .join("\n");
 
-  it("starts with the exam board, then subjects of that board", () => {
+  it("starts with year, school and exam board, then subjects of that board", () => {
+    expect(srcText).toContain("Which year are you in?");
+    expect(srcText).toContain("Where&apos;s your school?");
     expect(srcText).toContain("Which exam board are you studying with?");
     expect(srcText).toContain("Which subjects do you take with {board.name}?");
     expect(srcText).toContain("availableBoards()");
@@ -70,7 +75,7 @@ describe("first screen collects board → subjects → optional exam dates", () 
     expect(srcText).toContain("isOptionalExamDateValid(date, today)");
     expect(srcText).toContain("canContinue");
     expect(srcText).toContain("Build my plan without all dates");
-    expect(srcText).toContain("add dates later in Settings");
+    expect(srcText).toContain("add them later in Settings");
     expect(srcText).toContain("if (!date) continue");
   });
 
@@ -83,7 +88,7 @@ describe("first screen collects board → subjects → optional exam dates", () 
     expect(srcText).not.toContain("TIME_PRESETS");
     // The shipped funnel: three configuration steps, then a diagnostic offer,
     // then the promise of a personalised first step.
-    expect(srcText).toContain('const PHASES = ["Board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;');
+    expect(srcText).toContain('const PHASES = ["You & board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;');
     expect(srcText).toContain("quickCheckSkipped");
     // The diagnostic step never implies unreviewed questions are evidence.
     expect(srcText).toContain("cannot provide trusted evidence");
