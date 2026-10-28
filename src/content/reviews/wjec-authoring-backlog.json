@@ -802,7 +802,8 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
-          "transfer"
+          "recall",
+          "application"
         ]
       },
       {
@@ -811,6 +812,7 @@
         "currentQuestionCount": 2,
         "independentQuestionDeficit": 2,
         "missingCategories": [
+          "recall",
           "transfer"
         ]
       },
@@ -820,6 +822,7 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
+          "recall",
           "transfer"
         ]
       },
@@ -1009,6 +1012,7 @@
         "currentQuestionCount": 2,
         "independentQuestionDeficit": 2,
         "missingCategories": [
+          "recall",
           "transfer"
         ]
       },
@@ -1027,6 +1031,7 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
+          "recall",
           "transfer"
         ]
       },
@@ -1036,7 +1041,8 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
-          "transfer"
+          "recall",
+          "application"
         ]
       },
       {
@@ -1755,7 +1761,7 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
-          "application",
+          "recall",
           "transfer"
         ]
       },
@@ -1776,6 +1782,7 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
+          "recall",
           "transfer"
         ]
       },
@@ -1785,8 +1792,8 @@
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
-          "application",
-          "transfer"
+          "recall",
+          "application"
         ]
       },
       {
@@ -1799,20 +1806,12 @@
         ]
       },
       {
-        "specPointId": "wjec-alevel-biology.transport-plants.sp-02",
-        "topicId": "wjec-alevel-biology.transport-plants",
-        "currentQuestionCount": 5,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
-        ]
-      },
-      {
         "specPointId": "wjec-alevel-biology.transport-plants.sp-03",
         "topicId": "wjec-alevel-biology.transport-plants",
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
+          "recall",
           "transfer"
         ]
       },
