@@ -66,7 +66,7 @@ export function mathsUnitNumber(topic: Partial<Pick<Topic, "specRef" | "subjectI
   if (!ref) return null;
   const title = topic.title ?? "";
   if (/differential equations/i.test(title)) return 3;
-  if (/^pure/i.test(ref[1])) return /^Pure\s+1\.10\b/i.test(topic.specRef ?? "") || MATHS_A2_PURE_TITLE.test(title) ? 3 : 1;
+  if (/^pure/i.test(ref[1] ?? "")) return /^Pure\s+1\.10\b/i.test(topic.specRef ?? "") || MATHS_A2_PURE_TITLE.test(title) ? 3 : 1;
   return MATHS_A2_APPLIED_TITLE.test(title) ? 4 : 2;
 }
 
@@ -102,7 +102,7 @@ export function isUnit4Option(value: unknown): value is Unit4Option {
 /** The option letter from a specRef like "Unit 4 Option B(a)", or null for any other topic. */
 export function topicUnit4Option(topic: Pick<Topic, "specRef">): Unit4Option | null {
   const match = /^Unit\s+4\s+Option\s+([A-D])\b/i.exec(topic.specRef ?? "");
-  return match ? (match[1].toUpperCase() as Unit4Option) : null;
+  return match ? ((match[1] ?? "").toUpperCase() as Unit4Option) : null;
 }
 
 /**
