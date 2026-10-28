@@ -799,32 +799,27 @@
       {
         "specPointId": "wjec-alevel-biology.biodiversity.sp-02",
         "topicId": "wjec-alevel-biology.biodiversity",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
-          "application",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-biology.biodiversity.sp-03",
         "topicId": "wjec-alevel-biology.biodiversity",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "recall",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-biology.biodiversity.sp-04",
         "topicId": "wjec-alevel-biology.biodiversity",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
-          "application",
           "transfer"
         ]
       },
@@ -1011,10 +1006,9 @@
       {
         "specPointId": "wjec-alevel-biology.gas-exchange.sp-02",
         "topicId": "wjec-alevel-biology.gas-exchange",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "recall",
           "transfer"
         ]
       },
@@ -1030,22 +1024,18 @@
       {
         "specPointId": "wjec-alevel-biology.gas-exchange.sp-04",
         "topicId": "wjec-alevel-biology.gas-exchange",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
-          "application",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-biology.gas-exchange.sp-05",
         "topicId": "wjec-alevel-biology.gas-exchange",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
-          "application",
           "transfer"
         ]
       },
@@ -1762,10 +1752,9 @@
       {
         "specPointId": "wjec-alevel-biology.transport-animals.sp-02",
         "topicId": "wjec-alevel-biology.transport-animals",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
           "application",
           "transfer"
         ]
@@ -1784,21 +1773,18 @@
       {
         "specPointId": "wjec-alevel-biology.transport-animals.sp-04",
         "topicId": "wjec-alevel-biology.transport-animals",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
-          "application",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-biology.transport-animals.sp-05",
         "topicId": "wjec-alevel-biology.transport-animals",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
           "application",
           "transfer"
         ]
@@ -1815,8 +1801,8 @@
       {
         "specPointId": "wjec-alevel-biology.transport-plants.sp-02",
         "topicId": "wjec-alevel-biology.transport-plants",
-        "currentQuestionCount": 3,
-        "independentQuestionDeficit": 1,
+        "currentQuestionCount": 5,
+        "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
         ]
@@ -1824,11 +1810,9 @@
       {
         "specPointId": "wjec-alevel-biology.transport-plants.sp-03",
         "topicId": "wjec-alevel-biology.transport-plants",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
-          "recall",
-          "application",
           "transfer"
         ]
       },
