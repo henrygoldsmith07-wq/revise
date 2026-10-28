@@ -19,6 +19,7 @@ import { techniqueRepairForDiagnosis, techniqueShapeSuggestionForAnswer } from "
 import { ImproveAnswer } from "./ImproveAnswer";
 import { FlagThisMark } from "./FlagThisMark";
 import { LongAnswerFeedbackCard } from "./LongAnswerFeedbackCard";
+import { QerLevelCard } from "./QerLevelCard";
 import { ProofCheckBanner } from "./ProofCheckBanner";
 import { PracticeNextStep } from "./PracticeNextStep";
 import { RichText } from "./RichText";
@@ -353,6 +354,9 @@ export function MarkedResult({
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {answers && part && question.kind !== "mcq" && marked.max === 6 && part.marks === 6 ? (
+                <QerLevelCard question={question} part={part} marked={marked} answer={answers[part.id] ?? ""} />
               ) : null}
               {answers && part && question.kind !== "mcq" && marked.max >= 4 ? (
                 <LongAnswerFeedbackCard

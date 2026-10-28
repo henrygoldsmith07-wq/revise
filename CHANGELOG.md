@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-28 pass 97: 6-mark answers show their level of response
+WJEC science papers mark the 6-mark extended question by level. After a 6-mark written answer the result now shows Level 0-3 (1-2, 3-4, 5-6 marks), how many marks reach the next level, which missed points to add, and a flag when full-band content reads as unlinked. It restates the awarded mark and never changes it. Tests: tests/qer-levels.test.ts. Verified: tsc, eslint, targeted vitest; no browser run.
+
 ## 2026-10-28 pass 96: the plan stops revising a unit once its paper is sat; Physics sheet gains σ, Wien and μ0
 Pass 94 kept a unit-dated subject in the plan until its last paper, but every topic stayed a candidate, so after Unit 1 was sat the planner went on scheduling Unit 1 topics. `chooseActivity` now drops a topic once every dated paper for its own unit is on or before the block's day (`topicUnitSat`), scores each topic on its own unit's countdown, and applies the no-new-first-passes rule against the picked topic's own paper rather than whichever unit is nearest. One run-up end (`subjectRunUpEnd`) now drives the active-subject check, the default horizon (which stopped at the first unit paper, so a Unit 2 forty days out was never reached) and roll-forward (which dropped missed work at the first unit paper). A later whole-subject date also no longer gets cut short by an earlier unit date, since it still governs every undated unit. The Physics constants sheet also gains the Stefan constant, Wien constant and permeability of free space (CODATA 2018), which the bank's radiation and field questions use. Tests: tests/planner.test.ts (per-unit block), tests/constants-sheet.test.ts.
 
