@@ -23,6 +23,7 @@ import { assessLowConfidenceMark, createMarkEscalationRecord } from "@/domain/ma
 import type { Attempt, MarkedPart, Paper, PaperSpec, Question } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
 import { RichText } from "./RichText";
+import { ConstantsSheet } from "./ConstantsSheet";
 import { Button, Panel, Pill, ProgressBar, SectionHeading, cx } from "./ui";
 import { ICON_SIZE, TimerIcon } from "./icons";
 
@@ -363,6 +364,7 @@ export function ExamConditionMode({ paper, onExit }: { paper: Paper; onExit: () 
         />
       ) : current ? (
         <>
+          <ConstantsSheet subjectId={current.subjectId} />
           <ExamQuestion
             question={current}
             answers={answers}

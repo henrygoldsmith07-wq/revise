@@ -16,6 +16,7 @@ import type { Attempt, Id, InterventionAttemptContext, Mistake, Question } from 
 
 import { AnswerInput } from "./AnswerInput";
 import { RichText } from "./RichText";
+import { ConstantsSheet } from "./ConstantsSheet";
 import { Button, Panel, Pill, cx } from "./ui";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 import { ProofCheckBanner } from "./ProofCheckBanner";
@@ -100,6 +101,7 @@ export function QuestionRunner({
       {isProofContext && !result ? (
         <ProofCheckBanner topicTitle={topic?.title} href={`/practice?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`} state="due" />
       ) : null}
+      <ConstantsSheet subjectId={question.subjectId} />
       <Panel>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <Pill>{marksLabel(question.totalMarks)}</Pill>
