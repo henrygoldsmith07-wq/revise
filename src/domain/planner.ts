@@ -111,6 +111,13 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
       .map((e) => e.date)
       .sort()[0];
     if (next) examBySubject.set(subjectId, next);
+    // Once a subject has per-unit paper dates, its run-up lasts until the LAST
+    // dated paper: sitting Unit 1 must not stop Unit 2 revision being planned.
+    const hasUnitDates = input.exams.some((e) => e.subjectId === subjectId && e.paperSpecId);
+    if (hasUnitDates) {
+      const last = input.exams.filter((e) => e.subjectId === subjectId && e.paperSpecId && e.date >= today).map((e) => e.date).sort().pop();
+      if (last) examBySubject.set(subjectId, last);
+    }
   }
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
 

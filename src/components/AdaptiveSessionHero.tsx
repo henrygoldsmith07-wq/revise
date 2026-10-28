@@ -5,6 +5,8 @@ import { useMemo } from "react";
 import { getSubject, getTopic, topicsFor, unitsFor } from "@/domain/curriculum";
 import { buildPaperReadiness } from "@/domain/paper-readiness";
 import { buildTopicLifecycles } from "@/domain/proof-lifecycle";
+import { nextPaperSentence, timetableRows, upcomingPapers } from "@/domain/exam-timetable";
+import { todayLocal } from "@/domain/local-date";
 import { buildTodayBrief } from "@/domain/today-brief";
 import { useStoreFields } from "@/state/store";
 import type { AdaptiveSessionPlan } from "@/domain/adaptive-session";
@@ -38,7 +40,10 @@ export function AdaptiveSessionHero({
     const lifecycle = topic
       ? buildTopicLifecycles({ topics: [topic], ledger: proof, attempts: store.attempts, questions: store.questions })[0]
       : undefined;
-    return buildTodayBrief({ plan: session, papers, examDates: store.examDates, mistakes: store.mistakes, lifecycle });
+    const today = todayLocal(new Date());
+    const rows = subject ? timetableRows({ subjects: [subject], topics: topicsFor(subject.id), exams: store.examDates, today }) : [];
+    const nextPaper = nextPaperSentence(upcomingPapers(rows)[0]);
+    return buildTodayBrief({ plan: session, papers, examDates: store.examDates, mistakes: store.mistakes, lifecycle, topic, nextPaper });
   }, [subject, session, proof, store.questions, store.attempts, store.mistakes, store.examDates]);
   const explanation = useMemo(() => explainSession(session, proof?.conversion), [session, proof?.conversion]);
   // The planner already chose the sequence; name it so the learner sees one session, not a menu of modes.
@@ -66,6 +71,7 @@ export function AdaptiveSessionHero({
           {[brief.paperName, brief.examLabel].filter(Boolean).join(" · ") || "No exam date set"}
           {brief.marksAtRisk ? ` · ${brief.marksAtRisk} marks at risk here` : ""}
         </p>
+        {brief.nextPaper ? <p className="mt-0.5 text-sm text-ink3">{brief.nextPaper}</p> : null}
 
         {/* Start sits straight under what and where, as on BestNextStep, so it is
             in the first viewport on a 360 x 760 phone (it was at y=876, under the

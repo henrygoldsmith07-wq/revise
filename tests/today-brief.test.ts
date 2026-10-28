@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { topicsFor } from "@/domain/curriculum";
+import { topicUnitNumber } from "@/domain/year-group";
 import { buildTodayBrief, countdownLabel } from "@/domain/today-brief";
 import type { AdaptiveSessionPlan, AdaptiveStepKind } from "@/domain/adaptive-contract";
 import type { PaperReadiness } from "@/domain/paper-readiness";
@@ -60,5 +62,27 @@ describe("today brief", () => {
     expect(countdownLabel(-2)).toBe("Exam date has passed");
     expect(countdownLabel(0)).toBe("Exam today");
     expect(countdownLabel(1)).toBe("1 day to the exam");
+  });
+});
+
+describe("today brief with per-unit dates", () => {
+  const exams = [
+    { id: "a", userId: "u", subjectId: "wjec-alevel-physics", paperSpecId: "wjec-alevel-physics.u1", date: "2026-10-11", label: "Physics Unit 1" },
+    { id: "b", userId: "u", subjectId: "wjec-alevel-physics", paperSpecId: "wjec-alevel-physics.u2", date: "2026-10-21", label: "Physics Unit 2" },
+  ];
+  const physics = (unit: number) => topicsFor("wjec-alevel-physics").find((t) => topicUnitNumber(t) === unit)!;
+  const p = (t: { id: string }) => ({ ...plan("transfer"), subjectId: "wjec-alevel-physics", topicId: t.id });
+  it("counts down to the topic's own unit, not the nearest paper", () => {
+    expect(buildTodayBrief({ plan: p(physics(1)), examDates: exams, topic: physics(1), now: NOW }).daysToExam).toBe(10);
+    const b2 = buildTodayBrief({ plan: p(physics(2)), examDates: exams, topic: physics(2), now: NOW });
+    expect(b2.daysToExam).toBe(20);
+    expect(b2.paperName).toBe("Physics Unit 2");
+  });
+  it("gives no countdown when only another unit is dated", () => {
+    const b = buildTodayBrief({ plan: p(physics(2)), examDates: [exams[0]], topic: physics(2), now: NOW });
+    expect(b.daysToExam).toBeNull();
+  });
+  it("carries the next-paper sentence", () => {
+    expect(buildTodayBrief({ plan: plan("transfer"), nextPaper: "X Unit 1 is tomorrow.", now: NOW }).nextPaper).toBe("X Unit 1 is tomorrow.");
   });
 });
