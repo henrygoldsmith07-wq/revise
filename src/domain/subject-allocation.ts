@@ -204,7 +204,9 @@ function hasLiveEvidence(opp: AllocOpportunity): boolean {
  */
 export function allocateDay(blocks: number, opportunities: AllocOpportunity[]): AllocOutcome {
   const shares = new Map<Id, number>(opportunities.map((o) => [o.subjectId, 0]));
-  if (blocks <= 0 || opportunities.length === 0) return { fallback: true, shares, notes: [] };
+  if (!Number.isFinite(blocks) || !Number.isInteger(blocks) || blocks <= 0 || opportunities.length === 0) {
+    return { fallback: true, shares, notes: [] };
+  }
   if (!opportunities.some(hasLiveEvidence)) return { fallback: true, shares, notes: [] };
 
   const byId = new Map(opportunities.map((o) => [o.subjectId, o]));

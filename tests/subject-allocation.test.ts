@@ -197,6 +197,18 @@ describe("reviewBlocksNeeded", () => {
   });
 });
 
+describe("allocateDay — input boundaries", () => {
+  it("fails closed for non-finite and fractional block counts", () => {
+    const opportunities = [opp("Biology", { dueCards: 10 })];
+
+    for (const blocks of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1.5]) {
+      const outcome = allocateDay(blocks, opportunities);
+      expect(outcome.fallback).toBe(true);
+      expect(sum(outcome.shares)).toBe(0);
+    }
+  });
+});
+
 describe("allocateDay — scarce window, several subjects", () => {
   it("gives the due backlog the window before any other work, and lets a small backlog keep its own block", () => {
     // The user's scenario: Biology + French + Maths share 90 minutes (3 blocks).
