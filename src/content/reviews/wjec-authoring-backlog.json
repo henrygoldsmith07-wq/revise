@@ -1986,10 +1986,9 @@
       {
         "specPointId": "wjec-alevel-chemistry.atomic-structure.sp-04",
         "topicId": "wjec-alevel-chemistry.atomic-structure",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
-          "application",
           "transfer"
         ]
       },
@@ -2028,8 +2027,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.bonding.sp-04",
         "topicId": "wjec-alevel-chemistry.bonding",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2336,7 +2335,7 @@
       {
         "specPointId": "wjec-alevel-chemistry.moles.sp-01",
         "topicId": "wjec-alevel-chemistry.moles",
-        "currentQuestionCount": 6,
+        "currentQuestionCount": 10,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "recall"
@@ -2655,8 +2654,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.redox.sp-04",
         "topicId": "wjec-alevel-chemistry.redox",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "transfer"
         ]
