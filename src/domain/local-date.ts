@@ -25,7 +25,9 @@ const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function isLocalDateKey(value: unknown): value is IsoDate {
   if (typeof value !== "string" || !DATE_KEY_RE.test(value)) return false;
   const [y = NaN, m = NaN, d = NaN] = value.split("-").map(Number);
-  return y >= 1970 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+  if (y < 1970 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
 
 /**
