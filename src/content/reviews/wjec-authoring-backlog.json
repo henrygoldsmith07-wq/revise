@@ -2091,8 +2091,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-01",
         "topicId": "wjec-alevel-chemistry.electrochemical-cells",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "transfer"
         ]
@@ -2100,8 +2100,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-02",
         "topicId": "wjec-alevel-chemistry.electrochemical-cells",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2110,18 +2110,17 @@
       {
         "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-03",
         "topicId": "wjec-alevel-chemistry.electrochemical-cells",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 4,
+        "independentQuestionDeficit": 0,
         "missingCategories": [
-          "recall",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.electrochemical-cells.sp-04",
         "topicId": "wjec-alevel-chemistry.electrochemical-cells",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "recall",
           "application"
@@ -2521,8 +2520,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.p-block.sp-01",
         "topicId": "wjec-alevel-chemistry.p-block",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2531,27 +2530,24 @@
       {
         "specPointId": "wjec-alevel-chemistry.p-block.sp-02",
         "topicId": "wjec-alevel-chemistry.p-block",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": [
-          "application"
-        ]
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
       },
       {
         "specPointId": "wjec-alevel-chemistry.p-block.sp-03",
         "topicId": "wjec-alevel-chemistry.p-block",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "recall",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.p-block.sp-04",
         "topicId": "wjec-alevel-chemistry.p-block",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"

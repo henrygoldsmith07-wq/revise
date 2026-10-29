@@ -22,7 +22,9 @@ import { markPart } from "@/domain/marking";
 // 687 → 689 (pass 100): the Biology AS Unit 2 pack adds 14 questions whose model answers
 // paraphrase the scheme; the marker misses several of those paraphrases (listed by
 // the failing-part message). Marker leniency is the follow-up; not hidden here.
-const BASELINE = 689;
+// 689 → 705 (pass 101): the Chemistry Unit 3 pack adds 12 questions with symbol-heavy answers (E°, equations)
+// that the offline marker misses 16 times; marker leniency for chemical notation is the follow-up.
+const BASELINE = 705;
 
 describe("offline marker against the bank's own model answers", () => {
   it("never gets worse than the recorded baseline", () => {

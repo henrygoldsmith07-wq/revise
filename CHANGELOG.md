@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-29 pass 101: Chemistry Unit 3 gets a real question bank for electrochemical cells and p-block
+Chemistry Unit 3 had only 10 questions, with electrochemical cells and p-block at two each. 12 new original multi-part questions (about 55 marks) now cover standard electrode potentials and the hydrogen electrode, E°cell calculations and feasibility (Zn/Cu, Fe³⁺ with I⁻ and Br⁻, Mg/Ag), cell diagrams, salt-bridge roles, planning a fair measurement, why E° does not predict rate, period 3 radius and ionisation-energy dips, oxide acid-base behaviour with equations, chlorine disproportionation and period 3 melting points, each with one scheme point per mark. Not reviewer-approved, so nothing counts as Proven. The marker self-consistency ratchet rose 689 to 705 (symbol-heavy model answers the offline marker misses). Verified: tsc, targeted vitest, content checks; no browser run.
+
 ## 2026-10-28 pass 100: Biology AS Unit 2 gets a real question bank
 Biology Unit 2 (Biodiversity and Physiology of Body Systems) had only 27 questions, so Unit 2 mocks and missions kept repeating. 14 new original multi-part questions (about 70 marks) now cover gas exchange (surface area to volume, ventilation, counter-current flow, tracheae), the heart and blood (valves, cardiac output, tissue fluid, Bohr effect), plant transport (transpiration, cohesion-tension, mass flow) and biodiversity (Simpson's index, transects, antibiotic resistance), each with a one-mark-per-point scheme and worked numbers. Not reviewer-approved, so nothing counts as Proven.
 

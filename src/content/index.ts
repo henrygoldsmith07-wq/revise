@@ -64,6 +64,7 @@ import { physicsDepthCompletionPracticalQuestions } from "./questions/physics-de
 import { wjecMathsQualityQuestions } from "./questions/wjec-maths-quality";
 import { wjecBiologyQualityQuestions } from "./questions/wjec-biology-quality";
 import { wjecBiologyAsDepthQuestions } from "./questions/wjec-biology-as-depth";
+import { wjecChemistryAsDepthQuestions } from "./questions/wjec-chemistry-as-depth";
 import { wjecChemistryQualityQuestions } from "./questions/wjec-chemistry-quality";
 import { wjecFlagshipDepthQuestions, wjecFlagshipDepthCounts } from "./questions/wjec-flagship-depth";
 import { misconceptionsForTopic, seedMisconceptions } from "./misconceptions";
@@ -123,6 +124,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...wjecMathsQualityQuestions,
   ...wjecBiologyQualityQuestions,
   ...wjecBiologyAsDepthQuestions,
+  ...wjecChemistryAsDepthQuestions,
   ...wjecChemistryQualityQuestions,
   // The Maths/Biology/Chemistry depth pack (wjecFlagshipDepthQuestions) is
   // deliberately not in the learner bank: its parts are stitched from brief
