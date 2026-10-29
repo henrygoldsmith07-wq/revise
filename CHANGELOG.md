@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-29 pass 102: Chemistry Unit 2 gets worked energetics, kinetics and equilibria questions
+Unit 2 had too few multi-part items for Hess cycles, bond enthalpies, calorimetry, Maxwell-Boltzmann, rate equations and Kc. 8 new original questions (about 38 marks) cover Hess formation of methane (−76 kJ mol⁻¹), bond-enthalpy combustion (−818 kJ mol⁻¹) and why it is approximate, calorimetry with error evaluation (−67.9 kJ mol⁻¹), Maxwell-Boltzmann temperature change, catalysis, orders and k with units from initial rates, Kc for ammonia, and Haber conditions. One scheme point per mark; not reviewer-approved, so nothing counts as Proven. Marker ratchet 705 to 715. Verified: authoring/content/trust/review-gates checks, targeted vitest; no browser run.
+
 ## 2026-10-29 pass 101: Chemistry Unit 3 gets a real question bank for electrochemical cells and p-block
 Chemistry Unit 3 had only 10 questions, with electrochemical cells and p-block at two each. 12 new original multi-part questions (about 55 marks) now cover standard electrode potentials and the hydrogen electrode, E°cell calculations and feasibility (Zn/Cu, Fe³⁺ with I⁻ and Br⁻, Mg/Ag), cell diagrams, salt-bridge roles, planning a fair measurement, why E° does not predict rate, period 3 radius and ionisation-energy dips, oxide acid-base behaviour with equations, chlorine disproportionation and period 3 melting points, each with one scheme point per mark. Not reviewer-approved, so nothing counts as Proven. The marker self-consistency ratchet rose 689 to 705 (symbol-heavy model answers the offline marker misses). Verified: tsc, targeted vitest, content checks; no browser run.
 
