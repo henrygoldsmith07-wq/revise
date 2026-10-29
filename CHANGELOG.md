@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-29 pass 103: Chemistry Unit 1 gets worked moles, atomic structure, bonding and redox questions
+Unit 1 had the thinnest AS Chemistry bank (45 questions) for the calculations Year 12 sit first. 8 new original questions (about 38 marks) cover empirical and molecular formula (CH2, C4H8), titration concentration (0.0800 mol dm⁻³) with why concordant titres matter, gas volume from magnesium (480 cm³), percentage yield (75.0%), relative atomic mass from isotopes (35.5), ionisation-energy definition and group trend, shapes and bond angles (BF3, NH3, H2O) and a manganate(VII) redox titration (0.0920 mol dm⁻³). One scheme point per mark; not reviewer-approved, so nothing counts as Proven. Verified: tsc, authoring/content/trust/review-gates checks, targeted vitest; no browser run.
+
 ## 2026-10-29 pass 102: Chemistry Unit 2 gets worked energetics, kinetics and equilibria questions
 Unit 2 had too few multi-part items for Hess cycles, bond enthalpies, calorimetry, Maxwell-Boltzmann, rate equations and Kc. 8 new original questions (about 38 marks) cover Hess formation of methane (−76 kJ mol⁻¹), bond-enthalpy combustion (−818 kJ mol⁻¹) and why it is approximate, calorimetry with error evaluation (−67.9 kJ mol⁻¹), Maxwell-Boltzmann temperature change, catalysis, orders and k with units from initial rates, Kc for ammonia, and Haber conditions. One scheme point per mark; not reviewer-approved, so nothing counts as Proven. Marker ratchet 705 to 715. Verified: authoring/content/trust/review-gates checks, targeted vitest; no browser run.
 
