@@ -3,8 +3,8 @@ import { wjecChemistryAsDepthQuestions as qs } from "@/content/questions/wjec-ch
 
 describe("Chemistry Unit 3 depth pack", () => {
   it("covers electrochemical cells and p-block with enough marks", () => {
-    expect(qs.length).toBeGreaterThanOrEqual(12);
-    const topics = new Set(qs.flatMap((q) => q.topicIds));
+    expect(qs.filter((q) => q.id.includes("chem-u3-")).length).toBeGreaterThanOrEqual(12);
+    const topics = new Set(qs.filter((q) => q.id.includes("chem-u3-")).flatMap((q) => q.topicIds));
     expect(topics.size).toBe(2);
     expect(qs.reduce((n, q) => n + q.parts.reduce((m, p) => m + p.marks, 0), 0)).toBeGreaterThanOrEqual(50);
   });

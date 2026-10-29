@@ -2129,8 +2129,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.energetics.sp-02",
         "topicId": "wjec-alevel-chemistry.energetics",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2139,8 +2139,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.energetics.sp-03",
         "topicId": "wjec-alevel-chemistry.energetics",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2149,22 +2149,20 @@
       {
         "specPointId": "wjec-alevel-chemistry.energetics.sp-04",
         "topicId": "wjec-alevel-chemistry.energetics",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
-        "missingCategories": [
-          "recall",
-          "application",
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-chemistry.energetics.sp-05",
-        "topicId": "wjec-alevel-chemistry.energetics",
         "currentQuestionCount": 1,
         "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
           "application"
+        ]
+      },
+      {
+        "specPointId": "wjec-alevel-chemistry.energetics.sp-05",
+        "topicId": "wjec-alevel-chemistry.energetics",
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
+        "missingCategories": [
+          "recall"
         ]
       },
       {
@@ -2209,8 +2207,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.equilibria.sp-02",
         "topicId": "wjec-alevel-chemistry.equilibria",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2219,7 +2217,7 @@
       {
         "specPointId": "wjec-alevel-chemistry.equilibria.sp-03",
         "topicId": "wjec-alevel-chemistry.equilibria",
-        "currentQuestionCount": 9,
+        "currentQuestionCount": 10,
         "independentQuestionDeficit": 0,
         "missingCategories": [
           "transfer"
@@ -2239,8 +2237,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.equilibria.sp-05",
         "topicId": "wjec-alevel-chemistry.equilibria",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "recall",
           "application"
@@ -2309,8 +2307,8 @@
       {
         "specPointId": "wjec-alevel-chemistry.kinetics.sp-03",
         "topicId": "wjec-alevel-chemistry.kinetics",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
@@ -2319,21 +2317,19 @@
       {
         "specPointId": "wjec-alevel-chemistry.kinetics.sp-04",
         "topicId": "wjec-alevel-chemistry.kinetics",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "application",
           "transfer"
         ]
       },
       {
         "specPointId": "wjec-alevel-chemistry.kinetics.sp-05",
         "topicId": "wjec-alevel-chemistry.kinetics",
-        "currentQuestionCount": 0,
-        "independentQuestionDeficit": 4,
+        "currentQuestionCount": 1,
+        "independentQuestionDeficit": 3,
         "missingCategories": [
           "recall",
-          "application",
           "transfer"
         ]
       },

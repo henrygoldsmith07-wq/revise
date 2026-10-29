@@ -13,6 +13,7 @@ const meta = {
  * Chemistry Unit 3 depth pack (Physical and Inorganic Chemistry): electrochemical
  * cells and p-block. Each had two questions, so unit mocks and missions repeated.
  * Every item is original, with one awardable scheme point per mark.
+ * Pass 102 adds Unit 2 (energetics, kinetics, equilibria) items below.
  */
 export const wjecChemistryAsDepthQuestions = defineQuestions([
   {
@@ -382,6 +383,249 @@ export const wjecChemistryAsDepthQuestions = defineQuestions([
         answer: "Sodium has metallic bonding, the attraction between cations and delocalised electrons, giving a moderate melting point; Silicon has a giant covalent lattice with many strong covalent bonds, so it needs a lot of energy to break and melts at a very high temperature; Phosphorus and sulfur are simple molecular with weak London forces between molecules, so they melt at low temperatures; Sulfur (S₈) melts higher than phosphorus (P₄) because it has more electrons so stronger London forces.",
         specPointIds: [`${S}.p-block.sp-04`],
         learningClaims: ["relate physical properties to structure"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-hess-formation-methane",
+    topics: ["energetics"],
+    stem: "Standard enthalpy changes of combustion: C(s) = −394 kJ mol⁻¹, H₂(g) = −286 kJ mol⁻¹, CH₄(g) = −890 kJ mol⁻¹.",
+    difficulty: 3,
+    aos: ["AO2"],
+    parts: [
+      {
+        prompt: "Draw the Hess cycle and use it to calculate the standard enthalpy change of formation of methane.",
+        marks: 3,
+        aos: ["AO2"],
+        scheme: [
+          "Cycle (or equation) links C + 2H₂ and CH₄ to CO₂ and H₂O via the combustion routes",
+          "ΔHf = ΔHc(C) + 2 × ΔHc(H₂) − ΔHc(CH₄) = −394 + 2(−286) − (−890)",
+          "ΔHf = −76 kJ mol⁻¹"
+],
+        answer: "Cycle (or equation) links C + 2H₂ and CH₄ to CO₂ and H₂O via the combustion routes; ΔHf = ΔHc(C) + 2 × ΔHc(H₂) − ΔHc(CH₄) = −394 + 2(−286) − (−890); ΔHf = −76 kJ mol⁻¹.",
+        specPointIds: [`${S}.energetics.sp-02`],
+        learningClaims: ["use Hess cycles with combustion data"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-bond-enthalpy-methane-combustion",
+    topics: ["energetics"],
+    stem: "Mean bond enthalpies in kJ mol⁻¹: C–H 413, O=O 498, C=O 805, O–H 464. Methane burns: CH₄(g) + 2O₂(g) → CO₂(g) + 2H₂O(g).",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Calculate the enthalpy change for the reaction using bond enthalpies.",
+        marks: 3,
+        aos: ["AO2"],
+        scheme: [
+          "Bonds broken = 4(413) + 2(498) = 2648 kJ",
+          "Bonds formed = 2(805) + 4(464) = 3466 kJ",
+          "ΔH = broken − formed = −818 kJ mol⁻¹"
+],
+        answer: "Bonds broken = 4(413) + 2(498) = 2648 kJ; Bonds formed = 2(805) + 4(464) = 3466 kJ; ΔH = broken − formed = −818 kJ mol⁻¹.",
+        specPointIds: [`${S}.energetics.sp-03`],
+        learningClaims: ["calculate enthalpy change from bond enthalpies"],
+      },
+      {
+        prompt: "Explain why a value from bond enthalpies only approximates the true enthalpy change.",
+        marks: 2,
+        aos: ["AO3"],
+        scheme: [
+          "Bond enthalpies are mean values averaged over many different compounds",
+          "They apply to gaseous species, so they ignore the enthalpy of vaporisation of liquid water"
+],
+        answer: "Bond enthalpies are mean values averaged over many different compounds; They apply to gaseous species, so they ignore the enthalpy of vaporisation of liquid water.",
+        specPointIds: [`${S}.energetics.sp-04`],
+        learningClaims: ["explain why bond enthalpy values are approximate"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-calorimetry-neutralisation",
+    topics: ["energetics"],
+    stem: "In a polystyrene cup, 50.0 g of water rose in temperature by 6.5 K when 0.0200 mol of a reactant was dissolved. The specific heat capacity of water is 4.18 J g⁻¹ K⁻¹.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Calculate the enthalpy change of the reaction in kJ mol⁻¹ to three significant figures.",
+        marks: 3,
+        aos: ["AO2"],
+        scheme: [
+          "q = m c ΔT = 50.0 × 4.18 × 6.5 = 1358.5 J",
+          "Energy per mole = 1.3585 kJ ÷ 0.0200 mol",
+          "ΔH = −67.9 kJ mol⁻¹ (negative because the temperature rose)"
+],
+        answer: "q = m c ΔT = 50.0 × 4.18 × 6.5 = 1358.5 J; Energy per mole = 1.3585 kJ ÷ 0.0200 mol; ΔH = −67.9 kJ mol⁻¹ (negative because the temperature rose).",
+        specPointIds: [`${S}.energetics.sp-05`],
+        learningClaims: ["calculate enthalpy change from calorimetry"],
+      },
+      {
+        prompt: "Suggest one source of error in this experiment and its effect on the result.",
+        marks: 2,
+        aos: ["AO3"],
+        scheme: [
+          "Heat is lost to the surroundings, or absorbed by the cup and thermometer",
+          "so the measured temperature rise is too small and the ΔH appears less exothermic than the true value"
+],
+        answer: "Heat is lost to the surroundings, or absorbed by the cup and thermometer; so the measured temperature rise is too small and the ΔH appears less exothermic than the true value.",
+        specPointIds: [`${S}.energetics.sp-05`],
+        learningClaims: ["evaluate calorimetry errors"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-maxwell-boltzmann-temperature",
+    topics: ["kinetics"],
+    stem: "The Maxwell-Boltzmann distribution shows how molecular energies are spread in a gas at a fixed temperature.",
+    difficulty: 3,
+    aos: ["AO1", "AO2"],
+    parts: [
+      {
+        prompt: "Sketch-describe how the curve changes when the temperature is raised, and explain why the rate increases.",
+        marks: 3,
+        aos: ["AO1", "AO2"],
+        scheme: [
+          "The peak moves to the right and is lower, but the total area under the curve stays the same",
+          "A greater proportion of molecules have energy equal to or greater than the activation energy",
+          "so a greater fraction of collisions are successful and the rate rises"
+],
+        answer: "The peak moves to the right and is lower, but the total area under the curve stays the same; A greater proportion of molecules have energy equal to or greater than the activation energy; so a greater fraction of collisions are successful and the rate rises.",
+        specPointIds: [`${S}.kinetics.sp-03`],
+        learningClaims: ["interpret Maxwell-Boltzmann curves"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-catalyst-activation-energy",
+    topics: ["kinetics"],
+    stem: "A catalyst is added to a reaction mixture and the rate increases at constant temperature.",
+    difficulty: 2,
+    aos: ["AO1", "AO2"],
+    parts: [
+      {
+        prompt: "Explain how the catalyst increases the rate.",
+        marks: 3,
+        aos: ["AO1", "AO2"],
+        scheme: [
+          "It provides an alternative reaction pathway",
+          "with a lower activation energy",
+          "so a greater proportion of molecules have energy at or above it, and the catalyst is not used up"
+],
+        answer: "It provides an alternative reaction pathway; with a lower activation energy; so a greater proportion of molecules have energy at or above it, and the catalyst is not used up.",
+        specPointIds: [`${S}.kinetics.sp-04`],
+        learningClaims: ["explain catalysis in terms of activation energy"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-rate-equation-from-data",
+    topics: ["kinetics"],
+    stem: "Initial rates were measured for A + B → products. Experiment 1: [A] 0.10, [B] 0.10 mol dm⁻³, rate 2.0 × 10⁻³ mol dm⁻³ s⁻¹. Experiment 2: [A] 0.20, [B] 0.10, rate 8.0 × 10⁻³. Experiment 3: [A] 0.10, [B] 0.20, rate 4.0 × 10⁻³.",
+    difficulty: 4,
+    aos: ["AO2"],
+    parts: [
+      {
+        prompt: "Deduce the order with respect to A and with respect to B.",
+        marks: 2,
+        aos: ["AO2"],
+        scheme: [
+          "Doubling [A] quadruples the rate, so second order in A",
+          "Doubling [B] doubles the rate, so first order in B"
+],
+        answer: "Doubling [A] quadruples the rate, so second order in A; Doubling [B] doubles the rate, so first order in B.",
+        specPointIds: [`${S}.kinetics.sp-05`],
+        learningClaims: ["deduce orders from initial rates data"],
+      },
+      {
+        prompt: "Write the rate equation and calculate k, including its units.",
+        marks: 3,
+        aos: ["AO2"],
+        scheme: [
+          "rate = k[A]²[B]",
+          "k = 2.0 × 10⁻³ ÷ (0.10² × 0.10) = 2.0",
+          "units dm⁶ mol⁻² s⁻¹"
+],
+        answer: "rate = k[A]²[B]; k = 2.0 × 10⁻³ ÷ (0.10² × 0.10) = 2.0; units dm⁶ mol⁻² s⁻¹.",
+        specPointIds: [`${S}.kinetics.sp-05`],
+        learningClaims: ["calculate a rate constant with units"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-kc-ammonia",
+    topics: ["equilibria"],
+    stem: "At equilibrium in a closed vessel at constant temperature the concentrations are N₂ 0.50, H₂ 1.50 and NH₃ 0.40 mol dm⁻³ for N₂(g) + 3H₂(g) ⇌ 2NH₃(g).",
+    difficulty: 4,
+    aos: ["AO2"],
+    parts: [
+      {
+        prompt: "Write the expression for Kc and calculate its value with units.",
+        marks: 3,
+        aos: ["AO2"],
+        scheme: [
+          "Kc = [NH₃]² ÷ ([N₂][H₂]³)",
+          "Kc = 0.40² ÷ (0.50 × 1.50³)",
+          "Kc = 0.0948 dm⁶ mol⁻²"
+],
+        answer: "Kc = [NH₃]² ÷ ([N₂][H₂]³); Kc = 0.40² ÷ (0.50 × 1.50³); Kc = 0.0948 dm⁶ mol⁻².",
+        specPointIds: [`${S}.equilibria.sp-03`],
+        learningClaims: ["write Kc and calculate it with units"],
+      },
+    ],
+  },
+  {
+    ...meta,
+    slug: "chem-u2-haber-conditions",
+    topics: ["equilibria"],
+    stem: "The Haber process is exothermic: N₂(g) + 3H₂(g) ⇌ 2NH₃(g), ΔH = −92 kJ mol⁻¹.",
+    difficulty: 3,
+    aos: ["AO2", "AO3"],
+    parts: [
+      {
+        prompt: "Predict and explain the effect of raising the temperature on the equilibrium yield and on Kc.",
+        marks: 2,
+        aos: ["AO2"],
+        scheme: [
+          "The equilibrium moves left (the endothermic direction), so the yield of ammonia falls",
+          "Kc decreases because it depends on temperature"
+],
+        answer: "The equilibrium moves left (the endothermic direction), so the yield of ammonia falls; Kc decreases because it depends on temperature.",
+        specPointIds: [`${S}.equilibria.sp-02`],
+        learningClaims: ["predict temperature effects on equilibrium"],
+      },
+      {
+        prompt: "Explain why raising the pressure increases the yield.",
+        marks: 2,
+        aos: ["AO2"],
+        scheme: [
+          "Four moles of gas on the left and two on the right",
+          "so the equilibrium moves right to reduce the pressure"
+],
+        answer: "Four moles of gas on the left and two on the right; so the equilibrium moves right to reduce the pressure.",
+        specPointIds: [`${S}.equilibria.sp-02`],
+        learningClaims: ["predict pressure effects on equilibrium"],
+      },
+      {
+        prompt: "Explain why a moderate temperature and a catalyst are used industrially.",
+        marks: 2,
+        aos: ["AO3"],
+        scheme: [
+          "A low temperature gives a higher yield but too slow a rate, so a compromise temperature is chosen",
+          "The catalyst speeds up the approach to equilibrium without changing the position"
+],
+        answer: "A low temperature gives a higher yield but too slow a rate, so a compromise temperature is chosen; The catalyst speeds up the approach to equilibrium without changing the position.",
+        specPointIds: [`${S}.equilibria.sp-05`],
+        learningClaims: ["explain industrial compromise conditions"],
       },
     ],
   },
