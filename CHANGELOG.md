@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-29 pass 104: Biology Unit 1 gets worked cells, biochemistry, enzymes, membranes and nucleic-acid questions
+Biology Unit 1 topics such as cell fractionation, glycogen/cellulose, triglycerides, protein structure, enzyme inhibition, osmosis, DNA and protein synthesis had one or two questions each. 9 new original questions (about 52 marks) include magnification (3 µm), enzyme rate and inhibitor effect (0.40 cm³ s⁻¹, 62.5%), potato osmosis (−12.0%), base-pair percentages (22% guanine) and transcription to mRNA. One scheme point per mark; not reviewer-approved, so nothing counts as Proven. Marker ratchet 715 to 728. Verified: tsc, strict tsc, authoring/content/trust/review-gates/docs checks, targeted vitest; no browser run.
+
 ## 2026-10-29 pass 103: Chemistry Unit 1 gets worked moles, atomic structure, bonding and redox questions
 Unit 1 had the thinnest AS Chemistry bank (45 questions) for the calculations Year 12 sit first. 8 new original questions (about 38 marks) cover empirical and molecular formula (CH2, C4H8), titration concentration (0.0800 mol dm⁻³) with why concordant titres matter, gas volume from magnesium (480 cm³), percentage yield (75.0%), relative atomic mass from isotopes (35.5), ionisation-energy definition and group trend, shapes and bond angles (BF3, NH3, H2O) and a manganate(VII) redox titration (0.0920 mol dm⁻³). One scheme point per mark; not reviewer-approved, so nothing counts as Proven. Verified: tsc, authoring/content/trust/review-gates checks, targeted vitest; no browser run.
 
