@@ -25,7 +25,8 @@ import { markPart } from "@/domain/marking";
 // 689 → 705 (pass 101): the Chemistry Unit 3 pack adds 12 questions with symbol-heavy answers (E°, equations)
 // that the offline marker misses 16 times; marker leniency for chemical notation is the follow-up.
 // 705 → 715 (pass 102): Chemistry Unit 2 pack adds 8 questions with paraphrased calculation schemes the offline marker misses 10 times.
-const BASELINE = 715;
+// 715 → 728 (pass 104): Biology Unit 1 pack adds 9 questions whose paraphrased multi-point model answers the offline marker misses 13 times.
+const BASELINE = 728;
 
 describe("offline marker against the bank's own model answers", () => {
   it("never gets worse than the recorded baseline", () => {

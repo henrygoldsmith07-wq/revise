@@ -839,8 +839,8 @@
       {
         "specPointId": "wjec-alevel-biology.biological-molecules.sp-02",
         "topicId": "wjec-alevel-biology.biological-molecules",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
           "transfer"
         ]
@@ -848,19 +848,16 @@
       {
         "specPointId": "wjec-alevel-biology.biological-molecules.sp-03",
         "topicId": "wjec-alevel-biology.biological-molecules",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
-        "missingCategories": [
-          "application"
-        ]
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
+        "missingCategories": []
       },
       {
         "specPointId": "wjec-alevel-biology.biological-molecules.sp-04",
         "topicId": "wjec-alevel-biology.biological-molecules",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "application",
           "transfer"
         ]
       },
@@ -899,10 +896,9 @@
       {
         "specPointId": "wjec-alevel-biology.cell-structure.sp-03",
         "topicId": "wjec-alevel-biology.cell-structure",
-        "currentQuestionCount": 2,
-        "independentQuestionDeficit": 2,
+        "currentQuestionCount": 3,
+        "independentQuestionDeficit": 1,
         "missingCategories": [
-          "application",
           "transfer"
         ]
       },
@@ -980,8 +976,8 @@
       {
         "specPointId": "wjec-alevel-biology.enzymes.sp-02",
         "topicId": "wjec-alevel-biology.enzymes",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1264,20 +1260,10 @@
       {
         "specPointId": "wjec-alevel-biology.membranes-transport.sp-02",
         "topicId": "wjec-alevel-biology.membranes-transport",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
-          "recall",
-          "transfer"
-        ]
-      },
-      {
-        "specPointId": "wjec-alevel-biology.membranes-transport.sp-03",
-        "topicId": "wjec-alevel-biology.membranes-transport",
-        "currentQuestionCount": 13,
-        "independentQuestionDeficit": 0,
-        "missingCategories": [
-          "transfer"
+          "recall"
         ]
       },
       {
@@ -1461,8 +1447,8 @@
       {
         "specPointId": "wjec-alevel-biology.nucleic-acids.sp-02",
         "topicId": "wjec-alevel-biology.nucleic-acids",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
@@ -1471,8 +1457,8 @@
       {
         "specPointId": "wjec-alevel-biology.nucleic-acids.sp-03",
         "topicId": "wjec-alevel-biology.nucleic-acids",
-        "currentQuestionCount": 1,
-        "independentQuestionDeficit": 3,
+        "currentQuestionCount": 2,
+        "independentQuestionDeficit": 2,
         "missingCategories": [
           "recall",
           "transfer"
