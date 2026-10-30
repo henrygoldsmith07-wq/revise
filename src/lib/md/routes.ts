@@ -11,7 +11,17 @@
 // Only the routes below carry authored, public material.
 
 /** HTML routes with a markdown twin. An explicit allowlist, never a denylist. */
-export const MARKDOWN_PAGES = ["/", "/welcome", "/library", "/lesson", "/technique"] as const;
+export const MARKDOWN_PAGES = [
+  "/",
+  "/welcome",
+  "/library",
+  "/lesson",
+  "/technique",
+  "/wjec-a-level-physics",
+  "/wjec-a-level-physics/past-papers",
+  "/wjec-a-level-physics/definitions",
+  "/wjec-a-level-physics/data-booklet",
+] as const;
 export type MarkdownPage = (typeof MARKDOWN_PAGES)[number];
 
 /** Request header the proxy sets (or clears) so the root layout can link the twin. */
@@ -24,6 +34,10 @@ export const MARKDOWN_QUERY: Record<MarkdownPage, readonly string[]> = {
   "/library": ["subject", "topic"],
   "/lesson": ["subject", "topic", "checkpoint"],
   "/technique": [],
+  "/wjec-a-level-physics": [],
+  "/wjec-a-level-physics/past-papers": [],
+  "/wjec-a-level-physics/definitions": [],
+  "/wjec-a-level-physics/data-booklet": [],
 };
 
 export function isMarkdownPage(path: string): path is MarkdownPage {

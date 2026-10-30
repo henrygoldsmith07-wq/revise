@@ -43,6 +43,12 @@ An adaptive timetable from exam dates and availability — missed blocks roll fo
 
 417 WJEC A-level specification statements across Maths, Biology, Chemistry and Physics, with provenance and a live validator. Physics is fully authored (108 of 108); Maths, Biology and Chemistry still have 78, 102 and 95 statements to write.
 
+## Free WJEC A-level Physics guides
+
+Built from the same data the app uses, and honest about what is not yet reviewed.
+
+[Every topic, by how often it is examined](https://revise-gray.vercel.app/wjec-a-level-physics) [Past paper questions by topic, 2022–2025](https://revise-gray.vercel.app/wjec-a-level-physics/past-papers) [The definitions you must learn](https://revise-gray.vercel.app/wjec-a-level-physics/definitions) [Data booklet constants and key equations](https://revise-gray.vercel.app/wjec-a-level-physics/data-booklet)
+
 ## Honest by design
 
 Like every Le Studio app: local-first where it matters, no forced login, no ads, no sale of data. IndexedDB-first with an offline outbox; installable PWA.

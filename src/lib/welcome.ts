@@ -51,6 +51,15 @@ export const WELCOME = {
       ],
     },
     {
+      heading: "Free WJEC A-level Physics guides",
+      items: [
+        "[Every topic, by how often it is examined](/wjec-a-level-physics)",
+        "[Past paper questions by topic](/wjec-a-level-physics/past-papers)",
+        "[The definitions you must learn](/wjec-a-level-physics/definitions)",
+        "[Data booklet constants and key equations](/wjec-a-level-physics/data-booklet)",
+      ],
+    },
+    {
       heading: "Using it",
       paragraphs: [
         "The app needs JavaScript, because your revision history lives in your browser's own database and nothing is sent to a server to read it back. Turn JavaScript on and open [the app](/), or add dates to `/settings` at any point — a plan without exam dates is still a plan.",

@@ -1,6 +1,7 @@
 import { CORS_HEADERS, markdownNotFound, optionsResponse, textResponse } from "@/lib/md/http";
 import { listMarkdownRoutes, renderMarkdown } from "@/lib/md/registry";
 import { markdownPathFor } from "@/lib/md/routes";
+import { PHYSICS_GUIDE_PATHS } from "@/lib/physics-guides";
 import { absoluteUrl, SITE } from "@/lib/site";
 
 // The one markdown handler. src/proxy.ts rewrites every twin request here:
@@ -12,7 +13,7 @@ import { absoluteUrl, SITE } from "@/lib/site";
 export const runtime = "nodejs";
 
 /** Pages whose content changes only with a deploy are cached longer. */
-const STATIC_PAGES = new Set(["/", "/welcome", "/technique"]);
+const STATIC_PAGES = new Set<string>(["/", "/welcome", "/technique", ...PHYSICS_GUIDE_PATHS]);
 
 type Context = { params: Promise<{ path?: string[] }> };
 
