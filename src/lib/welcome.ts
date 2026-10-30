@@ -60,6 +60,10 @@ export const WELCOME = {
       ],
     },
     {
+      heading: "Pricing",
+      paragraphs: ["Everything on this page is free. [Plus](/pricing) adds cloud AI marking and feedback for a monthly or yearly fee."],
+    },
+    {
       heading: "Using it",
       paragraphs: [
         "The app needs JavaScript, because your revision history lives in your browser's own database and nothing is sent to a server to read it back. Turn JavaScript on and open [the app](/), or add dates to `/settings` at any point — a plan without exam dates is still a plan.",
