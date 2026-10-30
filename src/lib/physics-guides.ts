@@ -323,7 +323,7 @@ function dataBookletPage(): StaticPage {
       {
         heading: "This is not WJEC's booklet",
         honest: true,
-        paragraphs: [`In the exam you use WJEC's own data booklet, from its [AS and A level Physics page](${WJEC_PHYSICS_URL}). ${BOOKLET_SOURCE_NOTE}`],
+        paragraphs: [`${BOOKLET_SOURCE_NOTE} Get it from WJEC's [AS and A level Physics page](${WJEC_PHYSICS_URL}).`],
       },
       {
         heading: "Physical constants",
