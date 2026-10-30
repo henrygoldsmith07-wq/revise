@@ -5,6 +5,7 @@
 // scripts/generate-revise-site-ai-files.mjs. Keep the four in sync by editing
 // this file, never a generated copy.
 
+import { PHYSICS_GUIDE_PATHS } from "@/lib/physics-guides";
 import { SITE } from "@/lib/site";
 import { mdLink, mdList } from "./format";
 import { isFlagship } from "@/domain/flagship";
@@ -83,6 +84,9 @@ export function buildLlmsTxt(): string {
  * pages) and reference subjects stay in the catalog only.
  */
 function inFullText(route: MarkdownRoute): boolean {
+  // The Physics guides re-present library and lesson material this file
+  // already carries; llms.txt still lists them.
+  if ((PHYSICS_GUIDE_PATHS as readonly string[]).includes(route.path)) return false;
   if (route.group === "lessons") return !route.query.topic || Boolean(route.query.checkpoint);
   if (route.group !== "curriculum") return true;
   if (route.query.subject) return false;
@@ -109,7 +113,7 @@ export function buildLlmsFullTxt(generated: string): { text: string; size: numbe
     `> ${SITE.aiSummary}`,
     `Generated: ${generated}`,
     "",
-    `Order: core pages, guides, lessons, then the curriculum library. ${left} pages (lesson topic lists, subject pages and reference-subject topics) are left out to keep this one fetch; each is listed in ${SITE.url}/api/md/_catalog.`,
+    `Order: core pages, guides, lessons, then the curriculum library. ${left} pages (lesson topic lists, subject pages, reference-subject topics and the Physics guides, which repeat library and lesson content) are left out to keep this one fetch; each is listed in ${SITE.url}/api/md/_catalog.`,
     "",
     ...parts,
   ].join("\n")}\n`;
