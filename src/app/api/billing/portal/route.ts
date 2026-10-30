@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readBoundedText } from "@/lib/bounded-body";
 import { billingSession, crossSiteRefusal, ownSubscription } from "@/lib/billing/session";
 import { billingConfig, createPortalSession, StripeRequestError } from "@/lib/billing/stripe";
 import { errorClass } from "@/lib/observability";
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
   if (!configured.ok) return NextResponse.json({ error: "Plus is not set up on this server yet." }, { status: 503 });
   const refused = crossSiteRefusal(request);
   if (refused) return refused;
+  // The portal takes no input; the body is read only so it can never be unbounded.
+  const read = await readBoundedText(request, 200);
+  if (!read.ok) return NextResponse.json({ error: "Request body is too large." }, { status: 413 });
   const session = await billingSession();
   if ("error" in session) return session.error;
   const existing = await ownSubscription(session.supabase, session.user.id);

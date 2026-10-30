@@ -30,7 +30,8 @@ create table if not exists public.subscriptions (
 create index if not exists subscriptions_customer_idx on public.subscriptions(stripe_customer_id);
 
 alter table public.subscriptions enable row level security;
-revoke all on public.subscriptions from public, anon, authenticated;
+revoke insert, update, delete, truncate on public.subscriptions from anon, authenticated;
+revoke select on public.subscriptions from anon;
 grant select on public.subscriptions to authenticated;
 drop policy if exists subscriptions_select_own on public.subscriptions;
 create policy subscriptions_select_own on public.subscriptions

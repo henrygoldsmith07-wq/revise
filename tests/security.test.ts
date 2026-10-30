@@ -59,6 +59,9 @@ describe("security — RLS + schema invariants", () => {
     class_assignments: { kind: "class-read", policy: "class_assignments_read", predicate: "public.is_class_teacher(class_id) or public.is_active_class_member(class_id)" },
     class_evidence: { kind: "class-read", policy: "class_evidence_read", predicate: "exists (select 1 from public.class_memberships m where m.class_id = class_evidence.class_id and m.user_id = class_evidence.user_id and m.status = 'active') and (public.is_class_teacher(class_id) or (user_id = auth.uid() and public.is_active_class_member(class_id)))" },
     class_join_limits: { kind: "definer-only" },
+    // Revise Plus: the learner reads their own row; only the Stripe webhook's
+    // service-role function writes.
+    subscriptions: { kind: "self-read", policy: "subscriptions_select_own" },
   };
 
   const OWNER_CLAUSE = "using (user_id = auth.uid()) with check (user_id = auth.uid())";
