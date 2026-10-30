@@ -163,6 +163,66 @@ function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+interface ShortfallRepair {
+  removed: UnitMockPick[];
+  added: Question[];
+}
+
+/**
+ * Finds the smallest change (drop 0-2 picks, add 1-2 unused questions) that
+ * closes a mark shortfall exactly. Prefers fewer changes, then better
+ * trust/exposure rank, then the smallest drift from each topic's share.
+ */
+export function repairShortfall(input: {
+  picks: readonly UnitMockPick[];
+  pool: readonly Question[];
+  shortBy: number;
+  target: ReadonlyMap<Id, number>;
+  allocated: ReadonlyMap<Id, number>;
+  rank: (question: Question) => number;
+}): ShortfallRepair | null {
+  const { picks, shortBy } = input;
+  const pool = [...input.pool].sort((a, b) => a.id.localeCompare(b.id));
+  const dropSets: UnitMockPick[][] = [[]];
+  for (let i = 0; i < picks.length; i += 1) {
+    dropSets.push([picks[i]]);
+    for (let j = i + 1; j < picks.length; j += 1) dropSets.push([picks[i], picks[j]]);
+  }
+  const drift = (removed: UnitMockPick[], added: Question[]): number => {
+    const next = new Map(input.allocated);
+    for (const pick of removed) for (const topicId of pick.topicIds) next.set(topicId, (next.get(topicId) ?? 0) - pick.marks / pick.topicIds.length);
+    for (const question of added) for (const topicId of question.topicIds) next.set(topicId, (next.get(topicId) ?? 0) + question.totalMarks / question.topicIds.length);
+    let sum = 0;
+    for (const [topicId, goal] of input.target) sum += Math.abs(goal - (next.get(topicId) ?? 0));
+    return sum;
+  };
+  let bestRepair: ShortfallRepair | null = null;
+  let bestKey: number[] = [];
+  const consider = (removed: UnitMockPick[], added: Question[]) => {
+    const key = [removed.length + added.length, added.reduce((sum, question) => sum + input.rank(question), 0), drift(removed, added)];
+    const better =
+      !bestRepair ||
+      key[0] < bestKey[0] ||
+      (key[0] === bestKey[0] && (key[1] < bestKey[1] || (key[1] === bestKey[1] && key[2] < bestKey[2] - 1e-9)));
+    if (better) {
+      bestRepair = { removed, added };
+      bestKey = key;
+    }
+  };
+  for (const removed of dropSets) {
+    const need = shortBy + removed.reduce((sum, pick) => sum + pick.marks, 0);
+    for (let a = 0; a < pool.length; a += 1) {
+      if (pool[a].totalMarks === need) consider(removed, [pool[a]]);
+      else if (pool[a].totalMarks < need) {
+        for (let b = a + 1; b < pool.length; b += 1) {
+          if (pool[a].totalMarks + pool[b].totalMarks === need) consider(removed, [pool[a], pool[b]]);
+        }
+      }
+    }
+  }
+  return bestRepair;
+}
+
 /**
  * Builds one unit mock. Marks are shared across the unit's topics in
  * proportion to their specification statements (a topic with no listed
@@ -253,6 +313,34 @@ export function buildUnitMock(input: UnitMockInput): UnitMock {
       allocated.set(topicId, (allocated.get(topicId) ?? 0) + choice.totalMarks / choice.topicIds.length);
     }
     picks.push({ questionId: choice.id, marks: choice.totalMarks, topicIds: [...choice.topicIds], exposure: exposureOf(choice.id) });
+  }
+
+  // The greedy fill can stall a mark or two short when no unused question has
+  // exactly the marks left. Swap a few picks for unused questions so the paper
+  // reaches the real total whenever the bank allows it.
+  if (total < blueprint.marks) {
+    const repaired = repairShortfall({
+      picks,
+      pool: eligible.filter((question) => !used.has(question.id)),
+      shortBy: blueprint.marks - total,
+      target,
+      allocated,
+      rank,
+    });
+    if (repaired) {
+      for (const pick of repaired.removed) {
+        used.delete(pick.questionId);
+        picks.splice(picks.indexOf(pick), 1);
+        total -= pick.marks;
+        for (const topicId of pick.topicIds) allocated.set(topicId, (allocated.get(topicId) ?? 0) - pick.marks / pick.topicIds.length);
+      }
+      for (const choice of repaired.added) {
+        used.add(choice.id);
+        total += choice.totalMarks;
+        for (const topicId of choice.topicIds) allocated.set(topicId, (allocated.get(topicId) ?? 0) + choice.totalMarks / choice.topicIds.length);
+        picks.push({ questionId: choice.id, marks: choice.totalMarks, topicIds: [...choice.topicIds], exposure: exposureOf(choice.id) });
+      }
+    }
   }
 
   // Order the paper by topic in specification order, shorter questions first

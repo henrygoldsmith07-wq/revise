@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-30 pass 106: Unit mocks now reach the full 80 marks
+Biology and Chemistry Unit 1 mocks stopped at 79/80 because the greedy fill had no question with exactly the marks left, so the paper and clock were shortened. `repairShortfall` now swaps up to two picks for unused questions to close the gap exactly, preferring the fewest changes, then trusted/unseen questions, then closest topic shares. Verified: every Year 12 Physics, Chemistry, Biology and Maths Unit 1/2 mock is now complete (new tests; old code fails Chemistry/Biology U1). A2 Maths Units 3/4 are still bank-limited.
+
 ## 2026-10-30 pass 105: a linear board's Paper 1 no longer ends the plan, and paper days stay free
 Since pass 99 onboarding saves one row per paper for AQA, Edexcel and OCR, but `subjectRunUpEnd` still ended a subject's run-up at its next whole-subject date, so a Year 13 plan stopped revising Biology at Paper 1 and left the fortnight before Papers 2 and 3 empty, and missed work could not roll past Paper 1. The run-up now always ends at the last paper still ahead (one date behaves as before). A subject takes no block, planned or rolled, on a day it sits one of its papers, and a missed block for a topic whose unit paper is already sat stays missed instead of being re-queued after the paper. Exam outlook on Today and the grade-prediction log took the first stored exam row for a subject (an arbitrary unit or paper, possibly one already sat); both now use the next paper still ahead (`nextSubjectExam`). Tests: tests/planner.test.ts, tests/exam-timetable.test.ts. Verified: eslint, tsc, strict tsc, full vitest; no browser run.
 
