@@ -153,10 +153,11 @@ export function usePlanning(input: {
     const healed = rescheduleMissed(snapshot.plannedSessions, todayIso(), 6, undefined, {
       exams: snapshot.examDates,
       availability: snapshot.settings.availability,
+      topics,
     });
     await repo.replacePlan(userId, healed);
     patch((prev) => ({ ...prev, plannedSessions: healed }));
-  }, [snapshot, userId, patch]);
+  }, [snapshot, userId, topics, patch]);
 
   const completeSession = useCallback(async (sessionId: Id, status: PlannedSession["status"] = "done") => {
     const session = snapshot?.plannedSessions.find((s) => s.id === sessionId);

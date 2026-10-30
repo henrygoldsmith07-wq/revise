@@ -13,7 +13,9 @@
 import { confidenceWord, EVIDENCE_CONFIDENCE } from "@/domain/plain-numbers";
 import { getSubject } from "@/domain/curriculum";
 import { MIN_OUTLOOK_ATTEMPTS, outlookRows } from "@/domain/exam-outlook";
+import { nextSubjectExam } from "@/domain/exam-timetable";
 import { formatExamDate } from "@/domain/pace-forecast";
+import { todayIso } from "@/domain/scheduling";
 import { useStoreFields } from "@/state/store";
 
 export function ExamOutlook() {
@@ -25,6 +27,7 @@ export function ExamOutlook() {
   const rows = outlookRows(predictions, attempts, questions).filter((r) => settings.subjectIds.includes(r.subjectId));
   const claimable = rows.filter((r) => r.attempts >= MIN_OUTLOOK_ATTEMPTS);
   const attempted = rows.reduce((sum, r) => sum + r.attempts, 0);
+  const today = todayIso();
 
   if (!claimable.length) {
     if (attempted === 0) {
@@ -47,13 +50,13 @@ export function ExamOutlook() {
     <div className="text-xs text-ink3 mt-3 space-y-0.5" role="status">
       {claimable
         .sort((a, b) => {
-          const ea = examDates.find((e) => e.subjectId === a.subjectId)?.date ?? "9999";
-          const eb = examDates.find((e) => e.subjectId === b.subjectId)?.date ?? "9999";
+          const ea = nextSubjectExam(examDates, a.subjectId, today)?.date ?? "9999";
+          const eb = nextSubjectExam(examDates, b.subjectId, today)?.date ?? "9999";
           return ea.localeCompare(eb);
         })
         .map((row) => {
           const subject = getSubject(row.subjectId);
-          const exam = examDates.find((e) => e.subjectId === row.subjectId);
+          const exam = nextSubjectExam(examDates, row.subjectId, today);
           const name = subject?.name ?? row.subjectId;
           const when = exam ? ` in ${name} (exam ${formatExamDate(exam.date)})` : ` in ${name}`;
           const provisional = row.provisional ? "Provisional estimate" : "Estimate";

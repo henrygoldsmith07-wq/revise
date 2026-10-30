@@ -134,6 +134,7 @@ export function replanDynamically(input: ReplanInput): ReplanResult {
     plan = rescheduleMissed(plan, today, input.dailyBlockCap ?? 6, nextId, {
       exams: input.exams,
       availability: input.availability,
+      topics: input.topics,
     });
   }
   // Ids of the replacement blocks the roll-forward created, so the summary

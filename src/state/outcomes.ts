@@ -12,6 +12,7 @@ import { allSubjects } from "@/domain/curriculum";
 import { daysToExam } from "@/domain/recommender";
 import { delayedFarTransferRetests } from "@/domain/delayed-far-transfer";
 import { buildExamReadiness, summariseExamReadiness } from "@/domain/exam-readiness";
+import { nextSubjectExam } from "@/domain/exam-timetable";
 import type { ExamReadiness, ExamReadinessSummary } from "@/domain/exam-readiness";
 import type { GradePrediction } from "@/domain/grades";
 import { todayIso } from "@/domain/scheduling";
@@ -147,7 +148,7 @@ export function useOutcomes(input: {
           confidence: p.confidence,
           evidenceShare: Math.min(1, marked / 40),
           createdAt: new Date().toISOString(),
-          examDate: assessment.examDates.find((e) => e.subjectId === p.subjectId)?.date ?? null,
+          examDate: nextSubjectExam(assessment.examDates, p.subjectId, todayIso())?.date ?? null,
         };
         existing.push(record);
         appended = true;

@@ -53,15 +53,25 @@ export function topicUnitSat(exams: readonly ExamDate[], topic: Pick<Topic, "spe
 }
 
 /**
- * The day a subject's run-up ends: its next exam, or, once any unit is dated
- * separately, the latest paper still ahead (a whole-subject date included,
- * since it governs every undated unit). Sitting Unit 1 does not end Unit 2's run-up.
+ * The day a subject's run-up ends: the latest paper still ahead. Sitting
+ * Unit 1 does not end Unit 2's run-up, a whole-subject date governs every
+ * undated unit, and a linear board's Paper 1 does not end the revision for
+ * Papers 2 and 3 (one whole-subject row per paper, examRowsForSitting).
  */
 export function subjectRunUpEnd(exams: readonly ExamDate[], subjectId: Id, today: IsoDate): IsoDate | null {
   const ahead = exams.filter((exam) => exam.subjectId === subjectId && exam.date >= today).map((exam) => exam.date).sort();
-  if (!ahead.length) return null;
-  const unitDated = exams.some((exam) => exam.subjectId === subjectId && exam.paperSpecId);
-  return (unitDated ? ahead[ahead.length - 1] : ahead[0]) ?? null;
+  return ahead.at(-1) ?? null;
+}
+
+/**
+ * The subject's next paper still ahead (any unit or whole-subject row), or
+ * null. A subject can hold several rows (one per unit or paper), so the first
+ * row found is not its next exam.
+ */
+export function nextSubjectExam(exams: readonly ExamDate[], subjectId: Id, today: IsoDate): ExamDate | null {
+  return exams
+    .filter((exam) => exam.subjectId === subjectId && exam.date >= today)
+    .reduce<ExamDate | null>((best, exam) => (!best || exam.date < best.date ? exam : best), null);
 }
 
 export type UnitExamStatus = "upcoming" | "today" | "past" | "undated";

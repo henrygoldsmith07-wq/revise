@@ -113,6 +113,7 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
     const end = subjectRunUpEnd(input.exams, subjectId, today);
     if (end) examBySubject.set(subjectId, end);
   }
+  const paperDays = subjectPaperDays(input.exams);
   const topicById = new Map(input.topics.map((t) => [t.id, t]));
 
   // Working copy of mastery so the planner can "spend" attention within one
@@ -217,10 +218,11 @@ export function buildPlan(input: PlanInput): PlannedSession[] {
 
     // Subjects whose exam has passed (or is today) do not take blocks: their
     // run-up is over, so the day's attention goes to subjects still climbing
-    // toward their own exam.
+    // toward their own exam. A day the subject sits an earlier paper (Unit 1,
+    // a linear board's Paper 1) is left free too.
     const active = input.subjectIds.filter((subjectId) => {
       const exam = examBySubject.get(subjectId);
-      return !exam || date < exam;
+      return (!exam || date < exam) && !paperDays.has(`${subjectId}|${date}`);
     });
     if (!active.length) continue;
 
@@ -636,13 +638,15 @@ export interface RollForwardConstraints {
   availability?: readonly Availability[];
   /** Hard cap on minutes per day, as in PlanInput. */
   dailyMinutesCap?: number;
+  /** The plan's topics: a block for a topic whose unit paper is sat is not rolled onto or past that paper. */
+  topics?: readonly Pick<Topic, "specRef" | "id" | "subjectId" | "title">[];
 }
 
 /**
  * The first day (from `today`, within a fortnight) that can take `session`:
- * under the block cap, before the end of the subject's run-up, and — when
- * availability is known — a study day (buildPlan's 10-minute floor) whose
- * availability is at least the block's length. Null when none can. The block
+ * under the block cap, before the end of the subject's run-up, not a day it
+ * sits a paper, and — when availability is known — a study day (buildPlan's
+ * 10-minute floor) whose availability is at least the block's length. Null when none can. The block
  * cap, not the day's remaining minutes, bounds how much is added: a plan
  * fills each day, so a minutes test would never let missed work back in.
  * Without constraints the old behaviour stands: when nothing is under the
@@ -659,6 +663,11 @@ function rolledStart(tails: Map<IsoDate, DayTail>, date: IsoDate): number {
   return tail ? tail.end + 5 : DEFAULT_DAY_START;
 }
 
+/** "<subjectId>|<date>" for every day a subject sits a paper. */
+function subjectPaperDays(exams: readonly ExamDate[]): Set<string> {
+  return new Set(exams.map((exam) => `${exam.subjectId}|${exam.date}`));
+}
+
 function rollTarget(
   session: PlannedSession,
   today: IsoDate,
@@ -668,9 +677,13 @@ function rollTarget(
   endByDate: Map<IsoDate, DayTail>,
 ): IsoDate | null {
   const exam = constraints?.exams ? subjectRunUpEnd(constraints.exams, session.subjectId, today) : null;
+  const paperDays = subjectPaperDays(constraints?.exams ?? []);
+  const topic = session.topicId ? constraints?.topics?.find((t) => t.id === session.topicId) : undefined;
   for (let i = 0; i < 14; i++) {
     const candidate = addLocalDays(today, i);
     if (exam && candidate >= exam) break;
+    if (topic && constraints?.exams && topicUnitSat(constraints.exams, topic, candidate)) break;
+    if (paperDays.has(`${session.subjectId}|${candidate}`)) continue;
     if ((countByDate.get(candidate) ?? 0) >= dailyBlockCap) continue;
     // Rolled work goes after the day's last block; nothing runs past midnight.
     if (rolledStart(endByDate, candidate) + session.minutes > 24 * 60) continue;
