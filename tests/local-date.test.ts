@@ -13,6 +13,10 @@ import { nextLessonStreak } from "@/state/lesson-streak";
 describe("canonical local calendar days", () => {
   it("distinguishes IsoDate keys from IsoInstant values", () => {
     expect(isLocalDateKey("2026-09-28")).toBe(true);
+    expect(isLocalDateKey("2024-02-29")).toBe(true);
+    expect(isLocalDateKey("2023-02-29")).toBe(false);
+    expect(isLocalDateKey("2024-02-31")).toBe(false);
+    expect(isLocalDateKey("2026-04-31")).toBe(false);
     expect(isLocalDateKey("2026-09-28T00:00:00.000Z")).toBe(false);
     expect(isLocalDateKey("")).toBe(false);
     expect(isLocalDateKey(null)).toBe(false);
