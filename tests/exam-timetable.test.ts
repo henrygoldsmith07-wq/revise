@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { getSubject, topicsFor } from "@/domain/curriculum";
-import { checkUnitExamDate, daysToTopicExam, editUnitDate, examForTopic, nextPaperSentence, timetableRows, unitOfPaperSpec, upcomingPapers } from "@/domain/exam-timetable";
+import { checkUnitExamDate, daysToTopicExam, editUnitDate, examForTopic, nextPaperSentence, nextSubjectExam, subjectRunUpEnd, timetableRows, unitOfPaperSpec, upcomingPapers } from "@/domain/exam-timetable";
 import { topicUnitNumber } from "@/domain/year-group";
 import { recommend } from "@/domain/recommender";
 import { UnitExamTimetable } from "@/components/UnitExamTimetable";
@@ -16,6 +16,15 @@ const u2 = topics.find((t) => topicUnitNumber(t) === 2)!;
 const exam = (id: string, date: string, paperSpecId?: string): ExamDate => ({ id, userId: "u", subjectId: SUBJECT, date, label: id, ...(paperSpecId ? { paperSpecId } : {}) });
 
 describe("unit exam timetable", () => {
+  it("finds the subject's next paper and the end of its run-up whatever order the rows are stored in", () => {
+    // A linear board's papers are whole-subject rows; a sat paper is behind us.
+    const exams = [exam("p3", "2027-06-21"), exam("p1", "2026-10-20"), exam("p2", "2027-06-07"), { ...exam("x", "2027-05-01"), subjectId: "other" }];
+    expect(nextSubjectExam(exams, SUBJECT, today)?.id).toBe("p2");
+    expect(subjectRunUpEnd(exams, SUBJECT, today)).toBe("2027-06-21");
+    expect(nextSubjectExam([exam("p1", "2026-10-20")], SUBJECT, today)).toBeNull();
+    expect(subjectRunUpEnd([exam("p1", "2026-10-20")], SUBJECT, today)).toBeNull();
+  });
+
   it("parses paper spec ids", () => {
     expect(unitOfPaperSpec(`${SUBJECT}.u2`)).toBe(2);
     expect(unitOfPaperSpec(undefined)).toBeNull();

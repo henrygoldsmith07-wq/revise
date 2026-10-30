@@ -404,6 +404,53 @@ describe("buildPlan with per-unit paper dates", () => {
     const healed = rescheduleMissedPrioritised([missed], TODAY, 6, [], exams, ids());
     expect(healed.some((s) => s.id !== "m" && s.status === "pending")).toBe(true);
   });
+
+  it("does not roll a sat unit's topic past its paper, and still rolls the next unit's", () => {
+    const u1Topic = physics.find((t) => unit1.has(t.id))!;
+    const u2Topic = physics.find((t) => !unit1.has(t.id))!;
+    const block = (id: string, topicId: string): PlannedSession => ({ id, userId: "u", date: "2025-05-30", startMinute: 960, minutes: 30, subjectId: PHYS, topicId, activity: "practice", reason: "weak topic", status: "pending" });
+    const exams = [unitRow(1, "2025-06-02"), unitRow(2, "2025-06-30")];
+    const healed = rescheduleMissed([block("a", u1Topic.id), block("b", u2Topic.id)], TODAY, 6, ids(), { exams, topics: physics });
+    expect(healed.filter((s) => s.status === "pending").map((s) => s.topicId)).toEqual([u2Topic.id]);
+    expect(healed.find((s) => s.status === "pending")?.date).toBe("2025-06-03");
+  });
+});
+
+describe("buildPlan with a linear board's papers", () => {
+  // Onboarding saves one whole-subject row per paper for AQA/Edexcel/OCR
+  // (examRowsForSitting); any topic can come up on any of them.
+  const BIO = "aqa-alevel-biology";
+  const biology = topicsFor(BIO);
+  const paperRow = (n: number, date: string): ExamDate => ({ id: `e-p${n}`, userId: "u", subjectId: BIO, date, label: `Biology Paper ${n}` });
+  const papers = [paperRow(1, "2025-06-09"), paperRow(2, "2025-06-16"), paperRow(3, "2025-06-23")];
+  const plan = () =>
+    buildPlan({
+      userId: "u",
+      topics: biology,
+      mastery: biology.map((t) => mastery(t.id, BIO, 0.4)),
+      exams: papers,
+      availability: everyDay(120),
+      sessionLengthMinutes: 30,
+      subjectIds: [BIO],
+      now: NOW,
+      idFactory: ids(),
+    });
+
+  it("keeps revising between papers and stops at the last one", () => {
+    const sessions = plan();
+    expect(sessions.some((s) => s.date > "2025-06-09" && s.date < "2025-06-16")).toBe(true);
+    expect(sessions.some((s) => s.date > "2025-06-16" && s.date < "2025-06-23")).toBe(true);
+    expect(sessions.some((s) => s.date >= "2025-06-23")).toBe(false);
+    // The day of an earlier paper is the exam, not a revision day.
+    expect(sessions.some((s) => s.date === "2025-06-09" || s.date === "2025-06-16")).toBe(false);
+  });
+
+  it("rolls missed work past Paper 1 while later papers are still ahead", () => {
+    const missed: PlannedSession = { id: "m", userId: "u", date: "2025-06-01", startMinute: 960, minutes: 30, subjectId: BIO, activity: "practice", reason: "weak topic", status: "pending" };
+    const healed = rescheduleMissedPrioritised([missed], TODAY, 6, [], [paperRow(1, "2025-06-02"), paperRow(2, "2025-06-16")], ids());
+    const rolled = healed.find((s) => s.id !== "m" && s.status === "pending");
+    expect(rolled?.date).toBe("2025-06-03");
+  });
 });
 
 describe("rescheduleMissed", () => {

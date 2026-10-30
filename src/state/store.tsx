@@ -377,6 +377,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
           const healed = rescheduleMissed(loaded.plannedSessions, today, 6, undefined, {
             exams: loaded.examDates,
             availability: loaded.settings.availability,
+            topics: allTopics(loaded.settings.subjectIds),
           });
           await repo.savePlan(healed);
           setSnapshot((prev) => (prev ? { ...prev, plannedSessions: healed } : prev));
