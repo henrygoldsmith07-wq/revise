@@ -17,6 +17,8 @@ import { AI_CONSENT_HEADER, decideAiConsent, type AiConsentDecision } from "@/do
 import { prepareAiEgress } from "@/ai/egress";
 import { classifierConfigured } from "@/ai/error-classifier";
 import { readBoundedText } from "@/lib/bounded-body";
+import { billingEnabled } from "@/lib/billing/stripe";
+import { PLUS_REQUIRED_CODE, PLUS_REQUIRED_MESSAGE, PLUS_UNAVAILABLE_CODE, PLUS_UNAVAILABLE_MESSAGE } from "@/domain/plus";
 
 // The single AI entry point. Keys never leave this process; the browser only
 // ever sees a task name and a validated payload going out, and an envelope
@@ -30,11 +32,14 @@ import { readBoundedText } from "@/lib/bounded-body";
 //   2. the learner's AI consent (403 when absent, disabled or revoked; 503
 //      when it cannot be read) — re-read from public.ai_consent on every
 //      request, so revoking takes effect on the very next call;
-//   3. payload validation (400/413);
-//   4. the egress policy (src/ai/egress.ts) re-applied server-side, so an
+//   3. Plus, when this server sells it (STRIPE_SECRET_KEY set): 402 without
+//      it, 503 when it cannot be read. The browser falls back to the offline
+//      marker and the other on-device fallbacks either way;
+//   4. payload validation (400/413);
+//   5. the egress policy (src/ai/egress.ts) re-applied server-side, so an
 //      older client or a hand-written request still cannot put unmasked
 //      learner text in front of a model;
-//   5. the shared quota.
+//   6. the shared quota.
 
 export const runtime = "nodejs";
 
@@ -43,7 +48,10 @@ export const MAX_OCR_CHARS = 1_200_000;
 
 type AiAuth =
   | { error: NextResponse }
-  | { userId: string | null; rpc: QuotaRpcCaller | null; consent: AiConsentDecision };
+  | { userId: string | null; rpc: QuotaRpcCaller | null; consent: AiConsentDecision; plus: PlusDecision };
+
+/** Whether this request may reach a model, as far as Plus is concerned. */
+type PlusDecision = "not-sold" | "granted" | "required" | "unavailable";
 
 function providerCredentialsPresent(): boolean {
   // Mirrors src/ai/provider.ts selection without importing keys: any provider
@@ -88,7 +96,8 @@ async function requireAiUser(request: Request): Promise<AiAuth> {
     // account to hold consent, so the browser's versioned consent header is
     // the learner's recorded choice. Production with a provider never gets
     // here — it failed closed above.
-    return { userId: null, rpc: null, consent: decideAiConsent({ mode: "local", header: request.headers.get(AI_CONSENT_HEADER) }) };
+    // There are no accounts to hold a subscription either, so Plus is not sold.
+    return { userId: null, rpc: null, consent: decideAiConsent({ mode: "local", header: request.headers.get(AI_CONSENT_HEADER) }), plus: "not-sold" };
   }
 
   const cookieStore = await cookies();
@@ -130,7 +139,20 @@ async function requireAiUser(request: Request): Promise<AiAuth> {
     .select("enabled, consent_version")
     .eq("user_id", auth.user.id)
     .maybeSingle();
-  return { userId: auth.user.id, rpc, consent: decideAiConsent({ mode: "account", row: consentRow, error: consentError }) };
+  return {
+    userId: auth.user.id,
+    rpc,
+    consent: decideAiConsent({ mode: "account", row: consentRow, error: consentError }),
+    plus: await decidePlus(supabase),
+  };
+}
+
+/** has_plus() reads the caller's own row (auth.uid()); only an explicit true grants. */
+async function decidePlus(supabase: { rpc: (fn: "has_plus") => PromiseLike<{ data: unknown; error: unknown }> }): Promise<PlusDecision> {
+  if (!billingEnabled()) return "not-sold";
+  const { data, error } = await supabase.rpc("has_plus");
+  if (error) return "unavailable";
+  return data === true ? "granted" : "required";
 }
 
 export async function GET() {
@@ -142,6 +164,12 @@ export async function POST(request: Request) {
   if ("error" in auth) return auth.error;
   if (!auth.consent.allowed) {
     return NextResponse.json({ error: auth.consent.error, code: auth.consent.code }, { status: auth.consent.status });
+  }
+  if (auth.plus === "required") {
+    return NextResponse.json({ error: PLUS_REQUIRED_MESSAGE, code: PLUS_REQUIRED_CODE }, { status: 402 });
+  }
+  if (auth.plus === "unavailable") {
+    return NextResponse.json({ error: PLUS_UNAVAILABLE_MESSAGE, code: PLUS_UNAVAILABLE_CODE }, { status: 503 });
   }
   const rateKey = resolveRateLimitKey(request, auth.userId);
 

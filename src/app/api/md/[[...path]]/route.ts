@@ -13,7 +13,7 @@ import { absoluteUrl, SITE } from "@/lib/site";
 export const runtime = "nodejs";
 
 /** Pages whose content changes only with a deploy are cached longer. */
-const STATIC_PAGES = new Set<string>(["/", "/welcome", "/technique", ...PHYSICS_GUIDE_PATHS]);
+const STATIC_PAGES = new Set<string>(["/", "/welcome", "/technique", "/pricing", ...PHYSICS_GUIDE_PATHS]);
 
 type Context = { params: Promise<{ path?: string[] }> };
 

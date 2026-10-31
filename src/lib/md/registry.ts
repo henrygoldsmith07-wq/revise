@@ -20,8 +20,9 @@ import { isFlagship } from "@/domain/flagship";
 import { TECHNIQUE_CONTEXT, TECHNIQUE_DRILLS } from "@/domain/technique-drills";
 import type { SpecPoint, Subject, Topic } from "@/domain/types";
 import { PHYSICS_GUIDE_PATHS, physicsGuide, type PhysicsGuidePath } from "@/lib/physics-guides";
+import { pricingPage } from "@/lib/pricing-page";
 import { SITE } from "@/lib/site";
-import { renderStaticMarkdown } from "@/lib/static-page";
+import { renderStaticMarkdown, type StaticPage } from "@/lib/static-page";
 import { inlineMarkdown, WELCOME } from "@/lib/welcome";
 import { absoluteUrl } from "@/lib/site";
 import { mdBlock, mdLink, mdList, mdNumbered, mdTable, mdText, renderDocument, type MarkdownDocument } from "./format";
@@ -366,12 +367,14 @@ const technique: Renderer = () => ({
 
 // --- WJEC A-level Physics guides -----------------------------------------------
 
-function guide(path: PhysicsGuidePath): Renderer {
+function staticPage(page: () => StaticPage): Renderer {
   return () => {
-    const page = physicsGuide(path);
-    return { title: page.title, summary: page.description, canonical: path, body: renderStaticMarkdown(page), related: page.related };
+    const built = page();
+    return { title: built.title, summary: built.description, canonical: built.path, body: renderStaticMarkdown(built), related: built.related };
   };
 }
+
+const guide = (path: PhysicsGuidePath): Renderer => staticPage(() => physicsGuide(path));
 
 const RENDERERS: Record<MarkdownPage, Renderer> = {
   "/": home,
@@ -379,6 +382,7 @@ const RENDERERS: Record<MarkdownPage, Renderer> = {
   "/library": library,
   "/lesson": lesson,
   "/technique": technique,
+  "/pricing": staticPage(pricingPage),
   "/wjec-a-level-physics": guide("/wjec-a-level-physics"),
   "/wjec-a-level-physics/past-papers": guide("/wjec-a-level-physics/past-papers"),
   "/wjec-a-level-physics/definitions": guide("/wjec-a-level-physics/definitions"),
@@ -402,6 +406,7 @@ export function listMarkdownRoutes(): MarkdownRoute[] {
   const routes: MarkdownRoute[] = [
     { path: "/", query: {}, title: SITE.name, summary: SITE.aiSummary, group: "core" },
     { path: "/welcome", query: {}, title: WELCOME.title, summary: WELCOME.description, group: "core" },
+    { path: "/pricing", query: {}, title: pricingPage().title, summary: pricingPage().description, group: "core" },
     { path: "/technique", query: {}, title: "Exam technique drills", summary: "Describe, explain and evaluate drills and a 6-mark-style structure, on a fictional context.", group: "guides" },
     ...PHYSICS_GUIDE_PATHS.map((path) => ({ path, query: {}, title: physicsGuide(path).title, summary: physicsGuide(path).description, group: "guides" as const })),
     { path: "/lesson", query: {}, title: "Lessons", summary: "Taught lesson checkpoints by subject.", group: "lessons" },
