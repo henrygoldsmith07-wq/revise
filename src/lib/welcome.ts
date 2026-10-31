@@ -61,7 +61,7 @@ export const WELCOME = {
     },
     {
       heading: "Pricing",
-      paragraphs: ["Everything on this page is free. [Plus](/pricing) adds cloud AI marking and feedback for a monthly or yearly fee."],
+      paragraphs: ["Everything on this page is free. [Pricing](/pricing) explains Revise Plus, the paid tier for cloud AI marking and feedback."],
     },
     {
       heading: "Using it",

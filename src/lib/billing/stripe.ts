@@ -19,9 +19,7 @@ const STRIPE_API = "https://api.stripe.com/v1";
 /** Stripe's own default tolerance for a webhook timestamp. */
 export const WEBHOOK_TOLERANCE_SECONDS = 300;
 
-export function billingEnabled(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
-}
+export { plusOnSale as billingEnabled } from "./on-sale";
 
 export interface BillingConfig {
   secretKey: string;

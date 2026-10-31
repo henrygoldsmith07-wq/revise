@@ -358,7 +358,7 @@ describe("POST /api/ai with Plus on sale", () => {
 });
 
 describe("/pricing", () => {
-  const html = renderStaticHtml(pricingPage());
+  const html = renderStaticHtml(pricingPage(true));
 
   it("is an indexable, script-free page in the sitemap, with a twin", () => {
     expect(html).toContain('<meta name="robots" content="index, follow">');
@@ -372,6 +372,15 @@ describe("/pricing", () => {
     expect(html).toContain("£2.99 a month");
     expect(html).toContain("£24 a year");
     for (const feature of [...PLUS_PLAN.free, ...PLUS_PLAN.unlocks]) expect(html).toContain(feature);
+  });
+
+  it("says Plus is not on sale, and sends nobody to Settings, until billing is switched on", () => {
+    const presale = renderStaticHtml(pricingPage(false));
+    expect(presale).toContain("is not on sale yet");
+    expect(presale).not.toContain("Settings → Plus. You need an account");
+    expect(html).toContain("Settings → Plus. You need an account");
+    delete process.env.STRIPE_SECRET_KEY;
+    expect(pricingPage().lead).toContain("not on sale yet");
   });
 
   it("claims nothing the trust position cannot back", () => {

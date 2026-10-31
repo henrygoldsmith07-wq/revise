@@ -2,25 +2,33 @@
 // card and the markdown twin quote one price list. It may claim only what the
 // trust position allows: Plus buys model marking, not a reviewed bank or a
 // better grade.
+//
+// Until this deployment sells Plus (STRIPE_SECRET_KEY unset) the page says so
+// rather than sending people to a Settings card that is not there, so the
+// page and its links can ship before billing is switched on.
 
 import { formatPence, PLUS_PLAN } from "@/domain/plus";
+import { plusOnSale } from "@/lib/billing/on-sale";
 import type { StaticPage } from "@/lib/static-page";
 
 export const PRICING_PATH = "/pricing";
 
-let built: StaticPage | null = null;
+const built = new Map<boolean, StaticPage>();
 
-export function pricingPage(): StaticPage {
-  if (built) return built;
+export function pricingPage(onSale: boolean = plusOnSale()): StaticPage {
+  const cached = built.get(onSale);
+  if (cached) return cached;
   const month = formatPence(PLUS_PLAN.prices.month);
   const year = formatPence(PLUS_PLAN.prices.year);
   const yearPerMonth = formatPence(Math.round(PLUS_PLAN.prices.year / 12));
-  built = {
+  const page: StaticPage = {
     path: PRICING_PATH,
     title: `Revise pricing: free, or Plus for ${month} a month`,
     heading: "Pricing",
     description: `Revise is free: spaced repetition, exam practice with the offline marker, lessons and sync. Plus adds cloud AI marking and feedback for ${month} a month or ${year} a year.`,
-    lead: `Revise is free. Plus adds cloud AI for ${month} a month or ${year} a year.`,
+    lead: onSale
+      ? `Revise is free. Plus adds cloud AI for ${month} a month or ${year} a year.`
+      : `Revise is free. Plus, which will add cloud AI for ${month} a month or ${year} a year, is not on sale yet.`,
     blocks: [
       {
         heading: "Free and Plus",
@@ -54,15 +62,21 @@ export function pricingPage(): StaticPage {
         heading: "Under 18?",
         paragraphs: ["Ask a parent or carer to subscribe with their own card. Everything free works without paying anything."],
       },
-      {
-        heading: "Subscribing",
-        paragraphs: ["[Open Revise](/settings) and go to Settings → Plus. You need an account, so the subscription follows you across devices; signing in only needs an email address."],
-      },
+      onSale
+        ? {
+            heading: "Subscribing",
+            paragraphs: ["[Open Revise](/settings) and go to Settings → Plus. You need an account, so the subscription follows you across devices; signing in only needs an email address."],
+          }
+        : {
+            heading: "Subscribing",
+            paragraphs: ["Plus is not on sale yet, so every feature in the table is free for now. [Open Revise](/) to start."],
+          },
     ],
     related: [
       { label: "WJEC A-level Physics guides", path: "/wjec-a-level-physics" },
       { label: "What Revise can and cannot do yet", path: "/welcome" },
     ],
   };
-  return built;
+  built.set(onSale, page);
+  return page;
 }
