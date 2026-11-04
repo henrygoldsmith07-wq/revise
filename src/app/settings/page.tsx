@@ -46,6 +46,7 @@ import { ACCOUNT_DELETION_CONFIRMATION, ACCOUNT_DELETION_EXPLANATION, LOCAL_ERAS
 import { recordAiConsentChoice } from "@/ai/consent-client";
 import { UNIT4_OPTIONS, isUnit4Option, type Unit4Option, type YearGroup } from "@/domain/year-group";
 import { Button, Field, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
+import { PlusSettings } from "@/components/PlusSettings";
 import { UnitExamTimetable } from "@/components/UnitExamTimetable";
 import { PwaInstallSettings } from "@/components/PwaInstall";
 import { clearPilotQueue, flushPilotEvents, pendingPilotEvents } from "@/lib/pilot-telemetry";
@@ -391,6 +392,7 @@ export default function SettingsPage() {
       </section>
 
       <AiConsentSection ai={ai} />
+      <PlusSettings />
 
       <Account />
 

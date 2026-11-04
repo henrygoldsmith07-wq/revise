@@ -29,6 +29,7 @@ const calls: string[] = [];
 let residual: unknown[] = [];
 let deleteError: { message: string } | null = null;
 let signedOut = false;
+let subscriptionRow: { stripe_subscription_id: string; status: string } | null = null;
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
@@ -44,6 +45,16 @@ vi.mock("@supabase/ssr", () => ({
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
+    from: (table: string) => ({
+      select: () => ({
+        eq: (_col: string, value: string) => ({
+          maybeSingle: async () => {
+            calls.push(`select:${table}:${value}`);
+            return { data: subscriptionRow, error: null };
+          },
+        }),
+      }),
+    }),
     rpc: async (fn: string, args: Record<string, unknown>) => {
       calls.push(`rpc:${fn}:${String(args.p_user_id)}`);
       if (fn === "account_residual_rows") return { data: residual, error: null };
@@ -62,7 +73,7 @@ vi.mock("@supabase/supabase-js", () => ({
 
 import { POST as deleteAccount } from "@/app/api/account/delete/route";
 
-const ENV_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
+const ENV_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "STRIPE_SECRET_KEY"];
 const saved: Record<string, string | undefined> = {};
 
 function request(body: unknown, headers: Record<string, string> = {}) {
@@ -106,6 +117,7 @@ describe("account deletion — route behaviour", () => {
     residual = [];
     deleteError = null;
     signedOut = false;
+    subscriptionRow = null;
   });
   afterEach(() => {
     for (const key of ENV_KEYS) {
@@ -145,6 +157,7 @@ describe("account deletion — route behaviour", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ deleted: true });
     expect(calls).toEqual([
+      "select:subscriptions:user-1",
       "rpc:purge_account_server_data:user-1",
       "deleteUser:user-1",
       "rpc:account_residual_rows:user-1",
@@ -179,6 +192,47 @@ describe("account deletion — route behaviour", () => {
     const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
     expect(res.status).toBe(502);
     expect(calls).not.toContain("rpc:account_residual_rows:user-1");
+  });
+
+  it("cancels a live Plus subscription in Stripe before deleting anything", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    subscriptionRow = { stripe_subscription_id: "sub_123", status: "active" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      calls.push(`stripe:${init?.method}:${String(url).replace("https://api.stripe.com/v1", "")}`);
+      return new Response(JSON.stringify({ id: "sub_123", status: "canceled" }), { status: 200 });
+    });
+    try {
+      const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
+      expect(res.status).toBe(200);
+      expect(calls.slice(0, 3)).toEqual(["select:subscriptions:user-1", "stripe:DELETE:/subscriptions/sub_123", "rpc:purge_account_server_data:user-1"]);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("deletes nothing when Stripe will not cancel a live subscription", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    subscriptionRow = { stripe_subscription_id: "sub_123", status: "past_due" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "api_error" } }), { status: 500 }));
+    try {
+      const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
+      expect(res.status).toBe(502);
+      expect(calls).toEqual(["select:subscriptions:user-1"]);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("does not call Stripe for a subscription that has already ended", async () => {
+    subscriptionRow = { stripe_subscription_id: "sub_123", status: "canceled" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
+      expect(res.status).toBe(200);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it("never returns the service-role key", async () => {

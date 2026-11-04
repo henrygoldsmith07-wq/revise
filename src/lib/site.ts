@@ -16,7 +16,7 @@
  * production deployment, so a preview or a local build still names the real
  * site as canonical.
  */
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://revise-gray.vercel.app").replace(/\/+$/, "");
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.revise.my.id").replace(/\/+$/, "");
 
 /** The static landing page (revise-site/, its own Vercel project). */
 export const LANDING_URL = "https://revise-site-henrygoldsmith07-9188s-projects.vercel.app";

@@ -53,7 +53,7 @@ export function grantProblems(args) {
   if (granter && (granter === (args.label ?? "").toLowerCase() || granter === (args.email ?? "") || granter === (args.email ?? "").split("@")[0])) {
     problems.push("the maintainer cannot grant reviewer access to themselves: questions they authored need two independent reviewers");
   }
-  if (args.site && !/^https?:\/\/[^/\s]+$/.test(args.site)) problems.push("--site must be an origin like https://revise-gray.vercel.app");
+  if (args.site && !/^https?:\/\/[^/\s]+$/.test(args.site)) problems.push("--site must be an origin like https://www.revise.my.id");
   return problems;
 }
 

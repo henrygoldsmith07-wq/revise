@@ -44,7 +44,7 @@ questions. These are the only steps that need the maintainer; each one is
 something the code cannot do for you. In order:
 
 1. **Redirect allow-list (once).** Supabase dashboard → Authentication → URL
-   Configuration → Redirect URLs → add `https://revise-gray.vercel.app/reviewer/**`.
+   Configuration → Redirect URLs → add `https://www.revise.my.id/reviewer/**`.
    Without it the sign-in link returns the teacher to the Site URL (the
    student app), not the portal.
 2. **A code in the sign-in email (once, recommended).** Supabase dashboard →
@@ -72,7 +72,7 @@ something the code cannot do for you. In order:
    NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
      --email teacher@school.org --label teacher-a --role teacher \
      --qualification "PGCE Physics; N years teaching WJEC A-level" \
-     --granted-by henry --invite --site https://revise-gray.vercel.app
+     --granted-by henry --invite --site https://www.revise.my.id
    ```
 
    Add `--dry-run` first if unsure. The command prints `sendThisLink`.
@@ -233,7 +233,7 @@ shell (never committed):
 NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
   --email teacher@school.org --label teacher-jsmith --role teacher \
   --qualification "PGCE Physics; 8 years teaching WJEC A-level" \
-  --granted-by henry --invite --site https://revise-gray.vercel.app [--dry-run]
+  --granted-by henry --invite --site https://www.revise.my.id [--dry-run]
 
 NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- --email teacher@school.org --revoke
 ```

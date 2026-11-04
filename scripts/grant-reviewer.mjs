@@ -5,7 +5,7 @@
 //   NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run wjec:reviewer:grant -- \
 //     --email teacher@school.org --label teacher-jsmith --role teacher \
 //     --qualification "PGCE Physics; 8 years teaching WJEC A-level" \
-//     --granted-by henry --invite --site https://revise-gray.vercel.app [--dry-run]
+//     --granted-by henry --invite --site https://www.revise.my.id [--dry-run]
 //
 //   ... npm run wjec:reviewer:grant -- --email teacher@school.org --revoke
 //

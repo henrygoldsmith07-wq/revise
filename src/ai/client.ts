@@ -16,6 +16,7 @@ import { localAiConsentGranted } from "./consent-client";
 import { sendAiTask } from "./transport";
 import { assessMarkConfidence } from "@/domain/marking-confidence";
 import { AI_CONSENT_REQUIRED_MESSAGE } from "@/domain/ai-consent";
+import { PLUS_REQUIRED_MESSAGE } from "@/domain/plus";
 import { getTopic } from "@/domain/curriculum";
 import { checkExtractionInput } from "@/domain/paper-extraction";
 import { localClassifyError } from "@/domain/error-local-classifier";
@@ -180,7 +181,8 @@ export async function aiMark(question: Question, answers: Record<string, string>
       const server = await call<MarkResponse>("mark", { question, answers: maskedAnswers }, () => markFallback(question, answers));
       // The server refusing for lack of consent (revoked on another device) is
       // not a transient failure: nothing should be queued for a retry.
-      if (server.note === AI_CONSENT_REQUIRED_MESSAGE) cloudBlocked = true;
+      // Neither is an account without Plus: retrying would only be refused again.
+      if (server.note === AI_CONSENT_REQUIRED_MESSAGE || server.note === PLUS_REQUIRED_MESSAGE) cloudBlocked = true;
       // Only a genuine model grade is taken from the server. Any server-side
       // rubric result was computed from masked answers and a minimised
       // question, so the authoritative deterministic mark is recomputed here

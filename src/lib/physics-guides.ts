@@ -41,6 +41,7 @@ const RELATED: StaticPage["related"] = [
   { label: "Definitions", path: DEFINITIONS },
   { label: "Data booklet", path: DATA_BOOKLET },
   { label: "What Revise can and cannot do yet", path: "/welcome" },
+  { label: "Pricing", path: "/pricing" },
 ];
 
 function related(self: PhysicsGuidePath): StaticPage["related"] {
