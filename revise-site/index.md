@@ -47,7 +47,7 @@ An adaptive timetable from exam dates and availability — missed blocks roll fo
 
 Built from the same data the app uses, and honest about what is not yet reviewed.
 
-[Every topic, by how often it is examined](https://revise-gray.vercel.app/wjec-a-level-physics) [Past paper questions by topic, 2022–2025](https://revise-gray.vercel.app/wjec-a-level-physics/past-papers) [The definitions you must learn](https://revise-gray.vercel.app/wjec-a-level-physics/definitions) [Data booklet constants and key equations](https://revise-gray.vercel.app/wjec-a-level-physics/data-booklet)
+[Every topic, by how often it is examined](https://www.revise.my.id/wjec-a-level-physics) [Past paper questions by topic, 2022–2025](https://www.revise.my.id/wjec-a-level-physics/past-papers) [The definitions you must learn](https://www.revise.my.id/wjec-a-level-physics/definitions) [Data booklet constants and key equations](https://www.revise.my.id/wjec-a-level-physics/data-booklet)
 
 ## Honest by design
 
@@ -106,5 +106,5 @@ Coverage is per specPoint, verified by scripts/validate-curriculum.mjs in CI —
 
 ## Related
 
-- [Revise, the app](https://revise-gray.vercel.app/)
-- [The app as markdown, with its lessons and library](https://revise-gray.vercel.app/llms.txt)
+- [Revise, the app](https://www.revise.my.id/)
+- [The app as markdown, with its lessons and library](https://www.revise.my.id/llms.txt)
