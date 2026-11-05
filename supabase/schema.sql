@@ -1795,7 +1795,9 @@ $$;
 --
 -- Stripe can deliver events out of order and more than once. Each write
 -- carries the event's own creation time and only replaces a row written from
--- an older event, so a late "created" can never undo a "deleted".
+-- an older event for the same subscription, so a late "created" can never
+-- undo a "deleted". Across subscriptions, one that grants Plus wins over one
+-- that does not (20261105000100_plus_subscription_precedence.sql).
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.subscriptions (
@@ -1839,8 +1841,22 @@ $$;
 revoke all on function public.has_plus() from public, anon;
 grant execute on function public.has_plus() to authenticated;
 
+-- Whether a stored row grants Plus: has_plus()'s rule for one row.
+create or replace function public.plus_row_grants(p_status text, p_current_period_end timestamptz)
+returns boolean
+language sql
+stable
+set search_path = public
+as $$
+  select p_status in ('active', 'trialing', 'past_due')
+    and (p_current_period_end is null or p_current_period_end > now());
+$$;
+revoke all on function public.plus_row_grants(text, timestamptz) from public, anon, authenticated;
+
 -- The webhook's only write. Returns true when the event was applied, false
--- when a newer event had already been stored.
+-- when it lost: to a newer event for the same subscription, or, for a
+-- different subscription, to one that grants Plus when it does not
+-- (20261105000100_plus_subscription_precedence.sql).
 create or replace function public.apply_plus_subscription_event(
   p_user_id uuid,
   p_customer_id text,
@@ -1878,7 +1894,14 @@ begin
     cancel_at_period_end = excluded.cancel_at_period_end,
     event_created_at = excluded.event_created_at,
     updated_at = now()
-  where s.event_created_at <= excluded.event_created_at
+  where case
+    when s.stripe_subscription_id = excluded.stripe_subscription_id
+      then s.event_created_at <= excluded.event_created_at
+    when public.plus_row_grants(excluded.status, excluded.current_period_end)
+      <> public.plus_row_grants(s.status, s.current_period_end)
+      then public.plus_row_grants(excluded.status, excluded.current_period_end)
+    else s.event_created_at <= excluded.event_created_at
+  end
   returning true into applied;
   return coalesce(applied, false);
 end;
