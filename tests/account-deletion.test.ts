@@ -194,17 +194,88 @@ describe("account deletion — route behaviour", () => {
     expect(calls).not.toContain("rpc:account_residual_rows:user-1");
   });
 
+  const PAYER = "aaaaaaaa-1111-4111-8111-111111111111";
+
+  /** Stripe over fetch: the search returns `found`; DELETE succeeds unless `failDelete`. */
+  function stubStripe(found: { id: string; status: string }[], options: { failSearch?: boolean; failDelete?: boolean } = {}) {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      const path = url.pathname.replace("/v1", "");
+      calls.push(`stripe:${init?.method}:${path}`);
+      if (path === "/subscriptions/search") {
+        expect(url.searchParams.get("query")).toBe(`metadata['user_id']:'${PAYER}'`);
+        if (options.failSearch) return new Response(JSON.stringify({ error: { code: "api_error" } }), { status: 500 });
+        return new Response(JSON.stringify({ data: found, has_more: false }), { status: 200 });
+      }
+      if (options.failDelete) return new Response(JSON.stringify({ error: { code: "api_error" } }), { status: 500 });
+      return new Response(JSON.stringify({ id: path.split("/").pop(), status: "canceled" }), { status: 200 });
+    });
+  }
+
   it("cancels a live Plus subscription in Stripe before deleting anything", async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    sessionUser = { id: PAYER };
     subscriptionRow = { stripe_subscription_id: "sub_123", status: "active" };
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-      calls.push(`stripe:${init?.method}:${String(url).replace("https://api.stripe.com/v1", "")}`);
-      return new Response(JSON.stringify({ id: "sub_123", status: "canceled" }), { status: 200 });
-    });
+    const fetchSpy = stubStripe([{ id: "sub_123", status: "active" }]);
     try {
       const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
       expect(res.status).toBe(200);
-      expect(calls.slice(0, 3)).toEqual(["select:subscriptions:user-1", "stripe:DELETE:/subscriptions/sub_123", "rpc:purge_account_server_data:user-1"]);
+      expect(calls.slice(0, 4)).toEqual([
+        `select:subscriptions:${PAYER}`,
+        "stripe:GET:/subscriptions/search",
+        "stripe:DELETE:/subscriptions/sub_123",
+        `rpc:purge_account_server_data:${PAYER}`,
+      ]);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("cancels every live subscription Stripe holds for the account, not only the one the row follows", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    sessionUser = { id: PAYER };
+    // The row follows an old unpaid subscription; a second checkout is live,
+    // and a third has already ended.
+    subscriptionRow = { stripe_subscription_id: "sub_old", status: "unpaid" };
+    const fetchSpy = stubStripe([
+      { id: "sub_old", status: "unpaid" },
+      { id: "sub_new", status: "active" },
+      { id: "sub_done", status: "canceled" },
+    ]);
+    try {
+      const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
+      expect(res.status).toBe(200);
+      const stripeCalls = calls.filter((call) => call.startsWith("stripe:DELETE"));
+      expect(stripeCalls).toEqual(["stripe:DELETE:/subscriptions/sub_old", "stripe:DELETE:/subscriptions/sub_new"]);
+      expect(calls.indexOf("stripe:DELETE:/subscriptions/sub_new")).toBeLessThan(calls.indexOf(`rpc:purge_account_server_data:${PAYER}`));
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("cancels a subscription whose webhook has not landed yet", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    sessionUser = { id: PAYER };
+    subscriptionRow = null;
+    const fetchSpy = stubStripe([{ id: "sub_fresh", status: "active" }]);
+    try {
+      const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
+      expect(res.status).toBe(200);
+      expect(calls).toContain("stripe:DELETE:/subscriptions/sub_fresh");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("deletes nothing when Stripe cannot be searched", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    sessionUser = { id: PAYER };
+    subscriptionRow = null;
+    const fetchSpy = stubStripe([], { failSearch: true });
+    try {
+      const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
+      expect(res.status).toBe(502);
+      expect(calls).toEqual([`select:subscriptions:${PAYER}`, "stripe:GET:/subscriptions/search"]);
     } finally {
       fetchSpy.mockRestore();
     }
@@ -212,12 +283,13 @@ describe("account deletion — route behaviour", () => {
 
   it("deletes nothing when Stripe will not cancel a live subscription", async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    sessionUser = { id: PAYER };
     subscriptionRow = { stripe_subscription_id: "sub_123", status: "past_due" };
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { code: "api_error" } }), { status: 500 }));
+    const fetchSpy = stubStripe([{ id: "sub_123", status: "past_due" }], { failDelete: true });
     try {
       const res = await deleteAccount(request({ confirm: ACCOUNT_DELETION_CONFIRMATION }));
       expect(res.status).toBe(502);
-      expect(calls).toEqual(["select:subscriptions:user-1"]);
+      expect(calls).toEqual([`select:subscriptions:${PAYER}`, "stripe:GET:/subscriptions/search", "stripe:DELETE:/subscriptions/sub_123"]);
     } finally {
       fetchSpy.mockRestore();
     }

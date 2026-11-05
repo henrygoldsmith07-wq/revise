@@ -3,9 +3,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { STRIPE_SUBSCRIPTION_STATUSES, type PlusInterval, type StripeSubscriptionStatus } from "@/domain/plus";
 
 // ---------------------------------------------------------------------------
-// Stripe, over its REST API. No SDK: the app makes three calls (checkout,
-// portal, cancel) and checks one webhook signature, and a payment SDK in the
-// dependency tree is more surface than those are worth.
+// Stripe, over its REST API. No SDK: the app makes four calls (checkout,
+// portal, and search-then-cancel on account deletion) and checks one webhook
+// signature, and a payment SDK in the dependency tree is more surface than
+// those are worth.
 //
 // The secret key and webhook secret are read only here; this module is
 // server-only and nothing it returns carries either. Billing is "on" as soon
@@ -16,6 +17,7 @@ import { STRIPE_SUBSCRIPTION_STATUSES, type PlusInterval, type StripeSubscriptio
 // ---------------------------------------------------------------------------
 
 const STRIPE_API = "https://api.stripe.com/v1";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Stripe's own default tolerance for a webhook timestamp. */
 export const WEBHOOK_TOLERANCE_SECONDS = 300;
 
@@ -54,11 +56,13 @@ export class StripeRequestError extends Error {
   }
 }
 
-async function stripe<T>(secretKey: string, method: "POST" | "DELETE", path: string, params: Record<string, string> = {}): Promise<T> {
-  const res = await fetch(`${STRIPE_API}${path}`, {
+async function stripe<T>(secretKey: string, method: "GET" | "POST" | "DELETE", path: string, params: Record<string, string> = {}): Promise<T> {
+  const encoded = new URLSearchParams(params).toString();
+  const url = method === "GET" && encoded ? `${STRIPE_API}${path}?${encoded}` : `${STRIPE_API}${path}`;
+  const res = await fetch(url, {
     method,
     headers: { authorization: `Bearer ${secretKey}`, "content-type": "application/x-www-form-urlencoded" },
-    body: method === "POST" ? new URLSearchParams(params).toString() : undefined,
+    body: method === "POST" ? encoded : undefined,
   });
   const body = (await res.json().catch(() => null)) as (T & { error?: { code?: string } }) | null;
   if (!res.ok || !body) throw new StripeRequestError(res.status, body?.error?.code ?? null);
@@ -117,6 +121,42 @@ export async function cancelSubscription(secretKey: string, subscriptionId: stri
   }
 }
 
+/** Statuses after which Stripe will not charge the subscription again. */
+export const ENDED_SUBSCRIPTION_STATUSES: readonly StripeSubscriptionStatus[] = ["canceled", "incomplete_expired"];
+
+/**
+ * Every subscription Stripe holds for this account that could still charge,
+ * found by the user id checkout puts on each one's metadata — not just the one
+ * the subscriptions row follows, since an account can hold several (two
+ * checkouts in two tabs, or a new one after an unpaid one). Stripe's search is
+ * eventually consistent (about a minute), so callers also pass the ids they
+ * already know.
+ */
+export async function liveSubscriptionIds(secretKey: string, userId: string): Promise<string[]> {
+  if (!UUID.test(userId)) throw new Error("liveSubscriptionIds needs a user id");
+  const ids: string[] = [];
+  let page: string | null = null;
+  // A handful at most in practice; the cap only bounds a misbehaving response.
+  for (let round = 0; round < 10; round += 1) {
+    const params: Record<string, string> = { query: `metadata['user_id']:'${userId}'`, limit: "100" };
+    if (page) params.page = page;
+    const result = await stripe<{ data?: { id?: unknown; status?: unknown }[]; has_more?: unknown; next_page?: unknown }>(
+      secretKey,
+      "GET",
+      "/subscriptions/search",
+      params,
+    );
+    for (const subscription of result.data ?? []) {
+      if (typeof subscription.id !== "string") continue;
+      if ((ENDED_SUBSCRIPTION_STATUSES as readonly unknown[]).includes(subscription.status)) continue;
+      ids.push(subscription.id);
+    }
+    if (result.has_more !== true || typeof result.next_page !== "string") return ids;
+    page = result.next_page;
+  }
+  throw new StripeRequestError(502, "search_unbounded");
+}
+
 // --- webhooks ---------------------------------------------------------------
 
 /**
@@ -156,8 +196,6 @@ export interface SubscriptionChange {
   cancelAtPeriodEnd: boolean;
   eventCreatedAt: string;
 }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function unixToIso(value: unknown): string | null {
   return typeof value === "number" && Number.isFinite(value) ? new Date(value * 1000).toISOString() : null;

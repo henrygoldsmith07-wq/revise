@@ -5,7 +5,7 @@ import { checkDeletionRequest, residualScopes } from "@/domain/account-deletion"
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { errorClass } from "@/lib/observability";
 import { readBoundedText } from "@/lib/bounded-body";
-import { cancelSubscription } from "@/lib/billing/stripe";
+import { cancelSubscription, ENDED_SUBSCRIPTION_STATUSES, liveSubscriptionIds } from "@/lib/billing/stripe";
 
 // ---------------------------------------------------------------------------
 // Authenticated account deletion.
@@ -19,9 +19,10 @@ import { cancelSubscription } from "@/lib/billing/stripe";
 //   3. Only then is the service-role client created (server-only module; the
 //      key never reaches a browser). Missing configuration fails closed (503)
 //      rather than pretending the account was deleted.
-//   4. A live Plus subscription is cancelled in Stripe first (502 and nothing
-//      deleted if that fails), so nobody keeps paying for an account that no
-//      longer exists. The subscriptions row itself goes with the auth user.
+//   4. Every live Plus subscription is cancelled in Stripe first (502 and
+//      nothing deleted if that fails), so nobody keeps paying for an account
+//      that no longer exists: the one the subscriptions row follows and any
+//      other Stripe holds under this user id. The row goes with the auth user.
 //   5. purge_account_server_data removes rows with no auth.users cascade path
 //      (AI quota counters, AI consent).
 //   6. auth.admin.deleteUser removes the auth user; ON DELETE CASCADE removes
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const cancelled = await cancelLiveSubscription(admin, userId);
+  const cancelled = await cancelLiveSubscriptions(admin, userId);
   if (!cancelled) {
     return NextResponse.json(
       { error: "Your Plus subscription could not be cancelled, so nothing has been deleted. Try again, or cancel it in Settings → Plus first." },
@@ -146,28 +147,28 @@ export async function POST(request: Request) {
   return NextResponse.json({ deleted: true }, { headers: { "cache-control": "no-store" } });
 }
 
-/** Statuses after which Stripe will not charge again. */
-const ENDED = new Set(["canceled", "incomplete_expired"]);
-
 /**
- * Cancels the account's Stripe subscription if one could still charge. True
- * when there is nothing left to cancel; false when Stripe or the lookup failed.
+ * Cancels every Stripe subscription of this account that could still charge:
+ * the one the subscriptions row follows, and any other Stripe holds under the
+ * account's user id (a second checkout, or one whose webhook has not landed).
+ * True when nothing is left to cancel; false when Stripe or the lookup failed.
  */
-async function cancelLiveSubscription(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>, userId: string): Promise<boolean> {
+async function cancelLiveSubscriptions(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>, userId: string): Promise<boolean> {
   const { data, error } = await admin.from("subscriptions").select("stripe_subscription_id, status").eq("user_id", userId).maybeSingle();
-  if (error) {
-    // No subscriptions table means billing was never deployed here.
-    return error.code === "42P01";
-  }
-  const row = data as { stripe_subscription_id: string; status: string } | null;
-  if (!row || ENDED.has(row.status)) return true;
+  // No subscriptions table means billing was never deployed here.
+  if (error && error.code !== "42P01") return false;
+  const row = error ? null : (data as { stripe_subscription_id: string; status: string } | null);
+  const known = row && !(ENDED_SUBSCRIPTION_STATUSES as readonly string[]).includes(row.status) ? [row.stripe_subscription_id] : [];
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
+    // Without the key this server has never sold Plus, unless a row says otherwise.
+    if (!known.length) return true;
     console.error("[account] live subscription but no Stripe key; refusing to delete");
     return false;
   }
   try {
-    await cancelSubscription(secretKey, row.stripe_subscription_id);
+    const found = await liveSubscriptionIds(secretKey, userId);
+    for (const id of new Set([...known, ...found])) await cancelSubscription(secretKey, id);
     return true;
   } catch (error) {
     console.error("[account] Stripe cancellation failed", { errorClass: errorClass(error) });
