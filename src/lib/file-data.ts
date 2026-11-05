@@ -45,3 +45,47 @@ export async function imageForAi(file: File): Promise<{ base64: string; mediaTyp
   }
   return { base64: await toBase64(file), mediaType: file.type || "image/jpeg" };
 }
+
+/** Longest edge of a photo kept on a card: sharp on a phone, small enough to sync. */
+export const CARD_IMAGE_MAX_EDGE = 1400;
+/** Deck import accepts media up to 2 MB of data URL; stay well inside it. */
+export const CARD_IMAGE_MAX_CHARS = 1_500_000;
+
+/**
+ * Prepare a photo of a diagram for a card's `imageUrl`: re-encoded through a
+ * canvas (which drops the camera's GPS and device metadata, since the card
+ * syncs and exports), scaled to CARD_IMAGE_MAX_EDGE, and stepped down in
+ * quality until the data URL fits CARD_IMAGE_MAX_CHARS. Null when the browser
+ * cannot decode the file or it cannot be made small enough; unlike the AI
+ * path there is no raw fallback, because the raw bytes would carry metadata.
+ */
+export async function imageForCard(file: File): Promise<string | null> {
+  if (typeof createImageBitmap !== "function" || typeof document === "undefined") return null;
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return null;
+  }
+  try {
+    for (const edge of [CARD_IMAGE_MAX_EDGE, 1000]) {
+      const scale = Math.min(1, edge / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      // A transparent PNG (a screenshot of a figure) would turn black as a JPEG.
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.85, 0.7, 0.55]) {
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        if (dataUrl.startsWith("data:image/jpeg;base64,") && dataUrl.length <= CARD_IMAGE_MAX_CHARS) return dataUrl;
+      }
+    }
+    return null;
+  } finally {
+    bitmap.close();
+  }
+}

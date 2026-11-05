@@ -84,7 +84,7 @@ export function ShareDeck({ cards, name }: { cards: Card[]; name: string }) {
           <ShareIcon size={ICON_SIZE.sm} aria-hidden />
           Share as a file
         </Button>
-        <Button onClick={() => void copyLink()} disabled={!link} className="min-h-[2.75rem]">
+        <Button onClick={() => void copyLink()} disabled={!link || link.cardsIncluded === 0} className="min-h-[2.75rem]">
           {copied ? "Link copied" : "Copy a link"}
         </Button>
       </div>
@@ -93,6 +93,11 @@ export function ShareDeck({ cards, name }: { cards: Card[]; name: string }) {
         <p className="text-xs text-review">
           Too big for a link — a link would carry only the first {link.cardsIncluded}. Share the file to send all{" "}
           {cards.length}.
+        </p>
+      ) : link && link.cardsIncluded < cards.length ? (
+        <p className="text-xs text-review">
+          Photo diagrams cannot travel in a link, so it carries {link.cardsIncluded} of the {cards.length} cards. Share the file
+          to send them all.
         </p>
       ) : link ? (
         <p className="text-[11px] text-ink3">

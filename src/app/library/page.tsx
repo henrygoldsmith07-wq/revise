@@ -10,6 +10,8 @@ import { knowledgeVsAnswering } from "@/domain/exam-technique";
 import { buildSubjectGraph } from "@/domain/knowledge-graph";
 import { createCard } from "@/domain/scheduling";
 import { buildCloze, normaliseCloze } from "@/domain/cloze";
+import { diagramCardBack, diagramDraftIssue, type DiagramPointDraft } from "@/domain/diagrams";
+import { DiagramCardBuilder } from "@/components/DiagramCardBuilder";
 import { learnerState, topicEvidenceSummary, type LearnerStateView } from "@/domain/learner-state";
 import { topicLifecycle } from "@/domain/proof-lifecycle";
 import type { Card, Topic } from "@/domain/types";
@@ -526,18 +528,46 @@ function ManualCard({ subjectId }: { subjectId: string }) {
   const store = useStoreFields("addCards", "userId");
   const topics = subjectId ? topicsFor(subjectId) : [];
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
-  const [kind, setKind] = useState<"basic" | "cloze">("basic");
+  const [kind, setKind] = useState<"basic" | "cloze" | "diagram">("basic");
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  const [points, setPoints] = useState<DiagramPointDraft[]>([]);
   const [saved, setSaved] = useState(false);
 
   const cloze = kind === "cloze" ? buildCloze(front, back) : null;
+  const diagramIssue = kind === "diagram" ? diagramDraftIssue(imageUrl, points) : null;
   const canSave =
     Boolean(topicId) &&
-    (kind === "cloze" ? Boolean(cloze) : Boolean(front.trim() && back.trim()));
+    (kind === "cloze"
+      ? Boolean(cloze)
+      : kind === "diagram"
+        ? !diagramIssue
+        : Boolean(front.trim() && back.trim()));
 
   async function save() {
     if (!canSave) return;
+    if (kind === "diagram") {
+      await store.addCards([
+        createCard({
+          id: crypto.randomUUID(),
+          userId: store.userId,
+          subjectId,
+          topicId,
+          front: front.trim() || "Label this diagram",
+          back: diagramCardBack(points),
+          kind: "image",
+          imageUrl,
+          tags: ["diagram"],
+          origin: "manual",
+        }),
+      ]);
+      setFront("");
+      setImageUrl(undefined);
+      setPoints([]);
+      setSaved(true);
+      return;
+    }
     await store.addCards([
       createCard({
         id: crypto.randomUUID(),
@@ -562,7 +592,13 @@ function ManualCard({ subjectId }: { subjectId: string }) {
     <section>
       <SectionHeading
         title="Write a card"
-        hint={kind === "cloze" ? "Cloze hides one exact answer inside a complete sentence." : "Write a prompt and the answer you want to retrieve."}
+        hint={
+          kind === "cloze"
+            ? "Cloze hides one exact answer inside a complete sentence."
+            : kind === "diagram"
+              ? "Photograph a figure from your textbook or notes, mark the points, and recall each label."
+              : "Write a prompt and the answer you want to retrieve."
+        }
       />
       <Panel className="space-y-3">
         <div className="max-w-xs">
@@ -570,12 +606,13 @@ function ManualCard({ subjectId }: { subjectId: string }) {
             ariaLabel="Card type"
             value={kind}
             onChange={(value) => {
-              setKind(value as "basic" | "cloze");
+              setKind(value as "basic" | "cloze" | "diagram");
               setSaved(false);
             }}
             options={[
               { value: "basic", label: "Basic" },
               { value: "cloze", label: "Cloze" },
+              { value: "diagram", label: "Diagram" },
             ]}
           />
         </div>
@@ -588,38 +625,68 @@ function ManualCard({ subjectId }: { subjectId: string }) {
             ))}
           </select>
         </Field>
-        <Field
-          label={kind === "cloze" ? "Complete sentence" : "Front"}
-          hint={kind === "cloze"
-            ? "Write the full sentence with the answer visible."
-            : "A question, not a heading. LaTeX between $ works."}
-        >
-          <textarea
-            value={front}
-            onChange={(e) => {
-              setFront(e.target.value);
-              setSaved(false);
-            }}
-            rows={2}
-            className="field"
-            placeholder={kind === "cloze" ? "Mitochondria release energy by aerobic respiration." : undefined}
-          />
-        </Field>
-        <Field
-          label={kind === "cloze" ? "Hidden answer" : "Back"}
-          hint={kind === "cloze" ? "This exact text must occur in the complete sentence." : undefined}
-        >
-          <textarea
-            value={back}
-            onChange={(e) => {
-              setBack(e.target.value);
-              setSaved(false);
-            }}
-            rows={kind === "cloze" ? 2 : 3}
-            className="field"
-            placeholder={kind === "cloze" ? "aerobic respiration" : undefined}
-          />
-        </Field>
+        {kind === "diagram" ? (
+          <>
+            <Field label="Prompt" hint="Shown above the numbered diagram in review.">
+              <input
+                value={front}
+                onChange={(e) => {
+                  setFront(e.target.value);
+                  setSaved(false);
+                }}
+                className="field text-sm"
+                placeholder="Label the structure of the heart"
+              />
+            </Field>
+            <DiagramCardBuilder
+              imageUrl={imageUrl}
+              points={points}
+              onImage={(next) => {
+                setImageUrl(next);
+                setSaved(false);
+              }}
+              onPoints={(next) => {
+                setPoints(next);
+                setSaved(false);
+              }}
+            />
+          </>
+        ) : (
+          <>
+          <Field
+            label={kind === "cloze" ? "Complete sentence" : "Front"}
+            hint={kind === "cloze"
+              ? "Write the full sentence with the answer visible."
+              : "A question, not a heading. LaTeX between $ works."}
+          >
+            <textarea
+              value={front}
+              onChange={(e) => {
+                setFront(e.target.value);
+                setSaved(false);
+              }}
+              rows={2}
+              className="field"
+              placeholder={kind === "cloze" ? "Mitochondria release energy by aerobic respiration." : undefined}
+            />
+          </Field>
+          <Field
+            label={kind === "cloze" ? "Hidden answer" : "Back"}
+            hint={kind === "cloze" ? "This exact text must occur in the complete sentence." : undefined}
+          >
+            <textarea
+              value={back}
+              onChange={(e) => {
+                setBack(e.target.value);
+                setSaved(false);
+              }}
+              rows={kind === "cloze" ? 2 : 3}
+              className="field"
+              placeholder={kind === "cloze" ? "aerobic respiration" : undefined}
+            />
+          </Field>
+          </>
+        )}
         {kind === "cloze" && front.trim() && back.trim() ? (
           <div className="rounded-lg bg-surface2 px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Review prompt</p>
@@ -634,6 +701,8 @@ function ManualCard({ subjectId }: { subjectId: string }) {
           </Button>
           {kind === "cloze" && front.trim() && back.trim() && !cloze ? (
             <span className="text-xs text-ink3">The hidden answer must appear in the sentence.</span>
+          ) : diagramIssue && !saved ? (
+            <span className="text-xs text-ink3">{diagramIssue}</span>
           ) : saved ? (
             <span className="text-xs text-success">Saved — it is due in your next review.</span>
           ) : null}
