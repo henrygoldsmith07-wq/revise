@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useId } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 // The shared vocabulary every screen is built from. Le Studio's tokens carry
@@ -258,8 +257,6 @@ export function Field({
   /** The child is named by its own aria-label; the caption stays plain text. */
   labelled?: boolean;
 }) {
-  const generatedId = useId();
-  const id = htmlFor ?? generatedId;
   const caption = (
     <>
       <span className="text-xs font-semibold text-ink2">{label}</span>
@@ -275,7 +272,10 @@ export function Field({
     );
   }
   return (
-    <label className="block" htmlFor={id}>
+    // Without htmlFor the wrapping label names its child implicitly. A `for`
+    // pointing at an id the child does not carry would override that and
+    // leave the control with no accessible name.
+    <label className="block" htmlFor={htmlFor}>
       {caption}
       {children}
     </label>
