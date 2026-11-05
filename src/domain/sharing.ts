@@ -1,4 +1,5 @@
 import { exportDeck, normaliseKind } from "./deck-io";
+import { diagramNeedsCardImage } from "./diagrams";
 import type { Card, DeckExport } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -91,7 +92,9 @@ export interface ShareLink {
  * a partial deck plus an honest count beats a dead end.
  */
 export function buildShareLink(cards: Card[], name: string, origin: string): ShareLink {
-  let included = cards;
+  // A learner's photo diagram needs its image, which a link cannot carry; it
+  // would arrive as an unreadable payload. Share it as a file instead.
+  let included = cards.filter((card) => !diagramNeedsCardImage(card));
   let encoded = encodeDeckForLink(exportDeck(included, { name, includeScheduling: false }));
 
   while (encoded.length > MAX_LINK_BYTES && included.length > 1) {

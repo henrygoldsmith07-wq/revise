@@ -31,6 +31,19 @@ export interface DiagramSpec {
 /** The diagram lives on the card's `back` as JSON behind this marker. */
 const MARKER = "@diagram:";
 
+/**
+ * A learner's own diagram keeps its photo on the card's `imageUrl`, not inside
+ * the `back` payload: `imageUrl` is the media field every path already carries
+ * at full size (sync, deck export/import, shared decks), while `back` is a text
+ * field those paths cap at a few thousand characters. The payload then names
+ * the card's own image with this placeholder.
+ */
+export const CARD_IMAGE = "card:image";
+
+/** Enough points for any exam figure; more and the numbered markers overlap. */
+export const MAX_DIAGRAM_POINTS = 20;
+export const MAX_DIAGRAM_LABEL = 120;
+
 export function serialiseDiagram(spec: DiagramSpec): string {
   return `${MARKER}${JSON.stringify(spec)}`;
 }
@@ -40,10 +53,11 @@ export function serialiseDiagram(spec: DiagramSpec): string {
  * diagram, and for one whose payload is damaged — a half-parsed diagram would
  * render as an unanswerable question.
  */
-export function parseDiagram(card: Pick<Card, "back">): DiagramSpec | null {
+export function parseDiagram(card: Pick<Card, "back"> & { imageUrl?: string }): DiagramSpec | null {
   if (!card.back.startsWith(MARKER)) return null;
   try {
     const raw = JSON.parse(card.back.slice(MARKER.length)) as DiagramSpec;
+    if (raw?.imageUrl === CARD_IMAGE) raw.imageUrl = card.imageUrl ?? "";
     if (!raw?.imageUrl || !Array.isArray(raw.hotspots) || !raw.hotspots.length) return null;
     const hotspots = raw.hotspots
       .filter((h) => typeof h?.label === "string" && h.label.trim().length > 0)
@@ -51,7 +65,7 @@ export function parseDiagram(card: Pick<Card, "back">): DiagramSpec | null {
         id: String(h.id ?? index),
         x: clampPercent(Number(h.x)),
         y: clampPercent(Number(h.y)),
-        label: String(h.label).slice(0, 120),
+        label: String(h.label).slice(0, MAX_DIAGRAM_LABEL),
         note: h.note ? String(h.note).slice(0, 300) : undefined,
       }));
     return hotspots.length ? { imageUrl: raw.imageUrl, hotspots } : null;
@@ -60,13 +74,70 @@ export function parseDiagram(card: Pick<Card, "back">): DiagramSpec | null {
   }
 }
 
-export function isDiagramCard(card: Pick<Card, "back">): boolean {
+/**
+ * A diagram whose image is the card's own `imageUrl`. It cannot travel in a
+ * share link, which carries text fields only; a file export keeps it whole.
+ */
+export function diagramNeedsCardImage(card: Pick<Card, "back">): boolean {
+  if (!card.back.startsWith(MARKER)) return false;
+  try {
+    return (JSON.parse(card.back.slice(MARKER.length)) as { imageUrl?: unknown })?.imageUrl === CARD_IMAGE;
+  } catch {
+    return false;
+  }
+}
+
+export function isDiagramCard(card: Pick<Card, "back"> & { imageUrl?: string }): boolean {
   return parseDiagram(card) !== null;
 }
 
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 50;
   return Math.max(0, Math.min(100, value));
+}
+
+// --- the learner's own diagrams (image occlusion) -------------------------
+
+/** A point the learner has dropped on their image, label possibly not yet typed. */
+export interface DiagramPointDraft {
+  id: Id;
+  x: number;
+  y: number;
+  label: string;
+}
+
+/**
+ * Drop a point where the learner tapped. Coordinates are percentages of the
+ * displayed image, rounded so the payload stays short. Ids count up from the
+ * highest used, so deleting a point never reuses another's id.
+ */
+export function addDiagramPoint(points: DiagramPointDraft[], x: number, y: number): DiagramPointDraft[] {
+  if (points.length >= MAX_DIAGRAM_POINTS) return points;
+  const next = points.reduce((max, point) => Math.max(max, Number(point.id.replace(/^p/, "")) || 0), 0) + 1;
+  const round = (value: number) => Math.round(clampPercent(value) * 10) / 10;
+  return [...points, { id: `p${next}`, x: round(x), y: round(y), label: "" }];
+}
+
+/** Why the draft cannot be saved yet, or null when it can. */
+export function diagramDraftIssue(imageUrl: string | undefined, points: DiagramPointDraft[]): string | null {
+  if (!imageUrl) return "Add a photo or screenshot of the diagram first.";
+  if (!points.length) return "Tap the image to mark each point you want to recall.";
+  const unnamed = points.findIndex((point) => !point.label.trim());
+  if (unnamed >= 0) return `Name point ${unnamed + 1}, or remove it.`;
+  return null;
+}
+
+/**
+ * The `back` of a learner's diagram card. The image itself goes on the card's
+ * `imageUrl` (see CARD_IMAGE); this is only the points, so it survives every
+ * path that caps a card's text fields.
+ */
+export function diagramCardBack(points: DiagramPointDraft[]): string {
+  const hotspots: Hotspot[] = points
+    .filter((point) => point.label.trim())
+    .slice(0, MAX_DIAGRAM_POINTS)
+    .map((point) => ({ id: point.id, x: point.x, y: point.y, label: point.label.trim().slice(0, MAX_DIAGRAM_LABEL) }));
+  return serialiseDiagram({ imageUrl: CARD_IMAGE, hotspots });
 }
 
 // --- the labelling round ---------------------------------------------------
