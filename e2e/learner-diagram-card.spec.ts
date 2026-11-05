@@ -45,9 +45,12 @@ test("a learner builds a diagram card from their own image and labels it in Labe
 
   const image = main.getByRole("button", { name: /Diagram image/ });
   await expect(image).toBeVisible();
+  // Measure only once the photo has decoded, or the box is the empty button.
+  await expect.poll(() => image.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   const box = (await image.boundingBox())!;
-  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.3);
-  await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.7);
+  await image.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await image.click({ position: { x: box.width * 0.75, y: box.height * 0.7 } });
+  await expect(main.getByRole("list", { name: "Diagram points" }).getByRole("listitem")).toHaveCount(2);
   await expect(main.getByText("Name point 1, or remove it.")).toBeVisible();
   await main.getByLabel("Label for point 1").fill("Left atrium");
   await main.getByLabel("Label for point 2").fill("Aorta");
