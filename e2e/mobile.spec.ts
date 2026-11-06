@@ -144,10 +144,11 @@ test.describe("mobile core loop — Pixel 7", () => {
   test("OCR upload input is reachable and accepts a photo", async ({ page }) => {
     await settle(page);
     await page.goto("/practice");
-    const fileInput = page.locator('input[type="file"][accept*="image"]');
+    // A multi-part question has one upload per part; the first proves the path.
+    const fileInput = page.locator('input[type="file"][accept*="image"]').first();
     const emptyPractice = page.getByText(/No questions|nothing queued|Set an exam/i).first();
     await expect(fileInput.or(emptyPractice).first()).toBeVisible({ timeout: 15_000 });
-    if (!fileInput.isVisible()) {
+    if (!(await fileInput.isVisible())) {
       test.skip(true, "No answer input available in this profile");
       return;
     }
