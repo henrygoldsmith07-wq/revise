@@ -1,8 +1,9 @@
 import { boardOutline } from "./board-outline";
 import { AQA_PHYSICS_SPEC_CHECKED, AQA_PHYSICS_UNITS } from "./boards/aqa-alevel-physics";
 import { PHYSICS_EXTRA_TOPICS } from "./outlines/physics-extra";
-import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
+import { buildUnits } from "./helpers";
 import { PHYSICS_REFERENCE_OUTLINE } from "./outlines/physics";
+import { referenceSubject } from "./catalog";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
 
@@ -21,19 +22,7 @@ const { units, topics } = buildUnits(
 );
 
 export const aqaPhysics: CurriculumModule = registerSubject({
-  subject: {
-    id: SUBJECT_ID,
-    qualificationId: "aqa-alevel",
-    name: "Physics",
-    specCode: "7408",
-        papers: [
-      { id: `${SUBJECT_ID}.p1`, name: "Paper 1", weight: 0.34, durationMinutes: 120, calculatorAllowed: true },
-      { id: `${SUBJECT_ID}.p2`, name: "Paper 2", weight: 0.34, durationMinutes: 120, calculatorAllowed: true },
-      { id: `${SUBJECT_ID}.p3`, name: "Paper 3 (including Option)", weight: 0.32, durationMinutes: 120, calculatorAllowed: true },
-    ],
-    gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/physics/specifications/AQA-7407-7408-SP-2015.PDF" },
-  },
+  subject: referenceSubject(SUBJECT_ID),
   units,
   topics,
 });

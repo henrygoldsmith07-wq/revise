@@ -1,4 +1,5 @@
-import { registerBoard, registerQualification } from "./registry";
+import { REFERENCE_SUBJECTS } from "./catalog";
+import { registerBoard, registerQualification, registerSubjectStub } from "./registry";
 
 // ES module imports are hoisted, so the subject modules below actually
 // register first. That is safe: registration only stores records, and every
@@ -74,42 +75,55 @@ registerQualification({
   grades: ["9", "8", "7", "6", "5", "4", "3", "2", "1", "U"],
 });
 
-// Importing for side effects registers each subject into the registry.
+// The four WJEC flagships register with their topics at startup: the
+// question bank is written against them and builds before Today.
 import "./wjec-maths";
 import "./wjec-biology";
 import "./wjec-chemistry";
 import "./wjec-physics";
-import "./aqa-biology";
-import "./aqa-chemistry";
-import "./aqa-physics";
-import "./aqa-maths";
-import "./edexcel-maths";
-import "./edexcel-biology";
-import "./edexcel-chemistry";
-import "./edexcel-physics";
-import "./ocr-maths";
-import "./ocr-biology";
-import "./ocr-chemistry";
-import "./ocr-physics";
-import "./wjec-gcse-maths";
-import "./aqa-gcse-maths";
-import "./edexcel-gcse-maths";
-import "./ocr-gcse-maths";
-import "./wjec-gcse-biology";
-import "./aqa-gcse-biology";
-import "./edexcel-gcse-biology";
-import "./ocr-gcse-biology";
-import "./wjec-gcse-chemistry";
-import "./aqa-gcse-chemistry";
-import "./edexcel-gcse-chemistry";
-import "./ocr-gcse-chemistry";
-import "./wjec-gcse-physics";
-import "./aqa-gcse-physics";
-import "./edexcel-gcse-physics";
-import "./ocr-gcse-physics";
-import "./aqa-psychology";
-import "./aqa-computer-science";
-import "./aqa-economics";
+
+// Every other subject registers its catalogue metadata now and its topic tree
+// on demand (ensureSubjects / loadAllSubjects in ./registry.ts). Each loader
+// is its own chunk, so a learner downloads only the subjects they study.
+const SUBJECT_LOADERS: Record<string, () => Promise<unknown>> = {
+  "aqa-alevel-biology": () => import("./aqa-biology"),
+  "aqa-alevel-chemistry": () => import("./aqa-chemistry"),
+  "aqa-alevel-computer-science": () => import("./aqa-computer-science"),
+  "aqa-alevel-economics": () => import("./aqa-economics"),
+  "aqa-gcse-biology": () => import("./aqa-gcse-biology"),
+  "aqa-gcse-chemistry": () => import("./aqa-gcse-chemistry"),
+  "aqa-gcse-maths": () => import("./aqa-gcse-maths"),
+  "aqa-gcse-physics": () => import("./aqa-gcse-physics"),
+  "aqa-alevel-maths": () => import("./aqa-maths"),
+  "aqa-alevel-physics": () => import("./aqa-physics"),
+  "aqa-alevel-psychology": () => import("./aqa-psychology"),
+  "edexcel-alevel-biology": () => import("./edexcel-biology"),
+  "edexcel-alevel-chemistry": () => import("./edexcel-chemistry"),
+  "edexcel-gcse-biology": () => import("./edexcel-gcse-biology"),
+  "edexcel-gcse-chemistry": () => import("./edexcel-gcse-chemistry"),
+  "edexcel-gcse-maths": () => import("./edexcel-gcse-maths"),
+  "edexcel-gcse-physics": () => import("./edexcel-gcse-physics"),
+  "edexcel-alevel-maths": () => import("./edexcel-maths"),
+  "edexcel-alevel-physics": () => import("./edexcel-physics"),
+  "ocr-alevel-biology": () => import("./ocr-biology"),
+  "ocr-alevel-chemistry": () => import("./ocr-chemistry"),
+  "ocr-gcse-biology": () => import("./ocr-gcse-biology"),
+  "ocr-gcse-chemistry": () => import("./ocr-gcse-chemistry"),
+  "ocr-gcse-maths": () => import("./ocr-gcse-maths"),
+  "ocr-gcse-physics": () => import("./ocr-gcse-physics"),
+  "ocr-alevel-maths": () => import("./ocr-maths"),
+  "ocr-alevel-physics": () => import("./ocr-physics"),
+  "wjec-gcse-biology": () => import("./wjec-gcse-biology"),
+  "wjec-gcse-chemistry": () => import("./wjec-gcse-chemistry"),
+  "wjec-gcse-maths": () => import("./wjec-gcse-maths"),
+  "wjec-gcse-physics": () => import("./wjec-gcse-physics"),
+};
+
+for (const subject of Object.values(REFERENCE_SUBJECTS)) {
+  const load = SUBJECT_LOADERS[subject.id];
+  if (!load) throw new Error(`No loader for reference subject ${subject.id}`);
+  registerSubjectStub(subject, load);
+}
 
 export * from "./registry";
 export { A_LEVEL_BOUNDARIES } from "./helpers";

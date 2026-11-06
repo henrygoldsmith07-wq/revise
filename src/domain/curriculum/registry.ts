@@ -29,10 +29,68 @@ export function registerQualification(q: Qualification): Qualification {
   return q;
 }
 
+// --- loading on demand ------------------------------------------------------
+//
+// Every subject is registered at startup, but a reference subject starts as
+// a stub (its catalogue metadata, no units or topics) and its topic tree
+// loads when something asks for it: `ensureSubjects` for the subjects a
+// learner studies (the store, onboarding, settings), `loadAllSubjects` where
+// every subject is needed (server code, scripts, tests, the domain worker).
+// Until then `topicsFor` and `unitsFor` return [] and `getTopic` undefined for
+// that subject, exactly as for an unknown one.
+
+const loaded = new Set<Id>();
+const loaders = new Map<Id, () => Promise<unknown>>();
+const pending = new Map<Id, Promise<void>>();
+const listeners = new Set<() => void>();
+
 export function registerSubject(entry: CurriculumModule): CurriculumModule {
   const honest = honestSubject(entry);
   modules.set(honest.subject.id, honest);
+  loaded.add(honest.subject.id);
+  for (const listener of listeners) listener();
   return honest;
+}
+
+/** A subject whose topic tree loads on demand: its metadata now, `load` later. */
+export function registerSubjectStub(subject: Subject, load: () => Promise<unknown>): void {
+  loaders.set(subject.id, load);
+  if (!modules.has(subject.id)) modules.set(subject.id, honestSubject({ subject, units: [], topics: [] }));
+}
+
+/** Whether a subject's units and topics are registered (always true for a subject without a loader). */
+export function isSubjectLoaded(subjectId: Id): boolean {
+  return loaded.has(subjectId) || !loaders.has(subjectId);
+}
+
+/** Load the topic trees of these subjects, once each; concurrent callers share one load. */
+export async function ensureSubjects(subjectIds: Iterable<Id>): Promise<void> {
+  const waits: Promise<void>[] = [];
+  for (const id of new Set(subjectIds)) {
+    const load = loaders.get(id);
+    if (!load || loaded.has(id)) continue;
+    let wait = pending.get(id);
+    if (!wait) {
+      wait = load().then(
+        () => { pending.delete(id); },
+        (error: unknown) => { pending.delete(id); throw error; },
+      );
+      pending.set(id, wait);
+    }
+    waits.push(wait);
+  }
+  await Promise.all(waits);
+}
+
+/** Every registered subject's topic tree: for code that works across all subjects. */
+export function loadAllSubjects(): Promise<void> {
+  return ensureSubjects(loaders.keys());
+}
+
+/** Called whenever a subject's topic tree arrives. Returns the unsubscribe. */
+export function onSubjectsLoaded(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
 }
 
 export function allBoards(): ExamBoard[] {

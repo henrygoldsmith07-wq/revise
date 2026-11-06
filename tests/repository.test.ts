@@ -46,10 +46,12 @@ describe("loadSnapshot", () => {
     expect(snapshot.cards.filter((c) => isDue(c, today)).length).toBe(snapshot.cards.length);
   });
 
-  it("covers every topic in the registered curriculum", async () => {
+  it("covers every topic of the learner's subjects", async () => {
+    // Reference subjects install their cards when the learner enrols on them
+    // (installSubjects; tests/lazy-curriculum.test.ts), not on every device.
     const snapshot = await loadSnapshot(USER);
     const seeded = new Set(snapshot.cards.map((c) => c.topicId));
-    for (const topic of allTopics()) {
+    for (const topic of allTopics(snapshot.settings.subjectIds)) {
       expect(seeded.has(topic.id), `no cards for ${topic.id}`).toBe(true);
     }
   });

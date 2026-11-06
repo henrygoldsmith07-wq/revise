@@ -29,7 +29,7 @@ function boardPlacements(file) {
 
 function parseTopics() {
   const dir = join(ROOT, "src/domain/curriculum");
-  const files = readdirSync(dir).filter((f) => !["helpers.ts", "index.ts", "registry.ts", "honesty.ts", "board-outline.ts"].includes(f) && f.endsWith(".ts"));
+  const files = readdirSync(dir).filter((f) => !["helpers.ts", "index.ts", "registry.ts", "honesty.ts", "board-outline.ts", "catalog.ts"].includes(f) && f.endsWith(".ts"));
   const all = [];
   for (const file of files) {
     const text = curriculumText(file);
@@ -70,7 +70,7 @@ async function runtimeInventory() {
     stdin: {
       contents: `
         export { seedQuestions } from "./src/content";
-        export { allTopics } from "./src/domain/curriculum";
+        export { allTopics, loadAllSubjects } from "./src/domain/curriculum";
         export { FLAGSHIP_SUBJECTS } from "./src/domain/flagship";
       `,
       resolveDir: ROOT,
@@ -84,6 +84,8 @@ async function runtimeInventory() {
   const data = await import(
     `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`,
   );
+  // Reference subjects' topic trees load on demand; the audit counts them all.
+  await data.loadAllSubjects();
   const flagshipIds = new Set(data.FLAGSHIP_SUBJECTS.map((row) => row.subjectId));
   return {
     topics: data.allTopics().length,

@@ -1,8 +1,9 @@
 import { boardOutline } from "./board-outline";
 import { AQA_BIOLOGY_SPEC_CHECKED, AQA_BIOLOGY_UNITS } from "./boards/aqa-alevel-biology";
-import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
+import { buildUnits } from "./helpers";
 import { BIOLOGY_EXTRA_TOPICS } from "./outlines/biology-extra";
 import { BIOLOGY_REFERENCE_OUTLINE } from "./outlines/biology";
+import { referenceSubject } from "./catalog";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
 
@@ -21,19 +22,7 @@ const { units, topics } = buildUnits(
 );
 
 export const aqaBiology: CurriculumModule = registerSubject({
-  subject: {
-    id: SUBJECT_ID,
-    qualificationId: "aqa-alevel",
-    name: "Biology",
-    specCode: "7402",
-        papers: [
-      { id: `${SUBJECT_ID}.p1`, name: "Paper 1", weight: 0.35, durationMinutes: 120, calculatorAllowed: true },
-      { id: `${SUBJECT_ID}.p2`, name: "Paper 2", weight: 0.35, durationMinutes: 120, calculatorAllowed: true },
-      { id: `${SUBJECT_ID}.p3`, name: "Paper 3", weight: 0.30, durationMinutes: 120, calculatorAllowed: true },
-    ],
-    gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/biology/specifications/AQA-7401-7402-SP-2015.PDF" },
-  },
+  subject: referenceSubject(SUBJECT_ID),
   units,
   topics,
 });
