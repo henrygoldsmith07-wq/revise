@@ -72,7 +72,7 @@ export function boardOutline(pool: ReadonlyArray<UnitSpec | TopicSpec>, units: B
       const outlinePoints = (source.specPoints ?? []).flatMap((point, index) => {
         const ref = placement.pointRefs?.[index];
         if (ref === null) return [];
-        return [{ ...point, id: `${topicId}.sp-${pad(index + 1)}`, ref: ref ?? placement.specRef }];
+        return [{ ...point, id: `${topicId}.sp-${pad(index + 1)}`, ref: ref ?? placement.specRef, specVersion: point.specVersion ?? options.specVersion }];
       });
       const firstAdded = (source.specPoints?.length ?? 0) + 1;
       const added = (placement.addPoints ?? []).map((point, index) => ({
@@ -88,6 +88,7 @@ export function boardOutline(pool: ReadonlyArray<UnitSpec | TopicSpec>, units: B
       }));
       return {
         ...source,
+        specVersion: source.specVersion ?? options.specVersion,
         title: placement.title ?? source.title,
         specRef: placement.specRef,
         specPoints: [...outlinePoints, ...added],

@@ -13,7 +13,8 @@ describe("content pipeline — spec metadata", () => {
       expect(topic.specVersion, `${topic.id} missing specVersion`).toBe("2024-1.0");
       expect(topic.source, `${topic.id} missing source`).toBe("authored");
       expect(["unverified", "checked", "verified"], `${topic.id} bad verification`).toContain(topic.verification);
-      expect(topic.specRef).toMatch(/^(Unit|Pure|Applied|\d+\.\d)/);
+      // WJEC units and numbered sections, or AQA Maths content letters ("A", "B", "K–L").
+      expect(topic.specRef).toMatch(/^(Unit|Pure|Applied|\d+\.\d|[A-S](–[A-S])?$)/);
     }
   });
 
