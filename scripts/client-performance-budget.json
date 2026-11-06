@@ -6,9 +6,9 @@
   },
   "routes": {
     "/": {
-      "maxBytes": 2450000,
-      "maxGzipBytes": 700000,
-      "note": "Root files plus the layout and page entry chunks for /. Measured 2026-10-13 after the authored question bank moved to an on-demand chunk (src/data/authored-questions.ts): 2,968,583 raw / 732,941 gzip, down from 5,131,397 / 1,353,778. The biggest remaining piece is the curriculum topic tree (~0.85 MB raw). 2026-10-20: the 28 reference subjects build from four shared outlines (src/domain/curriculum/outlines) instead of 28 copies: 2,406,001 raw / 684,783 gzip, including three new authored subjects. Lower these as more leaves the boot path; never raise them to fit a regression."
+      "maxBytes": 2340000,
+      "maxGzipBytes": 685000,
+      "note": "Root files plus the layout and page entry chunks for /. Measured 2026-10-13 after the authored question bank moved to an on-demand chunk (src/data/authored-questions.ts): 2,968,583 raw / 732,941 gzip, down from 5,131,397 / 1,353,778. The biggest remaining piece is the curriculum topic tree (~0.85 MB raw). 2026-10-20: the 28 reference subjects build from four shared outlines (src/domain/curriculum/outlines) instead of 28 copies: 2,406,001 raw / 684,783 gzip, including three new authored subjects. 2026-11-06: reference subjects' topic trees load on demand (src/domain/curriculum/catalog.ts, ensureSubjects), so only the learner's own subjects are fetched: 2,239,774 raw / 652,273 gzip. The budget keeps room for the AQA specification structures (about 50 KB raw / 16 KB gzip, PR #162). Lower these as more leaves the boot path; never raise them to fit a regression."
     }
   },
   "optionalChunks": {

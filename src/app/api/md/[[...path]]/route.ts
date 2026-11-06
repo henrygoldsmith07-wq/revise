@@ -1,3 +1,4 @@
+import { loadAllSubjects } from "@/domain/curriculum";
 import { CORS_HEADERS, markdownNotFound, optionsResponse, textResponse } from "@/lib/md/http";
 import { listMarkdownRoutes, renderMarkdown } from "@/lib/md/registry";
 import { markdownPathFor } from "@/lib/md/routes";
@@ -39,6 +40,8 @@ function catalog(method: string): Response {
 }
 
 async function handle(request: Request, context: Context): Promise<Response> {
+  // Twins render any subject's topics; reference subjects load on demand.
+  await loadAllSubjects();
   const { path = [] } = await context.params;
   const url = new URL(request.url);
   const joined = `/${path.join("/")}`;

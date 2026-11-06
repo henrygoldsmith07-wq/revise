@@ -1,4 +1,5 @@
-import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
+import { buildUnits } from "./helpers";
+import { referenceSubject } from "./catalog";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
 
@@ -383,18 +384,7 @@ const { units, topics } = buildUnits(SUBJECT_ID, [
 ]);
 
 export const aqaComputerScience: CurriculumModule = registerSubject({
-  subject: {
-    id: SUBJECT_ID,
-    qualificationId: "aqa-alevel",
-    name: "Computer Science",
-    specCode: "7517",
-    papers: [
-      { id: `${SUBJECT_ID}.p1`, name: "Paper 1 (on-screen programming)", weight: 0.5, durationMinutes: 150, calculatorAllowed: false },
-      { id: `${SUBJECT_ID}.p2`, name: "Paper 2 (written)", weight: 0.5, durationMinutes: 150, calculatorAllowed: true },
-    ],
-    gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-10-20", url: "https://www.aqa.org.uk/subjects/computer-science-and-it/as-and-a-level/computer-science-7516-7517" },
-  },
+  subject: referenceSubject(SUBJECT_ID),
   units,
   topics,
 });

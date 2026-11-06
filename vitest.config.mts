@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["tests/setup-curriculum.ts"],
     // The assessment/property suites intentionally perform long synchronous
     // CPU work. On Windows, two concurrent CPU-heavy files can starve Vitest's
     // 60s worker RPC long enough for onTaskUpdate itself to time out even when

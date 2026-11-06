@@ -1,3 +1,4 @@
+import { loadAllSubjects } from "@/domain/curriculum";
 import { buildLlmsFullTxt } from "@/lib/md/agent-files";
 import { textResponse } from "@/lib/md/http";
 
@@ -7,7 +8,9 @@ import { textResponse } from "@/lib/md/http";
 // Next answers both for a static GET itself.
 export const dynamic = "force-static";
 
-export function GET(): Response {
+export async function GET(): Promise<Response> {
+  // Built from every subject; reference subjects load on demand.
+  await loadAllSubjects();
   const full = buildLlmsFullTxt(new Date().toISOString().slice(0, 10));
   if (full.overLimit) console.warn(`[llms-full] ${full.size} characters, over the one-fetch budget; trim inFullText in src/lib/md/agent-files.ts`);
   return textResponse(full.text, { method: "GET", contentType: "text/plain; charset=utf-8", maxAge: 86_400, staleWhileRevalidate: 604_800 });

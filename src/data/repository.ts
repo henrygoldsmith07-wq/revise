@@ -2,7 +2,7 @@ import { syncWireIdValue } from "./sync-contract";
 import { seedCards, upgradeSeedCardFaces } from "@/content/seed-cards";
 import { loadQuestionRows, preloadAuthoredQuestions } from "./authored-questions";
 import { applyRuntimeReviewLedger, readRuntimeReviewLedger } from "./runtime-review-ledger";
-import { allTopics } from "@/domain/curriculum";
+import { allTopics, ensureSubjects } from "@/domain/curriculum";
 import { FLAGSHIP_SUBJECTS } from "@/domain/flagship";
 import { aiConsentGrantedInSettings } from "@/domain/ai-consent";
 import { buildSundayPlan, retainedSundayPlan, type SundayPlanSnapshot } from "@/domain/sunday-plan";
@@ -175,15 +175,37 @@ const SEED_VERSION = 2;
  */
 export async function ensureSeeded(userId: Id): Promise<Card[]> {
   await migrateContentIds();
+  // Reference subjects' topic trees load on demand: bring in the learner's
+  // own before seeding, so their cards install and every screen after boot
+  // finds their topics. The WJEC flagships are always loaded.
+  const enrolled = ((await (await getDb()).get("settings", userId)) as UserSettings | undefined)?.subjectIds ?? [];
+  await ensureSubjects(enrolled);
   const installed = await readReviseMeta<number>("seedVersion");
   // putMissing skips ids already installed and ids the learner deleted (local
   // or wire tombstone), reading both inside its own write transaction.
   // Authored questions are not copied: the bundle serves them (see
   // ./authored-questions), so only cards, which carry FSRS state, install.
-  const seeded = seedCards(allTopics(), userId);
+  // Seed the learner's subjects and the flagships, whatever else happens to be
+  // loaded (onboarding preloads every subject in idle time).
+  const seedSubjects = [...new Set([...enrolled, ...FLAGSHIP_SUBJECTS.map((s) => s.subjectId)])];
+  const seeded = seedCards(allTopics(seedSubjects), userId);
   await putMissing("cards", seeded, userId);
   if (installed !== SEED_VERSION) await writeReviseMeta("seedVersion", SEED_VERSION);
   return seeded;
+}
+
+/**
+ * A learner has just enrolled on these subjects: load their topic trees and
+ * install their seed cards. Returns those subjects' cards as stored, so a card
+ * already on this device (with its review history) wins over a fresh seed.
+ */
+export async function installSubjects(userId: Id, subjectIds: Id[]): Promise<Card[]> {
+  await ensureSubjects(subjectIds);
+  const seeded = seedCards(allTopics(subjectIds), userId);
+  await putMissing("cards", seeded, userId);
+  const wanted = new Set(seeded.map((card) => card.id));
+  const stored = (await (await getDb()).getAll("cards")) as Card[];
+  return stored.filter((card) => wanted.has(card.id));
 }
 
 /** How many history rows load synchronously at boot before the rest streams in. */

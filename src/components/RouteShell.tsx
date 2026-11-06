@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
+import { CurriculumGate } from "@/components/CurriculumGate";
 import { DatabaseNotice } from "@/components/DatabaseNotice";
 import { ShortcutProvider } from "@/components/shortcuts";
 import { isReviewerPath } from "@/lib/reviewer/return-path";
@@ -34,7 +35,9 @@ export function RouteShell({ children }: { children: ReactNode }) {
       <DatabaseNotice />
       <AccountBoundary>
         <ShortcutProvider>
-          <AppShell>{children}</AppShell>
+          <AppShell>
+            <CurriculumGate>{children}</CurriculumGate>
+          </AppShell>
         </ShortcutProvider>
       </AccountBoundary>
     </>
