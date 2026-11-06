@@ -3,6 +3,7 @@ import { honestQuestion } from "@/domain/curriculum/honesty";
 import { applyPhysicsAnswerGuards } from "./questions/physics-answer-guards";
 import { enrichCuratedPhysicsLearning } from "./questions/physics-part-learning";
 import { biologyQuestions } from "./questions/biology";
+import { aqaAlevelBoardTopicQuestions } from "./questions/aqa-alevel-board-topics";
 import { biologyAqaQuestions } from "./questions/biology-aqa";
 import { biologyAqaExtraQuestions } from "./questions/biology-aqa-extra";
 import { aqaGcseQuestions } from "./questions/aqa-gcse";
@@ -138,6 +139,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...mathsAqaExtraQuestions,
   ...physicsAqaQuestions,
   ...physicsAqaExtraQuestions,
+  ...aqaAlevelBoardTopicQuestions,
   ...aqaGcseQuestions,
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,

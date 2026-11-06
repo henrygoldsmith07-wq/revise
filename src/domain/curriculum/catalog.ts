@@ -24,7 +24,7 @@ export const REFERENCE_SUBJECTS: Record<string, Subject> = {
       { id: "aqa-alevel-biology.p3", name: "Paper 3", weight: 0.30, durationMinutes: 120, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.aqa.org.uk/subjects/science/biology/as-and-a-level/biology-7401-7402" },
+    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/biology/specifications/AQA-7401-7402-SP-2015.PDF" },
   },
   "aqa-alevel-chemistry": {
     id: "aqa-alevel-chemistry",
@@ -37,7 +37,7 @@ export const REFERENCE_SUBJECTS: Record<string, Subject> = {
       { id: "aqa-alevel-chemistry.p3", name: "Paper 3", weight: 0.30, durationMinutes: 120, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.aqa.org.uk/subjects/science/chemistry/as-and-a-level/chemistry-7404-7405" },
+    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/chemistry/specifications/AQA-7404-7405-SP-2015.PDF" },
   },
   "aqa-alevel-computer-science": {
     id: "aqa-alevel-computer-science",
@@ -127,7 +127,7 @@ export const REFERENCE_SUBJECTS: Record<string, Subject> = {
       { id: "aqa-alevel-maths.p3", name: "Paper 3", weight: 0.334, durationMinutes: 120, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.aqa.org.uk/subjects/mathematics/as-and-a-level/mathematics-7356-7357" },
+    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/mathematics/specifications/AQA-7357-SP-2017.PDF" },
   },
   "aqa-alevel-physics": {
     id: "aqa-alevel-physics",
@@ -140,7 +140,7 @@ export const REFERENCE_SUBJECTS: Record<string, Subject> = {
       { id: "aqa-alevel-physics.p3", name: "Paper 3 (including Option)", weight: 0.32, durationMinutes: 120, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.aqa.org.uk/subjects/science/physics/as-and-a-level/physics-7407-7408" },
+    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/physics/specifications/AQA-7407-7408-SP-2015.PDF" },
   },
   "aqa-alevel-psychology": {
     id: "aqa-alevel-psychology",

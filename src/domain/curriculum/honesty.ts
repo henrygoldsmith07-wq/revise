@@ -44,12 +44,35 @@ export const AUTHORED_REFERENCE_SUBJECTS: ReadonlySet<string> = new Set([
 export const AUTHORED_REFERENCE_DISCLAIMER =
   "Reference-tier: this subject's topic list was written for this board's specification but has not yet been checked by a teacher. Use it to revise, not as a spec guarantee.";
 
+/**
+ * Reference subjects rebuilt section by section to their own board's
+ * published specification (./board-outline.ts): their units, topic titles and
+ * references follow the specification, checked against it, but their notes
+ * and questions are unreviewed and some notes were first written for the
+ * WJEC course, so the "adapted from WJEC" disclaimer no longer describes them.
+ */
+export const BOARD_STRUCTURED_SUBJECTS: ReadonlySet<string> = new Set([
+  "aqa-alevel-biology",
+  "aqa-alevel-chemistry",
+  "aqa-alevel-physics",
+  "aqa-alevel-maths",
+]);
+
+export const BOARD_STRUCTURED_DISCLAIMER =
+  "Reference-tier: this subject's units and topics follow the sections of this board's published specification, but its notes, flashcards and questions have not been checked by a teacher, and some notes were first written for another board's course. Use it to revise, not as a spec guarantee.";
+
+/** Whether a reference subject's topic list follows its own board's specification. */
+export function followsOwnSpecification(subjectId: string): boolean {
+  return AUTHORED_REFERENCE_SUBJECTS.has(subjectId) || BOARD_STRUCTURED_SUBJECTS.has(subjectId);
+}
+
 export function isGcseSubject(subjectId: string): boolean {
   return subjectId.includes("-gcse-");
 }
 
 export function referenceDisclaimerFor(subjectId: string): string {
   if (AUTHORED_REFERENCE_SUBJECTS.has(subjectId)) return AUTHORED_REFERENCE_DISCLAIMER;
+  if (BOARD_STRUCTURED_SUBJECTS.has(subjectId)) return BOARD_STRUCTURED_DISCLAIMER;
   return isGcseSubject(subjectId) ? GCSE_REFERENCE_DISCLAIMER : REFERENCE_DISCLAIMER;
 }
 

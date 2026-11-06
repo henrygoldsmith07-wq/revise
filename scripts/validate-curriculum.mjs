@@ -8,25 +8,35 @@ import { build } from "esbuild";
 
 const ROOT = join(import.meta.dirname, "..");
 
-// Reference subjects build from a shared outline in ./outlines; their topics
-// and statements are counted from that outline, once per subject that uses it.
+// Reference subjects build from shared outlines in ./outlines (an outline and,
+// for a board-structured subject, the science's extra topics) and may place
+// them under a board's own sections in ./boards; their topics and statements
+// are counted from every file the module imports, once per subject.
 function curriculumText(file) {
   const dir = join(ROOT, "src/domain/curriculum");
   const own = readFileSync(join(dir, file), "utf8");
-  const outline = own.match(/from "\.\/outlines\/([a-z-]+)"/);
-  return outline ? `${own}\n${readFileSync(join(dir, "outlines", `${outline[1]}.ts`), "utf8")}` : own;
+  const imported = [...own.matchAll(/from "\.\/((?:outlines|boards)\/[a-z-]+)"/g)].map((m) => m[1]);
+  return [own, ...imported.map((rel) => readFileSync(join(dir, `${rel}.ts`), "utf8"))].join("\n");
+}
+
+/** A board-structured module's topics are the placements in its board map. */
+function boardPlacements(file) {
+  const dir = join(ROOT, "src/domain/curriculum");
+  const board = readFileSync(join(dir, file), "utf8").match(/from "\.\/(boards\/[a-z-]+)"/);
+  if (!board) return null;
+  return [...readFileSync(join(dir, `${board[1]}.ts`), "utf8").matchAll(/\btopic:\s*"/g)].length;
 }
 
 function parseTopics() {
   const dir = join(ROOT, "src/domain/curriculum");
-  const files = readdirSync(dir).filter((f) => !["helpers.ts", "index.ts", "registry.ts", "honesty.ts", "catalog.ts"].includes(f) && f.endsWith(".ts"));
+  const files = readdirSync(dir).filter((f) => !["helpers.ts", "index.ts", "registry.ts", "honesty.ts", "board-outline.ts", "catalog.ts"].includes(f) && f.endsWith(".ts"));
   const all = [];
   for (const file of files) {
     const text = curriculumText(file);
     const ids = [...text.matchAll(/slug:\s*"([^"]+)"/g)].map((m) => m[1]);
     const topicIds = file === "wjec-alevel-expansions.ts"
       ? [...text.matchAll(/specRef:\s*"/g)].length
-      : [...text.matchAll(/title:\s*"[^"]+"[\s\S]{0,300}?specRef/g)].length;
+      : boardPlacements(file) ?? [...text.matchAll(/title:\s*"[^"]+"[\s\S]{0,300}?specRef/g)].length;
     all.push({ file, slugs: ids, topicCount: topicIds });
   }
   return all;
