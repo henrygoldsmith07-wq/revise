@@ -105,6 +105,21 @@ background and do other work while it runs. On Windows, invoke npm through
   `src/domain/curriculum/outlines` (forty-sixth pass, → 2.41 MB raw); never
   paste an outline back into a subject module. Lower the budget as more
   leaves; never raise it to fit a regression.
+- **AQA's four A-level sciences and maths follow AQA's own specification**
+  (one-hundred-and-ninth pass). `boardOutline` (`src/domain/curriculum/board-outline.ts`)
+  places the shared outline topics, plus the science's extra topics
+  (`outlines/*-extra.ts`), under the board's sections with its own titles and
+  references (`src/domain/curriculum/boards/`). Topic ids and statement ids
+  never move: a statement keeps `sp-NN` from its outline position, `null`
+  drops one the board does not examine (only if no question cites it), and
+  added statements are appended. `tests/board-structure.test.ts` checks units
+  and section coverage against lists transcribed from the AQA PDFs, and that
+  every board-added topic has an authored question
+  (`src/content/questions/aqa-alevel-board-topics.ts`); the shared question
+  templates skip board-added topics (`tests/fixtures/board-added-topics.ts`).
+  Edexcel, OCR and every GCSE still use the WJEC-derived outline. Do the next
+  board the same way, from its published PDF, and add it to
+  `BOARD_STRUCTURED_SUBJECTS` (honest labelling) in the same commit.
 - **Equivalent wording in the offline marker is a curated list**
   (`PHRASE_EQUIVALENTS` in `src/domain/marking-language.ts`, sixteenth pass).
   It rewrites both the scheme point and the answer, for keyword coverage only.

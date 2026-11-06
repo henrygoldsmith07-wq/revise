@@ -1,3 +1,4 @@
+import { BOARD_ADDED_TOPICS } from "./fixtures/board-added-topics";
 import { describe, expect, it } from "vitest";
 import { authenticExpansionQuestions, seedQuestions } from "@/content";
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
@@ -29,7 +30,8 @@ describe("massive authentic question expansion", () => {
         ...authenticExpansionQuestions,
         ...seedQuestions.filter((question) => question.id.includes("wjec-alevel-expansion-")),
       ].filter((question) => question.subjectId === subject.id);
-      for (const topic of topicsFor(subject.id)) {
+      // Board-added topics have their own authored questions (tests/board-structure.test.ts).
+      for (const topic of topicsFor(subject.id).filter((candidate) => !BOARD_ADDED_TOPICS.has(candidate.id))) {
         expect(
           questions.some((question) => question.topicIds.includes(topic.id)),
           `${subject.id} topic ${topic.id} has no expansion question`,

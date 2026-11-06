@@ -1,13 +1,24 @@
+import { boardOutline } from "./board-outline";
+import { AQA_CHEMISTRY_SPEC_CHECKED, AQA_CHEMISTRY_UNITS } from "./boards/aqa-alevel-chemistry";
+import { CHEMISTRY_EXTRA_TOPICS } from "./outlines/chemistry-extra";
 import { A_LEVEL_BOUNDARIES, buildUnits } from "./helpers";
 import { CHEMISTRY_REFERENCE_OUTLINE } from "./outlines/chemistry";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
 
-// AQA A Level Chemistry (7405). Grouped by the specification's broad
-// content areas; check the current AQA spec for exact assessment objectives.
+// AQA A Level Chemistry (7405), structured section by section to the AQA
+// specification (./boards/aqa-alevel-chemistry.ts) over the shared reference topics, whose
+// ids are unchanged.
 const SUBJECT_ID = "aqa-alevel-chemistry";
 
-const { units, topics } = buildUnits(SUBJECT_ID, CHEMISTRY_REFERENCE_OUTLINE);
+const { units, topics } = buildUnits(
+  SUBJECT_ID,
+  boardOutline([...CHEMISTRY_REFERENCE_OUTLINE, ...CHEMISTRY_EXTRA_TOPICS], AQA_CHEMISTRY_UNITS, {
+    subjectId: SUBJECT_ID,
+    lastChecked: AQA_CHEMISTRY_SPEC_CHECKED,
+    specVersion: "2024-1.0",
+  }),
+);
 
 export const aqaChemistry: CurriculumModule = registerSubject({
   subject: {
@@ -21,7 +32,7 @@ export const aqaChemistry: CurriculumModule = registerSubject({
       { id: `${SUBJECT_ID}.p3`, name: "Paper 3", weight: 0.30, durationMinutes: 120, calculatorAllowed: true },
     ],
     gradeBoundaries: A_LEVEL_BOUNDARIES,
-    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-08-01", url: "https://www.aqa.org.uk/subjects/science/chemistry/as-and-a-level/chemistry-7404-7405" },
+    spec: { version: "2024-1.0", releaseDate: "2024-09-01", lastChecked: "2026-11-06", url: "https://filestore.aqa.org.uk/resources/chemistry/specifications/AQA-7404-7405-SP-2015.PDF" },
   },
   units,
   topics,

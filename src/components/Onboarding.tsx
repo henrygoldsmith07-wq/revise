@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
 import { isFlagship } from "@/domain/flagship";
-import { AUTHORED_REFERENCE_SUBJECTS } from "@/domain/curriculum/honesty";
+import { followsOwnSpecification } from "@/domain/curriculum/honesty";
 import { todayIso } from "@/domain/scheduling";
 import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
@@ -99,7 +99,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
             detail:
               subject.contentTier === "flagship"
                 ? `${qualification.level} · Flagship`
-                : AUTHORED_REFERENCE_SUBJECTS.has(subject.id)
+                : followsOwnSpecification(subject.id)
                   ? `${qualification.level} · Reference · not yet teacher-checked`
                   : `${qualification.level} · Reference · not spec-checked`,
           }))
@@ -393,10 +393,12 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                     <p className="mb-2 text-xs text-ink3">
                       {row.level === "GCSE"
                         ? "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE. Only the practice questions were written for GCSE, and none has been checked against the specification."
-                        : <>These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
+                        : row.subjects.every((subject) => followsOwnSpecification(subject.id))
+                          ? <>Their topic lists follow {board.name}&apos;s specification, but their notes and questions have not yet been checked by a teacher.</>
+                          : <>These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
                       specification. Use them to navigate, not as a specification guarantee.</>}
-                      {row.subjects.some((subject) => AUTHORED_REFERENCE_SUBJECTS.has(subject.id))
-                        ? ` Except ${row.subjects.filter((subject) => AUTHORED_REFERENCE_SUBJECTS.has(subject.id)).map((subject) => subject.name).join(", ")}: their topic lists were written for this specification, but have not yet been checked by a teacher.`
+                      {row.level !== "GCSE" && !row.subjects.every((subject) => followsOwnSpecification(subject.id)) && row.subjects.some((subject) => followsOwnSpecification(subject.id))
+                        ? ` Except ${row.subjects.filter((subject) => followsOwnSpecification(subject.id)).map((subject) => subject.name).join(", ")}: their topic lists follow this specification, but have not yet been checked by a teacher.`
                         : null}
                     </p>
                     <SubjectPicker

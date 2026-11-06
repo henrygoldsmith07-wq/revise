@@ -1,3 +1,4 @@
+import { BOARD_ADDED_TOPICS } from "./fixtures/board-added-topics";
 import { describe, expect, it } from "vitest";
 import { authenticSourceQuestions, seedQuestions } from "@/content";
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
@@ -28,13 +29,13 @@ describe("authentic source-material expansion", () => {
       const questions = authenticSourceQuestions.filter((question) => question.subjectId === subject.id);
       const expected = subject.id === "wjec-alevel-physics"
         ? topicsFor(subject.id).length - 8
-        : topicsFor(subject.id).filter((topic) => !TEMPLATED_TOPICS.has(topic.id)).length;
+        : topicsFor(subject.id).filter((topic) => !TEMPLATED_TOPICS.has(topic.id) && !BOARD_ADDED_TOPICS.has(topic.id)).length;
       expect(questions, `${subject.id} should receive one source question per topic`).toHaveLength(expected);
       expect(new Set(questions.map((question) => question.id)).size).toBe(questions.length);
 
       for (const topic of topicsFor(subject.id)) {
         if (subject.id === "wjec-alevel-physics" && !questions.some((question) => question.topicIds.includes(topic.id))) continue;
-        if (TEMPLATED_TOPICS.has(topic.id)) continue;
+        if (TEMPLATED_TOPICS.has(topic.id) || BOARD_ADDED_TOPICS.has(topic.id)) continue;
         expect(
           questions.some((question) => question.topicIds.includes(topic.id)),
           `${subject.id} topic ${topic.id} has no source-stimulus question`,
