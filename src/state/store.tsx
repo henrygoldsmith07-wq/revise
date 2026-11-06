@@ -6,7 +6,7 @@ import { useAssessmentModels } from "./assessment-models";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { allTopics } from "@/domain/curriculum";
+import { allTopics, loadAllSubjects } from "@/domain/curriculum";
 import { topicsForYear } from "@/domain/year-group";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
 
@@ -348,6 +348,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
           // Onboarding is open and interactive: build the bank off the main
           // thread so the student's taps are not held up by it (nineteenth pass).
           startAuthoredQuestionsInWorker();
+          // The learner is about to choose subjects, possibly after going
+          // offline: fetch every subject's topic tree while still online, in
+          // idle time, so the service worker holds whichever they pick.
+          preloadAllSubjects();
         }
         const loaded = await repo.loadSnapshot(userId);
         setSnapshot(loaded);
@@ -1250,6 +1254,13 @@ function BankUnavailableScreen({ onRetry }: { onRetry: () => void }) {
  * purpose: on a throttled phone rendering the onboarding step alone can take
  * several hundred milliseconds, and a short timer would fire before the frame.
  */
+/** Warm every reference subject's topic tree in idle time; failures are harmless (offline). */
+function preloadAllSubjects(): void {
+  const run = () => void loadAllSubjects().catch(() => undefined);
+  if (typeof window !== "undefined" && "requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 5000 });
+  else setTimeout(run, 1000);
+}
+
 function afterNextPaint(): Promise<void> {
   return new Promise((resolve) => {
     if (typeof requestAnimationFrame !== "function" || document.visibilityState === "hidden") {

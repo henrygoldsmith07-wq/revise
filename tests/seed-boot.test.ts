@@ -121,7 +121,7 @@ describe("fresh profile sees onboarding before the bank is installed", () => {
 
   it("ensureSeeded installs cards through putMissing, and the legacy-id check reads keys, not rows", () => {
     const repo = src("src/data/repository.ts");
-    expect(repo).toContain("const seeded = seedCards(allTopics(), userId);");
+    expect(repo).toContain("const seeded = seedCards(allTopics(seedSubjects), userId);");
     expect(repo).toContain('await putMissing("cards", seeded, userId);');
     // Authored questions are served from the bundle (tests/authored-questions.test.ts).
     expect(repo).not.toContain('putMissing("questions"');

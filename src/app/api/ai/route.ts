@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { loadAllSubjects } from "@/domain/curriculum";
 import { providerStatus } from "@/ai/provider";
 import * as tasks from "@/ai/tasks";
 import { payloadSchemas } from "@/ai/tasks";
@@ -160,6 +161,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Grounding reads any subject's topics; reference subjects load on demand.
+  await loadAllSubjects();
   const auth = await requireAiUser(request);
   if ("error" in auth) return auth.error;
   if (!auth.consent.allowed) {

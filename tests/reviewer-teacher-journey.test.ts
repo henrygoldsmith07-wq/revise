@@ -32,7 +32,7 @@ describe("reviewer portal renders outside the student shell", () => {
     expect(layout).toContain("<RouteShell>{children}</RouteShell>");
     expect(layout).not.toContain("<AccountBoundary>");
     expect(shell).toContain("if (isReviewerPath(pathname)) return <ShortcutProvider>{children}</ShortcutProvider>;");
-    expect(shell).toMatch(/<AccountBoundary>\s*<ShortcutProvider>\s*<AppShell>\{children\}<\/AppShell>/);
+    expect(shell).toMatch(/<AccountBoundary>\s*<ShortcutProvider>\s*<AppShell>\s*<CurriculumGate>\{children\}<\/CurriculumGate>\s*<\/AppShell>/);
   });
 
   it("keeps the teacher's session fresh without the student client", () => {

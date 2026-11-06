@@ -1,3 +1,4 @@
+import { loadAllSubjects } from "@/domain/curriculum";
 import { buildLlmsTxt } from "@/lib/md/agent-files";
 import { textResponse } from "@/lib/md/http";
 
@@ -7,6 +8,8 @@ import { textResponse } from "@/lib/md/http";
 // Next answers both for a static GET itself.
 export const dynamic = "force-static";
 
-export function GET(): Response {
+export async function GET(): Promise<Response> {
+  // Built from every subject; reference subjects load on demand.
+  await loadAllSubjects();
   return textResponse(buildLlmsTxt(), { method: "GET", contentType: "text/plain; charset=utf-8", maxAge: 86_400, staleWhileRevalidate: 604_800 });
 }

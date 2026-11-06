@@ -199,8 +199,24 @@ export function usePlanning(input: {
   const updateSettings = useCallback(async (patchValue: Partial<UserSettings>) => {
     if (!snapshot) return;
     const next: UserSettings = { ...snapshot.settings, ...patchValue, updatedAt: new Date().toISOString() };
+    // A newly enrolled subject's topic tree loads on demand: load it and
+    // install its cards before the settings change reaches any screen.
+    const added = next.subjectIds.filter((id) => !snapshot.settings.subjectIds.includes(id));
+    // Offline with a subject never fetched, the load fails: the choice still
+    // saves, and its cards install at the next boot that can load it
+    // (ensureSeeded), rather than the learner being stuck on this step.
+    const installed = added.length
+      ? await repo.installSubjects(next.userId, added).catch((error: unknown) => {
+          console.warn("[curriculum] could not load newly enrolled subjects", added, error);
+          return [];
+        })
+      : [];
     await repo.saveSettings(next);
-    patch((prev) => ({ ...prev, settings: next }));
+    patch((prev) => {
+      const known = new Set(prev.cards.map((card) => card.id));
+      const fresh = installed.filter((card) => !known.has(card.id));
+      return { ...prev, settings: next, ...(fresh.length ? { cards: [...prev.cards, ...fresh] } : {}) };
+    });
   }, [snapshot, patch]);
 
   const refreshPhaseNotices = useCallback(async () => {

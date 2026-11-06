@@ -105,6 +105,23 @@ background and do other work while it runs. On Windows, invoke npm through
   `src/domain/curriculum/outlines` (forty-sixth pass, → 2.41 MB raw); never
   paste an outline back into a subject module. Lower the budget as more
   leaves; never raise it to fit a regression.
+- **Reference subjects' topic trees load on demand** (one-hundred-and-tenth
+  pass, `/` → 2.24 MB raw / 652 KB gzip). Every subject's metadata is
+  registered at startup from `src/domain/curriculum/catalog.ts`; only the four
+  WJEC flagships register their topics eagerly. Any other subject's units and
+  topics arrive through `ensureSubjects(ids)` / `loadAllSubjects()`
+  (`registry.ts`); until then `topicsFor`/`unitsFor` return `[]` and
+  `getTopic` `undefined`, as for an unknown subject. The store loads the
+  learner's own subjects before seeding (`ensureSeeded`), `updateSettings`
+  loads a newly enrolled one (`installSubjects`), onboarding preloads all of
+  them in idle time so an offline enrolment still works, and `CurriculumGate`
+  (in `RouteShell`) holds a page opened with `?subject=`/`?topic=` for another
+  subject until it has loaded. Server code that renders any subject (the md
+  twins, `llms*.txt`, `/api/ai`), scripts and the domain worker call
+  `loadAllSubjects()`; tests get it from `tests/setup-curriculum.ts`.
+  Anything new that reads another subject's topics on the client must ensure
+  it first. A new reference subject needs a catalogue entry and a loader in
+  `index.ts` (`SUBJECT_LOADERS`).
 - **Equivalent wording in the offline marker is a curated list**
   (`PHRASE_EQUIVALENTS` in `src/domain/marking-language.ts`, sixteenth pass).
   It rewrites both the scheme point and the answer, for keyword coverage only.
