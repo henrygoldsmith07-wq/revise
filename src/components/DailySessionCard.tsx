@@ -40,8 +40,9 @@ export function DailySessionCard({ subjectIds }: { subjectIds: string[] }) {
         mistakes: store.mistakes,
         masteryByTopic,
         subjectIds,
+        newCardsPerDay: store.settings.newCardsPerDay,
       }),
-    [store.cards, store.mistakes, masteryByTopic, subjectIds],
+    [store.cards, store.mistakes, masteryByTopic, subjectIds, store.settings.newCardsPerDay],
   );
 
   // The tutor's read of the evidence for the weakest topic, derived from the

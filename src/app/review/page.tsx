@@ -5,7 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { getSubject, getTopic } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
-import { buildReviewQueue, buryCard, isDue, previewIntervals, reinsert, setSuspended, todayIso } from "@/domain/scheduling";
+import { buildReviewQueue, buryCard, isDue, newCardsLeftToday, newCardsPerDay, previewIntervals, reinsert, setSuspended, todayIso } from "@/domain/scheduling";
 import { CUSTOM_STUDY_KEY } from "@/components/CustomStudyDialog";
 import { useShortcuts } from "@/components/shortcuts";
 import type { Card, Question, RecallGrade } from "@/domain/types";
@@ -132,7 +132,12 @@ function ReviewSession() {
     if (custom) return pool.map((card) => card.id);
     const limit =
       limitOverride ?? (mode === "mistakes" ? 20 : Math.max(10, Math.ceil(store.settings.sessionLengthMinutes * 2.5)));
-    return buildReviewQueue(pool, limit).map((card) => card.id);
+    // The mistakes queue is repair the learner asked for, so only an ordinary
+    // session spends today's new-card limit.
+    const today = todayIso();
+    const allowance =
+      mode === "mistakes" ? Infinity : newCardsLeftToday(store.cards, newCardsPerDay(store.settings.newCardsPerDay), today);
+    return buildReviewQueue(pool, limit, today, allowance).map((card) => card.id);
   });
 
   // Hold order, not card objects: an Again retry sees the committed FSRS state.

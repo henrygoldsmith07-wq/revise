@@ -1,5 +1,6 @@
 "use client";
 
+import { NEW_CARDS_PER_DAY_OPTIONS, newCardsPerDay } from "@/domain/scheduling";
 import { exportContinuityDeletions } from "@/data/learner-history";
 import { privatePilotExport } from "@/domain/pilot-export";
 import { exportMarkingFlags, type MarkingFlag } from "@/domain/marking-flag";
@@ -142,7 +143,7 @@ export default function SettingsPage() {
               className="field text-sm"
             />
           </Field>
-          <Field label="Year group" hint="Year 12 plans and quick checks start with the AS units (1 and 2) and leave A2-only topics for later.">
+          <Field label="Year group" hint="Year 12 plans and quick checks start with the AS units (1 and 2) and leave A2-only topics for later." labelled>
             <Segmented
               ariaLabel="Year group"
               value={settings.yearGroup ?? "unknown"}
@@ -155,7 +156,7 @@ export default function SettingsPage() {
             />
           </Field>
           {settings.yearGroup === "year-13" ? (
-            <Field label="Unit 4 option" hint="Pick the one option your class studies. Plans, quick checks and Today then use only that option's topics.">
+            <Field label="Unit 4 option" hint="Pick the one option your class studies. Plans, quick checks and Today then use only that option's topics." labelled>
               <Segmented
                 ariaLabel="Unit 4 option"
                 value={settings.unit4Option ?? "unknown"}
@@ -167,7 +168,7 @@ export default function SettingsPage() {
               />
             </Field>
           ) : null}
-          <Field label="Session length" hint="How long one block of revision runs.">
+          <Field label="Session length" hint="How long one block of revision runs." labelled>
             <Segmented
               ariaLabel="Session length"
               value={String(settings.sessionLengthMinutes)}
@@ -178,6 +179,18 @@ export default function SettingsPage() {
                 { value: "40", label: "40 min" },
                 { value: "60", label: "60 min" },
               ]}
+            />
+          </Field>
+          <Field
+            label="New cards per day"
+            hint="The most new flashcards started in a day, across every session. Each one comes back as several reviews over the next week, so this sets tomorrow's workload."
+            labelled
+          >
+            <Segmented
+              ariaLabel="New cards per day"
+              value={String(newCardsPerDay(settings.newCardsPerDay))}
+              onChange={(value) => void store.updateSettings({ newCardsPerDay: Number(value) })}
+              options={NEW_CARDS_PER_DAY_OPTIONS.map((count) => ({ value: String(count), label: String(count) }))}
             />
           </Field>
         </Panel>
@@ -338,7 +351,7 @@ export default function SettingsPage() {
       <section>
         <SectionHeading title="Appearance and accessibility" />
         <Panel className="space-y-4">
-          <Field label="Theme">
+          <Field label="Theme" labelled>
             <Segmented
               ariaLabel="Theme"
               value={settings.theme}

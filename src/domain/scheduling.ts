@@ -1,7 +1,8 @@
 import { computeDecayFactor, createEmptyCard, fsrs, generatorParameters, Rating, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import type { Card, CardKind, Id, IsoDate, RecallGrade, ReviewLog } from "./types";
-import { addLocalDays, todayLocal, toLocalDateKey } from "./local-date";
+import { addLocalDays, localDayOfInstant, todayLocal, toLocalDateKey } from "./local-date";
+import { pickBase } from "./sync-crdt";
 
 // FSRS is the empirically-fit successor to SM-2 (it is what current Anki
 // ships). It tracks memory *stability* and *difficulty* separately rather than
@@ -308,12 +309,62 @@ export function isMastered(card: Card): boolean {
  * cards interleaved so a session never opens with a wall of unseen material.
  * `limit` caps the session so it fits the planned block.
  */
-export function buildReviewQueue(cards: Card[], limit: number, on: IsoDate = todayIso()): Card[] {
+// --- the daily new-card limit ---------------------------------------------
+//
+// Each new card learned today comes back as several reviews over the next
+// week, so the number started in a day sets the review load days later. A
+// per-session share alone does not bound it: five sessions in one evening
+// started five sessions' worth, and the reviews all landed together. Anki's
+// answer, kept here, is a cap per day (default 20) on top of the session share.
+
+export const DEFAULT_NEW_CARDS_PER_DAY = 20;
+export const NEW_CARDS_PER_DAY_OPTIONS = [5, 10, 20, 30, 50] as const;
+
+/** The learner's daily limit, falling back to the default for a missing or odd value. */
+export function newCardsPerDay(setting: number | undefined): number {
+  return typeof setting === "number" && Number.isInteger(setting) && setting >= 0 && setting <= 500
+    ? setting
+    : DEFAULT_NEW_CARDS_PER_DAY;
+}
+
+/**
+ * Whether this card was studied for the first time on `on`. Read from the
+ * card's synced grade log, so a card started on another device counts here
+ * too: the log's base is the card before its first logged grade, and a card
+ * that was still new then was first studied at the earliest logged grade.
+ * A card with no log (graded before sync logging) counts only when its one
+ * and only review was today.
+ */
+export function firstStudiedOn(card: Card, on: IsoDate): boolean {
+  if (card.reps === 0 && card.state === State.New) return false;
+  const log = card.log ?? [];
+  const base = log.length ? pickBase(log) : null;
+  if (log.length && base) {
+    if (base.reps > 0 || base.state !== State.New) return false;
+    const first = log.reduce((min, event) => (event.reviewedAt < min ? event.reviewedAt : min), log[0]!.reviewedAt);
+    return localDayOfInstant(first) === on;
+  }
+  return card.reps === 1 && card.lastReviewedAt !== null && localDayOfInstant(card.lastReviewedAt) === on;
+}
+
+/** How many more new cards today's limit allows. */
+export function newCardsLeftToday(cards: Card[], perDay: number, on: IsoDate = todayIso()): number {
+  let started = 0;
+  for (const card of cards) if (firstStudiedOn(card, on)) started++;
+  return Math.max(0, perDay - started);
+}
+
+/**
+ * A session's queue: due reviews first by due date, with new cards woven in.
+ * New cards take at most a quarter of the session and, when `newAllowance` is
+ * given, no more than today's limit has left.
+ */
+export function buildReviewQueue(cards: Card[], limit: number, on: IsoDate = todayIso(), newAllowance = Infinity): Card[] {
   const live = cards.filter((c) => isAvailable(c, on));
   const due = live
     .filter((c) => c.state !== State.New && c.due <= on)
     .sort((a, b) => (a.due === b.due ? b.lapses - a.lapses : a.due < b.due ? -1 : 1));
-  const fresh = live.filter((c) => c.state === State.New).slice(0, Math.ceil(limit / 4));
+  const fresh = live.filter((c) => c.state === State.New).slice(0, Math.max(0, Math.min(Math.ceil(limit / 4), newAllowance)));
 
   const out: Card[] = [];
   const everyNth = fresh.length ? Math.max(1, Math.floor(due.length / fresh.length) || 1) : 0;

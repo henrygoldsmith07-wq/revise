@@ -114,6 +114,11 @@ export interface UserSettings {
   subjectIds: Id[];
   availability: Availability[];
   sessionLengthMinutes: number;
+  /**
+   * New cards to start per day, across every session and device. Missing means
+   * the default (DEFAULT_NEW_CARDS_PER_DAY in domain/scheduling.ts).
+   */
+  newCardsPerDay?: number;
   targetGrades: Record<Id, string>;
   theme: "light" | "dark" | "system";
   accessibility: {
