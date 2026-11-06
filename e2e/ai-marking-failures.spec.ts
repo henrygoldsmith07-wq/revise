@@ -68,15 +68,21 @@ async function openWrittenQuestion(page: Page): Promise<void> {
   // Default practice mode queues written questions first; the runner renders
   // the stem and the answer textarea once a question is current.
   await page.goto("/practice");
-  await expect(main.locator("textarea")).toBeVisible({ timeout: 30_000 });
+  // A multi-part question renders one textarea per part.
+  await expect(main.locator("textarea").first()).toBeVisible({ timeout: 30_000 });
+}
+
+/** Every written part needs some text before submit unlocks. */
+async function answerEveryPart(page: Page, text: string): Promise<void> {
+  const boxes = page.locator("main textarea");
+  for (let index = 0; index < (await boxes.count()); index += 1) await boxes.nth(index).fill(text);
 }
 
 test("a 503 from the AI mark route degrades to the rubric fallback without crashing", async ({ page }) => {
   await failMarksWith(page, 503, "upstream provider unavailable");
   await openWrittenQuestion(page);
 
-  // Every written part needs some text before submit unlocks.
-  await page.locator("main textarea").first().fill("Water moves through the xylem by transpiration pull.");
+  await answerEveryPart(page, "Water moves through the xylem by transpiration pull.");
   await page.getByRole("button", { name: "Submit for marking" }).click();
 
   // The fallback badge proves the rubric answered; the UI stays interactive.
@@ -121,7 +127,7 @@ test("a 0-confidence AI mark is escalated to the human-review queue", async ({ p
   });
 
   await openWrittenQuestion(page);
-  await page.locator("main textarea").first().fill("Water moves through the xylem by transpiration pull.");
+  await answerEveryPart(page, "Water moves through the xylem by transpiration pull.");
   await page.getByRole("button", { name: "Submit for marking" }).click();
 
   const main = page.locator("main#main");
