@@ -16,7 +16,7 @@
 // Pure domain: no React, no storage, no network.
 // ---------------------------------------------------------------------------
 
-import { buildReviewQueue, todayIso } from "./scheduling";
+import { buildReviewQueue, newCardsLeftToday, newCardsPerDay, todayIso } from "./scheduling";
 import { localDayOfInstant } from "./local-date";
 import { shapeForMastery } from "./session-structure";
 import { FATIGUE_LOCK_MINUTES, FATIGUE_MESSAGE } from "./fatigue";
@@ -72,6 +72,8 @@ export function buildDailySessionPlan(input: {
   subjectIds: string[];
   /** Requested length; clamped into the 12–25 minute cap. Defaults to 18. */
   totalMinutes?: number;
+  /** The learner's daily new-card limit (UserSettings.newCardsPerDay). */
+  newCardsPerDay?: number;
   on?: IsoDate;
 }): DailySessionPlan {
   const on = input.on ?? todayIso();
@@ -94,7 +96,12 @@ export function buildDailySessionPlan(input: {
 
   // Queue split for the FSRS block: the scheduler caps new cards at 25% of the
   // queue (buildReviewQueue), and this surfaces that split instead of hiding it.
-  const queue = buildReviewQueue(input.cards, Number.MAX_SAFE_INTEGER, on);
+  const queue = buildReviewQueue(
+    input.cards,
+    Number.MAX_SAFE_INTEGER,
+    on,
+    newCardsLeftToday(input.cards, newCardsPerDay(input.newCardsPerDay), on),
+  );
   const reviewCount = queue.filter((c) => c.state !== State.New).length;
   const newCount = queue.length - reviewCount;
   const queueSplit = `${newCount} new, ${reviewCount} reviews`;
