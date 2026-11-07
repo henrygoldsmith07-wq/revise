@@ -79,7 +79,7 @@ describe("sync replay honours the target each grade used", () => {
   it("rebuilds the lower target's long interval instead of falling back to 90%", () => {
     const low = history(0.8);
     const replayed = syncCardState(low).card;
-    const asIfDefault = syncCardState({ ...low, log: low.log!.map(({ retention: _retention, ...event }) => event) }).card;
+    const asIfDefault = syncCardState({ ...low, log: low.log!.map((event) => ({ ...event, retention: undefined })) }).card;
     expect(replayed.stability).toBeCloseTo(asIfDefault.stability, 10);
     expect(daysUntilDue(replayed)).toBeGreaterThan(daysUntilDue(asIfDefault) * 2);
   });
