@@ -19,6 +19,8 @@ import { SubjectPicker } from "@/components/SubjectPicker";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, cx } from "@/components/ui";
 import { ICON_SIZE, ModesIcon } from "@/components/icons";
 import { DailySessionCard } from "@/components/DailySessionCard";
+import { FlashcardStatistics } from "@/components/FlashcardStatistics";
+import { desiredRetention } from "@/domain/desired-retention";
 import type { LucideIcon } from "@/components/icons";
 import { AudioIcon, PracticeIcon, ReviewIcon, TodayIcon, TutorIcon } from "@/components/icons";
 
@@ -90,7 +92,7 @@ export default function StudyPage() {
 
 function Study() {
   const params = useSearchParams();
-  const store = useStoreFields("adaptiveSession", "cards", "clearRevisionCheckpoint", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "cards", "clearRevisionCheckpoint", "reviewLogs", "revisionCheckpoint", "saveRevisionCheckpoint", "settings");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjects = useSubjects();
   const subjectOptions = useMemo(
@@ -115,6 +117,16 @@ function Study() {
   const [query, setQuery] = useState(params.get("q") ?? "");
   // The daily session is the default; the six mode cards sit behind "More".
   const [moreOpen, setMoreOpen] = useState(false);
+  // Anki-style statistics for the enrolled decks, opened on demand (?stats=1 links straight to it).
+  const [statsOpen, setStatsOpen] = useState(params.get("stats") === "1");
+  const enrolledCards = useMemo(
+    () => store.cards.filter((card) => store.settings.subjectIds.includes(card.subjectId)),
+    [store.cards, store.settings.subjectIds],
+  );
+  const enrolledLogs = useMemo(() => {
+    const ids = new Set(enrolledCards.map((card) => card.id));
+    return store.reviewLogs.filter((log) => ids.has(log.cardId));
+  }, [enrolledCards, store.reviewLogs]);
 
   const pool = useMemo(() => {
     const scoped = store.cards.filter(
@@ -212,11 +224,21 @@ function Study() {
 
       <DailySessionCard subjectIds={store.settings.subjectIds} />
 
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Button variant="ghost" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen}>
           {moreOpen ? "Hide other ways to study" : "More ways to study"}
         </Button>
+        <Button variant="ghost" onClick={() => setStatsOpen((v) => !v)} aria-expanded={statsOpen}>
+          {statsOpen ? "Hide flashcard statistics" : "Flashcard statistics"}
+        </Button>
       </div>
+
+      {statsOpen ? (
+        <section aria-label="Flashcard statistics" className="space-y-2">
+          <SectionHeading title="Flashcard statistics" hint="Every enrolled deck. Counts of what is scheduled and what you did, not predictions." />
+          <FlashcardStatistics cards={enrolledCards} logs={enrolledLogs} target={desiredRetention(store.settings.desiredRetention)} />
+        </section>
+      ) : null}
 
       {moreOpen ? (
         <>

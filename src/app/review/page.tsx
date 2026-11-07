@@ -9,7 +9,7 @@ import { buildReviewQueue, buryCard, isDue, newCardsLeftToday, newCardsPerDay, p
 import { desiredRetention } from "@/domain/desired-retention";
 import { CUSTOM_STUDY_KEY } from "@/components/CustomStudyDialog";
 import { useShortcuts } from "@/components/shortcuts";
-import type { Card, Question, RecallGrade } from "@/domain/types";
+import type { Card, Question, RecallGrade, ReviewLog } from "@/domain/types";
 import { pickExamQuestionForCard } from "@/domain/card-question";
 import { diagnoseLoss } from "@/domain/loss-diagnosis";
 import { buildMistakePatterns } from "@/domain/mistake-patterns";
@@ -22,6 +22,7 @@ import { RunCounter } from "@/components/RunCounter";
 import { gradeExtendsRun, nextRun } from "@/domain/study-week";
 import { SpeakButton } from "@/components/SpeakButton";
 import { RichText } from "@/components/RichText";
+import { CardStatsPanel } from "@/components/CardStatsPanel";
 import { cardRevealNote, cardSpeechText } from "@/domain/card-display";
 import { examinerNoteForCard } from "@/domain/examiner-note";
 import { CardAnswerBody, CardPromptMedia, cardAnswerHeading } from "@/components/CardFaces";
@@ -47,7 +48,7 @@ export default function ReviewPage() {
 
 function ReviewSession() {
   const params = useSearchParams();
-  const store = useStoreFields("attempts", "cards", "clearRevisionCheckpoint", "mistakes", "questions", "reviewCard", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "updateCards", "userId");
+  const store = useStoreFields("attempts", "cards", "clearRevisionCheckpoint", "mistakes", "questions", "reviewCard", "reviewLogs", "revisionCheckpoint", "saveRevisionCheckpoint", "settings", "updateCards", "userId");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint } = store;
   const subjectId = params.get("subject");
   const topicId = params.get("topic");
@@ -539,6 +540,8 @@ function ReviewSession() {
         )}
       </Panel>
 
+      {revealed ? <CardInfo card={current} logs={store.reviewLogs} /> : null}
+
       {revealed && examinerNote ? (
         <p className="text-xs text-ink3">
           <span className="font-semibold text-ink2">Common mistake on this: </span>
@@ -675,5 +678,19 @@ function SessionSummary({
       hint="Every card has been rescheduled from how you graded it: what you found hard comes back sooner."
       secondary={returnHref ? { href: returnHref, label: "Back to the tutor step" } : { href: "/practice", label: "Practise questions" }}
     />
+  );
+}
+
+/** Anki's "Card info": this card's own numbers and review history, on demand. */
+function CardInfo({ card, logs }: { card: Card; logs: ReviewLog[] }) {
+  const [open, setOpen] = useState(false);
+  const own = useMemo(() => logs.filter((log) => log.cardId === card.id), [card.id, logs]);
+  return (
+    <div>
+      <Button size="sm" variant="ghost" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        {open ? "Hide card info" : "Card info"}
+      </Button>
+      {open ? <div className="mt-2"><CardStatsPanel card={card} logs={own} /></div> : null}
+    </div>
   );
 }
