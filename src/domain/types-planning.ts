@@ -119,6 +119,11 @@ export interface UserSettings {
    * the default (DEFAULT_NEW_CARDS_PER_DAY in domain/scheduling.ts).
    */
   newCardsPerDay?: number;
+  /**
+   * The recall FSRS schedules each card's next review for (0.7-0.97). Missing
+   * means 90% (DEFAULT_DESIRED_RETENTION in domain/desired-retention.ts).
+   */
+  desiredRetention?: number;
   targetGrades: Record<Id, string>;
   theme: "light" | "dark" | "system";
   accessibility: {

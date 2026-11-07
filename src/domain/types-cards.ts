@@ -41,6 +41,11 @@ export interface CardGradeEvent {
   deviceId: string;
   /** Minting device's Lamport counter — the other half of the total order. */
   lamport: number;
+  /**
+   * The desired retention this grade was scheduled with (domain/desired-retention.ts).
+   * Absent means the 90% default, which every event before the setting used.
+   */
+  retention?: number;
   /** Present only on the first event of a log: the pre-logging FSRS snapshot. */
   base?: CardSyncBase;
 }

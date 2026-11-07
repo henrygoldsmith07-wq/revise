@@ -6,6 +6,7 @@ import { getSubject, getTopic } from "@/domain/curriculum";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
 import { buildReviewQueue, buryCard, isDue, newCardsLeftToday, newCardsPerDay, previewIntervals, reinsert, setSuspended, todayIso } from "@/domain/scheduling";
+import { desiredRetention } from "@/domain/desired-retention";
 import { CUSTOM_STUDY_KEY } from "@/components/CustomStudyDialog";
 import { useShortcuts } from "@/components/shortcuts";
 import type { Card, Question, RecallGrade } from "@/domain/types";
@@ -401,7 +402,7 @@ function ReviewSession() {
 
   const topic = getTopic(current.topicId);
   const examinerNote = examinerNoteForCard(current, topic);
-  const intervals = previewIntervals(current);
+  const intervals = previewIntervals(current, new Date(), desiredRetention(store.settings.desiredRetention));
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">

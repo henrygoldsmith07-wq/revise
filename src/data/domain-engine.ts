@@ -39,7 +39,7 @@ export interface DomainEngineApi {
     questionsById: Map<Id, Question>;
   }): AssessmentInsight;
   trace(input: { questions: Question[]; attemptsByQuestion: Map<Id, Attempt[]> }): QuestionTrace[];
-  validate(input: { cards: Card[]; logs: ReviewLog[] }): FsrsValidation;
+  validate(input: { cards: Card[]; logs: ReviewLog[]; predictedRetention?: number }): FsrsValidation;
   calibrate(input: { traces: QuestionTrace[] }): DifficultyCalibrationReport;
 }
 
@@ -118,7 +118,7 @@ export const domainEngine = {
     viaEngine("assess", input.attempts.length, input, () => impl.assess(input)),
   trace: (input: { questions: Question[]; attemptsByQuestion: Map<Id, Attempt[]> }) =>
     viaEngine("trace", [...input.attemptsByQuestion.values()].reduce((n, rows) => n + rows.length, 0), input, () => impl.trace(input)),
-  validate: (input: { cards: Card[]; logs: ReviewLog[] }) =>
+  validate: (input: { cards: Card[]; logs: ReviewLog[]; predictedRetention?: number }) =>
     viaEngine("validate", input.logs.length, input, () => impl.validate(input)),
   calibrate: (input: { traces: QuestionTrace[] }) =>
     viaEngine("calibrate", input.traces.length, input, () => impl.calibrate(input)),

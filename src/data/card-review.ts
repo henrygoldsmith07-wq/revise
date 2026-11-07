@@ -18,6 +18,8 @@ export async function saveCardReview(
   elapsedMs: number,
   confidence?: 1 | 2 | 3 | 4 | 5,
   now = new Date(),
+  /** The learner's desired retention (UserSettings.desiredRetention); default 90%. */
+  retention?: number,
 ): Promise<{ card: Card; log: ReviewLog; mistakes: Mistake[] }> {
   if (identity.userId !== userId || activeDatabaseProfile() !== userId) {
     throw new Error("Cannot review a card from another account.");
@@ -34,7 +36,7 @@ export async function saveCardReview(
     if (current.userId !== userId) throw new Error("Cannot review a card from another account.");
     const lastReview = current.lastReviewedAt ? new Date(current.lastReviewedAt) : null;
     const reviewedAt = lastReview && now < lastReview ? lastReview : now;
-    const updated = gradeCard(current, grade, reviewedAt, { deviceId: device.deviceId, lamport });
+    const updated = gradeCard(current, grade, reviewedAt, { deviceId: device.deviceId, lamport }, retention);
     const log: ReviewLog = { id: crypto.randomUUID(), userId, cardId: current.id, topicId: current.topicId,
       grade, confidence, elapsedMs, reviewedAt: reviewedAt.toISOString() };
     const mistakes = (await tx.objectStore("mistakes").index("byUser").getAll(userId)).flatMap((mistake) => {
