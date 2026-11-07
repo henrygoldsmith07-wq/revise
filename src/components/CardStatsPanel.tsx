@@ -110,7 +110,7 @@ export function CardStatsPanel({ card, logs }: { card: Card; logs: ReviewLog[] }
   );
 }
 
-export function DeckStatsPanel({ cards, logs }: { cards: Card[]; logs: ReviewLog[] }) {
+export function DeckStatsPanel({ cards, logs, target = 0.9 }: { cards: Card[]; logs: ReviewLog[]; target?: number }) {
   const stats = useMemo(() => deckStats(cards, logs), [cards, logs]);
   const mix = stats.gradeMix;
   const totalGrades = mix.again + mix.hard + mix.good + mix.easy;
@@ -118,16 +118,20 @@ export function DeckStatsPanel({ cards, logs }: { cards: Card[]; logs: ReviewLog
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <StatTile label="Cards" value={stats.total} sub={`${stats.due} due now`} />
+        <StatTile label="Cards" value={stats.total} sub={`${countLabel(stats.dueReviews, "review")} due · ${stats.new} new`} />
         <StatTile
           label="True retention"
           value={stats.trueRetention == null ? "—" : `${Math.round(stats.trueRetention * 100)}%`}
           sub={countLabel(stats.reviewsTotal, "review")}
           tone={
-            stats.trueRetention == null ? undefined : stats.trueRetention >= 0.87 ? "success" : "review"
+            stats.trueRetention == null ? undefined : stats.trueRetention >= target - 0.03 ? "success" : "review"
           }
         />
-        <StatTile label="Average ease" value={stats.averageEase.toFixed(2)} sub={`stability ${stats.averageStability}d`} />
+        <StatTile
+          label="Average ease"
+          value={stats.averageEase ? stats.averageEase.toFixed(2) : "—"}
+          sub={stats.averageEase ? `stability ${stats.averageStability}d` : "nothing studied yet"}
+        />
         <StatTile
           label="Leeches"
           value={stats.leeches}
@@ -137,7 +141,7 @@ export function DeckStatsPanel({ cards, logs }: { cards: Card[]; logs: ReviewLog
       </div>
 
       <Panel>
-        <p className="text-sm text-ink2">{retentionVerdict(stats.trueRetention, stats.reviewsTotal)}</p>
+        <p className="text-sm text-ink2">{retentionVerdict(stats.trueRetention, stats.reviewsTotal, target)}</p>
 
         <div className="mt-4 space-y-2">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Card states</p>

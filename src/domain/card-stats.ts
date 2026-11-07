@@ -1,5 +1,6 @@
 import { easeFactor } from "./browser";
-import { isDue, retrievability, todayIso, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { isDue, isDueReview, isStudiedCard, retrievability, todayIso, MASTERED_STABILITY_DAYS } from "./scheduling";
+import { DEFAULT_DESIRED_RETENTION } from "./desired-retention";
 import type { Card, Id, IsoDate, RecallGrade, ReviewLog } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -97,7 +98,10 @@ export function cardStats(card: Card, logs: ReviewLog[], now: Date = new Date())
 
 export interface DeckStats {
   total: number;
+  /** Cards available today, new ones included. */
   due: number;
+  /** Studied cards whose interval has run out: the reviews owed today. */
+  dueReviews: number;
   new: number;
   learning: number;
   review: number;
@@ -105,7 +109,7 @@ export interface DeckStats {
   leeches: number;
   suspended: number;
   buried: number;
-  /** Mean of the per-card FSRS ease. */
+  /** Mean of the per-card FSRS ease, over studied cards (0 when none). */
   averageEase: number;
   averageStability: number;
   averageDifficulty: number;
@@ -128,10 +132,13 @@ export function deckStats(cards: Card[], logs: ReviewLog[], on: IsoDate = todayI
 
   const mean = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
   const recalled = scoped.filter((l) => l.grade !== "again").length;
+  // A never-studied card has FSRS's starting values, not a measured memory.
+  const studied = cards.filter(isStudiedCard);
 
   return {
     total: cards.length,
     due: cards.filter((c) => isDue(c, on)).length,
+    dueReviews: cards.filter((c) => isDueReview(c, on)).length,
     new: counted.new,
     learning: counted.learning,
     review: counted.review,
@@ -139,9 +146,9 @@ export function deckStats(cards: Card[], logs: ReviewLog[], on: IsoDate = todayI
     leeches: counted.leech,
     suspended: counted.suspended,
     buried: counted.buried,
-    averageEase: Math.round(mean(cards.map(easeFactor)) * 100) / 100,
-    averageStability: Math.round(mean(cards.map((c) => c.stability)) * 10) / 10,
-    averageDifficulty: Math.round(mean(cards.map((c) => c.difficulty)) * 10) / 10,
+    averageEase: Math.round(mean(studied.map(easeFactor)) * 100) / 100,
+    averageStability: Math.round(mean(studied.map((c) => c.stability)) * 10) / 10,
+    averageDifficulty: Math.round(mean(studied.map((c) => c.difficulty)) * 10) / 10,
     trueRetention: scoped.length ? recalled / scoped.length : null,
     reviewsTotal: scoped.length,
     hoursStudied: Math.round((scoped.reduce((a, l) => a + l.elapsedMs, 0) / 3_600_000) * 10) / 10,
@@ -154,19 +161,21 @@ export function deckStats(cards: Card[], logs: ReviewLog[], on: IsoDate = todayI
  * Students cannot act on a bare percentage; they can act on "intervals are too
  * long".
  */
-export function retentionVerdict(trueRetention: number | null, reviews: number): string {
+export function retentionVerdict(trueRetention: number | null, reviews: number, target: number = DEFAULT_DESIRED_RETENTION): string {
   if (trueRetention == null || reviews < 20) {
     return "Not enough reviews yet to judge whether your intervals are right.";
   }
   const percent = Math.round(trueRetention * 100);
-  if (trueRetention < 0.8) {
-    return `${percent}% recall — below the 90% target. You are seeing cards too late; expect more lapses until stability catches up.`;
+  const goal = `${Math.round(target * 100)}% target`;
+  // Bands sit around the learner's own desired retention (90% gives 80 / 87 / 94).
+  if (trueRetention < target - 0.1) {
+    return `${percent}% recall — below the ${goal}. You are seeing cards too late; expect more lapses until stability catches up.`;
   }
-  if (trueRetention < 0.87) {
-    return `${percent}% recall — slightly under the 90% target, which is normal while a deck is still young.`;
+  if (trueRetention < target - 0.03) {
+    return `${percent}% recall — slightly under the ${goal}, which is normal while a deck is still young.`;
   }
-  if (trueRetention <= 0.94) {
-    return `${percent}% recall — right on the 90% target. Your intervals are well calibrated.`;
+  if (trueRetention <= target + 0.04) {
+    return `${percent}% recall — right on the ${goal}. Your intervals are well calibrated.`;
   }
   return `${percent}% recall — above target. You are reviewing more often than you need to, which costs time without adding retention.`;
 }
