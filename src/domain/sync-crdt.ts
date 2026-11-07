@@ -2,6 +2,7 @@ import { createEmptyCard, fsrs, generatorParameters, Rating, State } from "ts-fs
 import type { Card, CardGradeEvent, CardSyncBase, Id, IsoInstant, LessonProgress, ReviewLog } from "./types";
 import { compareStamps, stampJson, type LamportStamp } from "./lamport";
 import { addLocalDays, toLocalDateKey } from "./local-date";
+import { desiredRetention } from "./desired-retention";
 
 // ---------------------------------------------------------------------------
 // CRDT layer for multi-device sync.
@@ -34,14 +35,27 @@ import { addLocalDays, toLocalDateKey } from "./local-date";
 // owns the math, and the tests exercise convergence without a browser.
 // ---------------------------------------------------------------------------
 
-/** Same scheduler parameters as domain/scheduling.ts — replay must match live grading. */
-const scheduler = fsrs(
-  generatorParameters({
-    request_retention: 0.9,
-    enable_fuzz: false, // fuzz is random; replay must be deterministic
-    enable_short_term: false,
-  }),
-);
+/**
+ * Same scheduler parameters as domain/scheduling.ts — replay must match live
+ * grading — at the desired retention each event was graded with (an event
+ * without one was graded at the 90% default).
+ */
+const replaySchedulers = new Map<number, ReturnType<typeof fsrs>>();
+function replaySchedulerFor(retention: number | undefined): ReturnType<typeof fsrs> {
+  const target = desiredRetention(retention);
+  let found = replaySchedulers.get(target);
+  if (!found) {
+    found = fsrs(
+      generatorParameters({
+        request_retention: target,
+        enable_fuzz: false, // fuzz is random; replay must be deterministic
+        enable_short_term: false,
+      }),
+    );
+    replaySchedulers.set(target, found);
+  }
+  return found;
+}
 
 const GRADE_TO_RATING = {
   again: Rating.Again,
@@ -150,7 +164,7 @@ export function syncCardState(card: Card): CardMergeResult {
   const base = pickBase(ordered);
   let state = base ? stateFromBase(card, base) : stateFromOrigin(card);
   for (const event of ordered) {
-    state = scheduler.next(state, new Date(event.reviewedAt), GRADE_TO_RATING[event.grade]).card;
+    state = replaySchedulerFor(event.retention).next(state, new Date(event.reviewedAt), GRADE_TO_RATING[event.grade]).card;
   }
 
   // Content fields (front/back/tags/…) come from whichever replica supplied

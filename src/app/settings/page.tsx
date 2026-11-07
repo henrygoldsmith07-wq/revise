@@ -1,6 +1,8 @@
 "use client";
 
 import { NEW_CARDS_PER_DAY_OPTIONS, newCardsPerDay } from "@/domain/scheduling";
+import { DESIRED_RETENTION_OPTIONS, desiredRetention, retentionEffect, retentionLabel } from "@/domain/desired-retention";
+import { personalisedSchedulerParams } from "@/domain/fsrs-tuning";
 import { exportContinuityDeletions } from "@/data/learner-history";
 import { privatePilotExport } from "@/domain/pilot-export";
 import { exportMarkingFlags, type MarkingFlag } from "@/domain/marking-flag";
@@ -193,6 +195,12 @@ export default function SettingsPage() {
               options={NEW_CARDS_PER_DAY_OPTIONS.map((count) => ({ value: String(count), label: String(count) }))}
             />
           </Field>
+          <DesiredRetentionField
+            value={desiredRetention(settings.desiredRetention)}
+            suggestion={personalisedSchedulerParams(store.forgettingCalibration)?.request_retention ?? null}
+            reason={store.forgettingCalibration.suggestion?.reason ?? null}
+            onChange={(value) => void store.updateSettings({ desiredRetention: value })}
+          />
         </Panel>
       </section>
 
@@ -1316,6 +1324,50 @@ function exportDataLegacy(store: ReturnType<typeof usePageStore>) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Anki's FSRS "desired retention": the recall each card's next review is
+ * scheduled for. Once 200 reviews show recall running well off the target,
+ * the tuning check (domain/fsrs-tuning.ts) suggests a new one, which the
+ * learner can take or ignore; nothing changes it for them.
+ */
+function DesiredRetentionField({
+  value,
+  suggestion,
+  reason,
+  onChange,
+}: {
+  value: number;
+  suggestion: number | null;
+  reason: string | null;
+  onChange: (value: number) => void;
+}) {
+  const choices = [...new Set<number>([...DESIRED_RETENTION_OPTIONS, value])].sort((a, b) => a - b);
+  const offer = suggestion !== null && desiredRetention(suggestion) !== value ? desiredRetention(suggestion) : null;
+  return (
+    <Field
+      label="Desired retention"
+      hint="How likely you are to remember a card when it comes back. Higher means you forget less but review more often."
+      labelled
+    >
+      <Segmented
+        ariaLabel="Desired retention"
+        value={String(value)}
+        onChange={(next) => onChange(Number(next))}
+        options={choices.map((choice) => ({ value: String(choice), label: retentionLabel(choice) }))}
+      />
+      <p className="text-[11px] text-ink3 mt-1" aria-live="polite">{retentionEffect(value)}</p>
+      {offer !== null ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink2">
+          <span>{reason ?? `Your reviews suggest ${retentionLabel(offer)}.`}</span>
+          <Button size="sm" variant="secondary" onClick={() => onChange(offer)}>
+            Use {retentionLabel(offer)}
+          </Button>
+        </div>
+      ) : null}
+    </Field>
+  );
+}
+
 function usePageStore() {
-  return useStoreFields("attempts", "cards", "examDates", "removeExamDate", "upsertExamDate", "experimentArm", "funnelEvents", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
+  return useStoreFields("attempts", "cards", "examDates", "removeExamDate", "upsertExamDate", "experimentArm", "forgettingCalibration", "funnelEvents", "gradeActuals", "gradePredictionLog", "paperOutcomeLog", "interventionOutcomes", "joinExperiment", "leaveExperiment", "lessonProgress", "mistakes", "papers", "plannedSessions", "questions", "regeneratePlan", "reviewLogs", "settings", "streak", "syncNow", "syncStatus", "updateSettings", "userId");
 }

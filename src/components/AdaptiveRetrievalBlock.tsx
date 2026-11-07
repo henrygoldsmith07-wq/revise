@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
+import { desiredRetention } from "@/domain/desired-retention";
 import { previewIntervals } from "@/domain/scheduling";
 import type { Card, Id, RecallGrade } from "@/domain/types";
 import { useStoreFields } from "@/state/store";
@@ -36,7 +37,7 @@ export function AdaptiveRetrievalBlock({
   cards: Card[];
   onComplete: (outcome: RetrievalOutcome) => void | Promise<void>;
 }) {
-  const store = useStoreFields("cards", "reviewCard");
+  const store = useStoreFields("cards", "reviewCard", "settings");
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [confidence, setConfidence] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
@@ -115,7 +116,7 @@ export function AdaptiveRetrievalBlock({
     [cards, confidence, current, finish, grades, index, revealed, store],
   );
 
-  const intervals = current ? previewIntervals(current) : null;
+  const intervals = current ? previewIntervals(current, new Date(), desiredRetention(store.settings.desiredRetention)) : null;
 
   return (
     <div className="space-y-4">

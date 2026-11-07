@@ -3,20 +3,32 @@ import type { Card as FsrsCard } from "ts-fsrs";
 import type { Card, CardKind, Id, IsoDate, RecallGrade, ReviewLog } from "./types";
 import { addLocalDays, localDayOfInstant, todayLocal, toLocalDateKey } from "./local-date";
 import { pickBase } from "./sync-crdt";
+import { DEFAULT_DESIRED_RETENTION, desiredRetention } from "./desired-retention";
 
 // FSRS is the empirically-fit successor to SM-2 (it is what current Anki
 // ships). It tracks memory *stability* and *difficulty* separately rather than
 // folding both into one ease multiplier, and schedules the next review for the
 // day predicted recall decays to the target retention.
 const SCHEDULER_PARAMETERS = generatorParameters({
-  request_retention: 0.9,
+  request_retention: DEFAULT_DESIRED_RETENTION,
   // Spread same-day reviews so they don't clump into one brutal session.
   enable_fuzz: true,
   // Minute-scale learning steps are handled inside the session queue
   // (see buildReviewQueue) rather than by FSRS's day-granularity model.
   enable_short_term: false,
 });
-const scheduler = fsrs(SCHEDULER_PARAMETERS);
+// One scheduler per desired retention (domain/desired-retention.ts); the
+// target only changes the interval each grade sets.
+const schedulers = new Map<number, ReturnType<typeof fsrs>>();
+function schedulerFor(retention: number | undefined): ReturnType<typeof fsrs> {
+  const target = desiredRetention(retention);
+  let found = schedulers.get(target);
+  if (!found) {
+    found = fsrs({ ...SCHEDULER_PARAMETERS, request_retention: target });
+    schedulers.set(target, found);
+  }
+  return found;
+}
 // Replay must be deterministic: fuzz only moves due dates, never stability,
 // but a replay has no use for random intervals either.
 const replayScheduler = fsrs({ ...SCHEDULER_PARAMETERS, enable_fuzz: false });
@@ -143,8 +155,15 @@ export function createCard(input: NewCardInput, now: Date = new Date()): Card {
  * histories deterministically instead of letting one device's write erase
  * another's (see domain/sync-crdt.ts and data/sync.ts).
  */
-export function gradeCard(card: Card, grade: RecallGrade, now: Date = new Date(), stamp?: { deviceId: string; lamport: number }): Card {
-  const result = scheduler.next(fromCard(card), now, GRADE_TO_RATING[grade]);
+export function gradeCard(
+  card: Card,
+  grade: RecallGrade,
+  now: Date = new Date(),
+  stamp?: { deviceId: string; lamport: number },
+  retention?: number,
+): Card {
+  const target = desiredRetention(retention);
+  const result = schedulerFor(target).next(fromCard(card), now, GRADE_TO_RATING[grade]);
   const next = result.card;
   // First stamped grade on this card: capture the immutable pre-logging base
   // so base + log always describe the card's full scheduling history exactly.
@@ -152,7 +171,15 @@ export function gradeCard(card: Card, grade: RecallGrade, now: Date = new Date()
     ? { due: card.due, stability: card.stability, difficulty: card.difficulty, reps: card.reps, lapses: card.lapses, state: card.state }
     : undefined;
   const event = stamp
-    ? { grade, reviewedAt: now.toISOString(), deviceId: stamp.deviceId, lamport: stamp.lamport, ...(base ? { base } : {}) }
+    ? {
+        grade,
+        reviewedAt: now.toISOString(),
+        deviceId: stamp.deviceId,
+        lamport: stamp.lamport,
+        // Recorded only off the default, so a replay sets the same interval (sync-crdt.ts).
+        ...(target !== DEFAULT_DESIRED_RETENTION ? { retention: target } : {}),
+        ...(base ? { base } : {}),
+      }
     : null;
   const log = event ? [...(card.log ?? []), event] : card.log;
   return {
@@ -170,7 +197,8 @@ export function gradeCard(card: Card, grade: RecallGrade, now: Date = new Date()
 }
 
 /** Interval in days each grade would produce — shown on the review buttons. */
-export function previewIntervals(card: Card, now: Date = new Date()): Record<RecallGrade, number> {
+export function previewIntervals(card: Card, now: Date = new Date(), retention?: number): Record<RecallGrade, number> {
+  const scheduler = schedulerFor(retention);
   const grades: RecallGrade[] = ["again", "hard", "good", "easy"];
   // A review timestamped in the future relative to this clock (another device
   // ahead, or clock skew) would make ts-fsrs's delta_t negative and throw.

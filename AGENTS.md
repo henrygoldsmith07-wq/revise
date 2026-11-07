@@ -137,6 +137,13 @@ background and do other work while it runs. On Windows, invoke npm through
   Anything new that reads another subject's topics on the client must ensure
   it first. A new reference subject needs a catalogue entry and a loader in
   `index.ts` (`SUBJECT_LOADERS`).
+- **Desired retention lives on each grade event** (one-hundred-and-eleventh
+  pass, `src/domain/desired-retention.ts`). `gradeCard`/`previewIntervals`
+  take the learner's target (`UserSettings.desiredRetention`, default 0.9),
+  the event records it as `retention` when it is not 0.9, and
+  `syncCardState` replays each event at its own target. Anything new that
+  grades or replays a card must pass the target through, or a sync silently
+  resets intervals to 90%. The target never changes stability or difficulty.
 - **Equivalent wording in the offline marker is a curated list**
   (`PHRASE_EQUIVALENTS` in `src/domain/marking-language.ts`, sixteenth pass).
   It rewrites both the scheme point and the answer, for keyword coverage only.

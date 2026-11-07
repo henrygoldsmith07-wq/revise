@@ -65,6 +65,7 @@ import type { QuestionExposureReport } from "@/domain/question-exposure";
 import { prerequisiteEdges, rootPrerequisiteRemediation as buildRootPrerequisiteRemediation } from "@/domain/prerequisites";
 import type { RootPrerequisiteRemediation } from "@/domain/prerequisites";
 import { validateFsrs } from "@/domain/fsrs-tuning";
+import { desiredRetention } from "@/domain/desired-retention";
 import type { FsrsValidation } from "@/domain/fsrs-tuning";
 
 import type { ResponseTimeCalibrationReport } from "@/domain/response-time-calibration";
@@ -438,6 +439,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const subjectIds = useMemo(() => snapshot?.settings.subjectIds ?? [], [snapshot?.settings.subjectIds]);
   const yearGroup = snapshot?.settings.yearGroup;
   const unit4Option = snapshot?.settings.unit4Option;
+  const retentionTarget = desiredRetention(snapshot?.settings.desiredRetention);
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
   // Year 12 plans and recommends AS (Units 1-2) topics only; mastery and
   // readiness still see every topic.
@@ -514,13 +516,14 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     if (!evidence) return;
     let cancelled = false;
     (async () => {
-      const validated = await domainEngine.validate({ cards: evidence.cards, logs: evidence.reviewLogs });
+      // Judged against the learner's own target, so the suggestion moves it from where it is.
+      const validated = await domainEngine.validate({ cards: evidence.cards, logs: evidence.reviewLogs, predictedRetention: retentionTarget });
       if (!cancelled) setForgettingCalibration(validated);
     })();
     return () => {
       cancelled = true;
     };
-  }, [evidence]);
+  }, [evidence, retentionTarget]);
   const calculationMastery = useMemo(() => {
     if (!evidence) return calculateCalculationMastery({ questions: [], attempts: [], mistakes: [] });
     return calculateCalculationMastery({
@@ -793,7 +796,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const reviewCard = useCallback<StoreValue["reviewCard"]>(
     async (card, grade, elapsedMs, confidence) => {
       // Card recall updates retention, but cannot prove independent exam repair.
-      const { card: updated, log, mistakes: deferred } = await saveCardReview(card, userId, grade, elapsedMs, confidence);
+      const { card: updated, log, mistakes: deferred } = await saveCardReview(card, userId, grade, elapsedMs, confidence, new Date(), retentionTarget);
       touchSessionClock(); // count only a saved retrieval decision
 
       setSnapshot((prev) => {
@@ -813,7 +816,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
         return next;
       });
     },
-    [userId, bumpGamification, patch],
+    [userId, bumpGamification, patch, retentionTarget],
   );
 
   const recordAttempt = useCallback<StoreValue["recordAttempt"]>(
