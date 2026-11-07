@@ -60,7 +60,7 @@ export function FlashcardStatistics({ cards, logs, target }: { cards: Card[]; lo
               className="relative flex-1 h-full flex items-end group"
             >
               <span
-                className={cx("block w-full rounded-t-[4px]", day.count ? (index === 0 ? "bg-review" : "bg-accent") : "bg-line h-px")}
+                className={cx("block w-full rounded-t-xs", day.count ? (index === 0 ? "bg-review" : "bg-accent") : "bg-line h-px")}
                 style={day.count ? { height: `${Math.max(4, (day.count / peak) * 100)}%` } : undefined}
               />
             </span>
@@ -105,7 +105,7 @@ export function FlashcardStatistics({ cards, logs, target }: { cards: Card[]; lo
                   <span
                     key={day.date}
                     title={`${dayLabel(day.date)}: ${countLabel(day.count, "review")}`}
-                    className={cx("aspect-square rounded-[2px]", LEVEL_CLASS[day.level])}
+                    className={cx("aspect-square rounded-xs", LEVEL_CLASS[day.level])}
                   />
                 ) : (
                   <span key={`empty-${w}-${d}`} className="aspect-square" />
@@ -117,7 +117,7 @@ export function FlashcardStatistics({ cards, logs, target }: { cards: Card[]; lo
         <div className="flex items-center justify-end gap-1 text-[10px] text-ink3" aria-hidden>
           <span>Fewer</span>
           {([0, 1, 2, 3, 4] as const).map((level) => (
-            <span key={level} className={cx("inline-block h-2.5 w-2.5 rounded-[2px]", LEVEL_CLASS[level])} />
+            <span key={level} className={cx("inline-block h-2.5 w-2.5 rounded-xs", LEVEL_CLASS[level])} />
           ))}
           <span>More</span>
         </div>
