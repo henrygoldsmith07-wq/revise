@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Quick cold-start diagnostic (about 5–10 minutes). It samples dimensions of
+// Quick cold-start diagnostic (about 5â€“10 minutes). It samples dimensions of
 // skill rather than random questions, then reports what is weak, what merely
 // looks strong, which errors repeat, and where evidence is missing.
 //
@@ -7,7 +7,7 @@
 // only selects and summarises. It never predicts a grade.
 // ---------------------------------------------------------------------------
 
-import { trustedAssessmentContent } from "./content-trust";
+import { learnerEvidenceTrusted } from "./content-trust";
 import { questionFamily, unseenQuestionTester } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Question } from "./types";
@@ -104,10 +104,20 @@ export function selectQuickDiagnostic(input: {
   const topics = new Set(input.topicIds);
   const eligible = (q: Question): boolean => {
     if (!q.topicIds.some((t) => topics.has(t))) return false;
-    if (trustedAssessmentContent(q)) return true;
+    if (learnerEvidenceTrusted(q)) return true;
     return Boolean(input.practiceTier) && q.origin !== "ai" && q.source !== "generated";
   };
   const pool = input.questions.filter(eligible);
+  // `uncovered` describes reviewed supply, even when the explicitly labelled
+  // practice fallback can still offer an authored question for that dimension.
+  const trustedDimensions = new Set(
+    input.questions
+      .filter((q) => q.topicIds.some((t) => topics.has(t)) && learnerEvidenceTrusted(q))
+      .map((q) => {
+        const topicId = input.topicIds.find((t) => q.topicIds.includes(t))!;
+        return dimensionOf(q, { prerequisite: input.prerequisiteTopicIds?.has(topicId) });
+      }),
+  );
   const byDimension = new Map<DiagnosticDimension, QuickItem[]>();
   for (const q of pool) {
     const topicId = input.topicIds.find((t) => q.topicIds.includes(t))!;
@@ -126,8 +136,8 @@ export function selectQuickDiagnostic(input: {
   // Greedy, one item at a time. Each dimension offers its best item (least
   // sampled topic first); the step takes, in order: a new dimension on a new
   // topic, a new topic, a new dimension, then anything. A few questions fit
-  // in the budget, so spending one on a topic already sampled — just to tick
-  // a dimension — left a "quick check" covering two topics.
+  // in the budget, so spending one on a topic already sampled â€” just to tick
+  // a dimension â€” left a "quick check" covering two topics.
   for (;;) {
     const offers = DIAGNOSTIC_DIMENSIONS.flatMap((dimension) => {
       const list = byDimension.get(dimension) ?? [];
@@ -151,7 +161,7 @@ export function selectQuickDiagnostic(input: {
   return {
     items,
     minutes: Math.round(used / 60),
-    uncovered: DIAGNOSTIC_DIMENSIONS.filter((d) => !items.some((i) => i.dimension === d)),
+    uncovered: DIAGNOSTIC_DIMENSIONS.filter((d) => !trustedDimensions.has(d)),
   };
 }
 
@@ -294,7 +304,7 @@ export function resumeQuickDiagnostic(
 
 /**
  * Topics a quick check samples, in priority order. Year 12 learners get AS
- * topics (Units 1–2) only, unless the subject has no AS topic in the pool;
+ * topics (Units 1â€“2) only, unless the subject has no AS topic in the pool;
  * everyone else keeps the sorted list. `isA2` is injected so this module needs
  * no curriculum import.
  */
@@ -315,3 +325,4 @@ export function quickCheckTopicIds(
   const as = all.filter((id) => !isA2Topic(topicOf(id) ?? {}));
   return as.length ? as : all;
 }
+
