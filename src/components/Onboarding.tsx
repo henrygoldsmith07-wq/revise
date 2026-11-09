@@ -143,6 +143,8 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const [finishQueued, setFinishQueued] = useState(false);
   const router = useRouter();
   const draftTouched = useRef(false);
+  const draftTouchedUserId = useRef<string | null>(null);
+  const draftOwnerRef = useRef<string | null>(null);
   const draftFinished = useRef(false);
   const draftWrites = useRef<Promise<void>>(Promise.resolve());
   const reachedPhases = useRef(new Set<number>());
@@ -155,16 +157,37 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const boardIds = useMemo(() => boards.map((b) => b.id), [boards]);
   const today = todayIso();
 
+  function resetDraftForNewUser() {
+    setPhase(0);
+    setBoardId(null);
+    setSubjectIds([]);
+    setExamDates({});
+    setRegion(undefined);
+    setBoardInferred(false);
+    setPickingBoard(false);
+    setDiagnosticChoice("quick");
+    setYearGroup(undefined);
+    setUnit4Option(undefined);
+    setShowReference(false);
+    setRestoredDraft(false);
+  }
+
   useEffect(() => {
     const userId = actions?.userId;
     if (!userId) return;
+    const previousOwner = draftOwnerRef.current;
+    draftOwnerRef.current = userId;
     let cancelled = false;
     draftFinished.current = false;
-    setDraftReady(false);
     void readReviseUserMeta<unknown>("onboardingDraft", userId)
       .then((saved) => {
         if (cancelled) return;
-        const draft = draftTouched.current ? null : parseOnboardingDraft(saved, boardIds);
+        const touchedForUser = draftTouched.current && (
+          draftTouchedUserId.current === userId ||
+          (previousOwner === null && draftTouchedUserId.current === null)
+        );
+        const draft = touchedForUser ? null : parseOnboardingDraft(saved, boardIds);
+        if (previousOwner !== null && previousOwner !== userId) setRestoredDraft(false);
         if (draft) {
           setPhase(draft.phase);
           setBoardId(draft.boardId);
@@ -178,12 +201,23 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
           setUnit4Option(draft.unit4Option ?? undefined);
           setShowReference(draft.showReference);
           setRestoredDraft(true);
+        } else if (previousOwner !== null && previousOwner !== userId && !touchedForUser) {
+          resetDraftForNewUser();
         }
+        draftTouched.current = touchedForUser;
+        draftTouchedUserId.current = touchedForUser ? userId : null;
         setDraftOwner(userId);
         setDraftReady(true);
       })
       .catch(() => {
         if (!cancelled) {
+          const touchedForUser = draftTouched.current && (
+            draftTouchedUserId.current === userId ||
+            (previousOwner === null && draftTouchedUserId.current === null)
+          );
+          if (previousOwner !== null && previousOwner !== userId && !touchedForUser) resetDraftForNewUser();
+          draftTouched.current = touchedForUser;
+          draftTouchedUserId.current = touchedForUser ? userId : null;
           setDraftOwner(userId);
           setDraftReady(true);
         }
@@ -419,8 +453,14 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   return (
     <div
       className="min-h-dvh bg-bg flex items-center justify-center p-4"
-      onClickCapture={() => { draftTouched.current = true; }}
-      onChangeCapture={() => { draftTouched.current = true; }}
+      onClickCapture={() => {
+        draftTouched.current = true;
+        draftTouchedUserId.current = actions?.userId ?? null;
+      }}
+      onChangeCapture={() => {
+        draftTouched.current = true;
+        draftTouchedUserId.current = actions?.userId ?? null;
+      }}
     >
       <div className="w-full max-w-xl space-y-4 app-enter motion-safe:app-enter">
         <header className="text-center space-y-1">
