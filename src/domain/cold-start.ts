@@ -2,9 +2,9 @@
 // Cold start. A learner with no trusted answers and no card history gives the
 // recommendation engine nothing to rank, so the first best step is a short,
 // skippable quick check on the subject with the nearest exam. It is offered
-// only while evidence is genuinely missing and only when enough reviewed,
-// unseen questions exist to make it worth the time. Answers go through the
-// normal attempt pipeline, so once they exist the learner is no longer cold.
+// only while evidence is genuinely missing and only when enough unseen
+// questions exist to make it worth the time. Reviewed supply is preferred; an
+// authored practice tier is clearly labelled and never counts as evidence.
 // ---------------------------------------------------------------------------
 
 import { isFlagship } from "./flagship";
@@ -25,6 +25,7 @@ export interface ColdStartPlan {
   questions: number;
   minutes: number;
   topics: number;
+  practiceTier: boolean;
 }
 
 export interface ColdStartInput {
@@ -62,8 +63,8 @@ function daysTo(exams: readonly ExamDate[], subjectId: Id, now: Date): number {
 
 /**
  * The one subject to check first, or null. Subject order never matters: the
- * nearest exam wins, then the id. A subject with too few reviewed, unseen
- * questions is passed over rather than offered a check that cannot run.
+ * nearest exam wins, then the id. Reviewed questions are preferred; authored
+ * practice is a labelled fallback when the reviewed set is too small.
  */
 export function planColdStart(input: ColdStartInput): ColdStartPlan | null {
   const skipped = new Set(input.skipped ?? []);
@@ -73,10 +74,19 @@ export function planColdStart(input: ColdStartInput): ColdStartPlan | null {
   for (const subjectId of candidates) {
     const pool = quickDiagnosticPool(input.questions, input.attempts, subjectId);
     const topicIds = quickCheckTopicIds(pool, input.yearGroup, input.topicOf ?? (() => undefined), input.unit4Option);
-    const selection = selectQuickDiagnostic({ questions: pool, topicIds });
+    let selection = selectQuickDiagnostic({ questions: pool, topicIds });
+    let practiceTier = false;
+    const isUseful = () => {
+      const topics = new Set(selection.items.map((i) => i.topicId)).size;
+      return selection.items.length >= COLD_START_MIN_QUESTIONS && (!isFlagship(subjectId) || topics >= COLD_START_FLAGSHIP_MIN_TOPICS);
+    };
+    if (!isUseful()) {
+      selection = selectQuickDiagnostic({ questions: pool, topicIds, practiceTier: true });
+      practiceTier = true;
+    }
     const topics = new Set(selection.items.map((i) => i.topicId)).size;
-    if (selection.items.length >= COLD_START_MIN_QUESTIONS && (!isFlagship(subjectId) || topics >= COLD_START_FLAGSHIP_MIN_TOPICS)) {
-      return { subjectId, questions: selection.items.length, minutes: selection.minutes, topics };
+    if (isUseful()) {
+      return { subjectId, questions: selection.items.length, minutes: selection.minutes, topics, practiceTier };
     }
   }
   return null;

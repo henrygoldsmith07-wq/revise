@@ -35,6 +35,8 @@ export const REVISE_META_KEYS = {
   runtimeReviewLedger: "revise.runtimeReviewLedger.v1",
   /** Unfinished quick-diagnostic runs by subject, so a reload resumes the same questions. */
   quickDiagnosticRuns: "revise.quickDiagnosticRuns.v1",
+  /** In-progress first-run setup, kept on this device until onboarding succeeds. */
+  onboardingDraft: "revise.onboardingDraft.v1",
   /** Push backoff after a transient sync failure (consecutive failures + next attempt time). */
   outboxBackoff: "revise.outboxBackoff.v1",
   /** Result of the last navigator.storage.persist() request on this device. */

@@ -18,7 +18,7 @@ import { flushPilotEvents, recordPilotEvent } from "@/lib/pilot-telemetry";
 import type { Attempt } from "@/domain/types";
 import { countLabel } from "@/domain/plural";
 
-export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: string; autoStart?: boolean }) {
+export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: forcePracticeTier = false }: { subjectId: string; autoStart?: boolean; practiceTier?: boolean }) {
   const store = useStoreFields("questions", "attempts", "mistakes", "recordFunnel", "userId", "settings");
   const { plan } = useRevisionPlan();
   const [started, setStarted] = useState(autoStart);
@@ -62,14 +62,14 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
       const trusted = selectQuickDiagnostic({ questions: pool, topicIds });
       // No trusted supply (the normal flagship state until human review lands):
       // offer an authored practice-tier check, labelled as practice, not proof.
-      const practiceTier = !trusted.items.length;
+      const practiceTier = forcePracticeTier || !trusted.items.length;
       const chosen = practiceTier ? selectQuickDiagnostic({ questions: pool, topicIds, practiceTier: true }) : trusted;
       setSelection({ ...chosen, version: 1, subjectId, topicIds, practiceTier, doneAttemptIds: [] });
     })();
     return () => { cancelled = true; };
     // Chosen once per mount, like the synchronous initialiser it replaces.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [forcePracticeTier]);
   useEffect(() => {
     // The marked attempt is saved as done the moment it is marked, not when
     // the learner moves on: a reload while reading the feedback must resume
@@ -154,7 +154,8 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
   if (report) {
     return (
       <Panel className="space-y-4">
-        <h2 className="text-base font-semibold text-ink">What I found</h2>
+        <h2 className="text-base font-semibold text-ink">Your first check is complete</h2>
+        <p className="text-sm text-ink2">You have a starting point. Here is what your answers suggest; it is not a grade.</p>
         {selection.practiceTier ? (
           <p className="text-xs text-ink2" role="note">Practice, not proof: these answers used unreviewed questions, so they guide where to start but count as no evidence in the ledger.</p>
         ) : null}
@@ -176,6 +177,11 @@ export function QuickDiagnostic({ subjectId, autoStart = false }: { subjectId: s
   }
   return (
     <>
+      {selection.practiceTier ? (
+        <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
+          Practice, not proof: these authored questions are unreviewed and cannot count as learner evidence.
+        </p>
+      ) : null}
       <p className="text-xs text-ink3">Question {index + 1} of {selection.items.length} · {title(item!.topicId)}{selection.practiceTier ? " · practice, not proof" : ""}</p>
       {index === 0 ? <p className="text-xs text-ink3">An initial signal about where to start, not a predicted grade. Skip any time from Today.</p> : null}
       {question ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
 import { isFlagship } from "@/domain/flagship";
@@ -11,9 +11,10 @@ import type { Availability, ExamDate, Id } from "@/domain/types";
 import { useStoreFields } from "@/state/store-context";
 import type { StoreValue } from "@/state/store";
 import { Button, Panel, Pill, cx } from "./ui";
-import type { Unit4Option, YearGroup } from "@/domain/year-group";
+import { isUnit4Option, isYearGroup, type Unit4Option, type YearGroup } from "@/domain/year-group";
 import { examRowsForSitting, examSittingFor, type ExamSitting } from "@/domain/exam-series";
-import { boardAfterRegionChange, regionBoardMissing, type SchoolRegion } from "@/domain/school-region";
+import { boardAfterRegionChange, isSchoolRegion, regionBoardMissing, type SchoolRegion } from "@/domain/school-region";
+import { deleteReviseUserMeta, readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
 import { OnboardingSchoolStep } from "./OnboardingSchoolStep";
@@ -34,6 +35,7 @@ import { OnboardingExamDatesStep } from "./OnboardingExamDatesStep";
 // ---------------------------------------------------------------------------
 
 const PHASES = ["You & board", "Subjects", "Exam dates", "Quick check", "Your first step"] as const;
+const PHASE_KEYS = ["you", "subjects", "exam_dates", "quick_check", "first_step"] as const;
 
 /** Default time budget while the student has not yet tuned Settings. */
 const STEADY_MINUTES = [90, 60, 60, 60, 60, 45, 120];
@@ -43,6 +45,65 @@ interface SubjectRow {
   qualificationId: Id;
   level: string;
   subjects: { id: Id; name: string; detail: string }[];
+}
+
+interface OnboardingDraft {
+  version: 1;
+  phase: number;
+  boardId: Id | null;
+  subjectIds: Id[];
+  examDates: Record<string, string>;
+  region: SchoolRegion | null;
+  boardInferred: boolean;
+  pickingBoard: boolean;
+  diagnosticChoice: "quick" | "skip";
+  yearGroup: YearGroup | null;
+  unit4Option: Unit4Option | null;
+  showReference: boolean;
+}
+
+function parseOnboardingDraft(value: unknown, boardIds: readonly Id[]): OnboardingDraft | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<OnboardingDraft>;
+  if (raw.version !== 1 || !Number.isInteger(raw.phase) || raw.phase! < 0 || raw.phase! >= PHASES.length) return null;
+  if (raw.boardId !== null && (typeof raw.boardId !== "string" || !boardIds.includes(raw.boardId))) return null;
+  if (!Array.isArray(raw.subjectIds) || !raw.subjectIds.every((id) => typeof id === "string")) return null;
+  if (!raw.examDates || typeof raw.examDates !== "object" || Array.isArray(raw.examDates)) return null;
+  if (!Object.values(raw.examDates).every((date) => typeof date === "string")) return null;
+  if (raw.region !== null && !isSchoolRegion(raw.region)) return null;
+  if (typeof raw.boardInferred !== "boolean" || typeof raw.pickingBoard !== "boolean" || typeof raw.showReference !== "boolean") return null;
+  if (raw.diagnosticChoice !== "quick" && raw.diagnosticChoice !== "skip") return null;
+  if (raw.yearGroup !== null && !isYearGroup(raw.yearGroup)) return null;
+  if (raw.unit4Option !== null && !isUnit4Option(raw.unit4Option)) return null;
+
+  const validSubjects = new Set(
+    raw.boardId
+      ? allQualifications(raw.boardId).flatMap((qualification) => allSubjects(qualification.id).map((subject) => subject.id))
+      : [],
+  );
+  const subjectIds = [...new Set(raw.subjectIds.filter((id): id is Id => validSubjects.has(id)))];
+  let phase = raw.phase!;
+  if (phase > 0 && !raw.boardId) phase = 0;
+  if (phase > 1 && !subjectIds.length) phase = 1;
+  const examDates = Object.fromEntries(
+    Object.entries(raw.examDates)
+      .filter(([id, date]) => subjectIds.includes(id) && (date === "" || /^\d{4}-\d{2}-\d{2}$/.test(date)))
+      .map(([id, date]) => [id, date]),
+  );
+  return {
+    version: 1,
+    phase,
+    boardId: raw.boardId ?? null,
+    subjectIds,
+    examDates,
+    region: raw.region ?? null,
+    boardInferred: raw.boardInferred,
+    pickingBoard: raw.pickingBoard,
+    diagnosticChoice: raw.diagnosticChoice,
+    yearGroup: raw.yearGroup ?? null,
+    unit4Option: raw.unit4Option ?? null,
+    showReference: raw.showReference,
+  };
 }
 
 /** The store actions the final step needs. `null` while the content bank is still installing. */
@@ -74,14 +135,95 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const [yearGroup, setYearGroup] = useState<YearGroup | undefined>(undefined);
   const [unit4Option, setUnit4Option] = useState<Unit4Option | undefined>(undefined);
   const [showReference, setShowReference] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftOwner, setDraftOwner] = useState<string | null>(null);
+  const [restoredDraft, setRestoredDraft] = useState(false);
   const [saving, setSaving] = useState(false);
   // The student pressed the final button before the store was ready.
   const [finishQueued, setFinishQueued] = useState(false);
   const router = useRouter();
+  const draftTouched = useRef(false);
+  const draftTouchedUserId = useRef<string | null>(null);
+  const draftOwnerRef = useRef<string | null>(null);
+  const draftFinished = useRef(false);
+  const draftWrites = useRef<Promise<void>>(Promise.resolve());
+  const reachedPhases = useRef(new Set<number>());
+  const completedPhases = useRef(new Set<number>());
+  const recordedReachedPhases = useRef(new Set<number>());
+  const recordedCompletedPhases = useRef(new Set<number>());
+  reachedPhases.current.add(phase);
 
   const boards = useMemo(() => availableBoards(), []);
   const boardIds = useMemo(() => boards.map((b) => b.id), [boards]);
   const today = todayIso();
+
+  function resetDraftForNewUser() {
+    setPhase(0);
+    setBoardId(null);
+    setSubjectIds([]);
+    setExamDates({});
+    setRegion(undefined);
+    setBoardInferred(false);
+    setPickingBoard(false);
+    setDiagnosticChoice("quick");
+    setYearGroup(undefined);
+    setUnit4Option(undefined);
+    setShowReference(false);
+    setRestoredDraft(false);
+  }
+
+  useEffect(() => {
+    const userId = actions?.userId;
+    if (!userId) return;
+    const previousOwner = draftOwnerRef.current;
+    draftOwnerRef.current = userId;
+    let cancelled = false;
+    draftFinished.current = false;
+    void readReviseUserMeta<unknown>("onboardingDraft", userId)
+      .then((saved) => {
+        if (cancelled) return;
+        const touchedForUser = draftTouched.current && (
+          draftTouchedUserId.current === userId ||
+          (previousOwner === null && draftTouchedUserId.current === null)
+        );
+        const draft = touchedForUser ? null : parseOnboardingDraft(saved, boardIds);
+        if (previousOwner !== null && previousOwner !== userId) setRestoredDraft(false);
+        if (draft) {
+          setPhase(draft.phase);
+          setBoardId(draft.boardId);
+          setSubjectIds(draft.subjectIds);
+          setExamDates(draft.examDates);
+          setRegion(draft.region ?? undefined);
+          setBoardInferred(draft.boardInferred);
+          setPickingBoard(draft.pickingBoard);
+          setDiagnosticChoice(draft.diagnosticChoice);
+          setYearGroup(draft.yearGroup ?? undefined);
+          setUnit4Option(draft.unit4Option ?? undefined);
+          setShowReference(draft.showReference);
+          setRestoredDraft(true);
+        } else if (previousOwner !== null && previousOwner !== userId && !touchedForUser) {
+          resetDraftForNewUser();
+        }
+        draftTouched.current = touchedForUser;
+        draftTouchedUserId.current = touchedForUser ? userId : null;
+        setDraftOwner(userId);
+        setDraftReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const touchedForUser = draftTouched.current && (
+            draftTouchedUserId.current === userId ||
+            (previousOwner === null && draftTouchedUserId.current === null)
+          );
+          if (previousOwner !== null && previousOwner !== userId && !touchedForUser) resetDraftForNewUser();
+          draftTouched.current = touchedForUser;
+          draftTouchedUserId.current = touchedForUser ? userId : null;
+          setDraftOwner(userId);
+          setDraftReady(true);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [actions?.userId, boardIds]);
 
   const board = boardId ? (getBoard(boardId) ?? null) : null;
 
@@ -169,6 +311,42 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const canContinue =
     phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : phase === 2 ? enteredDatesValid : true;
 
+  useEffect(() => {
+    const userId = actions?.userId;
+    if (!userId || !draftReady || draftOwner !== userId || draftFinished.current) return;
+    const draft: OnboardingDraft = {
+      version: 1,
+      phase,
+      boardId,
+      subjectIds,
+      examDates,
+      region: region ?? null,
+      boardInferred,
+      pickingBoard,
+      diagnosticChoice,
+      yearGroup: yearGroup ?? null,
+      unit4Option: unit4Option ?? null,
+      showReference,
+    };
+    const write = () => writeReviseUserMeta("onboardingDraft", userId, draft);
+    draftWrites.current = draftWrites.current.catch(() => undefined).then(write);
+    void draftWrites.current.catch(() => undefined);
+  }, [actions?.userId, boardId, boardInferred, diagnosticChoice, draftOwner, draftReady, examDates, phase, pickingBoard, region, showReference, subjectIds, unit4Option, yearGroup]);
+
+  useEffect(() => {
+    if (!actions) return;
+    for (const step of reachedPhases.current) {
+      if (recordedReachedPhases.current.has(step)) continue;
+      recordedReachedPhases.current.add(step);
+      void actions.recordFunnel("onboarding_step_reached", PHASE_KEYS[step]).catch(() => undefined);
+    }
+    for (const step of completedPhases.current) {
+      if (recordedCompletedPhases.current.has(step)) continue;
+      recordedCompletedPhases.current.add(step);
+      void actions.recordFunnel("onboarding_step_completed", PHASE_KEYS[step]).catch(() => undefined);
+    }
+  }, [actions, phase, saving, finishQueued]);
+
   function chooseBoard(id: Id | null, inferred = false) {
     setBoardInferred(inferred);
     if (id === boardId) return;
@@ -188,6 +366,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
 
   function requestFinish() {
     if (!boardId) return;
+    completedPhases.current.add(phase);
     setSaving(true);
     if (actions) void finish(actions);
     else setFinishQueued(true);
@@ -246,6 +425,9 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
     // (e2e/offline.spec.ts "offline banner appears when offline").
     try {
       await onDone();
+      draftFinished.current = true;
+      await draftWrites.current.catch(() => undefined);
+      await deleteReviseUserMeta("onboardingDraft", store.userId).catch(() => undefined);
     } catch {
       // Settings, exam dates and the plan are already saved; if only the
       // marker failed, onboarding reappears on the next load, as before.
@@ -269,7 +451,17 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   }, [finishQueued, actions]);
 
   return (
-    <div className="min-h-dvh bg-bg flex items-center justify-center p-4">
+    <div
+      className="min-h-dvh bg-bg flex items-center justify-center p-4"
+      onClickCapture={() => {
+        draftTouched.current = true;
+        draftTouchedUserId.current = actions?.userId ?? null;
+      }}
+      onChangeCapture={() => {
+        draftTouched.current = true;
+        draftTouchedUserId.current = actions?.userId ?? null;
+      }}
+    >
       <div className="w-full max-w-xl space-y-4 app-enter motion-safe:app-enter">
         <header className="text-center space-y-1">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Welcome</p>
@@ -278,6 +470,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
             Tell us your year, where you study and your subjects — Revise works out your board and exam dates, then
             the plan, flashcards and questions follow.
           </p>
+          {restoredDraft ? <p className="text-xs text-success" role="status">Your saved setup is back. You can change any answer before continuing.</p> : null}
         </header>
 
         <div>
@@ -445,9 +638,9 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
           <Panel className="space-y-3">
             <h2 className="text-sm font-semibold">Start with a short diagnostic?</h2>
             <p className="text-xs text-ink3">
-              A 5–10 minute quick check across several topics shows Revise where to start. It uses
-              trusted, reviewed questions where they exist — no hints, so answers count as unaided
-              evidence. It is not a grade and never tests everything.
+              A 5–10 minute quick check can help you choose where to start. Reviewed questions count
+              as evidence; if there are not enough, Revise may offer authored questions labelled
+              “practice, not proof”. It is not a grade and never tests everything.
             </p>
             <ul className="space-y-2" role="radiogroup" aria-label="Diagnostic choice">
               <li>
@@ -466,7 +659,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                   </span>
                   <span>
                     <span className="block text-sm font-medium text-ink">Yes — find where I should start</span>
-                    <span className="block text-xs text-ink3 mt-0.5">Recommended. About 5–10 minutes, then a personalised first step.</span>
+                    <span className="block text-xs text-ink3 mt-0.5">Recommended. About 5–10 minutes, then a suggested next step.</span>
                   </span>
                 </button>
               </li>
@@ -494,8 +687,8 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
             {flagshipChosen.length ? (
               <p className="text-xs text-ink2" role="status">
                 {flagshipChosen.length === subjectIds.length
-                  ? "Your subjects have authored flagship content; the check uses reviewed questions where they exist."
-                  : `Flagship: ${flagshipChosen.map((id) => getSubject(id)?.name ?? id).join(", ")} use reviewed questions where available.`}
+                  ? "Flagship subjects have authored question banks. If reviewed questions are not available, the check is labelled practice, not proof."
+                  : `Flagship: ${flagshipChosen.map((id) => getSubject(id)?.name ?? id).join(", ")} use reviewed questions where available; any unreviewed practice is labelled.`}
               </p>
             ) : null}
             {referenceChosen.length ? (
@@ -513,20 +706,16 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
             <p className="text-sm text-ink2">
               {diagnosticChoice === "quick"
                 ? firstSubjectName
-                  ? `Revise will start with a quick check in ${firstSubjectName}, then choose your personalised next action from what you get wrong. Anything you lose becomes a repair plan.`
-                  : "Revise will start with a quick check, then choose your personalised next action."
+                  ? `Revise will start with a quick check in ${firstSubjectName}. Reviewed answers can count as evidence; any unreviewed practice is labelled and cannot prove your skill.`
+                  : "Revise will start with a quick check. Reviewed answers can count as evidence; any unreviewed practice is labelled and cannot prove your skill."
                 : "Revise already has a first step waiting on Today — and you can run the quick check any time to sharpen it."}
             </p>
             <div className="rounded-xl border border-line bg-surface2/60 px-3 py-2.5">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What happens next</p>
               <ol className="mt-1.5 space-y-1 text-xs text-ink2 list-decimal pl-4">
-                <li>{diagnosticChoice === "quick" ? "Answer a few short questions with no hints." : "Open Today and start the recommended step."}</li>
-                <li>See what Revise found and why it chose the next action.</li>
-                <li>
-                  {flagshipChosen.length
-                    ? "Mistakes turn into targeted repair, then an unseen proof check."
-                    : "Mistakes turn into targeted repair, then a fresh practice question on the same skill."}
-                </li>
+                <li>{diagnosticChoice === "quick" ? "Answer a few short questions with no hints; unreviewed practice is labelled." : "Open Today and start the recommended step."}</li>
+                <li>See what Revise found, what counts as evidence, and why it suggested the next step.</li>
+                <li>Mistakes can lead to targeted repair. Proof needs a later, unseen, reviewed question.</li>
               </ol>
             </div>
           </Panel>
@@ -543,7 +732,10 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
               variant="primary"
               className="flex-1 min-h-[3rem]"
               disabled={!canContinue}
-              onClick={() => setPhase(phase + 1)}
+              onClick={() => {
+                completedPhases.current.add(phase);
+                setPhase(phase + 1);
+              }}
             >
               Continue
             </Button>

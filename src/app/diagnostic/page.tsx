@@ -102,7 +102,7 @@ function Diagnostic() {
       {!active ? (
         <Panel><p className="text-sm text-ink3">Choose a subject in Settings first.</p></Panel>
       ) : quick && !records.length ? (
-        <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} />
+        <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} practiceTier={params.get("tier") === "practice"} />
       ) : items.length === 0 ? (
         // Not a dead end: the full diagnostic needs reviewed questions, but the
         // quick check has a labelled practice tier and practice always works.

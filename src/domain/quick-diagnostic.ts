@@ -91,7 +91,7 @@ export function selectQuickDiagnostic(input: {
   prerequisiteTopicIds?: ReadonlySet<Id>;
   budgetMinutes?: number;
   /**
-   * Practice tier: when no trusted supply exists, sample authored but
+   * Practice tier: when reviewed supply is insufficient, sample authored but
    * unreviewed questions so a new learner still gets a first task. Generated
    * questions are never eligible. Practice-tier answers flow through the
    * normal pipeline but can never become proof: proof requires trusted
@@ -104,8 +104,8 @@ export function selectQuickDiagnostic(input: {
   const topics = new Set(input.topicIds);
   const eligible = (q: Question): boolean => {
     if (!q.topicIds.some((t) => topics.has(t))) return false;
-    if (learnerEvidenceTrusted(q)) return true;
-    return Boolean(input.practiceTier) && q.origin !== "ai" && q.source !== "generated";
+    if (input.practiceTier) return !learnerEvidenceTrusted(q) && q.origin !== "ai" && q.source !== "generated";
+    return learnerEvidenceTrusted(q);
   };
   const pool = input.questions.filter(eligible);
   // `uncovered` describes reviewed supply, even when the explicitly labelled

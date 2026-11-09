@@ -30,6 +30,8 @@ export type FunnelEventType =
   | "revision_task_started"
   | "recommendation_completed"
   | "onboarding_completed"
+  | "onboarding_step_reached"
+  | "onboarding_step_completed"
   | "diagnostic_started"
   | "diagnostic_completed"
   | "diagnostic_skipped"
@@ -254,6 +256,11 @@ export function analyseFunnel(input: {
 
   const steps: StepConversion[] = [
     { step: "App opened", entered: opened.length, advanced: displayed.length, rate: opened.length ? round(displayed.length / opened.length) : null },
+    ...["you", "subjects", "exam_dates", "quick_check", "first_step"].map((step) => {
+      const entered = input.events.filter((e) => e.anonId === input.anonId && e.type === "onboarding_step_reached" && e.detail === step).length;
+      const advanced = input.events.filter((e) => e.anonId === input.anonId && e.type === "onboarding_step_completed" && e.detail === step).length;
+      return { step: `Onboarding: ${step}`, entered, advanced, rate: entered ? round(advanced / entered) : null };
+    }),
     { step: "Recommendation displayed", entered: displayed.length, advanced: acceptedAfterDisplay, rate: displayed.length ? round(acceptedAfterDisplay / displayed.length) : null },
     { step: "Recommendation accepted", entered: accepted.length, advanced: started.length, rate: accepted.length ? round(started.length / accepted.length) : null },
     { step: "Task started", entered: started.length, advanced: completedAfterStart, rate: started.length ? round(completedAfterStart / started.length) : null },
