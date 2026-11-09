@@ -62,7 +62,7 @@ Today selects the best next step through that loop and shows one Start button:
 
 | Stage | What happens | Where it lives |
 |---|---|---|
-| **Diagnose** | A new learner takes a short, skippable quick check of reviewed, unseen questions across several topics. Answers are normal attempts; lost marks appear immediately. | `quick-diagnostic.ts`, `cold-start.ts` |
+| **Diagnose** | A new learner takes a short, skippable quick check of reviewed, unseen questions across several topics when supply allows. Otherwise, authored questions are offered in a clearly labelled practice tier that cannot count as learner evidence. | `quick-diagnostic.ts`, `cold-start.ts` |
 | **Learn / Repair** | A lost mark becomes a repair mission: understand the cause, then re-sit with help. Help never counts as proof. | `exam-mission.ts`, `mission-session.ts` |
 | **Practise** | Different questions on the same skill, then an unfamiliar context. | `mission-session.ts`, `learning-action.ts` |
 | **Prove** | A delayed, unaided answer to a new, reviewed question. Reskins of an earlier question never count. | `mark-recovery.ts`, `supply.ts` |
@@ -96,6 +96,11 @@ onboarding rather than appearing in the list next to a disclaimer. Physics has t
 deepest authored bank; run `npm run wjec:authoring:gaps` for current per-statement
 authoring coverage (the manifest totals in `src/domain/spec.ts` are the source of
 truth — prose counts here are not maintained).
+
+Onboarding saves an in-progress setup locally and restores it after a refresh;
+the draft is cleared when setup finishes. Funnel events record which onboarding
+steps learners reach and complete, so drop-off can be measured without claiming
+that onboarding itself improves learning outcomes.
 
 **Nothing is trusted yet.** All four flagships have **0 human-reviewed
 questions**, so Revise can practise with a student but cannot yet prove an
@@ -155,8 +160,10 @@ The app is one loop — **Diagnose → Learn/Repair → Practise → Prove → R
 Revise can only prove an improvement on questions a qualified person has
 reviewed. The four WJEC A-level flagships (Mathematics, Biology, Chemistry,
 Physics) have large authored banks but **no human-reviewed questions yet**, so
-proof, the cold-start diagnostic and Exam Mission proof are blocked there until
-review happens. The repository therefore ships a review workflow rather than
+proof, the reviewed cold-start diagnostic and Exam Mission proof are blocked
+there until review happens. A separate authored practice-tier check can still
+help a new learner choose where to start, but its answers cannot count as
+learner evidence. The repository therefore ships a review workflow rather than
 pretending the review has been done.
 
 **Teachers review in the browser** at `/reviewer` (the `(reviewer)` route

@@ -103,7 +103,7 @@ export function useExperiments(userId: Id): Experiments {
   const recordFunnel = useCallback((type: FunnelEventType, detail?: string) => {
     const write = async () => {
     const now = Date.now();
-    const windows: Record<FunnelEventType, number> = { app_opened: 3_600_000, recommendation_displayed: 6 * 3_600_000, recommendation_accepted: 0, revision_task_started: 30 * 60_000, recommendation_completed: 30 * 60_000, feedback_read: 0, onboarding_completed: 0, diagnostic_started: 0, diagnostic_completed: 0, diagnostic_skipped: 0, next_action_shown: 6 * 3_600_000, proof_blocked_by_supply: 24 * 3_600_000 };
+    const windows: Record<FunnelEventType, number> = { app_opened: 3_600_000, recommendation_displayed: 6 * 3_600_000, recommendation_accepted: 0, revision_task_started: 30 * 60_000, recommendation_completed: 30 * 60_000, feedback_read: 0, onboarding_completed: 0, onboarding_step_reached: 24 * 3_600_000, onboarding_step_completed: 24 * 3_600_000, diagnostic_started: 0, diagnostic_completed: 0, diagnostic_skipped: 0, next_action_shown: 6 * 3_600_000, proof_blocked_by_supply: 24 * 3_600_000 };
     const existing = ((await readReviseMeta<Array<{ anonId: string; type: FunnelEventType; at: string; detail?: string }>>("funnelEvents")) ?? []);
     let last: number | null = null;
     for (let i = existing.length - 1; i >= 0; i--) {

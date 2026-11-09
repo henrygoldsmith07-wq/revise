@@ -499,14 +499,18 @@ function quickCheckDraft(plan: ColdStartPlan, input: EngineInput): Draft {
     marksRecoverable: null, examWeight: null, daysToExam: days, evidenceStrength: 0.1, confidence: 0.3,
     expectedLearningGain: 0.3, expectedMarks: 1.5, proofStatus: "not-checked", requiredFirst: false, effectiveness: null, mistakeIds: [],
     explanation: {
-      why: `Revise has no answers from you in ${name} yet, so ${plan.questions} short questions will show what to work on first.`,
-      whyNow: "Every later recommendation is better with a few real answers behind it.",
-      whyBefore: "", stake: "Without a few real answers, Revise is guessing what you need.",
-      evidence: [`${plan.questions} reviewed questions across ${plan.topics} topic${plan.topics === 1 ? "" : "s"}`, "no hints, so the answers count as unaided evidence"],
-      after: "Your best next step is chosen from what you get wrong, and anything you lose becomes a recovery plan.",
+      why: plan.practiceTier
+        ? `Revise has no reviewed questions to check ${name} yet. ${plan.questions} authored practice questions can give you a first impression, but they cannot prove your skill.`
+        : `Revise has no answers from you in ${name} yet, so ${plan.questions} short reviewed questions will show what to work on first.`,
+      whyNow: plan.practiceTier ? "Reviewed answers are needed before Revise can make evidence-based claims." : "Every later recommendation is better with a few real answers behind it.",
+      whyBefore: "", stake: plan.practiceTier ? "Use this only as a starting point; unreviewed questions cannot establish what you know." : "Without a few real answers, Revise is guessing what you need.",
+      evidence: plan.practiceTier
+        ? [`${plan.questions} authored practice questions across ${plan.topics} topics`, "unreviewed answers do not count as learner evidence"]
+        : [`${plan.questions} reviewed questions across ${plan.topics} topic${plan.topics === 1 ? "" : "s"}`, "no hints, so the answers count as unaided evidence"],
+      after: plan.practiceTier ? "Use the results as a first impression, then choose a practice or learning step." : "Your best next step is chosen from what you get wrong, and anything you lose becomes a recovery plan.",
       proves: "Nothing yet. This is a first impression, not a grade.",
     },
-    route: { href: `/diagnostic?subject=${encodeURIComponent(plan.subjectId)}`, label: "Start quick check" },
+    route: { href: `/diagnostic?subject=${encodeURIComponent(plan.subjectId)}${plan.practiceTier ? "&tier=practice" : ""}`, label: plan.practiceTier ? "Start practice check" : "Start quick check" },
   };
 }
 
