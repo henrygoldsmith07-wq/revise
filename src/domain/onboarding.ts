@@ -7,12 +7,14 @@
 // call here — the caller decides whether to ship aggregates.
 // ---------------------------------------------------------------------------
 
+import { isLocalDateKey } from "./local-date";
+
 export type OnboardingStep = "you" | "subjects" | "exams" | "time";
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = ["you", "subjects", "exams", "time"] as const;
 
 /** Exam dates are optional during onboarding; an entered date must not be in the past. */
 export function isOptionalExamDateValid(date: string | undefined, today: string): boolean {
-  return !date || date >= today;
+  return !date || (isLocalDateKey(date) && date >= today);
 }
 
 export interface OnboardingProgress {

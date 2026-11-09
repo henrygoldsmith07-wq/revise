@@ -69,8 +69,8 @@ describe("cold start in the recommendation", () => {
   it("leads with the quick check when nothing else is evidence-based, ahead of a wall of due cards", () => {
     const plan = rankRevisionActions(engineFor({ examDates: [exam("physics", 40)] }));
     expect(plan.top?.type).toBe("quick-check");
-    expect(plan.top?.route.href).toMatch(/^\/diagnostic\?subject=physics$|^\/diagnostic\?subject=biology$/);
-    expect(plan.top?.explanation.stake).toMatch(/guessing/);
+    expect(plan.top?.route.href).toMatch(/^\/diagnostic\?subject=(physics|biology)&tier=practice$/);
+    expect(plan.top?.explanation.stake).toMatch(/unreviewed questions cannot establish what you know/);
     expect(plan.actions.some((a) => a.type === "due-reviews")).toBe(true);
   });
 

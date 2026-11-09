@@ -98,7 +98,7 @@ export function QuestionRunner({
   const isProofContext = hintBudget === 0 && (mission?.stage === "delayed-proof" || (Boolean(farTransfer) && learnerEvidenceTrusted(question)));
   return (
     <div className="space-y-4">
-      {isProofContext && !result ? (
+      {isProofContext && evidenceSource === "independent" && !result ? (
         <ProofCheckBanner topicTitle={topic?.title} href={`/practice?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}`} state="due" />
       ) : null}
       <ConstantsSheet subjectId={question.subjectId} />
@@ -120,7 +120,12 @@ export function QuestionRunner({
         <TrustDetails question={question} />
 
         {stepMode === "timed" ? <ExamPaceTimer marks={question.totalMarks} stopped={Boolean(result)} /> : null}
-        {stepMode === "unaided" && !result ? (
+        {evidenceSource !== "independent" && !result ? (
+          <p className="text-xs text-ink3 mb-3" role="note">
+            Support has been used on this answer. It counts as supported practice, including after returning to the question.
+          </p>
+        ) : null}
+        {stepMode === "unaided" && evidenceSource === "independent" && !result ? (
           // What the mark will be recorded as depends on this question's
           // review state (learnerEvidenceTrusted), not on the step: an unaided
           // answer on an unreviewed question is labelled "practice evidence
@@ -176,7 +181,6 @@ export function QuestionRunner({
                     disabled={Boolean(result)}
                     onClick={() => {
                       setChoice(index);
-                      onDraftChange?.({ answers, choice: index });
                     }}
                     className={cx(
                       "w-full min-h-12 sm:min-h-0 text-left card px-3 py-3 sm:py-2.5 flex gap-2.5 items-start transition-colors",
@@ -222,7 +226,6 @@ export function QuestionRunner({
                     onChange={(value) => {
                       const nextAnswers = { ...answers, [part.id]: value };
                       setAnswers(nextAnswers);
-                      onDraftChange?.({ answers: nextAnswers, choice });
                     }}
                     rows={Math.min(10, Math.max(3, part.marks + 1))}
                     mathMode={shouldOfferMathInput({
@@ -246,6 +249,7 @@ export function QuestionRunner({
             <Button
               variant="secondary"
               className="w-full min-h-11"
+              disabled={marking}
               aria-expanded={hintsOpen}
               onClick={() => {
                 const next = nextHint(ladder, usedTiers);

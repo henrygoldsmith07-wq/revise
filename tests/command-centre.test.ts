@@ -76,8 +76,8 @@ describe("quick diagnostic", () => {
     demand("big", "t3", "application", { totalMarks: 40 }),
   ];
 
-  it("samples different dimensions within 5-10 minutes", () => {
-    const sel = selectQuickDiagnostic({ questions: pool, topicIds: ["t1", "t2", "t3"], budgetMinutes: 10 });
+  it("samples reference questions as practice across different dimensions within 5-10 minutes", () => {
+    const sel = selectQuickDiagnostic({ questions: pool, topicIds: ["t1", "t2", "t3"], budgetMinutes: 10, practiceTier: true });
     const dims = new Set(sel.items.map((i) => i.dimension));
     expect(dims.size).toBeGreaterThanOrEqual(4);
     expect(sel.minutes).toBeLessThanOrEqual(QUICK_MAX_MINUTES);

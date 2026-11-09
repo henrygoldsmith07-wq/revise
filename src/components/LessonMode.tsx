@@ -540,11 +540,11 @@ export function LessonMode({
                     <RichText className="mt-1 text-sm text-ink2">{step.application.modelAnswer}</RichText>
                   </div>
                   <div className="border-t border-success/20 pt-2.5">
-                    <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Self-marking checklist</p>
+                    <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Compare your answer against each point</p>
                     <ul className="mt-1.5 space-y-1">
                       {step.application.successCriteria.map((criterion, index) => (
                         <li key={`${step.id}:criterion:${index}`} className="flex items-start gap-2 text-xs text-ink2">
-                          <span className="text-success" aria-hidden="true">✓</span>
+                          <span className="text-ink3" aria-hidden="true">•</span>
                           <RichText className="text-xs text-ink2">{criterion}</RichText>
                         </li>
                       ))}

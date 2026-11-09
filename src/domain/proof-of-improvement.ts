@@ -171,13 +171,26 @@ export function buildProofLedger(input: ProofInput): ProofLedger {
       else byTopic.set(topicId, [attempt]);
     }
   }
-  const reviewsByTopic = new Map<Id, number[]>();
+  const studyByTopic = new Map<Id, number[]>();
+  const trustedIds = new Set(trusted.map((attempt) => attempt.id));
+  // An untrusted mark cannot measure improvement, but answering still rehearses
+  // the topic. Keep that exposure in the delay clock without using its score.
+  for (const attempt of input.attempts) {
+    if (trustedIds.has(attempt.id)) continue;
+    const at = Date.parse(attempt.createdAt);
+    if (!Number.isFinite(at)) continue;
+    for (const topicId of new Set(attempt.topicIds)) {
+      const list = studyByTopic.get(topicId);
+      if (list) list.push(at);
+      else studyByTopic.set(topicId, [at]);
+    }
+  }
   for (const log of input.reviewLogs ?? []) {
     const at = Date.parse(log.reviewedAt);
     if (!Number.isFinite(at)) continue;
-    const list = reviewsByTopic.get(log.topicId);
+    const list = studyByTopic.get(log.topicId);
     if (list) list.push(at);
-    else reviewsByTopic.set(log.topicId, [at]);
+    else studyByTopic.set(log.topicId, [at]);
   }
 
   const rows: TopicProof[] = input.topics.map((topic) => {
@@ -188,7 +201,7 @@ export function buildProofLedger(input: ProofInput): ProofLedger {
     const unseen: Observation[] = [];
     const familiar: Observation[] = [];
     // Anything that is not an unaided first answer is study: it can teach, so it resets the delay clock.
-    const study: number[] = [...(reviewsByTopic.get(topic.id) ?? [])];
+    const study: number[] = [...(studyByTopic.get(topic.id) ?? [])];
     for (const attempt of attempts) {
       const observation = { at: Date.parse(attempt.createdAt), iso: attempt.createdAt, rate: Math.min(1, Math.max(0, attempt.awarded / attempt.max)) };
       const first = (exposure.get(attempt.id) ?? 1) === 1;
@@ -210,7 +223,7 @@ export function buildProofLedger(input: ProofInput): ProofLedger {
     // A follow-up answer counts only if the baseline and the most recent study before it are both old enough.
     const delayed = baselineEnd === null ? [] : unseen.slice(baseline.length).filter((row) => {
       if (row.at - baselineEnd < delayMs) return false;
-      const priorStudy = [...study].reverse().find((time) => time < row.at);
+      const priorStudy = [...study].reverse().find((time) => time <= row.at);
       return priorStudy === undefined || row.at - priorStudy >= delayMs;
     });
     const followUp = delayed.slice(-FOLLOW_UP_QUESTIONS);

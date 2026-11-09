@@ -24,7 +24,7 @@ import { isFlagship } from "./flagship";
 import { MIN_PROOF_DELAY_DAYS } from "./proof-of-improvement";
 import { officialPaperQuestionEligible, type OfficialPaperContext } from "./official-papers";
 import { isShallowReskin } from "./reskin";
-import type { Attempt, Id, Mistake, Question } from "./types";
+import type { Attempt, Id, Mistake, Question, ReviewLog } from "./types";
 
 export type RecoveryState = "open" | "targeted" | "provisional" | "awaiting-proof" | "proven" | "regressed";
 
@@ -126,6 +126,8 @@ export interface RecoveryTotals {
 export interface MarkRecoveryInput {
   mistakes: readonly Mistake[];
   attempts: readonly Attempt[];
+  /** Card retrieval also restarts delayed proof, even though it cannot score marks. */
+  reviewLogs?: readonly ReviewLog[];
   questions: readonly Question[];
   now?: Date;
   /**
@@ -152,6 +154,7 @@ export function classifyMistake(
   questionsById: ReadonlyMap<Id, Question>,
   now: Date = new Date(),
   officialPaper?: OfficialPaperContext,
+  reviewLogs: readonly ReviewLog[] = [],
 ): MistakeRecovery {
   const base: Pick<MistakeRecovery, "mistakeId" | "topicId" | "subjectId" | "marks" | "proofBarrier"> = { mistakeId: mistake.id, topicId: mistake.topicId, subjectId: mistake.subjectId, marks: mistake.marksLost };
   const sourceQuestion = mistake.questionId ? questionsById.get(mistake.questionId) : undefined;
@@ -212,9 +215,27 @@ export function classifyMistake(
   }
   const firstFamilies = new Set(questionsById.has(first.questionId) ? questionFamilies(questionsById.get(first.questionId)!) : []);
   // The delayed check must also be new relative to the success it follows.
-  const delayed = provable.find((a) => daysBetween(first.createdAt, a.createdAt) >= MIN_PROOF_DELAY_DAYS &&
-    a.questionId !== first.questionId && !questionFamilies(questionsById.get(a.questionId)!).some((f) => firstFamilies.has(f)) &&
-    (!questionsById.has(first.questionId) || !isShallowReskin(questionsById.get(a.questionId)!, questionsById.get(first.questionId)!)));
+  const delayed = provable.find((a) => {
+    if (a.questionId === first.questionId ||
+      questionFamilies(questionsById.get(a.questionId)!).some((f) => firstFamilies.has(f)) ||
+      (questionsById.has(first.questionId) && isShallowReskin(questionsById.get(a.questionId)!, questionsById.get(first.questionId)!))) return false;
+    // Any intervening answer is another rehearsal, even when its mark is not
+    // trustworthy enough to score. The delayed check must follow the latest
+    // observed attempt on this topic by the full spacing interval.
+    const priorStudyAt = attempts
+      .filter((attempt) => attempt.id !== a.id && attempt.userId === a.userId && attempt.topicIds.includes(mistake.topicId) &&
+        attempt.createdAt > first.createdAt && attempt.createdAt <= a.createdAt)
+      .map((attempt) => Date.parse(attempt.createdAt))
+      .filter(Number.isFinite)
+      .reduce((latest, at) => Math.max(latest, at), Date.parse(first.createdAt));
+    const latestReviewAt = reviewLogs
+      .filter((log) => log.userId === a.userId && log.topicId === mistake.topicId &&
+        log.reviewedAt > first.createdAt && log.reviewedAt <= a.createdAt)
+      .map((log) => Date.parse(log.reviewedAt))
+      .filter(Number.isFinite)
+      .reduce((latest, at) => Math.max(latest, at), priorStudyAt);
+    return a.createdAt > first.createdAt && Date.parse(a.createdAt) - Math.max(priorStudyAt, latestReviewAt) >= MIN_PROOF_DELAY_DAYS * DAY_MS;
+  });
   if (!delayed) {
     const due = Date.parse(proofDueAt) <= now.getTime();
     return { ...common, state: "awaiting-proof", reason: due
@@ -341,7 +362,7 @@ export function buildMarkRecovery(input: MarkRecoveryInput): MarkRecovery {
     .filter((m) => m.marksLost > 0)
     .map((m): MistakeRecovery => {
       const paperId = (m.attemptId ? attemptById.get(m.attemptId)?.paperId ?? attemptById.get(m.attemptId)?.paperSpecId : undefined);
-      const recovery = classifyMistake(m, input.attempts, questionsById, now, input.officialPaper);
+      const recovery = classifyMistake(m, input.attempts, questionsById, now, input.officialPaper, input.reviewLogs);
       return paperId ? { ...recovery, paperId } : recovery;
     });
   const trusted = (subset: readonly MistakeRecovery[]) => {

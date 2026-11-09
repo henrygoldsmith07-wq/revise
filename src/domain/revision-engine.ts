@@ -500,7 +500,7 @@ function quickCheckDraft(plan: ColdStartPlan, input: EngineInput): Draft {
     expectedLearningGain: 0.3, expectedMarks: 1.5, proofStatus: "not-checked", requiredFirst: false, effectiveness: null, mistakeIds: [],
     explanation: {
       why: plan.practiceTier
-        ? `Revise has no reviewed questions to check ${name} yet. ${plan.questions} authored practice questions can give you a first impression, but they cannot prove your skill.`
+        ? `Revise does not have enough reviewed questions for a broad check in ${name} yet. ${plan.questions} authored practice questions can give you a first impression, but they cannot prove your skill.`
         : `Revise has no answers from you in ${name} yet, so ${plan.questions} short reviewed questions will show what to work on first.`,
       whyNow: plan.practiceTier ? "Reviewed answers are needed before Revise can make evidence-based claims." : "Every later recommendation is better with a few real answers behind it.",
       whyBefore: "", stake: plan.practiceTier ? "Use this only as a starting point; unreviewed questions cannot establish what you know." : "Without a few real answers, Revise is guessing what you need.",
@@ -741,7 +741,8 @@ export function rankRevisionActions(input: EngineInput): RevisionPlan {
   });
 
   actions.sort((a, b) => b.score - a.score || a.minutes - b.minutes || a.id.localeCompare(b.id));
-  // With no marks-based evidence anywhere, the quick check is the only step that creates any, so it leads.
+  // With no marks-based evidence anywhere, lead with a first check. Practice
+  // supply can suggest a starting point but never creates learner evidence.
   const evidenceBased: ActionType[] = ["proof-check", "regression-recovery", "mission", "paper-repair", "recurring-error", "evidence-gap"];
   const check = actions.find((a) => a.type === "quick-check");
   if (check && !actions.some((a) => evidenceBased.includes(a.type))) actions = [check, ...actions.filter((a) => a !== check)];

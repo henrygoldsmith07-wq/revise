@@ -96,6 +96,9 @@ function verdictFromEnvelope(data: { category: string; confidence: number; reaso
 export interface QuestionDraft {
   answers: Record<string, string>;
   choice: number | null;
+  /** Support already seen stays attached when the question is reopened. */
+  hintTier?: HintTier;
+  repairTeachingSeen?: boolean;
 }
 
 export function useQuestionExecution({
@@ -107,10 +110,11 @@ export function useQuestionExecution({
   retestMistake,
   farTransfer,
   draft,
+  onDraftChange,
   onFinished,
   hintBudget,
   externalHintTier,
-  repairTeachingSeen = false,
+  repairTeachingSeen: teachingShown = false,
   intervention,
   mission,
   guided = false,
@@ -146,6 +150,7 @@ export function useQuestionExecution({
   const store = useStoreFields("attempts", "questions", "recordAttempt", "recordFunnel", "settings", "userId");
   const [answers, setAnswers] = useState<Record<string, string>>(() => ({ ...(draft?.answers ?? {}) }));
   const [choice, setChoice] = useState<number | null>(() => draft?.choice ?? null);
+  const repairTeachingSeen = teachingShown || draft?.repairTeachingSeen === true;
   const [marking, setMarking] = useState(false);
   // Set when a submit fails outright, so the student is told and keeps their
   // answer, instead of the button silently coming back as if never pressed.
@@ -202,9 +207,26 @@ export function useQuestionExecution({
     () => ladder.filter((h) => allowedTiers.includes(h.tier)).find((h) => !usedTiers.includes(h.tier)) ?? null,
     [ladder, allowedTiers, usedTiers],
   );
-  const highestUsedTier = HINT_TIERS.filter((tier) => usedTiers.includes(tier) || tier === externalHintTier ||
+  const highestUsedTier = HINT_TIERS.filter((tier) => usedTiers.includes(tier) || tier === draft?.hintTier || tier === externalHintTier ||
     (repairTeachingSeen && tier === "scaffold")).at(-1) ?? null;
   const evidenceSource = hintEvidenceSource(highestUsedTier);
+
+  // Both practice and paper navigation use this draft contract. Save support
+  // even before any text is entered, and never restore it as a newly available
+  // hint: a no-hint mode must retain the evidence without revealing help.
+  // Keep the callback current without making an inline parent's callback
+  // identity trigger another draft write and render indefinitely.
+  const draftChangeRef = useRef(onDraftChange);
+  useEffect(() => { draftChangeRef.current = onDraftChange; }, [onDraftChange]);
+  useEffect(() => {
+    if (result) return; // submission removes the draft; do not recreate it
+    draftChangeRef.current?.({
+      answers,
+      choice,
+      ...(highestUsedTier ? { hintTier: highestUsedTier } : {}),
+      ...(repairTeachingSeen ? { repairTeachingSeen: true } : {}),
+    });
+  }, [answers, choice, highestUsedTier, repairTeachingSeen, result]);
 
   // When the DLQ later re-grades this question with AI, refresh an open
   // result view in place so the student sees the AI mark land without

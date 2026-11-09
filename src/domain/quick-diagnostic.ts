@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { learnerEvidenceTrusted } from "./content-trust";
+import { isFlagship } from "./flagship";
 import { questionFamily, unseenQuestionTester } from "./learning-evidence";
 import { ROOT_CAUSE_LABEL, type RootCause } from "./mistake-patterns";
 import type { Attempt, Id, Question } from "./types";
@@ -38,6 +39,8 @@ export const DIMENSION_LABEL: Record<DiagnosticDimension, string> = {
 
 export const QUICK_MIN_MINUTES = 5;
 export const QUICK_MAX_MINUTES = 10;
+export const QUICK_CHECK_MIN_QUESTIONS = 3;
+export const QUICK_CHECK_FLAGSHIP_MIN_TOPICS = 3;
 const COMMAND_WORDS = /^\s*(evaluate|assess|discuss|justify|compare|suggest)\b/i;
 const PASS = 0.6;
 const STRONG = 0.75;
@@ -83,6 +86,12 @@ export interface QuickSelection {
   uncovered: DiagnosticDimension[];
 }
 
+function eligibleForQuickDiagnostic(question: Question, practiceTier: boolean): boolean {
+  return practiceTier
+    ? !learnerEvidenceTrusted(question) && question.origin !== "ai" && question.source !== "generated"
+    : learnerEvidenceTrusted(question);
+}
+
 /** Round-robin over dimensions, spreading topics, until the time budget is used. */
 export function selectQuickDiagnostic(input: {
   questions: readonly Question[];
@@ -104,8 +113,7 @@ export function selectQuickDiagnostic(input: {
   const topics = new Set(input.topicIds);
   const eligible = (q: Question): boolean => {
     if (!q.topicIds.some((t) => topics.has(t))) return false;
-    if (input.practiceTier) return !learnerEvidenceTrusted(q) && q.origin !== "ai" && q.source !== "generated";
-    return learnerEvidenceTrusted(q);
+    return eligibleForQuickDiagnostic(q, input.practiceTier === true);
   };
   const pool = input.questions.filter(eligible);
   // `uncovered` describes reviewed supply, even when the explicitly labelled
@@ -163,6 +171,23 @@ export function selectQuickDiagnostic(input: {
     minutes: Math.round(used / 60),
     uncovered: DIAGNOSTIC_DIMENSIONS.filter((d) => !trustedDimensions.has(d)),
   };
+}
+
+/** One supply rule for Today, onboarding and a directly opened quick check. */
+export function selectQuickCheck(input: {
+  questions: readonly Question[];
+  topicIds: readonly Id[];
+  subjectId: Id;
+  practiceTier?: boolean;
+}): QuickSelection & { practiceTier: boolean } {
+  const questions = input.questions.filter((q) => q.subjectId === input.subjectId);
+  const useful = (selection: QuickSelection) => selection.items.length >= QUICK_CHECK_MIN_QUESTIONS &&
+    (!isFlagship(input.subjectId) || new Set(selection.items.map((item) => item.topicId)).size >= QUICK_CHECK_FLAGSHIP_MIN_TOPICS);
+  const reviewed = selectQuickDiagnostic({ questions, topicIds: input.topicIds });
+  if (!input.practiceTier && useful(reviewed)) return { ...reviewed, practiceTier: false };
+  const practice = selectQuickDiagnostic({ questions, topicIds: input.topicIds, practiceTier: true });
+  if (useful(practice)) return { ...practice, practiceTier: true };
+  return { ...practice, items: [], minutes: 0, practiceTier: true };
 }
 
 export interface QuickProbe {
@@ -271,7 +296,8 @@ export interface QuickDiagnosticRun extends QuickSelection {
 /**
  * The saved run and its answered attempts when it can be resumed: same
  * subject, every question still in the bank, and every recorded attempt
- * still present and on its item's question. An inconsistent run returns null
+ * still present and on its item's question. Current trust is rechecked, so
+ * a withdrawn review cannot resume as reviewed evidence. An inconsistent run returns null
  * and a new check starts; a completed run is cleared once its report shows.
  */
 export function resumeQuickDiagnostic(
@@ -283,20 +309,32 @@ export function resumeQuickDiagnostic(
   if (!saved || typeof saved !== "object") return null;
   const run = saved as Partial<QuickDiagnosticRun>;
   if (run.version !== 1 || run.subjectId !== subjectId || !Array.isArray(run.items) || !run.items.length || !Array.isArray(run.doneAttemptIds)) return null;
+  if (typeof run.practiceTier !== "boolean" || !Array.isArray(run.topicIds) || !run.topicIds.every((id) => typeof id === "string") ||
+    !Number.isFinite(run.minutes) || run.minutes! <= 0 || !Array.isArray(run.uncovered) ||
+    !run.uncovered.every((dimension) => DIAGNOSTIC_DIMENSIONS.includes(dimension))) return null;
   // Nothing answered yet: nothing to preserve, so choose afresh. A run saved
   // before reviewed questions arrived (onboarding starts the check at once)
   // would otherwise pin a practice-tier set after trusted supply exists.
   if (!run.doneAttemptIds.length) return null;
-  const questionIds = new Set(questions.map((q) => q.id));
-  if (!run.items.every((item) => item && questionIds.has(item.questionId))) return null;
+  const questionsById = new Map(questions.map((q) => [q.id, q]));
+  const itemIds = new Set<Id>();
+  for (const item of run.items) {
+    if (!item || typeof item.questionId !== "string" || itemIds.has(item.questionId)) return null;
+    const question = questionsById.get(item.questionId);
+    if (!question || question.subjectId !== subjectId || !question.topicIds.includes(item.topicId) || !run.topicIds.includes(item.topicId) ||
+      !DIAGNOSTIC_DIMENSIONS.includes(item.dimension) || item.marks !== question.totalMarks ||
+      !Number.isFinite(item.seconds) || item.seconds <= 0 || !eligibleForQuickDiagnostic(question, run.practiceTier)) return null;
+    itemIds.add(item.questionId);
+  }
   // Every item answered but the report not yet shown (a reload on the last
   // question's feedback) resumes straight to the report.
   if (run.doneAttemptIds.length > run.items.length) return null;
+  if (new Set(run.doneAttemptIds).size !== run.doneAttemptIds.length) return null;
   const byId = new Map(attempts.map((a) => [a.id, a]));
   const done: Attempt[] = [];
   for (const [index, id] of run.doneAttemptIds.entries()) {
     const attempt = byId.get(id);
-    if (!attempt || attempt.questionId !== run.items[index]!.questionId) return null;
+    if (!attempt || attempt.subjectId !== subjectId || attempt.questionId !== run.items[index]!.questionId) return null;
     done.push(attempt);
   }
   return { run: run as QuickDiagnosticRun, done };

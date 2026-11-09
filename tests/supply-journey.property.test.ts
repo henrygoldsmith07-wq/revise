@@ -307,10 +307,10 @@ describe("what a brand-new learner is offered", () => {
     expect(bank.some(trustedAssessmentContent)).toBe(false);
     const now = day(0);
     const { plan } = rank(bank, { attempts: [], mistakes: [] }, now);
-    // Practice is allowed on unreviewed questions, so Today is not empty — but a
-    // quick check needs reviewed questions, so it must not be what is offered.
+    // A quick practice check gives a starting point while reviewed supply is
+    // blocked. Its route and explanation must preserve the evidence boundary.
     expect(plan.top).not.toBeNull();
-    expect(plan.top!.type).not.toBe("quick-check");
+    expect(plan.top!.route.href).toBe(`/diagnostic?subject=${SUBJECT}&tier=practice`);
     // Nothing has been proven, and nothing claims to have been.
     expect([null, "not-checked"]).toContain(plan.top!.proofStatus);
     expect(plan.top!.marksRecoverable).toBeNull();

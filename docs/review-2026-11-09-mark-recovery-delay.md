@@ -1,0 +1,9 @@
+
+## 9 November 2026 — mark-recovery proof delay
+
+Reviewed the delayed mark-recovery path after the separate proof-ledger fix. Checkout remains on `fix/onboarding-recovery-and-check-consistency`, with the existing onboarding, proof-ledger and lesson edits preserved.
+
+- **High impact / high confidence / low effort:** `src/domain/mark-recovery.ts:215-229` previously accepted a trusted independent answer once three days had elapsed since the first success, without checking for intervening practice. This could label a mark proven immediately after the learner rehearsed the same topic. The shared proof-delay requirement therefore applied in the ledger but not in mark recovery.
+- **Focused change:** the delayed answer now needs a full interval after the latest observed attempt on that topic by the same learner. Untrusted attempts reset the delay but do not contribute scores or satisfy trust gates. Existing independent-question, human-review, official-paper and source-loss trust conditions remain. The module receives no card-review log input, so this correction covers recorded answers only; card retrieval exposure is not checked here.
+- **Flow status:** Diagnose and Learn/Repair remain partial due to absent reviewed question supply and independently reviewed teaching. Practise is implemented as code; Prove remains partial pending genuine reviewed content, validated marks and delayed unseen evidence; Revisit scheduling is implemented, while retention benefit is unmeasured. No learner-benefit claim follows from this fix.
+- **Verification:** targeted ESLint (invoked through the repo's full lint script, which passed) and `git diff --check` passed. Standard TypeScript check is running / pending. No tests were added or run. No browser, account, staging, review corpus or learner outcomes were checked. Changes remain local and uncommitted; no remote actions.

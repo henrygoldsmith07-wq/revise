@@ -7,7 +7,7 @@ import { displayMinutes } from "@/domain/minutes";
 import { useEffect, useMemo, useState } from "react";
 import { getTopic } from "@/domain/curriculum";
 import { rootCauseOf } from "@/domain/mistake-patterns";
-import { quickCheckTopicIds, quickDiagnosticPool, quickDiagnosticReport, resumeQuickDiagnostic, selectQuickDiagnostic, type QuickDiagnosticRun, type QuickProbe } from "@/domain/quick-diagnostic";
+import { quickCheckTopicIds, quickDiagnosticPool, quickDiagnosticReport, resumeQuickDiagnostic, selectQuickCheck, type QuickDiagnosticRun, type QuickProbe } from "@/domain/quick-diagnostic";
 import { readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
 import { QuestionRunner } from "./QuestionRunner";
 import { ButtonLink, Button, Panel } from "./ui";
@@ -59,12 +59,8 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
       }
       const pool = quickDiagnosticPool(store.questions, store.attempts, subjectId);
       const topicIds = quickCheckTopicIds(pool, store.settings.yearGroup, getTopic, store.settings.unit4Option);
-      const trusted = selectQuickDiagnostic({ questions: pool, topicIds });
-      // No trusted supply (the normal flagship state until human review lands):
-      // offer an authored practice-tier check, labelled as practice, not proof.
-      const practiceTier = forcePracticeTier || !trusted.items.length;
-      const chosen = practiceTier ? selectQuickDiagnostic({ questions: pool, topicIds, practiceTier: true }) : trusted;
-      setSelection({ ...chosen, version: 1, subjectId, topicIds, practiceTier, doneAttemptIds: [] });
+      const chosen = selectQuickCheck({ questions: pool, topicIds, subjectId, practiceTier: forcePracticeTier });
+      setSelection({ ...chosen, version: 1, subjectId, topicIds, doneAttemptIds: [] });
     })();
     return () => { cancelled = true; };
     // Chosen once per mount, like the synchronous initialiser it replaces.
@@ -94,7 +90,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
   const question = item ? store.questions.find((q) => q.id === item.questionId) : undefined;
 
   const report = useMemo(() => {
-    if (!selection || index < items.length) return null;
+    if (!selection || !items.length || index < items.length) return null;
     const probes: QuickProbe[] = done.map((attempt, i) => {
       const it = items[i]!;
       const cause = store.mistakes.find((m) => m.attemptId === attempt.id);
@@ -141,7 +137,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
       <Panel className="space-y-3">
         {selection.practiceTier ? (
           <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
-            Practice, not proof: no reviewed questions exist here yet, so this check uses authored questions and cannot count as evidence.
+            Practice, not proof: there are not enough reviewed questions for a broad check, so this check uses authored questions and cannot count as evidence.
           </p>
         ) : null}
         <p className="text-sm text-ink2">{countLabel(selection.items.length, "question")} across {countLabel(new Set(selection.items.map((i) => i.topicId)).size, "topic")}, about {countLabel(selection.minutes, "minute")}. No hints.</p>

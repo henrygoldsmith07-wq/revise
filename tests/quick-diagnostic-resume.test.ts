@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { resumeQuickDiagnostic, type QuickDiagnosticRun } from "@/domain/quick-diagnostic";
 import type { Attempt, Question } from "@/domain/types";
+import { attempt, question } from "./helpers-recovery";
 
-const q = (id: string) => ({ id }) as Question;
-const a = (id: string, questionId: string) => ({ id, questionId }) as Attempt;
+const q = (id: string): Question => question(id, `t${id.slice(1)}`, { subjectId: "s", totalMarks: 2 });
+const a = (id: string, questionId: string): Attempt => attempt(id, questionId, 1, 2, "2026-10-03T09:00:00.000Z", { subjectId: "s" });
 const run = (over: Partial<QuickDiagnosticRun> = {}): QuickDiagnosticRun => ({
   version: 1,
   subjectId: "s",

@@ -21,6 +21,7 @@ import { PERSISTED_SCHEMA_VERSION } from "./persistence-schema";
 import { captureTelemetry, errorClass } from "@/lib/observability";
 import { tombstoneKey, wireTombstoneKey } from "@/domain/sync-tombstone";
 import { OutdatedTabError, currentDatabaseNotice, setDatabaseNotice } from "./db-notice";
+import { clearPracticeDrafts } from "./practice-draft-storage";
 
 // ---------------------------------------------------------------------------
 // IndexedDB is the *primary* store, not a cache. Every write lands here first
@@ -322,13 +323,17 @@ export async function deleteLocalDatabase(): Promise<void> {
   current?.close();
   profileConnections.delete(profileId);
   dbPromise = null;
-  if (typeof indexedDB === "undefined") return;
+  if (typeof indexedDB === "undefined") {
+    clearPracticeDrafts(profileId);
+    return;
+  }
   await new Promise<void>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(profileDatabaseName(profileId));
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error ?? new Error("Could not delete local database."));
     request.onblocked = () => reject(new Error("Close other Revise tabs before resetting local data."));
   });
+  clearPracticeDrafts(profileId);
 }
 
 /** Stores holding user-owned records, in the order sync should replay them. */
@@ -554,7 +559,7 @@ export async function deleteMeta(key: string): Promise<void> {
   await db.delete("meta", key);
 }
 
-/** Wipe every store. Used by "sign out and forget this device". */
+/** Wipe this profile's stores and device-only practice drafts. */
 export async function clearAll(): Promise<void> {
   const db = await getDb();
   const stores = [
@@ -571,6 +576,7 @@ export async function clearAll(): Promise<void> {
   const tx = db.transaction(stores, "readwrite");
   await Promise.all(stores.map((s) => tx.objectStore(s).clear()));
   await tx.done;
+  clearPracticeDrafts(profileId);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,8 +7,7 @@
 // authored practice tier is clearly labelled and never counts as evidence.
 // ---------------------------------------------------------------------------
 
-import { isFlagship } from "./flagship";
-import { quickCheckTopicIds, quickDiagnosticPool, selectQuickDiagnostic } from "./quick-diagnostic";
+import { QUICK_CHECK_FLAGSHIP_MIN_TOPICS, QUICK_CHECK_MIN_QUESTIONS, quickCheckTopicIds, quickDiagnosticPool, selectQuickCheck } from "./quick-diagnostic";
 import type { Unit4Option, YearGroup } from "./year-group";
 import { trustworthyAttempt } from "./learning-evidence";
 import { localDaysBetween, todayLocal } from "./local-date";
@@ -16,9 +15,9 @@ import type { Attempt, ExamDate, Id, Mistake, Question, ReviewLog } from "./type
 
 export const COLD_START_MIN_ATTEMPTS = 3;
 export const COLD_START_MIN_REVIEWS = 15;
-export const COLD_START_MIN_QUESTIONS = 3;
+export const COLD_START_MIN_QUESTIONS = QUICK_CHECK_MIN_QUESTIONS;
 /** A flagship check must sample several topics, or it is a topic quiz, not a first signal. */
-export const COLD_START_FLAGSHIP_MIN_TOPICS = 3;
+export const COLD_START_FLAGSHIP_MIN_TOPICS = QUICK_CHECK_FLAGSHIP_MIN_TOPICS;
 
 export interface ColdStartPlan {
   subjectId: Id;
@@ -74,19 +73,10 @@ export function planColdStart(input: ColdStartInput): ColdStartPlan | null {
   for (const subjectId of candidates) {
     const pool = quickDiagnosticPool(input.questions, input.attempts, subjectId);
     const topicIds = quickCheckTopicIds(pool, input.yearGroup, input.topicOf ?? (() => undefined), input.unit4Option);
-    let selection = selectQuickDiagnostic({ questions: pool, topicIds });
-    let practiceTier = false;
-    const isUseful = () => {
-      const topics = new Set(selection.items.map((i) => i.topicId)).size;
-      return selection.items.length >= COLD_START_MIN_QUESTIONS && (!isFlagship(subjectId) || topics >= COLD_START_FLAGSHIP_MIN_TOPICS);
-    };
-    if (!isUseful()) {
-      selection = selectQuickDiagnostic({ questions: pool, topicIds, practiceTier: true });
-      practiceTier = true;
-    }
+    const selection = selectQuickCheck({ questions: pool, topicIds, subjectId });
     const topics = new Set(selection.items.map((i) => i.topicId)).size;
-    if (isUseful()) {
-      return { subjectId, questions: selection.items.length, minutes: selection.minutes, topics, practiceTier };
+    if (selection.items.length) {
+      return { subjectId, questions: selection.items.length, minutes: selection.minutes, topics, practiceTier: selection.practiceTier };
     }
   }
   return null;

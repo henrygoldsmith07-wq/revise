@@ -6,7 +6,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { aiGenerateQuestions } from "@/lib/optional-ai";
 import { gateGeneratedQuestions } from "@/domain/generated-question-quality";
 import { remapContentIdString } from "@/data/content-ids";
-import { getSubject, getTopic, topicsFor } from "@/domain/curriculum";
+import { practiceDraftStorageKey } from "@/data/practice-draft-storage";
+import { getTopic, topicsFor } from "@/domain/curriculum";
 import { diagnosePrerequisiteWeakness, type PrerequisiteDiagnosis } from "@/domain/prerequisite-diagnosis";
 import { remediationForMistake } from "@/domain/remediation";
 import { rankQuestionsForExposure } from "@/domain/question-exposure";
@@ -33,6 +34,7 @@ import { wrongAnswerQueue } from "@/domain/wrong-answers";
 import { reviewedWjecTopicEdges } from "@/content/capabilities";
 import { requiresWjecContentReview } from "@/domain/physics-content-review";
 import { learnerEvidenceTrusted } from "@/domain/content-trust";
+import { HINT_TIERS } from "@/domain/hint-tiers";
 import { WeakTopicExamMode } from "@/components/WeakTopicExamMode";
 import { ProofCheckMode } from "@/components/ProofCheckMode";
 import { PrerequisiteCheck } from "@/components/PrerequisiteCheck";
@@ -40,7 +42,6 @@ import { QuickSessionMode, QuickSessionPicker } from "@/components/QuickSessionM
 import { RecoverMarksCard } from "@/components/MarksAtRiskPanel";
 import { MarksLedger } from "@/components/MarksLedger";
 import { PaperAutopsyView, PaperRepairMode, RecoverMarksMode } from "@/components/RecoveryModes";
-import { RichText } from "@/components/RichText";
 import { WorkedExamplePanel } from "@/components/WorkedExamplePanel";
 import { Button, ButtonLink, EmptyState, Panel, Pill, SectionHeading, Segmented } from "@/components/ui";
 
@@ -414,7 +415,6 @@ function Practice() {
 
   function resetSession() {
     setSessionAttempts([]);
-    setQuestionDrafts({});
     setClosed(false);
     setSessionElapsedMs(0);
     setSessionStartedAt(Date.now());
@@ -993,26 +993,10 @@ function Practice() {
           }
         />
       )}
-
-      {current && hintBudget !== 0 ? (
-        <section>
-          <SectionHeading title="Topic reminders" hint="Read these after you have answered, not before." />
-          <Panel>
-            <div className="flex items-center gap-2 mb-2">
-              <Pill>{getSubject(current.subjectId)?.name}</Pill>
-              <Pill>{getTopic(current.topicIds[0] ?? "")?.title}</Pill>
-            </div>
-            <RichText>
-              {(getTopic(current.topicIds[0] ?? "")?.keyPoints ?? []).map((p) => `- ${p}`).join("\n")}
-            </RichText>
-          </Panel>
-        </section>
-      ) : null}
     </div>
   );
 }
 
-const DRAFT_STORAGE_PREFIX = "revise:practice-drafts:";
 const MAX_STORED_DRAFTS = 20;
 
 /**
@@ -1023,21 +1007,25 @@ const MAX_STORED_DRAFTS = 20;
  */
 function readPracticeDrafts(userId: string): Record<string, QuestionDraft> {
   try {
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_PREFIX + userId);
+    const raw = window.localStorage.getItem(practiceDraftStorageKey(userId));
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
     const out: Record<string, QuestionDraft> = {};
     for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (typeof value !== "object" || value === null) continue;
-      const record = value as { answers?: unknown; choice?: unknown };
+      const record = value as { answers?: unknown; choice?: unknown; hintTier?: unknown; repairTeachingSeen?: unknown };
       if (typeof record.answers !== "object" || record.answers === null) continue;
       const answers: Record<string, string> = {};
       for (const [partId, text] of Object.entries(record.answers as Record<string, unknown>)) {
         if (typeof text === "string" && text.trim()) answers[partId] = text.slice(0, 8000);
       }
-      const choice = typeof record.choice === "number" ? record.choice : null;
-      if (Object.keys(answers).length || choice !== null) out[key] = { answers, choice };
+      const choice = typeof record.choice === "number" && Number.isInteger(record.choice) && record.choice >= 0 ? record.choice : null;
+      const hintTier = HINT_TIERS.find((tier) => tier === record.hintTier);
+      const repairTeachingSeen = record.repairTeachingSeen === true;
+      if (Object.keys(answers).length || choice !== null || hintTier || repairTeachingSeen) {
+        out[key] = { answers, choice, ...(hintTier ? { hintTier } : {}), ...(repairTeachingSeen ? { repairTeachingSeen: true } : {}) };
+      }
       if (Object.keys(out).length >= MAX_STORED_DRAFTS) break;
     }
     return out;
@@ -1048,12 +1036,14 @@ function readPracticeDrafts(userId: string): Record<string, QuestionDraft> {
 
 function writePracticeDrafts(userId: string, drafts: Record<string, QuestionDraft>): void {
   try {
-    const entries = Object.entries(drafts).slice(-MAX_STORED_DRAFTS);
+    const entries = Object.entries(drafts)
+      .filter(([, draft]) => draft.choice !== null || Object.values(draft.answers).some((answer) => answer.trim()) || draft.hintTier || draft.repairTeachingSeen)
+      .slice(-MAX_STORED_DRAFTS);
     const raw = JSON.stringify(Object.fromEntries(entries));
     // Drafts are unbounded learner text: refuse a large blob rather than
     // evicting silently or growing storage without bound.
     if (raw.length > 100_000) return;
-    window.localStorage.setItem(DRAFT_STORAGE_PREFIX + userId, raw);
+    window.localStorage.setItem(practiceDraftStorageKey(userId), raw);
   } catch {
     // Storage pressure or privacy mode: the session simply does not resume drafts.
   }

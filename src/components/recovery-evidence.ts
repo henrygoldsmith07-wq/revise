@@ -44,7 +44,7 @@ export interface RecoveryEvidence {
 }
 
 export function useRecoveryEvidence(): RecoveryEvidence {
-  const store = useStoreFields("attempts", "examDates", "interventionOutcomes", "mistakes", "proofLedger", "questions", "settings");
+  const store = useStoreFields("attempts", "examDates", "interventionOutcomes", "mistakes", "proofLedger", "questions", "reviewLogs", "settings");
   return useMemo(() => {
     const subjects = new Set(store.settings.subjectIds);
     // Missions, patterns and the paper-result card read the same year scope as
@@ -54,6 +54,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
     const recovery = buildMarkRecovery({
       mistakes,
       attempts: store.attempts,
+      reviewLogs: store.reviewLogs,
       questions: store.questions,
       now,
       officialPaper: officialPaperContextFromSettings({
@@ -76,7 +77,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
       mistakes, recovery, patterns, unseenByTopic, supplyByTopic, proof, daysToExam: days, topicTitle: (id: string) => getTopic(id)?.title ?? id, effectiveness,
       repairWeight: (kind: InterventionKind) => estimateEffectiveness(effectiveness, { kind }).weight,
     };
-  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.proofLedger, store.questions, store.settings.subjectIds, store.settings.yearGroup, store.settings.unit4Option, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
+  }, [store.attempts, store.examDates, store.interventionOutcomes, store.mistakes, store.proofLedger, store.questions, store.reviewLogs, store.settings.subjectIds, store.settings.yearGroup, store.settings.unit4Option, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
 }
 
 /** The single ranked plan Today, the command centre, the diagnostic and mission routes all read. */

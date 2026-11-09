@@ -50,12 +50,12 @@ describe("flagship learner journey on workflow-verified questions", () => {
   const byId = new Map(bank.map((q) => [q.id, q]));
   const q = (id: string) => byId.get(id)!;
 
-  it("supply failure: with no reviewed questions Revise offers no diagnostic, explains the block and claims nothing", () => {
+  it("supply failure: with no reviewed questions Revise offers a labelled practice check and claims nothing", () => {
     expect(authored.some(trustedAssessmentContent)).toBe(false);
     const plan = planColdStart({ subjectIds: [SUBJECT], attempts: [], mistakes: [], reviewLogs: [], questions: authored, examDates: [exam], topicSubject, now: NOW });
-    expect(plan).toBeNull();
+    expect(plan?.practiceTier).toBe(true);
     const input = engine(authored, [], [], NOW);
-    expect(rankRevisionActions(input).top?.type).not.toBe("quick-check");
+    expect(rankRevisionActions(input).top?.route.href).toBe(`/diagnostic?subject=${SUBJECT}&tier=practice`);
     const notes = evidenceLimits({ supply: unseenSupplyByTopic([topicId("algebra")], authored, [])[topicId("algebra")]!, daysToExam: 60, minProofDays: 3, trustedAttempts: 0, delayedChecked: false });
     expect(proofBlocked(notes)).toBe(true);
     expect(limitsSentence(notes)).toMatch(/cannot currently prove the improvement because the remaining new questions have not been reviewed yet/);

@@ -15,6 +15,7 @@ import { isUnit4Option, isYearGroup, type Unit4Option, type YearGroup } from "@/
 import { examRowsForSitting, examSittingFor, type ExamSitting } from "@/domain/exam-series";
 import { boardAfterRegionChange, isSchoolRegion, regionBoardMissing, type SchoolRegion } from "@/domain/school-region";
 import { deleteReviseUserMeta, readReviseUserMeta, writeReviseUserMeta } from "@/data/storage-namespace";
+import { syncWireIdValue } from "@/data/sync-contract";
 import { SubjectPicker } from "./SubjectPicker";
 import { CreditedIcon } from "./icons";
 import { OnboardingSchoolStep } from "./OnboardingSchoolStep";
@@ -139,6 +140,8 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const [draftOwner, setDraftOwner] = useState<string | null>(null);
   const [restoredDraft, setRestoredDraft] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const finishing = useRef(false);
   // The student pressed the final button before the store was ready.
   const [finishQueued, setFinishQueued] = useState(false);
   const router = useRouter();
@@ -309,7 +312,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   const referenceChosen = subjectIds.filter((id) => !isFlagship(id));
   const firstSubjectName = chosenSubjects[0] ? getSubject(chosenSubjects[0].id)?.name ?? chosenSubjects[0].name : "";
   const canContinue =
-    phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : phase === 2 ? enteredDatesValid : true;
+    phase === 0 ? boardId !== null : phase === 1 ? subjectIds.length > 0 : enteredDatesValid && boardId !== null && subjectIds.length > 0;
 
   useEffect(() => {
     const userId = actions?.userId;
@@ -365,81 +368,97 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
   }
 
   function requestFinish() {
-    if (!boardId) return;
-    completedPhases.current.add(phase);
+    if (!canContinue || saving || finishing.current) return;
+    setSaveError(null);
     setSaving(true);
     if (actions) void finish(actions);
     else setFinishQueued(true);
   }
 
   async function finish(store: OnboardingActions) {
-    if (!boardId) return;
+    if (finishing.current) return;
     setFinishQueued(false);
+    // A restored draft or an idle tab can outlive the dates it collected.
+    if (!boardId || !subjectIds.length || chosenSubjects.some((subject) => !isOptionalExamDateValid(shownDates[subject.id], todayIso()))) {
+      setSaving(false);
+      setSaveError("Review your subjects and exam dates before finishing. Clear any date you do not know yet.");
+      return;
+    }
+    finishing.current = true;
     setSaving(true);
-    const availability: Availability[] = STEADY_MINUTES.map((minutes, weekday) => ({ weekday, minutes }));
-
-    await store.updateSettings({
-      displayName: "Student",
-      subjectIds,
-      availability,
-      targetGrades: Object.fromEntries(subjectIds.map((id) => [id, gradesFor(id)[0] ?? "A*"])),
-      // A skipped quick check stays skipped on Today; otherwise Today leads with it.
-      ...(yearGroup ? { yearGroup } : {}),
-      ...(yearGroup === "year-13" && unit4Option ? { unit4Option } : {}),
-      quickCheckSkipped: diagnosticChoice === "skip" ? [...subjectIds] : [],
-    });
-
-    for (const subject of chosenSubjects) {
-      const sitting = autoFilled[subject.id];
-      if (sitting) {
-        // Auto-filled and untouched: one row per unit paper when timetabled.
-        const paperIds = getSubject(subject.id)?.papers.map((paper) => paper.id) ?? [];
-        const rows = examRowsForSitting({ sitting, subject: { id: subject.id, name: subject.name, paperIds }, userId: store.userId, newId: () => crypto.randomUUID() });
-        for (const row of rows) await store.upsertExamDate(row);
-        continue;
-      }
-      const date = examDates[subject.id];
-      if (!date) continue;
-      const exam: ExamDate = {
-        id: crypto.randomUUID(),
-        userId: store.userId,
-        subjectId: subject.id,
-        date,
-        label: `${subject.name} exam`,
-      };
-      await store.upsertExamDate(exam);
-    }
-
-    // Build the plan now, so Today (or the check) has real work the moment they land.
-    await store.regeneratePlan();
-    if (diagnosticChoice === "quick" && subjectIds.length) {
-      void store.recordFunnel("diagnostic_started", subjectIds[0]!);
-    } else {
-      void store.recordFunnel("diagnostic_skipped", subjectIds[0] ?? "none");
-    }
-    // Wait for the "onboarded" marker to land in IndexedDB before leaving.
-    // Online, router.push is a client-side transition and a fire-and-forget
-    // write finished anyway; offline, the RSC fetch for /diagnostic fails and
-    // Next falls back to a full browser navigation, which dropped the
-    // in-flight write, so the student landed back on step 1 of onboarding
-    // (e2e/offline.spec.ts "offline banner appears when offline").
+    setSaveError(null);
     try {
+      const availability: Availability[] = STEADY_MINUTES.map((minutes, weekday) => ({ weekday, minutes }));
+
+      await store.updateSettings({
+        displayName: "Student",
+        subjectIds,
+        availability,
+        targetGrades: Object.fromEntries(subjectIds.map((id) => [id, gradesFor(id)[0] ?? "A*"])),
+        // A skipped quick check stays skipped on Today; otherwise Today leads with it.
+        ...(yearGroup ? { yearGroup } : {}),
+        ...(yearGroup === "year-13" && unit4Option ? { unit4Option } : {}),
+        quickCheckSkipped: diagnosticChoice === "skip" ? [...subjectIds] : [],
+      });
+
+      for (const subject of chosenSubjects) {
+        const sitting = autoFilled[subject.id];
+        if (sitting) {
+          // Auto-filled and untouched: one row per unit paper when timetabled.
+          const paperIds = getSubject(subject.id)?.papers.map((paper) => paper.id) ?? [];
+          const rows = examRowsForSitting({ sitting, subject: { id: subject.id, name: subject.name, paperIds }, userId: store.userId, newId: () => crypto.randomUUID() });
+          for (const row of rows) await saveExamDate(row);
+          continue;
+        }
+        const date = examDates[subject.id];
+        if (!date) continue;
+        const exam: ExamDate = {
+          id: crypto.randomUUID(),
+          userId: store.userId,
+          subjectId: subject.id,
+          date,
+          label: `${subject.name} exam`,
+        };
+        await saveExamDate(exam);
+      }
+
+      // Build the plan now, so Today (or the check) has real work the moment they land.
+      await store.regeneratePlan();
+      // Wait for the "onboarded" marker to land in IndexedDB before leaving.
+      // Online, router.push is a client-side transition and a fire-and-forget
+      // write finished anyway; offline, the RSC fetch for /diagnostic fails and
+      // Next falls back to a full browser navigation, which dropped the
+      // in-flight write, so the student landed back on step 1 of onboarding
+      // (e2e/offline.spec.ts "offline banner appears when offline").
       await onDone();
+      void store.recordFunnel("onboarding_step_completed", PHASE_KEYS[phase]).catch(() => undefined);
       draftFinished.current = true;
       await draftWrites.current.catch(() => undefined);
       await deleteReviseUserMeta("onboardingDraft", store.userId).catch(() => undefined);
+      if (diagnosticChoice === "skip") {
+        void store.recordFunnel("diagnostic_skipped", subjectIds[0] ?? "none").catch(() => undefined);
+      }
+      // Honour the "Start my quick check" commit. The final step promises
+      // "Revise will start with a quick check", so take them straight to it
+      // (with autoStart) instead of dropping them on Today, where the check
+      // is only one of several next actions and — before human review lands —
+      // is not even the lead. A skipped check stays on Today, whose copy
+      // already promises exactly that ("a first step waiting on Today").
+      if (diagnosticChoice === "quick" && subjectIds.length) {
+        router.push(`/diagnostic?subject=${encodeURIComponent(subjectIds[0]!)}`);
+      }
     } catch {
-      // Settings, exam dates and the plan are already saved; if only the
-      // marker failed, onboarding reappears on the next load, as before.
+      setSaveError("Your setup could not finish saving on this device. Your choices are still here. Try again; if it keeps happening, check that this browser allows site storage.");
+    } finally {
+      finishing.current = false;
+      setSaving(false);
     }
-    // Honour the "Start my quick check" commit. The final step promises
-    // "Revise will start with a quick check", so take them straight to it
-    // (with autoStart) instead of dropping them on Today, where the check
-    // is only one of several next actions and — before human review lands —
-    // is not even the lead. A skipped check stays on Today, whose copy
-    // already promises exactly that ("a first step waiting on Today").
-    if (diagnosticChoice === "quick" && subjectIds.length) {
-      router.push(`/diagnostic?subject=${encodeURIComponent(subjectIds[0]!)}`);
+
+    async function saveExamDate(exam: ExamDate) {
+      // A failed finish can have saved some rows already. Reuse their IDs
+      // across retries and reloads rather than adding duplicate countdowns.
+      const id = syncWireIdValue(store.userId, JSON.stringify(["onboarding-exam-v1", exam.subjectId, exam.paperSpecId ?? null, exam.date, exam.label]));
+      await store.upsertExamDate({ ...exam, id });
     }
   }
 
@@ -721,9 +740,11 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
           </Panel>
         ) : null}
 
+        {saveError ? <p className="text-sm text-danger" role="alert">{saveError}</p> : null}
+        {onFinalPhase && !enteredDatesValid ? <p className="text-sm text-danger" role="alert">An exam date is invalid or has passed. Go back to Exam dates and update it, or clear it to add later.</p> : null}
         <div className={cx("flex gap-2", onFinalPhase && "flex-col sm:flex-row")}>
           {phase > 0 ? (
-            <Button className="min-h-[3rem]" onClick={() => setPhase(phase - 1)}>
+            <Button className="min-h-[3rem]" disabled={saving} onClick={() => { setSaveError(null); setPhase(phase - 1); }}>
               Back
             </Button>
           ) : null}
