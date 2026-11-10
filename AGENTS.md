@@ -315,6 +315,22 @@ background and do other work while it runs. On Windows, invoke npm through
   (`focusedQuestion`). The start panel and the result still say in full that
   unreviewed questions are practice, not proof: shorten the repeats, never
   the first statement.
+- **A failed repair is not a second debt** (one-hundred-and-fifteenth pass).
+  `missionRetryParts` (`src/domain/repair-evidence.ts`) marks the parts of a
+  mission's repair or supported-practice question that sit on an open source
+  mistake's point, capability or topic; `recordAttempt` creates no new
+  mistake or card for them, as it already did for a retest of the same
+  question. Without it a student who kept failing went from 12 marks "still
+  open" to 26 in three runs of trying to repair them. Unaided stages (apply,
+  delayed proof) are excluded: a failure there is new evidence. The attempt
+  is still saved and still moves mastery; only the mistake ledger and the
+  card queue are spared. Related fixes from the same walk: a mark the device
+  marker cannot be sure of is not called an AI mark or said to be awaiting a
+  person (nothing in the product reviews it), and it is said once, in the
+  provisional box; the session summary counts such an answer as "not
+  counted", not "nothing was marked"; and when the next step is the mission
+  stage already open, "Continue" starts a fresh run (`MissionSessionRun`
+  keyed by run) instead of linking to the current URL, which did nothing.
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by

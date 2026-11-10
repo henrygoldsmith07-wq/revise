@@ -106,7 +106,12 @@ export function assessLowConfidenceMark(input: LowConfidenceMarkInput): LowConfi
     target: "human-review",
     confidence,
     threshold,
-    message: `AI mark confidence is ${percentage(confidence)}, below the ${percentage(threshold)} threshold — request human review before treating it as final.`,
+    // A mark made on the device is not an AI mark, and nothing in the product
+    // sends it to a person: the record is kept so the answer is left out of
+    // progress, and the wording says only that.
+    message: input.markedBy === "ai"
+      ? `AI mark confidence is ${percentage(confidence)}, below the ${percentage(threshold)} threshold — request human review before treating it as final.`
+      : `The match between this answer and the mark scheme was too weak to be sure of the mark (${percentage(confidence)}, below the ${percentage(threshold)} needed), so it is left out of your progress either way.`,
   };
 }
 

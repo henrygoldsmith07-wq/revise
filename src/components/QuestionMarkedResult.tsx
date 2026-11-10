@@ -105,6 +105,9 @@ export function MarkedResult({
   const stored = attempt?.markAssessment;
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
   const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
+  // The device marker could not be sure of this mark, so the attempt is kept
+  // out of progress (trustworthyAttempt). Said once, in the provisional box.
+  const deviceMarkUnsure = Boolean(result.escalation) && result.source !== "ai";
   const plan = result.remediation;
   const marksLost = awarded < question.totalMarks;
   const techniqueRepair = !inDiagnostic && awarded < question.totalMarks
@@ -267,9 +270,23 @@ export function MarkedResult({
             {result.assessment?.explanation ??
               "This mark is provisional, not an examiner's decision. If you think it is wrong, use “Flag this mark”."}
           </p>
+          {deviceMarkUnsure ? (
+            <p className="text-xs mt-1" data-testid="mark-not-counted">
+              Because of that, Revise leaves this answer out of your progress either way. Check it against the model answer below to see where you stand.
+            </p>
+          ) : null}
+        </div>
+      ) : deviceMarkUnsure ? (
+        <div className="mb-3 rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status" data-testid="mark-not-counted">
+          <p className="font-semibold text-review">Not counted yet</p>
+          <p className="text-xs mt-1">{result.escalation?.message} Check it against the model answer below; if the mark is wrong, use “Flag this mark”.</p>
         </div>
       ) : null}
-      {result.escalation ? (
+      {/* Only an AI mark is described as awaiting review. A mark made on the
+          device used to show the same box, reading "AI mark confidence is 45%
+          … saved for a second-marker decision": no AI had marked it and
+          nothing sends it to a person. */}
+      {result.escalation && result.source === "ai" ? (
         <div className="rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
           <p className="font-semibold text-review">Human review requested</p>
           <p className="text-xs mt-1">{result.escalation.message}</p>

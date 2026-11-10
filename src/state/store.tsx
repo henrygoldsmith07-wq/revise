@@ -17,7 +17,7 @@ import {
   evaluateMistakeRetest,
   mistakesFromAttempt,
 } from "@/domain/mistakes";
-import { advanceMistakeRepair, repairTargetParts } from "@/domain/repair-evidence";
+import { advanceMistakeRepair, missionRetryParts, repairTargetParts } from "@/domain/repair-evidence";
 
 import { trustedAssessmentContent } from "@/domain/physics-content-review";
 
@@ -850,8 +850,11 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       // create another card for the same gap.
       const misconceptions = [...new Set(question.topicIds.flatMap((id) => misconceptionsForTopic(id)))];
       const repairedParts = new Set(updatedMistakes.flatMap((m) => repairTargetParts(m, question)));
+      // Nor does a mission's repair question that fails again: it is another
+      // go at the mistake the mission is already repairing, not a new one.
+      const retryParts = missionRetryParts(attempt, question, snapshot?.mistakes ?? [], snapshot?.questions ?? [question]);
       const drafts = mistakesFromAttempt(attempt, question, undefined, new Date(attempt.createdAt), misconceptions)
-        .filter((draft) => !draft.mistake.partId || !repairedParts.has(draft.mistake.partId));
+        .filter((draft) => !draft.mistake.partId || (!repairedParts.has(draft.mistake.partId) && !retryParts.has(draft.mistake.partId)));
       await repo.saveLearningResult(attempt, [...updatedMistakes, ...drafts.map((d) => d.mistake)], drafts.map((d) => d.card));
       // Intervention evidence is appended only after the attempt is safely in
       // the learning-result transaction. Transfer and retention rungs attach

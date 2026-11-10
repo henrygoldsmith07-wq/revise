@@ -43,7 +43,12 @@ export function QuestionSetSession({
   contextFor?: Record<Id, MissionAttemptContext>;
   exitLabel?: string;
   /** The next best action, computed from the evidence this session just created. */
-  nextStep?: { href: string; label: string; detail: string } | null;
+  /**
+   * `onStart` is set when the next step is the page already open (the same
+   * mission stage again): a link to the current URL does nothing, so the
+   * caller starts the next run itself.
+   */
+  nextStep?: { href: string; label: string; detail: string; onStart?: () => void } | null;
   /** Continue a session interrupted by a refresh: skip the intro, start at `index`, keep the answers already given. */
   resume?: { index: number; attempts: Attempt[] };
   /** Called with the first unanswered position whenever it changes while the session runs. */
@@ -117,7 +122,25 @@ export function QuestionSetSession({
         {nextStep ? (
           <div className="space-y-2">
             <p className="text-sm text-ink2"><span className="font-medium text-ink">Next:</span> {nextStep.detail}</p>
-            <ButtonLink href={nextStep.href} variant="primary" className="w-full">{nextStep.label}</ButtonLink>
+            {nextStep.onStart ? (
+              <Button variant="primary" className="w-full" onClick={nextStep.onStart} data-testid="next-step-same-page">{nextStep.label}</Button>
+            ) : (
+              <ButtonLink
+                href={nextStep.href}
+                variant="primary"
+                className="w-full"
+                // A link to the page already open changes nothing. Any caller
+                // that did not take over with onStart gets a reload instead of
+                // a button that silently does nothing.
+                onClick={(event) => {
+                  if (`${window.location.pathname}${window.location.search}` !== nextStep.href) return;
+                  event.preventDefault();
+                  window.location.reload();
+                }}
+              >
+                {nextStep.label}
+              </ButtonLink>
+            )}
             <Button className="w-full" onClick={onExit}>{exitLabel}</Button>
           </div>
         ) : (

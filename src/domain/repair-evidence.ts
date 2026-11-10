@@ -29,6 +29,59 @@ export function repairTargetParts(mistake: Mistake, question: Question): string[
   return question.parts.filter((p) => p.capabilityIds?.length === 1 && p.capabilityIds[0] === mistake.capabilityIds?.[0]).map((p) => p.id);
 }
 
+/** Mission stages that are another go at the mission's own mistakes, with help available. */
+const RETRY_STAGES: ReadonlySet<string> = new Set(["repair", "practise"]);
+
+/**
+ * Parts of a mission question that are a further attempt at one of that
+ * mission's own open mistakes, and so must not open a new mistake when they
+ * lose marks again.
+ *
+ * A repair step serves a different question on the skill a mark was lost on.
+ * `repairTargetParts` recognises it only when both carry the same single
+ * capability; most siblings are matched by specification point, so each
+ * failed repair opened fresh mistakes and cards for the gap it was meant to
+ * close. A student who kept answering "I don't know" went from 12 marks
+ * "still open" to 26 in three sessions of trying to repair them.
+ *
+ * A part counts when the attempt carries the mission's source mistakes
+ * (repair or supported practice only: an unaided check that fails is new
+ * evidence) and the part shares a specification point or capability with an
+ * open source mistake, or its question sits in that mistake's topic. The
+ * topic is enough because supported practice is chosen by topic ("new
+ * questions that exercise the same weakness"): matching on the point alone
+ * still let the count climb from 12 to 19 in three failed runs. The marks
+ * the mission set out to recover are the debt; marks dropped while working
+ * on it are that work, recorded on the attempt and in mastery, not a second
+ * debt. The source mistake stays open; nothing is recovered, resolved or
+ * advanced here.
+ */
+export function missionRetryParts(
+  attempt: Pick<Attempt, "mission" | "subjectId">,
+  question: Pick<Question, "id" | "subjectId" | "topicIds" | "parts">,
+  mistakes: readonly Mistake[],
+  questions: readonly Question[],
+): Set<string> {
+  const out = new Set<string>();
+  const context = attempt.mission;
+  if (!context || !RETRY_STAGES.has(context.stage) || !context.sourceMistakeIds.length) return out;
+  const sourceIds = new Set(context.sourceMistakeIds);
+  for (const mistake of mistakes) {
+    if (!sourceIds.has(mistake.id) || mistake.resolved || mistake.subjectId !== question.subjectId) continue;
+    const source = questions.find((candidate) => candidate.id === mistake.questionId);
+    const lostPart = source?.parts.find((part) => part.id === mistake.partId);
+    const skills = new Set<string>([
+      ...(mistake.capabilityIds ?? []),
+      ...(lostPart ? [lostPart] : source?.parts ?? []).flatMap((part) => [...(part.specPointIds ?? []), ...(part.capabilityIds ?? [])]),
+    ]);
+    for (const part of question.parts) {
+      const tags = [...(part.specPointIds ?? []), ...(part.capabilityIds ?? [])];
+      if (tags.some((tag) => skills.has(tag)) || question.topicIds.includes(mistake.topicId)) out.add(part.id);
+    }
+  }
+  return out;
+}
+
 /** The same transition is used for practice, adaptive sessions and paper answers. */
 export function advanceMistakeRepair(mistake: Mistake, question: Question, attempt: Attempt,
   history: readonly Attempt[] = [], questions: readonly Question[] = [question]): Mistake {
