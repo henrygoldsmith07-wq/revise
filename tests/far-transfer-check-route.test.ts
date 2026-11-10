@@ -66,8 +66,9 @@ describe("practice page runs a far-transfer check", () => {
 
   it("offers no hints, and hides topic reminders wherever hints are off", () => {
     expect(page).toContain("const hintBudget = adaptiveHintBudget ?? (farTransferRetest ? 0 : stepModeHintBudget(stepMode));");
-    // Timed steps have no hints either; the reminders used to show under them.
-    expect(page).toContain("{current && hintBudget !== 0 ? (");
+    // The topic reminders that sat under the question are gone altogether:
+    // they gave the idea away beside a question that offers no hints.
+    expect(page).not.toContain("Topic reminders");
   });
 
   it("claims evidence only on a question that can carry it", () => {

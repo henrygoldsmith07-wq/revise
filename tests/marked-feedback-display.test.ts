@@ -104,7 +104,8 @@ describe("marked result inside a check", () => {
     // PracticeNextStep, which is only rendered outside a check.
     expect(view).toContain("{marksLost && !inDiagnostic ? (");
     expect(view).toContain("&& !inDiagnostic;"); // showSocratic
-    expect(view).toContain("{!inDiagnostic && !marksLost ? ("); // full-marks taught-us card only
+    // Full marks says what the answer shows, with no link out of the check.
+    expect(view).toContain("{inDiagnostic ? null : fullMarksReading?.kind === \"supported\" ? (");
     expect(view).toContain("result.remediation.headline && !inDiagnostic");
     expect(view).not.toContain("<SocraticExaminerPanel");
     expect(view).not.toContain("How to fix it");

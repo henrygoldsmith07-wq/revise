@@ -122,13 +122,13 @@ export function QuestionRunner({
           <EditorialBadge source={question.source ?? null}
             verification={needsWjecHumanReview ? "unverified" : question.verification ?? null}
             origin={question.origin} reviewer={question.reviewer ?? null} contentTier={getSubject(question.subjectId)?.contentTier} />
-          {needsWjecHumanReview ?
-            <span className="text-xs text-ink3">Needs human review · practice evidence only</span> : null}
           {!question.calculatorAllowed ? <Pill tone="danger">No calculator</Pill> : null}
           {farTransfer ? <Pill tone="accent">Delayed check · new context</Pill> : null}
         </div>
 
-        <TrustDetails question={question} />
+        {/* One trust line per question: the review warning is the label of the
+            disclosure that explains it, not a second line above it. */}
+        <TrustDetails question={question} label={needsWjecHumanReview ? "Needs human review · practice evidence only" : undefined} />
 
         {stepMode === "timed" ? <ExamPaceTimer marks={question.totalMarks} stopped={Boolean(result)} /> : null}
         {evidenceSource !== "independent" && !result ? (

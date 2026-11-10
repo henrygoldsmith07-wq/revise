@@ -11,7 +11,15 @@ import { buildTrustIndicator } from "@/domain/trust-indicator";
 import type { Question, Topic } from "@/domain/types";
 import { Pill } from "./ui";
 
-export function TrustDetails({ question }: { question: Question }) {
+export function TrustDetails({ question, label = "About this question" }: {
+  question: Question;
+  /**
+   * What the closed disclosure says. The runner passes its own review warning
+   * here so a question carries one trust line, not a warning and then a
+   * second "About this question · Not yet checked" under it.
+   */
+  label?: string;
+}) {
   const trust = useMemo(() => {
     const topics = question.topicIds.map((id) => getTopic(id)).filter((t): t is Topic => Boolean(t));
     return buildTrustIndicator({ question, subject: getSubject(question.subjectId) ?? null, topics });
@@ -19,7 +27,7 @@ export function TrustDetails({ question }: { question: Question }) {
   return (
     <details className="mb-3 text-xs text-ink2">
       <summary className="cursor-pointer select-none inline-flex min-h-11 items-center gap-2 font-medium text-ink2">
-        About this question <Pill tone={trust.tone}>{trust.tier === "trusted" ? "Checked" : trust.tier === "reference" ? "Reference" : "Not yet checked"}</Pill>
+        {label} <Pill tone={trust.tone}>{trust.tier === "trusted" ? "Checked" : trust.tier === "reference" ? "Reference" : "Not yet checked"}</Pill>
       </summary>
       <dl className="mt-1 grid gap-x-4 gap-y-1.5 sm:grid-cols-[auto_minmax(0,1fr)]">
         {trust.specification ? (

@@ -1,7 +1,7 @@
 // Deterministic offline error classifier (fallback + confidence gate).
 // Pure domain: no network. classifier.dev refines this, never replaces marking.
 
-import { readAnswerGap } from "./answer-gap";
+import { detectAnswerGap } from "./answer-gap-detect";
 import { ERROR_CONFIDENCE_FLOOR, ERROR_CONFIDENCE_THRESHOLD, isErrorCategory } from "./error-taxonomy";
 import type { ErrorCategory } from "./error-taxonomy";
 
@@ -40,7 +40,7 @@ export function localClassifyError(input: ErrorSignalInput): LocalErrorVerdict {
   // "insufficient detail". Only readings that rest on the answer itself carry
   // a verdict; everything else falls through to the keyword heuristics below
   // at their existing, below-threshold confidence.
-  const gap = readAnswerGap({
+  const gap = detectAnswerGap({
     answer: input.answer,
     missedPoints: input.missedPoints ?? [input.point],
     ...(input.creditedPoints ? { creditedPoints: input.creditedPoints } : {}),

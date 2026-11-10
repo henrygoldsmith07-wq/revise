@@ -32,7 +32,8 @@ import { useStoreFields } from "@/state/store";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { commentRestatesMarkedPoints, condenseMarkedFeedback, feedbackWithoutGeneratedVerdict } from "@/domain/marked-feedback-display";
 import { readQuestionGaps } from "@/domain/answer-gap";
-import { relearnCheckpointAt } from "@/domain/practice-next-step";
+import { gapPracticeHref, relearnCheckpointAt } from "@/domain/practice-next-step";
+import { readFullMarks } from "@/domain/full-marks-reading";
 import { useQuestionTeaching } from "@/state/checkpoint-teaching";
 import { RepairTeaching, WhyMarksWent } from "./LostMarksRepair";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
@@ -149,6 +150,7 @@ export function MarkedResult({
   const taught = useQuestionTeaching(question, marksLost && !inDiagnostic, lostParts);
   const taughtTopic = taught ? getTopic(taught.topicId) : undefined;
   const relearn = taught && taughtTopic ? relearnCheckpointAt(taughtTopic, taught.specPoint.id) : null;
+  const leadGap = gaps[0] ?? null;
   const feedbackText = useMemo(
     () => (gaps.length ? feedbackWithoutGeneratedVerdict(result.feedback, result.marked) : condenseMarkedFeedback(result.feedback, result.marked)),
     [gaps.length, result.feedback, result.marked],
@@ -173,6 +175,13 @@ export function MarkedResult({
     return result.marks > 0 ? result : null;
   }, [fullMarks, attempt, store.mistakes, store.attempts, store.questions, store.settings.officialPaperTrust, store.settings.officialPaperTermsConfirmed]);
   const provedTopic = proved ? getTopic(proved.topicIds[0] ?? "")?.title : undefined;
+  // What a full-mark answer shows: unaided on a new question, a familiar
+  // one, or with help. Only read when there is a saved attempt to read.
+  const fullMarksReading = useMemo(() => {
+    if (!fullMarks || !attempt) return null;
+    const byId = new Map(store.questions.map((q) => [q.id, q] as const));
+    return readFullMarks({ attempt, question, earlier: store.attempts, questionFor: (id) => byId.get(id), reviewed: learnerEvidenceTrusted(question) });
+  }, [fullMarks, attempt, question, store.attempts, store.questions]);
   const reviewedQuestion = learnerEvidenceTrusted(question);
   const actions = useMemo(() => {
     const seen = new Map<string, RemediationAction>();
@@ -464,16 +473,16 @@ export function MarkedResult({
             showSocratic={showSocratic}
             showMistakesLogged={!result.retest}
             relearnOverride={relearn}
+            gap={leadGap ? {
+              kind: leadGap.gap.kind,
+              repair: leadGap.gap.repair,
+              certainty: leadGap.gap.certainty,
+              topicId: relearn?.topicId ?? question.topicIds[0] ?? question.subjectId,
+              specPointId: relearn?.specPointId ?? question.parts.find((part) => part.id === leadGap.partId)?.specPointIds?.[0] ?? null,
+              taughtInPlace: Boolean(taught && relearn),
+              canRewrite: Boolean(improvableAnswers),
+            } : null}
           />
-        ) : null}
-        {/* Full marks keeps its short "what this taught us" read (support used,
-            familiar question or bank it); a lost mark folds it into the next step. */}
-        {!inDiagnostic && !marksLost ? (
-          <div className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5">
-            <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this taught us</p>
-            <p className="text-sm font-semibold text-ink mt-0.5">{result.nextAction.label}</p>
-            <p className="text-xs text-ink2 mt-0.5">{result.nextAction.why}</p>
-          </div>
         ) : null}
         {awarded < question.totalMarks && inDiagnostic ? (
           <p className="text-xs text-ink2" data-testid="diagnostic-repair-deferred">
@@ -492,24 +501,42 @@ export function MarkedResult({
                 state="passed"
               />
             ) : (
-              <div className="rounded-lg border border-line px-3 py-2.5 space-y-2" aria-label="What this answer establishes">
-                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Full marks — practice, not proof</p>
-                <p className="text-sm text-ink2">
-                  {reviewedQuestion
-                    ? "Revise records this as a correct answer. It only becomes proof once the same skill is answered unaided on a different question, after a delay."
-                    : "Revise records this as a correct answer. This question has not been checked by a teacher yet, so it counts as practice; only answers on reviewed questions can prove a skill."}
+              // What the student did, then separately what Revise can claim
+              // about it (src/domain/full-marks-reading.ts). Unaided on a new
+              // question, a familiar one, and a helped one are three
+              // different events and used to read as the same sentence.
+              <div className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5 space-y-1.5" aria-label="What this answer shows" data-testid="full-marks-reading" data-full-marks={fullMarksReading?.kind ?? "unknown"}>
+                <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">What this answer shows</p>
+                <p className="text-sm font-semibold text-ink">{fullMarksReading?.headline ?? result.nextAction.label}</p>
+                <p className="text-sm text-ink2">{fullMarksReading?.detail ?? result.nextAction.why}</p>
+                <p className="text-[11px] text-ink3">
+                  {fullMarksReading?.claim ?? (reviewedQuestion
+                    ? "Recorded as a correct answer. It becomes proof once the same skill holds on a different reviewed question, unaided, after a delay."
+                    : "Recorded as practice, not proof: this question has not been checked by a teacher yet, so Revise cannot vouch for it.")}
                 </p>
-                {/* An ordinary adaptive session: practice, as the copy above says.
+                {/* An ordinary adaptive session: practice, as the line above says.
                     It used to carry &proof=1, which nothing reads, and log a
                     proof attempt that never happened. */}
-                <ButtonLink
-                  href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1`}
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => captureProductEvent("recommendation.accepted", { kind: "unseen-practice" })}
-                >
-                  Try an unseen question
-                </ButtonLink>
+                {/* Inside a check there is no way out of it from here: the check moves on. */}
+                {inDiagnostic ? null : fullMarksReading?.kind === "supported" ? (
+                  <ButtonLink
+                    href={gapPracticeHref(question.topicIds[0] ?? question.subjectId, "unaided", question.parts[0]?.specPointIds?.[0] ?? null)}
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => captureProductEvent("recommendation.accepted", { kind: "unaided-after-support" })}
+                  >
+                    Try a fresh one without help
+                  </ButtonLink>
+                ) : (
+                  <ButtonLink
+                    href={`/adaptive-session?topic=${encodeURIComponent(question.topicIds[0] ?? question.subjectId)}&start=1`}
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => captureProductEvent("recommendation.accepted", { kind: "unseen-practice" })}
+                  >
+                    Try an unseen question
+                  </ButtonLink>
+                )}
               </div>
             )
         )}
