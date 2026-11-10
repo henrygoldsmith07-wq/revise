@@ -346,6 +346,22 @@ export function buildMissionSession(mission: ExamMission, input: MissionSessionI
   };
 }
 
+/** Causes that are a gap in the idea itself, where practising before learning repeats the error. */
+const LEARN_FIRST_CAUSES: ReadonlySet<string> = new Set<RootCause>(["missing-knowledge", "misunderstood-concept", "wrong-method", "prerequisite-weakness"]);
+
+/**
+ * Whether a mission question opens with its teaching (the idea and a worked
+ * example of a similar problem) before the answer box: only in the repair
+ * stage, and only when the marks went on not knowing or misunderstanding the
+ * idea. A slip, a unit error or a technique loss keeps help on request, so
+ * the retry stays a retrieval attempt. A question that opens taught is
+ * recorded as supported practice, exactly like a guided plan step; the
+ * mission's later stages remove the help.
+ */
+export function repairTeachesFirst(context: { stage: MissionAttemptContext["stage"]; targetCause: string | null } | undefined): boolean {
+  return context?.stage === "repair" && LEARN_FIRST_CAUSES.has(context.targetCause ?? "");
+}
+
 export function stageForRoute(value: string | null): MissionStageKind | undefined {
   return ["diagnose", "repair", "practise", "apply", "delayed-proof"].includes(value ?? "") ? (value as MissionStageKind) : undefined;
 }

@@ -245,6 +245,44 @@ background and do other work while it runs. On Windows, invoke npm through
   taught from `src/content/teaching/taught-spec-points.ts`, not the teaching
   itself: add an id there with each new entry
   (`tests/lesson-relearn.test.ts` fails otherwise).
+- **A lost mark is read from the answer, then taught in place** (one-hundred-and-thirteenth
+  pass). `readAnswerGap` (`src/domain/answer-gap.ts`) reads what the student
+  wrote against the points they missed: blank or "I don't know", the opposite
+  of a scheme point, a division written the wrong way round, a power of ten
+  out, points left unsaid. `localClassifyError` asks it first, so a reading
+  that rests on the answer itself becomes the mistake's stored
+  `errorCategory` (and so the mission's cause and Today's reason); every
+  other reading has `verdict: null`, is worded as a possibility and falls
+  through to the old keyword heuristics below the action threshold. Add a
+  verdict only for evidence in the answer, never from the question's wording,
+  and keep `insufficient-detail` below the threshold: an actionable one makes
+  the generic writing drill the primary next step
+  (`techniqueRepairForDiagnosis`). The marked result shows the reading
+  ("Why the marks went") in place of the device marker's percentage-based
+  verdict sentence, then `RepairTeaching` (`src/components/LostMarksRepair.tsx`):
+  the taught idea, the usual trap, a worked example one step at a time and
+  one unrecorded check. Reading it is not evidence and is saved nowhere.
+- **Hints come from the question, not the top of its topic**
+  (`buildHintLadder` in `src/domain/hints.ts`, same pass). The ladder used
+  to take `keyPoints[0]`/`commonErrors[0]` whatever the question tested, and
+  its "worked solution" was the mark scheme joined with dots. With a `focus`
+  it names the specification point (cue), teaches it (prompt), works a
+  different problem on the same idea (scaffold) and only then shows this
+  question's own model answer (worked solution, by explicit give-up);
+  without teaching it takes the key point and common error that share most
+  words with the question. The four tiers and their evidence weights are
+  unchanged. `chooseTeachingPoint` decides which taught point bears on a
+  question: the part's tag stands unless its teaching shares next to nothing
+  with the question, or the tag is the topic's first statement and another
+  point is plainly closer (55 of 1,656 written Physics questions move, the
+  sp-01 default-tag cases). It is a display choice only: it never retags a
+  question and nothing else may read it as a tag. Teaching loads on demand
+  through `useQuestionTeaching` (`src/state/checkpoint-teaching.ts`); never
+  import `@/content/teaching` statically from a practice component, and
+  every caller must work when it returns null (offline, chunk not cached).
+  A mission's repair stage opens guided ("Learn it first, then answer") only
+  when its cause is a gap in the idea (`repairTeachesFirst`); a slip or unit
+  error keeps help on request so the retry is still retrieval.
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by

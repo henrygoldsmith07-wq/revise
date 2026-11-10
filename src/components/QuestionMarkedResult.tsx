@@ -30,7 +30,11 @@ import { officialPaperContextFromSettings } from "@/domain/official-papers";
 import { getTopic } from "@/domain/curriculum";
 import { useStoreFields } from "@/state/store";
 import { captureProductEvent } from "@/lib/product-telemetry";
-import { commentRestatesMarkedPoints, condenseMarkedFeedback } from "@/domain/marked-feedback-display";
+import { commentRestatesMarkedPoints, condenseMarkedFeedback, feedbackWithoutGeneratedVerdict } from "@/domain/marked-feedback-display";
+import { readQuestionGaps } from "@/domain/answer-gap";
+import { relearnCheckpointAt } from "@/domain/practice-next-step";
+import { useQuestionTeaching } from "@/state/checkpoint-teaching";
+import { RepairTeaching, WhyMarksWent } from "./LostMarksRepair";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
 
 export function MarkedResult({
@@ -125,7 +129,30 @@ export function MarkedResult({
     if (!active || active === document.body) headingRef.current?.focus();
   }, []);
   const anyMissed = result.marked.some((m) => m.missedPoints.length > 0);
-  const feedbackText = useMemo(() => condenseMarkedFeedback(result.feedback, result.marked), [result.feedback, result.marked]);
+  // What the answer itself shows about each lost mark (blank, the opposite of
+  // the scheme, a division the wrong way round, points left unsaid). It
+  // replaces the device marker's verdict sentence, which is chosen from the
+  // percentage alone and could say "detail rather than understanding" about
+  // an answer that stated the opposite of the mark scheme.
+  const writtenAnswers = attempt?.answers ?? answers;
+  const gaps = useMemo(
+    () => (marksLost ? readQuestionGaps(question, result.marked, writtenAnswers) : []),
+    [marksLost, question, result.marked, writtenAnswers],
+  );
+  // The teaching that bears on the parts that lost marks, when Revise has
+  // written some. Not inside a check: the check moves on to its next
+  // question and plans the repair from all of its answers.
+  const lostParts = useMemo(
+    () => question.parts.filter((part) => result.marked.some((mark) => mark.partId === part.id && mark.awarded < mark.max)),
+    [question.parts, result.marked],
+  );
+  const taught = useQuestionTeaching(question, marksLost && !inDiagnostic, lostParts);
+  const taughtTopic = taught ? getTopic(taught.topicId) : undefined;
+  const relearn = taught && taughtTopic ? relearnCheckpointAt(taughtTopic, taught.specPoint.id) : null;
+  const feedbackText = useMemo(
+    () => (gaps.length ? feedbackWithoutGeneratedVerdict(result.feedback, result.marked) : condenseMarkedFeedback(result.feedback, result.marked)),
+    [gaps.length, result.feedback, result.marked],
+  );
   // "Proven" is said only when the mark-recovery ledger says this exact
   // attempt was the delayed proof of an earlier loss. Full marks alone is
   // practice: it was previously shown as "now proven" for any unaided answer
@@ -413,7 +440,12 @@ export function MarkedResult({
       </section>
 
       <div className="mt-4 pt-4 border-t border-line space-y-3">
-        <RichText className="text-sm">{feedbackText}</RichText>
+        {gaps.length ? <WhyMarksWent gaps={gaps} multiPart={question.parts.length > 1} /> : null}
+        {taught && relearn ? (
+          // A wrong option says the idea needs learning, though not what was misunderstood.
+          <RepairTeaching key={relearn.specPointId} question={question} relearn={relearn} repair={gaps[0]?.gap.repair ?? (question.kind === "mcq" ? "learn" : null)} teaching={taught.teaching} />
+        ) : null}
+        {feedbackText ? <RichText className="text-sm">{feedbackText}</RichText> : null}
         {/* Outside a check, a lost mark gets ONE next step; the guiding question,
             fix list, optional drill and the rest of the repair plan sit under
             "More help with this answer". Inside a check the deferral line
@@ -431,6 +463,7 @@ export function MarkedResult({
             techniqueShapeSuggestion={techniqueShapeSuggestion}
             showSocratic={showSocratic}
             showMistakesLogged={!result.retest}
+            relearnOverride={relearn}
           />
         ) : null}
         {/* Full marks keeps its short "what this taught us" read (support used,

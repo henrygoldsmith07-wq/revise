@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { choosePracticeNextStep, relearnCheckpointFor, RELEARN_NOTE, withRelearnHref } from "@/domain/practice-next-step";
+import { choosePracticeNextStep, relearnCheckpointFor, RELEARN_NOTE, withRelearnHref, type RelearnCheckpoint } from "@/domain/practice-next-step";
 import { getTopic } from "@/domain/curriculum";
 import { TAUGHT_SPEC_POINT_IDS } from "@/content/teaching/taught-spec-points";
 import { interventionStepLabel } from "@/domain/intervention-engine";
@@ -33,7 +33,15 @@ export function PracticeNextStep({
   techniqueShapeSuggestion,
   showSocratic,
   showMistakesLogged,
+  relearnOverride,
 }: {
+  /**
+   * The lesson checkpoint the marked result is already teaching in place,
+   * when its teaching has loaded. It is the point closest to the lost parts
+   * (chooseTeachingPoint), which is usually but not always the part's tag;
+   * using it here keeps the lesson link on the same point as the panel.
+   */
+  relearnOverride?: RelearnCheckpoint | null;
   question: Question;
   marked: MarkedPart[];
   answers?: Record<string, string>;
@@ -49,7 +57,7 @@ export function PracticeNextStep({
 }) {
   const prescribed = useInterventionPrescription(question.topicIds[0] ?? question.subjectId);
   // The lesson that teaches the point this answer lost, when one is written.
-  const relearn = relearnCheckpointFor({ question, marked, taught: TAUGHT, topicFor: getTopic });
+  const relearn = relearnOverride ?? relearnCheckpointFor({ question, marked, taught: TAUGHT, topicFor: getTopic });
   const plan = prescribed ? prescribed.prescription.steps.slice(0, 4).map((item) => withRelearnHref(item, relearn)) : [];
   const step = choosePracticeNextStep({
     techniqueRepair,
@@ -105,7 +113,7 @@ export function PracticeNextStep({
 
       {relearn && relearnElsewhere ? (
         <p className="text-xs text-ink2 px-1" data-testid="relearn-lesson-more">
-          Not sure why you lost the mark?{" "}
+          Want the whole lesson for this point?{" "}
           <Link href={relearn.href} className="font-medium text-ink underline inline-flex min-h-11 items-center">
             Open the lesson for {relearn.ref} ({relearn.topicTitle})
           </Link>

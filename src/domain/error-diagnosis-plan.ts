@@ -81,6 +81,12 @@ export function diagnoseAttemptErrors(input: {
       awarded: marked.awarded,
       maxMarks: marked.max,
       command: commandWordIn(input.question, part),
+      // Read by the local classifier only (src/domain/answer-gap.ts): every
+      // missed and credited point, so the answer is judged against the whole
+      // part rather than its first missed point.
+      missedPoints: marked.missedPoints,
+      creditedPoints: marked.creditedPoints,
+      isMcq: input.question.kind === "mcq",
     };
     // A remote verdict is used only when it arrives already gated and
     // confident; anything else falls back to the deterministic local read.
