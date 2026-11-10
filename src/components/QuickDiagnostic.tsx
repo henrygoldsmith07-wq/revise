@@ -18,12 +18,18 @@ import { flushPilotEvents, recordPilotEvent } from "@/lib/pilot-telemetry";
 import type { Attempt } from "@/domain/types";
 import { countLabel } from "@/domain/plural";
 
+export type QuickCheckRunState = "idle" | "started" | "answering";
+
 export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: forcePracticeTier = false, onRunningChange }: {
   subjectId: string;
   autoStart?: boolean;
   practiceTier?: boolean;
-  /** True while questions are on screen, so the page can drop its preamble and put the question first. */
-  onRunningChange?: (running: boolean) => void;
+  /**
+   * "started" while the first question is on screen and unanswered, so the
+   * page can shorten its preamble but still offer the full diagnostic;
+   * "answering" once an answer has been given, when switching would abandon it.
+   */
+  onRunningChange?: (state: QuickCheckRunState) => void;
 }) {
   const store = useStoreFields("questions", "attempts", "mistakes", "recordFunnel", "userId", "settings");
   const { plan } = useRevisionPlan();
@@ -118,10 +124,11 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
   const finished = Boolean(report);
   // Questions are on screen: started, something to ask, and no result yet.
   const running = started && Boolean(selection?.items.length) && !finished;
+  const runState: QuickCheckRunState = !running ? "idle" : done.length > 0 || reviewing ? "answering" : "started";
   useEffect(() => {
-    onRunningChange?.(running);
-    return () => onRunningChange?.(false);
-  }, [running, onRunningChange]);
+    onRunningChange?.(runState);
+    return () => onRunningChange?.("idle");
+  }, [runState, onRunningChange]);
   useEffect(() => {
     if (finished) {
       void saveRun(null);
@@ -190,8 +197,7 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
           banner, the label and a third caveat here put the first question
           about 700px down a phone screen. */}
       <p className="text-xs text-ink3" data-testid="quick-check-progress">
-        Question {index + 1} of {selection.items.length} · {title(item!.topicId)}
-        {selection.practiceTier ? <span role="note"> · practice, not proof (unreviewed questions)</span> : null}
+        {`Question ${index + 1} of ${selection.items.length} · ${title(item!.topicId)}${selection.practiceTier ? " · practice, not proof (unreviewed questions)" : ""}`}
       </p>
       {question ? (
         <QuestionRunner key={question.id} question={question} hintBudget={0} inDiagnostic onFinished={(attempt) => setReviewing(attempt)} />
