@@ -35,3 +35,20 @@ export function condenseMarkedFeedback(feedback: string, marked: readonly Marked
   if (!feedback.startsWith(generated)) return feedback;
   return `${opening}${advice}${feedback.slice(generated.length)}`;
 }
+
+/**
+ * The overall feedback without the device marker's generated verdict at all
+ * ("A sound answer that drops marks on detail rather than understanding…"),
+ * for a result that shows a reading of the answer itself instead: the two
+ * can disagree, and the generated one is chosen from the percentage alone.
+ * What follows the summary (a relevant common slip, the provenance line) is
+ * kept. Feedback in any other words, an AI marker's included, is unchanged.
+ */
+export function feedbackWithoutGeneratedVerdict(feedback: string, marked: readonly MarkedPart[]): string {
+  const awarded = marked.reduce((sum, m) => sum + m.awarded, 0);
+  const max = marked.reduce((sum, m) => sum + m.max, 0);
+  const { score, opening, detail, advice } = examinerSummaryParts(awarded, max, [...marked]);
+  const generated = `${score} ${opening}${detail}${advice}`;
+  if (!feedback.startsWith(generated)) return condenseMarkedFeedback(feedback, marked);
+  return feedback.slice(generated.length).trim();
+}

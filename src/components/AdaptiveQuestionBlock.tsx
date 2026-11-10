@@ -1,8 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { buildHintLadder, nextHint } from "@/domain/hints";
+import { buildHintLadder, nextHint, questionSpecPoint } from "@/domain/hints";
 import type { HintTier } from "@/domain/hints";
+import { getTopic } from "@/domain/curriculum";
+import { useQuestionTeaching } from "@/state/checkpoint-teaching";
+import { HintView } from "./HintView";
 import type { Attempt, InterventionAttemptContext, Mistake, Question } from "@/domain/types";
 import { QuestionRunner } from "./QuestionRunner";
 import { Button, Pill } from "./ui";
@@ -42,10 +45,20 @@ export function AdaptiveQuestionBlock({
   const [gaveUp, setGaveUp] = useState(false);
   const submittedRef = useRef(false);
 
-  const ladder = useMemo(
-    () => (support === "supported" ? buildHintLadder(question) : []),
-    [question, support],
-  );
+  // Built from the question's own topic and specification point. It used to
+  // be built from the question alone, which left the ladder without a worked
+  // solution: "Give up" recorded heavy support and showed nothing.
+  const taggedPoint = useMemo(() => questionSpecPoint(question, getTopic), [question]);
+  const taught = useQuestionTeaching(question, support === "supported");
+  const ladder = useMemo(() => {
+    if (support !== "supported") return [];
+    const topic = getTopic(question.topicIds[0] ?? "");
+    return buildHintLadder(
+      question,
+      topic ? { keyPoints: topic.keyPoints, commonErrors: topic.commonErrors } : undefined,
+      { specPoint: taught?.specPoint ?? taggedPoint, teaching: taught?.teaching ?? null },
+    );
+  }, [question, support, taggedPoint, taught]);
   const hintsAllowed = support === "supported";
   const next = hintsAllowed ? nextHint(ladder, revealedTiers) : null;
   // The worked solution is never served as "the next hint" — it is only shown
@@ -75,9 +88,9 @@ export function AdaptiveQuestionBlock({
           {revealedTiers.map((tier) => {
             const hint = ladder.find((candidate) => candidate.tier === tier);
             return hint ? (
-              <p key={tier} className="text-xs text-ink2 mt-2" role="status">
-                <span className="font-semibold text-ink">{hintTierLabel(tier)}:</span> {hint.text}
-              </p>
+              <div key={tier} className="mt-2 text-xs text-ink2" role="status">
+                <HintView hint={hint} />
+              </div>
             ) : null;
           })}
           <div className="flex flex-wrap gap-2 mt-2.5">

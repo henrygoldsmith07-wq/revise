@@ -6,7 +6,8 @@ import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from
 import { misconceptionsForTopic } from "@/content/misconceptions";
 
 import { getTopic } from "@/domain/curriculum";
-import { buildHintLadder, HINT_TIERS, hintEvidenceSource, type HintTier } from "@/domain/hints";
+import { buildHintLadder, HINT_TIERS, hintEvidenceSource, questionSpecPoint, type HintTier } from "@/domain/hints";
+import { useQuestionTeaching } from "./checkpoint-teaching";
 import { guidedOpeningTiers } from "@/domain/practice-step-mode";
 import {
   completeDelayedFarTransfer,
@@ -190,9 +191,18 @@ export function useQuestionExecution({
   // The hint ladder is deterministic content from the question and topic —
   // no model call — and every tier used is recorded on the attempt so the
   // tutor's evidence stays honest about assisted wins.
+  // What each rung says comes from the specification point the question
+  // turns on, and the teaching written for it when there is some (loaded on
+  // demand, and not at all for a question that offers no help).
+  const taggedPoint = useMemo(() => questionSpecPoint(question, getTopic), [question]);
+  const taught = useQuestionTeaching(question, hintBudget !== 0);
   const ladder = useMemo(
-    () => buildHintLadder(question, topic ? { keyPoints: topic.keyPoints, commonErrors: topic.commonErrors } : undefined),
-    [question, topic],
+    () => buildHintLadder(
+      question,
+      topic ? { keyPoints: topic.keyPoints, commonErrors: topic.commonErrors } : undefined,
+      { specPoint: taught?.specPoint ?? taggedPoint, teaching: taught?.teaching ?? null },
+    ),
+    [question, topic, taggedPoint, taught],
   );
   const allowedTiers: HintTier[] = useMemo(
     () => HINT_TIERS.slice(0, Math.max(0, Math.min(HINT_TIERS.length, hintBudget ?? HINT_TIERS.length))),

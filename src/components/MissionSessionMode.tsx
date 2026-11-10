@@ -6,7 +6,7 @@
 
 import { aboutMinutesLabel } from "@/domain/minutes";
 import { useCallback, useState } from "react";
-import { stageForRoute, buildMissionSession, missionCheckpoint, missionProofHref, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
+import { repairTeachesFirst, stageForRoute, buildMissionSession, missionCheckpoint, missionProofHref, missionResumePosition, missionRunAttempts, restoreMissionSession, type MissionSession } from "@/domain/mission-session";
 import { collectMissions } from "@/domain/revision-engine";
 import { useStoreFields } from "@/state/store";
 import { QuestionSetSession } from "./QuestionSetSession";
@@ -84,6 +84,11 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
           {session.steps.map((step) => (
             <p key={step.id}><span className="font-semibold">{step.title}:</span> {step.why}{step.verified ? "" : " Some of these questions have not been reviewed yet, so they are practice only."}</p>
           ))}
+          {session.steps.some((step) => repairTeachesFirst(step.context) && step.hintBudget !== 0) ? (
+            <p data-testid="mission-teaches-first">
+              Each question opens with the idea it tests, and a worked example of a similar problem where Revise has written one, because these marks went on the idea itself rather than a slip. Read them, then answer. The next step takes the help away.
+            </p>
+          ) : null}
           {session.limit ? <p className="font-semibold">{session.limit}</p> : null}
         </>
       ) : null}

@@ -1,6 +1,7 @@
 // Deterministic offline error classifier (fallback + confidence gate).
 // Pure domain: no network. classifier.dev refines this, never replaces marking.
 
+import { readAnswerGap } from "./answer-gap";
 import { ERROR_CONFIDENCE_FLOOR, ERROR_CONFIDENCE_THRESHOLD, isErrorCategory } from "./error-taxonomy";
 import type { ErrorCategory } from "./error-taxonomy";
 
@@ -11,7 +12,11 @@ export interface ErrorSignalInput {
   awarded: number;
   maxMarks: number;
   command?: string | null;
-  missedPoints?: string[];
+  missedPoints?: readonly string[];
+  /** Points the answer earned, so their values are not read as errors. */
+  creditedPoints?: readonly string[];
+  /** The "answer" is a chosen option index, not writing to read. */
+  isMcq?: boolean;
 }
 
 export interface LocalErrorVerdict {
@@ -29,6 +34,22 @@ export function localClassifyError(input: ErrorSignalInput): LocalErrorVerdict {
   const hay = `${input.prompt} ${input.point}`.toLowerCase();
   const ans = input.answer.trim();
   if (!ans) return { category: "knowledge-gap", confidence: 0.8, reasons: ["no answer evidence reached the point"] };
+  // What the student actually wrote outranks what the question looks like:
+  // "I don't know" on a numeric question is a knowledge gap, not a
+  // calculation error, and a division written the wrong way round is not
+  // "insufficient detail". Only readings that rest on the answer itself carry
+  // a verdict; everything else falls through to the keyword heuristics below
+  // at their existing, below-threshold confidence.
+  const gap = readAnswerGap({
+    answer: input.answer,
+    missedPoints: input.missedPoints ?? [input.point],
+    ...(input.creditedPoints ? { creditedPoints: input.creditedPoints } : {}),
+    awarded: input.awarded,
+    max: input.maxMarks,
+    prompt: input.prompt,
+    ...(input.isMcq ? { isMcq: true } : {}),
+  });
+  if (gap?.verdict) return { category: gap.verdict.category, confidence: gap.verdict.confidence, reasons: [gap.verdict.reason] };
   if (UNIT_RE.test(hay) || UNIT_RE.test(ans)) {
     const isUnit = /\bunit|kJ|J\b|m s|mol dm/i.test(hay);
     return { category: isUnit ? "unit-error" : "calculation", confidence: 0.62, reasons: ["units/significant-figure signal in the scheme text"] };

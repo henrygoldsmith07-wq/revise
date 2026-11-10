@@ -152,23 +152,29 @@ export function relearnCheckpointFor(input: {
     for (const specPointId of part.specPointIds ?? []) {
       if (!taught.has(specPointId)) continue;
       for (const topic of topics) {
-        const points = (topic.specPoints ?? []).filter((point) => point.text.trim().length > 0);
-        const index = points.findIndex((point) => point.id === specPointId);
-        if (index < 0) continue;
-        const printed = points[index]!.ref.trim();
-        const query = new URLSearchParams({ subject: topic.subjectId, topic: topic.id, checkpoint: specPointId });
-        return {
-          topicId: topic.id,
-          subjectId: topic.subjectId,
-          topicTitle: topic.title,
-          specPointId,
-          ref: printed || `checkpoint ${index + 1} of ${points.length}`,
-          href: `/lesson?${query}`,
-        };
+        const checkpoint = relearnCheckpointAt(topic, specPointId);
+        if (checkpoint) return checkpoint;
       }
     }
   }
   return null;
+}
+
+/** The lesson checkpoint for one specification point of a topic, or null when the topic does not list it. */
+export function relearnCheckpointAt(topic: Topic, specPointId: Id): RelearnCheckpoint | null {
+  const points = (topic.specPoints ?? []).filter((point) => point.text.trim().length > 0);
+  const index = points.findIndex((point) => point.id === specPointId);
+  if (index < 0) return null;
+  const printed = points[index]!.ref.trim();
+  const query = new URLSearchParams({ subject: topic.subjectId, topic: topic.id, checkpoint: specPointId });
+  return {
+    topicId: topic.id,
+    subjectId: topic.subjectId,
+    topicTitle: topic.title,
+    specPointId,
+    ref: printed || `checkpoint ${index + 1} of ${points.length}`,
+    href: `/lesson?${query}`,
+  };
 }
 
 /**

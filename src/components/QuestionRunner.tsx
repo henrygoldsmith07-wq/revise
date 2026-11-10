@@ -4,7 +4,7 @@ import { validateCommandWord, type CommandWordValidation } from "@/domain/comman
 import { stemRepeatsOnlyPart } from "@/domain/question-display";
 import { getSubject } from "@/domain/curriculum";
 import { learnerEvidenceTrusted } from "@/domain/content-trust";
-import { formatHint, nextHint, type HintTier } from "@/domain/hints";
+import { nextHint, type Hint, type HintTier } from "@/domain/hints";
 import { type DelayedFarTransferRetest } from "@/domain/delayed-far-transfer";
 
 import { shouldOfferMathInput } from "@/domain/math-input";
@@ -24,15 +24,23 @@ import { ProofCheckBanner } from "./ProofCheckBanner";
 import { useQuestionExecution, type QuestionDraft } from "@/state/question-execution";
 export type { QuestionDraft } from "@/state/question-execution";
 import { MarkedResult } from "./QuestionMarkedResult";
+import { HintView } from "./HintView";
 import { ExamPaceTimer } from "./ExamPaceTimer";
 import type { PracticeStepMode } from "@/domain/practice-step-mode";
 import { marksLabel } from "@/domain/plural";
-const TIER_HINT_CTA: Record<HintTier, string> = {
-  cue: "Reveal a small cue",
-  prompt: "Reveal what to think about",
-  scaffold: "Reveal the answer structure",
-  "worked-solution": "Reveal a worked solution",
-};
+/**
+ * What the next rung is, so the student can choose how much help to take.
+ * Each label starts "Reveal": the unaided steps are checked for having no
+ * such button.
+ */
+function hintCta(hint: Hint): string {
+  switch (hint.tier) {
+    case "cue": return "Reveal a small cue";
+    case "prompt": return "Reveal the idea behind this";
+    case "scaffold": return hint.detail?.example ? "Reveal a similar problem, worked" : "Reveal the answer structure";
+    case "worked-solution": return "Reveal this question's worked solution";
+  }
+}
 
 export function QuestionRunner({
   question,
@@ -53,7 +61,10 @@ export function QuestionRunner({
   onConfidence,
   inDiagnostic = false,
   stepMode = null,
+  guidedHeading = "Guided try: use these steps as you write",
 }: {
+  /** Heading over the opened steps of a guided question. */
+  guidedHeading?: string;
   /**
    * The repair-plan step this question was opened for (/practice?guided=1,
    * ?timed=1, ?unaided=1). Guided shows the hint steps before the answer
@@ -151,11 +162,11 @@ export function QuestionRunner({
 
         {guided && !result ? (
           <div className="rounded-lg border border-accent bg-accentsoft px-3 py-2.5 mt-4 space-y-2" data-testid="guided-steps" aria-live="polite">
-            <p className="text-sm font-semibold text-ink">Guided try: use these steps as you write</p>
+            <p className="text-sm font-semibold text-ink">{guidedHeading}</p>
             {visibleHints.length ? (
               <ol className="space-y-1.5 list-decimal pl-5">
                 {visibleHints.map((hint) => (
-                  <li key={hint.tier} className="text-sm text-ink2">{formatHint(hint)}</li>
+                  <li key={hint.tier} className="text-sm text-ink2"><HintView hint={hint} /></li>
                 ))}
               </ol>
             ) : (
@@ -259,16 +270,16 @@ export function QuestionRunner({
                 }
               }}
             >
-              {TIER_HINT_CTA[upcoming.tier]}
+              {hintCta(upcoming)}
             </Button>
           </div>
         ) : null}
         {hintsOpen && visibleHints.length && !(guided && !result) ? (
           <div className="mt-2 space-y-2" aria-live="polite">
             {visibleHints.map((hint) => (
-              <p key={hint.tier} className="card card-2 p-3 text-sm text-ink2">
-                {formatHint(hint)}
-              </p>
+              <div key={hint.tier} className="card card-2 p-3 text-sm text-ink2">
+                <HintView hint={hint} />
+              </div>
             ))}
             {evidenceSource !== "independent" ? (
               <p className="text-[11px] text-ink3">

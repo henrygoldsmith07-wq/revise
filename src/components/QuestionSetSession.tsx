@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getSubject, getTopic } from "@/domain/curriculum";
 import type { Attempt, Id, MissionAttemptContext, Question } from "@/domain/types";
+import { repairTeachesFirst } from "@/domain/mission-session";
 import { useStoreFields } from "@/state/store";
 import { QuestionRunner } from "./QuestionRunner";
 import { ButtonLink, Button, EmptyState, Panel, Pill, ProgressBar, SectionHeading } from "./ui";
@@ -176,6 +177,9 @@ export function QuestionSetSession({
             mode="practice"
             hintBudget={hintBudgetFor?.[current.id]}
             mission={contextFor?.[current.id]}
+            // A repair for a gap in the idea itself opens taught (see repairTeachesFirst).
+            stepMode={repairTeachesFirst(contextFor?.[current.id]) && hintBudgetFor?.[current.id] !== 0 ? "guided" : null}
+            guidedHeading="Learn it first, then answer"
             onFinished={(attempt) => setAttempts((previous) => [...previous, attempt])}
           />
           <Button
