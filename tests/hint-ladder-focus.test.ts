@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { seedQuestions } from "@/content";
 import { TEACHING } from "@/content/teaching";
 import { getTopic } from "@/domain/curriculum";
-import { buildHintLadder, chooseTeachingPoint, questionSpecPoint, teachingLinesFor } from "@/domain/hints";
+import { buildHintLadder, chooseAnsweredExample, chooseTeachingPoint, questionSpecPoint, teachingLinesFor } from "@/domain/hints";
 import { repairTeachesFirst } from "@/domain/mission-session";
 
 // Help comes from the question, not the top of its topic. The ladder used to
@@ -95,6 +95,36 @@ describe("chooseTeachingPoint", () => {
   it("offers nothing where no teaching is written", () => {
     const maths = seedQuestions.find((q) => q.subjectId === "wjec-alevel-maths")!;
     expect(chooseTeachingPoint(maths, getTopic, teachingFor)).toBeNull();
+  });
+});
+
+describe("chooseAnsweredExample", () => {
+  const internalResistance = seedQuestions.find((q) => q.subjectId === "wjec-alevel-physics" && q.stem.includes("always supplies 12 V"))!;
+  const choice = chooseTeachingPoint(internalResistance, getTopic, teachingFor)!;
+  const point = choice.specPoint.id;
+  const onPoint = seedQuestions.filter((q) => q.subjectId === "wjec-alevel-physics" && q.kind !== "mcq" && q.id !== internalResistance.id && q.parts.some((p) => (p.specPointIds ?? []).includes(point)));
+
+  it("prefers a question the student has sat on the same point when it is closer than the taught example", () => {
+    const closer = onPoint.filter((q) => /internal resistance/i.test(`${q.stem} ${q.parts.map((p) => p.prompt).join(" ")}`));
+    expect(closer.length).toBeGreaterThan(0);
+    const example = chooseAnsweredExample(internalResistance, closer, point, choice.teaching.worked)!;
+    expect(example.source).toBe("answered");
+    expect(`${example.prompt} ${example.answer}`).toMatch(/internal resistance|lost volts|terminal/i);
+    const ladder = buildHintLadder(internalResistance, undefined, { specPoint: choice.specPoint, teaching: choice.teaching, answeredExample: example });
+    expect(ladder.find((h) => h.tier === "scaffold")!.detail?.example).toEqual(example);
+  });
+
+  it("never uses the question itself, another point, a multiple-choice item or nothing answered", () => {
+    expect(chooseAnsweredExample(internalResistance, [internalResistance], point, choice.teaching.worked)).toBeNull();
+    expect(chooseAnsweredExample(internalResistance, [], point, choice.teaching.worked)).toBeNull();
+    expect(chooseAnsweredExample(internalResistance, onPoint, null, choice.teaching.worked)).toBeNull();
+    const elsewhere = seedQuestions.filter((q) => q.subjectId === "wjec-alevel-physics" && !q.parts.some((p) => (p.specPointIds ?? []).includes(point))).slice(0, 40);
+    expect(chooseAnsweredExample(internalResistance, elsewhere, point, choice.teaching.worked)).toBeNull();
+  });
+
+  it("without one, the ladder keeps the taught example", () => {
+    const ladder = buildHintLadder(internalResistance, undefined, { specPoint: choice.specPoint, teaching: choice.teaching, answeredExample: null });
+    expect(ladder.find((h) => h.tier === "scaffold")!.detail?.example).toMatchObject({ prompt: choice.teaching.worked.prompt, source: "taught" });
   });
 });
 

@@ -285,6 +285,10 @@ background and do other work while it runs. On Windows, invoke npm through
   through `useQuestionTeaching` (`src/state/checkpoint-teaching.ts`); never
   import `@/content/teaching` statically from a practice component, and
   every caller must work when it returns null (offline, chunk not cached).
+  The scaffold's worked example is the point's authored one unless a
+  question the student has already sat on that point is closer
+  (`chooseAnsweredExample`); never show the answer of a question they have
+  not sat, which would spend it with no record that it was seen.
   A mission's repair stage opens guided ("Learn it first, then answer") only
   when its cause is a gap in the idea (`repairTeachesFirst`); a slip or unit
   error keeps help on request so the retry is still retrieval.

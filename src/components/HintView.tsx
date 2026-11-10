@@ -29,7 +29,7 @@ export function HintView({ hint }: { hint: Hint }) {
       ) : null}
       {detail.example ? (
         <>
-          <p className="font-semibold text-ink">A similar problem, worked</p>
+          <p className="font-semibold text-ink">{detail.example.source === "answered" ? "A question you answered before, worked" : "A similar problem, worked"}</p>
           <RichText className="text-ink">{detail.example.prompt}</RichText>
           <ol className="list-decimal space-y-1 pl-5">
             {detail.example.steps.map((step) => (
@@ -40,7 +40,11 @@ export function HintView({ hint }: { hint: Hint }) {
             <span className="shrink-0 font-semibold text-ink">Answer:</span>
             <RichText className="min-w-0 flex-1 text-ink">{detail.example.answer}</RichText>
           </div>
-          <p className="text-xs text-ink3">Different numbers, same method. Now do the same with your question.</p>
+          <p className="text-xs text-ink3">
+            {detail.example.source === "answered"
+              ? "You have sat this one, so nothing new is given away. The same method fits your question."
+              : "Different numbers, same method. Now do the same with your question."}
+          </p>
         </>
       ) : null}
       {detail.trap ? (
