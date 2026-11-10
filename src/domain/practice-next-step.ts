@@ -10,6 +10,12 @@
 // Precedence, most specific evidence first:
 //   1. A technique repair: an actionable (above-threshold) diagnosis of THIS
 //      answer names a structure loss on a describe/explain/evaluate part.
+//   1b. What THIS answer showed (src/domain/answer-gap.ts), when the reading
+//      is clear or likely. A gap in the idea goes to a fresh question on the
+//      same point with the steps open; a slip goes to a fresh one without
+//      help; a point left out goes back to this answer. The topic's plan is
+//      built from the topic's history, so it sent "I don't know" and a
+//      slipped conversion to the same guided step.
 //   2. The first step of the topic's repair plan (intervention engine).
 //   3. The lesson that teaches the lost part's specification point, when
 //      Revise has written teaching for it (relearnCheckpointFor). Not yet
@@ -22,6 +28,7 @@
 // A tentative, heuristic shape suggestion is never primary: it does not
 // establish why marks were lost.
 
+import type { AnswerGapCertainty, AnswerGapKind, AnswerGapRepair } from "./answer-gap-detect";
 import type { InterventionStep } from "./intervention-engine";
 import { interventionStepLabel } from "./intervention-engine";
 import type { TechniqueRepair } from "./technique-repair";
@@ -46,6 +53,17 @@ export type PracticeNextStep =
       stepKind: InterventionStep["kind"];
     }
   | {
+      /** Chosen from what this answer showed, not from the topic's history. */
+      kind: "gap";
+      title: string;
+      why: string;
+      note: string;
+      /** Null when the step is on this page (rewrite this answer) and needs no link. */
+      cta: string | null;
+      href: string | null;
+      repair: AnswerGapRepair;
+    }
+  | {
       kind: "relearn";
       title: string;
       why: string;
@@ -66,12 +84,105 @@ export function techniqueDrillName(drillId: TechniqueRepair["drillId"]): string 
   return drillId === "six-mark" ? "extended evaluation" : drillId;
 }
 
+/** What the marked answer itself showed, and where a fresh question on it lives. */
+export interface AnswerGapStepInput {
+  kind: AnswerGapKind;
+  repair: AnswerGapRepair;
+  certainty: AnswerGapCertainty;
+  topicId: Id;
+  /** The specification point the lost part turns on, when one is known. */
+  specPointId?: Id | null;
+  /** The idea was taught in place under the mark (RepairTeaching), so the step can say so. */
+  taughtInPlace?: boolean;
+  /** "Improve my answer" is offered on this result (practice, not a retest or a check). */
+  canRewrite?: boolean;
+}
+
+/** `/practice` link for a fresh question on the same point, guided or unaided. */
+export function gapPracticeHref(topicId: Id, mode: "guided" | "unaided", specPointId?: Id | null): string {
+  const query = new URLSearchParams({ topic: topicId, [mode]: "1", minutes: mode === "guided" ? "8" : "6" });
+  if (specPointId) query.set("point", specPointId);
+  return `/practice?${query}`;
+}
+
+const SUPPORTED_NOTE = "Practice, not proof: an answer given with the steps open counts as supported practice.";
+const UNAIDED_NOTE = "No hints on this one, so the mark shows what you can do on your own. Practice, not proof, until the question is teacher-reviewed.";
+
+/**
+ * The step a clear or likely reading of this answer calls for, or null when
+ * the reading is only a possibility (the topic's plan is no worse a guess).
+ */
+export function gapNextStep(gap: AnswerGapStepInput | null | undefined): Extract<PracticeNextStep, { kind: "gap" }> | null {
+  if (!gap || gap.certainty === "unsure") return null;
+  const { repair } = gap;
+  if (repair === "learn") {
+    return {
+      kind: "gap",
+      repair,
+      title: "Now try one on this idea, with the steps open",
+      why: gap.taughtInPlace
+        ? "You have just read the idea. A fresh question on the same point, with the idea and a worked example beside it, turns reading it into using it."
+        : "This looks like a gap in the idea, not a slip, so more unaided questions would repeat it. A fresh question on the same point opens with the idea beside it.",
+      note: SUPPORTED_NOTE,
+      cta: "Start a guided question",
+      href: gapPracticeHref(gap.topicId, "guided", gap.specPointId),
+    };
+  }
+  if (repair === "example") {
+    return {
+      kind: "gap",
+      repair,
+      title: "Now do one yourself, with the method open",
+      why: "You picked the right quantities and combined them the wrong way. Work a fresh question on the same point with a worked example beside it, one line at a time.",
+      note: SUPPORTED_NOTE,
+      cta: "Start a guided question",
+      href: gapPracticeHref(gap.topicId, "guided", gap.specPointId),
+    };
+  }
+  if (repair === "redo") {
+    return {
+      kind: "gap",
+      repair,
+      title: "Try a fresh one on your own",
+      why: gap.kind === "arithmetic"
+        ? "The method was there and one line of arithmetic slipped, so help would only hide whether it was a one-off. A fresh question on the same point, without hints, shows that."
+        : "The method looked right and a conversion slipped, so help would only hide whether it was a one-off. A fresh question on the same point, without hints, shows that.",
+      note: UNAIDED_NOTE,
+      cta: "Start an unaided question",
+      href: gapPracticeHref(gap.topicId, "unaided", gap.specPointId),
+    };
+  }
+  // state-points: the idea is there; the answer left a point out.
+  if (gap.canRewrite) {
+    return {
+      kind: "gap",
+      repair,
+      title: "Add the missing point to this answer",
+      why: "Most of this was right. Use “Improve my answer” above to write the point you left out while the question is still in front of you, then carry on.",
+      note: "A rewrite is practice: it does not change the mark above.",
+      cta: null,
+      href: null,
+    };
+  }
+  return {
+    kind: "gap",
+    repair,
+    title: "Try a fresh one on your own",
+    why: "Most of this was right; a point was left out rather than not known. A fresh question on the same point, without hints, is the check that every step gets written down.",
+    note: UNAIDED_NOTE,
+    cta: "Start an unaided question",
+    href: gapPracticeHref(gap.topicId, "unaided", gap.specPointId),
+  };
+}
+
 export function choosePracticeNextStep(input: {
   techniqueRepair: TechniqueRepair | null;
   prescription: { headline: string; topicTitle: string; firstStep: InterventionStep | undefined } | null;
   fallback: { label: string; why: string };
   /** The taught lesson checkpoint for the lost part, if any (relearnCheckpointFor). */
   relearn?: RelearnCheckpoint | null;
+  /** What this answer showed (readQuestionGaps), when it can be read. */
+  gap?: AnswerGapStepInput | null;
 }): PracticeNextStep {
   const { techniqueRepair, prescription, fallback, relearn } = input;
   if (techniqueRepair) {
@@ -85,6 +196,8 @@ export function choosePracticeNextStep(input: {
       href: techniqueRepair.href,
     };
   }
+  const fromAnswer = gapNextStep(input.gap);
+  if (fromAnswer) return fromAnswer;
   const first = prescription?.firstStep;
   if (prescription && first) {
     return {

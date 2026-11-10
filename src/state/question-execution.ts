@@ -6,7 +6,7 @@ import { AI_DLQ_RESOLVED_EVENT, enqueueDeadMark, type AiDlqResolvedDetail } from
 import { misconceptionsForTopic } from "@/content/misconceptions";
 
 import { getTopic } from "@/domain/curriculum";
-import { buildHintLadder, HINT_TIERS, hintEvidenceSource, questionSpecPoint, type HintTier } from "@/domain/hints";
+import { buildHintLadder, chooseAnsweredExample, HINT_TIERS, hintEvidenceSource, questionSpecPoint, type HintTier } from "@/domain/hints";
 import { useQuestionTeaching } from "./checkpoint-teaching";
 import { guidedOpeningTiers } from "@/domain/practice-step-mode";
 import {
@@ -196,13 +196,23 @@ export function useQuestionExecution({
   // demand, and not at all for a question that offers no help).
   const taggedPoint = useMemo(() => questionSpecPoint(question, getTopic), [question]);
   const taught = useQuestionTeaching(question, hintBudget !== 0);
+  // A question the student has already sat on the same point, when it is
+  // closer to this one than the point's single authored example.
+  const answeredExample = useMemo(() => {
+    const pointId = (taught?.specPoint ?? taggedPoint)?.id ?? null;
+    if (hintBudget === 0 || !pointId) return null;
+    const sat = new Set(store.attempts.map((attempt) => attempt.questionId));
+    sat.delete(question.id);
+    if (!sat.size) return null;
+    return chooseAnsweredExample(question, store.questions.filter((candidate) => sat.has(candidate.id)), pointId, taught?.teaching.worked);
+  }, [hintBudget, question, store.attempts, store.questions, taggedPoint, taught]);
   const ladder = useMemo(
     () => buildHintLadder(
       question,
       topic ? { keyPoints: topic.keyPoints, commonErrors: topic.commonErrors } : undefined,
-      { specPoint: taught?.specPoint ?? taggedPoint, teaching: taught?.teaching ?? null },
+      { specPoint: taught?.specPoint ?? taggedPoint, teaching: taught?.teaching ?? null, answeredExample },
     ),
-    [question, topic, taggedPoint, taught],
+    [question, topic, taggedPoint, taught, answeredExample],
   );
   const allowedTiers: HintTier[] = useMemo(
     () => HINT_TIERS.slice(0, Math.max(0, Math.min(HINT_TIERS.length, hintBudget ?? HINT_TIERS.length))),

@@ -72,7 +72,10 @@ describe("learning roadmap", () => {
     expect(source).toContain("Recommended next");
     expect(source).toContain("What you should be able to do");
     expect(source).toContain("Reveal model answer");
-    expect(source).toContain("Self-marking checklist");
+    // The apply step's model-answer points are a comparison, not a self-mark:
+    // ticking them proved nothing, so they are listed to compare against.
+    expect(source).toContain("Compare your answer against each point");
+    expect(source).not.toContain("Self-marking checklist");
     expect(source).toContain("Your success criteria");
     expect(source).toContain("How it works");
     expect(source).toContain("Follow in order");

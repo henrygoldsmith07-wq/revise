@@ -18,7 +18,13 @@ import { flushPilotEvents, recordPilotEvent } from "@/lib/pilot-telemetry";
 import type { Attempt } from "@/domain/types";
 import { countLabel } from "@/domain/plural";
 
-export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: forcePracticeTier = false }: { subjectId: string; autoStart?: boolean; practiceTier?: boolean }) {
+export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: forcePracticeTier = false, onRunningChange }: {
+  subjectId: string;
+  autoStart?: boolean;
+  practiceTier?: boolean;
+  /** True while questions are on screen, so the page can drop its preamble and put the question first. */
+  onRunningChange?: (running: boolean) => void;
+}) {
   const store = useStoreFields("questions", "attempts", "mistakes", "recordFunnel", "userId", "settings");
   const { plan } = useRevisionPlan();
   const [started, setStarted] = useState(autoStart);
@@ -110,6 +116,12 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
   }, [report, done, items, plan.actions, subjectId]);
 
   const finished = Boolean(report);
+  // Questions are on screen: started, something to ask, and no result yet.
+  const running = started && Boolean(selection?.items.length) && !finished;
+  useEffect(() => {
+    onRunningChange?.(running);
+    return () => onRunningChange?.(false);
+  }, [running, onRunningChange]);
   useEffect(() => {
     if (finished) {
       void saveRun(null);
@@ -173,13 +185,14 @@ export function QuickDiagnostic({ subjectId, autoStart = false, practiceTier: fo
   }
   return (
     <>
-      {selection.practiceTier ? (
-        <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
-          Practice, not proof: these authored questions are unreviewed and cannot count as learner evidence.
-        </p>
-      ) : null}
-      <p className="text-xs text-ink3">Question {index + 1} of {selection.items.length} · {title(item!.topicId)}{selection.practiceTier ? " · practice, not proof" : ""}</p>
-      {index === 0 ? <p className="text-xs text-ink3">An initial signal about where to start, not a predicted grade. Skip any time from Today.</p> : null}
+      {/* One line while answering. The start panel and the result both say in
+          full that unreviewed questions are practice, not proof; repeating the
+          banner, the label and a third caveat here put the first question
+          about 700px down a phone screen. */}
+      <p className="text-xs text-ink3" data-testid="quick-check-progress">
+        Question {index + 1} of {selection.items.length} · {title(item!.topicId)}
+        {selection.practiceTier ? <span role="note"> · practice, not proof (unreviewed questions)</span> : null}
+      </p>
       {question ? (
         <QuestionRunner key={question.id} question={question} hintBudget={0} inDiagnostic onFinished={(attempt) => setReviewing(attempt)} />
       ) : null}

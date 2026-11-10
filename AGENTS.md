@@ -249,7 +249,12 @@ background and do other work while it runs. On Windows, invoke npm through
   pass). `readAnswerGap` (`src/domain/answer-gap.ts`) reads what the student
   wrote against the points they missed: blank or "I don't know", the opposite
   of a scheme point, a division written the wrong way round, a power of ten
-  out, points left unsaid. `localClassifyError` asks it first, so a reading
+  out, points left unsaid. Detection is `detectAnswerGap`
+  (`src/domain/answer-gap-detect.ts`); the sentences are added by
+  `readAnswerGap`, which only the marked result imports, because the
+  detection half is on the `/` route (the mistake pipeline) and that route
+  is within a few KB of its budget: keep wording out of the detect module.
+  `localClassifyError` asks the detection first, so a reading
   that rests on the answer itself becomes the mistake's stored
   `errorCategory` (and so the mission's cause and Today's reason); every
   other reading has `verdict: null`, is worded as a possibility and falls
@@ -280,9 +285,36 @@ background and do other work while it runs. On Windows, invoke npm through
   through `useQuestionTeaching` (`src/state/checkpoint-teaching.ts`); never
   import `@/content/teaching` statically from a practice component, and
   every caller must work when it returns null (offline, chunk not cached).
+  The scaffold's worked example is the point's authored one unless a
+  question the student has already sat on that point is closer
+  (`chooseAnsweredExample`); never show the answer of a question they have
+  not sat, which would spend it with no record that it was seen.
   A mission's repair stage opens guided ("Learn it first, then answer") only
   when its cause is a gap in the idea (`repairTeachesFirst`); a slip or unit
   error keeps help on request so the retry is still retrieval.
+- **The step after a mark follows what the answer showed** (one-hundred-and-fourteenth
+  pass). `gapNextStep` (`src/domain/practice-next-step.ts`) outranks the
+  topic's plan when the reading is clear or likely: a gap in the idea goes to
+  a guided question, a slip (a power of ten, or a line of the student's own
+  arithmetic that does not add up) to an unaided one, a point left out back
+  to "Improve my answer". An unsure reading chooses nothing. Those links
+  carry `point=<spec point id>`; `/practice` orders the step's questions on
+  that point first, before `deferProofSupply`, so a teacher-reviewed question
+  on the point is still kept back. Full marks is read by `readFullMarks`
+  (`src/domain/full-marks-reading.ts`): unaided on a question (and family)
+  never answered, a familiar one, or with help. It states what the student
+  did and, separately, what Revise can claim; it changes no ledger, and its
+  wording must never say proof, evidence or mastery for an unreviewed
+  question (`tests/full-marks-reading.test.ts`).
+- **One trust line per question, and the question first on a phone** (same
+  pass). The runner's review warning is the label of `TrustDetails`, not a
+  line above a second "About this question"; while a quick check has
+  questions on screen the page keeps its title and drops its preamble and
+  length switch (`onRunningChange`); a question opened by `?question=` or
+  `?retest=` is shown without the practice hub, topic row or navigator
+  (`focusedQuestion`). The start panel and the result still say in full that
+  unreviewed questions are practice, not proof: shorten the repeats, never
+  the first statement.
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by

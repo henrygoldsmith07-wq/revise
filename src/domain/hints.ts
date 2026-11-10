@@ -25,6 +25,7 @@
 // points, and it is reached only by an explicit give-up.
 // ---------------------------------------------------------------------------
 
+import { questionFamilies } from "./learning-evidence";
 import type { Id, Question, Topic } from "./types";
 import type { HintTier } from "./hint-tiers";
 
@@ -35,6 +36,8 @@ export interface HintWorkedExample {
   prompt: string;
   steps: string[];
   answer: string;
+  /** "answered": a question the student has already sat, with its own model answer; else authored teaching. */
+  source?: "taught" | "answered";
 }
 
 export interface Hint {
@@ -67,6 +70,8 @@ export interface HintTeaching {
 export interface HintFocus {
   specPoint?: { id: Id; ref: string; text: string } | null;
   teaching?: HintTeaching | null;
+  /** A closer worked example from the student's own answered questions (chooseAnsweredExample). */
+  answeredExample?: HintWorkedExample | null;
 }
 
 const TIER_LABELS: Record<HintTier, string> = {
@@ -231,6 +236,51 @@ const TAG_ADVANTAGE = 2;
 /** How many more of the question's words it must share than a first-statement tag. */
 const MIN_EXTRA_SHARED = 3;
 
+/**
+ * A worked example from a question the student has already answered, when it
+ * is closer to this question than the taught example is.
+ *
+ * A specification point has one authored example, and a point often covers
+ * several ideas (series and parallel networks, then internal resistance), so
+ * the example can be about a different one. A question the student has sat
+ * on the same point, with its own model answer, costs nothing to show: it is
+ * already seen, so it could never be an unseen practice or proof question
+ * again. A question never sat is not used here, because showing its answer
+ * would spend it without any record that it was seen.
+ *
+ * Candidates must share the point, come from a different question family
+ * (a near copy would give this answer away), have a model answer, and share
+ * more of this question's words than the taught example does.
+ */
+export function chooseAnsweredExample(
+  question: Question,
+  answered: readonly Question[],
+  specPointId: Id | null,
+  taught?: { prompt: string; steps: readonly string[] } | null,
+): HintWorkedExample | null {
+  if (!specPointId) return null;
+  const asked = questionWords(question);
+  const families = new Set(questionFamilies(question));
+  const shared = (text: string) => {
+    let count = 0;
+    for (const word of stems(text)) if (asked.has(word)) count += 1;
+    return count;
+  };
+  const bar = taught ? shared([taught.prompt, ...taught.steps].join(" ")) : 1;
+  let best: { example: HintWorkedExample; score: number } | null = null;
+  for (const candidate of answered) {
+    if (candidate.id === question.id || candidate.kind === "mcq") continue;
+    if (questionFamilies(candidate).some((family) => families.has(family))) continue;
+    const part = candidate.parts.find((p) => (p.specPointIds ?? []).includes(specPointId) && p.modelAnswer?.trim());
+    if (!part) continue;
+    const prompt = part.prompt && part.prompt !== candidate.stem ? `${candidate.stem} ${part.prompt}` : candidate.stem;
+    const score = shared(`${prompt} ${part.modelAnswer}`);
+    if (score <= bar || (best && score <= best.score)) continue;
+    best = { score, example: { prompt, steps: [...(part.markScheme ?? [])], answer: part.modelAnswer.trim(), source: "answered" } };
+  }
+  return best?.example ?? null;
+}
+
 function sentence(text: string): string {
   const trimmed = text.trim();
   return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
@@ -301,11 +351,12 @@ export function buildHintLadder(
   hints.push({
     tier: "scaffold",
     text: scaffoldText,
-    ...(teaching
+    ...(teaching || focus?.answeredExample
       ? {
           detail: {
-            example: { prompt: teaching.worked.prompt, steps: [...teaching.worked.steps], answer: teaching.worked.answer },
-            ...(teaching.trap ? { trap: teaching.trap } : {}),
+            example: focus?.answeredExample
+              ?? { prompt: teaching!.worked.prompt, steps: [...teaching!.worked.steps], answer: teaching!.worked.answer, source: "taught" as const },
+            ...(teaching?.trap ? { trap: teaching.trap } : {}),
           },
         }
       : {}),

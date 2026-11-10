@@ -291,6 +291,30 @@ export function questionUsesCommand(question: Pick<Question, "stem" | "parts">, 
   return commandOf(question.stem) === command;
 }
 
+/** A specification point id from a link (?point=): plain id characters only, bounded. */
+export function parseSpecPointParam(value: string | null): string | null {
+  const text = (value ?? "").trim();
+  return text && text.length <= 160 && /^[A-Za-z0-9._:-]+$/.test(text) ? text : null;
+}
+
+export function questionHasSpecPoint(question: Pick<Question, "parts">, specPointId: string): boolean {
+  return question.parts.some((part) => (part.specPointIds ?? []).includes(specPointId));
+}
+
+/**
+ * Put questions tagged with the specification point first (a repair step
+ * opened from a lost mark carries ?point=), keeping the existing order inside
+ * each group. Never drops a question: a topic with no other question on the
+ * point still has a queue, and `matched` says how many were on it.
+ */
+export function orderBySpecPoint<T extends Pick<Question, "parts">>(questions: readonly T[], specPointId: string | null): { ordered: T[]; matched: number } {
+  if (!specPointId) return { ordered: [...questions], matched: 0 };
+  const hit: T[] = [];
+  const rest: T[] = [];
+  for (const question of questions) (questionHasSpecPoint(question, specPointId) ? hit : rest).push(question);
+  return { ordered: [...hit, ...rest], matched: hit.length };
+}
+
 /**
  * Put questions that ask for the command word first, keeping the existing
  * order inside each group. Never drops a question: when the topic has none,

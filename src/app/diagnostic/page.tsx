@@ -36,6 +36,10 @@ function Diagnostic() {
   const requested = params.get("subject");
   const [subjectId, setSubjectId] = useState<string | null>(requested && subjectIds.includes(requested) ? requested : null);
   const [quick, setQuick] = useState(true);
+  // The quick check has questions on screen. The page then keeps its title
+  // and drops the preamble and the length switch, so the question is the
+  // first thing on a phone rather than the fifth.
+  const [quickRunning, setQuickRunning] = useState(false);
   const [records, setRecords] = useState<ProbeRecord[]>([]);
   // The attempt just marked, held on screen with its marked result until the
   // student continues. Confidence is captured with the submit, before the
@@ -79,19 +83,23 @@ function Diagnostic() {
       <header>
         <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">{finished && records.length ? "Result" : quick ? "Optional · 5–10 minutes" : "Optional · 15–25 minutes"}</p>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight mt-1">{finished && records.length ? "Your diagnostic result" : quick ? "Quick check" : "Full diagnostic"}</h1>
-        <p className="text-sm text-ink3 mt-1 max-w-3xl">
-          A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered. Answers on teacher-reviewed questions count as unaided evidence; anything else is labelled practice, not proof.
-        </p>
+        {quickRunning ? (
+          <p className="text-xs text-ink3 mt-1">No hints. Not a grade. <Link href="/" className="underline underline-offset-4 hover:text-ink">Stop and go back to Today</Link></p>
+        ) : (
+          <p className="text-sm text-ink3 mt-1 max-w-3xl">
+            A short check so Revise can choose your first step. It is not a grade and does not test everything. No hints are offered. Answers on teacher-reviewed questions count as unaided evidence; anything else is labelled practice, not proof.
+          </p>
+        )}
       </header>
 
-      {!records.length ? (
+      {!records.length && !quickRunning ? (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Diagnostic length">
           <Button size="sm" variant={quick ? "primary" : "secondary"} aria-pressed={quick} onClick={() => setQuick(true)}>Quick · 5–10 min</Button>
           <Button size="sm" variant={quick ? "secondary" : "primary"} aria-pressed={!quick} onClick={() => setQuick(false)}>Full · 15–25 min</Button>
         </div>
       ) : null}
 
-      {subjectIds.length > 1 && !records.length ? (
+      {subjectIds.length > 1 && !records.length && !quickRunning ? (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Subject">
           {subjectIds.map((id) => (
             <Button key={id} size="sm" variant={id === active ? "primary" : "secondary"} onClick={() => setSubjectId(id)}>{getSubject(id)?.name ?? id}</Button>
@@ -102,7 +110,7 @@ function Diagnostic() {
       {!active ? (
         <Panel><p className="text-sm text-ink3">Choose a subject in Settings first.</p></Panel>
       ) : quick && !records.length ? (
-        <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} practiceTier={params.get("tier") === "practice"} />
+        <QuickDiagnostic key={active} subjectId={active} autoStart={requested === active} practiceTier={params.get("tier") === "practice"} onRunningChange={setQuickRunning} />
       ) : items.length === 0 ? (
         // Not a dead end: the full diagnostic needs reviewed questions, but the
         // quick check has a labelled practice tier and practice always works.

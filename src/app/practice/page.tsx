@@ -16,7 +16,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
-import { chooseWorkedExample, deferProofSupply, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, parseCommandParam, parsePracticeStepMode, parseStepMinutes, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
+import { chooseWorkedExample, deferProofSupply, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, orderBySpecPoint, parseCommandParam, parsePracticeStepMode, parseSpecPointParam, parseStepMinutes, questionHasSpecPoint, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
 import { commandWordLabel } from "@/domain/command-word-validation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
@@ -67,7 +67,7 @@ export default function PracticePage() {
 function PracticeForRequest() {
   const params = useSearchParams();
   const step = parsePracticeStepMode(params);
-  return <Practice key={step ? `step:${step}:${params.get("topic") ?? ""}:${params.get("command") ?? ""}` : "practice"} />;
+  return <Practice key={step ? `step:${step}:${params.get("topic") ?? ""}:${params.get("command") ?? ""}:${params.get("point") ?? ""}` : "practice"} />;
 }
 
 function Practice() {
@@ -94,6 +94,9 @@ function Practice() {
   // rungs keep their own rules (see src/domain/practice-step-mode.ts).
   const requestedStepMode = parsePracticeStepMode(params);
   const commandParam = parseCommandParam(params.get("command"));
+  // ?point= is the specification point a lost mark turned on: the step's
+  // questions on that point come first (never only those).
+  const pointParam = parseSpecPointParam(params.get("point"));
   // ?minutes= is the plan step's stated length; the step's questions fit it
   // at exam pace (90 s a mark) instead of a flat three.
   const stepMinutes = parseStepMinutes(params.get("minutes"));
@@ -319,7 +322,9 @@ function Practice() {
     if (!stepMode) return pool.map((q) => q.id);
     // Guided and worked steps keep unseen teacher-reviewed questions for the
     // topic's proof check while anything else can fill the step.
-    const ranked = deferProofSupply(pool, stepMode, store.attempts, store.questions).ordered;
+    // The point comes first, then the proof deferral, so a teacher-reviewed
+    // question on that point is still kept back while anything else can serve.
+    const ranked = deferProofSupply(orderBySpecPoint(pool, pointParam).ordered, stepMode, store.attempts, store.questions).ordered;
     // A worked step is the example plus one fresh try outside its family.
     if (stepMode === "worked") {
       return fitStepQueueToMinutes(freshAfterExample(ranked, workedExample?.example ?? null), stepMinutes, WORKED_STEP_TRIES).queue.map((q) => q.id);
@@ -359,6 +364,9 @@ function Practice() {
 
   const current: Question | undefined = retestMistake ? retestQuestion : queue[index];
 
+  // One question opened by its own link (?question= or ?retest=) is shown
+  // on its own, like a repair-plan step, not under every other way in.
+  const focusedQuestion = Boolean(questionParam || retestId) && !wrongOnly && queue.length <= 1;
   // The step's real length at exam pace, so a plan step never looks shorter
   // (or longer) than the questions it holds.
   const stepLength = useMemo(() => {
@@ -387,11 +395,12 @@ function Practice() {
     if (retestId) next.set("retest", retestId);
     if (appliedStepMode) next.set(appliedStepMode, "1");
     if (timedCommand) next.set("command", timedCommand);
+    if (appliedStepMode && pointParam) next.set("point", pointParam);
     if (appliedStepMode && stepMinutes) next.set("minutes", String(stepMinutes));
     next.set("resume", "1");
     const query = next.toString();
     return query ? `/practice?${query}` : "/practice?resume=1";
-  }, [appliedStepMode, mode, retestId, sessionId, stepMinutes, subjectId, timedCommand, topicId]);
+  }, [appliedStepMode, mode, pointParam, retestId, sessionId, stepMinutes, subjectId, timedCommand, topicId]);
 
   // Mission, recovery, paper-repair, weak-topic and quick modes run their own question sets; the generic
   // queue behind them must not save a resume point for questions the student never opened.
@@ -707,12 +716,26 @@ function Practice() {
               Practise normally instead
             </Link>
           </p>
+          {pointParam && current ? (
+            <p className="text-xs text-ink3" data-testid="step-point-note">
+              {questionHasSpecPoint(current, pointParam)
+                ? "This question is on the same point as the mark you lost."
+                : "Revise has no other question on the exact point you lost the mark on, so this one is from the same topic."}
+            </p>
+          ) : null}
           {workedUnavailable ? (
             <p className="text-xs text-ink2" data-testid="worked-unavailable-note">
               No worked example can be shown here without using up a question that could later prove this topic, so this is the guided try instead.
             </p>
           ) : null}
         </div>
+      ) : focusedQuestion ? (
+        // A single question opened by its own link (a lesson, a card, a
+        // retest): the other ways in would push it below the fold too.
+        <p className="text-xs text-ink3" data-testid="focused-question-note">
+          {retestId ? "One retest, opened directly." : "One question, opened directly."}{" "}
+          <Link href="/practice" className="underline underline-offset-4 hover:text-ink">See all practice options</Link>
+        </p>
       ) : (<>
       {wrongOnly ? (
         wrongQueueIds.length ? (
@@ -816,7 +839,7 @@ function Practice() {
       <QuickSessionPicker onSelect={setQuickMinutes} />
       </>)}
 
-      {stepMode ? null : (
+      {stepMode || focusedQuestion ? null : (
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
         <select
           value={topicId}
@@ -914,7 +937,9 @@ function Practice() {
       {retestId && !farTransferMatch && (!retestMistake || !retestQuestion) ? null : current ? (
         <>
           {stepMode === "worked" && workedExample ? <WorkedExamplePanel choice={workedExample} /> : null}
-          <QuestionNavigator
+          {/* One directly opened question has nothing to navigate; the bar that
+              rises after marking carries the way on. */}
+          {focusedQuestion ? null : <QuestionNavigator
             currentIndex={index}
             total={queue.length}
             answered={answered}
@@ -926,7 +951,7 @@ function Practice() {
             nextDisabled={finishing || (index >= queue.length - 1 && !currentAnswered)}
             nextLabel={index >= queue.length - 1 ? "Finish session" : currentAnswered ? "Next question" : "Skip question"}
             controlsClassName="grid grid-cols-2 gap-2"
-          />
+          />}
           <RunCounter run={trailingRun(sessionAttempts.map(attemptExtendsRun))} />
           {latestCurrentAttempt ? (
             <p className="text-sm text-ink2" aria-live="polite">

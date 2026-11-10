@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { choosePracticeNextStep, relearnCheckpointFor, RELEARN_NOTE, withRelearnHref, type RelearnCheckpoint } from "@/domain/practice-next-step";
+import { choosePracticeNextStep, relearnCheckpointFor, RELEARN_NOTE, withRelearnHref, type AnswerGapStepInput, type RelearnCheckpoint } from "@/domain/practice-next-step";
 import { getTopic } from "@/domain/curriculum";
 import { TAUGHT_SPEC_POINT_IDS } from "@/content/teaching/taught-spec-points";
 import { interventionStepLabel } from "@/domain/intervention-engine";
@@ -34,7 +34,10 @@ export function PracticeNextStep({
   showSocratic,
   showMistakesLogged,
   relearnOverride,
+  gap,
 }: {
+  /** What this answer showed, when it can be read; it outranks the topic's plan. */
+  gap?: AnswerGapStepInput | null;
   /**
    * The lesson checkpoint the marked result is already teaching in place,
    * when its teaching has loaded. It is the point closest to the lost parts
@@ -64,6 +67,7 @@ export function PracticeNextStep({
     prescription: prescribed ? { headline: prescribed.prescription.headline, topicTitle: prescribed.topicTitle, firstStep: plan[0] } : null,
     fallback: nextAction,
     relearn,
+    gap,
   });
   // Already the primary button, or already the plan's explanation link: not offered twice.
   const relearnElsewhere = Boolean(relearn) && step.href !== relearn?.href && !plan.some((item) => item.href === relearn?.href);
@@ -94,8 +98,8 @@ export function PracticeNextStep({
         <p className="text-sm font-semibold text-ink mt-0.5">{step.title}</p>
         <p className="text-xs text-ink2 mt-0.5">{step.why}</p>
         {step.note ? <p className="text-[11px] text-ink3 mt-1">{step.note}</p> : null}
-        {step.kind === "technique" || step.kind === "relearn" ? (
-          <div data-testid={step.kind === "technique" ? "technique-repair" : "relearn-lesson"}>
+        {(step.kind === "technique" || step.kind === "relearn" || step.kind === "gap") && step.href && step.cta ? (
+          <div data-testid={step.kind === "technique" ? "technique-repair" : step.kind === "gap" ? "gap-next-step" : "relearn-lesson"}>
             <ButtonLink href={step.href} size="sm" variant="primary" className="mt-2">{step.cta}</ButtonLink>
           </div>
         ) : step.kind === "prescription" ? (
