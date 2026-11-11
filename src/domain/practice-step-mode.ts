@@ -318,6 +318,34 @@ export function parseSpecPointParam(value: string | null): string | null {
   return text && text.length <= 160 && /^[A-Za-z0-9._:-]+$/.test(text) ? text : null;
 }
 
+/**
+ * Where a step link was opened from, when that changes what the page should
+ * say (?from=). A lesson's "try a question" link is not a repair: no mark was
+ * lost, so the page must not talk about one.
+ */
+export type PracticeStepSource = "lesson";
+export function parseStepSource(value: string | null): PracticeStepSource | null {
+  return value === "lesson" ? "lesson" : null;
+}
+
+/** What the step's banner says about where it came from and why this question. */
+export function stepSourceCopy(source: PracticeStepSource | null, onPoint: boolean): { opened: string; point: string } {
+  if (source === "lesson") {
+    return {
+      opened: "Opened from your lesson",
+      point: onPoint
+        ? "This question is on the point your lesson taught."
+        : "Revise has no question on the exact point your lesson taught, so this one is from the same topic.",
+    };
+  }
+  return {
+    opened: "Opened from your repair plan",
+    point: onPoint
+      ? "This question is on the same point as the mark you lost."
+      : "Revise has no other question on the exact point you lost the mark on, so this one is from the same topic.",
+  };
+}
+
 export function questionHasSpecPoint(question: Pick<Question, "parts">, specPointId: string): boolean {
   return question.parts.some((part) => (part.specPointIds ?? []).includes(specPointId));
 }

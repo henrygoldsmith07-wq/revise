@@ -16,6 +16,8 @@ import {
   stepModeHintBudget,
   chooseWorkedExample,
   deferSupportedQuestions,
+  parseStepSource,
+  stepSourceCopy,
   fitStepQueueToMinutes,
   freshAfterExample,
   hasWorkedSolution,
@@ -24,6 +26,7 @@ import {
   WORKED_STEP_TRIES,
 } from "@/domain/practice-step-mode";
 import { hintEvidenceSource } from "@/domain/hint-tiers";
+import { lessonPracticeHref } from "@/domain/practice-next-step";
 import { learnerEvidenceTrusted } from "@/domain/content-trust";
 import { unseenQuestion } from "@/domain/learning-evidence";
 import type { Attempt, Question } from "@/domain/types";
@@ -310,5 +313,35 @@ describe("deferSupportedQuestions", () => {
     for (const mode of ["guided", "worked", null] as const) {
       expect(deferSupportedQuestions(ranked, mode, new Set(["a"])).ordered.map((q) => q.id)).toEqual(["a", "b", "c"]);
     }
+  });
+});
+
+describe("a question opened from a lesson", () => {
+  it("is an unaided step on the lesson's point, marked as coming from a lesson", () => {
+    const href = lessonPracticeHref("wjec-alevel-physics.kinematics-dynamics", "wjec-alevel-physics.kinematics-dynamics.sp-02");
+    const query = new URL(href, "https://revise.test").searchParams;
+    expect(parsePracticeStepMode(query)).toBe("unaided");
+    expect(query.get("topic")).toBe("wjec-alevel-physics.kinematics-dynamics");
+    expect(query.get("point")).toBe("wjec-alevel-physics.kinematics-dynamics.sp-02");
+    expect(parseStepSource(query.get("from"))).toBe("lesson");
+    expect(parseStepSource("anything-else")).toBeNull();
+    expect(parseStepSource(null)).toBeNull();
+  });
+
+  it("is not described as repairing a lost mark", () => {
+    for (const onPoint of [true, false]) {
+      const lesson = stepSourceCopy("lesson", onPoint);
+      expect(`${lesson.opened} ${lesson.point}`).not.toMatch(/repair|mark you lost|lost the mark/);
+      expect(lesson.point).toMatch(/your lesson taught/);
+      const repair = stepSourceCopy(null, onPoint);
+      expect(repair.opened).toBe("Opened from your repair plan");
+    }
+  });
+
+  it("the practice page reads the source and keeps it on resume", () => {
+    const page = readFileSync("src/app/practice/page.tsx", "utf8");
+    expect(page).toContain('const stepSource = parseStepSource(params.get("from"));');
+    expect(page).toContain('if (appliedStepMode && stepSource) next.set("from", stepSource);');
+    expect(page).toContain("stepSourceCopy(stepSource, questionHasSpecPoint(current, pointParam)).point");
   });
 });

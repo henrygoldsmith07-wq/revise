@@ -25,7 +25,8 @@ import type { Question } from "@/domain/types";
 import type { CheckpointTeaching } from "@/content/teaching/types";
 import { RichText } from "./RichText";
 import { CreditedIcon, ICON_SIZE, MissedIcon } from "./icons";
-import { Button, cx } from "./ui";
+import { WorkedSteps } from "./WorkedSteps";
+import { cx } from "./ui";
 
 export function WhyMarksWent({ gaps, multiPart }: { gaps: readonly PartAnswerGap[]; multiPart: boolean }) {
   const lead = gaps[0];
@@ -135,35 +136,6 @@ function Fold({ title, hint, open, onToggle, children }: { title: string; hint: 
         </span>
       </button>
       {open ? <div className="px-3 pb-3">{children}</div> : null}
-    </div>
-  );
-}
-
-/** The example a step at a time, so each step can be predicted before it is shown. */
-function WorkedSteps({ worked }: { worked: CheckpointTeaching["worked"] }) {
-  const [shown, setShown] = useState(1);
-  const done = shown > worked.steps.length;
-  return (
-    <div className="space-y-2">
-      <RichText className="text-sm text-ink">{worked.prompt}</RichText>
-      <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink2" aria-live="polite">
-        {worked.steps.slice(0, shown).map((step) => (
-          <li key={step}><RichText className="text-sm text-ink2">{step}</RichText></li>
-        ))}
-      </ol>
-      {done ? (
-        <div className="flex gap-1.5 text-sm">
-          <span className="shrink-0 font-semibold text-ink">Answer:</span>
-          <RichText className="min-w-0 flex-1 text-sm text-ink">{worked.answer}</RichText>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => setShown((count) => count + 1)}>
-            {shown >= worked.steps.length ? "Show the answer" : "Show the next step"}
-          </Button>
-          <span className="text-[11px] text-ink3">Say what comes next before you look.</span>
-        </div>
-      )}
     </div>
   );
 }

@@ -16,7 +16,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
-import { chooseWorkedExample, deferProofSupply, deferSupportedQuestions, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, orderBySpecPoint, parseCommandParam, parsePracticeStepMode, parseSpecPointParam, parseStepMinutes, questionHasSpecPoint, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
+import { chooseWorkedExample, deferProofSupply, deferSupportedQuestions, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, orderBySpecPoint, parseCommandParam, parsePracticeStepMode, parseSpecPointParam, parseStepMinutes, parseStepSource, questionHasSpecPoint, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, stepSourceCopy, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
 import { commandWordLabel } from "@/domain/command-word-validation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
@@ -97,6 +97,7 @@ function Practice() {
   // ?point= is the specification point a lost mark turned on: the step's
   // questions on that point come first (never only those).
   const pointParam = parseSpecPointParam(params.get("point"));
+  const stepSource = parseStepSource(params.get("from"));
   // ?minutes= is the plan step's stated length; the step's questions fit it
   // at exam pace (90 s a mark) instead of a flat three.
   const stepMinutes = parseStepMinutes(params.get("minutes"));
@@ -400,11 +401,12 @@ function Practice() {
     if (appliedStepMode) next.set(appliedStepMode, "1");
     if (timedCommand) next.set("command", timedCommand);
     if (appliedStepMode && pointParam) next.set("point", pointParam);
+    if (appliedStepMode && stepSource) next.set("from", stepSource);
     if (appliedStepMode && stepMinutes) next.set("minutes", String(stepMinutes));
     next.set("resume", "1");
     const query = next.toString();
     return query ? `/practice?${query}` : "/practice?resume=1";
-  }, [appliedStepMode, mode, pointParam, retestId, sessionId, stepMinutes, subjectId, timedCommand, topicId]);
+  }, [appliedStepMode, mode, pointParam, retestId, sessionId, stepMinutes, stepSource, subjectId, timedCommand, topicId]);
 
   // Mission, recovery, paper-repair, weak-topic and quick modes run their own question sets; the generic
   // queue behind them must not save a resume point for questions the student never opened.
@@ -715,16 +717,14 @@ function Practice() {
       {stepMode ? (
         <div className="space-y-1">
           <p className="text-xs text-ink3" data-testid="step-length-note">
-            Opened from your repair plan{stepLength ? `: ${stepLength}` : ""}.{" "}
+            {stepSourceCopy(stepSource, true).opened}{stepLength ? `: ${stepLength}` : ""}.{" "}
             <Link href={topicId ? `/practice?topic=${encodeURIComponent(topicId)}` : "/practice"} className="underline underline-offset-4 hover:text-ink">
               Practise normally instead
             </Link>
           </p>
           {pointParam && current ? (
             <p className="text-xs text-ink3" data-testid="step-point-note">
-              {questionHasSpecPoint(current, pointParam)
-                ? "This question is on the same point as the mark you lost."
-                : "Revise has no other question on the exact point you lost the mark on, so this one is from the same topic."}
+              {stepSourceCopy(stepSource, questionHasSpecPoint(current, pointParam)).point}
             </p>
           ) : null}
           {workedUnavailable ? (
