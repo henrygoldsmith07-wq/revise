@@ -61,7 +61,9 @@ test("a real offline marked response offers tentative structure practice and a s
   await expect(page.locator("textarea").first()).toBeVisible();
   await page.locator("textarea").first().fill("It is moving upwards and speeding up.");
   await page.getByRole("button", { name: /^(Not sure · submit|Submit for marking)$/ }).click();
-  const finish = page.getByRole("button", { name: "Finish session", exact: true });
+  // The page header and the bar that rises after marking both offer it;
+  // the bar is the one in reach.
+  const finish = page.getByTestId("answer-feedback-sheet").getByRole("button", { name: "Finish session", exact: true });
   await finish.click();
   await expect(finish).toHaveCount(0);
   await page.goto("/");

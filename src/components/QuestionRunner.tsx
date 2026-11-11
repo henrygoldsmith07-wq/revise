@@ -131,7 +131,8 @@ export function QuestionRunner({
         <TrustDetails question={question} label={needsWjecHumanReview ? "Needs human review · practice evidence only" : undefined} />
 
         {stepMode === "timed" ? <ExamPaceTimer marks={question.totalMarks} stopped={Boolean(result)} /> : null}
-        {evidenceSource !== "independent" && !result ? (
+        {/* A guided question says the same in its own box, under the steps. */}
+        {evidenceSource !== "independent" && !result && !guided ? (
           <p className="text-xs text-ink3 mb-3" role="note">
             Support has been used on this answer. It counts as supported practice, including after returning to the question.
           </p>

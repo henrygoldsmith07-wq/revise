@@ -45,5 +45,6 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
   await main.getByRole("button", { name: "Next" }).click();
   await expect(main).toContainText("Apply it");
   await main.getByRole("button", { name: "Reveal model answer" }).click();
-  await expect(main).toContainText("Self-marking checklist");
+  // The model answer's points are a comparison, not a self-mark (7872e41).
+  await expect(main).toContainText("Compare your answer against each point");
 });

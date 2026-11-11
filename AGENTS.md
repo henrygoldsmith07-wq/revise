@@ -315,6 +315,44 @@ background and do other work while it runs. On Windows, invoke npm through
   (`focusedQuestion`). The start panel and the result still say in full that
   unreviewed questions are practice, not proof: shorten the repeats, never
   the first statement.
+- **A failed repair is not a second debt** (one-hundred-and-fifteenth pass).
+  `missionRetryParts` (`src/domain/repair-evidence.ts`) marks the parts of a
+  mission's repair or supported-practice question that sit on an open source
+  mistake's point, capability or topic; `recordAttempt` creates no new
+  mistake or card for them, as it already did for a retest of the same
+  question. Without it a student who kept failing went from 12 marks "still
+  open" to 26 in three runs of trying to repair them. Unaided stages (apply,
+  delayed proof) are excluded: a failure there is new evidence. The attempt
+  is still saved and still moves mastery; only the mistake ledger and the
+  card queue are spared. Related fixes from the same walk: a mark the device
+  marker cannot be sure of is not called an AI mark or said to be awaiting a
+  person (nothing in the product reviews it), and it is said once, in the
+  provisional box; the session summary counts such an answer as "not
+  counted", not "nothing was marked"; and when the next step is the mission
+  stage already open, "Continue" starts a fresh run (`MissionSessionRun`
+  keyed by run) instead of linking to the current URL, which did nothing.
+- **No mark is ever said to be going to a person** (same pass). Nothing
+  resolves a `markEscalation`: the pending record exists so
+  `trustworthyAttempt` leaves the answer out of progress. Device and AI marks
+  both say only that ("left out of your progress"); never write "human
+  review requested" or "second marker" in student-facing copy unless a path
+  that performs it ships with it (`tests/low-confidence-mark-escalation.test.ts`,
+  `e2e/ai-marking-failures.spec.ts`).
+- **A restated value is not contradictory working** (same pass).
+  `contradictoryWorkingStep` and `conflictingWorkingLabel`
+  (`src/domain/calculation-rubric.ts`) compare values as written and again
+  scaled by their unit (`unitScale`: %, SI prefixes in front of a base unit,
+  cm³/dm³, minutes and hours), so `= 0.70 = 70%` and `144000 J = 144 kJ`
+  agree while `0.7` then `7%` still conflicts. It only ever accepts more
+  than before. A prefix is read only in front of a base unit not raised to
+  a power (`ms⁻¹` is metres per second). Add a conversion only with a
+  still-wrong case beside it in `tests/physics-marking-repairs.test.ts`.
+- **Unaided and timed steps skip questions already shown with hints** (same
+  pass). Support seen on an unanswered question stays on its saved draft, so
+  `/practice` orders the step queue through `deferSupportedQuestions`
+  (`src/domain/practice-step-mode.ts`) after the command-word order and
+  before the minutes fit; one is served only when nothing else is left, and
+  the runner then says support was used instead of the unaided note.
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by

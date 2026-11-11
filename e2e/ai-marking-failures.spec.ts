@@ -12,9 +12,9 @@ import { completeOnboarding, todayOrOnboarding } from "./helpers";
 //   * a 503 from the mark route must degrade to the rubric fallback with an
 //     honest "from the spec content on this device" badge — never a crash,
 //     never a stuck "Marking…" state;
-//   * an AI response with confidence 0 must be treated as untrustworthy and
-//     escalate straight into the human-review queue ("Human review requested"),
-//     and the escalation must survive on the Progress page.
+//   * an AI response with confidence 0 must be treated as untrustworthy:
+//     the student is told the mark is not counted ("AI mark not counted"),
+//     and never that a person will review it, because nobody does.
 //
 // Both tests drive a real written question through the real submit path, so
 // the DLQ enqueue, escalation record and attempt persistence all run for real.
@@ -92,10 +92,10 @@ test("a 503 from the AI mark route degrades to the rubric fallback without crash
   await expect(main.getByRole("button", { name: "Submit for marking" })).toHaveCount(0);
 });
 
-test("a 0-confidence AI mark is escalated to the human-review queue", async ({ page }) => {
+test("a 0-confidence AI mark is left out of progress, and no human review is promised", async ({ page }) => {
   // Intercept the mark call and answer with a schema-valid AI mark whose
   // confidence is exactly 0: the provider "worked", but claims no trust in
-  // itself. assessLowConfidenceMark must route that to human review.
+  // itself. assessLowConfidenceMark must keep that mark out of progress.
   await page.route("**/api/ai", async (route: Route) => {
     const body = route.request().postDataJSON() as
       | { task?: string; payload?: { question?: { parts?: { id: string; marks: number }[] } } }
@@ -131,13 +131,15 @@ test("a 0-confidence AI mark is escalated to the human-review queue", async ({ p
   await page.getByRole("button", { name: "Submit for marking" }).click();
 
   const main = page.locator("main#main");
-  const reviewStatus = main.getByRole("status").filter({ hasText: "Human review requested" });
+  const reviewStatus = main.getByTestId("ai-mark-not-counted");
   await expect(reviewStatus).toBeVisible({ timeout: 20_000 });
-  await expect(reviewStatus).toContainText("AI mark confidence is 0%, below the 60% threshold");
-  await expect(reviewStatus).toContainText("second-marker decision");
+  await expect(reviewStatus).toContainText("AI mark not counted");
+  await expect(reviewStatus).toContainText("The AI marker was only 0% sure of this mark, below the 60% it needs");
+  await expect(reviewStatus).toContainText("left out of your progress");
+  // Nothing in the product sends a mark to a person, so nothing may say so.
+  await expect(main).not.toContainText(/Human review requested|second-marker/);
 
-  // The escalation is persisted with the attempt: it stays visible on the
-  // runner's result banner, and the pending record travels with the attempt
-  // itself (IndexedDB + sync outbox) for a second-marker decision.
+  // The pending record is saved with the attempt (IndexedDB + sync outbox),
+  // which is what keeps it out of progress; the box stays on the result.
   await expect(reviewStatus).toBeVisible();
 });

@@ -105,6 +105,9 @@ export function MarkedResult({
   const stored = attempt?.markAssessment;
   const provisional = result.assessment?.provisional ?? stored?.provisional ?? false;
   const markLabel = result.assessment?.label ?? (stored ? markAssessmentLabel(stored) : null);
+  // The device marker could not be sure of this mark, so the attempt is kept
+  // out of progress (trustworthyAttempt). Said once, in the provisional box.
+  const deviceMarkUnsure = Boolean(result.escalation) && result.source !== "ai";
   const plan = result.remediation;
   const marksLost = awarded < question.totalMarks;
   const techniqueRepair = !inDiagnostic && awarded < question.totalMarks
@@ -267,13 +270,27 @@ export function MarkedResult({
             {result.assessment?.explanation ??
               "This mark is provisional, not an examiner's decision. If you think it is wrong, use “Flag this mark”."}
           </p>
+          {deviceMarkUnsure ? (
+            <p className="text-xs mt-1" data-testid="mark-not-counted">
+              Because of that, Revise leaves this answer out of your progress either way. Check it against the model answer below to see where you stand.
+            </p>
+          ) : null}
+        </div>
+      ) : deviceMarkUnsure ? (
+        <div className="mb-3 rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status" data-testid="mark-not-counted">
+          <p className="font-semibold text-review">Not counted yet</p>
+          <p className="text-xs mt-1">{result.escalation?.message} Check it against the model answer below; if the mark is wrong, use “Flag this mark”.</p>
         </div>
       ) : null}
-      {result.escalation ? (
-        <div className="rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
-          <p className="font-semibold text-review">Human review requested</p>
+      {/* An AI mark the model itself was unsure of. This box used to read
+          "Human review requested … saved for a second-marker decision", but
+          nothing in the product sends a mark to a person, so it says what
+          does happen: the answer is left out of progress. */}
+      {result.escalation && result.source === "ai" ? (
+        <div className="rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status" data-testid="ai-mark-not-counted">
+          <p className="font-semibold text-review">AI mark not counted</p>
           <p className="text-xs mt-1">{result.escalation.message}</p>
-          <p className="text-[11px] text-ink3 mt-1">This pending escalation is saved with the attempt for a second-marker decision.</p>
+          <p className="text-[11px] text-ink3 mt-1">Nobody re-marks it for you. Check it against the model answer below; if the mark is wrong, use “Flag this mark”.</p>
         </div>
       ) : null}
       {result.farTransfer?.role === "source" ? (

@@ -15,7 +15,27 @@ import { ProofCheckBanner } from "./ProofCheckBanner";
 import { captureProductEvent } from "@/lib/product-telemetry";
 import { useRecoveryEvidence, useRevisionPlan } from "./recovery-evidence";
 
-export function MissionSessionMode({ missionId, stage, onExit }: { missionId: string; stage: string | null; onExit: () => void }) {
+/**
+ * One mission stage, and the next run of it. When the best next step after a
+ * finished step is the same mission at the same stage (more open mistakes to
+ * repair), its link is this very URL: following it changed nothing, so
+ * "Continue" did nothing and the summary stayed on screen. That case starts
+ * a fresh run here instead, built from the evidence the last one created.
+ */
+export function MissionSessionMode(props: { missionId: string; stage: string | null; onExit: () => void }) {
+  const [run, setRun] = useState(0);
+  return <MissionSessionRun key={run} {...props} onRestart={() => setRun((count) => count + 1)} />;
+}
+
+/** True when a route is this mission at this stage, i.e. the page already open. */
+function sameMissionStep(href: string, missionId: string, stage: string | null, resolvedStage: string | undefined): boolean {
+  const query = new URLSearchParams(href.split("?")[1] ?? "");
+  if (!href.startsWith("/practice?") || query.get("mission") !== missionId) return false;
+  const target = query.get("stage");
+  return target === stage || (target !== null && target === resolvedStage);
+}
+
+function MissionSessionRun({ missionId, stage, onExit, onRestart }: { missionId: string; stage: string | null; onExit: () => void; onRestart: () => void }) {
   const store = useStoreFields("attempts", "clearRevisionCheckpoint", "examDates", "mistakes", "papers", "questions", "revisionCheckpoint", "saveRevisionCheckpoint", "recordFunnel");
   const { saveRevisionCheckpoint, clearRevisionCheckpoint, recordFunnel } = store;
   const ev = useRecoveryEvidence();
@@ -92,7 +112,12 @@ export function MissionSessionMode({ missionId, stage, onExit }: { missionId: st
           {session.limit ? <p className="font-semibold">{session.limit}</p> : null}
         </>
       ) : null}
-      nextStep={plan.top ? { href: plan.top.route.href, label: `Continue: ${plan.top.title}`, detail: `${plan.top.title}, ${aboutMinutesLabel(plan.top.minutes)}. ${plan.top.explanation.stake}` } : null}
+      nextStep={plan.top ? {
+        href: plan.top.route.href,
+        label: `Continue: ${plan.top.title}`,
+        detail: `${plan.top.title}, ${aboutMinutesLabel(plan.top.minutes)}. ${plan.top.explanation.stake}`,
+        ...(sameMissionStep(plan.top.route.href, missionId, stage, session?.stage) ? { onStart: onRestart } : {}),
+      } : null}
       renderSummary={(attempts) => <SessionEvidenceBlock attempts={attempts} />}
     />
   );

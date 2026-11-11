@@ -16,7 +16,7 @@ test("onboarding → quick check → Today → repair → independent success �
   // Cold start: one clear action ("Do this now", the current Today lead), visible without scrolling, and skippable.
   await expect(main).toContainText("Do this now", { timeout: 30_000 });
   await expect(main).toContainText("Find where to start");
-  const start = main.getByRole("link", { name: "Start quick check" });
+  const start = main.getByRole("link", { name: /^Start (quick|practice) check$/ });
   const box = await start.boundingBox();
   expect(box!.y + box!.height).toBeLessThan(844);
   await expect(main.getByRole("button", { name: /Skip, just start revising/ })).toBeVisible();
@@ -46,7 +46,7 @@ test("onboarding → quick check → Today → repair → independent success �
     await next.scrollIntoViewIfNeeded();
     await next.click();
   }
-  await expect(main).toContainText("What I found", { timeout: 60_000 });
+  await expect(main).toContainText("Your first check is complete", { timeout: 60_000 });
 
   // The check changed the recommendation: lost marks now lead, and the quick check is gone.
   await page.goto("/");

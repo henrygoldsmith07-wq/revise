@@ -9,7 +9,7 @@ import {
 import type { Attempt } from "@/domain/types";
 
 describe("low-confidence mark escalation", () => {
-  it("queues a low-confidence AI mark for human review", () => {
+  it("records a low-confidence AI mark as pending and promises no review nothing performs", () => {
     const decision = assessLowConfidenceMark({ markedBy: "ai", confidence: 0.42 });
 
     expect(decision).toMatchObject({
@@ -21,7 +21,11 @@ describe("low-confidence mark escalation", () => {
       confidence: 0.42,
       threshold: LOW_CONFIDENCE_MARK_THRESHOLD,
     });
-    expect(decision.message).toMatch(/human review/i);
+    // Nothing in the product sends a mark to a person, so the student is told
+    // only what does happen: the mark is left out of their progress.
+    expect(decision.message).toBe("The AI marker was only 42% sure of this mark, below the 60% it needs, so the mark is provisional and left out of your progress.");
+    expect(decision.message).not.toMatch(/human review|second.marker/i);
+    expect(assessLowConfidenceMark({ markedBy: "ai", confidence: null }).message).not.toMatch(/human review|second.marker/i);
 
     const record = createMarkEscalationRecord(decision, "2026-08-18T12:00:00.000Z");
     expect(record).toMatchObject({

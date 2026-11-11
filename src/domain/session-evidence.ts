@@ -40,7 +40,12 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
   const trusted = input.attempts.filter(trustworthyAttempt);
   const independent = trusted.filter(independentAttempt);
   const correct = independent.filter((a) => a.awarded / a.max >= 0.75);
+  // Answered and marked, but the mark was too uncertain to count (a
+  // provisional mark awaiting a re-mark). Not "nothing was marked".
+  const uncounted = input.attempts.length - trusted.length;
   const { before, after } = input;
+  // Whether this session moved any lost mark forward.
+  const gained = after.provisional > before.provisional || after.awaitingProof > before.awaitingProof || after.proven > before.proven;
 
   const changed: string[] = [];
   if (after.proven > before.proven) changed.push(`${marks(after.proven - before.proven)} newly proven recovered.`);
@@ -64,7 +69,9 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
     `${correct.length} correct`,
     delayedProof ? "delayed proof passed" : "no delayed proof yet",
   ];
-  if (trusted.length > independent.length) lines.push(`${trusted.length - independent.length} answer${trusted.length - independent.length === 1 ? "" : "s"} used help and count as practice only`);
+  const helped = trusted.length - independent.length;
+  if (helped > 0) lines.push(`${helped} answer${helped === 1 ? "" : "s"} used help and count${helped === 1 ? "s" : ""} as practice only`);
+  if (uncounted > 0) lines.push(`${uncounted} answer${uncounted === 1 ? " has" : "s have"} a provisional mark and ${uncounted === 1 ? "is" : "are"} not counted either way`);
 
   let next: string;
   const waitDays = input.nextCheckAt && input.now ? Math.ceil((Date.parse(input.nextCheckAt) - input.now.getTime()) / 86_400_000) : null;
@@ -73,8 +80,11 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
       ? `Revise will check this again on a different question in ${waitDays} day${waitDays === 1 ? "" : "s"}.`
       : "Revise can check this on a different question now. It will be your next step.";
   } else if (after.awaitingProof > 0) next = `Revise will check this again on a different question at least ${MIN_PROOF_DELAY_DAYS} days after your first success.`;
-  else if (after.provisional > 0) next = "Next, a different question on this topic to turn early success into evidence.";
+  // "Early success" is only said when there was some: after a session that
+  // moved nothing, with mistakes still open, the next step is the repair.
+  else if (after.provisional > 0 && (gained || after.open === 0)) next = "Next, a different question on this topic to turn early success into evidence.";
   else if (after.open > 0) next = "Next, another repair on the open mistakes, then a different question.";
+  else if (after.provisional > 0) next = "Next, a different question on this topic to turn early success into evidence.";
   else next = after.proven > 0 ? "Nothing open here. Revise will keep a light delayed check scheduled." : "Revise needs more answers before it can plan a check.";
 
   const marksLines = after.previouslyLost > 0 ? [
@@ -89,6 +99,7 @@ export function buildSessionEvidence(input: SessionEvidenceInput): SessionEviden
   let headline: SessionEvidence["headline"];
   if (after.regressed > before.regressed) headline = { state: "regressed", text: "Regressed: marks you had recovered were lost again." };
   else if (after.proven > before.proven) headline = { state: "proven", text: "Proven: the delayed check on a different question held." };
+  else if (!trusted.length && uncounted > 0) headline = { state: "not-checked", text: uncounted === 1 ? "Not counted: Revise could not be sure of the mark on your answer, so nothing has changed yet." : "Not counted: Revise could not be sure of the marks on your answers, so nothing has changed yet." };
   else if (!trusted.length) headline = { state: "not-checked", text: "Nothing was marked, so nothing has changed." };
   else if (!independent.length) headline = { state: "needs-work", text: "Needs another independent attempt: every answer used help, so it counts as practice only." };
   else if (correct.length && after.awaitingProof > before.awaitingProof) headline = { state: "awaiting-proof", text: "Repaired for now. Awaiting proof on a different question later." };

@@ -144,7 +144,7 @@ export function buildLongAnswerFeedback(input: LongAnswerInput): LongAnswerFeedb
     rewrite,
     equivalentQuestionId: pickEquivalent(input),
     confidence: lowConfidence
-      ? { level: "low", note: "This automated mark is low-confidence and has been queued for human review. Treat it as provisional.", humanReview: true }
+      ? { level: "low", note: "This automated mark is low-confidence, so it is provisional and left out of your progress.", humanReview: true }
       : { level: "normal", note: null, humanReview: false },
   };
 }
