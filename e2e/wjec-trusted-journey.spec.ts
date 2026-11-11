@@ -56,7 +56,7 @@ test("WJEC Maths: trusted quick diagnostic → lost marks → Today recovers →
     await expect(main).toContainText("Examiner marking");
     await page.getByRole("button", { name: n === total ? "See what I found" : "Next question" }).click();
   }
-  await expect(main).toContainText("What I found", { timeout: 60_000 });
+  await expect(main).toContainText("Your first check is complete", { timeout: 60_000 });
   await expect(main).toContainText(/initial signal, not a predicted grade/i);
 
   // The same attempts feed recovery: Today changes immediately.

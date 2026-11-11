@@ -16,7 +16,7 @@ import { todayIso } from "@/domain/scheduling";
 import { buildPostSessionClosure } from "@/domain/post-session-closure";
 import { initialPracticeSubject, practiceSessionSummary, recordPracticeAttempt } from "@/domain/practice-session";
 import { adaptiveReturnHref } from "@/domain/study-navigation";
-import { chooseWorkedExample, deferProofSupply, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, orderBySpecPoint, parseCommandParam, parsePracticeStepMode, parseSpecPointParam, parseStepMinutes, questionHasSpecPoint, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
+import { chooseWorkedExample, deferProofSupply, deferSupportedQuestions, examPaceTargetSeconds, fitStepQueueToMinutes, freshAfterExample, orderByCommand, orderBySpecPoint, parseCommandParam, parsePracticeStepMode, parseSpecPointParam, parseStepMinutes, questionHasSpecPoint, questionUsesCommand, stepModeApplies, stepModeHintBudget, stepModeSupportTier, WORKED_STEP_TRIES, type WorkedExampleChoice } from "@/domain/practice-step-mode";
 import { commandWordLabel } from "@/domain/command-word-validation";
 import type { Attempt, Mistake, Question } from "@/domain/types";
 import { useStoreFields, useSubjects } from "@/state/store";
@@ -332,7 +332,11 @@ function Practice() {
     // A command-word check puts questions using that verb first; it never
     // removes the rest, so a topic without one still has a queue. The step
     // fits its stated minutes at exam pace (at most three questions).
-    return fitStepQueueToMinutes(orderByCommand(ranked, timedCommand).ordered, stepMinutes).queue.map((q) => q.id);
+    // An unaided or timed step cannot be unaided on a question whose hints
+    // were already opened (a guided step left unanswered): those go last.
+    const supported = new Set(Object.entries(questionDrafts).filter(([, draft]) => draft.hintTier || draft.repairTeachingSeen).map(([id]) => id));
+    const unaidedFirst = deferSupportedQuestions(orderByCommand(ranked, timedCommand).ordered, stepMode, supported).ordered;
+    return fitStepQueueToMinutes(unaidedFirst, stepMinutes).queue.map((q) => q.id);
   };
 
   const [index, setIndex] = useState(() => savedCheckpoint?.position ?? 0);

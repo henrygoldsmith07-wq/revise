@@ -80,7 +80,9 @@ export function assessLowConfidenceMark(input: LowConfidenceMarkInput): LowConfi
       target: "human-review",
       confidence: null,
       threshold,
-      message: "The AI mark did not return a confidence score — request human review before treating it as final.",
+      // Nothing in the product sends a mark to a person, so the wording never
+      // says a review was requested: only that the mark is left out.
+      message: "The AI marker did not say how sure it was of this mark, so it is provisional and left out of your progress.",
     };
   }
 
@@ -106,11 +108,11 @@ export function assessLowConfidenceMark(input: LowConfidenceMarkInput): LowConfi
     target: "human-review",
     confidence,
     threshold,
-    // A mark made on the device is not an AI mark, and nothing in the product
-    // sends it to a person: the record is kept so the answer is left out of
-    // progress, and the wording says only that.
+    // Nothing in the product sends a mark to a person, AI or device: the
+    // record is kept so the answer is left out of progress, and the wording
+    // says only that. (It used to say "request human review" for an AI mark.)
     message: input.markedBy === "ai"
-      ? `AI mark confidence is ${percentage(confidence)}, below the ${percentage(threshold)} threshold — request human review before treating it as final.`
+      ? `The AI marker was only ${percentage(confidence)} sure of this mark, below the ${percentage(threshold)} it needs, so the mark is provisional and left out of your progress.`
       : `The match between this answer and the mark scheme was too weak to be sure of the mark (${percentage(confidence)}, below the ${percentage(threshold)} needed), so it is left out of your progress either way.`,
   };
 }

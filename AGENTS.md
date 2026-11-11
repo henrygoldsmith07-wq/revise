@@ -331,6 +331,28 @@ background and do other work while it runs. On Windows, invoke npm through
   counted", not "nothing was marked"; and when the next step is the mission
   stage already open, "Continue" starts a fresh run (`MissionSessionRun`
   keyed by run) instead of linking to the current URL, which did nothing.
+- **No mark is ever said to be going to a person** (same pass). Nothing
+  resolves a `markEscalation`: the pending record exists so
+  `trustworthyAttempt` leaves the answer out of progress. Device and AI marks
+  both say only that ("left out of your progress"); never write "human
+  review requested" or "second marker" in student-facing copy unless a path
+  that performs it ships with it (`tests/low-confidence-mark-escalation.test.ts`,
+  `e2e/ai-marking-failures.spec.ts`).
+- **A restated value is not contradictory working** (same pass).
+  `contradictoryWorkingStep` and `conflictingWorkingLabel`
+  (`src/domain/calculation-rubric.ts`) compare values as written and again
+  scaled by their unit (`unitScale`: %, SI prefixes in front of a base unit,
+  cm³/dm³, minutes and hours), so `= 0.70 = 70%` and `144000 J = 144 kJ`
+  agree while `0.7` then `7%` still conflicts. It only ever accepts more
+  than before. A prefix is read only in front of a base unit not raised to
+  a power (`ms⁻¹` is metres per second). Add a conversion only with a
+  still-wrong case beside it in `tests/physics-marking-repairs.test.ts`.
+- **Unaided and timed steps skip questions already shown with hints** (same
+  pass). Support seen on an unanswered question stays on its saved draft, so
+  `/practice` orders the step queue through `deferSupportedQuestions`
+  (`src/domain/practice-step-mode.ts`) after the command-word order and
+  before the minutes fit; one is served only when nothing else is left, and
+  the runner then says support was used instead of the unaided note.
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by

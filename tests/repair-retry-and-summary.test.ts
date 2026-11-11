@@ -110,14 +110,18 @@ describe("an uncertain mark made on the device", () => {
     expect(device.escalate).toBe(true);
     expect(device.message).not.toMatch(/AI mark|human review/i);
     expect(device.message).toMatch(/left out of your progress either way/);
-    // An AI mark keeps its wording, and the record is the same either way.
+    // An AI mark names the AI marker, promises no review either, and the
+    // record is the same either way.
     const ai = assessLowConfidenceMark({ markedBy: "ai", confidence: 0.45 });
-    expect(ai.message).toMatch(/AI mark confidence is 45%/);
+    expect(ai.message).toMatch(/The AI marker was only 45% sure of this mark/);
+    expect(ai.message).not.toMatch(/human review/i);
     expect({ ...device, message: "" }).toEqual({ ...ai, message: "" });
   });
 
-  it("the marked result shows the review box for AI marks only", () => {
+  it("the marked result keeps a separate box for AI marks, and neither promises a review", () => {
     const view = readFileSync("src/components/QuestionMarkedResult.tsx", "utf8");
+    expect(view).toContain("AI mark not counted");
+    expect(view).not.toContain(">Human review requested<");
     expect(view).toContain('{result.escalation && result.source === "ai" ? (');
     expect(view).toContain('const deviceMarkUnsure = Boolean(result.escalation) && result.source !== "ai";');
   });

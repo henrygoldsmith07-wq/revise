@@ -85,9 +85,43 @@ function unitKey(unit: string): string {
     .replace(/[\s^]/g, "").replace(/[.,;:!]+$/, "");
 }
 
+const PREFIX_FACTOR: Record<string, number> = { G: 1e9, M: 1e6, k: 1e3, c: 1e-2, m: 1e-3, "µ": 1e-6, "μ": 1e-6, u: 1e-6, n: 1e-9, p: 1e-12 };
+// A prefix counts only in front of a base unit symbol that is not then raised
+// to a power: `ms` is milliseconds but `ms^-1` is metres per second, `m` is
+// metres, `mol` and `min` are not milli-anything, and cm³ is not 0.01 of a m³.
+const PREFIXED_UNIT = /^([GMkcmµμunp])(?:mol|Pa|Hz|Bq|eV|[AVWJNsmgLlTCFHΩ])(?![a-zA-Z^])/;
+
+/**
+ * The factor a value's trailing unit puts on its number: 70% is 0.7 and
+ * 144 kJ is 144000 J. 1 when there is no unit or it is not one of these.
+ */
+function unitScale(unit: string): number {
+  const text = unit.trim();
+  if (/^(?:%|per\s?cent\b)/i.test(text)) return 0.01;
+  // The two conversions written out most often besides prefixes: chemistry's
+  // cm³ and dm³ (as litres, so mol dm⁻³ work stays in step), and minutes or
+  // hours restated in seconds.
+  const volume = /^(c|d)m\^3(?![\d^])/.exec(text)?.[1];
+  if (volume) return volume === "c" ? 1e-3 : 1;
+  if (/^min(?:ute)?s?\b/.test(text)) return 60;
+  if (/^(?:h|hr|hour)s?\b(?!\^)/.test(text)) return 3600;
+  const prefix = PREFIXED_UNIT.exec(text)?.[1];
+  return prefix ? PREFIX_FACTOR[prefix] ?? 1 : 1;
+}
+
+/**
+ * Two statements of one quantity agree when the numbers match as written or
+ * once each is scaled by its unit. `efficiency = 0.70 = 70%` and
+ * `E = 144000 J = 144 kJ` restate a value; they do not contradict it. This
+ * only ever accepts more: numbers that match as written always agree.
+ */
+function sameQuantity(a: number, aScale: number, b: number, bScale: number): boolean {
+  return close(a, b) || close(a * aScale, b * bScale);
+}
+
 /** Locate explicit contradictions without guessing at unrecognised algebra. */
 export function contradictoryWorkingStep(answer: string): number | null {
-  const seen = new Map<string, number>();
+  const seen = new Map<string, { value: number; scale: number }>();
   const lines = splitWorkingLines(answer);
   for (const [index, line] of lines.entries()) {
     const [rawLabel, ...segments] = line.split("=").map((segment) => segment.trim());
@@ -97,13 +131,14 @@ export function contradictoryWorkingStep(answer: string): number | null {
     if (!final) continue;
     const value = numberOf(final[1]!) ?? Number(final[1]);
     if (!Number.isFinite(value)) continue;
+    const scale = unitScale(final[2] ?? "");
     const prior = seen.get(label);
-    if (prior !== undefined && !close(prior, value)) return index;
-    seen.set(label, value);
+    if (prior !== undefined && !sameQuantity(prior.value, prior.scale, value, scale)) return index;
+    seen.set(label, { value, scale });
     // An explicitly evaluated expression that disagrees with its result.
     for (const expression of segments.slice(0, -1)) {
       const computed = numberOf(expression);
-      if (computed !== null && !close(computed, value)) return index;
+      if (computed !== null && !sameQuantity(computed, 1, value, scale)) return index;
     }
   }
   return null;
@@ -129,7 +164,7 @@ export function hasContradictoryWorking(answer: string): boolean {
  * while the accuracy mark stays lost, exactly as an examiner would.
  */
 export function conflictingWorkingLabel(answer: string): string | null {
-  const seen = new Map<string, number>();
+  const seen = new Map<string, { value: number; scale: number }>();
   const lines = splitWorkingLines(answer);
   for (const line of lines) {
     const [rawLabel, ...segments] = line.split("=").map((segment) => segment.trim());
@@ -139,9 +174,10 @@ export function conflictingWorkingLabel(answer: string): string | null {
     if (!final) continue;
     const value = numberOf(final[1]!) ?? Number(final[1]);
     if (!Number.isFinite(value)) continue;
+    const scale = unitScale(final[2] ?? "");
     const prior = seen.get(label);
-    if (prior !== undefined && !close(prior, value)) return label;
-    seen.set(label, value);
+    if (prior !== undefined && !sameQuantity(prior.value, prior.scale, value, scale)) return label;
+    seen.set(label, { value, scale });
   }
   return null;
 }

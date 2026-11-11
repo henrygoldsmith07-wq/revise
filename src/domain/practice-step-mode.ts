@@ -145,6 +145,27 @@ export function deferProofSupply<T extends Question>(
   return { ordered: [...keep, ...reserve], deferred: reserve.length };
 }
 
+/**
+ * An unaided or timed step is only unaided on a question whose help the
+ * student has not already seen. Support seen on an unanswered question stays
+ * attached to it (its saved draft carries the hint tier), so serving that
+ * question here would record supported practice under an "unaided" heading.
+ * Move such questions behind the rest, keeping the ranked order within each
+ * group; one is served only when nothing else is left, and the question then
+ * says support was used. Guided and worked steps are unchanged.
+ */
+export function deferSupportedQuestions<T extends Pick<Question, "id">>(
+  ranked: readonly T[],
+  mode: PracticeStepMode | null,
+  supported: ReadonlySet<string>,
+): { ordered: T[]; deferred: number } {
+  if ((mode !== "unaided" && mode !== "timed") || !supported.size) return { ordered: [...ranked], deferred: 0 };
+  const keep: T[] = [];
+  const later: T[] = [];
+  for (const q of ranked) (supported.has(q.id) ? later : keep).push(q);
+  return { ordered: [...keep, ...later], deferred: later.length };
+}
+
 /** A question can be shown worked through only when every part has a model answer. */
 export function hasWorkedSolution(question: Pick<Question, "parts">): boolean {
   return question.parts.length > 0 && question.parts.every((part) => part.modelAnswer.trim().length > 0);

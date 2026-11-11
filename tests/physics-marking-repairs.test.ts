@@ -53,6 +53,31 @@ describe("synthetic Physics marking regressions, not human validation", () => {
     expect(contradictoryWorkingStep("F = 1.04 × 10³ N\nF = 1040 N")).toBeNull();
     expect(contradictoryWorkingStep("E = 2 × 10⁻³ J\nE = 0.002 J")).toBeNull();
     expect(contradictoryWorkingStep("F = 1.04 × 10³ N\nF = 104 N")).toBe(1);
+    // A value restated in another scale is the same value: a percentage, an SI
+    // prefix, cm³ and dm³, minutes and seconds. A correct answer written
+    // "= 0.70 = 70%" used to be reported as contradictory working, with high
+    // confidence, and its mark held back as unreliable.
+    for (const restated of [
+      "efficiency = 420/600 = 0.70 = 70%",
+      "efficiency = 420/600 = 0.7\nefficiency = 70%",
+      "efficiency = 70%\nefficiency = 0.7",
+      "P = 2.4 kW = 2400 W\nE = Pt = 2400 × 60 = 144000 J = 144 kJ",
+      "I = 0.005 A\nI = 5 mA",
+      "d = 5 cm\nd = 0.05 m",
+      "f = 2.5 kHz\nf = 2500 Hz",
+      "V = 25.0 cm³\nV = 0.0250 dm³",
+      "t = 2 min\nt = 120 s",
+      "v = 20 ms⁻¹\nv = 20 m/s",
+    ]) expect(contradictoryWorkingStep(restated), restated).toBeNull();
+    // Still contradictions: the scale does not account for the difference.
+    for (const wrong of [
+      "efficiency = 0.7\nefficiency = 7%",
+      "E = 144000 J\nE = 14.4 kJ",
+      "v = 20 m/s\nv = 200 m/s",
+      "t = 2 min\nt = 100 s",
+      "V = 25.0 cm³\nV = 0.250 dm³",
+    ]) expect(contradictoryWorkingStep(wrong), wrong).toBe(1);
+    expect(contradictoryWorkingStep("E = 2400 × 60 = 144 J")).toBe(0);
   });
   it("accepts the correct required-voltage alternative", () => {
     expect(markPart(energy("choose-pulse-bank"), "For A, V = sqrt(2*0.40/0.0022) = 19.1 V, above the 16 V rating. For B, V = sqrt(2*0.40/0.0010) = 28.3 V, below the 35 V rating and 30 V supply maximum. Only B is suitable.").awarded).toBe(3);

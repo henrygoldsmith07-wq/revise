@@ -15,6 +15,7 @@ import {
   stepModeApplies,
   stepModeHintBudget,
   chooseWorkedExample,
+  deferSupportedQuestions,
   fitStepQueueToMinutes,
   freshAfterExample,
   hasWorkedSolution,
@@ -163,7 +164,9 @@ describe("practice honours the flags (source wiring)", () => {
     expect(page).toContain("const hintBudget = adaptiveHintBudget ?? (farTransferRetest ? 0 : stepModeHintBudget(stepMode));");
     expect(page).toContain("hintBudget={hintBudget}");
     expect(page).toContain("stepMode={stepMode}");
-    expect(page).toContain("fitStepQueueToMinutes(orderByCommand(ranked, timedCommand).ordered, stepMinutes)");
+    // Command first, then anything already shown with hints goes last, then the step is fitted to its minutes.
+    expect(page).toContain("deferSupportedQuestions(orderByCommand(ranked, timedCommand).ordered, stepMode, supported)");
+    expect(page).toContain("fitStepQueueToMinutes(unaidedFirst, stepMinutes)");
     expect(page).toContain("fitStepQueueToMinutes(freshAfterExample(ranked, workedExample?.example ?? null), stepMinutes, WORKED_STEP_TRIES)");
     // The worked try records support, so it can never be unaided evidence.
     expect(page).toContain("externalHintTier={stepModeSupportTier(stepMode)}");
@@ -289,4 +292,23 @@ describe("worked example step", () => {
     expect(practiceOnly + none).toBe(topics.length);
     expect(practiceOnly).toBeGreaterThan(0);
   }, 100_000);
+});
+
+describe("deferSupportedQuestions", () => {
+  const ranked = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("puts a question whose hints were already opened behind the rest in unaided and timed steps", () => {
+    for (const mode of ["unaided", "timed"] as const) {
+      const out = deferSupportedQuestions(ranked, mode, new Set(["a"]));
+      expect(out.ordered.map((q) => q.id)).toEqual(["b", "c", "a"]);
+      expect(out.deferred).toBe(1);
+    }
+  });
+
+  it("still serves it when nothing else is left, and leaves supported steps alone", () => {
+    expect(deferSupportedQuestions([{ id: "a" }], "unaided", new Set(["a"])).ordered.map((q) => q.id)).toEqual(["a"]);
+    for (const mode of ["guided", "worked", null] as const) {
+      expect(deferSupportedQuestions(ranked, mode, new Set(["a"])).ordered.map((q) => q.id)).toEqual(["a", "b", "c"]);
+    }
+  });
 });

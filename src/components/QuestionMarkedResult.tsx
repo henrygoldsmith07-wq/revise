@@ -282,15 +282,15 @@ export function MarkedResult({
           <p className="text-xs mt-1">{result.escalation?.message} Check it against the model answer below; if the mark is wrong, use “Flag this mark”.</p>
         </div>
       ) : null}
-      {/* Only an AI mark is described as awaiting review. A mark made on the
-          device used to show the same box, reading "AI mark confidence is 45%
-          … saved for a second-marker decision": no AI had marked it and
-          nothing sends it to a person. */}
+      {/* An AI mark the model itself was unsure of. This box used to read
+          "Human review requested … saved for a second-marker decision", but
+          nothing in the product sends a mark to a person, so it says what
+          does happen: the answer is left out of progress. */}
       {result.escalation && result.source === "ai" ? (
-        <div className="rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status">
-          <p className="font-semibold text-review">Human review requested</p>
+        <div className="rounded-lg border border-review bg-reviewsoft px-3 py-2.5 text-sm text-ink2" role="status" data-testid="ai-mark-not-counted">
+          <p className="font-semibold text-review">AI mark not counted</p>
           <p className="text-xs mt-1">{result.escalation.message}</p>
-          <p className="text-[11px] text-ink3 mt-1">This pending escalation is saved with the attempt for a second-marker decision.</p>
+          <p className="text-[11px] text-ink3 mt-1">Nobody re-marks it for you. Check it against the model answer below; if the mark is wrong, use “Flag this mark”.</p>
         </div>
       ) : null}
       {result.farTransfer?.role === "source" ? (

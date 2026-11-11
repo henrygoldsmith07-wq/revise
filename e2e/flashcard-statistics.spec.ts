@@ -21,6 +21,9 @@ test("a reviewed card shows up in card info, the forecast and the calendar", asy
   await main.getByRole("button", { name: "Card info" }).click();
   await expect(main.getByText("Never reviewed, so there is nothing to measure yet.")).toBeVisible();
   await main.getByRole("button", { name: /^Good/ }).first().click();
+  // The grade buttons go only once the review is saved; leaving before that
+  // aborted the write and the statistics page then had nothing to show.
+  await expect(main.getByRole("button", { name: /^Good/ })).toHaveCount(0, { timeout: 15_000 });
 
   await page.goto("/study?stats=1");
   const stats = page.getByRole("region", { name: "Flashcard statistics" });

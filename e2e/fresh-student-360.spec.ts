@@ -67,14 +67,14 @@ test("fresh WJEC Physics student: quick check → repair → lesson → plan →
 
   // Quick check: answer every question badly; each one is marked on the device.
   for (let question = 0; question < 8; question++) {
-    const found = main.getByText("What I found");
+    const found = main.getByText("Your first check is complete");
     if (await found.isVisible().catch(() => false)) break;
     await expect(main.getByText(/Question \d+ of \d+/).first()).toBeVisible({ timeout: 30_000 });
     await answerBadly(page);
     await expect(main.getByText(/on this one\./).first()).toBeVisible({ timeout: 20_000 });
     await main.getByRole("button", { name: /Next question|See what I found/ }).first().click();
   }
-  await expect(main.getByText("What I found")).toBeVisible({ timeout: 20_000 });
+  await expect(main.getByText("Your first check is complete")).toBeVisible({ timeout: 20_000 });
   await expect(main.getByText("Best next step")).toBeVisible();
   await fits(page, "the quick-check result");
 
