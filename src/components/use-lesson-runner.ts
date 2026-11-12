@@ -51,6 +51,8 @@ export function useLessonRunner(input: {
   continueFromSummary: () => void;
   updateRecallDraft: (stepId: string, value: string) => void;
   revealApplication: (stepId: string) => void;
+  /** Marks the current step's task done without a typed draft (a worked example read to its answer). */
+  completeTask: () => void;
 } {
   const { lessons, initialLessonIdx, completed, completeLesson } = input;
   const [activeIdx, setActiveIdx] = useState<number | null>(() => (initialLessonIdx >= 0 ? initialLessonIdx : null));
@@ -74,7 +76,8 @@ export function useLessonRunner(input: {
     [completed],
   );
   const chosen = step?.id ? checked[step.id] : undefined;
-  const recallDone = !step?.id || Boolean(recallRevealed[step.id]);
+  // A step whose one task is its check question has nothing to recall first.
+  const recallDone = !step?.id || step.task === "check" || Boolean(recallRevealed[step.id]);
   // Check questions and active recall both gate progress. Every step asks the
   // student to produce the idea before the authored answer is shown.
   const hasCheck = Boolean(step?.check);
@@ -177,6 +180,12 @@ export function useLessonRunner(input: {
     setApplicationRevealed((previous) => ({ ...previous, [stepId]: true }));
   }, []);
 
+  const completeTask = useCallback(() => {
+    if (!step?.id) return;
+    const stepId = step.id;
+    setRecallRevealed((previous) => ({ ...previous, [stepId]: true }));
+  }, [step]);
+
   const currentRecallDraft = step?.id ? (recallDraft[step.id] ?? "") : "";
 
   return {
@@ -205,5 +214,6 @@ export function useLessonRunner(input: {
     continueFromSummary,
     updateRecallDraft,
     revealApplication,
+    completeTask,
   };
 }

@@ -105,6 +105,15 @@ export function gapPracticeHref(topicId: Id, mode: "guided" | "unaided", specPoi
   return `/practice?${query}`;
 }
 
+/**
+ * The question a finished lesson hands on to: unaided, on the lesson's own
+ * specification point first, and marked as coming from a lesson so the
+ * practice page does not describe it as repairing a lost mark.
+ */
+export function lessonPracticeHref(topicId: Id, specPointId: Id): string {
+  return `${gapPracticeHref(topicId, "unaided", specPointId)}&from=lesson`;
+}
+
 const SUPPORTED_NOTE = "Practice, not proof: an answer given with the steps open counts as supported practice.";
 const UNAIDED_NOTE = "No hints on this one, so the mark shows what you can do on your own. Practice, not proof, until the question is teacher-reviewed.";
 

@@ -353,6 +353,22 @@ background and do other work while it runs. On Windows, invoke npm through
   (`src/domain/practice-step-mode.ts`) after the command-word order and
   before the minutes fit; one is served only when nothing else is left, and
   the runner then says support was used instead of the unaided note.
+- **A taught lesson gives each step one task and ends on a question**
+  (one-hundred-and-sixteenth pass). `authoredCheckpointLesson`
+  (`src/content/lessons.ts`) builds idea + check, worked example, exam
+  question and (where written) the usual mistake; there is no orientation
+  step. `LessonStep.task` (`"check" | "worked" | "apply"`) tells
+  `LessonMode` the step's single task: a check step has no typed recall, a
+  worked step is `WorkedSteps` (shared with `LostMarksRepair`) and unlocks
+  Next when its answer is shown (`completeTask`), an apply step's box is the
+  answer to the exam question and reveals the model and checklist. A step
+  with no `task` keeps the old shape (outline lessons). Never print a check's
+  answer above its question, and never add a second "recall" beside a
+  step's task. The summary's first action is `lessonPracticeHref`
+  (`/practice?topic=…&unaided=1&point=…&from=lesson`); `from=lesson` is read
+  by `parseStepSource` and worded by `stepSourceCopy`, so the practice page
+  never tells a student who lost no mark that they are repairing one. A
+  lesson still records no evidence.
 - **Repair does not re-sit the question just answered** (twenty-seventh pass):
   `buildMissionSession`'s repair stage takes an unseen question from another
   family sharing the lost part's spec point or capability, ranked by

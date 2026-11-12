@@ -38,11 +38,16 @@ describe("learning roadmap", () => {
         topicEntries.forEach((entry, index) => {
           expect(entry.lesson.checkpointIndex, entry.lesson.id).toBe(index + 1);
           expect(entry.lesson.checkpointTotal, entry.lesson.id).toBe(pointCount);
-          expect(entry.lesson.steps.length, entry.lesson.id).toBeGreaterThanOrEqual(4);
+          // A taught lesson is the idea, a worked example and an exam question
+          // (plus the usual mistake where one is written); an outline keeps its
+          // orientation step, so it has at least four.
+          expect(entry.lesson.steps.length, entry.lesson.id).toBeGreaterThanOrEqual(entry.lesson.teachingReview ? 3 : 4);
           expect(entry.lesson.learningObjectives?.length, entry.lesson.id).toBeGreaterThan(0);
           expect(entry.lesson.estimatedMinutes, entry.lesson.id).toBeGreaterThanOrEqual(6);
+          // Every core step makes the student do something: an application, or
+          // the single task a taught lesson gives it.
           expect(
-            entry.lesson.steps.filter((step) => step.kind === "core").every((step) => Boolean(step.application)),
+            entry.lesson.steps.filter((step) => step.kind === "core").every((step) => Boolean(step.application) || Boolean(step.task)),
             entry.lesson.id,
           ).toBe(true);
           expect(entry.lesson.focus.trim(), entry.lesson.id).not.toBe("");
@@ -82,11 +87,51 @@ describe("learning roadmap", () => {
     expect(source).toContain("Process steps");
   });
 
+  it("a taught lesson teaches from its first screen and gives each step one task", () => {
+    const taught = buildRoadmapLessons(allTopics(["wjec-alevel-physics"])).filter((entry) => entry.lesson.teachingReview);
+    expect(taught.length).toBe(108);
+    for (const { lesson } of taught) {
+      // No orientation screen that only restates the specification point.
+      expect(lesson.steps.some((step) => step.kind === "overview"), lesson.id).toBe(false);
+      expect(lesson.steps.map((step) => step.task).slice(0, 3), lesson.id).toEqual(["check", "worked", "apply"]);
+      const [idea, worked, apply, trap] = lesson.steps;
+      // The idea is checked by a question, not by retyping text still on screen.
+      expect(idea!.check, lesson.id).toBeDefined();
+      expect(idea!.application, lesson.id).toBeUndefined();
+      // The worked example has steps to reveal and an answer to end on.
+      expect(worked!.explanationSteps.length, lesson.id).toBeGreaterThan(0);
+      expect(worked!.workedAnswer?.trim(), lesson.id).toBeTruthy();
+      // The exam question is answered before its model is shown.
+      expect(apply!.application?.modelAnswer.trim(), lesson.id).toBeTruthy();
+      expect(apply!.application?.successCriteria.length, lesson.id).toBeGreaterThan(0);
+      // The usual mistake is a decision: neither option is printed above the question.
+      if (trap) {
+        expect(trap.task, lesson.id).toBe("check");
+        for (const option of trap.check!.options) expect(`${trap.body} ${trap.explanationSteps.join(" ")}`, lesson.id).not.toContain(option);
+      }
+      // A title is a capitalised phrase cut at a word, never mid-word.
+      expect(lesson.title, lesson.id).toMatch(/^[A-Z0-9(]/);
+      if (lesson.title.endsWith("…")) expect(lesson.focus.toLowerCase(), lesson.id).toContain(`${lesson.title.slice(0, -1).toLowerCase()} `);
+      expect(lesson.recap?.[0], lesson.id).toBe(idea!.body);
+      expect(lesson.specPointId, lesson.id).toBeTruthy();
+    }
+  });
+
+  it("the lesson player renders the single task and hands on to a question", () => {
+    expect(source).toContain('step.task === "worked" ? (');
+    expect(source).toContain("<WorkedSteps worked={{ prompt: step.body, steps: step.explanationSteps, answer: step.workedAnswer ?? \"\" }} onDone={completeTask} />");
+    expect(source).toContain("{step.task ? null : (");
+    expect(source).toContain('aria-label="Your answer to the exam question"');
+    expect(source).toContain("lessonPracticeHref(lesson.topicId, lesson.specPointId)");
+    expect(source).toContain('data-testid="lesson-practice-handoff"');
+    expect(source).toContain("Practice, not proof.");
+  });
+
   it("makes retrieval the gate before a model takeaway or next step", () => {
     // The gate itself lives in the extracted state machine: progress requires
     // a non-empty recall draft, and the check answer only counts once the
     // recall has been revealed.
-    expect(runnerSource).toContain("const recallDone = !step?.id || Boolean(recallRevealed[step.id]);");
+    expect(runnerSource).toContain('const recallDone = !step?.id || step.task === "check" || Boolean(recallRevealed[step.id]);');
     expect(runnerSource).toContain("const checkAnswered = recallDone && (!hasCheck || chosen !== undefined);");
     expect(runnerSource).toContain("if (!step?.id || !recallDraft[step.id]?.trim()) return;");
     expect(source).toContain("Your active recall answer");

@@ -9,7 +9,9 @@ import type { RoadmapLessonEntry } from "@/content/lessons";
 import { AchievementIcon, CreditedIcon, MissedIcon, StreakIcon, ICON_SIZE } from "./icons";
 import { RichText } from "./RichText";
 import { useShortcuts } from "./shortcuts";
-import { Button, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
+import { Button, ButtonLink, EmptyState, Panel, Pill, ProgressBar, cx } from "./ui";
+import { WorkedSteps } from "./WorkedSteps";
+import { lessonPracticeHref } from "@/domain/practice-next-step";
 import { useStoreFields } from "@/state/store";
 import { useLessonRunner } from "./use-lesson-runner";
 
@@ -105,6 +107,7 @@ export function LessonMode({
     continueFromSummary,
     updateRecallDraft,
     revealApplication,
+    completeTask,
   } = run;
   // When this subject is finished, point at the next enrolled subject that
   // still has lessons left, in curriculum order — momentum over dead ends.
@@ -185,7 +188,11 @@ export function LessonMode({
   if (lesson && summary) {
     const perfect = summary.total > 0 && summary.correct === summary.total;
     const next = nextIdx !== null ? lessons[nextIdx] : null;
-    const recap = lesson.steps.filter((candidate) => candidate.kind === "core").map((candidate) => candidate.takeaway);
+    const recap = lesson.recap ?? lesson.steps.filter((candidate) => candidate.kind === "core").map((candidate) => candidate.takeaway);
+    // Reading a lesson is not answering a question. The summary used to offer
+    // only the next lesson; it now leads to one exam question on this point,
+    // with no hints, and the next lesson comes second.
+    const practiceHref = lesson.specPointId ? lessonPracticeHref(lesson.topicId, lesson.specPointId) : null;
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-center justify-between gap-3">
@@ -211,11 +218,11 @@ export function LessonMode({
 
           {lesson.learningObjectives?.length ? (
             <div className="text-left rounded-lg border border-accent/30 bg-accentsoft/30 px-3 py-3">
-              <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">What to practise next</p>
+              <p className="text-[11px] uppercase tracking-wide text-accent font-semibold">This lesson covered</p>
               <ul className="mt-2 space-y-1.5">
                 {lesson.learningObjectives.map((objective, index) => (
                   <li key={`${lesson.id}:objective:${index}`} className="flex items-start gap-2 text-sm text-ink2">
-                    <span className="mt-1 text-accent" aria-hidden="true">✓</span>
+                    <span className="mt-1 text-accent" aria-hidden="true">•</span>
                     <RichText className="text-sm text-ink2">{objective}</RichText>
                   </li>
                 ))}
@@ -262,12 +269,25 @@ export function LessonMode({
             </div>
           ) : null}
 
+          {practiceHref ? (
+            <div className="text-left rounded-lg border border-line bg-surface2 px-3 py-3" data-testid="lesson-practice-handoff">
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Now try it in a question</p>
+              <p className="mt-1 text-sm text-ink2">
+                Finishing a lesson shows you have read it, not that you can do it. One exam question from this topic, with no hints, starting with this
+                point where Revise has one. Practice, not proof.
+              </p>
+              <ButtonLink href={practiceHref} variant="primary" size="md" className="mt-3 w-full sm:w-auto">
+                Try an exam question on this
+              </ButtonLink>
+            </div>
+          ) : null}
+
           {next ? (
             <div className="pt-2 border-t border-line">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Next up</p>
               <p className="text-sm font-medium text-ink mt-1">{next.lesson.title}</p>
               <p className="text-xs text-ink3 mt-0.5">{next.topic.title}</p>
-              <Button variant="primary" className="mt-3" onClick={continueFromSummary}>
+              <Button variant={practiceHref ? "secondary" : "primary"} className="mt-3" onClick={continueFromSummary}>
                 Start next lesson
               </Button>
             </div>
@@ -308,13 +328,16 @@ export function LessonMode({
     const stepMeta = STEP_META[step.kind];
     const selectedCorrect = Boolean(step.check && chosen === step.check.correctIndex);
     const isProcessExplanation = step.explanationMode === "process";
+    // What the disabled Next button says is still to do on this step.
+    const pendingTask = step.task === "worked" ? "Show every step first" : step.task === "apply" ? "Write your answer first" : "Complete active recall";
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Lesson</p>
             <h2 className="text-lg font-semibold">{lesson.title}</h2>
-            <p className="text-xs text-ink3 mt-1 max-w-xl whitespace-pre-line">{lesson.intro}</p>
+            {/* Said once, on the first step; after that the step itself comes first on a phone. */}
+            {stepIdx === 0 ? <p className="text-xs text-ink3 mt-1 max-w-xl whitespace-pre-line">{lesson.intro}</p> : null}
           </div>
           <Button size="sm" variant="ghost" onClick={exitLesson}>
             Exit
@@ -326,6 +349,10 @@ export function LessonMode({
           <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
             Outline only: Revise has not written teaching for this checkpoint yet, so these steps are built from the
             specification wording. Use it as a checklist, and learn the idea from your notes or textbook.
+          </p>
+        ) : lesson.teachingReview === "not-teacher-reviewed" && stepIdx > 0 ? (
+          <p className="text-[11px] text-ink3" role="note" data-testid="lesson-review-state">
+            <span className="font-semibold">Not yet teacher-reviewed.</span> If it disagrees with your notes, go with your notes.
           </p>
         ) : lesson.teachingReview === "not-teacher-reviewed" ? (
           <p className="rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-ink2" role="note" data-testid="lesson-review-state">
@@ -359,14 +386,20 @@ export function LessonMode({
         {/* keyed by step id so each new step re-mounts and plays the enter animation */}
         <Panel key={step.id} className="space-y-4 app-enter">
           <div className="flex items-center justify-between gap-3">
-            <Pill tone={stepMeta.tone}>{stepMeta.label}</Pill>
+            <Pill tone={stepMeta.tone}>{step.task === "worked" ? "Worked example" : step.task === "apply" ? "Exam question" : stepMeta.label}</Pill>
             <span className="text-[11px] text-ink3 tabular-nums">
-              {stepIdx === 0 ? "Orientation" : `Step ${stepIdx} of ${lesson.steps.length - 1}`}
+              {lesson.steps[0]?.kind !== "overview"
+                ? `Step ${stepIdx + 1} of ${lesson.steps.length}`
+                : stepIdx === 0 ? "Orientation" : `Step ${stepIdx} of ${lesson.steps.length - 1}`}
             </span>
           </div>
           <h3 className="text-base sm:text-lg font-semibold tracking-tight text-ink">{step.title}</h3>
 
-          <RichText className="text-base text-ink">{step.body}</RichText>
+          {step.task === "worked" ? (
+            <WorkedSteps worked={{ prompt: step.body, steps: step.explanationSteps, answer: step.workedAnswer ?? "" }} onDone={completeTask} />
+          ) : (
+            <RichText className="text-base text-ink">{step.body}</RichText>
+          )}
 
           {step.objective ? (
             <div className="rounded-lg border border-line bg-surface2/60 px-3 py-2.5">
@@ -375,6 +408,7 @@ export function LessonMode({
             </div>
           ) : null}
 
+          {step.task === "worked" || (step.task && !step.explanationSteps.length) ? null : (
           <div className="pt-4 border-t border-line">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
@@ -401,6 +435,7 @@ export function LessonMode({
               ))}
             </ol>
           </div>
+          )}
 
           {step.examLink ? (
             <div className="rounded-lg border border-line bg-surface2/50 px-3 py-2.5">
@@ -409,6 +444,7 @@ export function LessonMode({
             </div>
           ) : null}
 
+          {step.task ? null : (
           <div className="rounded-lg border border-accent/30 bg-accentsoft/30 px-3 py-3 space-y-2.5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -442,6 +478,7 @@ export function LessonMode({
               </div>
             )}
           </div>
+          )}
 
           {step.check ? (
             <div className="space-y-3 pt-4 border-t border-line">
@@ -499,7 +536,7 @@ export function LessonMode({
                 </div>
               ) : null}
             </div>
-          ) : (
+          ) : step.task ? null : (
             <div className="rounded-lg border border-line bg-surface2/50 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">Pause and say it back</p>
               <p className="text-sm text-ink2 mt-1">
@@ -515,7 +552,58 @@ export function LessonMode({
             </div>
           ) : null}
 
-          {step.application ? (
+          {step.application && step.task === "apply" ? (
+            // The step's one task: write the answer, then compare. The prompt
+            // is the step's own text above, so it is not printed twice.
+            <div className="space-y-3 rounded-lg border border-accent/30 bg-accentsoft/20 px-3 py-3" data-testid="lesson-apply">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-accent font-semibold">Your answer</p>
+                <p className="mt-1 text-sm font-medium text-ink">Write it as you would in the exam, then compare it with the model.</p>
+              </div>
+              {!recallDone ? (
+                <>
+                  <textarea
+                    value={currentRecallDraft}
+                    onChange={(event) => updateRecallDraft(step.id, event.target.value)}
+                    rows={5}
+                    placeholder="Your answer…"
+                    aria-label="Your answer to the exam question"
+                    className="field text-sm"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="primary" size="sm" onClick={revealRecall} disabled={!currentRecallDraft.trim()}>
+                      Compare with the model answer
+                    </Button>
+                    <span className="text-[11px] text-ink3">Not marked or saved: you judge it against the checklist.</span>
+                  </div>
+                </>
+              ) : (
+                <div role="status" aria-live="polite" className="space-y-3">
+                  <div className="rounded-lg border border-line bg-surface px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-wide text-ink3 font-semibold">You wrote</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink2">{currentRecallDraft}</p>
+                  </div>
+                  <div className="space-y-3 rounded-lg border border-success/30 bg-successsoft/40 px-3 py-2.5">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Model answer</p>
+                      <RichText className="mt-1 text-sm text-ink2">{step.application.modelAnswer}</RichText>
+                    </div>
+                    <div className="border-t border-success/20 pt-2.5">
+                      <p className="text-[10px] uppercase tracking-wide text-success font-semibold">Compare your answer against each point</p>
+                      <ul className="mt-1.5 space-y-1">
+                        {step.application.successCriteria.map((criterion, index) => (
+                          <li key={`${step.id}:criterion:${index}`} className="flex items-start gap-2 text-xs text-ink2">
+                            <span className="text-ink3" aria-hidden="true">•</span>
+                            <RichText className="text-xs text-ink2">{criterion}</RichText>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : step.application ? (
             <div className="space-y-3 rounded-lg border border-accent/30 bg-accentsoft/20 px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -562,11 +650,11 @@ export function LessonMode({
           </Button>
           {isLast ? (
             <Button variant="primary" onClick={finishLesson} disabled={!checkAnswered}>
-              {checkAnswered ? "Finish lesson" : recallDone ? "Answer the check" : "Complete active recall"}
+              {checkAnswered ? "Finish lesson" : recallDone ? "Answer the check" : pendingTask}
             </Button>
           ) : (
             <Button variant="primary" disabled={!checkAnswered} onClick={advance}>
-              {checkAnswered ? "Next" : recallDone ? "Choose an answer" : "Complete active recall"}
+              {checkAnswered ? "Next" : recallDone ? "Choose an answer" : pendingTask}
             </Button>
           )}
         </div>

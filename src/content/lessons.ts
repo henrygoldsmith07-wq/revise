@@ -39,6 +39,17 @@ export interface LessonStep {
   takeaway: string;
   /** Optional link to the specification wording for this idea. */
   examLink?: string;
+  /**
+   * The one thing this step asks the student to do. Unset keeps the original
+   * shape (a typed recall, then any check and application). Authored lessons
+   * set it, so each step has a single task that fits its role:
+   *   "check"  answer the check question; no typed recall of text still on screen
+   *   "worked" reveal the worked example a step at a time
+   *   "apply"  write an answer, then compare it with the model and checklist
+   */
+  task?: "check" | "worked" | "apply";
+  /** The final answer of a "worked" step, shown after its last step. */
+  workedAnswer?: string;
   /** Optional check question — the student must answer before moving on. */
   check?: {
     question: string;
@@ -72,6 +83,8 @@ export interface Lesson {
   learningObjectives?: string[];
   /** Honest, bounded estimate for a complete guided pass. */
   estimatedMinutes?: number;
+  /** What to carry away, when the lesson says so itself; otherwise the core steps' takeaways. */
+  recap?: string[];
   /**
    * True when no teaching has been written for this checkpoint: the steps are
    * assembled from the specification wording, so the page must say it is an
@@ -281,7 +294,8 @@ export function summariseLesson(
   const missed = checks
     .filter((s) => checked[s.id] !== s.check!.correctIndex)
     .map((s) => ({
-      body: s.body,
+      // A step whose task is its check is remembered by the question asked.
+      body: s.task === "check" ? s.check!.question : s.body,
       answer: s.check!.options[s.check!.correctIndex],
       explanation: s.check!.explanation,
     }));
@@ -292,7 +306,24 @@ export function summariseLesson(
 function pointTitle(point: string, fallback: string): string {
   const clause = firstClause(point);
   if (!clause) return fallback;
-  return clause.length <= 72 ? clause : `${clause.slice(0, 69).trimEnd()}…`;
+  if (clause.length <= 72) return clause;
+  // Cut at a word, not through one ("…into perpendicu…").
+  const cut = clause.slice(0, 70);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > 40 ? cut.slice(0, space) : cut.slice(0, 69)).replace(/[\s,;:(]+$/, "")}…`;
+}
+
+const NOT_A_VERB = new Set(["sin", "cos", "tan", "log", "exp"]);
+
+/**
+ * A specification statement is a verb phrase ("distinguish scalars from…"),
+ * so as a lesson title it starts with a capital. Only a plain lower-case
+ * first word is changed: "pH", "mRNA" and symbols are left as written.
+ */
+function statementTitle(point: string, fallback: string): string {
+  const title = pointTitle(point, fallback);
+  const first = /^[a-z]{3,}(?=[\s,])/.exec(title)?.[0];
+  return first && !NOT_A_VERB.has(first) ? title.charAt(0).toUpperCase() + title.slice(1) : title;
 }
 
 /** A compact sentence used in takeaways without changing the authored fact. */
@@ -384,7 +415,7 @@ function estimateCheckpointMinutes(topic: Topic, hasMisconception: boolean, hasT
 function buildLessonIntro(topic: Topic, objectives: string[], minutes: number): string {
   const firstObjective = objectives[0] ?? `explain ${topic.title.toLowerCase()} in your own words`;
   return [
-    `In about ${minutes} minutes, you will build a usable understanding of ${topic.title.toLowerCase()}.`,
+    `In about ${minutes} minutes, you will build a usable understanding of ${topic.title}.`,
     `Success looks like this: ${firstObjective}`,
     "The rhythm is understand → retrieve → apply → check. Try the answer before revealing the model response.",
   ].join("\n\n");
@@ -981,7 +1012,7 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
     return specPoints.map((specPoint, index) => {
       const checkpointIndex = index + 1;
       const lessonId = `${base.id}:checkpoint:${specPoint.id}`;
-      const focusTitle = pointTitle(specPoint.text, `Checkpoint ${checkpointIndex}`);
+      const focusTitle = statementTitle(specPoint.text, `Checkpoint ${checkpointIndex}`);
       const teaching = teachingFor(specPoint.id);
       if (teaching) {
         return {
@@ -1169,58 +1200,41 @@ function authoredCheckpointLesson(input: {
   const { topic, specPoint, teaching, lessonId, focusTitle, checkpointIndex, checkpointTotal } = input;
   const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
   const objective = objectiveForPoint(specPoint.text, true);
+  // Each step has one task. The lesson used to open on a screen that only
+  // restated the specification point (five times) and asked for it to be
+  // "recalled" before anything had been taught, and every later step asked
+  // for the same typed "key idea" beside its real task. Now: the idea and a
+  // check on it, a worked example a step at a time, then an exam question to
+  // answer before the model is shown.
   const steps: LessonStep[] = [
-    {
-      id: `${lessonId}:overview`,
-      kind: "overview",
-      title: "Know the target",
-      body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
-      objective,
-      explanationSteps: [
-        `Where it sits: one part of ${topic.title}.`,
-        "You will learn the idea, follow a worked example, check yourself, then write an exam answer.",
-      ],
-      takeaway: takeawayForPoint(specPoint.text),
-      examLink,
-    },
     {
       id: `${lessonId}:core`,
       kind: "core",
       title: focusTitle,
       body: teaching.explain[0]!,
-      objective,
       explanationSteps: teaching.explain.slice(1),
       explanationMode: "concept",
-      application: {
-        prompt: `Without looking back, explain this in two or three sentences: ${specPoint.text}.`,
-        modelAnswer: teaching.explain.slice(0, 2).join("\n\n"),
-        successCriteria: ["Uses the key terms precisely", "States the relationship or condition, not just a definition"],
-      },
       takeaway: teaching.explain[0]!,
       examLink,
       check: teaching.check,
+      task: "check",
     },
     {
       id: `${lessonId}:worked`,
       kind: "core",
       title: "Worked example",
       body: teaching.worked.prompt,
-      objective: "Follow each step, then cover it and try to reproduce the method.",
       explanationSteps: teaching.worked.steps,
       explanationMode: "process",
-      application: {
-        prompt: `Cover the steps and solve it yourself: ${teaching.worked.prompt}`,
-        modelAnswer: [...teaching.worked.steps, `Answer: ${teaching.worked.answer}`].join("\n"),
-        successCriteria: ["Follows the same method, step by step", `Reaches the answer: ${teaching.worked.answer}`],
-      },
       takeaway: `Answer: ${teaching.worked.answer}`,
+      task: "worked",
+      workedAnswer: teaching.worked.answer,
     },
     {
       id: `${lessonId}:apply`,
       kind: "core",
-      title: "Use it in an exam answer",
+      title: "Now you: an exam question",
       body: teaching.apply.prompt,
-      objective: "Write your own answer before revealing the model answer, then mark it against the checklist.",
       explanationSteps: [],
       application: {
         prompt: teaching.apply.prompt,
@@ -1229,6 +1243,7 @@ function authoredCheckpointLesson(input: {
       },
       examTechnique: examTechniqueFor(teaching.apply.prompt),
       takeaway: teaching.apply.successCriteria.join("; "),
+      task: "apply",
     },
   ];
   if (teaching.trap) {
@@ -1236,17 +1251,19 @@ function authoredCheckpointLesson(input: {
     steps.push({
       id: `${lessonId}:trap`,
       kind: "trap",
-      title: "Avoid a common exam trap",
-      body: `Common trap: ${teaching.trap.wrong}`,
-      objective: "Spot the error before it costs marks.",
-      explanationSteps: [`The error: ${teaching.trap.wrong}`, `Instead: ${teaching.trap.right}`],
+      title: "Spot the usual mistake",
+      // The answer is not printed above the question any more: the student
+      // decides first, and the explanation follows the choice.
+      body: "One of these is the mistake examiners see most on this point. Decide which is right before you read on.",
+      explanationSteps: [],
       takeaway: teaching.trap.right,
       check: {
         question: "Which of these is the correct approach?",
         options,
         correctIndex: options.indexOf(teaching.trap.right),
-        explanation: `${teaching.trap.right} The other option is the trap.`,
+        explanation: `${teaching.trap.right} The other option is the usual mistake.`,
       },
+      task: "check",
     });
   }
   const minutes = Math.max(8, Math.min(15, 3 + teaching.explain.length + teaching.worked.steps.length + (teaching.trap ? 1 : 0)));
@@ -1255,10 +1272,11 @@ function authoredCheckpointLesson(input: {
     topicId: topic.id,
     subjectId: topic.subjectId,
     title: focusTitle,
-    intro: `Checkpoint ${checkpointIndex} of ${checkpointTotal}. ${buildLessonIntro(topic, [objective], minutes)}`,
+    intro: `Checkpoint ${checkpointIndex} of ${checkpointTotal}. ${topic.title}, about ${minutes} minutes: the idea, a worked example, then an exam question you answer before seeing the model.`,
     steps,
     learningObjectives: [objective],
     estimatedMinutes: minutes,
+    recap: [teaching.explain[0]!, ...(teaching.trap ? [`Watch for: ${teaching.trap.right}`] : [])],
     focus: specPoint.text,
     checkpointIndex,
     checkpointTotal,
