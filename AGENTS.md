@@ -198,7 +198,12 @@ background and do other work while it runs. On Windows, invoke npm through
   it with fixture-only reviews.
 - **A saved checkpoint is not an interrupted run** (twenty-ninth pass). Pages
   save a resume point as soon as a question shows; anything that offers to
-  resume must ask `checkpointHasProgress` (Today and Schedule do). Mission
+  resume must ask `checkpointHasProgress` (Today and Schedule do). On Today
+  it leads only while fresh (`checkpointLeadsToday`: the local day it was
+  left, or within `CHECKPOINT_LEAD_HOURS`); from the next day the
+  recommendation leads and `ResumeRevisionCard compact` sits beneath it
+  (one-hundred-and-seventeenth pass, `e2e/resume-steps-aside.spec.ts`), so a
+  student back after a week is not shown only a stale queue. Mission
   titles that prefix "Recover N marks" compose through `missionActionTitle`,
   never by concatenating `mission.title`.
 - **Outbox failures are classified** (`src/domain/sync-retry.ts`). Only a

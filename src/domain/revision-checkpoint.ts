@@ -1,3 +1,4 @@
+import { localDayOfInstant, todayLocal } from "./local-date";
 import type { Attempt, Id, IsoInstant, MissionAttemptContext, ReviewLog } from "./types";
 
 export type RevisionActivity = "practice" | "review" | "paper" | "study" | "adaptive";
@@ -95,6 +96,43 @@ export function checkpointHasProgress(checkpoint: RevisionCheckpoint, evidence: 
   const topic = checkpoint.activity === "adaptive" ? checkpoint.topicId : undefined;
   return evidence.attempts.some((a) => a.createdAt >= since && (ids.has(a.questionId) || (topic !== undefined && a.topicIds.includes(topic)))) ||
     evidence.reviewLogs.some((l) => l.reviewedAt >= since && (ids.has(l.cardId) || (topic !== undefined && l.topicId === topic)));
+}
+
+/**
+ * How many of a flashcard run's cards have been reviewed. The saved position
+ * can trail by one (it is written after the grade, and leaving at once loses
+ * that write), so a run left after its first card read "0 of 16 reviewed";
+ * the review log is what was actually done.
+ */
+export function checkpointReviewedCount(
+  checkpoint: Pick<RevisionCheckpoint, "position" | "queueIds" | "startedAt" | "updatedAt">,
+  reviewLogs: ReadonlyArray<Pick<ReviewLog, "cardId" | "reviewedAt">>,
+): number {
+  const since = checkpoint.startedAt ?? checkpoint.updatedAt;
+  const queue = new Set(checkpoint.queueIds ?? []);
+  const reviewed = new Set<Id>();
+  for (const log of reviewLogs) if (log.reviewedAt >= since && queue.has(log.cardId)) reviewed.add(log.cardId);
+  return Math.max(checkpoint.position, reviewed.size);
+}
+
+/** How long after it was left an interrupted run still leads Today, even across midnight. */
+export const CHECKPOINT_LEAD_HOURS = 4;
+
+/**
+ * Whether an interrupted run is still the first thing Today should show.
+ *
+ * It is on the day it was left, and for a few hours after (a session left
+ * at 23:30 and reopened at 00:10). After that the day's recommendation leads
+ * again and the run is offered beneath it: a student coming back five days
+ * later used to see only "Resume interrupted revision" for a flashcard queue
+ * built five days earlier, with the marks they had lost and everything due
+ * since hidden until they dismissed it.
+ */
+export function checkpointLeadsToday(checkpoint: Pick<RevisionCheckpoint, "updatedAt">, now: Date, timeZone?: string): boolean {
+  const left = new Date(checkpoint.updatedAt).getTime();
+  if (!Number.isFinite(left)) return false;
+  if (now.getTime() - left < CHECKPOINT_LEAD_HOURS * 3_600_000) return true;
+  return localDayOfInstant(checkpoint.updatedAt, timeZone) === todayLocal(now, timeZone);
 }
 
 export function isRevisionCheckpoint(value: unknown): value is RevisionCheckpoint {

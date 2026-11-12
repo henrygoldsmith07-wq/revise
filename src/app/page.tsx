@@ -17,7 +17,7 @@ import { BestNextStep } from "@/components/BestNextStep";
 import { CommandCentreCard } from "@/components/CommandCentreCard";
 import { useRevisionPlan } from "@/components/recovery-evidence";
 import { todayPick } from "@/domain/today-pick";
-import { checkpointHasProgress } from "@/domain/revision-checkpoint";
+import { checkpointHasProgress, checkpointLeadsToday } from "@/domain/revision-checkpoint";
 import { WeekLine } from "@/components/RecoverySummary";
 import { StudyWeek } from "@/components/StudyWeek";
 import { ExamDateNudge } from "@/components/ExamDateNudge";
@@ -75,6 +75,16 @@ export default function TodayPage() {
     () => (revisionCheckpoint ? checkpointHasProgress(revisionCheckpoint, { attempts: store.attempts, reviewLogs }) : false),
     [revisionCheckpoint, store.attempts, reviewLogs],
   );
+  // An interrupted run leads Today only while it is fresh (the day it was
+  // left). On a later day the recommendation leads and the run is offered
+  // beneath it, unless the recommendation is that same mission.
+  const resumeLeads = useMemo(
+    () => Boolean(resume && revisionCheckpoint && checkpointLeadsToday(revisionCheckpoint, new Date())),
+    [resume, revisionCheckpoint],
+  );
+  const leftMission = revisionCheckpoint?.mission?.missionId;
+  const resumeBeneath = resume && !resumeLeads &&
+    !(leftMission && plan.top?.route.href.includes(encodeURIComponent(leftMission)));
 
   // Honest pace forecast: what the current pace actually implies before the
   // nearest exam date. Null when nothing is untouched or no date is set — it
@@ -125,7 +135,7 @@ export default function TodayPage() {
       <TodayWelcome name={settings.displayName} greeting={greetingLabel} context={context} />
       <PhaseEntryNotice />
       <CountdownPhaseBanner />
-      {resume ? (
+      {resumeLeads ? (
         <ResumeRevisionCard />
       ) : (
         <div className="today-focus card p-5 sm:p-7">
@@ -136,15 +146,16 @@ export default function TodayPage() {
           )}
         </div>
       )}
-      {resume ? null : (
+      {resumeBeneath ? <ResumeRevisionCard compact /> : null}
+      {resumeLeads ? null : (
         <p className="text-sm text-ink3">
           Prefer to pick for yourself?{" "}
           <Link href="/study" className="inline-flex min-h-11 items-center font-medium text-ink2 underline underline-offset-4 hover:text-ink">Choose how to study</Link>
         </p>
       )}
-      {resume ? null : <StudyWeek />}
-      {resume ? null : <WeekLine />}
-      {resume ? null : <ExamDateNudge />}
+      {resumeLeads ? null : <StudyWeek />}
+      {resumeLeads ? null : <WeekLine />}
+      {resumeLeads ? null : <ExamDateNudge />}
       <details className="card p-4 sm:p-5">
         <summary className="cursor-pointer select-none text-sm font-medium text-ink2">
           Plan, pace and outlook
