@@ -85,7 +85,11 @@ describe("Today screen — one dominant next action (decision engine)", () => {
     const source = page();
     // Only a run with progress in it is "interrupted" (checkpointHasProgress).
     expect(source).toContain("checkpointHasProgress(revisionCheckpoint");
-    expect(source).toContain("resume ? (");
+    // It leads only while fresh; on a later day the recommendation leads and
+    // the run is offered beneath it (checkpointLeadsToday).
+    expect(source).toContain("checkpointLeadsToday(revisionCheckpoint, new Date())");
+    expect(source).toContain("resumeLeads ? (");
+    expect(source).toContain("{resumeBeneath ? <ResumeRevisionCard compact /> : null}");
     expect(source).toContain("ResumeRevisionCard");
     expect(source).toContain("AdaptiveSessionHero");
   });
