@@ -34,17 +34,32 @@ test("Lessons presents a unit-by-unit learning roadmap with detailed outlines", 
 
   await main.getByRole("button", { name: /Open lesson 1:/i }).first().click();
   await expect(main).toContainText("Checkpoint 1 of");
-  await expect(main).toContainText("Know the target");
 
-  const recall = main.getByRole("textbox", { name: "Your active recall answer" });
-  await expect(recall).toBeVisible();
-  await recall.fill("I can explain the checkpoint from memory before checking the model.");
-  await main.getByRole("button", { name: "Show model answer" }).click();
-  await expect(main).toContainText("Now compare");
-
-  await main.getByRole("button", { name: "Next" }).click();
-  await expect(main).toContainText("Apply it");
-  await main.getByRole("button", { name: "Reveal model answer" }).click();
-  // The model answer's points are a comparison, not a self-mark (7872e41).
-  await expect(main).toContainText("Compare your answer against each point");
+  // An outline lesson (no written teaching): no orientation screen and no
+  // invented model answer. It says what the specification asks and, after the
+  // student has said what they know, the key points Revise has on it.
+  await expect(main.getByTestId("lesson-outline-note")).toContainText("Outline only");
+  await expect(main).not.toContainText("Know the target");
+  await expect(main).toContainText(/What the specification asks( \(.+?\))?:/);
+  const reveal = main.getByTestId("lesson-reveal");
+  if (await reveal.count()) {
+    await expect(main.getByRole("button", { name: "Show the key points first" })).toBeDisabled();
+    await reveal.getByRole("button", { name: "Show the key points" }).click();
+    await expect(main).toContainText("Key points Revise has on this");
+  }
+  await expect(main).not.toContainText(/Model answer|Reveal model answer/);
+  // Finish however many steps the outline has; each mistake step is a decision.
+  for (let step = 0; step < 4; step++) {
+    const finish = main.getByRole("button", { name: "Finish lesson" });
+    const next = main.getByRole("button", { name: "Next", exact: true });
+    if (!(await finish.count()) && !(await next.count())) {
+      await main.getByRole("listitem").getByRole("button").first().click();
+    }
+    if (await main.getByRole("button", { name: "Finish lesson" }).count()) {
+      await main.getByRole("button", { name: "Finish lesson" }).click();
+      break;
+    }
+    await main.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  await expect(main.getByTestId("lesson-practice-handoff").getByRole("link", { name: "Try an exam question on this" })).toHaveAttribute("href", /&point=.*&from=lesson$/);
 });

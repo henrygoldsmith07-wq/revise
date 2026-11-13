@@ -210,10 +210,14 @@ export function LessonMode({
             <AchievementIcon size={ICON_SIZE.lg} />
           </div>
           <div>
-            <p className="text-lg font-semibold text-ink">{perfect ? "All lesson checks passed." : "Lesson done — review the misses below."}</p>
-            <p className="text-sm text-ink3 mt-1">
-              {summary.correct} of {summary.total} check questions correct
+            <p className="text-lg font-semibold text-ink">
+              {summary.total === 0 ? "Outline done." : perfect ? "All lesson checks passed." : "Lesson done — review the misses below."}
             </p>
+            {summary.total ? (
+              <p className="text-sm text-ink3 mt-1">
+                {summary.correct} of {summary.total} check questions correct
+              </p>
+            ) : null}
           </div>
 
           {lesson.learningObjectives?.length ? (
@@ -329,7 +333,7 @@ export function LessonMode({
     const selectedCorrect = Boolean(step.check && chosen === step.check.correctIndex);
     const isProcessExplanation = step.explanationMode === "process";
     // What the disabled Next button says is still to do on this step.
-    const pendingTask = step.task === "worked" ? "Show every step first" : step.task === "apply" ? "Write your answer first" : "Complete active recall";
+    const pendingTask = step.task === "worked" ? "Show every step first" : step.task === "apply" ? "Write your answer first" : step.task === "reveal" ? "Show the key points first" : "Complete active recall";
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="flex items-start justify-between gap-3">
@@ -346,9 +350,9 @@ export function LessonMode({
         <ProgressBar value={(stepIdx + 1) / lesson.steps.length} label="Lesson progress" />
 
         {lesson.outline ? (
-          <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note">
-            Outline only: Revise has not written teaching for this checkpoint yet, so these steps are built from the
-            specification wording. Use it as a checklist, and learn the idea from your notes or textbook.
+          <p className="rounded-lg border border-review/40 bg-reviewsoft px-3 py-2 text-xs font-medium text-ink" role="note" data-testid="lesson-outline-note">
+            Outline only: Revise has not written teaching for this checkpoint yet. It shows what the specification asks and
+            the key points Revise has on it; learn the idea itself from your notes or textbook.
           </p>
         ) : lesson.teachingReview === "not-teacher-reviewed" && stepIdx > 0 ? (
           <p className="text-[11px] text-ink3" role="note" data-testid="lesson-review-state">
@@ -361,7 +365,8 @@ export function LessonMode({
           </p>
         ) : null}
 
-        {stepIdx === 0 && lesson.learningObjectives?.length ? (
+        {/* An outline's first step states its one requirement itself; a success-criteria panel would only repeat it. */}
+        {stepIdx === 0 && lesson.learningObjectives?.length && !lesson.outline ? (
           <Panel className="space-y-3 border-accent/30 bg-accentsoft/20">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -386,7 +391,7 @@ export function LessonMode({
         {/* keyed by step id so each new step re-mounts and plays the enter animation */}
         <Panel key={step.id} className="space-y-4 app-enter">
           <div className="flex items-center justify-between gap-3">
-            <Pill tone={stepMeta.tone}>{step.task === "worked" ? "Worked example" : step.task === "apply" ? "Exam question" : stepMeta.label}</Pill>
+            <Pill tone={stepMeta.tone}>{step.task === "worked" ? "Worked example" : step.task === "apply" ? "Exam question" : step.task === "reveal" || step.task === "read" ? "The point" : stepMeta.label}</Pill>
             <span className="text-[11px] text-ink3 tabular-nums">
               {lesson.steps[0]?.kind !== "overview"
                 ? `Step ${stepIdx + 1} of ${lesson.steps.length}`
@@ -408,11 +413,22 @@ export function LessonMode({
             </div>
           ) : null}
 
-          {step.task === "worked" || (step.task && !step.explanationSteps.length) ? null : (
+          {step.task === "reveal" && !recallDone ? (
+            // Retrieval before reading: what the student can already say about
+            // the requirement, then the key points Revise has on it.
+            <div className="rounded-lg border border-accent/30 bg-accentsoft/30 px-3 py-3" data-testid="lesson-reveal">
+              <p className="text-sm font-medium text-ink">Before you look: say what you already know about this, in a sentence or two.</p>
+              <Button variant="primary" size="sm" className="mt-2" onClick={completeTask}>
+                Show the key points
+              </Button>
+            </div>
+          ) : null}
+
+          {step.task === "worked" || (step.task && !step.explanationSteps.length) || (step.task === "reveal" && !recallDone) ? null : (
           <div className="pt-4 border-t border-line">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">
-                {isProcessExplanation ? "How it works" : "Break it down"}
+                {step.task === "reveal" ? "Key points Revise has on this" : isProcessExplanation ? "How it works" : "Break it down"}
               </p>
               {isProcessExplanation ? <Pill tone="accent">Follow in order</Pill> : null}
             </div>
