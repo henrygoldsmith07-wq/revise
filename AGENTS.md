@@ -129,6 +129,11 @@ background and do other work while it runs. On Windows, invoke npm through
   match an A-level slug: seed cards install once by id and are never
   rewritten. A seed card whose topic has left its loaded subject is retired
   (`src/domain/card-retirement.ts`), hidden by the store, never deleted.
+  Mistakes and attempts on such a topic are read on the topic their
+  question now sits on, or the mistake is retired (`liveRecords`, pass
+  120); plan blocks on it are rebuilt (`topics-changed` in `replan.ts`).
+  Anything new in the store that reads mistakes, attempts or cards reads
+  `liveSnapshot`, not `snapshot`.
   Every GCSE physics question passes `scopeGcseQuestion`
   (`src/content/gcse-question-scope.ts`): a shared template is retagged to
   a GCSE statement or withheld (`null`), an unplaced template is withheld

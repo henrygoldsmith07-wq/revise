@@ -66,7 +66,7 @@ describe("missionRetryParts", () => {
 
   it("the store drops those parts before creating mistakes and cards", () => {
     const store = readFileSync("src/state/store.tsx", "utf8");
-    expect(store).toContain("missionRetryParts(attempt, question, snapshot?.mistakes ?? [], snapshot?.questions ?? [question])");
+    expect(store).toContain("missionRetryParts(attempt, question, liveSnapshot?.mistakes ?? [], snapshot?.questions ?? [question])");
     expect(store).toContain("!retryParts.has(draft.mistake.partId)");
   });
 });

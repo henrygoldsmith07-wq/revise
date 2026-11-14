@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { allTopics, loadAllSubjects } from "@/domain/curriculum";
-import { liveCards, loadedTopics } from "@/domain/card-retirement";
+import { liveRecords, loadedTopics } from "@/domain/card-retirement";
 import { topicsForYear } from "@/domain/year-group";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
 
@@ -442,14 +442,28 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const unit4Option = snapshot?.settings.unit4Option;
   const retentionTarget = desiredRetention(snapshot?.settings.desiredRetention);
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
-  // Seed cards whose topic has left a loaded subject's tree (every GCSE
-  // physics subject's A-level cards) are hidden everywhere below, never
-  // deleted (src/domain/card-retirement.ts).
+  // Records on a topic that has left a loaded subject's tree (every GCSE
+  // physics subject's A-level topics) are read on the current tree below:
+  // seed cards retired, mistakes and attempts moved to the topic their
+  // question now sits on, or the mistake retired when its question left the
+  // course. Never deleted or rewritten (src/domain/card-retirement.ts).
   const loaded = useMemo(() => loadedTopics(topics), [topics]);
   const snapshotCards = snapshot?.cards;
-  const live = useMemo(() => (snapshotCards ? liveCards(snapshotCards, loaded) : undefined), [snapshotCards, loaded]);
+  const snapshotMistakes = snapshot?.mistakes;
+  const snapshotAttempts = snapshot?.attempts;
+  const snapshotQuestions = snapshot?.questions;
+  const live = useMemo(
+    () =>
+      snapshotCards && snapshotMistakes && snapshotAttempts && snapshotQuestions
+        ? liveRecords({ cards: snapshotCards, mistakes: snapshotMistakes, attempts: snapshotAttempts }, loaded, snapshotQuestions)
+        : undefined,
+    [snapshotCards, snapshotMistakes, snapshotAttempts, snapshotQuestions, loaded],
+  );
   const liveSnapshot = useMemo(
-    () => (snapshot && live && live !== snapshot.cards ? { ...snapshot, cards: live as Card[] } : snapshot),
+    () =>
+      snapshot && live && (live.cards !== snapshot.cards || live.mistakes !== snapshot.mistakes || live.attempts !== snapshot.attempts)
+        ? { ...snapshot, cards: live.cards as Card[], mistakes: live.mistakes as Mistake[], attempts: live.attempts as Attempt[] }
+        : snapshot,
     [snapshot, live],
   );
   // Year 12 plans and recommends AS (Units 1-2) topics only; mastery and
@@ -667,14 +681,14 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   });
 
   const recommendations = useMemo(() => {
-    if (!snapshot) return [];
+    if (!snapshot || !liveSnapshot) return [];
     return recommend({
       topics: scopedTopics,
       mastery,
-      cards: snapshot.cards,
-      mistakes: snapshot.mistakes,
+      cards: liveSnapshot.cards,
+      mistakes: liveSnapshot.mistakes,
       questions: snapshot.questions,
-      attempts: snapshot.attempts,
+      attempts: liveSnapshot.attempts,
       exams: snapshot.examDates,
       plan: snapshot.plannedSessions,
       sessionLengthMinutes: snapshot.settings.sessionLengthMinutes,
@@ -687,7 +701,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       recallMastery,
       applicationMastery,
     });
-  }, [snapshot, mastery, scopedTopics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog, recallMastery, applicationMastery]);
+  }, [snapshot, liveSnapshot, mastery, scopedTopics, subjectIds, marksPerHour, techniqueReports, paperOutcomeLog, recallMastery, applicationMastery]);
 
   // Unlike `recommendations`, this is not a list of competing activity
   // queues. It is one optimiser pass over the same snapshot, then one
@@ -713,7 +727,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     }));
     const today = todayIso();
     const dueByTopic = new Map<Id, { count: number; oldestDue: string }>();
-    for (const card of snapshot.cards) {
+    for (const card of liveSnapshot?.cards ?? snapshot.cards) {
       if (card.due > today) continue;
       const current = dueByTopic.get(card.topicId) ?? { count: 0, oldestDue: card.due };
       dueByTopic.set(card.topicId, {
@@ -733,7 +747,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     const fallback = recommendations[0];
     if (!fallback) return [];
     return [{ ...fallback, topicId: pick.topicId, reason: pick.reason }];
-  }, [experimentArm, recommendations, mastery, snapshot]);
+  }, [experimentArm, recommendations, mastery, snapshot, liveSnapshot]);
 
   // Revision session lifecycle (checkpoint + twin + the one adaptive plan)
   // composes here so twin choices and the plan read the ranked
@@ -759,8 +773,8 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     cards: liveSnapshot?.cards ?? [],
     reviewLogs: snapshot?.reviewLogs ?? [],
     questions: snapshot?.questions ?? [],
-    attempts: snapshot?.attempts ?? [],
-    mistakes: snapshot?.mistakes ?? [],
+    attempts: liveSnapshot?.attempts ?? [],
+    mistakes: liveSnapshot?.mistakes ?? [],
     mastery,
     exams: snapshot?.examDates ?? [],
     subjectIds,
@@ -835,15 +849,15 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       touchSessionClock(); // time-on-task feeds the recommender's fatigue penalty
       const isRetest = Boolean(attempt.retestMistakeId);
       const retestMistake = isRetest
-        ? snapshot?.mistakes.find((mistake) => mistake.id === attempt.retestMistakeId && !mistake.resolved)
+        ? liveSnapshot?.mistakes.find((mistake) => mistake.id === attempt.retestMistakeId && !mistake.resolved)
         : undefined;
       if (isRetest && !retestMistake) {
         throw new Error("Cannot retest an unavailable or already resolved mistake.");
       }
-      const retestEvaluation = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, snapshot?.attempts, snapshot?.questions) : undefined;
+      const retestEvaluation = retestMistake ? evaluateMistakeRetest(retestMistake, question, attempt, liveSnapshot?.attempts, snapshot?.questions) : undefined;
       if (retestEvaluation?.status === "not-applicable") throw new Error("This question does not test the captured weakness.");
-      const updatedMistakes = (snapshot?.mistakes ?? []).flatMap((mistake) => {
-        const updated = advanceMistakeRepair(mistake, question, attempt, snapshot?.attempts, snapshot?.questions);
+      const updatedMistakes = (liveSnapshot?.mistakes ?? []).flatMap((mistake) => {
+        const updated = advanceMistakeRepair(mistake, question, attempt, liveSnapshot?.attempts, snapshot?.questions);
         return updated === mistake ? [] : [updated];
       });
       const updatedById = new Map(updatedMistakes.map((m) => [m.id, m]));
@@ -863,7 +877,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       const repairedParts = new Set(updatedMistakes.flatMap((m) => repairTargetParts(m, question)));
       // Nor does a mission's repair question that fails again: it is another
       // go at the mistake the mission is already repairing, not a new one.
-      const retryParts = missionRetryParts(attempt, question, snapshot?.mistakes ?? [], snapshot?.questions ?? [question]);
+      const retryParts = missionRetryParts(attempt, question, liveSnapshot?.mistakes ?? [], snapshot?.questions ?? [question]);
       const drafts = mistakesFromAttempt(attempt, question, undefined, new Date(attempt.createdAt), misconceptions)
         .filter((draft) => !draft.mistake.partId || (!repairedParts.has(draft.mistake.partId) && !retryParts.has(draft.mistake.partId)));
       await repo.saveLearningResult(attempt, [...updatedMistakes, ...drafts.map((d) => d.mistake)], drafts.map((d) => d.card));
@@ -882,12 +896,12 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
           (context.kind === "transfer" ? !row.transfer : context.kind === "retention" ? Boolean(row.transfer) && !row.delayedRetention : false));
         let next: InterventionOutcomeRecord[];
         if (related && context.kind === "transfer") {
-          const updated = attachTransferOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [] });
+          const updated = attachTransferOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: liveSnapshot?.attempts ?? [] });
           next = [...current.filter((row) => row.id !== related.id), updated];
         } else if (related && context.kind === "retention") {
           const lastLearningAt = current.filter((row) => row.capabilityId === context.capabilityId && row.updatedAt < attempt.createdAt)
             .map((row) => row.updatedAt).sort().at(-1);
-          const updated = attachDelayedRetentionOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [], lastLearningAt });
+          const updated = attachDelayedRetentionOutcome(related, attempt, { question, questions: snapshot?.questions ?? [question], history: liveSnapshot?.attempts ?? [], lastLearningAt });
           next = [...current.filter((row) => row.id !== related.id), updated];
         } else {
           const priorQuestionAt = current.filter((row) => row.capabilityId === context.capabilityId &&
@@ -898,7 +912,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
             row.createdAt > priorQuestionAt && row.createdAt <= attempt.createdAt);
           const outcome = createInterventionOutcome({ userId: attempt.userId, subjectId: attempt.subjectId, context, attempt, question,
             actualMinutes: attempt.elapsedMs / 60_000 + supportObservations.reduce((sum, row) => sum + row.actualMinutes, 0),
-            questions: snapshot?.questions ?? [question], history: snapshot?.attempts ?? [] });
+            questions: snapshot?.questions ?? [question], history: liveSnapshot?.attempts ?? [] });
           // Planned durations remain visible but cannot enter empirical gain.
           outcome.timeMeasured = outcome.timeMeasured === true && supportObservations.every((row) => row.timeMeasured === true);
           next = [...current, outcome];
@@ -923,7 +937,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
       });
       return [...updatedMistakes, ...drafts.map((d) => d.mistake)];
     },
-    [bumpGamification, patch, snapshot, experimentArm, recordExperimentEvent, setInterventionOutcomes, userId],
+    [bumpGamification, patch, snapshot, liveSnapshot, experimentArm, recordExperimentEvent, setInterventionOutcomes, userId],
   );
 
   const addCards = useCallback<StoreValue["addCards"]>(
@@ -998,7 +1012,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     updateSettings,
     refreshPhaseNotices,
     dismissExamPhaseNotice,
-  } = usePlanning({ userId, snapshot, setSnapshot, patch, topics: scopedTopics, mastery, bumpGamification });
+  } = usePlanning({ userId, snapshot: liveSnapshot, setSnapshot, patch, topics: scopedTopics, mastery, bumpGamification });
 
   const completeLesson = useCallback<StoreValue["completeLesson"]>(
     async (lessonId) => {
