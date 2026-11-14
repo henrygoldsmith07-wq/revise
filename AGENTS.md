@@ -233,9 +233,13 @@ background and do other work while it runs. On Windows, invoke npm through
   `next.config.ts` (browsers enforce every CSP header, and a nonce-less one
   blocks Next's own scripts). `tests/security.test.ts` pins this.
 - **Lesson teaching is authored per spec point** in `src/content/teaching`
-  (all 108 WJEC Physics checkpoints). A checkpoint without an entry is built
-  from its spec wording and flagged `outline: true`, which the lesson page and
-  roadmap card label "Outline only". Teaching is unreviewed authored content:
+  (all 108 WJEC Physics checkpoints). A checkpoint without an entry is an
+  outline (`outlineCheckpointLesson`, `outline: true`, labelled "Outline
+  only"): the requirement, the topic's key points that bear on it
+  (`bearingOn`: two shared terms), and a common error or misconception only
+  when one bears on it. It never builds a model answer, an application or a
+  check from the specification wording, and never pairs material with a point
+  by list position (one-hundred-and-eighteenth pass). Teaching is unreviewed authored content:
   it never makes a question, mark or proof claim. Check worked-example
   arithmetic before adding one (`tests/lesson-teaching.test.ts` checks shape,
   not physics).

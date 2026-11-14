@@ -46,8 +46,10 @@ export interface LessonStep {
    *   "check"  answer the check question; no typed recall of text still on screen
    *   "worked" reveal the worked example a step at a time
    *   "apply"  write an answer, then compare it with the model and checklist
+   *   "reveal" say what you already know, then show the step's points
+   *   "read"   nothing to retrieve (an outline with no key point on it)
    */
-  task?: "check" | "worked" | "apply";
+  task?: "check" | "worked" | "apply" | "reveal" | "read";
   /** The final answer of a "worked" step, shown after its last step. */
   workedAnswer?: string;
   /** Optional check question — the student must answer before moving on. */
@@ -388,28 +390,10 @@ function objectiveForPoint(text: string, specStatement: boolean): string {
 
 const STARTS_WITH_COMMAND_WORD = new RegExp(`^(?:${COMMAND_WORDS.map((word) => word.replace(" ", "\\s+")).join("|")})\\b`, "i");
 
-/** First-person success statement for a spec point ("I can resolve a vector…"). */
-function takeawayForPoint(text: string): string {
-  const clean = text.replace(/\s+/g, " ").trim().replace(/[.!?]+$/, "");
-  if (!clean) return "I can explain the idea clearly and use it in context.";
-  const lower = clean.charAt(0).toLowerCase() + clean.slice(1);
-  const ableTo = lower.match(/^be able to\s+(.*)$/i);
-  if (ableTo) return `I can ${ableTo[1]}.`;
-  // Spec statements are verb phrases ("resolve a vector…", "define rate…");
-  // a capitalised start is usually a named idea ("Hardy Weinberg equilibrium").
-  if (/^[a-z]/.test(clean) || STARTS_WITH_COMMAND_WORD.test(clean)) return `I can ${lower}.`;
-  return `I can explain ${clean}.`;
-}
-
 function estimateLessonMinutes(topic: Topic): number {
   const core = Math.max(1, authoredKeyPoints(topic).length);
   const support = Math.min(4, topic.commonErrors.length) + Math.min(3, misconceptionsForTopic(topic.id).length);
   return Math.max(8, Math.min(20, 5 + Math.ceil(core * 1.5) + support));
-}
-
-function estimateCheckpointMinutes(topic: Topic, hasMisconception: boolean, hasTrap: boolean): number {
-  const support = (hasMisconception ? 2 : 0) + (hasTrap ? 1 : 0);
-  return Math.max(6, Math.min(14, 6 + support + Math.ceil(Math.max(1, authoredKeyPoints(topic).length) / 3)));
 }
 
 function buildLessonIntro(topic: Topic, objectives: string[], minutes: number): string {
@@ -876,64 +860,6 @@ function uniqueStrings(values: string[]): string[] {
   });
 }
 
-/** Build a check directly from one specification requirement. */
-function checkFromSpecPoint(
-  topic: Topic,
-  specPoint: NonNullable<Topic["specPoints"]>[number],
-  index: number,
-): NonNullable<LessonStep["check"]> {
-  const pointExplanation = explainPoint(specPoint.text);
-  const choices = uniqueStrings([
-    specPoint.text,
-    ...(topic.specPoints ?? []).filter((point) => point.id !== specPoint.id).map((point) => point.text),
-    ...authoredKeyPoints(topic),
-  ]).slice(0, 4);
-  const options = shuffleStable(
-    choices.length >= 2
-      ? choices
-      : [...choices, `This checkpoint is not part of ${topic.title}.`],
-    topic.id,
-    3000 + index,
-  );
-  return {
-    question: `Which statement matches this ${topic.title.toLowerCase()} checkpoint?`,
-    options,
-    correctIndex: options.indexOf(specPoint.text),
-    explanation:
-      pointExplanation.mode === "process"
-        ? `Follow this checkpoint in order: ${pointExplanation.steps.join(" → ")} Connect it to the wider topic before moving on.`
-        : `This checkpoint asks you to know: ${sentence(specPoint.text)} Connect it to the wider topic before moving on.`,
-  };
-}
-
-/** Match a spec requirement to a supporting key point by meaning, not index. */
-function relevantCoreStep(
-  coreSteps: LessonStep[],
-  requirement: string,
-  fallbackIndex: number,
-): LessonStep | undefined {
-  if (!coreSteps.length) return undefined;
-  const target = meaningfulTerms(requirement);
-  if (!target.length) return undefined;
-
-  let bestStep: LessonStep | undefined;
-  let bestScore = -1;
-  let bestIndex = Number.POSITIVE_INFINITY;
-  coreSteps.forEach((step, index) => {
-    const candidate = meaningfulTerms(step.body);
-    const score = target.reduce((total, term) => total + (candidate.some((word) => relatedTerm(word, term)) ? 1 : 0), 0);
-    if (score > bestScore || (score === bestScore && Math.abs(index - fallbackIndex) < Math.abs(bestIndex - fallbackIndex))) {
-      bestStep = step;
-      bestScore = score;
-      bestIndex = index;
-    }
-  });
-
-  // One shared word such as "cell" or "energy" is not enough evidence to
-  // attach a supporting fact. The checkpoint can still teach itself safely.
-  return bestStep && bestScore >= Math.min(2, target.length) ? bestStep : undefined;
-}
-
 function meaningfulTerms(text: string): string[] {
   const stopWords = new Set([
     "and", "the", "for", "from", "with", "including", "into", "this", "that", "when", "where", "how", "what", "why",
@@ -989,8 +915,6 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
   return topics.flatMap((topic) => {
     const base = buildLesson(topic);
     if (!base) return [];
-    const keyPoints = authoredKeyPoints(topic);
-
     const specPoints = topic.specPoints?.filter((point) => point.text.trim().length > 0) ?? [];
     if (!specPoints.length) {
       return [
@@ -1006,7 +930,6 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
       ];
     }
 
-    const coreSteps = base.steps.filter((step) => step.kind === "core");
     const misconceptions = misconceptionsForTopic(topic.id);
 
     return specPoints.map((specPoint, index) => {
@@ -1020,167 +943,159 @@ export function buildRoadmapLessons(topics: Topic[]): RoadmapLessonEntry[] {
           lesson: authoredCheckpointLesson({ topic, specPoint, teaching, lessonId, focusTitle, checkpointIndex, checkpointTotal: specPoints.length }),
         };
       }
-      // Specification points and key points are authored independently; an
-      // array-index join silently teaches the wrong fact when one list is
-      // reordered or has a different granularity. Only borrow a supporting
-      // explanation when its vocabulary overlaps the checkpoint; otherwise
-      // stay with the checkpoint itself rather than presenting a false link.
-      const sourceStep = relevantCoreStep(coreSteps, specPoint.text, index);
-      const sourceBody = sourceStep?.body && sourceStep.body !== specPoint.text ? sourceStep.body : null;
-      const checkpointExplanation = explainPoint(specPoint.text);
-      const sourceExplanation = sourceStep?.explanationSteps ?? [];
-      const isProcess = sourceStep?.explanationMode === "process" || checkpointExplanation.mode === "process";
-      const examLink = [specPoint.ref ? `Spec ${specPoint.ref}` : null, specPoint.text].filter(Boolean).join(" — ");
-      const trap = topic.commonErrors[index % Math.max(1, topic.commonErrors.length)];
-      const misconception = misconceptions[index];
-      const steps: LessonStep[] = [
-        {
-          id: `${lessonId}:overview`,
-          kind: "overview",
-          title: "Know the target",
-          body: `This checkpoint covers one requirement from ${topic.title}: ${specPoint.text}`,
-          objective: objectiveForPoint(specPoint.text, true),
-          explanationSteps: [
-            `Where it sits: one part of ${topic.title}.`,
-            "You will finish by retrieving the idea, applying it and saying the point back without looking.",
-          ],
-          takeaway: takeawayForPoint(specPoint.text),
-          examLink,
-        },
-        {
-          id: `${lessonId}:core`,
-          kind: "core",
-          title: focusTitle,
-          body: sourceBody ? `${specPoint.text}\n\nConnect it to this core idea: ${sourceBody}` : specPoint.text,
-          objective: objectiveForPoint(specPoint.text, true),
-          explanationSteps: [
-            `Translate the checkpoint into a sentence you would use in an answer: ${specPoint.text}`,
-            ...(sourceExplanation.length ? sourceExplanation.slice(0, 3) : checkpointExplanation.steps.slice(0, 3)),
-            "Say the complete idea once, including the condition or consequence the question asks for.",
-          ],
-          explanationMode: isProcess ? "process" : "concept",
-          application: buildApplication(
-            topic,
-            specPoint.text,
-            checkpointExplanation,
-            specPoint,
-            "understand",
-            sourceExplanation.slice(0, 4),
-          ),
-          examTechnique: examTechniqueFor(specPoint.text),
-          takeaway: `Remember: ${sentence(specPoint.text)}`,
-          examLink,
-          check: checkFromSpecPoint(topic, specPoint, index),
-        },
-        {
-          id: `${lessonId}:apply`,
-          kind: "core",
-          title: "Use it in an exam answer",
-          body: `When a question tests this checkpoint, start with the precise requirement: ${specPoint.text}`,
-          objective: `Use this checkpoint in a complete answer, not as an isolated definition.`,
-          explanationSteps: isProcess
-            ? [
-                "Read the process from its starting condition to the final result; keep every change in order.",
-                ...checkpointExplanation.steps.slice(0, 3),
-                "Finish by stating the result or consequence in the context of the question.",
-              ]
-            : [
-                "Underline the command word so you answer the task, not just the topic.",
-                `Use the checkpoint wording: ${specPoint.text}`,
-                "Add the relevant mechanism, comparison, calculation or evidence if the question asks for it.",
-              ],
-          explanationMode: isProcess ? "process" : "concept",
-          application: buildApplication(
-            topic,
-            specPoint.text,
-            checkpointExplanation,
-            specPoint,
-            "exam",
-            sourceExplanation.slice(0, 4),
-          ),
-          examTechnique: examTechniqueFor(specPoint.text),
-          takeaway: `Exam habit: begin with ${sentence(specPoint.text)}`,
-        },
-      ];
-
-      if (trap) {
-        const trapOptions = shuffleStable(
-          uniqueStrings([trap, specPoint.text, ...keyPoints]),
-          topic.id,
-          4000 + index,
-        );
-        steps.push({
-          id: `${lessonId}:trap`,
-          kind: "trap",
-          title: "Avoid a common exam trap",
-          body: `Common trap: ${trap}`,
-          objective: `Spot and correct this recurring error: ${trap}`,
-          explanationSteps: [
-            `Spot the risky wording: ${trap}`,
-            `Replace it with the precise checkpoint: ${specPoint.text}`,
-            "Before you submit, check that the corrected wording is explicit.",
-          ],
-          takeaway: `Check your answer for this trap: ${trap}`,
-          check: {
-            question: `Which wording should you avoid when answering ${topic.title.toLowerCase()}?`,
-            options: trapOptions,
-            correctIndex: trapOptions.indexOf(trap),
-            explanation: `Avoid this wording: ${trap}. Keep the requirement precise: ${specPoint.text}`,
-          },
-        });
-      }
-
-      if (misconception) {
-        const options = shuffleStable(
-          uniqueStrings([misconception.statement, specPoint.text, ...keyPoints]),
-          topic.id,
-          5000 + index,
-        );
-        steps.push({
-          id: `${lessonId}:misconception`,
-          kind: "misconception",
-          title: "Correct a common misunderstanding",
-          body: `${misconception.explanation}\n\nExaminer's eye: ${misconception.example} — ${misconception.correction}`,
-          objective: `Replace the tempting wrong idea with the explanation an examiner can credit.`,
-          explanationSteps: [
-            `The tempting wrong idea: ${misconception.statement}`,
-            `Why it fails: ${misconception.explanation}`,
-            `What to say instead: ${misconception.correction}`,
-          ],
-          takeaway: `Use the corrected idea: ${misconception.correction}`,
-          check: {
-            question: "Which statement is the misconception, not what the examiner rewards?",
-            options,
-            correctIndex: options.indexOf(misconception.statement),
-            explanation: `That statement is the misconception. The examiner rewards: ${misconception.correction}`,
-          },
-        });
-      }
-
       return {
         topic,
-        lesson: {
-          id: lessonId,
-          topicId: topic.id,
-          subjectId: topic.subjectId,
-          title: focusTitle,
-          intro: `Checkpoint ${checkpointIndex} of ${specPoints.length}. ${buildLessonIntro(
-            topic,
-            [objectiveForPoint(specPoint.text, true)],
-            estimateCheckpointMinutes(topic, Boolean(misconception), Boolean(trap)),
-          )}`,
-          steps,
-          learningObjectives: [objectiveForPoint(specPoint.text, true)],
-          estimatedMinutes: estimateCheckpointMinutes(topic, Boolean(misconception), Boolean(trap)),
-          focus: specPoint.text,
+        lesson: outlineCheckpointLesson({
+          topic,
+          specPoint,
+          lessonId,
+          focusTitle,
           checkpointIndex,
           checkpointTotal: specPoints.length,
-          specPointId: specPoint.id,
-          outline: true,
-        },
+          misconceptions,
+        }),
       };
     });
   });
+}
+
+/** How many of a requirement's meaningful terms a piece of authored text shares. */
+function relevanceTo(requirement: string, text: string): number {
+  const target = meaningfulTerms(requirement);
+  const candidate = meaningfulTerms(text);
+  return target.reduce((total, term) => total + (candidate.some((word) => relatedTerm(word, term)) ? 1 : 0), 0);
+}
+
+/** The authored items that bear on a requirement (two shared terms, or every term of a short one), best first. */
+function bearingOn<T>(requirement: string, items: readonly T[], text: (item: T) => string): T[] {
+  const needed = Math.min(2, meaningfulTerms(requirement).length);
+  if (!needed) return [];
+  return items
+    .map((item, index) => ({ item, index, score: relevanceTo(requirement, text(item)) }))
+    .filter((row) => row.score >= needed)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((row) => row.item);
+}
+
+/**
+ * A checkpoint Revise has written no teaching for. It used to be built from
+ * the specification wording alone and dressed as a full lesson: a "model
+ * answer" that was the statement plus stock phrases ("keep the condition,
+ * comparison or cause attached to the key term"), a check that asked which
+ * statement was this checkpoint's title, and a trap and a misconception
+ * attached by list position (in WJEC Chemistry the trap shared no word with
+ * its point in 77 of 108 lessons). It now shows only what Revise has:
+ *   - what the specification asks, and the topic's authored key points that
+ *     bear on it, after the student has said what they already know;
+ *   - the usual mistake and the misconception, only when one bears on this
+ *     point, as a decision rather than printed above the question;
+ * and the summary hands on to an exam question on the point.
+ */
+function outlineCheckpointLesson(input: {
+  topic: Topic;
+  specPoint: NonNullable<Topic["specPoints"]>[number];
+  lessonId: string;
+  focusTitle: string;
+  checkpointIndex: number;
+  checkpointTotal: number;
+  misconceptions: ReturnType<typeof misconceptionsForTopic>;
+}): RoadmapLesson {
+  const { topic, specPoint, lessonId, focusTitle, checkpointIndex, checkpointTotal, misconceptions } = input;
+  const requirement = specPoint.text;
+  const objective = objectiveForPoint(requirement, true);
+  const keyPoints = uniqueStrings(topic.keyPoints);
+  const bearing = bearingOn(requirement, keyPoints, (point) => point).slice(0, 3);
+  const trap = bearingOn(requirement, topic.commonErrors, (error) => error)[0];
+  const misconception = bearingOn(requirement, misconceptions, (m) => `${m.statement} ${m.correction}`)[0];
+
+  const steps: LessonStep[] = [
+    {
+      id: `${lessonId}:core`,
+      kind: "core",
+      title: focusTitle,
+      // The requirement is said once, with its reference; the title and the
+      // success criteria above already name it.
+      body: bearing.length
+        ? `What the specification asks${specPoint.ref ? ` (${specPoint.ref})` : ""}: ${sentence(requirement)}`
+        : `What the specification asks${specPoint.ref ? ` (${specPoint.ref})` : ""}: ${sentence(requirement)}\n\nRevise has no teaching or key point written for this yet. Learn it from your notes or textbook, then try a question on it.`,
+      explanationSteps: bearing,
+      explanationMode: "concept",
+      takeaway: bearing[0] ?? sentence(requirement),
+      task: bearing.length ? "reveal" : "read",
+    },
+  ];
+
+  if (trap) {
+    // True statements from the topic beside the mistake: the ones on this point first.
+    const truths = uniqueStrings([...bearing, ...keyPoints]).filter((point) => point !== trap).slice(0, 3);
+    if (truths.length) {
+      const options = shuffleStable([trap, ...truths], topic.id, 4000 + checkpointIndex);
+      steps.push({
+        id: `${lessonId}:trap`,
+        kind: "trap",
+        title: "Spot the usual mistake",
+        body: `One of these is a mistake examiners often see in ${topic.title}. The others are key points. Decide which is the mistake before you read on.`,
+        explanationSteps: [],
+        takeaway: `Watch for: ${trap}`,
+        check: {
+          question: "Which of these is the mistake?",
+          options,
+          correctIndex: options.indexOf(trap),
+          explanation: `That is the usual mistake. The other options are key points from ${topic.title}.`,
+        },
+        task: "check",
+      });
+    }
+  }
+
+  if (misconception) {
+    const options = shuffleStable(
+      uniqueStrings([misconception.statement, misconception.correction, ...bearing]).slice(0, 4),
+      topic.id,
+      5000 + checkpointIndex,
+    );
+    steps.push({
+      id: `${lessonId}:misconception`,
+      kind: "misconception",
+      title: "Spot the misconception",
+      body: "One of these is a common misunderstanding. Decide which before you read on.",
+      explanationSteps: [],
+      takeaway: `Say instead: ${misconception.correction}`,
+      check: {
+        question: "Which of these is the misconception?",
+        options,
+        correctIndex: options.indexOf(misconception.statement),
+        explanation: `${misconception.explanation} What is credited instead: ${misconception.correction}`,
+      },
+      task: "check",
+    });
+  }
+
+  const minutes = Math.max(3, 2 + bearing.length + (steps.length - 1) * 2);
+  const parts = [
+    "what the specification asks",
+    ...(bearing.length ? ["the key points Revise has on it"] : []),
+    ...(steps.length > 1 ? ["the usual mistake"] : []),
+  ];
+  return {
+    id: lessonId,
+    topicId: topic.id,
+    subjectId: topic.subjectId,
+    title: focusTitle,
+    intro: `Checkpoint ${checkpointIndex} of ${checkpointTotal}. ${topic.title}, about ${minutes} minutes: ${parts.join(", ")}, then a question to try.`,
+    steps,
+    learningObjectives: [objective],
+    estimatedMinutes: minutes,
+    recap: [
+      ...(bearing.length ? bearing.slice(0, 2) : [sentence(requirement)]),
+      ...(trap ? [`Watch for: ${trap}`] : []),
+    ],
+    focus: requirement,
+    checkpointIndex,
+    checkpointTotal,
+    specPointId: specPoint.id,
+    outline: true,
+  };
 }
 
 /**

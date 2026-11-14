@@ -39,11 +39,11 @@ describe("learning roadmap", () => {
           expect(entry.lesson.checkpointIndex, entry.lesson.id).toBe(index + 1);
           expect(entry.lesson.checkpointTotal, entry.lesson.id).toBe(pointCount);
           // A taught lesson is the idea, a worked example and an exam question
-          // (plus the usual mistake where one is written); an outline keeps its
-          // orientation step, so it has at least four.
-          expect(entry.lesson.steps.length, entry.lesson.id).toBeGreaterThanOrEqual(entry.lesson.teachingReview ? 3 : 4);
+          // (plus the usual mistake where one is written). An outline is the
+          // point itself, plus a mistake or misconception only where one bears on it.
+          expect(entry.lesson.steps.length, entry.lesson.id).toBeGreaterThanOrEqual(entry.lesson.teachingReview ? 3 : 1);
           expect(entry.lesson.learningObjectives?.length, entry.lesson.id).toBeGreaterThan(0);
-          expect(entry.lesson.estimatedMinutes, entry.lesson.id).toBeGreaterThanOrEqual(6);
+          expect(entry.lesson.estimatedMinutes, entry.lesson.id).toBeGreaterThanOrEqual(entry.lesson.outline ? 3 : 6);
           // Every core step makes the student do something: an application, or
           // the single task a taught lesson gives it.
           expect(
@@ -117,6 +117,47 @@ describe("learning roadmap", () => {
     }
   });
 
+  it("an outline lesson shows only material that bears on its point, and invents no answer", () => {
+    const subjects = ["wjec-alevel-chemistry", "wjec-alevel-biology", "wjec-alevel-maths", "aqa-alevel-biology"];
+    const words = (text: string) => new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 4).map((word) => word.replace(/s$/, "")));
+    let lessons = 0;
+    let withKeyPoints = 0;
+    for (const subject of subjects) {
+      for (const { topic, lesson } of buildRoadmapLessons(allTopics([subject]))) {
+        if (!lesson.outline) continue;
+        lessons++;
+        const [point, ...rest] = lesson.steps;
+        // No orientation screen, no stock "model answer", no check that only
+        // asks which statement is this checkpoint's title.
+        expect(lesson.steps.some((step) => step.kind === "overview"), lesson.id).toBe(false);
+        expect(lesson.steps.some((step) => step.application), lesson.id).toBe(false);
+        expect(lesson.steps.every((step) => !/matches this .* checkpoint/.test(step.check?.question ?? "")), lesson.id).toBe(true);
+        expect(JSON.stringify(lesson.steps), lesson.id).not.toMatch(/keep the condition, comparison or cause attached/);
+        // The point: its requirement, and only the topic's own key points.
+        expect(point!.body, lesson.id).toMatch(/^What the specification asks( \(.+?\))?: /);
+        expect(point!.body, lesson.id).toContain(lesson.focus.replace(/[.!?]+$/, ""));
+        expect(point!.examLink, lesson.id).toBeUndefined();
+        expect(point!.task, lesson.id).toBe(point!.explanationSteps.length ? "reveal" : "read");
+        for (const line of point!.explanationSteps) expect(topic.keyPoints, lesson.id).toContain(line);
+        if (point!.explanationSteps.length) withKeyPoints++;
+        else expect(point!.body, lesson.id).toContain("Revise has no teaching or key point written for this yet");
+        // A mistake or misconception is a decision on something that bears on the
+        // point: it shares a word with the requirement, and is not printed above its question.
+        for (const step of rest) {
+          expect(step.task, step.id).toBe("check");
+          const answer = step.check!.options[step.check!.correctIndex]!;
+          expect(`${step.body} ${step.explanationSteps.join(" ")}`, step.id).not.toContain(answer);
+          const shared = [...words(answer)].filter((word) => words(lesson.focus).has(word));
+          if (step.kind === "trap") expect(topic.commonErrors, step.id).toContain(answer);
+          expect(shared.length + (step.kind === "misconception" ? 1 : 0), step.id).toBeGreaterThan(0);
+        }
+      }
+    }
+    expect(lessons).toBeGreaterThan(400);
+    // Most outline points have at least one authored key point on them.
+    expect(withKeyPoints / lessons).toBeGreaterThan(0.5);
+  });
+
   it("the lesson player renders the single task and hands on to a question", () => {
     expect(source).toContain('step.task === "worked" ? (');
     expect(source).toContain("<WorkedSteps worked={{ prompt: step.body, steps: step.explanationSteps, answer: step.workedAnswer ?? \"\" }} onDone={completeTask} />");
@@ -124,6 +165,9 @@ describe("learning roadmap", () => {
     expect(source).toContain('aria-label="Your answer to the exam question"');
     expect(source).toContain("lessonPracticeHref(lesson.topicId, lesson.specPointId)");
     expect(source).toContain('data-testid="lesson-practice-handoff"');
+    // An outline's point is revealed after the student has said what they know.
+    expect(source).toContain('data-testid="lesson-reveal"');
+    expect(runnerSource).toContain('step.task === "read"');
     expect(source).toContain("Practice, not proof.");
   });
 
@@ -131,7 +175,7 @@ describe("learning roadmap", () => {
     // The gate itself lives in the extracted state machine: progress requires
     // a non-empty recall draft, and the check answer only counts once the
     // recall has been revealed.
-    expect(runnerSource).toContain('const recallDone = !step?.id || step.task === "check" || Boolean(recallRevealed[step.id]);');
+    expect(runnerSource).toContain('const recallDone = !step?.id || step.task === "check" || step.task === "read" || Boolean(recallRevealed[step.id]);');
     expect(runnerSource).toContain("const checkAnswered = recallDone && (!hasCheck || chosen !== undefined);");
     expect(runnerSource).toContain("if (!step?.id || !recallDraft[step.id]?.trim()) return;");
     expect(source).toContain("Your active recall answer");

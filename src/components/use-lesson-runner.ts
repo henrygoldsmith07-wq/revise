@@ -76,8 +76,9 @@ export function useLessonRunner(input: {
     [completed],
   );
   const chosen = step?.id ? checked[step.id] : undefined;
-  // A step whose one task is its check question has nothing to recall first.
-  const recallDone = !step?.id || step.task === "check" || Boolean(recallRevealed[step.id]);
+  // A step whose one task is its check question, or that has nothing to
+  // retrieve (an outline with no key point on its requirement), needs no recall first.
+  const recallDone = !step?.id || step.task === "check" || step.task === "read" || Boolean(recallRevealed[step.id]);
   // Check questions and active recall both gate progress. Every step asks the
   // student to produce the idea before the authored answer is shown.
   const hasCheck = Boolean(step?.check);
