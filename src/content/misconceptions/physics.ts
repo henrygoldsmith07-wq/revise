@@ -58,10 +58,14 @@ export const physicsMisconceptions = defineMisconceptions([
     ao: "AO2",
   },
   // --- AQA GCSE ---------------------------------------------------------
+  // GCSE physics entries point at the GCSE outline's topics (DfE subject
+  // content) since the one-hundred-and-nineteenth pass. Two were A-level
+  // material, the e.m.f. and terminal p.d. and the decay constant: they moved
+  // to the A-level Physics subject of the same board, slug and id unchanged.
   {
     slug: "gcse-vt-area-is-acceleration",
     subjectId: "aqa-gcse-physics",
-    topics: ["kinematics-dynamics"],
+    topics: ["speed-acceleration"],
     statement: "The area under a velocity–time graph is the acceleration.",
     explanation:
       "On a velocity–time graph the gradient is the acceleration, while the area under the curve is the displacement. Swapping the two is the graph-reading error examiners flag every session.",
@@ -74,7 +78,7 @@ export const physicsMisconceptions = defineMisconceptions([
   {
     slug: "gcse-constant-velocity-force",
     subjectId: "aqa-gcse-physics",
-    topics: ["kinematics-dynamics"],
+    topics: ["newtons-laws-momentum"],
     statement: "An object moving at constant velocity needs a resultant force on it to keep moving.",
     explanation:
       "Newton's first law: with zero resultant force an object keeps moving at constant velocity. A resultant force is what changes the velocity, not what maintains it.",
@@ -87,7 +91,7 @@ export const physicsMisconceptions = defineMisconceptions([
   {
     slug: "gcse-third-law-any-equal-opposite",
     subjectId: "aqa-gcse-physics",
-    topics: ["kinematics-dynamics"],
+    topics: ["newtons-laws-momentum"],
     statement: "Any two forces that are equal and opposite form a Newton's third law pair, whatever their type.",
     explanation:
       "A third-law pair must be the same type of force acting on different bodies: the book's pull on the Earth pairs with the Earth's pull on the book. Weight and the normal contact force may be equal and opposite, but they act on the same body and are different types.",
@@ -100,7 +104,7 @@ export const physicsMisconceptions = defineMisconceptions([
   {
     slug: "gcse-refraction-wavelength",
     subjectId: "aqa-gcse-physics",
-    topics: ["waves"],
+    topics: ["electromagnetic-spectrum"],
     statement: "When light refracts into a denser medium its wavelength stays the same and only the direction changes.",
     explanation:
       "Frequency is set by the source and cannot change at a boundary. Speed falls in the denser medium, and since v = fλ with f fixed, the smaller speed forces a shorter wavelength. λ changes; f never does.",
@@ -112,7 +116,7 @@ export const physicsMisconceptions = defineMisconceptions([
   },
   {
     slug: "gcse-emf-terminal-pd",
-    subjectId: "aqa-gcse-physics",
+    subjectId: "aqa-alevel-physics",
     topics: ["electric-circuits"],
     statement: "The e.m.f. of a cell and the terminal p.d. across it are the same thing, whatever the current.",
     explanation:
@@ -180,7 +184,7 @@ export const physicsMisconceptions = defineMisconceptions([
   {
     slug: "edexcel-ke-all-collisions",
     subjectId: "edexcel-gcse-physics",
-    topics: ["momentum"],
+    topics: ["newtons-laws-momentum"],
     statement: "Kinetic energy is conserved in every collision, because momentum is.",
     explanation:
       "Momentum is conserved in any collision in a closed system, but kinetic energy is conserved only in elastic collisions. In inelastic collisions some kinetic energy transfers to thermal and sound stores and to deformation — the momentum balance still holds exactly.",
@@ -193,7 +197,7 @@ export const physicsMisconceptions = defineMisconceptions([
   {
     slug: "ocr-energy-lost-destroyed",
     subjectId: "ocr-gcse-physics",
-    topics: ["energy-power"],
+    topics: ["energy-conservation-resources"],
     statement: "A machine that warms up destroys some of the energy put into it.",
     explanation:
       "Energy is never destroyed — it is transferred to less useful stores, usually heating the surroundings. The energy is dissipated (spread out); the machine's efficiency falls because the useful fraction shrinks, not because energy vanished.",
@@ -207,7 +211,7 @@ export const physicsMisconceptions = defineMisconceptions([
   {
     slug: "wjec-gcse-parallel-add-directly",
     subjectId: "wjec-gcse-physics",
-    topics: ["electric-circuits"],
+    topics: ["current-pd-resistance"],
     statement: "Two resistors in parallel have a combined resistance of R₁ + R₂, just like in series.",
     explanation:
       "Adding directly is the series rule. In parallel the current splits, so it is the reciprocals that add: 1/Rₜ = 1/R₁ + 1/R₂ — and the total is always smaller than either resistor alone.",
@@ -219,7 +223,7 @@ export const physicsMisconceptions = defineMisconceptions([
   },
   {
     slug: "wjec-gcse-lambda-is-half-life",
-    subjectId: "wjec-gcse-physics",
+    subjectId: "wjec-alevel-physics",
     topics: ["nuclear"],
     statement: "The decay constant λ is just the half-life written in seconds, so they can be swapped in the decay equations.",
     explanation:

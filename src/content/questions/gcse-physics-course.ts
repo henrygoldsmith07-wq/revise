@@ -27,7 +27,7 @@ const ITEMS: Item[] = [
     kind: "calculation",
     stem: "A diver swims 12 m below the surface of seawater. The density of seawater is 1030 kg/m³. Use g = 9.8 N/kg.",
     parts: [
-      p("Calculate the pressure due to the seawater at this depth.", 2, ["pressure = height × density × g", "12 × 1030 × 9.8 = 1.2 × 10⁵ Pa (121 000 Pa)"], "p = hρg = 12 × 1030 × 9.8 ≈ 1.2 × 10⁵ Pa.", "calculate the pressure at a depth in a liquid", 4),
+      p("Calculate the pressure due to the seawater at this depth.", 2, ["pressure = height × density × g", "12 × 1030 × 9.8 = 1.2 × 10⁵ Pa (121 000 Pa)"], "Pressure = height × density × g, so p = 12 × 1030 × 9.8 ≈ 1.2 × 10⁵ Pa.", "calculate the pressure at a depth in a liquid", 4),
       p("Explain why the pressure on the diver increases as she swims deeper.", 2, ["there is a greater height (column) of water above her", "so a greater weight of water acts on each square metre (greater force per unit area)"], "Deeper down there is a taller column of water above her, so a greater weight of water presses on each square metre: the force per unit area is larger.", "explain why pressure in a liquid increases with depth", 3, ["AO1"]),
     ],
   },
@@ -37,8 +37,8 @@ const ITEMS: Item[] = [
     kind: "calculation",
     stem: "A force of 40 N is applied at right angles to the end of a spanner 0.60 m long to turn a nut.",
     parts: [
-      p("Calculate the moment of the force about the nut.", 2, ["moment = force × perpendicular distance from the pivot", "40 × 0.60 = 24 N m"], "Moment = 40 × 0.60 = 24 N m.", "calculate the moment of a force", 1),
-      p("Suggest how the same moment could be produced with a smaller force.", 1, ["use a longer spanner, so the force acts further from the nut"], "Use a longer spanner, so the force acts at a greater distance from the nut.", "explain how a lever increases the turning effect of a force", 2, ["AO1"]),
+      p("Calculate the moment of the force about the nut.", 2, ["moment = force × perpendicular distance from the pivot", "40 × 0.60 = 24 N m"], "Moment = 40 × 0.60 = 24 N m.", "calculate the moment of a force", 2),
+      p("Suggest how the same moment could be produced with a smaller force.", 1, ["use a longer spanner, so the force acts further from the nut"], "Use a longer spanner, so the force acts at a greater distance from the nut.", "explain how a lever increases the turning effect of a force", 3, ["AO1"]),
     ],
   },
   {
@@ -65,7 +65,7 @@ const ITEMS: Item[] = [
     kind: "calculation",
     stem: "A kettle is connected to the 230 V mains supply and takes a current of 10 A.",
     parts: [
-      p("Calculate the power of the kettle.", 2, ["power = potential difference × current", "230 × 10 = 2300 W"], "P = VI = 230 × 10 = 2300 W.", "calculate power from potential difference and current", 3),
+      p("Calculate the power of the kettle.", 2, ["power = potential difference × current", "230 × 10 = 2300 W"], "Power = potential difference × current, so P = 230 × 10 = 2300 W.", "calculate power from potential difference and current", 3),
       p("Calculate the energy the kettle transfers in 2 minutes.", 2, ["energy = power × time, with time in seconds (120 s)", "2300 × 120 = 276 000 J"], "E = Pt = 2300 × 120 = 276 000 J.", "calculate energy transferred from power and time", 6),
     ],
   },
@@ -74,8 +74,8 @@ const ITEMS: Item[] = [
     topic: "static-electricity",
     stem: "A balloon is rubbed on a wool jumper and becomes negatively charged.",
     parts: [
-      p("Explain how the balloon becomes negatively charged.", 2, ["electrons are transferred", "from the jumper to the balloon"], "Rubbing transfers electrons from the jumper to the balloon, so the balloon gains extra negative charge.", "explain charging by friction as a transfer of electrons", 1, ["AO1"]),
-      p("A second balloon, also negatively charged, is held near the first. Describe and explain what happens.", 2, ["the balloons repel (move apart)", "because like charges repel"], "The balloons push each other apart: both are negative, and like charges repel without touching.", "describe the force between charged objects", 1),
+      p("Explain how the balloon becomes negatively charged.", 2, ["electrons are transferred", "from the jumper to the balloon"], "Rubbing transfers electrons from the jumper to the balloon, so the balloon gains extra negative charge.", "explain charging by friction as a transfer of electrons", 3, ["AO1"]),
+      p("A second balloon, also negatively charged, is held near the first. Describe and explain what happens.", 2, ["the balloons repel (move apart)", "because like charges repel"], "The balloons push each other apart: both are negative, and like charges repel without touching.", "describe the force between charged objects", 2),
     ],
   },
   {
@@ -84,7 +84,7 @@ const ITEMS: Item[] = [
     stem: "A steel paper clip is placed near the north pole of a bar magnet.",
     parts: [
       p("Describe the difference between a permanent magnet and an induced magnet.", 2, ["a permanent magnet produces its own magnetic field", "an induced magnet becomes a magnet only when placed in a magnetic field"], "A permanent magnet makes its own magnetic field all the time; an induced magnet is magnetic only while it is in another magnet's field.", "distinguish permanent from induced magnets", 1, ["AO1"]),
-      p("Explain why the paper clip is attracted to the magnet.", 2, ["the paper clip becomes an induced magnet", "induced magnetism always causes attraction"], "The magnet's field makes the paper clip an induced magnet, and an induced magnet is always attracted to the magnet that induced it.", "explain attraction by induced magnetism", 1),
+      p("Explain why the paper clip is attracted to the magnet.", 2, ["the paper clip becomes an induced magnet", "induced magnetism always causes attraction"], "The magnet's field makes the paper clip an induced magnet, and induced magnetism always causes attraction, so the clip is pulled towards the magnet.", "explain attraction by induced magnetism", 1),
     ],
   },
   {
@@ -93,7 +93,7 @@ const ITEMS: Item[] = [
     kind: "calculation",
     stem: "A wire carries a current of 3.0 A at right angles to a magnetic field of flux density 0.20 T. A 0.050 m length of the wire is in the field.",
     parts: [
-      p("Calculate the force on the wire.", 2, ["force = magnetic flux density × current × length", "0.20 × 3.0 × 0.050 = 0.030 N"], "F = BIl = 0.20 × 3.0 × 0.050 = 0.030 N.", "calculate the force on a current-carrying conductor in a magnetic field", 4),
+      p("Calculate the force on the wire.", 2, ["force = magnetic flux density × current × length", "0.20 × 3.0 × 0.050 = 0.030 N"], "Force = magnetic flux density × current × length. F = 0.20 × 3.0 × 0.050 = 0.030 N, acting at right angles to both the wire and the field.", "calculate the force on a current-carrying conductor in a magnetic field", 4),
       p("State one change that would reverse the direction of the force.", 1, ["reverse the current (or reverse the direction of the magnetic field)"], "Reverse the direction of the current, or reverse the magnetic field.", "use Fleming's left-hand rule to relate the directions of force, current and field", 3, ["AO1"]),
     ],
   },
@@ -104,7 +104,7 @@ const ITEMS: Item[] = [
     stem: "A transformer has 200 turns on its primary coil and 4000 turns on its secondary coil. The primary coil is connected to a 12 V a.c. supply.",
     parts: [
       p("Calculate the potential difference across the secondary coil.", 2, ["Vs = Vp × Ns ÷ Np", "12 × 4000 ÷ 200 = 240 V"], "Vs = Vp × Ns/Np = 12 × 4000/200 = 240 V.", "use the transformer turns-ratio equation", 3),
-      p("Explain why the transformer would not work with a 12 V d.c. supply.", 2, ["d.c. produces an unchanging magnetic field in the core", "so no potential difference is induced in the secondary coil"], "Direct current gives a constant magnetic field, and only a changing field induces a potential difference in the secondary coil.", "explain how a transformer depends on a changing magnetic field", 2, ["AO1"]),
+      p("Explain why the transformer would not work with a 12 V d.c. supply.", 2, ["d.c. produces an unchanging magnetic field in the core", "so no potential difference is induced in the secondary coil"], "d.c. produces an unchanging magnetic field in the core, so no potential difference is induced in the secondary coil: only a changing field induces one.", "explain how a transformer depends on a changing magnetic field", 2, ["AO1"]),
     ],
   },
   {
@@ -123,7 +123,7 @@ const ITEMS: Item[] = [
     kind: "calculation",
     stem: "0.50 kg of ice at 0 °C is melted. The specific latent heat of fusion of ice is 334 000 J/kg.",
     parts: [
-      p("Calculate the energy needed to melt the ice.", 2, ["energy = mass × specific latent heat", "0.50 × 334 000 = 167 000 J"], "E = mL = 0.50 × 334 000 = 167 000 J.", "calculate the energy for a change of state", 3),
+      p("Calculate the energy needed to melt the ice.", 2, ["energy = mass × specific latent heat", "0.50 × 334 000 = 167 000 J"], "Energy = mass × specific latent heat. E = 0.50 × 334 000 = 167 000 J, all taken in at 0 °C with no rise in temperature.", "calculate the energy for a change of state", 3),
       p("Explain why the temperature of the ice does not rise while it is melting.", 2, ["the energy breaks the bonds (overcomes the forces) between the particles", "so it increases their potential energy, not their kinetic energy (temperature)"], "The energy supplied breaks the bonds holding the particles in the solid, increasing the internal energy without increasing the particles' kinetic energy, so the temperature stays at 0 °C.", "describe how heating can change state without changing temperature", 1, ["AO1"]),
     ],
   },
@@ -168,7 +168,7 @@ const ITEMS: Item[] = [
     stem: "Light from a distant galaxy is observed to be red-shifted.",
     parts: [
       p("State what this red-shift tells us about the galaxy.", 1, ["it is moving away from us"], "The galaxy is moving away from us.", "interpret red-shift as evidence that a galaxy is receding", 1, ["AO1"]),
-      p("Explain how observations of red-shift support the Big Bang model.", 3, ["more distant galaxies have a greater red-shift", "so they are moving away faster", "so the universe is expanding, as if from a small, dense starting point (the Big Bang)"], "The further away a galaxy is, the greater its red-shift, so the faster it is receding. Everything is moving apart, so the universe is expanding, which fits it having started from a very small, dense region.", "explain how red-shift is evidence for the Big Bang", 1, ["AO1", "AO2"]),
+      p("Explain how observations of red-shift support the Big Bang model.", 3, ["more distant galaxies have a greater red-shift", "so they are moving away faster", "so the universe is expanding, as if from a small, dense starting point (the Big Bang)"], "The further away a galaxy is, the greater its red-shift, so the faster it is receding. Everything is moving apart, so the universe is expanding, which fits it having started from a very small, dense region.", "explain how red-shift is evidence for the Big Bang", 3, ["AO1", "AO2"]),
     ],
   },
 ];

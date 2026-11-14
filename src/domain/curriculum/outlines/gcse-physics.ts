@@ -51,7 +51,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         keyPoints: [
           "Kinetic energy = 0.5 × mass × speed²; gravitational potential energy = mass × g × height; elastic potential energy = 0.5 × spring constant × extension².",
           "Power is the rate at which energy is transferred: power = energy transferred ÷ time, measured in watts (1 W = 1 J/s).",
-          "Heating, work done by a force and work done by a current all move energy from one store to another.",
+          "Energy transfers: energy moves from one store to another by heating, by a force doing work, or by a current doing work.",
           "An appliance with a higher power rating transfers more energy in the same time.",
         ],
         commonErrors: [
@@ -140,7 +140,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
           "Pressure = force normal to a surface ÷ area of that surface, measured in pascals (1 Pa = 1 N/m²).",
           "Atmospheric pressure falls with height because there is less air above, and the air is less dense.",
           "Pressure in a liquid = height of column × density × g, so it increases with depth and with density.",
-          "Upthrust arises because the pressure on the bottom of a submerged object is greater than on its top; an object floats when upthrust equals its weight.",
+          "Upthrust: the pressure on the bottom of a submerged object is greater than on its top, so the liquid pushes it upwards; it floats when upthrust equals its weight.",
         ],
         commonErrors: [
           "Using an area in cm² with a force in N and quoting the answer in pascals.",
@@ -162,8 +162,8 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         summary: "Forces that cause rotation, the moment of a force, and how levers and gears transmit rotational effects.",
         keyPoints: [
           "Moment of a force = force × perpendicular distance from the pivot to the line of action of the force.",
-          "For a balanced object, the total clockwise moment about a pivot equals the total anticlockwise moment.",
-          "A lever or a small gear driving a larger one lets a small force produce a larger moment.",
+          "Principle of moments: for a balanced object, the total clockwise moment about a pivot equals the total anticlockwise moment.",
+          "Levers and gears: a long lever, or a small gear driving a larger one, lets a small force produce a larger moment.",
         ],
         commonErrors: [
           "Measuring the distance along the lever to the force rather than the perpendicular distance to its line of action.",
@@ -171,7 +171,8 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         ],
         ...SOURCE,
         specPoints: [
-          { ref: "DfE physics: Forces", text: "describe examples in which forces cause rotation; define and calculate the moment of the force in such examples", aos: ["AO1", "AO2"] },
+          { ref: "DfE physics: Forces", text: "describe examples in which forces cause rotation", aos: ["AO1"] },
+          { ref: "DfE physics: Forces", text: "define and calculate the moment of a force in such examples", aos: ["AO1", "AO2"] },
           { ref: "DfE physics: Forces", text: "explain how levers and gears transmit the rotational effects of forces", aos: ["AO1"] },
         ],
       },
@@ -184,7 +185,8 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         keyPoints: [
           "Speed = distance ÷ time; velocity is speed in a given direction, so it is a vector.",
           "Acceleration = change in velocity ÷ time taken; for uniform acceleration, v² − u² = 2as.",
-          "The gradient of a distance-time graph is the speed; the gradient of a velocity-time graph is the acceleration and the area under it is the distance travelled.",
+          "Distance-time graph: its gradient is the speed, and a horizontal line means the object is stationary.",
+          "Velocity-time graph: its gradient is the acceleration, and the area under it is the distance travelled.",
           "An object moving in a circle at constant speed is accelerating because its direction, and so its velocity, keeps changing.",
         ],
         commonErrors: [
@@ -235,7 +237,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         difficulty: 2,
         summary: "Reaction times, thinking and braking distances, how speed affects stopping distance, and the forces involved in large decelerations.",
         keyPoints: [
-          "Stopping distance = thinking distance + braking distance.",
+          "Stopping distance: the sum of the thinking distance (travelled during the driver's reaction time) and the braking distance.",
           "Thinking distance depends on speed and reaction time; tiredness, alcohol, drugs and distractions increase reaction time.",
           "Braking distance increases with speed (roughly with its square) and with poor road or tyre conditions.",
           "Increasing the time over which a vehicle or passenger stops, as crumple zones, seat belts and airbags do, reduces the force for the same change in momentum.",
@@ -296,7 +298,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         keyPoints: [
           "All electromagnetic waves are transverse and travel at the same speed in a vacuum, about 3 × 10⁸ m/s.",
           "In order of increasing frequency (decreasing wavelength): radio, microwave, infrared, visible, ultraviolet, X-rays, gamma rays.",
-          "Ultraviolet, X-rays and gamma rays carry the most energy and can damage cells; ultraviolet can cause skin cancer and X-rays and gamma rays can cause mutations.",
+          "Hazards of ultraviolet, X-rays and gamma rays: they carry the most energy and can damage cells; ultraviolet can cause skin cancer, and X-rays and gamma rays can cause mutations.",
           "Refraction happens because a wave's speed changes as it passes from one substance into another.",
         ],
         commonErrors: [
@@ -321,7 +323,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         difficulty: 3,
         summary: "Ray diagrams for reflection, refraction and lenses, why objects have colour, and how the temperature of a body depends on the radiation it absorbs and emits.",
         keyPoints: [
-          "A convex (converging) lens brings parallel rays together at a focus; a concave (diverging) lens spreads them out.",
+          "Convex and concave lenses: a convex (converging) lens brings parallel rays together at a focus, while a concave (diverging) lens spreads them out.",
           "An object looks a colour because it reflects or transmits that colour and absorbs the others.",
           "Every object emits radiation; a hotter object emits more radiation, with more at shorter wavelengths.",
           "An object's temperature stays constant when it absorbs radiation at the same rate as it emits it.",
@@ -352,8 +354,8 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         difficulty: 2,
         summary: "Charge and current, potential difference and resistance, current-voltage graphs for components, and series and parallel circuits.",
         keyPoints: [
-          "Charge flow = current × time (Q = It); potential difference = current × resistance (V = IR).",
-          "In a series circuit the current is the same everywhere, the potential differences add up to the supply, and the total resistance is the sum of the resistances.",
+          "Two circuit equations: charge flow = current × time (Q = It), and potential difference = current × resistance (V = IR).",
+          "Series circuit rules: the current is the same everywhere, the potential differences add up to the supply, and the total resistance is the sum of the resistances.",
           "Adding a resistor in parallel decreases the total resistance, because the current has an extra path.",
           "A fixed resistor at constant temperature has a straight-line I-V graph; a filament lamp's resistance rises as it heats up; a diode lets current flow one way only.",
         ],
@@ -414,7 +416,9 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         ],
         ...SOURCE,
         specPoints: [
-          { ref: "DfE physics: Electricity", text: "describe the production of static electricity and sparking by rubbing surfaces, the forces between charged objects, and explain them by the transfer of electrons", aos: ["AO1"] },
+          { ref: "DfE physics: Electricity", text: "describe the production of static electricity, and sparking, by rubbing surfaces", aos: ["AO1"] },
+          { ref: "DfE physics: Electricity", text: "describe evidence that charged objects exert forces of attraction or repulsion on one another when not in contact", aos: ["AO1"] },
+          { ref: "DfE physics: Electricity", text: "explain how the transfer of electrons between objects can explain the phenomena of static electricity", aos: ["AO1", "AO2"] },
           { ref: "DfE physics: Electricity", text: "explain the concept of an electric field and how it helps to explain the phenomena of static electricity", aos: ["AO1"] },
         ],
       },
@@ -431,9 +435,9 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         difficulty: 1,
         summary: "Poles, permanent and induced magnets, magnetic field patterns and the Earth's magnetic field.",
         keyPoints: [
-          "Like poles repel and unlike poles attract.",
+          "Forces between magnetic poles: like poles repel and unlike poles attract, without the magnets touching.",
           "An induced magnet is magnetic only while it is in a magnetic field, and is always attracted to the magnet.",
-          "Magnetic field lines point from north to south; the field is strongest where the lines are closest, near the poles.",
+          "Magnetic field lines: they point from north to south, and the field is strongest where the lines are closest, near the poles.",
           "A compass points along the Earth's magnetic field, which is evidence that the Earth's core is magnetic.",
         ],
         commonErrors: [
@@ -481,7 +485,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         keyPoints: [
           "Moving a wire through a magnetic field, or changing the field around a coil, induces a potential difference; its current produces a field that opposes the change.",
           "An alternator produces alternating current; a dynamo uses a split-ring commutator to produce direct current.",
-          "For a transformer, Vp ÷ Vs = Np ÷ Ns, and for an ideal transformer Vp × Ip = Vs × Is.",
+          "Transformer equations: Vp ÷ Vs = Np ÷ Ns, and for an ideal transformer Vp × Ip = Vs × Is.",
           "A microphone turns the pressure variations of sound into a varying current; a loudspeaker does the reverse.",
         ],
         commonErrors: [
@@ -512,7 +516,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         keyPoints: [
           "Density = mass ÷ volume; solids are usually densest because their particles are packed most closely.",
           "Melting, freezing, evaporating, condensing and sublimating are physical changes: mass is conserved and the substance gets its original properties back if the change is reversed.",
-          "The volume of an irregular solid can be measured by the volume of water it displaces.",
+          "Volume of an irregular solid: measure the volume of water it displaces, for example in a measuring cylinder or a eureka can.",
         ],
         commonErrors: [
           "Mixing units, such as a mass in grams with a volume in m³.",
@@ -671,7 +675,7 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         keyPoints: [
           "The solar system has one star (the Sun), eight planets, dwarf planets, natural moons and artificial satellites.",
           "Gravity provides the force that keeps planets and satellites in orbit; in a circular orbit the speed is constant but the velocity changes.",
-          "If an object's speed in a stable orbit changes, the radius of its orbit must change too: a smaller orbit needs a higher speed.",
+          "Orbit speed and radius: if an object's speed in a stable orbit changes, the radius of its orbit must change too, and a smaller orbit needs a higher speed.",
           "The Sun formed from a cloud of dust and gas pulled together by gravity; it is stable while the outward pressure from fusion balances gravity.",
         ],
         commonErrors: [
@@ -693,8 +697,8 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         summary: "The red-shift of light from distant galaxies, the expanding universe and the evidence for the Big Bang.",
         keyPoints: [
           "Light from galaxies moving away from us is shifted towards longer wavelengths: red-shift.",
-          "More distant galaxies show greater red-shift, so they are moving away faster: the universe is expanding.",
-          "An expanding universe suggests it began from a very small, hot, dense region: the Big Bang.",
+          "Distance and red-shift: more distant galaxies show greater red-shift, so they are moving away faster and the universe is expanding.",
+          "The Big Bang: an expanding universe suggests it began from a very small, hot, dense region.",
         ],
         commonErrors: [
           "Saying red-shift means the galaxy turns red.",
@@ -702,7 +706,9 @@ export const GCSE_PHYSICS_OUTLINE: UnitSpec[] = withTopicAos([
         ],
         ...SOURCE,
         specPoints: [
-          { ref: "DfE physics: Space physics", text: "explain the red-shift of light from receding galaxies (qualitative only), how the change of each galaxy's speed with distance is evidence of an expanding universe, and the link between this evidence and the Big Bang model", aos: ["AO1"] },
+          { ref: "DfE physics: Space physics", text: "explain the red-shift of light from galaxies which are receding (qualitative only)", aos: ["AO1"] },
+          { ref: "DfE physics: Space physics", text: "explain that the change of each galaxy's speed with distance is evidence of an expanding universe", aos: ["AO1", "AO2"] },
+          { ref: "DfE physics: Space physics", text: "explain the link between the evidence of an expanding universe and the Big Bang model", aos: ["AO1", "AO2"] },
         ],
       },
     ],
