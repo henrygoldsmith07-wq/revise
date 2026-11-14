@@ -182,7 +182,9 @@ for (const t of topics) {
   const text2 = curriculumText(t.file);
   const refCount = t.file === "wjec-alevel-expansions.ts"
     ? (text2.match(/point\(\s*"(?:Unit|Pure|Applied)/g) || []).length
-    : (text2.match(/ref:\s*"(?:Unit|Pure|Applied|\d+\.\d)/g) || []).length;
+    // Board references, or the DfE GCSE subject content a GCSE outline is
+    // transcribed from (src/domain/curriculum/outlines/gcse-*.ts).
+    : (text2.match(/ref:\s*"(?:Unit|Pure|Applied|DfE|\d+\.\d)/g) || []).length;
   const min = minStatements[t.file] ?? 40;
   if (refCount < min) errors.push(`${t.file}: only ${refCount} specPoint statements — expected >=${min}`);
 }

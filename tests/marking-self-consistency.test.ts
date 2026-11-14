@@ -26,7 +26,11 @@ import { markPart } from "@/domain/marking";
 // that the offline marker misses 16 times; marker leniency for chemical notation is the follow-up.
 // 705 → 715 (pass 102): Chemistry Unit 2 pack adds 8 questions with paraphrased calculation schemes the offline marker misses 10 times.
 // 715 → 728 (pass 104): Biology Unit 1 pack adds 9 questions whose paraphrased multi-point model answers the offline marker misses 13 times.
-const BASELINE = 728;
+// 728 → 716 (pass 119): A-level material withheld from GCSE physics (its
+// copies of photoelectric, Young modulus, SHM and similar templates) took 12
+// under-credited parts with it; the 64 new GCSE physics parts all earn full
+// marks from their own model answers.
+const BASELINE = 716;
 
 describe("offline marker against the bank's own model answers", () => {
   it("never gets worse than the recorded baseline", () => {

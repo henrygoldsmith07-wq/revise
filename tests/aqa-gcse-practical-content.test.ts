@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { aqaGcsePracticalQuestions, seedQuestionsForSubject } from "@/content";
+import { aqaGcsePracticalQuestions as rawPractical, seedQuestionsForSubject } from "@/content";
+import { scopeGcseQuestion } from "@/content/gcse-question-scope";
+
+// What ships: GCSE physics questions are retagged to the GCSE outline or
+// withheld when they are A-level material (src/content/gcse-question-scope.ts).
+const aqaGcsePracticalQuestions = rawPractical.flatMap(scopeGcseQuestion);
 import { getTopic } from "@/domain/curriculum";
 
 const AQA_GCSE_SUBJECTS = [

@@ -1,8 +1,9 @@
 import { BOARD_ADDED_TOPICS } from "./fixtures/board-added-topics";
 import { describe, expect, it } from "vitest";
+import { scopeGcseQuestion } from "@/content/gcse-question-scope";
 import { dataExpansionQuestions, seedQuestions } from "@/content";
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
-import { AUTHORED_REFERENCE_SUBJECTS } from "@/domain/curriculum/honesty";
+import { AUTHORED_REFERENCE_SUBJECTS, GCSE_SUBJECT_CONTENT_SUBJECTS } from "@/domain/curriculum/honesty";
 import { wjecAlevelCoverageQuestions } from "@/content/questions/wjec-alevel-coverage";
 
 // The expansion programmes cover the 32 science and maths subjects. Subjects
@@ -26,6 +27,9 @@ describe("data-question expansion", () => {
     expect(dataExpansionQuestions.some((question) => question.id.includes("-coverage-"))).toBe(false);
 
     for (const subject of ALL_SUBJECTS) {
+      // A subject on its own GCSE outline is not covered by this A-level
+      // template; tests/gcse-question-scope.test.ts covers what it ships.
+      if (GCSE_SUBJECT_CONTENT_SUBJECTS.has(subject.id)) continue;
       const questions = dataExpansionQuestions.filter((question) => question.subjectId === subject.id);
       const expected = subject.id === "wjec-alevel-physics"
         ? topicsFor(subject.id).length - 8
@@ -47,7 +51,9 @@ describe("data-question expansion", () => {
   });
 
   it("keeps data questions checked, markable and linked to their curriculum", () => {
-    for (const question of dataExpansionQuestions) {
+    // What ships: GCSE physics copies are retagged to the GCSE outline or
+    // withheld (src/content/gcse-question-scope.ts).
+    for (const question of dataExpansionQuestions.flatMap(scopeGcseQuestion)) {
       expect(question.stem).toContain("Data:");
       expect(question.origin).toBe("seed");
       expect(question.source).toBe("authored");

@@ -120,6 +120,22 @@ background and do other work while it runs. On Windows, invoke npm through
   Edexcel, OCR and every GCSE still use the WJEC-derived outline. Do the next
   board the same way, from its published PDF, and add it to
   `BOARD_STRUCTURED_SUBJECTS` (honest labelling) in the same commit.
+- **GCSE physics builds from the DfE GCSE subject content, not the A-level
+  outline** (one-hundred-and-nineteenth pass). `GCSE_PHYSICS_OUTLINE`
+  (`src/domain/curriculum/outlines/gcse-physics.ts`) is the DfE document's
+  physics bullets under its own headings; every board's GCSE physics uses it
+  (`GCSE_SUBJECT_CONTENT_SUBJECTS` in `honesty.ts` labels it, and WJEC's
+  label says its Welsh GCSE is regulated separately). Its slugs must never
+  match an A-level slug: seed cards install once by id and are never
+  rewritten. A seed card whose topic has left its loaded subject is retired
+  (`src/domain/card-retirement.ts`), hidden by the store, never deleted.
+  Every GCSE physics question passes `scopeGcseQuestion`
+  (`src/content/gcse-question-scope.ts`): a shared template is retagged to
+  a GCSE statement or withheld (`null`), an unplaced template is withheld
+  and fails `tests/gcse-question-scope.test.ts`, and the
+  `gcse-physics-course-` pack is written for the outline directly. Do
+  biology, chemistry and maths the same way: their GCSE trees are still the
+  A-level ones.
 - **Reference subjects' topic trees load on demand** (one-hundred-and-tenth
   pass, `/` → 2.24 MB raw / 652 KB gzip). Every subject's metadata is
   registered at startup from `src/domain/curriculum/catalog.ts`; only the four

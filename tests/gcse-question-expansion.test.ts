@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { gcseExpansionQuestions, seedQuestions } from "@/content";
+import { gcseExpansionQuestions as rawExpansion, seedQuestions } from "@/content";
+import { scopeGcseQuestion } from "@/content/gcse-question-scope";
+import { GCSE_SUBJECT_CONTENT_SUBJECTS } from "@/domain/curriculum/honesty";
+
+// What ships: GCSE physics questions are retagged to the GCSE outline or
+// withheld when they are A-level material (src/content/gcse-question-scope.ts).
+const gcseExpansionQuestions = rawExpansion.flatMap(scopeGcseQuestion);
 import { allSubjects, getTopic, topicsFor } from "@/domain/curriculum";
 
 const GCSE_SUBJECTS = allSubjects().filter((subject) => subject.qualificationId.endsWith("-gcse"));
@@ -7,9 +13,13 @@ const GCSE_SUBJECTS = allSubjects().filter((subject) => subject.qualificationId.
 describe("GCSE question expansion", () => {
   it("adds one original question for every GCSE topic across every supported board", () => {
     expect(GCSE_SUBJECTS).toHaveLength(16);
-    expect(gcseExpansionQuestions).toHaveLength(220);
+    expect(rawExpansion).toHaveLength(220);
 
     for (const subject of GCSE_SUBJECTS) {
+      // A subject on its own GCSE outline has more, smaller topics than the
+      // A-level list these questions were written against; its coverage is
+      // reported in tests/gcse-question-scope.test.ts, not claimed here.
+      if (GCSE_SUBJECT_CONTENT_SUBJECTS.has(subject.id)) continue;
       const questions = gcseExpansionQuestions.filter((question) => question.subjectId === subject.id);
       expect(questions, `${subject.id} should receive one question per topic`).toHaveLength(topicsFor(subject.id).length);
       expect(new Set(questions.map((question) => question.id)).size).toBe(questions.length);

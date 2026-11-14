@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { allTopics, loadAllSubjects } from "@/domain/curriculum";
+import { liveCards, loadedTopics } from "@/domain/card-retirement";
 import { topicsForYear } from "@/domain/year-group";
 import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
 
@@ -441,11 +442,21 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
   const unit4Option = snapshot?.settings.unit4Option;
   const retentionTarget = desiredRetention(snapshot?.settings.desiredRetention);
   const topics = useMemo(() => allTopics(subjectIds), [subjectIds]);
+  // Seed cards whose topic has left a loaded subject's tree (every GCSE
+  // physics subject's A-level cards) are hidden everywhere below, never
+  // deleted (src/domain/card-retirement.ts).
+  const loaded = useMemo(() => loadedTopics(topics), [topics]);
+  const snapshotCards = snapshot?.cards;
+  const live = useMemo(() => (snapshotCards ? liveCards(snapshotCards, loaded) : undefined), [snapshotCards, loaded]);
+  const liveSnapshot = useMemo(
+    () => (snapshot && live && live !== snapshot.cards ? { ...snapshot, cards: live as Card[] } : snapshot),
+    [snapshot, live],
+  );
   // Year 12 plans and recommends AS (Units 1-2) topics only; mastery and
   // readiness still see every topic.
   const scopedTopics = useMemo(() => topicsForYear(topics, yearGroup, unit4Option), [topics, yearGroup, unit4Option]);
   const scopeTopicIds = useMemo(() => new Set(scopedTopics.map((t) => t.id)), [scopedTopics]);
-  const { evidence, mastery, recallMastery, applicationMastery, masteryUncertainty } = useLearnerMastery(snapshot, topics);
+  const { evidence, mastery, recallMastery, applicationMastery, masteryUncertainty } = useLearnerMastery(liveSnapshot, topics);
 
   const dueCards = useMemo(() => {
     if (!evidence) return [];
@@ -745,7 +756,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     userId,
     recommendations: experimentRecs,
     topics,
-    cards: snapshot?.cards ?? [],
+    cards: liveSnapshot?.cards ?? [],
     reviewLogs: snapshot?.reviewLogs ?? [],
     questions: snapshot?.questions ?? [],
     attempts: snapshot?.attempts ?? [],
@@ -1012,7 +1023,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     // is exactly what boot's single Promise.all guaranteed before the split.
     if (!bootLoaded || !snapshot || !experimentsLoaded || !outcomesLoaded || !sessionsLoaded) return null;
     return {
-      ...snapshot,
+      ...(liveSnapshot ?? snapshot),
       ready: true,
       needsOnboarding,
       completeOnboarding,
@@ -1097,6 +1108,7 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     };
   }, [
     snapshot,
+    liveSnapshot,
     bootLoaded,
     needsOnboarding,
     completeOnboarding,

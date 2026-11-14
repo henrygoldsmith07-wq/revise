@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { aqaGcseSynopticQuestions, seedQuestionsForSubject } from "@/content";
+import { aqaGcseSynopticQuestions as rawSynoptic, seedQuestionsForSubject } from "@/content";
+import { scopeGcseQuestion } from "@/content/gcse-question-scope";
+
+// What ships: GCSE physics questions are retagged to the GCSE outline or
+// withheld when they are A-level material (src/content/gcse-question-scope.ts).
+const aqaGcseSynopticQuestions = rawSynoptic.flatMap(scopeGcseQuestion);
 import { getTopic } from "@/domain/curriculum";
 
 const AQA_GCSE_SUBJECTS = [
@@ -11,11 +16,14 @@ const AQA_GCSE_SUBJECTS = [
 
 describe("AQA GCSE synoptic question bank", () => {
   it("adds four multi-topic questions to each AQA GCSE subject", () => {
-    expect(aqaGcseSynopticQuestions).toHaveLength(16);
+    expect(rawSynoptic).toHaveLength(16);
+    // Two AQA GCSE physics synoptic questions (orbital centripetal acceleration,
+    // emf and internal resistance) are A-level material and are withheld.
+    expect(aqaGcseSynopticQuestions).toHaveLength(14);
 
     for (const subjectId of AQA_GCSE_SUBJECTS) {
       const questions = aqaGcseSynopticQuestions.filter((question) => question.subjectId === subjectId);
-      expect(questions, `${subjectId} should have four synoptic questions`).toHaveLength(4);
+      expect(questions, `${subjectId} synoptic questions`).toHaveLength(subjectId === "aqa-gcse-physics" ? 2 : 4);
       expect(questions.every((question) => question.topicIds.length >= 2)).toBe(true);
       const seededIds = new Set(seedQuestionsForSubject(subjectId).map((question) => question.id));
       expect(questions.every((question) => seededIds.has(question.id))).toBe(true);
