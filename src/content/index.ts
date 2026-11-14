@@ -1,3 +1,5 @@
+import { scopeGcseQuestion } from "./gcse-question-scope";
+import { gcsePhysicsCourseQuestions } from "./questions/gcse-physics-course";
 import type { Id, Misconception, Question } from "@/domain/types";
 import { honestQuestion } from "@/domain/curriculum/honesty";
 import { applyPhysicsAnswerGuards } from "./questions/physics-answer-guards";
@@ -143,6 +145,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...aqaGcseQuestions,
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
+  ...gcsePhysicsCourseQuestions,
   ...aqaPsychologyQuestions,
   ...aqaComputerScienceQuestions,
   ...aqaEconomicsQuestions,
@@ -152,7 +155,11 @@ const BASE_SEED_QUESTIONS: Question[] = [
   // learner sees reviewed authored items first. Coverage and adaptive
   // selection are keyed by ids, not array position.
   ...wjecPhysicsDeepQuestions,
-].map(honestQuestion);
+]
+  // GCSE subjects keep only the questions on their GCSE course, retagged to
+  // the GCSE outline (./gcse-question-scope.ts).
+  .flatMap(scopeGcseQuestion)
+  .map(honestQuestion);
 
 const authoredSeedQuestions = enrichCuratedPhysicsLearning(BASE_SEED_QUESTIONS);
 const ledgerApplication = applyHumanVerificationLedger(authoredSeedQuestions, humanVerificationLedger);
@@ -172,6 +179,7 @@ export function isSeedWjecReleaseQuestion(question: Question): boolean {
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
 export { aqaComputerScienceQuestions, aqaEconomicsQuestions, aqaPsychologyQuestions };
 export { gcseExpansionQuestions };
+export { gcsePhysicsCourseQuestions };
 export { edexcelExpansionQuestions };
 export { dataExpansionQuestions };
 export { unfamiliarContextQuestions };

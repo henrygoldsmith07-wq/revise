@@ -120,7 +120,10 @@ const LEFT_FOR_REVIEW_31: Record<string, string> = {
 };
 
 describe("Physics spec-point tags (thirty-first pass)", () => {
-  const PHYSICS_VARIANTS = [...new Set(seedQuestions.filter((q) => q.subjectId.endsWith("-physics")).map((q) => q.subjectId))];
+  // A-level Physics variants only: GCSE physics builds from its own GCSE
+  // outline since the one-hundred-and-nineteenth pass, and its tags are
+  // checked in tests/gcse-question-scope.test.ts.
+  const PHYSICS_VARIANTS = [...new Set(seedQuestions.filter((q) => q.subjectId.endsWith("-physics") && !q.subjectId.includes("-gcse-")).map((q) => q.subjectId))];
   const byId = new Map<string, Question>(seedQuestions.map((q) => [q.id, q]));
 
   function check(table: Record<string, string>) {
@@ -162,9 +165,9 @@ describe("Physics spec-point tags (thirty-first pass)", () => {
         }
       }
     }
-    // Found by this check, outside this pass's scope (AQA GCSE): the topic tree
-    // stops at sp-07. Left for its owner; listed so a new problem still fails.
-    expect(problems).toEqual(["cnt:question:aqa-gcse-physics-practical-resistance: aqa-gcse-physics.electric-circuits.sp-08 is not in the curriculum"]);
+    // The one problem this used to list (an AQA GCSE practical tagged to an
+    // A-level statement that does not exist) went with the GCSE outline.
+    expect(problems).toEqual([]);
   });
 });
 

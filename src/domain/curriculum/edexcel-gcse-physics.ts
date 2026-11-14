@@ -1,14 +1,16 @@
 import { buildUnits } from "./helpers";
-import { PHYSICS_REFERENCE_OUTLINE } from "./outlines/physics";
+import { GCSE_PHYSICS_OUTLINE } from "./outlines/gcse-physics";
 import { referenceSubject } from "./catalog";
 import { registerSubject } from "./registry";
 import type { CurriculumModule } from "./registry";
 
-// Pearson Edexcel GCSE Physics (1PH0).
-// areas; check the current AQA spec for exact assessment objectives.
+// Pearson Edexcel GCSE Physics (1PH0). Topics follow the DfE GCSE physics subject content that every
+// board's GCSE physics specification is built on (./outlines/gcse-physics.ts),
+// not yet this board's own topic order and numbering. Until the
+// one-hundred-and-nineteenth pass it was built from the WJEC A-level outline.
 const SUBJECT_ID = "edexcel-gcse-physics";
 
-const { units, topics } = buildUnits(SUBJECT_ID, PHYSICS_REFERENCE_OUTLINE);
+const { units, topics } = buildUnits(SUBJECT_ID, GCSE_PHYSICS_OUTLINE);
 
 export const aqaPhysics: CurriculumModule = registerSubject({
   subject: referenceSubject(SUBJECT_ID),

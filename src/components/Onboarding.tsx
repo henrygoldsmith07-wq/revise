@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { allQualifications, allSubjects, availableBoards, getBoard, getSubject, gradesFor } from "@/domain/curriculum";
 import { isFlagship } from "@/domain/flagship";
-import { followsOwnSpecification } from "@/domain/curriculum/honesty";
+import { followsOwnSpecification, GCSE_SUBJECT_CONTENT_SUBJECTS } from "@/domain/curriculum/honesty";
 import { todayIso } from "@/domain/scheduling";
 import { isOptionalExamDateValid } from "@/domain/onboarding";
 import type { Availability, ExamDate, Id } from "@/domain/types";
@@ -604,7 +604,7 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                     </div>
                     <p className="mb-2 text-xs text-ink3">
                       {row.level === "GCSE"
-                        ? "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE. Only the practice questions were written for GCSE, and none has been checked against the specification."
+                        ? gcseRowNote(row.subjects)
                         : row.subjects.every((subject) => followsOwnSpecification(subject.id))
                           ? <>Their topic lists follow {board.name}&apos;s specification, but their notes and questions have not yet been checked by a teacher.</>
                           : <>These reuse another board&apos;s topic list and have not been checked against {board.name}&apos;s
@@ -783,4 +783,19 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
       </div>
     </div>
   );
+}
+
+/**
+ * What a board's GCSE row says about its subjects' topic lists. Subjects on
+ * a GCSE outline (DfE subject content) are named; the rest still use the
+ * WJEC A-level list and say so (src/domain/curriculum/honesty.ts).
+ */
+function gcseRowNote(subjects: ReadonlyArray<{ id: string; name: string }>): string {
+  const gcse = subjects.filter((subject) => GCSE_SUBJECT_CONTENT_SUBJECTS.has(subject.id));
+  const alevel = subjects.filter((subject) => !GCSE_SUBJECT_CONTENT_SUBJECTS.has(subject.id));
+  const unchecked = "None of it has been checked by a teacher.";
+  if (!alevel.length) return `Their topics follow the DfE GCSE subject content, not yet this board's own order and numbering. ${unchecked}`;
+  const lead = "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE; only the practice questions were written for GCSE.";
+  if (!gcse.length) return `${lead} ${unchecked}`;
+  return `${lead} Except ${gcse.map((subject) => subject.name).join(", ")}: its topics follow the DfE GCSE subject content. ${unchecked}`;
 }

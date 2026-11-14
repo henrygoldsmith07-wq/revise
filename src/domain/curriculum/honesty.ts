@@ -29,6 +29,28 @@ export const GCSE_REFERENCE_DISCLAIMER =
   "Reference-tier GCSE: this subject currently uses the WJEC A-level topic list, so its lessons and flashcards go well beyond GCSE. Only its practice questions were written for GCSE, and none has been checked against this board's specification.";
 
 /**
+ * GCSE subjects that now build from a GCSE outline transcribed from the DfE
+ * GCSE subject content (./outlines/gcse-*.ts), not the WJEC A-level one. The
+ * other GCSE subjects keep GCSE_REFERENCE_DISCLAIMER until theirs is written.
+ */
+export const GCSE_SUBJECT_CONTENT_SUBJECTS: ReadonlySet<string> = new Set([
+  "aqa-gcse-physics",
+  "edexcel-gcse-physics",
+  "ocr-gcse-physics",
+  "wjec-gcse-physics",
+]);
+
+export const GCSE_SUBJECT_CONTENT_DISCLAIMER =
+  "Reference-tier GCSE: this subject's topics follow the DfE GCSE subject content that this board's specification is built on, not yet the board's own topic order and numbering. Its notes, flashcards and questions have not been checked by a teacher.";
+
+/**
+ * WJEC's GCSE for Wales is regulated by Qualifications Wales and is not built
+ * on the DfE document, so its label must not claim it is.
+ */
+export const WJEC_GCSE_SUBJECT_CONTENT_DISCLAIMER =
+  "Reference-tier GCSE: this subject's topics follow the DfE GCSE subject content for England. WJEC's GCSE for Wales shares most of it but is regulated separately, so check your own specification for differences. Its notes, flashcards and questions have not been checked by a teacher.";
+
+/**
  * Reference subjects whose topic list was written for their own board's
  * specification rather than cloned from a flagship. Still reference-tier:
  * nobody has checked them against the spec, and their questions are
@@ -73,6 +95,9 @@ export function isGcseSubject(subjectId: string): boolean {
 export function referenceDisclaimerFor(subjectId: string): string {
   if (AUTHORED_REFERENCE_SUBJECTS.has(subjectId)) return AUTHORED_REFERENCE_DISCLAIMER;
   if (BOARD_STRUCTURED_SUBJECTS.has(subjectId)) return BOARD_STRUCTURED_DISCLAIMER;
+  if (GCSE_SUBJECT_CONTENT_SUBJECTS.has(subjectId)) {
+    return subjectId.startsWith("wjec-") ? WJEC_GCSE_SUBJECT_CONTENT_DISCLAIMER : GCSE_SUBJECT_CONTENT_DISCLAIMER;
+  }
   return isGcseSubject(subjectId) ? GCSE_REFERENCE_DISCLAIMER : REFERENCE_DISCLAIMER;
 }
 
