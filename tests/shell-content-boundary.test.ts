@@ -62,6 +62,13 @@ describe("app shell / content bank boundary", () => {
     expect(staticChain(meta.inputs, BANK)).toBeNull();
   }, 60_000);
 
+  it("the / route never statically imports the misconception library (a lazy chunk since pass 123)", async () => {
+    const meta = await metafile();
+    const library = "src/content/misconceptions/index.ts";
+    expect(meta.inputs[library], "the library should still be bundled, on demand").toBeDefined();
+    expect(staticChain(meta.inputs, library)).toBeNull();
+  }, 60_000);
+
   it("nothing the / route can load, statically or on demand, imports the bank except the loader", async () => {
     // Nineteenth pass: the loader builds the bank in a worker. Any other module the
     // route can reach (a lazily loaded Today panel included) that imports `@/content`

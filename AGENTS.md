@@ -62,7 +62,9 @@ background and do other work while it runs. On Windows, invoke npm through
   may import `@/content` (`tests/shell-content-boundary.test.ts` walks the real
   graph and prints the chain). The shell reads questions through
   `loadAuthoredQuestions()` in `src/data/authored-questions.ts`, misconceptions
-  from `@/content/misconceptions` and seed cards from `@/content/seed-cards`.
+  through `loadMisconceptions()` (`@/content/misconceptions/load`, a lazy chunk
+  since pass 123; other routes may still import `@/content/misconceptions`) and
+  seed cards from `@/content/seed-cards`.
   Resolve the bank *before* opening an IndexedDB transaction: awaiting the
   import inside one lets it auto-commit. A route that still imports
   `@/content` itself builds the bank again on the main thread when it loads
