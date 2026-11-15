@@ -53,6 +53,7 @@ const NO_TWIN: Record<string, string> = {
   "/llms-full.txt": "agent file, not a page",
   "/ai.txt": "agent file, not a page",
   "/robots.txt": "agent file, not a page",
+  "/wjec-a-level-physics/[topic]": "each topic page's twin is its library twin, /library.md?topic=…, with the same key points, errors and misconceptions",
 };
 
 function appRoutes(dir = join(process.cwd(), "src/app")): string[] {

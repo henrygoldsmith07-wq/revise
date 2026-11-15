@@ -5,7 +5,9 @@ import { constantsSheetFor } from "@/content/booklets/constants";
 import { pastPaperIndexFor } from "@/content/past-papers";
 import { teachingFor } from "@/content/teaching";
 import { renderMarkdown } from "@/lib/md/registry";
-import { definitionPoints, PHYSICS_GUIDE_PATHS, physicsGuide, superscriptPowers } from "@/lib/physics-guides";
+import { definitionPoints, PHYSICS_GUIDE_PATHS, physicsGuide, physicsTopicGuide, physicsTopicPaths, physicsTopicSlugs, superscriptPowers } from "@/lib/physics-guides";
+import { GET as topicRoute } from "@/app/wjec-a-level-physics/[topic]/route";
+import { topicsFor } from "@/domain/curriculum";
 import { absoluteUrl, SITE } from "@/lib/site";
 import { renderStaticHtml } from "@/lib/static-page";
 
@@ -107,5 +109,62 @@ describe("WJEC Physics guide pages", () => {
   it("is in the sitemap", () => {
     const urls = sitemap().map((entry) => entry.url);
     for (const path of PHYSICS_GUIDE_PATHS) expect(urls).toContain(absoluteUrl(path));
+  });
+});
+
+describe("one WJEC Physics page per topic", () => {
+  const slugs = physicsTopicSlugs();
+
+  it("has a page for every WJEC Physics topic, in the sitemap and linked from the hub and past papers", () => {
+    expect(slugs).toHaveLength(topicsFor("wjec-alevel-physics").length);
+    const urls = sitemap().map((entry) => entry.url);
+    const hub = html("/wjec-a-level-physics");
+    const papers = html("/wjec-a-level-physics/past-papers");
+    for (const path of physicsTopicPaths()) {
+      expect(urls).toContain(absoluteUrl(path));
+      expect(hub).toContain(`href="${path}"`);
+      expect(papers).toContain(`href="${path}"`);
+    }
+    // The hub no longer sends search visitors into the noindex app library.
+    expect(hub).not.toContain("/library?topic=");
+  });
+
+  it.each(physicsTopicSlugs())("%s is an indexable, script-free page with one H1, a short title and description, and a breadcrumb", (slug) => {
+    const page = physicsTopicGuide(slug)!;
+    const out = renderStaticHtml(page);
+    expect(page.title.length).toBeLessThanOrEqual(60);
+    expect(page.description.length).toBeLessThanOrEqual(160);
+    expect(out.match(/<h1[\s>]/g)).toHaveLength(1);
+    expect(out).toContain('<meta name="robots" content="index, follow">');
+    expect(out).toContain(`<link rel="canonical" href="${absoluteUrl(page.path)}">`);
+    // Its markdown twin is the topic's library twin, which exists.
+    expect(out).toContain(`href="${absoluteUrl(`/library.md?topic=wjec-alevel-physics.${slug}`)}"`);
+    expect(renderMarkdown("/library", new URLSearchParams({ topic: `wjec-alevel-physics.${slug}` }))).not.toBeNull();
+    expect(out.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "")).not.toContain("<script");
+    const ld = JSON.parse(out.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!);
+    const crumbs = ld["@graph"].find((node: { "@type": string }) => node["@type"] === "BreadcrumbList").itemListElement;
+    expect(crumbs.map((c: { name: string }) => c.name)).toEqual(["Revise", "WJEC A-level Physics", page.heading]);
+    expect(out).toContain(SITE.trustPosition.slice(0, 40));
+  });
+
+  it("shows no lesson check answer, model answer or trap, and reproduces no question text", () => {
+    for (const slug of slugs) {
+      const text = renderStaticHtml(physicsTopicGuide(slug)!);
+      const topic = topicsFor("wjec-alevel-physics").find((t) => t.id.endsWith(`.${slug}`))!;
+      for (const point of topic.specPoints ?? []) {
+        const teaching = teachingFor(point.id);
+        for (const hidden of [teaching?.check.explanation, teaching?.apply.modelAnswer, teaching?.trap?.right, teaching?.worked.answer]) {
+          if (hidden) expect(text, `${slug}: ${point.id}`).not.toContain(hidden);
+        }
+      }
+    }
+  });
+
+  it("serves a page for a real topic and a 404 for anything else", async () => {
+    const ok = await topicRoute(new Request("https://x/wjec-a-level-physics/capacitance"), { params: Promise.resolve({ topic: "capacitance" }) });
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toContain("Capacitance and RC circuits");
+    const missing = await topicRoute(new Request("https://x/wjec-a-level-physics/nope"), { params: Promise.resolve({ topic: "nope" }) });
+    expect(missing.status).toBe(404);
   });
 });

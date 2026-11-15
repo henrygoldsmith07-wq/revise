@@ -449,7 +449,11 @@ background and do other work while it runs. On Windows, invoke npm through
   check's answer, a model answer or the question bank. `/llms.txt`,
   `/llms-full.txt` (kept under 500k characters), `/ai.txt` and `/robots.txt`
   come from `src/lib/md/agent-files.ts`; the production URL is `SITE_URL` in
-  `src/lib/site.ts`. After editing `revise-site/index.html`, run
+  `src/lib/site.ts`. The indexable pages (/welcome, /pricing, the WJEC
+  Physics guides and the per-topic pages at `/wjec-a-level-physics/<topic>`,
+  pass 122) are route handlers rendered by `src/lib/static-page.ts`: each
+  carries ld+json describing only what it shows (no author, FAQ or review
+  markup it does not display) and no executable script. After editing `revise-site/index.html`, run
   `npm run site:ai-files`: it regenerates the landing site's `index.md`,
   agent files, head block and `vercel.json` headers, and `verify` fails while
   they are stale.

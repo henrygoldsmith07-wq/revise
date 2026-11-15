@@ -56,7 +56,7 @@ function humanDate(key: string): string {
 }
 
 export default function SchedulePage() {
-  const store = useStoreFields("adaptiveSession", "attempts", "examDates", "planChangelog", "plannedSessions", "regeneratePlan", "reviewLogs", "revisionCheckpoint", "settings");
+  const store = useStoreFields("adaptiveSession", "attempts", "examDates", "planChangelog", "plannedSessions", "regeneratePlan", "replanSummary", "reviewLogs", "revisionCheckpoint", "settings");
   // Today's one recommendation, read from the same ranked plan and the same
   // choice Today makes (todayPick), so Schedule's "Today" names the same next
   // step instead of only warning that the two can differ.
@@ -143,6 +143,14 @@ export default function SchedulePage() {
           </Button>
         </div>
       </header>
+
+      {store.replanSummary ? (
+        // The plan rebuilt itself (an exam date, target, availability, subject
+        // or topic list changed, or sessions were missed): say why, once.
+        <p role="status" data-testid="schedule-replan-summary" className="card px-4 py-3 text-xs text-ink2 leading-snug">
+          {store.replanSummary}
+        </p>
+      ) : null}
 
       {store.planChangelog.length ? (
         <section aria-label="Last rebuild" className="card px-4 py-3">

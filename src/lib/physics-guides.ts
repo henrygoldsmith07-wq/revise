@@ -16,6 +16,7 @@ import { BOOKLET_SOURCE_NOTE, constantsSheetFor } from "@/content/booklets/const
 import { pastPaperIndexFor } from "@/content/past-papers";
 import { TAUGHT_SPEC_POINT_IDS } from "@/content/teaching/taught-spec-points";
 import { teachingFor } from "@/content/teaching";
+import { misconceptionsForTopic } from "@/content/misconceptions";
 import { topicsFor } from "@/domain/curriculum";
 import { pastPaperCoverage, type PastPaperCoverageRow, type PastPaperIndex } from "@/domain/past-paper-coverage";
 import type { SpecPoint, Topic } from "@/domain/types";
@@ -58,8 +59,15 @@ function pastPapers(): PastPaperIndex {
   return index;
 }
 
+/** `/wjec-a-level-physics/<slug>`: one indexable page per topic. */
+export const PHYSICS_TOPIC_PREFIX = `${HUB}/`;
+
+function topicPath(topicId: string): string {
+  return `${PHYSICS_TOPIC_PREFIX}${topicId.slice(SUBJECT_ID.length + 1)}`;
+}
+
 function topicLink(topic: Pick<Topic, "id" | "title">): string {
-  return `[${topic.title}](/library?topic=${topic.id})`;
+  return `[${topic.title}](${topicPath(topic.id)})`;
 }
 
 function lessonLink(topic: Topic, point: SpecPoint, label: string): string {
@@ -167,7 +175,7 @@ function hub(): StaticPage {
     ...all.map((topic) => ({
       heading: topic.title,
       sub: true,
-      paragraphs: [topic.summary],
+      paragraphs: [`${topic.summary} [${topic.title}: what earns marks](${topicPath(topic.id)}).`],
       items: topic.commonErrors.length ? topic.commonErrors.map((error) => `Common error: ${error}`) : undefined,
     })),
   ];
@@ -248,7 +256,7 @@ function pastPaperPage(): StaticPage {
     ...coverage.topics.map((row) => ({
       heading: row.title,
       sub: true,
-      paragraphs: [`Examined in ${row.years} of ${coverage.years.length} years: ${plural(row.questions, "question")}, ${row.marks} marks.${row.optionOnly ? " Only ever as a Unit 4 option." : ""} [Revise this topic](/library?topic=${row.key}).`],
+      paragraphs: [`Examined in ${row.years} of ${coverage.years.length} years: ${plural(row.questions, "question")}, ${row.marks} marks.${row.optionOnly ? " Only ever as a Unit 4 option." : ""} [${row.title}: what earns marks](${topicPath(row.key)}).`],
       items: refsList(row),
     })),
   ];
@@ -360,6 +368,101 @@ const BUILDERS: Record<PhysicsGuidePath, () => StaticPage> = {
 const built = new Map<PhysicsGuidePath, StaticPage>();
 
 /** A guide page, built once per process: its content changes only with a deploy. */
+// --- one page per topic -------------------------------------------------------
+
+/** The topic slugs that have a page, in course order. */
+export function physicsTopicSlugs(): string[] {
+  return topics().map((topic) => topic.id.slice(SUBJECT_ID.length + 1));
+}
+
+/** Every topic page's path, for the sitemap. */
+export function physicsTopicPaths(): string[] {
+  return physicsTopicSlugs().map((slug) => `${PHYSICS_TOPIC_PREFIX}${slug}`);
+}
+
+function topicPage(topic: Topic): StaticPage {
+  const index = pastPapers();
+  const coverage = pastPaperCoverage(index, topics());
+  const row = coverage.topics.find((candidate) => candidate.key === topic.id);
+  const units = unitsByTopic(index).get(topic.id) ?? [];
+  const span = yearSpan(coverage.years);
+  const points = topic.specPoints ?? [];
+  const taught = points.filter((point) => TAUGHT_SPEC_POINT_IDS.includes(point.id));
+  const definitions = definitionPoints().filter((entry) => entry.topic.id === topic.id);
+  const misconceptions = misconceptionsForTopic(topic.id);
+  const examined = row
+    ? `The ${span} papers examined it in ${row.years} of ${coverage.years.length} years: ${plural(row.questions, "question")} and ${row.marks} marks${units.length ? `, in Unit${units.length > 1 ? "s" : ""} ${units.join(" and ")}` : ""}.${row.optionOnly ? " It only ever appears as a Unit 4 option." : ""}`
+    : `None of the ${span} papers Revise has indexed examined it.`;
+
+  const blocks: StaticBlock[] = [
+    {
+      heading: "How often it is examined",
+      paragraphs: [examined, ...(row?.refs.length ? ["Each question below links to WJEC's own paper (or its mark scheme where the paper is not published). Which topics a question assesses is Revise's own classification and has not been reviewed."] : [])],
+      items: row ? refsList(row) : undefined,
+    },
+    {
+      heading: "What the specification asks",
+      paragraphs: [`${plural(points.length, "statement")} in Revise's outline of this topic${taught.length ? `; ${taught.length} ${taught.length === 1 ? "has" : "have"} a written lesson` : ""}. The wording follows Revise's outline, not WJEC's numbering.`],
+      items: points.map((point) => (TAUGHT_SPEC_POINT_IDS.includes(point.id) ? `${capitalise(point.text)} (${lessonLink(topic, point, "lesson")})` : capitalise(point.text))),
+    },
+    { heading: "What earns marks", paragraphs: ["The ideas a mark scheme for this topic usually rewards, in Revise's words."], items: topic.keyPoints },
+    { heading: "Where marks are lost", paragraphs: ["The errors that most often cost marks on this topic."], items: topic.commonErrors },
+  ];
+  if (misconceptions.length) {
+    blocks.push({ heading: "Misconceptions to unlearn", paragraphs: ["Each is a belief that sounds right and loses marks, then the correct idea."] });
+    blocks.push(...misconceptions.map((entry) => ({ heading: `“${entry.statement}”`, sub: true, paragraphs: [entry.explanation, `Instead: ${entry.correction}`] })));
+  }
+  if (definitions.length) {
+    blocks.push({
+      heading: "Definitions to learn",
+      paragraphs: [`This topic asks you to state ${plural(definitions.length, "definition or law")}. [All the definitions, written out](${DEFINITIONS}).`],
+      items: definitions.map(({ point }) => capitalise(point.text)),
+    });
+  }
+  blocks.push(
+    {
+      heading: "What Revise covers today",
+      honest: true,
+      paragraphs: [SITE.trustPosition, "This page and its lessons are written by Revise and are not yet teacher-reviewed."],
+    },
+    {
+      heading: "Revise it",
+      paragraphs: [
+        `[Practise ${topic.title.toLowerCase()} in Revise](/practice?topic=${topic.id}): exam-style questions marked point by point, free, with no account. Or [see every topic](${HUB}), ranked by how often it is examined.`,
+      ],
+    },
+  );
+
+  const long = `${topic.title}: WJEC A-level Physics`;
+  return {
+    path: topicPath(topic.id),
+    parent: { label: "WJEC A-level Physics", path: HUB },
+    title: long.length <= 60 ? long : `${topic.title}: WJEC Physics`,
+    heading: `${topic.title} (WJEC A-level Physics)`,
+    description: row
+      ? `${topic.title}, WJEC A-level Physics: examined in ${row.years} of ${coverage.years.length} years (${span}), ${row.marks} marks. What earns marks, where they are lost.`
+      : `${topic.title}, WJEC A-level Physics: what the specification asks, what earns marks and where they are lost.`,
+    lead: topic.summary,
+    blocks,
+    related: RELATED,
+    markdownTwin: `/library.md?topic=${topic.id}`,
+  };
+}
+
+const builtTopics = new Map<string, StaticPage>();
+
+/** The page for one topic slug, or null when the subject has no such topic. */
+export function physicsTopicGuide(slug: string): StaticPage | null {
+  const topic = topics().find((candidate) => candidate.id === `${SUBJECT_ID}.${slug}`);
+  if (!topic) return null;
+  let page = builtTopics.get(topic.id);
+  if (!page) {
+    page = topicPage(topic);
+    builtTopics.set(topic.id, page);
+  }
+  return page;
+}
+
 export function physicsGuide(path: PhysicsGuidePath): StaticPage {
   let page = built.get(path);
   if (!page) {

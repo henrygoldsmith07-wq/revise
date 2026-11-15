@@ -42,6 +42,8 @@ export interface StaticPage {
   related: { label: string; path: string }[];
   /** The page above this one, shown in the breadcrumb between Revise and the page. */
   parent?: { label: string; path: string };
+  /** Its markdown twin when that is not `<path>.md` (a topic page's is its library twin). */
+  markdownTwin?: string;
 }
 
 const STYLE = `
@@ -159,7 +161,7 @@ export function renderStaticHtml(page: StaticPage): string {
 <meta name="description" content="${description}">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="${canonical}">
-<link rel="alternate" type="text/markdown" href="${absoluteUrl(`${page.path}.md`)}">
+<link rel="alternate" type="text/markdown" href="${absoluteUrl(page.markdownTwin ?? `${page.path}.md`)}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="${SITE.name}">
 <meta property="og:title" content="${title}">
