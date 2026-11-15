@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-15 pass 123: the misconception library leaves the boot path
+Reviewing the `/` route showed it sat 22 bytes under its budget. One of its chunks (85 KB) held the whole authored misconception library for every subject. The store imported it statically, though nothing on Today needs it before an answer is marked. It is now its own chunk (`loadMisconceptions` in `src/content/misconceptions/load.ts`). The store fetches it once the boot data is in, for the recurring-misconceptions tally, which is empty until it arrives. `recordAttempt` awaits it before tagging a lost mark with its misconception; if the chunk cannot load (offline before it was ever cached), the mistake is saved without a tag rather than failing. The `/` route went from 2,339,978 to 2,284,076 bytes raw (677,541 to 659,142 gzip), and its budget is lowered to 2,295,000 / 666,000. `tests/shell-content-boundary.test.ts` now fails if the library is statically reachable from `/` again. Checked: the full verify, and the fresh-student, mission-recovery and offline e2e walks.
+
 ## 2026-11-15 pass 122: a search page for every WJEC Physics topic, and Schedule says why the plan changed
 Search: only 6 pages of the site were indexable, and the WJEC Physics hub sent search visitors to `/library?topic=…`, an app screen that is noindex and empty without the learner's data. Each of the 19 WJEC A-level Physics topics now has its own server-rendered page at `/wjec-a-level-physics/<topic>` (`physicsTopicGuide` in `src/lib/physics-guides.ts`, route `src/app/wjec-a-level-physics/[topic]/route.ts`). Each page shows:
 - how often the 2022–2025 papers examined the topic, in which units, with links to each question on WJEC's own papers;

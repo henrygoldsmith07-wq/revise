@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { allTopics, loadAllSubjects } from "@/domain/curriculum";
 import { liveRecords, loadedTopics } from "@/domain/card-retirement";
 import { topicsForYear } from "@/domain/year-group";
-import { misconceptionsForTopic, seedMisconceptions } from "@/content/misconceptions";
+import { loadMisconceptions } from "@/content/misconceptions/load";
 
 import type { GradePrediction } from "@/domain/grades";
 import { officialPaperContextFromSettings } from "@/domain/official-papers";
@@ -73,6 +73,7 @@ import type { ResponseTimeCalibrationReport } from "@/domain/response-time-calib
 import type {
   AssessmentInsight,
   Attempt,
+  Misconception,
   Calibration,
   Card,
   ExamDate,
@@ -601,13 +602,23 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
     [topics, mastery, marksPerHour],
   );
 
+  // The misconception library is a lazy chunk (src/content/misconceptions/load.ts),
+  // fetched once the boot data is in; the tally is empty until it arrives.
+  const [misconceptionLibrary, setMisconceptionLibrary] = useState<Misconception[] | null>(null);
+  useEffect(() => {
+    if (!bootLoaded || misconceptionLibrary) return;
+    let live = true;
+    loadMisconceptions().then((library) => { if (live) setMisconceptionLibrary(library); }, () => undefined);
+    return () => { live = false; };
+  }, [bootLoaded, misconceptionLibrary]);
+
   const recurringMisconceptions = useMemo(
     () => {
-      if (!evidence) return [];
+      if (!evidence || !misconceptionLibrary) return [];
       const mistakes = evidence.mistakes.filter((mistake) => trustedSnapshotMistake(mistake, evidence.questions, evidence.attempts));
-      return tallyMisconceptions(mistakes, seedMisconceptions);
+      return tallyMisconceptions(mistakes, misconceptionLibrary);
     },
-    [evidence],
+    [evidence, misconceptionLibrary],
   );
 
   // Calibration per subject from paper-mode attempts: predicted vs actual.
@@ -873,7 +884,10 @@ export function StoreProvider({ children, userId }: { children: ReactNode; userI
 
       // A failed retest updates the original mistake in place. It must not
       // create another card for the same gap.
-      const misconceptions = [...new Set(question.topicIds.flatMap((id) => misconceptionsForTopic(id)))];
+      // Awaited here rather than shipped with the shell; an unavailable library
+      // (offline, never cached) only means no misconception tag on the mistake.
+      const library = await loadMisconceptions().catch((): Misconception[] => []);
+      const misconceptions = [...new Set(question.topicIds.flatMap((id) => library.filter((entry) => entry.topicIds.includes(id))))];
       const repairedParts = new Set(updatedMistakes.flatMap((m) => repairTargetParts(m, question)));
       // Nor does a mission's repair question that fails again: it is another
       // go at the mistake the mission is already repairing, not a new one.
