@@ -87,24 +87,28 @@ test("a mistake on a topic the GCSE course no longer has is read on its GCSE top
     });
     await new Promise((r) => { tx.oncomplete = r; });
   });
-  await page.goto("/");
-  const main = page.locator("main#main");
-  await expect(main).toContainText(/Speed, velocity and acceleration/, { timeout: 60_000 });
-  await expect(page.locator("body")).not.toContainText("kinematics-dynamics");
-  await page.goto("/study");
-  await expect(main).toContainText(/Speed, velocity and acceleration/, { timeout: 30_000 });
-  await expect(page.locator("body")).not.toContainText("kinematics-dynamics");
-  // A plan block on the old topic is rebuilt at boot, with nothing else changed.
   const pendingOnOldTopic = () => page.evaluate(async () => {
     const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open("revise"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
     const rows: Array<{ topicId?: string; status: string }> = await new Promise((res) => { const r = db.transaction("plannedSessions").objectStore("plannedSessions").getAll(); r.onsuccess = () => res(r.result); });
     db.close();
     return rows.filter((row) => row.status === "pending" && row.topicId === "aqa-gcse-physics.kinematics-dynamics").length;
   });
+  await page.goto("/");
+  const main = page.locator("main#main");
+  await expect(main).toContainText(/Speed, velocity and acceleration/, { timeout: 60_000 });
+  await expect(page.locator("body")).not.toContainText("kinematics-dynamics");
+  // The plan block on the old topic is rebuilt at boot, with nothing else changed,
+  // and in the same visit Schedule says why without being asked.
   await expect.poll(pendingOnOldTopic, { timeout: 30_000 }).toBe(0);
-  await page.goto("/schedule");
-  await expect(main).toBeVisible();
+  // At phone width Schedule sits in the bottom bar's Tools sheet.
+  const scheduleLink = page.locator('a[href="/schedule"]:visible');
+  if (!(await scheduleLink.count())) await page.locator("summary:visible", { hasText: "Tools" }).first().click();
+  await scheduleLink.first().click();
+  await expect(page.getByTestId("schedule-replan-summary")).toContainText("a subject's topic list changed", { timeout: 30_000 });
   await expect(page.locator('a[href*="kinematics-dynamics"]')).toHaveCount(0);
+  await page.goto("/study");
+  await expect(main).toContainText(/Speed, velocity and acceleration/, { timeout: 30_000 });
+  await expect(page.locator("body")).not.toContainText("kinematics-dynamics");
 });
 
 // GCSE chemistry builds from the DfE chemistry content too (pass 120).

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-15 pass 122: a search page for every WJEC Physics topic, and Schedule says why the plan changed
+Search: only 6 pages of the site were indexable, and the WJEC Physics hub sent search visitors to `/library?topic=…`, an app screen that is noindex and empty without the learner's data. Each of the 19 WJEC A-level Physics topics now has its own server-rendered page at `/wjec-a-level-physics/<topic>` (`physicsTopicGuide` in `src/lib/physics-guides.ts`, route `src/app/wjec-a-level-physics/[topic]/route.ts`). Each page shows:
+- how often the 2022–2025 papers examined the topic, in which units, with links to each question on WJEC's own papers;
+- the specification statements, linked to their lessons where one is written;
+- what earns marks and where marks are lost;
+- the misconceptions;
+- the definitions to learn;
+- the trust position.
+
+The past-paper topic data is Revise's own classification of 126 questions, labelled as unreviewed. No lesson check, model answer, trap or worked answer appears (a test checks every taught point). Every page has one H1, a title of at most 60 characters, a description of at most 160, a canonical URL, structured data (WebPage and a three-level BreadcrumbList that matches the visible breadcrumb) and no executable script. The pages are in the sitemap. The hub and the past-papers page link to them instead of the library. An unknown topic is a 404. A topic page's markdown twin is its library twin (`/library.md?topic=…`, the same key points, errors and misconceptions), recorded in `NO_TWIN` in `tests/markdown-twins.test.ts`.
+
+Schedule: `replanSummary` (why the plan rebuilt itself: an exam date, target, availability, subject or topic list changed, or sessions were missed) was computed but shown nowhere. Schedule now shows it (`schedule-replan-summary`). `e2e/gcse-physics-course.spec.ts` checks it after the topics-changed rebuild of pass 120. It lives in memory, so it is shown in the visit when the rebuild happened, not after a reload.
+
 ## 2026-11-15 pass 121: GCSE chemistry is a GCSE course
 Like GCSE physics before pass 119, every board's GCSE chemistry was built from the WJEC A-level outline: its lessons and flashcards taught Kc, orders of reaction, electrode potentials and NMR. `GCSE_CHEMISTRY_OUTLINE` (`src/domain/curriculum/outlines/gcse-chemistry.ts`) is the DfE GCSE chemistry content: 32 topics in nine units, 142 statements, the document's bullets under its own headings. Its "use of mathematics" lists are cross-topic skills, so they are not topics. The transition-metal and potable-water bullets are split so each statement asks one thing. No slug matches an A-level one, so the A-level seed cards a learner already has retire (pass 119) and their old mistakes are read on the new tree (pass 120). All four boards use it; the labels say so, and WJEC's says its Welsh GCSE is regulated separately. The onboarding note now names "Chemistry and Physics".
 
