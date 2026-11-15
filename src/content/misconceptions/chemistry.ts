@@ -58,10 +58,12 @@ export const chemistryMisconceptions = defineMisconceptions([
     ao: "AO2",
   },
   // --- AQA GCSE ---------------------------------------------------------
+  // GCSE chemistry follows the DfE outline (pass 120); entries that are
+  // A-level material moved to an A-level subject, keeping their ids.
   {
     slug: "gcse-yield-from-excess",
     subjectId: "aqa-gcse-chemistry",
-    topics: ["moles"],
+    topics: ["yield-atom-economy"],
     statement: "Percentage yield is the same whichever reactant I calculate it from, because the equation fixes the amounts.",
     explanation:
       "The limiting reagent decides how much product can form; the excess reagent is left over and makes no extra product. Basing the theoretical yield on the excess reagent inflates it, so the calculated percentage yield is too low.",
@@ -73,7 +75,7 @@ export const chemistryMisconceptions = defineMisconceptions([
   },
   {
     slug: "gcse-celsius-ideal-gas",
-    subjectId: "aqa-gcse-chemistry",
+    subjectId: "edexcel-alevel-chemistry",
     topics: ["moles"],
     statement: "pV = nRT works with temperatures in °C because the gas equation is just proportional.",
     explanation:
@@ -87,7 +89,7 @@ export const chemistryMisconceptions = defineMisconceptions([
   {
     slug: "gcse-empirical-formula-percentages",
     subjectId: "aqa-gcse-chemistry",
-    topics: ["moles"],
+    topics: ["formulae-equations"],
     statement: "Percentage masses by mass can be written into the empirical formula as they stand — no need to divide by atomic mass.",
     explanation:
       "Percentages are amounts in grams, not amounts of atoms. To find the mole ratio you divide each percentage by the relative atomic mass (Aᵣ) first, then reduce to the smallest whole-number ratio.",
@@ -100,7 +102,7 @@ export const chemistryMisconceptions = defineMisconceptions([
   {
     slug: "gcse-exothermic-sign",
     subjectId: "aqa-gcse-chemistry",
-    topics: ["energetics"],
+    topics: ["exothermic-endothermic"],
     statement: "An exothermic reaction releases heat, so its enthalpy change ΔH is positive.",
     explanation:
       "ΔH is measured from the system's point of view: energy leaving the system is negative. Heat released to the surroundings therefore means ΔH < 0 — exothermic is negative, endothermic is positive.",
@@ -113,7 +115,7 @@ export const chemistryMisconceptions = defineMisconceptions([
   {
     slug: "gcse-ionic-lattice-energy",
     subjectId: "aqa-gcse-chemistry",
-    topics: ["bonding"],
+    topics: ["ionic-covalent-metallic"],
     statement: "Molten ionic compounds do not conduct electricity because the bonds have not broken.",
     explanation:
       "In the molten state the giant ionic lattice has melted — ions are free to move and do carry current. It is the solid that cannot conduct: fixed lattice positions keep the ions from moving, not 'unbroken bonds'.",
@@ -179,7 +181,8 @@ export const chemistryMisconceptions = defineMisconceptions([
   // --- Edexcel & OCR GCSE -------------------------------------------------
   {
     slug: "edexcel-4s-3d-ionisation",
-    subjectId: "edexcel-gcse-chemistry",    topics: ["atomic-structure"],
+    subjectId: "edexcel-alevel-chemistry",
+    topics: ["atomic-structure"],
     statement: "4s fills before 3d, so in a transition-metal ion the electrons leave 3d first.",
     explanation:
       "The filling order rules the build-up, not the removal. 4s fills before 3d, but once occupied 3d sits lower, so ionisation empties 4s first: Fe is [Ar] 3d⁶ 4s², and Fe²⁺ is [Ar] 3d⁶ — not 3d⁴ 4s².",
@@ -192,7 +195,7 @@ export const chemistryMisconceptions = defineMisconceptions([
   {
     slug: "ocr-covalent-bonds-melt",
     subjectId: "ocr-gcse-chemistry",
-    topics: ["bonding"],
+    topics: ["states-particle-model"],
     statement: "When ice or iodine melts, the covalent bonds within the molecules break.",
     explanation:
       "Melting a simple molecular solid overcomes only the weak intermolecular forces between molecules — the strong covalent bonds inside each molecule survive intact. That is why molecular melting points are low while the molecules themselves stay whole.",
@@ -205,7 +208,7 @@ export const chemistryMisconceptions = defineMisconceptions([
   // --- WJEC GCSE -----------------------------------------------------------
   {
     slug: "wjec-gcse-calorimetry-solid-mass",
-    subjectId: "wjec-gcse-chemistry",
+    subjectId: "wjec-alevel-chemistry",
     topics: ["energetics"],
     statement: "In a calorimetry experiment q = mcΔT uses the mass of the solid burned, because that is what releases the energy.",
     explanation:
@@ -218,8 +221,8 @@ export const chemistryMisconceptions = defineMisconceptions([
   },
   {
     slug: "wjec-gcse-curly-arrow-charge",
-    subjectId: "wjec-gcse-chemistry",
-    topics: ["organic-basics"],
+    subjectId: "wjec-alevel-chemistry",
+    topics: ["organic-mechanisms"],
     statement: "A curly arrow starts from the positive charge, showing where the electron pair wants to go.",
     explanation:
       "Curly arrows show the movement of an electron pair, so each one must start from a source of electrons — a bond or a lone pair — and end where that pair ends up. A positive charge has no electrons to give; an arrow drawn from it describes an impossible electron movement.",

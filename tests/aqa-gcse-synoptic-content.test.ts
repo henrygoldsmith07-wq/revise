@@ -18,12 +18,13 @@ describe("AQA GCSE synoptic question bank", () => {
   it("adds four multi-topic questions to each AQA GCSE subject", () => {
     expect(rawSynoptic).toHaveLength(16);
     // Two AQA GCSE physics synoptic questions (orbital centripetal acceleration,
-    // emf and internal resistance) are A-level material and are withheld.
-    expect(aqaGcseSynopticQuestions).toHaveLength(14);
+    // emf and internal resistance) and two chemistry ones (enthalpy per mole of
+    // ethanol, structure from IR and NMR) are A-level material and are withheld.
+    expect(aqaGcseSynopticQuestions).toHaveLength(12);
 
     for (const subjectId of AQA_GCSE_SUBJECTS) {
       const questions = aqaGcseSynopticQuestions.filter((question) => question.subjectId === subjectId);
-      expect(questions, `${subjectId} synoptic questions`).toHaveLength(subjectId === "aqa-gcse-physics" ? 2 : 4);
+      expect(questions, `${subjectId} synoptic questions`).toHaveLength(subjectId === "aqa-gcse-physics" || subjectId === "aqa-gcse-chemistry" ? 2 : 4);
       expect(questions.every((question) => question.topicIds.length >= 2)).toBe(true);
       const seededIds = new Set(seedQuestionsForSubject(subjectId).map((question) => question.id));
       expect(questions.every((question) => seededIds.has(question.id))).toBe(true);

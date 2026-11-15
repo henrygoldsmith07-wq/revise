@@ -1,4 +1,5 @@
 import { scopeGcseQuestion } from "./gcse-question-scope";
+import { gcseChemistryCourseQuestions } from "./questions/gcse-chemistry-course";
 import { gcsePhysicsCourseQuestions } from "./questions/gcse-physics-course";
 import type { Id, Misconception, Question } from "@/domain/types";
 import { honestQuestion } from "@/domain/curriculum/honesty";
@@ -146,6 +147,7 @@ const BASE_SEED_QUESTIONS: Question[] = [
   ...aqaGcsePracticalQuestions,
   ...aqaGcseSynopticQuestions,
   ...gcsePhysicsCourseQuestions,
+  ...gcseChemistryCourseQuestions,
   ...aqaPsychologyQuestions,
   ...aqaComputerScienceQuestions,
   ...aqaEconomicsQuestions,
@@ -179,7 +181,7 @@ export function isSeedWjecReleaseQuestion(question: Question): boolean {
 export { aqaGcsePracticalQuestions, aqaGcseQuestions, aqaGcseSynopticQuestions, authenticExpansionQuestions };
 export { aqaComputerScienceQuestions, aqaEconomicsQuestions, aqaPsychologyQuestions };
 export { gcseExpansionQuestions };
-export { gcsePhysicsCourseQuestions };
+export { gcseChemistryCourseQuestions, gcsePhysicsCourseQuestions };
 export { edexcelExpansionQuestions };
 export { dataExpansionQuestions };
 export { unfamiliarContextQuestions };

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { aqaGcseQuestions as rawAqaGcse, seedQuestionsForSubject } from "@/content";
 import { scopeGcseQuestion } from "@/content/gcse-question-scope";
 
-// What ships: GCSE physics questions are retagged to the GCSE outline or
+// What ships: GCSE physics and chemistry questions are retagged to the GCSE outline or
 // withheld when they are A-level material (src/content/gcse-question-scope.ts).
 const aqaGcseQuestions = rawAqaGcse.flatMap(scopeGcseQuestion);
 import { getTopic } from "@/domain/curriculum";
@@ -16,11 +16,15 @@ const AQA_GCSE_SUBJECTS = [
 
 describe("AQA GCSE authored question bank", () => {
   it("adds six questions to each AQA GCSE subject", () => {
-    expect(aqaGcseQuestions).toHaveLength(24);
+    expect(rawAqaGcse).toHaveLength(24);
+    expect(aqaGcseQuestions).toHaveLength(23);
 
+    // The AQA GCSE chemistry energetics question (q = mcΔT) is withheld: the
+    // DfE chemistry content has no statement for it.
+    const expected = (subjectId: string) => (subjectId === "aqa-gcse-chemistry" ? 5 : 6);
     for (const subjectId of AQA_GCSE_SUBJECTS) {
       const questions = aqaGcseQuestions.filter((question) => question.subjectId === subjectId);
-      expect(questions, `${subjectId} should have six AQA GCSE questions`).toHaveLength(6);
+      expect(questions, `${subjectId} AQA GCSE questions`).toHaveLength(expected(subjectId));
       // Six questions on six different topics at least (a GCSE physics question
       // can now be tagged to two outline topics, such as energy and efficiency).
       expect(new Set(questions.flatMap((question) => question.topicIds)).size).toBeGreaterThanOrEqual(6);
