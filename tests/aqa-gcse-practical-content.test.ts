@@ -16,12 +16,14 @@ const AQA_GCSE_SUBJECTS = [
 
 describe("AQA GCSE practical question bank", () => {
   it("adds four practical questions to each AQA GCSE subject", () => {
-    expect(aqaGcsePracticalQuestions).toHaveLength(16);
+    // The AQA GCSE chemistry calorimetry practical (q = mcΔT) is withheld: the
+    // DfE chemistry content has no statement for it.
+    expect(aqaGcsePracticalQuestions).toHaveLength(15);
 
     for (const subjectId of AQA_GCSE_SUBJECTS) {
       const questions = aqaGcsePracticalQuestions.filter((question) => question.subjectId === subjectId);
-      expect(questions, `${subjectId} should have four practical questions`).toHaveLength(4);
-      expect(new Set(questions.flatMap((question) => question.topicIds)).size).toBe(4);
+      expect(questions, `${subjectId} practical questions`).toHaveLength(subjectId === "aqa-gcse-chemistry" ? 3 : 4);
+      expect(new Set(questions.flatMap((question) => question.topicIds)).size).toBe(questions.length);
       const seededIds = new Set(seedQuestionsForSubject(subjectId).map((question) => question.id));
       expect(questions.every((question) => seededIds.has(question.id))).toBe(true);
     }

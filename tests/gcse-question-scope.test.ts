@@ -7,11 +7,14 @@ import {
   authenticSourceQuestions,
   dataExpansionQuestions,
   gcseExpansionQuestions,
+  gcseChemistryCourseQuestions,
   gcsePhysicsCourseQuestions,
+  misconceptionsForSubject,
   seedQuestions,
   unfamiliarContextQuestions,
 } from "@/content";
-import { GCSE_PHYSICS_PLACEMENT, gcseTemplateKey, scopeGcseQuestion } from "@/content/gcse-question-scope";
+import { GCSE_CHEMISTRY_PLACEMENT, GCSE_PHYSICS_PLACEMENT, gcseTemplateKey, scopeGcseQuestion } from "@/content/gcse-question-scope";
+import { GCSE_CHEMISTRY_OUTLINE } from "@/domain/curriculum/outlines/gcse-chemistry";
 import { GCSE_PHYSICS_OUTLINE } from "@/domain/curriculum/outlines/gcse-physics";
 import { getTopic, topicsFor } from "@/domain/curriculum";
 import { referenceDisclaimerFor } from "@/domain/curriculum/honesty";
@@ -64,8 +67,9 @@ describe("GCSE physics follows the DfE GCSE subject content, not the A-level out
       expect(label, subjectId).not.toMatch(/A-level topic list|go well beyond GCSE/);
     }
     expect(referenceDisclaimerFor("wjec-gcse-physics")).toMatch(/regulated separately/);
-    // The other GCSE subjects still say they use the A-level list until theirs is written.
-    expect(referenceDisclaimerFor("aqa-gcse-chemistry")).toMatch(/A-level topic list/);
+    // GCSE biology and maths still say they use the A-level list until theirs is written.
+    expect(referenceDisclaimerFor("aqa-gcse-biology")).toMatch(/A-level topic list/);
+    expect(referenceDisclaimerFor("aqa-gcse-maths")).toMatch(/A-level topic list/);
   });
 });
 
@@ -213,5 +217,69 @@ describe("mistakes and attempts on a topic that has left its subject are read on
     // The plan rebuilds blocks on a removed topic at the next boot, with no other change.
     const planning = readFileSync("src/state/planning.ts", "utf8");
     expect(planning).toContain("plannedTopicsLeftTree(snapshot.plannedSessions, knownTopics)");
+  });
+});
+
+const GCSE_CHEMISTRY = ["aqa-gcse-chemistry", "edexcel-gcse-chemistry", "ocr-gcse-chemistry", "wjec-gcse-chemistry"];
+// A-level ideas that are not in the DfE GCSE chemistry content.
+const CHEM_A_LEVEL_ONLY = /\bKc\b|\bKa\b|equilibrium constant|order of reaction|order with respect|electrode potential|E°|ionisation energ|sub-?shell|d-orbital|ligand|oxidation state|oxidation number|London forces|log\[H|−log|NMR|IR absorption|IR spectr|Tollens|Fehling|carbonyl|amine|nucleophil|electrophil|enthalpy change of|mcΔT|pV = nRT/i;
+
+describe("GCSE chemistry follows the DfE GCSE subject content, not the A-level outline", () => {
+  const raw = [
+    ...gcseExpansionQuestions, ...dataExpansionQuestions, ...unfamiliarContextQuestions, ...authenticExpansionQuestions,
+    ...authenticSourceQuestions, ...aqaGcseQuestions, ...aqaGcsePracticalQuestions, ...aqaGcseSynopticQuestions, ...gcseChemistryCourseQuestions,
+  ].filter((question) => GCSE_CHEMISTRY.includes(question.subjectId));
+  const bank = seedQuestions.filter((question) => GCSE_CHEMISTRY.includes(question.subjectId));
+
+  it("every GCSE chemistry subject builds from the GCSE outline, with no A-level slug or idea", () => {
+    const slugs = GCSE_CHEMISTRY_OUTLINE.flatMap((unit) => unit.topics.map((topic) => topic.slug));
+    for (const subjectId of GCSE_CHEMISTRY) {
+      const topics = topicsFor(subjectId);
+      expect(topics.map((topic) => topic.id.slice(subjectId.length + 1)), subjectId).toEqual(slugs);
+      for (const topic of topics) {
+        expect(`${topic.title} ${topic.summary} ${topic.keyPoints.join(" ")} ${(topic.specPoints ?? []).map((p) => p.text).join(" ")}`, topic.id).not.toMatch(CHEM_A_LEVEL_ONLY);
+        expect(topic.specPoints?.length, topic.id).toBeGreaterThanOrEqual(3);
+      }
+      for (const slug of ["atomic-structure", "moles", "bonding", "energetics", "kinetics", "equilibria", "acids-bases", "redox", "periodicity", "transition-metals", "organic-basics", "hydrocarbons", "carbonyls-acids", "aromatics-nitrogen", "spectroscopy"]) {
+        expect(getTopic(`${subjectId}.${slug}`), `${subjectId}.${slug}`).toBeUndefined();
+      }
+      expect(referenceDisclaimerFor(subjectId)).toMatch(/DfE GCSE subject content/);
+    }
+    expect(referenceDisclaimerFor("wjec-gcse-chemistry")).toMatch(/regulated separately/);
+  });
+
+  it("every question is tagged to its own subject's GCSE outline, with no A-level idea in it", () => {
+    expect(bank.length).toBeGreaterThan(150);
+    for (const question of bank) {
+      for (const topicId of question.topicIds) expect(getTopic(topicId), `${question.id}: ${topicId}`).toBeDefined();
+      for (const part of question.parts) {
+        expect(part.specPointIds?.length, `${question.id} part ${part.id}`).toBeGreaterThan(0);
+        for (const id of part.specPointIds ?? []) {
+          expect(question.topicIds.map(getTopic).some((t) => t?.specPoints?.some((p) => p.id === id)), `${question.id}: ${id}`).toBe(true);
+        }
+      }
+      const text = `${question.stem} ${question.parts.map((p) => `${p.prompt} ${p.modelAnswer} ${p.markScheme.join(" ")}`).join(" ")}`;
+      expect(text, question.id).not.toMatch(CHEM_A_LEVEL_ONLY);
+    }
+  });
+
+  it("every template is placed or withheld by a person, and every topic has a question on every board", () => {
+    const unplaced = [...new Set(raw.map(gcseTemplateKey).filter((key) => !(key in GCSE_CHEMISTRY_PLACEMENT) && !key.startsWith("gcse-chemistry-course-")))];
+    expect(unplaced).toEqual([]);
+    const templates = new Set(raw.map(gcseTemplateKey));
+    expect(Object.keys(GCSE_CHEMISTRY_PLACEMENT).filter((key) => !templates.has(key))).toEqual([]);
+    for (const subjectId of GCSE_CHEMISTRY) {
+      const questions = bank.filter((question) => question.subjectId === subjectId);
+      const uncovered = topicsFor(subjectId).filter((topic) => !questions.some((question) => question.topicIds.includes(topic.id)));
+      expect(uncovered.map((topic) => topic.id), subjectId).toEqual([]);
+    }
+  });
+
+  it("every GCSE chemistry misconception names a topic its subject has", () => {
+    for (const subjectId of GCSE_CHEMISTRY) {
+      for (const entry of misconceptionsForSubject(subjectId)) {
+        for (const topicId of entry.topicIds) expect(getTopic(topicId), `${entry.id}: ${topicId}`).toBeDefined();
+      }
+    }
   });
 });

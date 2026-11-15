@@ -33,22 +33,20 @@ export const GCSE_REFERENCE_DISCLAIMER =
  * GCSE subject content (./outlines/gcse-*.ts), not the WJEC A-level one. The
  * other GCSE subjects keep GCSE_REFERENCE_DISCLAIMER until theirs is written.
  */
-export const GCSE_SUBJECT_CONTENT_SUBJECTS: ReadonlySet<string> = new Set([
-  "aqa-gcse-physics",
-  "edexcel-gcse-physics",
-  "ocr-gcse-physics",
-  "wjec-gcse-physics",
-]);
+export const GCSE_SUBJECT_CONTENT_SUBJECTS: ReadonlySet<string> = new Set(
+  ["aqa", "edexcel", "ocr", "wjec"].flatMap((board) => ["physics", "chemistry"].map((subject) => `${board}-gcse-${subject}`)),
+);
 
-export const GCSE_SUBJECT_CONTENT_DISCLAIMER =
-  "Reference-tier GCSE: this subject's topics follow the DfE GCSE subject content that this board's specification is built on, not yet the board's own topic order and numbering. Its notes, flashcards and questions have not been checked by a teacher.";
+const DFE_TOPICS = "Reference-tier GCSE: this subject's topics follow the DfE GCSE subject content";
+const NOT_TEACHER_CHECKED = "Its notes, flashcards and questions have not been checked by a teacher.";
+
+export const GCSE_SUBJECT_CONTENT_DISCLAIMER = `${DFE_TOPICS} that this board's specification is built on, not yet the board's own topic order and numbering. ${NOT_TEACHER_CHECKED}`;
 
 /**
  * WJEC's GCSE for Wales is regulated by Qualifications Wales and is not built
  * on the DfE document, so its label must not claim it is.
  */
-export const WJEC_GCSE_SUBJECT_CONTENT_DISCLAIMER =
-  "Reference-tier GCSE: this subject's topics follow the DfE GCSE subject content for England. WJEC's GCSE for Wales shares most of it but is regulated separately, so check your own specification for differences. Its notes, flashcards and questions have not been checked by a teacher.";
+export const WJEC_GCSE_SUBJECT_CONTENT_DISCLAIMER = `${DFE_TOPICS} for England. WJEC's GCSE for Wales shares most of it but is regulated separately, so check your own specification for differences. ${NOT_TEACHER_CHECKED}`;
 
 /**
  * Reference subjects whose topic list was written for their own board's

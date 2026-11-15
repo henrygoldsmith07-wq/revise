@@ -138,9 +138,12 @@ background and do other work while it runs. On Windows, invoke npm through
   (`src/content/gcse-question-scope.ts`): a shared template is retagged to
   a GCSE statement or withheld (`null`), an unplaced template is withheld
   and fails `tests/gcse-question-scope.test.ts`, and the
-  `gcse-physics-course-` pack is written for the outline directly. Do
-  biology, chemistry and maths the same way: their GCSE trees are still the
-  A-level ones.
+  `gcse-physics-course-` pack is written for the outline directly. GCSE
+  chemistry follows the same pattern from pass 120 (`GCSE_CHEMISTRY_OUTLINE`,
+  `GCSE_CHEMISTRY_PLACEMENT`, `gcse-chemistry-course-`); q = mcΔT and
+  relative atomic mass from abundances are withheld because the DfE
+  chemistry content has no statement for them. Do biology and maths the
+  same way: their GCSE trees are still the A-level ones.
 - **Reference subjects' topic trees load on demand** (one-hundred-and-tenth
   pass, `/` → 2.24 MB raw / 652 KB gzip). Every subject's metadata is
   registered at startup from `src/domain/curriculum/catalog.ts`; only the four

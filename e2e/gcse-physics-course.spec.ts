@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 // onboarding note, the lessons and the flashcards must all be GCSE.
 const A_LEVEL_ONLY = /photoelectric|simple harmonic|gravitational potential(?! energy)|centripetal|Young modulus|internal resistance/i;
 
-async function onboardAqaGcsePhysics(page: Page) {
+async function onboardAqaGcse(page: Page, subject: RegExp = /Physics/) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
   await page.getByText("Revision that knows what to do next").waitFor({ state: "visible", timeout: 60_000 });
@@ -18,9 +18,9 @@ async function onboardAqaGcsePhysics(page: Page) {
   await page.getByRole("button", { name: /^Continue$/i }).click();
 
   await page.getByRole("button", { name: /unverified preview/i }).first().click();
-  // The GCSE row names physics as the subject that follows the GCSE content.
-  await expect(page.getByText(/Except Physics: its topics follow the DfE GCSE subject content/)).toBeVisible();
-  await page.getByRole("group", { name: "GCSE unverified preview subjects" }).getByRole("button", { name: /Physics/ }).click();
+  // The GCSE row names the subjects that follow the GCSE content.
+  await expect(page.getByText(/Except (Chemistry and Physics|Physics and Chemistry): their topics follow the DfE GCSE subject content/)).toBeVisible();
+  await page.getByRole("group", { name: "GCSE unverified preview subjects" }).getByRole("button", { name: subject }).click();
   await page.getByRole("button", { name: /Continue/i }).click();
   const finalCta = page.getByRole("button", { name: /Start my quick check|Build my plan|Start revising|Finish/i });
   for (let step = 0; step < 4 && !(await finalCta.isVisible().catch(() => false)); step++) {
@@ -33,7 +33,7 @@ async function onboardAqaGcsePhysics(page: Page) {
 
 test("a GCSE physics student is taught GCSE physics, not A-level", async ({ page }) => {
   test.setTimeout(180_000);
-  await onboardAqaGcsePhysics(page);
+  await onboardAqaGcse(page);
 
   // Lessons: the GCSE outline, under the DfE headings.
   await page.goto("/lesson?subject=aqa-gcse-physics");
@@ -62,7 +62,7 @@ test("a GCSE physics student is taught GCSE physics, not A-level", async ({ page
 // mistake is read on the GCSE topic it now tests, never shown as a raw id.
 test("a mistake on a topic the GCSE course no longer has is read on its GCSE topic", async ({ page }) => {
   test.setTimeout(180_000);
-  await onboardAqaGcsePhysics(page);
+  await onboardAqaGcse(page);
   await page.evaluate(async () => {
     type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open("revise"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
@@ -105,4 +105,24 @@ test("a mistake on a topic the GCSE course no longer has is read on its GCSE top
   await page.goto("/schedule");
   await expect(main).toBeVisible();
   await expect(page.locator('a[href*="kinematics-dynamics"]')).toHaveCount(0);
+});
+
+// GCSE chemistry builds from the DfE chemistry content too (pass 120).
+const CHEM_A_LEVEL_ONLY = /\bKc\b|order of reaction|electrode potential|ionisation energ|d-orbital|ligand|oxidation state|NMR|Tollens|nucleophil/i;
+
+test("a GCSE chemistry student is taught GCSE chemistry, not A-level", async ({ page }) => {
+  test.setTimeout(180_000);
+  await onboardAqaGcse(page, /Chemistry/);
+  const main = page.locator("main#main");
+  await page.goto("/lesson?subject=aqa-gcse-chemistry");
+  await expect(main).toContainText("Atoms, isotopes and the model of the atom", { timeout: 30_000 });
+  await expect(main).toContainText("Percentage yield and atom economy");
+  await expect(main).not.toContainText(CHEM_A_LEVEL_ONLY);
+  await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 360);
+  await page.goto("/review?subject=aqa-gcse-chemistry");
+  const show = main.getByRole("button", { name: /Show answer/ }).first();
+  await expect(show).toBeVisible({ timeout: 30_000 });
+  await expect(main).not.toContainText(CHEM_A_LEVEL_ONLY);
+  await show.click();
+  await expect(main).not.toContainText(CHEM_A_LEVEL_ONLY);
 });

@@ -797,5 +797,5 @@ function gcseRowNote(subjects: ReadonlyArray<{ id: string; name: string }>): str
   if (!alevel.length) return `Their topics follow the DfE GCSE subject content, not yet this board's own order and numbering. ${unchecked}`;
   const lead = "These use the WJEC A-level topic list, so their lessons and flashcards go well beyond GCSE; only the practice questions were written for GCSE.";
   if (!gcse.length) return `${lead} ${unchecked}`;
-  return `${lead} Except ${gcse.map((subject) => subject.name).join(", ")}: its topics follow the DfE GCSE subject content. ${unchecked}`;
+  return `${lead} Except ${gcse.map((subject) => subject.name).join(" and ")}: ${gcse.length > 1 ? "their" : "its"} topics follow the DfE GCSE subject content. ${unchecked}`;
 }
