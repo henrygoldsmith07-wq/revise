@@ -259,6 +259,7 @@ function pastPaperPage(): StaticPage {
 
   return {
     path: PAST_PAPERS,
+    parent: { label: "WJEC A-level Physics", path: HUB },
     title: "WJEC A-level Physics past paper questions by topic",
     heading: "WJEC A-level Physics past paper questions by topic",
     description: `All ${coverage.questions} questions from ${coverage.papers} WJEC AS and A level Physics papers (${span}), sorted by unit and by topic, with links to WJEC's papers and mark schemes.`,
@@ -296,6 +297,7 @@ function definitionsPage(): StaticPage {
 
   return {
     path: DEFINITIONS,
+    parent: { label: "WJEC A-level Physics", path: HUB },
     title: "WJEC A-level Physics definitions to learn",
     heading: "WJEC A-level Physics definitions",
     description: `The ${points.length} definitions and laws WJEC A-level Physics asks you to state, written out with equations and units, each linked to practice.`,
@@ -316,6 +318,7 @@ function dataBookletPage(): StaticPage {
 
   return {
     path: DATA_BOOKLET,
+    parent: { label: "WJEC A-level Physics", path: HUB },
     title: "WJEC A-level Physics data booklet: constants and equations",
     heading: "WJEC A-level Physics data booklet",
     description: `The ${sheet.constants.length} physical constants and the key equations by topic for WJEC A-level Physics, so you know what the data booklet gives you and what to learn.`,

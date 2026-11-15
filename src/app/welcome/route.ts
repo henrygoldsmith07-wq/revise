@@ -9,7 +9,8 @@
 // The words live in src/lib/welcome.ts so this page and /welcome.md say the
 // same thing; the claims they may make are explained there.
 
-import { absoluteUrl, SITE } from "@/lib/site";
+import { absoluteUrl, jsonLdScript, SITE } from "@/lib/site";
+import { webPageJsonLd } from "@/lib/static-page";
 import { inlineHtml, WELCOME, type WelcomeSection } from "@/lib/welcome";
 
 const CANONICAL = absoluteUrl("/welcome");
@@ -41,6 +42,7 @@ const PAGE = `<!doctype html>
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="${WELCOME.title}">
 <meta name="twitter:description" content="${WELCOME.socialDescription}">
+<script type="application/ld+json">${jsonLdScript(webPageJsonLd({ path: "/welcome", title: WELCOME.title, description: WELCOME.description }))}</script>
 <style>
   :root { color-scheme: light dark; }
   body { margin: 0; font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f4f6; color: #16161a; }

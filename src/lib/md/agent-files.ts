@@ -65,13 +65,12 @@ export function buildLlmsTxt(): string {
     "## Machine-readable",
     mdList([
       `${mdLink("Full content", "/llms-full.txt")}: the core pages, guides, lessons and flagship topics in one file`,
-      `${mdLink("Markdown catalog", "/api/md/_catalog")}: every markdown page (${routes.length}), as JSON`,
       `${mdLink("Sitemap", "/sitemap.xml")}: the indexable HTML pages`,
       `${mdLink("AI usage policy", "/ai.txt")}: what you may do with this content`,
     ]),
     "",
     "## Optional",
-    mdList([`${mdLink("Landing page", SITE.landingUrl)}: the static introduction to Revise`]),
+    mdList([`${mdLink("Markdown catalog", "/api/md/_catalog")}: every markdown page (${routes.length}), as JSON`]),
     "",
     `<!-- ${SYNC_NOTE} -->`,
   ].join("\n")}\n`;
@@ -130,7 +129,7 @@ export function buildAiTxt(input: { siteName: string; url: string; description: 
     `name: ${input.siteName}`,
     `url: ${input.url}`,
     `description: ${input.description}`,
-    `contact: ${SITE.landingUrl}`,
+    `contact: ${SITE.url}/welcome`,
     "",
     "[permissions]",
     "summarise: allowed",
@@ -155,7 +154,7 @@ export function buildAiTxt(input: { siteName: string; url: string; description: 
     `exclude: ${input.exclude.join(", ")}`,
     "",
     "[contact]",
-    `url: ${SITE.landingUrl}`,
+    `url: ${SITE.url}/welcome`,
   ].join("\n")}\n`;
 }
 

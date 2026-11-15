@@ -5,7 +5,7 @@
 name: Revise
 url: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app
 description: Revise — WJEC A-level revision that tells you the one thing to do next. Four subjects authored to their specification, FSRS scheduling, examiner-style marking, and honest coverage: nothing counts as evidence until two people have reviewed it.
-contact: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app
+contact: https://www.revise.my.id/welcome
 
 [permissions]
 summarise: allowed
@@ -30,4 +30,4 @@ include: /, /index.md, /llms.txt
 exclude: none: this site has no private paths
 
 [contact]
-url: https://revise-site-henrygoldsmith07-9188s-projects.vercel.app
+url: https://www.revise.my.id/welcome

@@ -22,7 +22,9 @@ describe("WJEC Physics guide pages", () => {
     expect(page).toContain('<meta name="robots" content="index, follow">');
     expect(page).toContain(`<link rel="canonical" href="${absoluteUrl(path)}">`);
     expect(page).toContain(`<link rel="alternate" type="text/markdown" href="${absoluteUrl(`${path}.md`)}">`);
-    expect(page).not.toContain("<script");
+    // Zero JavaScript: the only <script> is the ld+json data block, which never runs.
+    expect(page.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "")).not.toContain("<script");
+    expect(page).toContain('<script type="application/ld+json">');
     expect(page).not.toMatch(/\son[a-z]+=/);
     expect(page.endsWith("</html>")).toBe(true);
     expect(physicsGuide(path).title.length).toBeLessThanOrEqual(60);
