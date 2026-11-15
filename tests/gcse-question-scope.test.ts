@@ -15,9 +15,9 @@ import { GCSE_PHYSICS_PLACEMENT, gcseTemplateKey, scopeGcseQuestion } from "@/co
 import { GCSE_PHYSICS_OUTLINE } from "@/domain/curriculum/outlines/gcse-physics";
 import { getTopic, topicsFor } from "@/domain/curriculum";
 import { referenceDisclaimerFor } from "@/domain/curriculum/honesty";
-import { liveCards, loadedTopics, retiredSeedCard } from "@/domain/card-retirement";
+import { liveCards, liveRecords, loadedTopics, relocatedAttempt, relocatedMistake, retiredSeedCard } from "@/domain/card-retirement";
 import { seedCardsForTopic } from "@/content/seed-cards";
-import type { Question } from "@/domain/types";
+import type { Attempt, Card, Mistake, Question } from "@/domain/types";
 
 const GCSE_PHYSICS = ["aqa-gcse-physics", "edexcel-gcse-physics", "ocr-gcse-physics", "wjec-gcse-physics"];
 
@@ -148,5 +148,70 @@ describe("seed cards from a topic that has left its subject retire from review",
     const store = readFileSync("src/state/store.tsx", "utf8");
     expect(store).toContain("useLearnerMastery(liveSnapshot, topics)");
     expect(store).toContain("...(liveSnapshot ?? snapshot),");
+  });
+});
+
+describe("mistakes and attempts on a topic that has left its subject are read on the current tree", () => {
+  const loaded = loadedTopics(topicsFor("aqa-gcse-physics"));
+  const byId = new Map(seedQuestions.map((question) => [question.id, question]));
+  const retagged = byId.get("cnt:question:gcse-expansion-aqa-gcse-physics-acceleration-calculation")!;
+  const OLD = "aqa-gcse-physics.kinematics-dynamics";
+  const mistake = (over: Partial<Mistake>): Mistake => ({
+    id: "m1", userId: "u1", subjectId: "aqa-gcse-physics", topicId: OLD, questionId: retagged.id, partId: retagged.parts[0]!.id,
+    marksLost: 2, description: "Lost the acceleration mark", category: "method", resolved: false, createdAt: "2026-11-01T10:00:00.000Z", ...over,
+  });
+
+  it("the retagged question survived under its old id, on a GCSE topic", () => {
+    expect(getTopic(OLD)).toBeUndefined();
+    expect(retagged.topicIds).toEqual(["aqa-gcse-physics.speed-acceleration"]);
+  });
+
+  it("a lost mark on a retagged question moves to the topic its part now tests", () => {
+    expect(relocatedMistake(mistake({}), loaded, byId)?.topicId).toBe("aqa-gcse-physics.speed-acceleration");
+  });
+
+  it("a lost mark on a question withheld as A-level material, or on no question, is retired", () => {
+    const withheld = "cnt:question:gcse-expansion-aqa-gcse-physics-photon-energy";
+    expect(byId.has(withheld)).toBe(false);
+    expect(relocatedMistake(mistake({ questionId: withheld, partId: `${withheld}:0` }), loaded, byId)).toBeNull();
+    expect(relocatedMistake(mistake({ questionId: undefined, partId: undefined }), loaded, byId)).toBeNull();
+  });
+
+  it("leaves a mistake alone when its topic is current or its subject is not loaded", () => {
+    const current = mistake({ topicId: "aqa-gcse-physics.speed-acceleration" });
+    expect(relocatedMistake(current, loaded, byId)).toBe(current);
+    const unloaded = mistake({ subjectId: "ocr-gcse-physics", topicId: "ocr-gcse-physics.kinematics-dynamics" });
+    expect(relocatedMistake(unloaded, loaded, byId)).toBe(unloaded);
+  });
+
+  it("an attempt takes its question's current topics; a withheld question's attempt is left as it was", () => {
+    const attempt = { subjectId: "aqa-gcse-physics", topicIds: [OLD], questionId: retagged.id } as Attempt;
+    expect(relocatedAttempt(attempt, loaded, byId).topicIds).toEqual(["aqa-gcse-physics.speed-acceleration"]);
+    const gone = { ...attempt, questionId: "cnt:question:gcse-expansion-aqa-gcse-physics-photon-energy" };
+    expect(relocatedAttempt(gone, loaded, byId)).toBe(gone);
+  });
+
+  it("a card made from a relocated mistake moves with it; unchanged arrays come back as given", () => {
+    const card = { origin: "mistake", subjectId: "aqa-gcse-physics", topicId: OLD, sourceMistakeId: "m1" } as Card;
+    const records = { mistakes: [mistake({})], attempts: [] as Attempt[], cards: [card] };
+    const live = liveRecords(records, loaded, seedQuestions);
+    expect(live.mistakes[0]!.topicId).toBe("aqa-gcse-physics.speed-acceleration");
+    expect(live.cards[0]!.topicId).toBe("aqa-gcse-physics.speed-acceleration");
+    expect(records.mistakes[0]!.topicId).toBe(OLD);
+    const clean = { mistakes: [mistake({ topicId: "aqa-gcse-physics.speed-acceleration" })], attempts: [] as Attempt[], cards: [] as Card[] };
+    const same = liveRecords(clean, loaded, seedQuestions);
+    expect(same.mistakes).toBe(clean.mistakes);
+    expect(same.attempts).toBe(clean.attempts);
+  });
+
+  it("the store reads every record through liveRecords, recording attempts included", async () => {
+    const { readFileSync } = await import("node:fs");
+    const store = readFileSync("src/state/store.tsx", "utf8");
+    expect(store).toContain("liveRecords({ cards: snapshotCards, mistakes: snapshotMistakes, attempts: snapshotAttempts }, loaded, snapshotQuestions)");
+    expect(store).toContain("liveSnapshot?.mistakes.find((mistake) => mistake.id === attempt.retestMistakeId");
+    expect(store).toContain("usePlanning({ userId, snapshot: liveSnapshot,");
+    // The plan rebuilds blocks on a removed topic at the next boot, with no other change.
+    const planning = readFileSync("src/state/planning.ts", "utf8");
+    expect(planning).toContain("plannedTopicsLeftTree(snapshot.plannedSessions, knownTopics)");
   });
 });

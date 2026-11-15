@@ -19,6 +19,11 @@
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.revise.my.id").replace(/\/+$/, "");
 
 /** The static landing page (revise-site/, its own Vercel project). */
+// The static landing site's own canonical (revise-site/, built by
+// scripts/generate-revise-site-ai-files.mjs). On 2026-11-15 this address
+// answered DEPLOYMENT_NOT_FOUND, so nothing the app serves links to it: a
+// dead sameAs, contact or "related" link costs crawlers and agents a hop to
+// nowhere. Point it at a live deployment before linking it again.
 export const LANDING_URL = "https://revise-site-henrygoldsmith07-9188s-projects.vercel.app";
 
 export const SITE = {
@@ -56,7 +61,6 @@ export function siteJsonLd(): Record<string, unknown> {
         url: SITE.url,
         logo: absoluteUrl("/logo.svg"),
         description: SITE.description,
-        sameAs: [SITE.landingUrl],
       },
       {
         "@type": "WebSite",

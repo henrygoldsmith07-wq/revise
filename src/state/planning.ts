@@ -9,13 +9,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { allSubjects, getSubject } from "@/domain/curriculum";
+import { allSubjects, allTopics, getSubject } from "@/domain/curriculum";
 import { daysToExam } from "@/domain/recommender";
 import { buildPlan, rescheduleMissed, summarizePlanChange } from "@/domain/planner";
 import { buildSubjectEvidence } from "@/domain/subject-allocation";
 import { currentPhaseBuckets, techniqueEntryNotices } from "@/domain/phase-notice";
 import type { PhaseBucket, PhaseNotice, PhaseSubject } from "@/domain/phase-notice";
-import { computeFingerprint, fingerprintKey, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
+import { computeFingerprint, fingerprintKey, plannedTopicsLeftTree, replanDynamically, type ReplanFingerprint } from "@/domain/replan";
 import { todayIso } from "@/domain/scheduling";
 import { XP } from "@/domain/gamification";
 import type {
@@ -87,11 +87,14 @@ export function usePlanning(input: {
       yearGroup: snapshot.settings.yearGroup,
       unit4Option: snapshot.settings.yearGroup === "year-13" ? snapshot.settings.unit4Option : undefined,
     });
+    // Blocks on a topic that has left its subject's tree are rebuilt even
+    // when no input changed: the boot after a subject's tree is rebuilt.
+    const knownTopics = allTopics(snapshot.settings.subjectIds);
+    const leftTree = plannedTopicsLeftTree(snapshot.plannedSessions, knownTopics).length > 0;
     if (lastFingerprint.current === null) {
       lastFingerprint.current = current;
-      return;
-    }
-    if (fingerprintKey(current) === fingerprintKey(lastFingerprint.current)) return;
+      if (!leftTree) return;
+    } else if (fingerprintKey(current) === fingerprintKey(lastFingerprint.current) && !leftTree) return;
     const previous = lastFingerprint.current;
     lastFingerprint.current = current;
     void (async () => {
@@ -110,6 +113,7 @@ export function usePlanning(input: {
         evidence: buildSubjectEvidence(snapshot.cards, snapshot.mistakes, snapshot.attempts, todayIso(), snapshot.questions),
         existing: snapshot.plannedSessions,
         previous,
+        knownTopics,
       });
       if (result.changed) {
         await repo.replacePlan(userId, result.plan);

@@ -363,7 +363,9 @@ describe("/pricing", () => {
   it("is an indexable, script-free page in the sitemap, with a twin", () => {
     expect(html).toContain('<meta name="robots" content="index, follow">');
     expect(html).toContain(`<link rel="canonical" href="${absoluteUrl(PRICING_PATH)}">`);
-    expect(html).not.toContain("<script");
+    // Zero JavaScript: the only <script> is the ld+json data block, which never runs.
+    expect(html.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "")).not.toContain("<script");
+    expect(html).toContain('<script type="application/ld+json">');
     expect(sitemap().map((entry) => entry.url)).toContain(absoluteUrl(PRICING_PATH));
     expect(renderMarkdown(PRICING_PATH)!.text).toContain(`Canonical: ${absoluteUrl(PRICING_PATH)}`);
   });

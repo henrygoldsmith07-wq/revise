@@ -1,12 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // A GCSE physics student (AQA) at 360px. GCSE physics used to be the WJEC
 // A-level course; it now builds from the DfE GCSE subject content. The
 // onboarding note, the lessons and the flashcards must all be GCSE.
 const A_LEVEL_ONLY = /photoelectric|simple harmonic|gravitational potential(?! energy)|centripetal|Young modulus|internal resistance/i;
 
-test("a GCSE physics student is taught GCSE physics, not A-level", async ({ page }) => {
-  test.setTimeout(180_000);
+async function onboardAqaGcsePhysics(page: Page) {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/");
   await page.getByText("Revision that knows what to do next").waitFor({ state: "visible", timeout: 60_000 });
@@ -30,6 +29,12 @@ test("a GCSE physics student is taught GCSE physics, not A-level", async ({ page
   await finalCta.click();
   await expect(page.locator("main#main")).toBeVisible({ timeout: 60_000 });
 
+}
+
+test("a GCSE physics student is taught GCSE physics, not A-level", async ({ page }) => {
+  test.setTimeout(180_000);
+  await onboardAqaGcsePhysics(page);
+
   // Lessons: the GCSE outline, under the DfE headings.
   await page.goto("/lesson?subject=aqa-gcse-physics");
   const main = page.locator("main#main");
@@ -50,4 +55,54 @@ test("a GCSE physics student is taught GCSE physics, not A-level", async ({ page
     await main.getByRole("button", { name: /^Good/ }).first().click();
     await expect(main.getByRole("button", { name: /^Good/ })).toHaveCount(0, { timeout: 15_000 });
   }
+});
+
+// A lost mark recorded before the GCSE outline existed sits on an A-level
+// topic id the subject no longer has. Its question survived, retagged; the
+// mistake is read on the GCSE topic it now tests, never shown as a raw id.
+test("a mistake on a topic the GCSE course no longer has is read on its GCSE topic", async ({ page }) => {
+  test.setTimeout(180_000);
+  await onboardAqaGcsePhysics(page);
+  await page.evaluate(async () => {
+    type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open("revise"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const cards: Row[] = await new Promise((res) => { const r = db.transaction("cards").objectStore("cards").getAll(); r.onsuccess = () => res(r.result as Row[]); });
+    const userId = cards[0]!.userId as string;
+    const questionId = "cnt:question:gcse-expansion-aqa-gcse-physics-acceleration-calculation";
+    const at = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    const today = new Date().toLocaleDateString("en-CA");
+    const tx = db.transaction(["attempts", "mistakes", "plannedSessions"], "readwrite");
+    tx.objectStore("plannedSessions").put({
+      id: "old-block", userId, date: today, startMinute: 23 * 60, minutes: 30, subjectId: "aqa-gcse-physics",
+      topicId: "aqa-gcse-physics.kinematics-dynamics", activity: "practice", reason: "Weakest topic", status: "pending",
+    });
+    tx.objectStore("attempts").put({
+      id: "old-att", userId, questionId, subjectId: "aqa-gcse-physics", topicIds: ["aqa-gcse-physics.kinematics-dynamics"], answers: {},
+      marked: [{ partId: `${questionId}:0:aqa-gcse-physics.kinematics-dynamics.sp-01`, awarded: 0, max: 3, points: [] }],
+      awarded: 0, max: 3, feedback: "", markedBy: "rubric", elapsedMs: 90_000, mode: "practice", createdAt: at,
+    });
+    tx.objectStore("mistakes").put({
+      id: "old-m", userId, subjectId: "aqa-gcse-physics", topicId: "aqa-gcse-physics.kinematics-dynamics", questionId, attemptId: "old-att",
+      marksLost: 3, description: "Divided the wrong way round", category: "method", resolved: false, createdAt: at,
+    });
+    await new Promise((r) => { tx.oncomplete = r; });
+  });
+  await page.goto("/");
+  const main = page.locator("main#main");
+  await expect(main).toContainText(/Speed, velocity and acceleration/, { timeout: 60_000 });
+  await expect(page.locator("body")).not.toContainText("kinematics-dynamics");
+  await page.goto("/study");
+  await expect(main).toContainText(/Speed, velocity and acceleration/, { timeout: 30_000 });
+  await expect(page.locator("body")).not.toContainText("kinematics-dynamics");
+  // A plan block on the old topic is rebuilt at boot, with nothing else changed.
+  const pendingOnOldTopic = () => page.evaluate(async () => {
+    const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open("revise"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const rows: Array<{ topicId?: string; status: string }> = await new Promise((res) => { const r = db.transaction("plannedSessions").objectStore("plannedSessions").getAll(); r.onsuccess = () => res(r.result); });
+    db.close();
+    return rows.filter((row) => row.status === "pending" && row.topicId === "aqa-gcse-physics.kinematics-dynamics").length;
+  });
+  await expect.poll(pendingOnOldTopic, { timeout: 30_000 }).toBe(0);
+  await page.goto("/schedule");
+  await expect(main).toBeVisible();
+  await expect(page.locator('a[href*="kinematics-dynamics"]')).toHaveCount(0);
 });

@@ -27,7 +27,8 @@ export type ReplanReason =
   | "availability-changed"
   | "session-length-changed"
   | "subject-set-changed"
-  | "year-changed";
+  | "year-changed"
+  | "topics-changed";
 
 /** The replan-relevant inputs, reduced to comparable strings/values. */
 export interface ReplanFingerprint {
@@ -75,6 +76,18 @@ export function fingerprintKey(fp: ReplanFingerprint): string {
   return JSON.stringify(fp);
 }
 
+/**
+ * Pending blocks planned on a topic that has left its subject's tree, as
+ * every GCSE physics topic did when the subject was rebuilt from the DfE
+ * content: the block names no topic Revise can show and links to an empty
+ * practice queue. A subject whose tree is not loaded is never judged.
+ */
+export function plannedTopicsLeftTree(existing: readonly PlannedSession[], known: ReadonlyArray<Pick<Topic, "id" | "subjectId">>): PlannedSession[] {
+  const subjects = new Set(known.map((topic) => topic.subjectId));
+  const topics = new Set(known.map((topic) => topic.id));
+  return existing.filter((s) => s.status === "pending" && s.topicId !== undefined && subjects.has(s.subjectId) && !topics.has(s.topicId));
+}
+
 export interface ReplanInput {
   userId: Id;
   topics: Topic[];
@@ -92,6 +105,12 @@ export interface ReplanInput {
   evidence?: Map<Id, SubjectEvidence>;
   /** Fingerprint of the inputs the current plan was built from, when known. */
   previous?: ReplanFingerprint;
+  /**
+   * Every topic of the enrolled subjects' trees, year scope aside; defaults
+   * to `topics`. A pending block on a topic its loaded subject no longer has
+   * is rebuilt (plannedTopicsLeftTree).
+   */
+  knownTopics?: ReadonlyArray<Pick<Topic, "id" | "subjectId">>;
   now?: Date;
   horizonDays?: number;
   /** Daily block cap used when rolling missed sessions forward. */
@@ -124,6 +143,7 @@ export function replanDynamically(input: ReplanInput): ReplanResult {
     if (fingerprint.subjects !== previous.subjects) reasons.push("subject-set-changed");
     if ((fingerprint.year ?? "") !== (previous.year ?? "") || (fingerprint.unit4 ?? "") !== (previous.unit4 ?? "")) reasons.push("year-changed");
   }
+  if (plannedTopicsLeftTree(input.existing, input.knownTopics ?? input.topics).length > 0) reasons.push("topics-changed");
   const structural = reasons.length > 0;
 
   const hadMissed = input.existing.some((s) => s.status === "pending" && s.date < today);
@@ -179,6 +199,7 @@ function describeReplan(reasons: ReplanReason[], rolledSurvived: number): string
   if (reasons.includes("session-length-changed")) parts.push("session length changed");
   if (reasons.includes("subject-set-changed")) parts.push("your subjects changed");
   if (reasons.includes("year-changed")) parts.push("your year group or Unit 4 option changed");
+  if (reasons.includes("topics-changed")) parts.push("a subject's topic list changed");
   if (reasons.includes("sessions-missed")) {
     // Say only what survived: a structural rebuild replaces rolled-forward
     // blocks, and work with no room before its exam is not re-queued.

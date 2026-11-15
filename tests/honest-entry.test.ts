@@ -34,7 +34,9 @@ describe("no-JS entry point", () => {
     expect(welcome).toContain("text/html; charset=utf-8");
     // A route handler is served outside the app layout, so none of the client
     // providers apply. It must therefore ship no script at all.
-    expect(welcome).not.toContain("<script");
+    // Zero JavaScript: the only <script> is the ld+json data block, which never runs.
+    expect(welcome.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "")).not.toContain("<script");
+    expect(welcome).toContain('<script type="application/ld+json">');
     expect(welcome).not.toMatch(/\son[a-z]+=/);
     expect(welcome).not.toContain("dangerouslySetInnerHTML");
   });

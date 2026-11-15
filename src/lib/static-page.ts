@@ -8,7 +8,7 @@
 // Inline markup is the /welcome subset: **bold**, `code` and [text](/path or URL).
 
 import { mdTable } from "@/lib/md/format";
-import { absoluteUrl, SITE } from "@/lib/site";
+import { absoluteUrl, jsonLdScript, SITE, siteJsonLd } from "@/lib/site";
 import { inlineHtml, inlineMarkdown } from "@/lib/welcome";
 
 export interface StaticTable {
@@ -40,6 +40,8 @@ export interface StaticPage {
   lead: string;
   blocks: StaticBlock[];
   related: { label: string; path: string }[];
+  /** The page above this one, shown in the breadcrumb between Revise and the page. */
+  parent?: { label: string; path: string };
 }
 
 const STYLE = `
@@ -87,6 +89,61 @@ function blockHtml(block: StaticBlock): string {
   return parts.join("\n");
 }
 
+/** The site, its publisher and one page of it, for a page's ld+json block. */
+export function webPageJsonLd(page: { path: string; title: string; description: string }, breadcrumbId?: string): Record<string, unknown> {
+  const site = siteJsonLd();
+  const url = absoluteUrl(page.path);
+  return {
+    ...site,
+    "@graph": [
+      ...(site["@graph"] as unknown[]),
+      {
+        "@type": "WebPage",
+        "@id": `${url}#webpage`,
+        url,
+        name: page.title,
+        description: page.description,
+        inLanguage: SITE.locale,
+        isPartOf: { "@id": `${SITE.url}/#website` },
+        publisher: { "@id": `${SITE.url}/#organization` },
+        ...(breadcrumbId ? { breadcrumb: { "@id": breadcrumbId } } : {}),
+      },
+    ],
+  };
+}
+
+/** The breadcrumb trail: Revise, the parent page if any, then this page. */
+function crumbs(page: StaticPage): { label: string; path: string }[] {
+  return [{ label: SITE.name, path: "/welcome" }, ...(page.parent ? [page.parent] : []), { label: page.heading, path: page.path }];
+}
+
+/**
+ * Structured data that describes only what the page shows: the site and its
+ * publisher, the page itself, and the breadcrumb printed above the heading.
+ * No author (none is named on the page), no FAQ or review markup, no dates
+ * the page does not state.
+ */
+export function staticPageJsonLd(page: StaticPage): Record<string, unknown> {
+  const url = absoluteUrl(page.path);
+  const base = webPageJsonLd(page, `${url}#breadcrumb`);
+  return {
+    ...base,
+    "@graph": [
+      ...(base["@graph"] as unknown[]),
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${url}#breadcrumb`,
+        itemListElement: crumbs(page).map((crumb, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: crumb.label,
+          item: absoluteUrl(crumb.path),
+        })),
+      },
+    ],
+  };
+}
+
 /** The page as a complete HTML document: indexable, canonical, with its markdown twin linked. */
 export function renderStaticHtml(page: StaticPage): string {
   const canonical = absoluteUrl(page.path);
@@ -110,11 +167,12 @@ export function renderStaticHtml(page: StaticPage): string {
 <meta property="og:url" content="${canonical}">
 <meta property="og:locale" content="en_GB">
 <meta name="twitter:card" content="summary">
+<script type="application/ld+json">${jsonLdScript(staticPageJsonLd(page))}</script>
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
-  <nav class="crumbs" aria-label="Breadcrumb">${inlineHtml(`[${SITE.name}](/welcome)`)}</nav>
+  <nav class="crumbs" aria-label="Breadcrumb">${crumbs(page).slice(0, -1).map((crumb) => inlineHtml(`[${crumb.label}](${crumb.path})`)).join(" › ")}</nav>
   <h1>${inlineHtml(page.heading)}</h1>
   <p class="lead">${inlineHtml(page.lead)}</p>
 

@@ -110,7 +110,6 @@ const home: Renderer = () => ({
   ].join("\n\n"),
   related: [
     { label: "What Revise does, and what it cannot yet do", path: "/welcome" },
-    { label: "Revise landing page", path: SITE.landingUrl },
   ],
 });
 

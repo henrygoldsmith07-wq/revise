@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPlan } from "@/domain/planner";
-import { computeFingerprint, fingerprintKey, replanDynamically } from "@/domain/replan";
+import { computeFingerprint, fingerprintKey, plannedTopicsLeftTree, replanDynamically } from "@/domain/replan";
 import type {
   Availability,
   ExamDate,
@@ -200,5 +200,35 @@ describe("buildPlan target-gap weighting", () => {
     const maths = plan.filter((s) => s.subjectId === "maths").length;
     const physics = plan.filter((s) => s.subjectId === "physics").length;
     expect(maths).toBeGreaterThan(physics);
+  });
+});
+
+describe("a plan block on a topic that has left its subject's tree", () => {
+  const block = (over: Partial<PlannedSession>): PlannedSession => ({
+    id: "b", userId: "u", date: TODAY, startMinute: 960, minutes: 30, subjectId: "maths", topicId: "gone", activity: "practice", reason: "Weak topic: Gone", status: "pending", ...over,
+  });
+
+  it("is found only while pending, and only for a subject whose tree is loaded", () => {
+    const known = baseInput().topics;
+    expect(plannedTopicsLeftTree([block({})], known).map((s) => s.id)).toEqual(["b"]);
+    expect(plannedTopicsLeftTree([block({ status: "done" })], known)).toEqual([]);
+    expect(plannedTopicsLeftTree([block({ topicId: "m1" })], known)).toEqual([]);
+    expect(plannedTopicsLeftTree([block({ subjectId: "chemistry" })], known)).toEqual([]);
+  });
+
+  it("rebuilds the plan with no other input changed, keeping done history, and says why", () => {
+    const done = block({ id: "done", status: "done", date: "2025-06-01" });
+    const result = replanDynamically({ ...baseInput(), existing: [done, block({})], previous: computeFingerprint(baseInput()) });
+    expect(result.changed).toBe(true);
+    expect(result.reasons).toContain("topics-changed");
+    expect(result.plan.find((s) => s.id === "done")).toEqual(done);
+    expect(plannedTopicsLeftTree(result.plan, baseInput().topics)).toEqual([]);
+    expect(result.summary).toBe("Plan updated because a subject's topic list changed.");
+  });
+
+  it("judges the whole tree, not the year-scoped topics the plan is built from", () => {
+    const scoped = { ...baseInput(), topics: baseInput().topics.filter((t) => t.id !== "m2") };
+    const result = replanDynamically({ ...scoped, knownTopics: baseInput().topics, existing: [block({ topicId: "m2" })], previous: computeFingerprint(baseInput()) });
+    expect(result.reasons).not.toContain("topics-changed");
   });
 });
