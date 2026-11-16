@@ -288,8 +288,13 @@ export function useQuestionExecution({
   const awarded = useMemo(() => result?.marked.reduce((a, m) => a + m.awarded, 0) ?? 0, [result]);
 
   const funnelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A second invocation before React commits `marking` would mint a fresh
+  // attempt id and record the answer twice. Latch synchronously.
+  const submittingRef = useRef(false);
   useEffect(() => () => { if (funnelTimer.current) clearTimeout(funnelTimer.current); }, []);
   async function submit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setMarking(true);
     setSubmitError(null);
     try {
@@ -298,6 +303,7 @@ export function useQuestionExecution({
     } catch {
       setSubmitError("That answer was not marked or saved. It is still here, so you can submit it again.");
     } finally {
+      submittingRef.current = false;
       // Whatever marking or persistence does, the runner must never stay
       // stuck on "Marking…" with the submit button disabled.
       setMarking(false);

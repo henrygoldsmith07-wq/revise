@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-16 answer submit guard
+
+- `useQuestionExecution.submit()` now latches synchronously, so a second call before React commits `marking` cannot mint a second attempt id and record the answer twice. The latch resets in `finally`.
+
 ## 2026-11-16 CI and security-test evidence
 
 - Added runtime tests for `POST /api/reviewer/decisions` (`tests/reviewer-routes-behaviour.test.ts`) covering origin, body cap, strict schema, all three reviewer-context states, rate limiting and audit-chain failure without a write. The route's gates were previously asserted only by searching its source for status strings.
