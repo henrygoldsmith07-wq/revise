@@ -471,10 +471,6 @@ function TopicDetail({
         </section>
       ) : null}
 
-      <div className="flex flex-wrap gap-2" aria-label="Secondary study actions">
-        <span className="text-xs text-ink3">All study modes remain above under “More ways”. Manual card tools follow.</span>
-      </div>
-
       {status ? <p className="text-xs text-ink3">{status}</p> : null}
 
       {explanation ? (

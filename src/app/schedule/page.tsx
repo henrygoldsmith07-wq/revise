@@ -67,6 +67,7 @@ export default function SchedulePage() {
     : (() => { const p = todayPick(plan.top, store.adaptiveSession); return p ? { kind: "pick", pick: p } : null; })();
   const subjects = useSubjects();
   const [rebuilding, setRebuilding] = useState(false);
+  const [icsError, setIcsError] = useState<string | null>(null);
   const autoBuilt = useRef(false);
 
   const today = todayLocal();
@@ -109,21 +110,38 @@ export default function SchedulePage() {
 
   /** Download the plan + exams as an .ics any calendar app can import. */
   function downloadIcs() {
-    const ics = buildIcsCalendar({
-      sessions,
-      exams,
-      subjectName: (id) => getSubject(id)?.name ?? id,
-    });
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "revise-schedule.ics";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    try {
+      const ics = buildIcsCalendar({
+        sessions,
+        exams,
+        subjectName: (id) => getSubject(id)?.name ?? id,
+      });
+      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "revise-schedule.ics";
+      anchor.click();
+      // Give the browser time to start the download before releasing the URL;
+      // revoking synchronously can abort it in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setIcsError(null);
+    } catch {
+      setIcsError("Could not prepare the calendar file. Please try again.");
+    }
   }
 
-  if (!subjects.length) return null;
+  if (!subjects.length) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <EmptyState
+          title="No subjects yet"
+          body="Add a subject in Settings and your exam run-up will be scheduled here."
+          action={<ButtonLink href="/settings" variant="primary">Add a subject</ButtonLink>}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -143,6 +161,12 @@ export default function SchedulePage() {
           </Button>
         </div>
       </header>
+
+      {icsError ? (
+        <p role="alert" className="card px-4 py-3 text-xs text-danger">
+          {icsError}
+        </p>
+      ) : null}
 
       {store.replanSummary ? (
         // The plan rebuilt itself (an exam date, target, availability, subject

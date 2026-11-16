@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-16 small UX and copy fixes
+
+- Schedule no longer renders a blank page when no subject is enrolled: it shows an EmptyState linking to Settings. The `.ics` download now defers revoking its blob URL and reports a generation error instead of failing silently.
+- Practice disables its topic selector while "Generate similar questions" is in flight, so the queue cannot be rebuilt under a pending request.
+- Library's leftover developer note with the inaccurate "More ways" label was removed; the study-mode controls it described are already visible.
+
 ## 2026-11-16 security and reliability hardening
 
 - Production with AI or Supabase configured now fails closed instead of silently using per-process in-memory rate limits; the shared `consume_ai_quota` backend remains required there, and local/test behaviour is unchanged.

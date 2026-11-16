@@ -847,7 +847,7 @@ function Practice() {
       <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
         <select
           value={topicId}
-          disabled={Boolean(retestMistake || farTransferRetest || wrongOnly)}
+          disabled={generating || Boolean(retestMistake || farTransferRetest || wrongOnly)}
           onChange={(e) => {
             setTopicId(e.target.value);
             // The queue is rebuilt for the new filter, so a stale cursor would
