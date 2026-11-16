@@ -288,7 +288,7 @@ export function LessonMode({
 
           {next ? (
             <div className="pt-2 border-t border-line">
-              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Next up</p>
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Up next</p>
               <p className="text-sm font-medium text-ink mt-1">{next.lesson.title}</p>
               <p className="text-xs text-ink3 mt-0.5">{next.topic.title}</p>
               <Button variant={practiceHref ? "secondary" : "primary"} className="mt-3" onClick={continueFromSummary}>
@@ -298,7 +298,7 @@ export function LessonMode({
           ) : upNextSubject ? (
             <div className="pt-2 border-t border-line">
               <p className="text-sm text-ink3">All lessons in this subject are complete.</p>
-              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-3">Up next</p>
+              <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold mt-3">Next subject</p>
               <p className="text-sm font-medium text-ink mt-1">
                 {upNextSubject.name} — {upNextSubject.remaining} {upNextSubject.remaining === 1 ? "lesson" : "lessons"} left
               </p>
@@ -689,7 +689,7 @@ export function LessonMode({
 
   // ---- Learning roadmap ---------------------------------------------------
   const doneCount = lessons.filter(isEntryComplete).length;
-  // Mirror the summary's "Next up" on the roadmap: one glanceable resume card
+  // Mirror the summary's "Up next" on the roadmap: one glanceable resume card
   // instead of making the student scan for the first unfinished lesson. A
   // A topic is complete only after its guided written checkpoint is complete.
   const firstIncomplete = lessons.findIndex((entry) => !isEntryComplete(entry));
@@ -704,16 +704,6 @@ export function LessonMode({
   const roadmapTitle = currentSubjectId ? `${getSubject(currentSubjectId)?.name ?? "Subject"} roadmap` : "Learning roadmap";
   return (
     <div className="max-w-4xl mx-auto space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Subject roadmap</p>
-          <h2 className="text-lg font-semibold">{roadmapTitle}</h2>
-        </div>
-        <Button size="sm" variant="ghost" onClick={onExit}>
-          Exit
-        </Button>
-      </div>
-
       <section className="overflow-hidden rounded-2xl border border-line bg-surface2">
         {/* Tinted, not inverted: a full-bleed bg-accent header became a solid
             white slab in dark mode. */}
@@ -721,14 +711,19 @@ export function LessonMode({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.14em] font-bold text-ink3">Your learning path</p>
-              <h3 className="mt-1 text-xl font-bold tracking-tight">{roadmapTitle}</h3>
+              <h2 className="mt-1 text-xl font-bold tracking-tight">{roadmapTitle}</h2>
               <p className="mt-1 max-w-xl text-sm text-ink2">
                 Follow the path from foundations to exam-ready ideas. Each node opens written teaching, active recall, worked application and quick checks.
               </p>
             </div>
-            <div className="shrink-0 rounded-xl border border-line bg-surface2 px-3 py-2 text-center">
-              <p className="text-2xl font-bold leading-none tabular-nums">{doneCount}</p>
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink3 tabular-nums">of {lessons.length}</p>
+            <div className="flex shrink-0 items-start gap-2">
+              <div className="rounded-xl border border-line bg-surface2 px-3 py-2 text-center">
+                <p className="text-2xl font-bold leading-none tabular-nums">{doneCount}</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink3 tabular-nums">of {lessons.length}</p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={onExit}>
+                Exit
+              </Button>
             </div>
           </div>
         </div>
@@ -991,7 +986,7 @@ export function LessonMode({
                           >
                             {done ? "✓" : lessonNumber + 1}
                           </button>
-                          <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-ink3">
+                          <span className="mt-1 text-[11px] font-bold uppercase tracking-wide text-ink3">
                             {done ? "Done" : current ? "Start" : "Next"}
                           </span>
                         </div>

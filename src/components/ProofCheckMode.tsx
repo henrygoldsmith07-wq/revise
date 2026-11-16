@@ -49,7 +49,7 @@ export function ProofCheckMode({ topicId, onExit }: { topicId: string; onExit: (
   const onProgress = useCallback((position: number) => {
     if (position >= check.questionIds.length) return;
     if (position === 0) void recordFunnel("revision_task_started", `proof:${topicId}`);
-    void saveRevisionCheckpoint(proofCheckCheckpoint(check, { title: `Prove ${topic?.title ?? topicId}`, subjectId: topic?.subjectId ?? "" }, startedAt, position));
+    void saveRevisionCheckpoint(proofCheckCheckpoint(check, { title: `Prove ${topic?.title ?? "this topic"}`, subjectId: topic?.subjectId ?? "" }, startedAt, position));
   }, [check, recordFunnel, saveRevisionCheckpoint, startedAt, topic?.subjectId, topic?.title, topicId]);
 
   const onFinished = useCallback(() => {
@@ -59,8 +59,8 @@ export function ProofCheckMode({ topicId, onExit }: { topicId: string; onExit: (
 
   const exit = useCallback(() => { void clearRevisionCheckpoint(); onExit(); }, [clearRevisionCheckpoint, onExit]);
 
-  const label = topic?.title ?? topicId;
-  const subjectName = topic ? getSubject(topic.subjectId)?.name ?? topic.subjectId : "";
+  const label = topic?.title ?? "this topic";
+  const subjectName = topic ? getSubject(topic.subjectId)?.name ?? "your course" : "";
 
   if (!check.questionIds.length) {
     return (

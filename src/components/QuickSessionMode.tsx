@@ -130,7 +130,7 @@ export function QuickSessionMode({
           <div>
             <p className="text-lg font-semibold text-ink">Use the time you actually have.</p>
             <p className="text-sm text-ink3 mt-1">
-              {subject?.name ?? subjectId}{topicId ? ` · ${getTopic(topicId)?.title ?? topicId}` : ""} · {queue.length} question{queue.length === 1 ? "" : "s"} selected
+              {subject?.name ?? "your course"}{topicId ? ` · ${getTopic(topicId)?.title ?? "this topic"}` : ""} · {queue.length} question{queue.length === 1 ? "" : "s"} selected
             </p>
           </div>
 
@@ -170,7 +170,7 @@ export function QuickSessionMode({
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Question sprint</p>
           <h1 className="text-sm font-semibold truncate">I have {minutes} minutes</h1>
-          <p className="text-[11px] text-ink3">Question {index + 1} of {queue.length} · {subject?.name ?? subjectId}</p>
+          <p className="text-[11px] text-ink3">Question {index + 1} of {queue.length} · {subject?.name ?? "your course"}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Pill className="text-sm px-3 py-1.5 tabular-nums" tone={clockTone}>

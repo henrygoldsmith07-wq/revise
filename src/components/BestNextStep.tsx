@@ -28,7 +28,7 @@ function evidenceStrengthLine(action: RevisionAction): string | null {
 }
 
 export function BestNextStep({ action, plan }: { action: RevisionAction; plan: RevisionPlan }) {
-  const subject = getSubject(action.subjectId)?.name ?? action.subjectId;
+  const subject = getSubject(action.subjectId)?.name ?? "your course";
   const topicTitle = action.topicIds.length === 1 ? (getTopic(action.topicIds[0]!)?.title ?? null) : null;
   const queued = plan.actions.slice(1, 4);
   const waiting = plan.deferred.filter((d) => /Waiting for the delay/.test(d.reason)).slice(0, 2);

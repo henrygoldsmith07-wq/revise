@@ -85,7 +85,7 @@ function LessonBrowserForRequest() {
             <p className="text-[11px] uppercase tracking-wide text-ink3 font-semibold">Choose a subject</p>
             <p className="mt-0.5 text-xs text-ink3">Pick a path to see its units and checkpoint lessons.</p>
           </div>
-          {subjectId ? <Pill tone="accent">{subjects.find((subject) => subject.id === subjectId)?.name ?? subjectId}</Pill> : null}
+          {subjectId ? <Pill tone="accent">{subjects.find((subject) => subject.id === subjectId)?.name ?? "your course"}</Pill> : null}
         </div>
         {subjectOptions.length ? (
           <div className="mt-3">

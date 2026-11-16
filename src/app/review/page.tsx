@@ -362,10 +362,11 @@ function ReviewSession() {
             <p className="text-xs text-ink3 truncate">
               {meta ? `${getSubject(meta.subjectId)?.name} · ${metaTopic?.title}` : ""}
             </p>
-            <h1 className="text-sm font-semibold">
+            <h1 className="text-base sm:text-lg font-semibold">
               {custom ? "Custom study" : mode === "mistakes" ? "Mistake repair" : "Spaced repetition"}
             </h1>
           </div>
+          <span className="ml-auto"><RunCounter run={run} /></span>
           <ButtonLink href={returnHref ?? "/"} size="sm" variant="ghost">
             {returnHref ? "Back to tutor" : "End session"}
           </ButtonLink>
@@ -421,7 +422,7 @@ function ReviewSession() {
           <p className="text-xs text-ink3 truncate">
             {getSubject(current.subjectId)?.name} · {topic?.title}
           </p>
-          <h1 className="text-sm font-semibold">
+          <h1 className="text-base sm:text-lg font-semibold">
             {custom ? "Custom study" : mode === "mistakes" ? "Mistake repair" : "Spaced repetition"}
           </h1>
         </div>

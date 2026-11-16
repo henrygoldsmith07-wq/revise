@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-16 lesson, review and header details
+
+- The Learn roadmap renders its title once with a coherent heading level; the Exit button moved into the same header, node status labels are 11px, and "Up next" / "Next subject" name the two cases distinctly.
+- Review keeps the streak counter visible through exam-style questions and uses a properly sized `<h1>` on both focused headers.
+- Timed sprint, proof-check, Best Next Step and lesson headings fall back to "this topic"/"your course" instead of printing raw record ids when a lookup misses.
+
 ## 2026-11-16 small UX and copy fixes
 
 - Schedule no longer renders a blank page when no subject is enrolled: it shows an EmptyState linking to Settings. The `.ics` download now defers revoking its blob URL and reports a generation error instead of failing silently.
