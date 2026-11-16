@@ -226,7 +226,7 @@ describe("AI egress — one transport for every request", () => {
   });
 
   it("the live client and the dead-letter retry both use sendAiTask", () => {
-    expect(readFileSync("src/ai/client.ts", "utf8")).toContain("await sendAiTask(task, payload)");
+    expect(readFileSync("src/ai/client.ts", "utf8")).toContain("sendAiTask(task, payload)");
     const dlq = readFileSync("src/ai/mark-dlq.ts", "utf8");
     expect(dlq).toContain('sendAiTask("mark", { question: item.question, answers: item.answers }, fetchFn)');
     expect(dlq).not.toContain('fetchFn("/api/ai"');

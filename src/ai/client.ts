@@ -47,13 +47,25 @@ import type {
 // no provider configured: the feature still returns something correct.
 // ---------------------------------------------------------------------------
 
+/** A stalled AI request must never leave the runner stuck waiting. */
+const AI_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(onTimeout()), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
 async function call<T>(task: AiTask, payload: unknown, fallback: () => T): Promise<AiEnvelope<T>> {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     return { data: fallback(), source: "fallback", note: "offline" };
   }
   try {
     // Consent gate + egress policy + request, in that order (src/ai/transport.ts).
-    const sent = await sendAiTask(task, payload);
+    const sent = await withTimeout(sendAiTask(task, payload), AI_TIMEOUT_MS,
+      () => ({ ok: false as const, blocked: "egress" as const, note: "timeout" }));
     if (!sent.ok) return { data: fallback(), source: "fallback", note: sent.note };
     const res = sent.response;
     if (!res.ok) {
@@ -114,16 +126,8 @@ export async function aiSocraticExaminer(input: {
     },
     fallback,
   );
-  const timeoutMs = input.timeoutMs ?? 8000;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<AiEnvelope<SocraticResponse>>((resolve) => {
-    timer = setTimeout(() => resolve({ data: fallback(), source: "fallback", note: "timeout" }), timeoutMs);
-  });
-  try {
-    return await Promise.race([request, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  return withTimeout(request, input.timeoutMs ?? 8000,
+    () => ({ data: fallback(), source: "fallback" as const, note: "timeout" }));
 }
 
 /**

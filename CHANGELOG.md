@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-16 AI request timeout
+
+- Every browser AI call is now bounded by a shared `withTimeout` helper (30s; the Socratic examiner keeps its 8s). A stalled request returns the same offline fallback as any other failure instead of leaving the runner waiting. The helper replaces the examiner's inline timer, so the route budget is unchanged; `tests/ai-client-timeout.test.ts` pins the behaviour.
+
 ## 2026-11-16 answer submit guard
 
 - `useQuestionExecution.submit()` now latches synchronously, so a second call before React commits `marking` cannot mint a second attempt id and record the answer twice. The latch resets in `finally`.
