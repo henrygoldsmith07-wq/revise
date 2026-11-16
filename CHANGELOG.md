@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-16 CI and security-test evidence
+
+- Added runtime tests for `POST /api/reviewer/decisions` (`tests/reviewer-routes-behaviour.test.ts`) covering origin, body cap, strict schema, all three reviewer-context states, rate limiting and audit-chain failure without a write. The route's gates were previously asserted only by searching its source for status strings.
+- The main push/PR workflow now also calls the staging suite on pushes to `main`, non-blocking until those secrets are confirmed, so live Postgres/RLS coverage is no longer limited to a weekly cron.
+
 ## 2026-11-16 lesson, review and header details
 
 - The Learn roadmap renders its title once with a coherent heading level; the Exit button moved into the same header, node status labels are 11px, and "Up next" / "Next subject" name the two cases distinctly.
