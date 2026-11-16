@@ -197,6 +197,47 @@ describe("shared limiter wiring and misconfiguration", () => {
     expect(res.ok).toBe(true);
     expect(res.remaining).toBe(8);
   });
+
+  it("fails closed in production when a provider is configured but the backend is unset", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    delete process.env.RATE_LIMIT_BACKEND;
+    expect(rateLimitBackendMode()).toBe("memory");
+    await expect(
+      enforceAiRateLimit({ key: "user:1", cost: 1, userId: "1", rpc: null }),
+    ).rejects.toBeInstanceOf(RateLimiterUnavailableError);
+  });
+
+  it("fails closed in production when Supabase is configured but the backend is unset", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    delete process.env.RATE_LIMIT_BACKEND;
+    // A live RPC client is itself proof of Supabase config, so even passing a
+    // perfectly good quota caller cannot unlock the memory fallback in prod.
+    await expect(
+      enforceAiRateLimit({ key: "user:1", cost: 1, userId: "1", rpc: createFakeQuotaDb() }),
+    ).rejects.toBeInstanceOf(RateLimiterUnavailableError);
+  });
+
+  it("still calls the shared RPC in production when the backend is configured", async () => {
+    process.env.RATE_LIMIT_BACKEND = "supabase";
+    vi.stubEnv("NODE_ENV", "production");
+    const db = createFakeQuotaDb();
+    const res = await enforceAiRateLimit({ key: "user:1", cost: 2, userId: "1", rpc: db });
+    expect(res.ok).toBe(true);
+    expect(res.remaining).toBe(8);
+    // The decision came from the RPC's shared row, not a per-process bucket.
+    expect(db.rows.get("user:1")?.usedDay).toBe(2);
+  });
+
+  it("keeps the in-memory path in production with no AI or Supabase config", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    delete process.env.RATE_LIMIT_BACKEND;
+    // No provider, no billing, no Supabase: a production build with AI simply
+    // switched off must not start 503-ing requests it used to answer locally.
+    const res = await enforceAiRateLimit({ key: "ip:1.2.3.4", cost: 1, userId: null, rpc: null });
+    expect(res.ok).toBe(true);
+  });
 });
 
 describe("quota SQL invariants", () => {

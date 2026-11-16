@@ -23,6 +23,9 @@ type DbRow = { id: string; updated_at: string; user_id?: string; data: unknown }
 const db: Record<string, DbRow[]> = { user_settings: [], review_logs: [], attempts: [], ai_consent: [] };
 let authUser: { id: string } | null = null;
 let failingTable: string | null = null;
+// Capture every `.insert()` a route attempts so tests can prove that refusals
+// never reach the write, not just that the response status looks right.
+const insertedRows: Array<Record<string, unknown>>[] = [];
 
 function applyOrders(rows: DbRow[], orders: Array<{ col: string; asc: boolean }>): DbRow[] {
   return [...rows].sort((a, b) => {
@@ -85,6 +88,12 @@ function makeQuery(table: string) {
   builder.limit = ((n: number) => {
     limit = n;
     return builder;
+  }) as never;
+  builder.insert = ((rows: Record<string, unknown> | Record<string, unknown>[]) => {
+    const list = Array.isArray(rows) ? rows : [rows];
+    if (failingTable === table) return Promise.resolve({ data: null, error: { message: "db down" } });
+    insertedRows.push(list);
+    return Promise.resolve({ data: null, error: null });
   }) as never;
   builder.maybeSingle = (async () => {
     if (failingTable === table) return { data: null, error: { message: "db down" } };
@@ -569,5 +578,136 @@ describe("AI route behaviour", () => {
     expect((await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }))).status).toBe(200);
     const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "t" } }));
     expect(res.status).toBe(429);
+  });
+});
+
+describe("Pilot events route behaviour", () => {
+  const SUPABASE_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const key of SUPABASE_KEYS) saved[key] = process.env[key];
+    // The Supabase client is mocked; the route only needs the env present.
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
+    db.user_settings = [];
+    authUser = { id: USER };
+    failingTable = null;
+    insertedRows.length = 0;
+    resetRateLimiterForTests();
+  });
+  afterEach(() => {
+    for (const key of SUPABASE_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  const validBody = {
+    events: [
+      {
+        anonId: "a1b2c3d4-1111-2222-3333-444455556666",
+        event: "diagnostic.completed",
+        subjectId: "physics",
+        count: 1,
+        minutes: 5,
+      },
+    ],
+  };
+  const pilotRequest = (body: unknown = validBody) =>
+    new Request("https://x/api/pilot/events", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://x", "sec-fetch-site": "same-origin" },
+      body: JSON.stringify(body),
+    });
+  const settingsRow = (data: unknown): DbRow => ({
+    id: "s",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    user_id: USER,
+    data,
+  });
+  const optIn = () => {
+    db.user_settings = [settingsRow({ pilotTelemetry: true })];
+  };
+
+  it("inserts the events when the signed-in caller's own settings say pilotTelemetry is true", async () => {
+    optIn();
+    const res = await pilotEventsPost(pilotRequest());
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { recorded: number }).recorded).toBe(1);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    // Actually reached the write, once, with the caller's id on the row.
+    expect(insertedRows).toHaveLength(1);
+    expect(insertedRows[0]).toHaveLength(1);
+    expect(insertedRows[0]![0]).toMatchObject({
+      user_id: USER,
+      event: "diagnostic.completed",
+      subject_id: "physics",
+      count_value: 1,
+      minutes_value: 5,
+      anon_id: "a1b2c3d4-1111-2222-3333-444455556666",
+    });
+  });
+
+  it("returns 403 and writes nothing when consent is false or a stale client still thinks it is on", async () => {
+    for (const data of [{ pilotTelemetry: false }, {}, { pilotTelemetry: "true" }, { pilotTelemetry: 1 }]) {
+      insertedRows.length = 0;
+      db.user_settings = [settingsRow(data)];
+      const res = await pilotEventsPost(pilotRequest());
+      expect(res.status, JSON.stringify(data)).toBe(403);
+      expect(insertedRows, JSON.stringify(data)).toHaveLength(0);
+    }
+  });
+
+  it("returns 403 and writes nothing when the caller has no settings row", async () => {
+    db.user_settings = [];
+    const res = await pilotEventsPost(pilotRequest());
+    expect(res.status).toBe(403);
+    expect(insertedRows).toHaveLength(0);
+  });
+
+  it("fails closed with 409 and writes nothing when the settings row is E2EE-encrypted", async () => {
+    db.user_settings = [settingsRow({ v: 1, alg: "AES-GCM", iv: "aXY=", ct: "Y3Q=", fp: "00" })];
+    const res = await pilotEventsPost(pilotRequest());
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe("e2ee");
+    expect(insertedRows).toHaveLength(0);
+  });
+
+  it("fails closed when the settings row cannot be read", async () => {
+    optIn();
+    failingTable = "user_settings";
+    const res = await pilotEventsPost(pilotRequest());
+    expect([403, 409]).toContain(res.status);
+    expect(insertedRows).toHaveLength(0);
+  });
+
+  it("stops the very next request after consent is revoked, even from a stale client", async () => {
+    const settings = settingsRow({ pilotTelemetry: true });
+    db.user_settings = [settings];
+    expect((await pilotEventsPost(pilotRequest())).status).toBe(201);
+    expect(insertedRows).toHaveLength(1);
+
+    // The learner flips the switch off; the client is not told and sends again.
+    settings.data = { pilotTelemetry: false };
+    const res = await pilotEventsPost(pilotRequest());
+    expect(res.status).toBe(403);
+    expect(insertedRows).toHaveLength(1);
+  });
+
+  it("keeps the existing auth and payload gates ahead of the consent write", async () => {
+    optIn();
+    authUser = null;
+    expect((await pilotEventsPost(pilotRequest())).status).toBe(401);
+    authUser = { id: USER };
+
+    const crossSite = new Request("https://x/api/pilot/events", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://evil.example", "sec-fetch-site": "cross-site" },
+      body: JSON.stringify(validBody),
+    });
+    expect((await pilotEventsPost(crossSite)).status).toBe(403);
+    expect((await pilotEventsPost(pilotRequest({ events: [{ anonId: "nope", event: "unknown.event" }] }))).status).toBe(400);
+    expect(insertedRows).toHaveLength(0);
   });
 });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-16 security and reliability hardening
+
+- Production with AI or Supabase configured now fails closed instead of silently using per-process in-memory rate limits; the shared `consume_ai_quota` backend remains required there, and local/test behaviour is unchanged.
+- The pilot-events route re-reads the caller's `pilotTelemetry` consent from their own settings row under RLS before any insert, refuses stale clients with 403, and fails closed on unreadable or encrypted settings.
+- Pulse cursor ids and timestamps are allowlisted before interpolation into PostgREST filters. The rules exclude filter metacharacters while accepting the ISO timestamp variants and readable legacy ids real rows use; `tests/pulse-history-pagination.test.ts` covers injection attempts.
+
 ## 2026-11-16 engineering pass: bundle-safe fallback, enforced boundaries, billing and accessibility
 
 - The last-resort "Keep practising" action now measures enrolled-topic supply in the domain on that path only. Today supplies a mistake-scoped map whose keys this draft reserves, so the fallback could almost never fire. `tests/supply-journey.property.test.ts` now mirrors the real caller.

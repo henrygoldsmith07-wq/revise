@@ -22,6 +22,39 @@ export interface PulseSortable {
   updatedAt: string;
 }
 
+// A cursor's `ts` and `id` (and a raw `since`) are interpolated verbatim into
+// PostgREST `.or()`/`.gt()` filters by the history route. Keep that boundary
+// strict: only values that cannot contain `,`, `(` or `)` may pass, otherwise a
+// crafted cursor could widen the filter and defeat deterministic pagination.
+//
+// Only ISO-8601 UTC may pass — with optional fractional seconds and either `Z`
+// or an explicit `+00:00` (how Postgres renders timestamptz). The shape is
+// allowlisted so no `,`, `(` or `)` can reach a PostgREST filter, and Date.parse
+// rejects impossible calendar dates such as February 30th.
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|\+00:00)$/;
+const PULSE_EPOCH = "1970-01-01T00:00:00.000Z";
+
+export function isValidPulseTimestamp(value: unknown): value is string {
+  if (typeof value !== "string" || !ISO_UTC.test(value)) return false;
+  const parsed = Date.parse(value);
+  // Date.parse normalises impossible dates (Feb 30 → Mar 2); refuse those.
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value.slice(0, 10);
+}
+
+// Real history ids are UUIDs, but imported and older rows may use readable
+// keys like `review:r-000`. Allow only characters that cannot terminate or
+// widen a PostgREST filter value; length stays bounded as before.
+const PULSE_SAFE_ID = /^[A-Za-z0-9:_-]{1,256}$/;
+
+export function isValidPulseId(value: unknown): value is string {
+  return typeof value === "string" && PULSE_SAFE_ID.test(value);
+}
+
+/** Coerce a raw `since` to strict UTC milliseconds, falling back to the epoch. */
+export function normalizePulseSince(since: unknown): string {
+  return isValidPulseTimestamp(since) ? new Date(since).toISOString() : PULSE_EPOCH;
+}
+
 export function encodePulseCursor(cursor: PulseCursor): string {
   const json = JSON.stringify(cursor);
   // base64url without padding — safe in query strings, no external dep.
@@ -38,9 +71,9 @@ export function decodePulseCursor(raw: unknown): PulseCursor | null {
     const padded = raw.replace(/-/g, "+").replace(/_/g, "/");
     const json = Buffer.from(padded, "base64").toString("utf8");
     const parsed = JSON.parse(json) as Partial<PulseCursor>;
-    if (typeof parsed.ts !== "string" || !Number.isFinite(Date.parse(parsed.ts))) return null;
+    if (!isValidPulseTimestamp(parsed.ts)) return null;
     if (parsed.kind !== "attempt" && parsed.kind !== "review") return null;
-    if (typeof parsed.id !== "string" || parsed.id.length === 0 || parsed.id.length > 256) return null;
+    if (!isValidPulseId(parsed.id)) return null;
     // Round-trip check: reject cursors that were not produced by the encoder
     // (truncated base64, trailing bytes, wrong shape).
     const reencoded = encodePulseCursor({ ts: parsed.ts, kind: parsed.kind, id: parsed.id });
@@ -113,7 +146,10 @@ export function pulseTableQuery(
   cursor: PulseCursor | null,
   since: string,
 ): PulseTableQuery {
-  if (!cursor) return { mode: "gt", ts: since };
+  // Even though the route validates `since`, re-check at the point of use so a
+  // malformed value can never reach a PostgREST filter through this module.
+  const safeSince = normalizePulseSince(since);
+  if (!cursor) return { mode: "gt", ts: safeSince };
   if (kind === cursor.kind) return { mode: "or", ts: cursor.ts, id: cursor.id };
   if (kind > cursor.kind) return { mode: "gte", ts: cursor.ts };
   return { mode: "gt", ts: cursor.ts };

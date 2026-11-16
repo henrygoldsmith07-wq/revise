@@ -6,6 +6,9 @@ import {
   decodePulseCursor,
   encodePulseCursor,
   isAfterPulseCursor,
+  isValidPulseId,
+  isValidPulseTimestamp,
+  normalizePulseSince,
   paginatePulseRows,
   pulseOrCondition,
   pulseTableQuery,
@@ -23,6 +26,9 @@ function row(kind: "attempt" | "review", id: string, updatedAt: string): Row {
 }
 
 const SINCE = "1970-01-01T00:00:00.000Z";
+const VALID_TS = "2026-01-01T00:00:00.000Z";
+// Canonical v4 UUID — the shape of review_logs.id / attempts.id.
+const VALID_UUID = "3f2a1b4c-5d6e-4f80-9a1b-2c3d4e5f6071";
 
 // Faithful route simulation: each table applies its own lexicographic SQL
 // tail (WHERE scope ORDER BY updated_at, id LIMIT limit+1) — exactly what the
@@ -310,10 +316,10 @@ describe("pulse history deterministic pagination", () => {
     expect(decodePulseCursor(encodePulseCursor({ ts: "2026-01-01T00:00:00.000Z", kind: "bogus" as never, id: "x" }))).toBeNull();
     expect(decodePulseCursor("x".repeat(600))).toBeNull();
     // Truncated cursor fails round-trip check.
-    const good = encodePulseCursor({ ts: "2026-01-01T00:00:00.000Z", kind: "attempt", id: "a1" });
+    const good = encodePulseCursor({ ts: VALID_TS, kind: "attempt", id: VALID_UUID });
     expect(decodePulseCursor(good.slice(0, good.length - 2))).toBeNull();
     // Valid cursor round-trips.
-    expect(decodePulseCursor(good)).toEqual({ ts: "2026-01-01T00:00:00.000Z", kind: "attempt", id: "a1" });
+    expect(decodePulseCursor(good)).toEqual({ ts: VALID_TS, kind: "attempt", id: VALID_UUID });
   });
 
   it("route rejects invalid cursors with 400 and never returns hasMore:true with cursor:null", () => {
@@ -340,5 +346,116 @@ describe("pulse history deterministic pagination", () => {
     // Revoked between requests withholds.
     expect(pulseHistoryAllowed({ pulseEnabled: false })).toBe(false);
     expect(pulseHistoryAllowed({})).toBe(false);
+  });
+});
+
+// The `ts`/`id`/`since` values below are interpolated verbatim into PostgREST
+// `.or()`/`.gt()` filters. These tests lock the strict boundary that keeps a
+// crafted cursor from corrupting or widening those filters.
+describe("pulse cursor validation", () => {
+  it("rejects comma/parenthesis PostgREST injection in the cursor ts or id", () => {
+    const tsInjection = encodePulseCursor({
+      ts: `${VALID_TS},and(updated_at.eq.1970-01-01T00:00:00.000Z))`,
+      kind: "attempt",
+      id: VALID_UUID,
+    });
+    expect(decodePulseCursor(tsInjection)).toBeNull();
+
+    const idInjection = encodePulseCursor({
+      ts: VALID_TS,
+      kind: "review",
+      id: `${VALID_UUID},and(updated_at.eq.1970-01-01T00:00:00.000Z))`,
+    });
+    expect(decodePulseCursor(idInjection)).toBeNull();
+
+    // The values that DO pass can never contain the filter metacharacters.
+    for (const value of [VALID_TS, VALID_UUID]) {
+      expect(value).not.toMatch(/[,()]/);
+    }
+  });
+
+  it("rejects non-ISO timestamps and accepts the UTC forms Postgres and callers write", () => {
+    const malformed = [
+      "bad",
+      "",
+      "2026-01-01", // date only
+      "2026-01-01T00:00:00.0000Z", // too many millisecond digits
+      "2026-02-30T00:00:00.000Z", // lenient Date.parse, impossible date
+      `${VALID_TS} `, // trailing whitespace
+      `${VALID_TS},and(updated_at.eq.1970-01-01T00:00:00.000Z))`, // injection
+    ];
+    for (const ts of malformed) {
+      expect(isValidPulseTimestamp(ts), ts).toBe(false);
+      expect(decodePulseCursor(encodePulseCursor({ ts, kind: "attempt", id: VALID_UUID })), ts).toBeNull();
+    }
+    for (const ts of [VALID_TS, "2026-01-01T00:00:00Z", "2026-01-02T10:00:00.5+00:00"]) {
+      expect(isValidPulseTimestamp(ts), ts).toBe(true);
+      expect(decodePulseCursor(encodePulseCursor({ ts, kind: "attempt", id: VALID_UUID }))?.ts).toBe(ts);
+    }
+    expect(normalizePulseSince("2026-01-02T10:00:00Z")).toBe("2026-01-02T10:00:00.000Z");
+  });
+
+  it("rejects ids with filter metacharacters or unbounded length", () => {
+    const badIds = [
+      "",
+      "x".repeat(257), // over the old maximum length
+      `{${VALID_UUID}}`, // braces
+      "x".repeat(257), // over the length bound
+      `${VALID_UUID},and(updated_at.eq.1970-01-01T00:00:00.000Z))`, // injection
+      `${VALID_UUID} and active`, // whitespace
+      'id.eq."x"', // quotes
+    ];
+    for (const id of badIds) {
+      expect(isValidPulseId(id), id).toBe(false);
+      expect(decodePulseCursor(encodePulseCursor({ ts: VALID_TS, kind: "review", id })), id).toBeNull();
+    }
+    // Real UUIDs and readable legacy keys are both safe in a filter value.
+    for (const id of [VALID_UUID, "review:r-000", "attempt:a-0001", "a1", "not-a-uuid"]) {
+      expect(isValidPulseId(id), id).toBe(true);
+    }
+  });
+
+  it("round-trips a valid cursor and builds a well-formed PostgREST condition", () => {
+    const cursor: PulseCursor = { ts: VALID_TS, kind: "attempt", id: VALID_UUID };
+    const encoded = encodePulseCursor(cursor);
+    const decoded = decodePulseCursor(encoded);
+    expect(decoded).toEqual(cursor);
+    expect(pulseOrCondition({ mode: "or", ts: decoded!.ts, id: decoded!.id })).toBe(
+      `updated_at.gt.${VALID_TS},and(updated_at.eq.${VALID_TS},id.gt.${VALID_UUID})`,
+    );
+  });
+
+  it("normalizes malformed or injected since values at the module boundary", () => {
+    expect(isValidPulseTimestamp(SINCE)).toBe(true);
+    expect(normalizePulseSince(SINCE)).toBe(SINCE);
+    for (const since of [
+      `${VALID_TS},and(updated_at.eq.1970-01-01T00:00:00.000Z))`, // injection
+      "not-a-date",
+      "2026-01-01", // date only
+    ]) {
+      expect(isValidPulseTimestamp(since), since).toBe(false);
+      expect(normalizePulseSince(since)).toBe(SINCE);
+      expect(pulseTableQuery("attempt", null, since)).toEqual({ mode: "gt", ts: SINCE });
+      expect(queryTableTail({ rows: [], kind: "attempt", cursor: null, since, limit: 5 })).toEqual([]);
+    }
+  });
+
+  it("still walks pages deterministically with real-format UUID history ids", () => {
+    const uuids = [
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000004",
+      "00000000-0000-4000-8000-000000000005",
+    ];
+    const ts = "2026-07-01T00:00:00.000Z";
+    for (const id of uuids) expect(isValidPulseId(id)).toBe(true);
+    const rows: Row[] = uuids.map((id, i) => row(i % 2 === 0 ? "attempt" : "review", id, ts));
+    expectCompleteWalk(rows, 2);
+    // A cursor produced by this walk decodes cleanly at the strict boundary.
+    const first = sqlWalkPages(rows, 2)[0]!;
+    const last = first[first.length - 1]!;
+    const encoded = encodePulseCursor({ ts: last.updatedAt, kind: last.kind, id: last.id });
+    expect(decodePulseCursor(encoded)).toEqual({ ts: last.updatedAt, kind: last.kind, id: last.id });
   });
 });

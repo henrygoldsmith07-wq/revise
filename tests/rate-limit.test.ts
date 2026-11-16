@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
   AI_RATE_LIMIT,
   AI_TASK_COSTS,
@@ -12,6 +12,7 @@ import {
   setRateLimiterBackend,
   getRateLimiterBackend,
 } from "@/lib/rate-limit";
+import { enforceAiRateLimit } from "@/lib/rate-limit-supabase";
 
 function req(ip = "1.2.3.4"): Request {
   return new Request("https://revise.local/api/ai", { headers: { "x-forwarded-for": ip } });
@@ -100,5 +101,26 @@ describe("rate limiting", () => {
     expect(aiDailyLimit()).toBe(500);
     if (prev === undefined) delete process.env.AI_DAILY_LIMIT;
     else process.env.AI_DAILY_LIMIT = prev;
+  });
+
+  it("keeps the in-memory backend outside production, even with provider config present", async () => {
+    const prevProviderKey = process.env.ANTHROPIC_API_KEY;
+    const prevBackend = process.env.RATE_LIMIT_BACKEND;
+    vi.stubEnv("NODE_ENV", "test");
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    delete process.env.RATE_LIMIT_BACKEND;
+    try {
+      // The production fail-closed gate must not leak into local dev or tests:
+      // no RPC and no shared backend is a normal, working configuration here.
+      const res = await enforceAiRateLimit({ key: "user:nonprod", cost: 1, userId: "1", rpc: null });
+      expect(res.ok).toBe(true);
+      expect(getRateLimiterBackend().name).toBe("memory");
+    } finally {
+      vi.unstubAllEnvs();
+      if (prevProviderKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = prevProviderKey;
+      if (prevBackend === undefined) delete process.env.RATE_LIMIT_BACKEND;
+      else process.env.RATE_LIMIT_BACKEND = prevBackend;
+    }
   });
 });

@@ -41,6 +41,30 @@ const pilotEventSchema = z.object({
 
 const pilotBodySchema = z.object({ events: z.array(pilotEventSchema).min(1).max(MAX_EVENTS) });
 
+/**
+ * Revise's own pilot opt-in, re-read server-side from the caller's own synced
+ * `user_settings` row on every request (same pattern as the Pulse history
+ * route). Off by default: a missing row, a missing flag, or anything other than
+ * an explicit boolean `true` withholds the write. A stale client that still
+ * thinks the switch is on cannot keep writing study-outcome events after the
+ * learner turns it off, and a hand-written request never reaches the insert.
+ */
+function pilotTelemetryAllowed(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  return (data as { pilotTelemetry?: unknown }).pilotTelemetry === true;
+}
+
+/**
+ * The settings row is end-to-end encrypted, so the server cannot read the
+ * pilot choice. Same shape test as `pulseSettingsEncrypted` and the client's
+ * `isEncryptedPayload`; fail closed rather than guessing.
+ */
+function pilotSettingsEncrypted(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  const v = data as Record<string, unknown>;
+  return v.v === 1 && v.alg === "AES-GCM" && typeof v.iv === "string" && typeof v.ct === "string";
+}
+
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin || !sameOriginRequest(request.url, origin, request.headers.get("sec-fetch-site"))) {
@@ -89,6 +113,41 @@ export async function POST(request: Request) {
   const limited = rateLimit(`pilot:${auth.user.id}`, PILOT_RATE);
   if (!limited.ok) {
     return NextResponse.json({ error: "Too many events in a short time. Wait a moment." }, { status: 429 });
+  }
+
+  // Re-read the caller's own opt-in under RLS before any insert. The user-scoped
+  // client (anon key + session cookies) can only see this account's settings
+  // row; the service role is deliberately not used. Absent/false, E2EE, or an
+  // unreadable row all refuse the write rather than trusting the client.
+  const { data: settingsRow, error: settingsError } = await supabase
+    .from("user_settings")
+    .select("data")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  if (settingsError) {
+    return NextResponse.json(
+      { error: "Your pilot telemetry choice could not be read. Nothing was recorded." },
+      { status: 409 },
+    );
+  }
+  const settingsData =
+    settingsRow && typeof settingsRow === "object" && "data" in settingsRow
+      ? (settingsRow as { data: unknown }).data
+      : null;
+  if (pilotSettingsEncrypted(settingsData)) {
+    return NextResponse.json(
+      {
+        error: "Sync encryption is on, so Revise's server cannot read your pilot telemetry choice. Turn off sync encryption in Revise settings.",
+        code: "e2ee",
+      },
+      { status: 409 },
+    );
+  }
+  if (!pilotTelemetryAllowed(settingsData)) {
+    return NextResponse.json(
+      { error: "Pilot telemetry is turned off. Enable it in Revise settings." },
+      { status: 403 },
+    );
   }
 
   const rows = parsed.data.events.map((e) => ({
