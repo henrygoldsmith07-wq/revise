@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { validateCommandWord, type CommandWordValidation } from "@/domain/command-word-validation";
-import { stemRepeatsOnlyPart } from "@/domain/question-display";
+import { radioMove, stemRepeatsOnlyPart } from "@/domain/question-display";
 import { getSubject } from "@/domain/curriculum";
 import { learnerEvidenceTrusted } from "@/domain/content-trust";
 import { nextHint, type Hint, type HintTier } from "@/domain/hints";
@@ -103,6 +104,11 @@ export function QuestionRunner({
 }) {
   const { answers, setAnswers, choice, setChoice, marking, result, awarded, topic, needsWjecHumanReview, isMcq, hintsOpen, setHintsOpen, visibleHints, upcoming, usedTiers, setUsedTiers, evidenceSource, ladder, submit, submitError } = useQuestionExecution({ question, mode, paperId, paperSpecId, paperRunId, retestMistake, farTransfer, draft, onDraftChange, onFinished, hintBudget, externalHintTier, repairTeachingSeen, intervention, mission, guided: stepMode === "guided" });
   const guided = stepMode === "guided";
+  // A radiogroup is one tab stop: arrow keys move between options, and only
+  // the checked one (or the first, before a pick) is in the tab order. Without
+  // this every option is a separate tab stop and screen readers announce a
+  // radio that does not behave like one.
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
   // The banner promises the answer "will count as evidence", so a far-transfer
   // check shows it only on a question that can carry learner evidence; on an
   // unreviewed one the check still runs unaided but is practice.
@@ -188,11 +194,21 @@ export function QuestionRunner({
                 <li key={index}>
                   <button
                     type="button"
+                    ref={(el) => { optionRefs.current[index] = el; }}
                     role="radio"
                     aria-checked={choice === index}
+                    tabIndex={choice === index || (choice === null && index === 0) ? 0 : -1}
                     disabled={Boolean(result)}
                     onClick={() => {
                       setChoice(index);
+                    }}
+                    onKeyDown={(e) => {
+                      if (result) return;
+                      const next = radioMove(e.key, index, question.options?.length ?? 0);
+                      if (next === null) return;
+                      e.preventDefault();
+                      setChoice(next);
+                      optionRefs.current[next]?.focus();
                     }}
                     className={cx(
                       "w-full min-h-12 sm:min-h-0 text-left card px-3 py-3 sm:py-2.5 flex gap-2.5 items-start transition-colors",

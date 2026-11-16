@@ -10,3 +10,16 @@ const normalise = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase
 export function stemRepeatsOnlyPart(question: { stem: string; parts: readonly { prompt: string }[] }): boolean {
   return question.parts.length === 1 && normalise(question.stem) !== "" && normalise(question.stem) === normalise(question.parts[0]!.prompt);
 }
+
+/**
+ * Roving-tabindex target for a radiogroup: the next option for a navigation
+ * key, or null for any other key. Wraps at both ends, as native radios do.
+ */
+export function radioMove(key: string, index: number, count: number): number | null {
+  if (count <= 0) return null;
+  if (key === "ArrowDown" || key === "ArrowRight") return (index + 1) % count;
+  if (key === "ArrowUp" || key === "ArrowLeft") return (index - 1 + count) % count;
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  return null;
+}

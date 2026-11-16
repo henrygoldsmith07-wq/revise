@@ -6,7 +6,7 @@
 - `src/domain` purity is enforced rather than documented: the graph test resolves the `@` alias, and `tests/domain-purity.test.ts` scans the tree for storage, network, UI and filesystem imports.
 - `/api/ai` treats `STRIPE_SECRET_KEY` as a configured third party, so a deployment that sells Plus but lacks Supabase auth fails closed instead of relenting to local mode. `subscriptionChange` refuses to grant Plus from a signed Stripe event whose price is not one this deployment sells; revoking events still apply.
 - A failed diagnose re-sit of a source question no longer opens a duplicate mistake and card on the same part, the flagship trust-gate variant of the repair-debt bug.
-- Accessibility: arrowing search results now scrolls the active option into view; async practice notes and question position are announced; revealing a flashcard answer moves focus to the grade buttons; one-way disclosures no longer claim a false `aria-expanded`; a timed step no longer names a command when the served question does not use it.
+- Accessibility: arrowing search results now scrolls the active option into view; async practice notes and question position are announced; revealing a flashcard answer moves focus to the grade buttons; one-way disclosures no longer claim a false `aria-expanded`; a timed step no longer names a command when the served question does not use it. MCQ options are now a single-tab-stop radiogroup with arrow, Home and End keys (`radioMove`), pinned by `tests/radio-navigation.test.ts`.
 - `AGENTS.md` now names the real auto-skip secrets (`REVISE_STAGING_*`, `TEST_DATABASE_URL`) instead of an unused `DATABASE_URL`.
 
 ## 2026-11-15 pass 122: a search page for every WJEC Physics topic, and Schedule says why the plan changed
