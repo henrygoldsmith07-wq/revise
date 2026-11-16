@@ -144,6 +144,15 @@ function ReviewSession() {
 
   // Hold order, not card objects: an Again retry sees the committed FSRS state.
   const current = store.cards.find((card) => card.id === queue[0]);
+  // "Show answer" unmounts with the pre-answer panel, dropping focus to the
+  // body. Move it to the first grade button so keyboard and screen-reader users
+  // land on the control that now needs them, without stealing focus otherwise.
+  const firstGradeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!revealed) return;
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    if (!active || active === document.body) firstGradeRef.current?.focus();
+  }, [revealed, current?.id]);
   const total = queue.length + done.reviewed;
   const isPreview = Boolean(custom?.preview);
 
@@ -521,6 +530,7 @@ function ReviewSession() {
             {GRADES.map((option, i) => (
               <button
                 key={option.grade}
+                ref={i === 0 ? firstGradeRef : undefined}
                 type="button"
                 onClick={() => void grade(option.grade)}
                 disabled={saving}

@@ -629,7 +629,7 @@ function Practice() {
               : stepMode === "guided"
               ? "Guided application"
               : stepMode === "timed"
-              ? timedCommand ? `Timed question: “${commandWordLabel(timedCommand)}”` : "Timed question"
+              ? timedCommand && (!current || questionUsesCommand(current, timedCommand)) ? `Timed question: “${commandWordLabel(timedCommand)}”` : "Timed question"
               : stepMode === "unaided"
               ? "Unaided exam question"
               : "Exam questions"}
@@ -881,7 +881,12 @@ function Practice() {
       </div>
       )}
 
-      {note ? <p className="text-xs text-ink3">{note}</p> : null}
+      {note ? <p role="status" aria-live="polite" className="text-xs text-ink3">{note}</p> : null}
+      {/* Moving between questions leaves focus on the navigator control; say
+          where the learner now is without pulling focus out of it. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {current ? `Question ${index + 1} of ${queue.length}` : ""}
+      </p>
 
       {prereqDiagnosis && prereqTarget && current ? (
         <PrerequisiteCheck

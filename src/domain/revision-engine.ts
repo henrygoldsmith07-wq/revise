@@ -33,7 +33,7 @@ import type { MarkRecovery } from "./mark-recovery";
 import { buildMissionSession, buildProofCheck, missionHref, proofHref } from "./mission-session";
 import { ROOT_CAUSE_LABEL } from "./mistake-patterns";
 import { timeBoxPlan, type TimeBox, type TimeBoxPlan } from "./pre-exam-plan";
-import type { TopicSupply } from "./supply";
+import { unseenSupplyByTopic as bankSupply, type TopicSupply } from "./supply";
 import type { Attempt, ExamDate, Id, Mistake, Question } from "./types";
 import { BLOCKED_PROOF_COPY } from "./proof-copy";
 import { MIN_PROOF_DELAY_DAYS, type ProofLedger, type TopicProof } from "./proof-of-improvement";
@@ -597,7 +597,8 @@ function commandCentreDrafts(input: EngineInput, enrolled: ReadonlySet<Id>, esti
  * unseen questions a delayed proof check needs.
  */
 function keepPractisingDraft(input: EngineInput, enrolled: ReadonlySet<Id>, missions: readonly ExamMission[]): Draft | null {
-  const supply = input.supplyByTopic ?? {};
+  // The caller's supply map is scoped to mistake topics, which this draft
+  // reserves. Measure enrolled topics here, only on this last-resort path.
   const reserved = new Set<Id>([
     ...missions.flatMap((m) => m.topicIds),
     ...input.recovery.items.filter((i) => i.state !== "proven").map((i) => i.topicId),
@@ -607,6 +608,7 @@ function keepPractisingDraft(input: EngineInput, enrolled: ReadonlySet<Id>, miss
     if (!enrolled.has(q.subjectId)) continue;
     for (const t of q.topicIds) if (!subjectOf.has(t)) subjectOf.set(t, q.subjectId);
   }
+  const supply = bankSupply(subjectOf.keys(), input.questions, input.attempts);
   const candidates = Object.entries(supply)
     .filter(([topicId, s]) => subjectOf.has(topicId) && !reserved.has(topicId) && s.provable + s.practiceOnly > 0)
     .map(([topicId, s]) => ({ topicId, s, share: input.topicWeight?.(topicId)?.share ?? 0 }))

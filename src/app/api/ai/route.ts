@@ -64,6 +64,11 @@ function providerCredentialsPresent(): boolean {
   // in local mode, where consent is only a browser header and the rate-limit
   // key comes from x-forwarded-for.
   if (classifierConfigured()) return true;
+  // Billing is on as soon as Stripe is configured (src/lib/billing/stripe.ts),
+  // which is the deployment saying Plus is sold. It must not fall back to
+  // local mode — where consent is only a browser header and Plus is "not-sold"
+  // — just because no model provider is configured yet.
+  if (process.env.STRIPE_SECRET_KEY) return true;
   if (process.env.ANTHROPIC_API_KEY) return true;
   if (process.env.AI_PROVIDER === "none") return false;
   if (process.env.OPENAI_COMPATIBLE_BASE_URL && process.env.OPENAI_COMPATIBLE_MODEL) return true;
@@ -87,7 +92,7 @@ async function requireAiUser(request: Request): Promise<AiAuth> {
         error: NextResponse.json(
           {
             error:
-              "AI authentication is not configured. Set Supabase auth before enabling AI providers or the error classifier (unset CLASSIFIER_ENABLED to turn it off).",
+              "AI authentication is not configured. Set Supabase auth before enabling AI providers, billing or the error classifier (unset CLASSIFIER_ENABLED to turn it off).",
           },
           { status: 503 },
         ),

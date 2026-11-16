@@ -288,11 +288,11 @@ describe("Pulse history route behaviour", () => {
 describe("AI route behaviour", () => {
   const SUPABASE_KEYS = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
   const PROVIDER_KEYS = ["ANTHROPIC_API_KEY", "AI_PROVIDER", "OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_MODEL", "OPENAI_COMPATIBLE_API_KEY"];
-  const ALL_KEYS = [...SUPABASE_KEYS, ...PROVIDER_KEYS, "NODE_ENV", "RATE_LIMIT_BACKEND", "AI_DAILY_LIMIT", "CLASSIFIER_DISABLED", "CLASSIFIER_ENABLED"];
+  const ALL_KEYS = [...SUPABASE_KEYS, ...PROVIDER_KEYS, "NODE_ENV", "RATE_LIMIT_BACKEND", "AI_DAILY_LIMIT", "CLASSIFIER_DISABLED", "CLASSIFIER_ENABLED", "STRIPE_SECRET_KEY"];
 
   beforeEach(() => {
     saveEnv(...ALL_KEYS);
-    for (const key of [...SUPABASE_KEYS, ...PROVIDER_KEYS]) delete process.env[key];
+    for (const key of [...SUPABASE_KEYS, ...PROVIDER_KEYS, "STRIPE_SECRET_KEY"]) delete process.env[key];
     delete process.env.RATE_LIMIT_BACKEND;
     delete process.env.AI_DAILY_LIMIT;
     authUser = null;
@@ -389,6 +389,13 @@ describe("AI route behaviour", () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+
+  it("fails closed in production without auth config when billing is on, even with no model key", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.STRIPE_SECRET_KEY = "sk-test-secret";
+    const res = await aiPost(aiRequest({ task: "explain", payload: { topicId: "unknown-topic" } }));
+    expect(res.status).toBe(503);
   });
 
   it("keeps local mode in production only when no third party is configured (classifier disabled, no model key)", async () => {

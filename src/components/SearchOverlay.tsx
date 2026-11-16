@@ -10,12 +10,6 @@ import { useStoreFields } from "@/state/store";
 import { Modal } from "./Modal";
 import { cx, Pill } from "./ui";
 
-/** Escape a string for use inside a CSS attribute/id selector. */
-function cssEscape(value: string): string {
-  return value.replace(/[^a-zA-Z0-9_-]/g, (ch) => `\\${ch}`);
-}
-
-
 /** ⌘K search across topics, cards, questions and misconceptions. Runs
  *  locally, so it works offline and returns within a keystroke. */
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
@@ -44,7 +38,7 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
   // Keyboard focus must follow the highlight: with 20 options in a scrolling
   // list, arrowing past the fold selected an option the student could not see.
   useEffect(() => {
-    const node = listRef.current?.querySelector<HTMLButtonElement>(`#search-result-${cssEscape(results[cursor]?.id ?? "")}`);
+    const node = listRef.current?.querySelector<HTMLButtonElement>('[role="option"][aria-selected="true"]');
     node?.scrollIntoView({ block: "nearest" });
   }, [cursor, results]);
 

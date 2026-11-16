@@ -182,6 +182,19 @@ describe("subscription events", () => {
     expect(subscriptionChange(subscriptionEvent({}, "customer.subscription.deleted"))?.status).toBe("canceled");
   });
 
+  it("refuses to grant Plus from a price this deployment does not sell", () => {
+    const foreign = { items: { data: [{ current_period_end: 1_792_000_000, price: { id: "price_other_product" } }] } };
+    expect(subscriptionChange(subscriptionEvent(foreign))).toBeNull();
+    expect(subscriptionChange(subscriptionEvent({ items: { data: [{ price: {} }] } }))).toBeNull();
+    expect(subscriptionChange(subscriptionEvent({ items: { data: [] } }))).toBeNull();
+  });
+
+  it("still accepts revoking events for a foreign or missing price", () => {
+    const foreign = { items: { data: [{ price: { id: "price_other_product" } }] } };
+    expect(subscriptionChange(subscriptionEvent(foreign, "customer.subscription.deleted"))?.status).toBe("canceled");
+    expect(subscriptionChange(subscriptionEvent({ status: "unpaid" }, "customer.subscription.updated"))?.status).toBe("unpaid");
+  });
+
   it("ignores other event types, subscriptions with no Revise user, and unknown statuses", () => {
     expect(subscriptionChange(subscriptionEvent({}, "invoice.paid"))).toBeNull();
     expect(subscriptionChange(subscriptionEvent({ metadata: {} }))).toBeNull();

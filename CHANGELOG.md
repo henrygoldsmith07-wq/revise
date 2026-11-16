@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-16 engineering pass: bundle-safe fallback, enforced boundaries, billing and accessibility
+
+- The last-resort "Keep practising" action now measures enrolled-topic supply in the domain on that path only. Today supplies a mistake-scoped map whose keys this draft reserves, so the fallback could almost never fire. `tests/supply-journey.property.test.ts` now mirrors the real caller.
+- `src/domain` purity is enforced rather than documented: the graph test resolves the `@` alias, and `tests/domain-purity.test.ts` scans the tree for storage, network, UI and filesystem imports.
+- `/api/ai` treats `STRIPE_SECRET_KEY` as a configured third party, so a deployment that sells Plus but lacks Supabase auth fails closed instead of relenting to local mode. `subscriptionChange` refuses to grant Plus from a signed Stripe event whose price is not one this deployment sells; revoking events still apply.
+- A failed diagnose re-sit of a source question no longer opens a duplicate mistake and card on the same part, the flagship trust-gate variant of the repair-debt bug.
+- Accessibility: arrowing search results now scrolls the active option into view; async practice notes and question position are announced; revealing a flashcard answer moves focus to the grade buttons; one-way disclosures no longer claim a false `aria-expanded`; a timed step no longer names a command when the served question does not use it.
+- `AGENTS.md` now names the real auto-skip secrets (`REVISE_STAGING_*`, `TEST_DATABASE_URL`) instead of an unused `DATABASE_URL`.
+
 ## 2026-11-15 pass 122: a search page for every WJEC Physics topic, and Schedule says why the plan changed
 Search: only 6 pages of the site were indexable, and the WJEC Physics hub sent search visitors to `/library?topic=…`, an app screen that is noindex and empty without the learner's data. Each of the 19 WJEC A-level Physics topics now has its own server-rendered page at `/wjec-a-level-physics/<topic>` (`physicsTopicGuide` in `src/lib/physics-guides.ts`, route `src/app/wjec-a-level-physics/[topic]/route.ts`). Each page shows:
 - how often the 2022–2025 papers examined the topic, in which units, with links to each question on WJEC's own papers;

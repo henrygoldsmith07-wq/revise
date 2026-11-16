@@ -73,16 +73,23 @@ interface LearnerState {
   mistakes: Mistake[];
 }
 
-function rank(bank: Question[], state: LearnerState, now: Date) {
+function rank(bank: Question[], state: LearnerState, now: Date, options: { mistakeScopedSupply?: boolean } = {}) {
   const recovery = buildMarkRecovery({ mistakes: state.mistakes, attempts: state.attempts, questions: bank, now });
   // Mirror what the app passes, so "nothing ranked" means the same thing here as
   // it does on Today: untouched topics and exam weighting are part of the input.
   const topics = [...new Set(bank.flatMap((q) => q.topicIds))].sort();
   const touched = new Set(state.attempts.flatMap((a) => a.topicIds));
   const share = 1 / Math.max(1, topics.length);
+  const fullSupply = supplySnapshot(bank, state.attempts);
+  // Today's real caller scopes supply to topics with mistakes; that map cannot
+  // feed the last-resort draft, which reserves exactly those topics.
+  const mistakeTopics = [...new Set(state.mistakes.map((m) => m.topicId))];
+  const supplyByTopic = options.mistakeScopedSupply
+    ? Object.fromEntries(mistakeTopics.flatMap((t) => (fullSupply[t] ? [[t, fullSupply[t]] as const] : [])))
+    : fullSupply;
   const plan = rankRevisionActions({
     now, subjectIds: [SUBJECT], mistakes: state.mistakes, attempts: state.attempts, questions: bank, recovery,
-    examDates: [exam], supplyByTopic: supplySnapshot(bank, state.attempts),
+    examDates: [exam], supplyByTopic,
     coldStart: planColdStart({
       subjectIds: [SUBJECT], attempts: state.attempts, mistakes: state.mistakes, reviewLogs: [],
       questions: bank, examDates: [exam], topicSubject, now,
@@ -298,6 +305,19 @@ describe("a learner who has started everything", () => {
     const topic = last.plan.top!.topicIds[0]!;
     expect(bank.some((q) => q.topicIds.includes(topic) && !last.seen.has(q.id))).toBe(true);
     expect(last.plan.top!.proofStatus).toBeNull();
+  }, 30_000);
+
+  it("finds the fallback when Today supplies only mistake-topic supply", () => {
+    // The app passes supply scoped to mistake topics; every key in that map is
+    // reserved by the fallback draft, so a learner with no open mistakes gets
+    // an empty Today unless the ranker also receives full-bank supply.
+    const bank = buildBank(2, 2);
+    const now = day(2);
+    const attempts = [bank[0]!, bank[QUESTIONS_PER_TOPIC]!].map((q) => answerAttempt(q, q.totalMarks, now));
+    const { plan } = rank(bank, { attempts, mistakes: [] }, now, { mistakeScopedSupply: true });
+    expect(plan.top).not.toBeNull();
+    expect(plan.top!.type).toBe("adaptive-session");
+    expect(plan.top!.title).toMatch(/^Keep practising /);
   }, 30_000);
 });
 

@@ -42,8 +42,15 @@ describe("missionRetryParts", () => {
     expect(missionRetryParts({ mission: mission("repair", ["m1"]), subjectId: "s" }, other, open, bank).size).toBe(0);
   });
 
+  it("a failed diagnose re-sit is the same gap, not a second debt", () => {
+    // The diagnose step serves the source questions to classify the error. On
+    // a review-gated flagship its failure cannot advance the repair chain, so
+    // it must not open a duplicate mistake and card on the same part.
+    expect([...missionRetryParts({ mission: mission("diagnose", ["m1"]), subjectId: "s" }, source, open, bank)]).toEqual(["source.a"]);
+  });
+
   it("only supported mission stages count: an unaided check that fails is new evidence", () => {
-    for (const stage of ["apply", "transfer", "delayed-proof", "diagnose"] as const) {
+    for (const stage of ["apply", "transfer", "delayed-proof"] as const) {
       expect(missionRetryParts({ mission: mission(stage, ["m1"]), subjectId: "s" }, sibling, open, bank).size, stage).toBe(0);
     }
     expect(missionRetryParts({ subjectId: "s" }, sibling, open, bank).size).toBe(0);

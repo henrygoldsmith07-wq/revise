@@ -29,8 +29,8 @@ export function repairTargetParts(mistake: Mistake, question: Question): string[
   return question.parts.filter((p) => p.capabilityIds?.length === 1 && p.capabilityIds[0] === mistake.capabilityIds?.[0]).map((p) => p.id);
 }
 
-/** Mission stages that are another go at the mission's own mistakes, with help available. */
-const RETRY_STAGES: ReadonlySet<string> = new Set(["repair", "practise"]);
+/** Mission stages that are another go at the mission's own mistakes. Diagnose re-sits the source questions. */
+const RETRY_STAGES: ReadonlySet<string> = new Set(["repair", "practise", "diagnose"]);
 
 /**
  * Parts of a mission question that are a further attempt at one of that
@@ -45,8 +45,8 @@ const RETRY_STAGES: ReadonlySet<string> = new Set(["repair", "practise"]);
  * "still open" to 26 in three sessions of trying to repair them.
  *
  * A part counts when the attempt carries the mission's source mistakes
- * (repair or supported practice only: an unaided check that fails is new
- * evidence) and the part shares a specification point or capability with an
+ * (repair, diagnose or supported practice only: an unaided check that fails is
+ * new evidence) and the part shares a specification point or capability with an
  * open source mistake, or its question sits in that mistake's topic. The
  * topic is enough because supported practice is chosen by topic ("new
  * questions that exercise the same weakness"): matching on the point alone

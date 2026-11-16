@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { STRIPE_SUBSCRIPTION_STATUSES, type PlusInterval, type StripeSubscriptionStatus } from "@/domain/plus";
+import { PLUS_GRANTING_STATUSES, STRIPE_SUBSCRIPTION_STATUSES, type PlusInterval, type StripeSubscriptionStatus } from "@/domain/plus";
 
 // ---------------------------------------------------------------------------
 // Stripe, over its REST API. No SDK: the app makes four calls (checkout,
@@ -228,12 +228,21 @@ export function subscriptionChange(event: unknown): SubscriptionChange | null {
   const eventCreatedAt = unixToIso(created);
   if (!eventCreatedAt) return null;
   const item = object.items?.data?.[0];
+  const priceId = typeof item?.price?.id === "string" ? item.price.id : null;
+  // A signed event from another product on the same Stripe account may carry a
+  // Revise user_id in its metadata. Never let it grant Plus unless the price is
+  // one this deployment actually sells. Revoking events are always accepted, so
+  // a legacy price can still be cancelled and cannot leave stale access. When
+  // no prices are configured (unit fixtures), keep the permissive behaviour.
+  const soldPrices = [process.env.STRIPE_PRICE_PLUS_MONTHLY, process.env.STRIPE_PRICE_PLUS_YEARLY].filter(Boolean);
+  const grants = (PLUS_GRANTING_STATUSES as readonly unknown[]).includes(status);
+  if (grants && soldPrices.length && (!priceId || !soldPrices.includes(priceId))) return null;
   return {
     userId,
     customerId: object.customer,
     subscriptionId: object.id,
     status: status as StripeSubscriptionStatus,
-    priceId: typeof item?.price?.id === "string" ? item.price.id : null,
+    priceId,
     // Newer API versions moved the period onto the subscription item.
     currentPeriodEnd: unixToIso(object.current_period_end) ?? unixToIso(item?.current_period_end),
     cancelAtPeriodEnd: object.cancel_at_period_end === true,

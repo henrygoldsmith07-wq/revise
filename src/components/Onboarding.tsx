@@ -626,7 +626,6 @@ export function OnboardingFlow({ actions, onDone }: { actions: OnboardingActions
                 <button
                   type="button"
                   className="w-full rounded-xl border border-dashed border-line bg-surface2/40 px-3 py-3 text-left text-sm text-ink2 hover:text-ink"
-                  aria-expanded={false}
                   onClick={() => setShowReference(true)}
                 >
                   <span className="font-semibold">Show {hiddenReferenceCount} more subjects — unverified preview</span>

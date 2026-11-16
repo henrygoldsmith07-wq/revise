@@ -40,7 +40,7 @@ export function ImproveAnswer({
   return (
     <div className="mt-3">
       {!open ? (
-        <Button size="sm" variant="secondary" aria-expanded={false} onClick={() => setOpen(true)}>
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
           Improve my answer
         </Button>
       ) : (

@@ -552,5 +552,8 @@ existing is not proof it works in production. `docs/data-flows.md` and
 
 ## Tests that auto-skip
 
-Real-Postgres suites skip unless `TEST_DATABASE_URL` and `DATABASE_URL` are set. A
-green run with those suites skipped is not evidence about them.
+`tests/supabase-staging.test.ts` skips unless all six `REVISE_STAGING_*` secrets
+are set (it hard-fails on missing ones when `REVISE_STAGING_REQUIRED=1`);
+`tests/review-throughput.test.ts` skips without `TEST_DATABASE_URL`. The main
+push/PR workflow sets neither, so both are covered only by the staging workflow.
+A green run with those suites skipped is not evidence about them.

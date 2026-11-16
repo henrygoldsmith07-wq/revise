@@ -66,7 +66,7 @@ export function useRecoveryEvidence(): RecoveryEvidence {
     // The store's ledger, not a second build: review logs feed the proof delay
     // clock, so rebuilding it here would drift from every other proof surface.
     const proof = store.proofLedger;
-    const supplyByTopic = unseenSupplyByTopic(new Set(mistakes.map((m) => m.topicId)), store.questions, store.attempts);
+    const supplyByTopic = unseenSupplyByTopic(mistakes.map((m) => m.topicId), store.questions, store.attempts);
     const unseenByTopic = Object.fromEntries(Object.entries(supplyByTopic).map(([t, s]) => [t, s.provable]));
     const days = [...subjects].map((id) => daysToNearestExam(store.examDates, id, now)).filter((d): d is number => d !== null).sort((a, b) => a - b)[0] ?? null;
     const effectiveness: EffectivenessEvidence = {
