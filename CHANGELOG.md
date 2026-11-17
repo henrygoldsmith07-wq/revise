@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17 deck import failure
+
+- Importing a deck now reports a storage/quota failure in the visible error area, keeps the preview so the learner can retry, and disables the button while the write is in flight. `tests/deck-io.test.ts` (30 tests) and the build/budget gate remain green.
+
 ## 2026-11-17 Segmented picker overflow
 
 - Segmented controls now scroll inside a narrow viewport instead of widening the page, with 2.25rem-tall options. The fix is app CSS scoped to the picker's existing classes, so the `/` route's already-tight JS budget is unchanged (verified by `perf:budget`).

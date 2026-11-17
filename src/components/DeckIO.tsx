@@ -102,6 +102,7 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const [pasted, setPasted] = useState("");
 
   const knownTopicIds = useMemo(() => new Set(allTopics().map((t) => t.id)), []);
@@ -146,14 +147,25 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
   }
 
   async function commit() {
-    if (!preview?.cards.length) return;
-    await store.addCards(preview.cards);
-    setStatus(
-      `Imported ${countLabel(preview.cards.length, "card")}${preview.duplicates ? `, skipped ${countLabel(preview.duplicates, "duplicate")}` : ""}. Tagged "imported".`,
-    );
-    onImported?.(preview.cards.length);
-    setReport(null);
-    setPasted("");
+    if (!preview?.cards.length || importing) return;
+    setImporting(true);
+    setStatus(null);
+    setReadError(null);
+    try {
+      await store.addCards(preview.cards);
+      setStatus(
+        `Imported ${countLabel(preview.cards.length, "card")}${preview.duplicates ? `, skipped ${countLabel(preview.duplicates, "duplicate")}` : ""}. Tagged "imported".`,
+      );
+      onImported?.(preview.cards.length);
+      setReport(null);
+      setPasted("");
+    } catch {
+      // Keep the preview so the learner can retry after a quota or storage
+      // failure, and say so where they are looking instead of doing nothing.
+      setReadError("Those cards could not be saved on this device. Nothing was imported; try again.");
+    } finally {
+      setImporting(false);
+    }
   }
 
   return (
@@ -285,7 +297,7 @@ export function ImportDeckPanel({ onImported }: { onImported?: (count: number) =
               </div>
 
               <div className="flex items-center gap-3">
-                <Button variant="primary" onClick={() => void commit()} disabled={!preview?.cards.length}>
+                <Button variant="primary" onClick={() => void commit()} disabled={!preview?.cards.length || importing}>
                   Import {countLabel(preview?.cards.length ?? 0, "card")}
                 </Button>
                 <Button onClick={() => setReport(null)}>Cancel</Button>
