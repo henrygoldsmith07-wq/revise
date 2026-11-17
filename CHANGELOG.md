@@ -2,7 +2,7 @@
 
 ## 2026-11-17 deck import failure
 
-- Importing a deck now reports a storage/quota failure in the visible error area, keeps the preview so the learner can retry, and disables the button while the write is in flight. `tests/deck-io.test.ts` (30 tests) and the build/budget gate remain green.
+- Importing a deck now reports a storage/quota failure in the visible error area, keeps the preview so the learner can retry, and disables the button while the write is in flight. Export preparation failures are reported in the same visible way instead of failing silently. `tests/deck-io.test.ts` (30 tests) and the build/budget gate remain green.
 
 ## 2026-11-17 Segmented picker overflow
 

@@ -26,6 +26,7 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
   const [name, setName] = useState(defaultName);
   const [includeScheduling, setIncludeScheduling] = useState(true);
   const [done, setDone] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const revokeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -35,19 +36,25 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
   );
 
   function download() {
-    const deck = exportDeck(cards, { name, includeScheduling, subjectId: cards[0]?.subjectId });
-    const blob = new Blob([serialiseDeck(deck)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "deck"}.revise.json`;
-    link.click();
-    // Chrome tears the download down with the element, so the URL must outlive
-    // it: revoking synchronously aborts large exports mid-save. Revoke after
-    // a tick, tracked so a quick exit from settings leaves no timer running.
-    if (revokeTimer.current) clearTimeout(revokeTimer.current);
-    revokeTimer.current = setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_REVOKE_MS);
-    setDone(`Exported ${countLabel(cards.length, "card")}${includeScheduling ? " with scheduling" : " as a shared deck"}.`);
+    setExportError(null);
+    try {
+      const deck = exportDeck(cards, { name, includeScheduling, subjectId: cards[0]?.subjectId });
+      const blob = new Blob([serialiseDeck(deck)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "deck"}.revise.json`;
+      link.click();
+      // Chrome tears the download down with the element, so the URL must outlive
+      // it: revoking synchronously aborts large exports mid-save. Revoke after
+      // a tick, tracked so a quick exit from settings leaves no timer running.
+      if (revokeTimer.current) clearTimeout(revokeTimer.current);
+      revokeTimer.current = setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_REVOKE_MS);
+      setDone(`Exported ${countLabel(cards.length, "card")}${includeScheduling ? " with scheduling" : " as a shared deck"}.`);
+    } catch {
+      setDone(null);
+      setExportError("The deck could not be prepared. Nothing was downloaded; try again.");
+    }
   }
 
   return (
@@ -85,6 +92,7 @@ export function ExportDeckPanel({ cards, defaultName }: { cards: Card[]; default
           Download .revise.json
         </Button>
         {done ? <span className="text-xs text-success">{done}</span> : null}
+        {exportError ? <span role="alert" className="text-xs text-danger">{exportError}</span> : null}
       </div>
     </Panel>
   );
