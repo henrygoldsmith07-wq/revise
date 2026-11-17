@@ -10,7 +10,7 @@ Le Studio family · Revise
 
 A revision platform for WJEC A-level — four subjects (Mathematics, Biology, Chemistry, Physics) authored against their specifications, with FSRS scheduling, point-by-point examiner marking, and a recommender that always knows the highest-value thing to do next. Other boards reuse that outline and are labelled as an unverified preview.
 
-[Open Revise](https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise) [← Back to family](https://le-studio-site-henrygoldsmith07-9188s-projects.vercel.app/)
+[Open Revise](https://www.revise.my.id/) [← Back to family](https://le-studio-site-henrygoldsmith07-9188s-projects.vercel.app/)
 
 - **417** WJEC A-level spec statements
 - **4** flagship subjects
@@ -60,7 +60,7 @@ And the honest part: no question has been through human review yet, so Revise ca
 - Prefers-reduced-motion
 - Open source in this repo
 
-[Open Revise](https://github.com/henrygoldsmith07-wq/Claude-Code/tree/main/apps/revise)
+[Open Revise](https://www.revise.my.id/)
 
 ## Measured, not claimed
 

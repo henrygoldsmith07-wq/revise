@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17 landing page CTA
+
+- The three "Open Revise" buttons on the static landing page opened the source repository instead of the app. They now point at the canonical app URL; the generated `index.md` was regenerated and the agent-file check is green.
+
 ## 2026-11-17 Windows test portability
 
 - `npm run verify` now passes on Windows. Generated landing-site files are pinned to LF via `.gitattributes` so `site:ai-files --check` compares identical bytes, and source-string tests that assumed `\n` or `/` now accept CRLF and backslash paths.
