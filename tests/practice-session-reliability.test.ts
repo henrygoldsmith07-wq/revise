@@ -17,7 +17,7 @@ function completionHarness(
   completeSession = vi.fn(async () => {}),
   clearRevisionCheckpoint = vi.fn(async () => {}),
 ) {
-  const body = source.match(/  async function finishSession\(\) \{([\s\S]*?)\n  \}\n\n  const /)?.[1];
+  const body = source.match(/  async function finishSession\(\) \{([\s\S]*?)\r?\n  \}\r?\n\r?\n  const /)?.[1];
   if (!body) throw new Error("Practice completion handler not found");
   const create = new Function("store", "sessionId", "clearRevisionCheckpoint", `
     const sessionAttempts = [{ id: 'a1' }];
@@ -39,7 +39,7 @@ function completionHarness(
 }
 
 function appendFromPage(previous: Attempt[], next: Attempt): Attempt[] {
-  const callback = source.match(/setSessionAttempts\(\(previous\) => ([\s\S]*?)\);\n\s+setQuestionDrafts/)?.[1];
+  const callback = source.match(/setSessionAttempts\(\(previous\) => ([\s\S]*?)\);\r?\n\s+setQuestionDrafts/)?.[1];
   if (!callback) throw new Error("Practice attempt callback not found");
   return new Function("previous", "attempt", "recordPracticeAttempt", `return (${callback});`)(previous, next, recordPracticeAttempt) as Attempt[];
 }

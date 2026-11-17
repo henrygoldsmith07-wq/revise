@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-17 Windows test portability
+
+- `npm run verify` now passes on Windows. Generated landing-site files are pinned to LF via `.gitattributes` so `site:ai-files --check` compares identical bytes, and source-string tests that assumed `\n` or `/` now accept CRLF and backslash paths.
+- The Socratic examiner source assertion follows the shared `withTimeout` helper introduced with the AI timeout.
+
 ## 2026-11-16 AI request timeout
 
 - Every browser AI call is now bounded by a shared `withTimeout` helper (30s; the Socratic examiner keeps its 8s). A stalled request returns the same offline fallback as any other failure instead of leaving the runner waiting. The helper replaces the examiner's inline timer, so the route budget is unchanged; `tests/ai-client-timeout.test.ts` pins the behaviour.

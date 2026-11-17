@@ -17,7 +17,7 @@ describe("zod jitless", () => {
   });
   it("no source imports zod directly", () => {
     const bad = walk("src").filter(
-      (p) => !p.endsWith("lib/zod.ts") && /from "zod"/.test(readFileSync(p, "utf8")),
+      (p) => !p.replace(/\\/g, "/").endsWith("lib/zod.ts") && /from "zod"/.test(readFileSync(p, "utf8")),
     );
     expect(bad).toEqual([]);
   });

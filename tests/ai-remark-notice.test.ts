@@ -13,9 +13,9 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 describe("AI re-mark notice", () => {
   it("enqueueDeadMark reports whether it actually queued the re-mark", () => {
     const dlq = read("src/ai/mark-dlq.ts");
-    expect(dlq).toMatch(/reason: string;\n\}\): Promise<boolean>/);
+    expect(dlq).toMatch(/reason: string;\r?\n\}\): Promise<boolean>/);
     expect(dlq).toMatch(/if \(!\(await localAiConsentGranted\(\)\)\) return false;/);
-    expect(dlq).toMatch(/await db\.put\("aiDlq", item\);\n\s*return true;/);
+    expect(dlq).toMatch(/await db\.put\("aiDlq", item\);\r?\n\s*return true;/);
   });
 
   it("the runner derives the notice from the queue result, never from the fallback alone", () => {

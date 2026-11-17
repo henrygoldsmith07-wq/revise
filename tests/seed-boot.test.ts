@@ -15,7 +15,8 @@ import type { Card } from "@/domain/types";
 // integrity rules that putAll used to enforce row by row.
 
 const USER = "seed-boot-user";
-const src = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
+// Normalise line endings so the source-string assertions behave on Windows too.
+const src = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8").replace(/\r\n/g, "\n");
 
 beforeEach(async () => {
   await clearAll();

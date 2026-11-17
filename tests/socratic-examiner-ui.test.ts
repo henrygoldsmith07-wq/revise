@@ -33,7 +33,8 @@ describe("Socratic examiner panel", () => {
   it("bounds the wait and keeps a model reply only if the domain guard accepts it", () => {
     expect(panel).toContain("timeoutMs: SOCRATIC_TIMEOUT_MS");
     expect(panel).toContain("checkSocraticReply(envelope.data, context.markScheme)");
-    expect(read("src/ai/client.ts")).toContain("Promise.race([request, timeout])");
+    // The examiner's bound now comes from the shared helper used by every AI call.
+    expect(read("src/ai/client.ts")).toContain("withTimeout(request, input.timeoutMs ?? 8000,");
   });
 
   it("is an accessible conversation: polite live log, status typing indicator, labelled composer", () => {
