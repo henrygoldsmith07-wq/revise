@@ -15,6 +15,11 @@
 .field-inline { width: auto; }
 .field-search { padding-left: 2.25rem; }
 
+/* Segmented pickers (ui.tsx) can carry long subject names. Keep the strip
+   inside a phone viewport and its options comfortably tappable. */
+.card.card-2[role="group"] { max-width: 100%; overflow-x: auto; }
+.card.card-2[role="group"] > button { flex: 0 0 auto; min-height: 2.25rem; }
+
 /* Screen-reader only â visible to assistive tech, not sighted users. Used for
    form labels that would otherwise be visual-only placeholders. */
 .sr-only {

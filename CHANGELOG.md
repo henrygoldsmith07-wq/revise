@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17 Segmented picker overflow
+
+- Segmented controls now scroll inside a narrow viewport instead of widening the page, with 2.25rem-tall options. The fix is app CSS scoped to the picker's existing classes, so the `/` route's already-tight JS budget is unchanged (verified by `perf:budget`).
+
 ## 2026-11-17 landing page CTA
 
 - The three "Open Revise" buttons on the static landing page opened the source repository instead of the app. They now point at the canonical app URL; the generated `index.md` was regenerated and the agent-file check is green.
