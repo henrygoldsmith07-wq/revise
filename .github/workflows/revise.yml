@@ -46,15 +46,3 @@ jobs:
             e2e/__screenshots__
           if-no-files-found: ignore
       - run: du -sh .next 2>/dev/null || du -sh dist 2>/dev/null || du -sh build 2>/dev/null || echo "no build artifact to measure"
-
-  # The main gate has no staging secrets, so the live Postgres/RLS suite used
-  # to run only on a weekly cron. Run it on every push to main as well. It is
-  # deliberately non-blocking until the staging secrets are confirmed present
-  # in this repository; promote it to a required check after one green run.
-  staging:
-    name: revise-staging-sync (informational)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: verify
-    uses: ./.github/workflows/revise-staging.yml
-    secrets: inherit
-    continue-on-error: true
